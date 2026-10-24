@@ -23,16 +23,22 @@ _UNSIGNED_SCHEMA = {"type": "string", "pattern": r"^(?:0|[1-9][0-9]*)(?:\.[0-9]+
 _SIGNED_SCHEMA = {"type": "string", "pattern": r"^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$"}
 _RATIO_SCHEMA = {"type": "string", "pattern": r"^(?:0(?:\.[0-9]+)?|1(?:\.0+)?)$"}
 
+
+def _plain_decimal(value: Decimal) -> str:
+    """Render without exponent notation so accepted values remain valid JSON inputs."""
+    return format(value, "f")
+
+
 UnsignedAmount = Annotated[
-    Decimal, BeforeValidator(parse_amount), PlainSerializer(str, return_type=str),
+    Decimal, BeforeValidator(parse_amount), PlainSerializer(_plain_decimal, return_type=str),
     WithJsonSchema(_UNSIGNED_SCHEMA),
 ]
 SignedAmount = Annotated[
     Decimal, BeforeValidator(lambda value: parse_amount(value, allow_negative=True)),
-    PlainSerializer(str, return_type=str), WithJsonSchema(_SIGNED_SCHEMA),
+    PlainSerializer(_plain_decimal, return_type=str), WithJsonSchema(_SIGNED_SCHEMA),
 ]
 Ratio = Annotated[
-    Decimal, BeforeValidator(parse_ratio), PlainSerializer(str, return_type=str),
+    Decimal, BeforeValidator(parse_ratio), PlainSerializer(_plain_decimal, return_type=str),
     WithJsonSchema(_RATIO_SCHEMA),
 ]
 NonemptyId = Annotated[str, Field(strict=True, min_length=1, pattern=r"\S")]

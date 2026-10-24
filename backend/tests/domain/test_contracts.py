@@ -1,7 +1,9 @@
 import json
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
+import pyarrow.parquet as pq
 from pydantic import TypeAdapter, ValidationError
 
 from investment_agent.domain.models import (
@@ -14,8 +16,13 @@ from investment_agent.domain.models import (
     QualityStatus,
     Ratio,
     SnapshotVersions,
+    SignedAmount,
     UnsignedAmount,
 )
+from investment_agent.market.parquet_store import ParquetStore
+
+
+TINY = "0.000000000000000000000000000001"
 
 
 def observation(**overrides):
@@ -73,6 +80,29 @@ def test_unsigned_and_ratio_pydantic_adapters_reject_signed_zero(value):
     for boundary in (UnsignedAmount, Ratio):
         with pytest.raises(ValidationError):
             TypeAdapter(boundary).validate_python(value)
+
+
+@pytest.mark.parametrize("boundary,value", [
+    (UnsignedAmount, TINY), (Ratio, TINY), (SignedAmount, TINY),
+    (SignedAmount, "-" + TINY),
+])
+def test_tiny_decimal_serializes_as_fixed_schema_compatible_string(boundary, value):
+    adapter = TypeAdapter(boundary)
+    parsed = adapter.validate_python(value)
+    assert parsed == Decimal(value)
+    assert json.loads(adapter.dump_json(parsed)) == value
+
+
+@pytest.mark.parametrize("value", [TINY, "-" + TINY])
+def test_tiny_observation_roundtrips_through_parquet(tmp_path: Path, value: str):
+    item = Observation.model_validate(observation(value=value))
+    assert Observation.model_validate_json(item.model_dump_json()).value == Decimal(value)
+    store = ParquetStore(tmp_path / "observations")
+    path = store.write_observation(item)
+    assert pq.read_table(path).to_pylist()[0]["value"] == value
+    restored = store.read_observation(path.name)
+    assert restored.value == Decimal(value)
+    assert json.loads(restored.model_dump_json())["value"] == value
 
 
 def test_entity_identity_keeps_canonical_id_distinct_from_ticker():

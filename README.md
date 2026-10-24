@@ -2,14 +2,18 @@
 
 Local Windows application foundation for Vietnamese stock research. Exact decimal
 contracts, versioned SQLite/Parquet snapshots and synthetic source audits are
-implemented. Live data, Firebase access, AI calls and Telegram delivery are not
-implemented yet. The investment ledger and recommendations remain future work.
+implemented. Task 6 adds single-owner Firebase session authentication and a signed
+loopback Python API bridge. Live data, Firestore repositories, AI calls and
+Telegram delivery are not implemented yet. The investment ledger and
+recommendations remain future work.
 
 Current progress: Tasks 1–4 implemented; Task 5 has a
 [partial source assessment](docs/data/2026-10-25-source-feasibility.md).
-The live 50-issuer/10-year source gate remains closed. Next implementation task:
-Task 6 (single-owner authentication and internal API bridge); live provider audits
-remain outstanding alongside it.
+The live 50-issuer/10-year source gate remains closed. Task 6 is implemented with
+automated local checks; real Firebase/emulator verification is not run. See
+[authentication setup and API contract](docs/operations/authentication.md).
+Next implementation task: Task 7 (versioned personal Firestore repository); live
+provider audits remain outstanding alongside it.
 
 ## Runtimes
 
@@ -52,10 +56,11 @@ npm.cmd --prefix apps/web run test:e2e
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/test-doctor.ps1
 ```
 
-Backend verification on 2026-10-25: 69 tests pass, including exact contracts,
-snapshot persistence and conservative synthetic coverage checks. Browser/business
-workflows are not implemented: Playwright exits 1 for its empty suite; Vitest
-explicitly permits an empty suite. These are not evidence of tested UI behavior. Install Playwright
+Verification on 2026-10-25: 99 backend tests and 36 web server tests pass, including
+exact contracts, snapshots, synthetic coverage, authentication rejection paths,
+and a TypeScript signer talking to the actual loopback Python HTTP service with
+test-only credentials. Browser/business workflows are not implemented: Playwright
+exits 1 for its empty suite. These are not evidence of tested UI behavior. Install Playwright
 browsers when browser tests are introduced using `npx.cmd --prefix apps/web playwright install chromium`.
 
 `.env.example` lists names only, with blank values. Local scaffold checks need no

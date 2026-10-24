@@ -2,13 +2,15 @@
 
 Ngày: 24/10/2026 · Múi giờ: Asia/Ho_Chi_Minh
 
-Trạng thái: Bản thiết kế trình duyệt, chưa được phê duyệt để triển khai.
+Trạng thái: Đã được người dùng phê duyệt ngày 24/10/2026 để chuyển sang lập kế hoạch triển khai. Việc mua dịch vụ, đặt ngân sách AI và kích hoạt gửi bản tin thật vẫn theo các điều kiện cấu hình trong tài liệu.
 
 ## 1. Mục đích và cách đọc
 
 Xây dựng bản thử nghiệm cá nhân giúp người thiếu thời gian và kiến thức đầu tư ra quyết định tích lũy cổ phiếu trong nhiều tháng đến nhiều năm. Ứng dụng kết nối hoàn cảnh tài chính, danh mục thực tế, phân tích vĩ mô, ngành, doanh nghiệp và định giá thành khuyến nghị có thể kiểm tra.
 
 Các mục ghi **Đã chốt** phản ánh quyết định của người dùng. Các mục ghi **Đề xuất thiết kế** là lựa chọn của người soạn để tạo một đặc tả có thể lập kế hoạch; cần được xem xét khi duyệt tài liệu. Phê duyệt một phần trong trao đổi trước không phải phê duyệt toàn bộ tài liệu này.
+
+Ghi nhận phê duyệt toàn tài liệu: người dùng đã yêu cầu “duyệt bản thiết kế này để chuyển sang lập kế hoạch triển khai”. Các đề xuất cụ thể trong tài liệu trở thành đường cơ sở của kế hoạch; giữ nguyên nhãn để truy vết nguồn quyết định. Những mục cố ý chưa ấn định, như nhà cung cấp dữ liệu, mô hình cụ thể và ngân sách AI, tiếp tục được giải quyết qua các điểm kiểm tra đã mô tả, không được tự coi là có quyền mua dịch vụ.
 
 “Nhanh và chính xác” được chuyển thành tiêu chí: số liệu đúng theo nguồn và thời điểm; công thức nhất quán; căn cứ truy xuất được; tách sự kiện, giả định và nhận định; nêu rõ khi chưa đủ dữ liệu. Không có cam kết giao dịch luôn đúng hoặc bảo đảm lợi nhuận.
 

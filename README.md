@@ -1,7 +1,15 @@
 # Investment Agent
 
-Local Windows scaffold for a Vietnamese stock research application. No financial
-logic, live data, Firebase resources, AI calls, or Telegram delivery exists yet.
+Local Windows application foundation for Vietnamese stock research. Exact decimal
+contracts, versioned SQLite/Parquet snapshots and synthetic source audits are
+implemented. Live data, Firebase access, AI calls and Telegram delivery are not
+implemented yet. The investment ledger and recommendations remain future work.
+
+Current progress: Tasks 1–4 implemented; Task 5 has a
+[partial source assessment](docs/data/2026-10-25-source-feasibility.md).
+The live 50-issuer/10-year source gate remains closed. Next implementation task:
+Task 6 (single-owner authentication and internal API bridge); live provider audits
+remain outstanding alongside it.
 
 ## Runtimes
 
@@ -44,9 +52,10 @@ npm.cmd --prefix apps/web run test:e2e
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/test-doctor.ps1
 ```
 
-No business tests exist at bootstrap: pytest exits 5 and Playwright exits 1 for
-empty suites; Vitest explicitly permits an empty suite. These are not evidence
-of tested product behavior. Future tasks add meaningful tests. Install Playwright
+Backend verification on 2026-10-25: 69 tests pass, including exact contracts,
+snapshot persistence and conservative synthetic coverage checks. Browser/business
+workflows are not implemented: Playwright exits 1 for its empty suite; Vitest
+explicitly permits an empty suite. These are not evidence of tested UI behavior. Install Playwright
 browsers when browser tests are introduced using `npx.cmd --prefix apps/web playwright install chromium`.
 
 `.env.example` lists names only, with blank values. Local scaffold checks need no
@@ -58,3 +67,15 @@ unset until their implementation is explicitly enabled. No `.env` auto-loading
 is performed by doctor. Credentials, personal data, logs, and backups stay out of Git;
 synthetic fixtures remain versioned. Firestore will own personal records; local
 SQLite/Parquet will hold derived and market analysis state.
+
+## Synthetic source audit
+
+```powershell
+.\.venv\Scripts\python.exe -m investment_agent.cli data-audit --fixtures --output-dir data/audits
+```
+
+Produces `data-audit.json` and `data-audit.md` with per-issuer gaps and a distinct
+issuer aggregate. Synthetic weekdays are a test calendar, not a HOSE calendar.
+The CLI cannot establish live eligibility; relabeling fixtures or duplicating an
+issuer cannot unlock the live universe. Provider setup in
+`config/data-sources.example.json` is a documentation example, not a runtime loader.

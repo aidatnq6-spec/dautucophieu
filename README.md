@@ -41,6 +41,7 @@ npm.cmd --prefix apps/web run lint
 npm.cmd --prefix apps/web run test -- --run
 npm.cmd --prefix apps/web run build
 npm.cmd --prefix apps/web run test:e2e
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/test-doctor.ps1
 ```
 
 No business tests exist at bootstrap: pytest exits 5 and Playwright exits 1 for
@@ -49,7 +50,9 @@ of tested product behavior. Future tasks add meaningful tests. Install Playwrigh
 browsers when browser tests are introduced using `npx.cmd --prefix apps/web playwright install chromium`.
 
 `.env.example` lists names only, with blank values. Local scaffold checks need no
-credentials. `doctor.ps1 -RequireServices` checks all listed names in the process
+credentials. `doctor.ps1` checks installed Node (>=22.12, <27), npm 11, Git 2,
+and both global and project venv 64-bit Python 3.11; it warns when Node is not
+the recommended 24 LTS. `doctor.ps1 -RequireServices` checks all listed names in the process
 environment, never their values or remote validity. Optional services may remain
 unset until their implementation is explicitly enabled. No `.env` auto-loading
 is performed by doctor. Credentials, personal data, logs, and backups stay out of Git;

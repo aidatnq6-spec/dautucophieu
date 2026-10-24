@@ -113,6 +113,25 @@ class Observation(ContractModel):
         return self
 
 
+class PresentObservation(Observation):
+    """Measured value; a missing-data explanation cannot accompany it."""
+
+    value: SignedAmount
+    quality_status: Literal[
+        QualityStatus.VERIFIED, QualityStatus.PROVISIONAL,
+        QualityStatus.STALE, QualityStatus.INVALID,
+    ]
+    missing_reason: None = None
+
+
+class MissingObservation(Observation):
+    """Unavailable value with an explicit reason."""
+
+    value: None
+    quality_status: Literal[QualityStatus.MISSING, QualityStatus.INVALID]
+    missing_reason: Annotated[str, Field(min_length=1, pattern=r"\S")]
+
+
 class SnapshotVersions(ContractModel):
     profile_version: NonemptyId
     portfolio_version: NonemptyId
@@ -134,7 +153,7 @@ class DomainContract(ContractModel):
 
     contract_version: Literal["1"]
     entity: EntityIdentity
-    observation: Observation
+    observation: PresentObservation | MissingObservation
     snapshot_versions: SnapshotVersions
     report_status: ReportStatus
     delivery_status: DeliveryStatus

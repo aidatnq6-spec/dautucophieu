@@ -8,6 +8,7 @@ export type ContractVersion = "1";
 export type EntityId = string;
 export type Ticker = string;
 export type Exchange = string;
+export type Observation = PresentObservation | MissingObservation;
 export type EntityId1 = string;
 export type Metric = string;
 export type PeriodEnd = string;
@@ -16,10 +17,21 @@ export type ObservedAt = string;
 export type RevisionId = string;
 export type SourceId = string;
 export type Unit = string;
-export type Value = string | null;
-export type QualityStatus = "verified" | "provisional" | "stale" | "missing" | "invalid";
+export type Value = string;
+export type QualityStatus = "verified" | "provisional" | "stale" | "invalid";
 export type ProvenanceMode = "synthetic" | "historical_as_reported" | "latest_restated";
-export type MissingReason = string | null;
+export type MissingReason = null;
+export type EntityId2 = string;
+export type Metric1 = string;
+export type PeriodEnd1 = string;
+export type PublishedAt1 = string;
+export type ObservedAt1 = string;
+export type RevisionId1 = string;
+export type SourceId1 = string;
+export type Unit1 = string;
+export type Value1 = null;
+export type QualityStatus1 = "missing" | "invalid";
+export type MissingReason1 = string;
 export type ProfileVersion = string;
 export type PortfolioVersion = string;
 export type UniverseVersion = string;
@@ -54,7 +66,10 @@ export interface EntityIdentity {
   ticker: Ticker;
   exchange: Exchange;
 }
-export interface Observation {
+/**
+ * Measured value; a missing-data explanation cannot accompany it.
+ */
+export interface PresentObservation {
   entity_id: EntityId1;
   metric: Metric;
   period_end: PeriodEnd;
@@ -67,6 +82,23 @@ export interface Observation {
   quality_status: QualityStatus;
   provenance_mode: ProvenanceMode;
   missing_reason?: MissingReason;
+}
+/**
+ * Unavailable value with an explicit reason.
+ */
+export interface MissingObservation {
+  entity_id: EntityId2;
+  metric: Metric1;
+  period_end: PeriodEnd1;
+  published_at: PublishedAt1;
+  observed_at: ObservedAt1;
+  revision_id: RevisionId1;
+  source_id: SourceId1;
+  unit: Unit1;
+  value: Value1;
+  quality_status: QualityStatus1;
+  provenance_mode: ProvenanceMode;
+  missing_reason: MissingReason1;
 }
 export interface SnapshotVersions {
   profile_version: ProfileVersion;

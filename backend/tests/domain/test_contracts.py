@@ -2,15 +2,19 @@ import json
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from investment_agent.domain.models import (
     DomainContract,
     EntityIdentity,
+    MissingObservation,
     Observation,
+    PresentObservation,
     ProvenanceMode,
     QualityStatus,
+    Ratio,
     SnapshotVersions,
+    UnsignedAmount,
 )
 
 
@@ -54,6 +58,23 @@ def test_observation_rejects_float_and_missing_without_reason():
         Observation.model_validate(observation(value="0", quality_status="missing"))
 
 
+def test_exported_observation_union_accepts_only_explained_missing_values():
+    adapter = TypeAdapter(PresentObservation | MissingObservation)
+    assert isinstance(adapter.validate_python(observation()), PresentObservation)
+    assert isinstance(adapter.validate_python(observation(
+        value=None, quality_status="missing", missing_reason="No filing supplied",
+    )), MissingObservation)
+    with pytest.raises(ValidationError):
+        adapter.validate_python(observation(value=None, quality_status="missing", missing_reason=None))
+
+
+@pytest.mark.parametrize("value", ["-0", "-0.0"])
+def test_unsigned_and_ratio_pydantic_adapters_reject_signed_zero(value):
+    for boundary in (UnsignedAmount, Ratio):
+        with pytest.raises(ValidationError):
+            TypeAdapter(boundary).validate_python(value)
+
+
 def test_entity_identity_keeps_canonical_id_distinct_from_ticker():
     assert EntityIdentity(entity_id="entity-001", ticker="ABC", exchange="HOSE").ticker == "ABC"
     with pytest.raises(ValidationError):
@@ -77,5 +98,20 @@ def test_schema_export_matches_model_and_declares_boundary_constraints():
     assert exported["properties"]["contract_version"]["const"] == "1"
     definitions = exported["$defs"]
     assert set(definitions["ProvenanceMode"]["enum"]) == {mode.value for mode in ProvenanceMode}
-    assert set(definitions["QualityStatus"]["enum"]) == {status.value for status in QualityStatus}
-    assert definitions["Observation"]["properties"]["value"]["anyOf"][0]["type"] == "string"
+    branches = exported["properties"]["observation"]["anyOf"]
+    branch_defs = [definitions[branch["$ref"].rsplit("/", 1)[-1]] for branch in branches]
+    assert len(branch_defs) == 2
+    assert {status for branch in branch_defs for status in branch["properties"]["quality_status"]["enum"]} == {
+        status.value for status in QualityStatus
+    }
+    assert any(
+        branch["properties"]["value"]["type"] == "null"
+        and "missing_reason" in branch["required"]
+        and branch["properties"]["missing_reason"]["minLength"] == 1
+        for branch in branch_defs
+    )
+    assert any(
+        branch["properties"]["value"]["type"] == "string"
+        and branch["properties"]["missing_reason"]["type"] == "null"
+        for branch in branch_defs
+    )

@@ -23,6 +23,15 @@ def test_negative_money_requires_explicit_permission():
     assert parse_amount("-0.01", allow_negative=True) == Decimal("-0.01")
 
 
+@pytest.mark.parametrize("value", ["-0", "-0.0"])
+def test_unsigned_money_and_ratio_reject_signed_zero(value):
+    with pytest.raises(ValueError):
+        parse_amount(value)
+    with pytest.raises(ValueError):
+        parse_ratio(value)
+    assert parse_amount(value, allow_negative=True) == Decimal(value)
+
+
 @pytest.mark.parametrize("value", ["0", "0.25", "1", "1.000"])
 def test_ratio_inclusive_boundaries(value):
     assert parse_ratio(value) == Decimal(value)

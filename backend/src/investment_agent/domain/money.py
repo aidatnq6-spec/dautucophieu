@@ -20,7 +20,7 @@ def parse_amount(value: str, *, allow_negative: bool = False) -> Decimal:
     if not _DECIMAL.fullmatch(value):
         raise ValueError("amount must be a finite plain decimal string")
     result = Decimal(value)
-    if result < 0 and not allow_negative:
+    if value.startswith("-") and not allow_negative:
         raise ValueError("amount must be nonnegative")
     return result
 

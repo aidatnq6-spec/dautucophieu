@@ -14,6 +14,9 @@ dev = ["pytest==9.0.2", "httpx==0.28.1"]
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+investment_agent = ["repositories/migrations/*.sql"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

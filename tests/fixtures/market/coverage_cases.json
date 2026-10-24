@@ -1,0 +1,20 @@
+[
+  {
+    "name": "eligible_transfer", "as_of": "2026-10-24", "evidence_kind": "synthetic", "entity_id": "entity-1", "current_ticker": "ABC", "current_exchange": "HOSE",
+    "identity_segments": [{"entity_id": "entity-1", "ticker": "OLD", "exchange": "HNX", "start": "2015-01-01", "end": "2020-12-31"}, {"entity_id": "entity-1", "ticker": "ABC", "exchange": "HOSE", "start": "2021-01-01", "end": "2026-10-24"}],
+    "capabilities": {"prices": "verified", "financials": "verified", "ratios": "verified", "actions": "verified", "disclosures": "verified", "publication_timestamps": "verified", "usage_rights": "verified"},
+    "prices": {"start": "2016-10-24", "end": "2026-10-24", "continuity_verified": true, "gaps": [], "raw": true, "adjusted": true, "adjustment_method": "split-and-dividend"},
+    "financials": {"annual_periods": ["2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024", "2025"], "quarter_periods": ["2016Q1", "2016Q2", "2016Q3", "2016Q4", "2017Q1", "2017Q2", "2017Q3", "2017Q4", "2018Q1", "2018Q2", "2018Q3", "2018Q4", "2019Q1", "2019Q2", "2019Q3", "2019Q4", "2020Q1", "2020Q2", "2020Q3", "2020Q4", "2021Q1", "2021Q2", "2021Q3", "2021Q4", "2022Q1", "2022Q2", "2022Q3", "2022Q4", "2023Q1", "2023Q2", "2023Q3", "2023Q4", "2024Q1", "2024Q2", "2024Q3", "2024Q4", "2025Q1", "2025Q2", "2025Q3", "2025Q4"], "consolidated": true, "notes": true, "revisions": true},
+    "ratios": {"pe_start": "2016-10-24", "pe_end": "2026-10-24", "pb_start": "2016-10-24", "pb_end": "2026-10-24", "continuity_verified": true, "invalid_intervals": []},
+    "actions": {"history_verified": true}, "disclosures": {"published_at_verified": true, "historical_revisions": true}, "rights": {"personal_analysis": "verified", "redistribution": "unknown", "evidence": "synthetic fixture"},
+    "expect_eligible": true, "expect_gaps": []
+  },
+  {
+    "name": "unverified_source", "as_of": "2026-10-24", "evidence_kind": "synthetic", "entity_id": "entity-2", "current_ticker": "XYZ", "current_exchange": "HOSE",
+    "capabilities": {}, "prices": {"start": "2016-10-24", "end": "2026-10-24", "continuity_verified": false},
+    "financials": {"annual_periods": ["2016", "2016"], "quarter_periods": []},
+    "ratios": {"invalid_intervals": [{"start": "2020-01-01", "end": "2020-03-31", "reason": "non-positive EPS"}]},
+    "actions": {}, "disclosures": {}, "rights": {"personal_analysis": "unknown"},
+    "expect_eligible": false, "expect_gaps": ["capability_prices", "entity_continuity", "annual_periods", "quarter_periods", "publication_timestamps", "usage_rights"]
+  }
+]

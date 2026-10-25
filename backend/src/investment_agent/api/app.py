@@ -20,10 +20,11 @@ from .routes.risk import router as risk_router
 from .routes.settings import router as settings_router
 from .routes.universe import router as universe_router
 from .routes.valuation_assumptions import router as valuation_router
+from .routes.watchlist import router as watchlist_router
 
 
 def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[[], float] = time.time, personal_repository=None,
-               market=None, jobs=None, outbox=None, telegram=None, deliveries=None) -> FastAPI:
+               market=None, jobs=None, outbox=None, telegram=None, deliveries=None, data_dir=None) -> FastAPI:
     """personal_repository None keeps personal routes fail-closed (503)."""
     authenticator = InternalAuthenticator(settings or InternalAuthSettings.from_env(), clock)
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
@@ -31,6 +32,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.state.market = market or EmptyMarket()  # no licensed market source is connected yet
     app.state.jobs, app.state.outbox = jobs, outbox  # both required for report jobs
     app.state.telegram, app.state.deliveries = telegram, deliveries  # sender holds the bot token; None = not configured
+    app.state.data_dir = data_dir  # market-symbols.txt and index-groups.json for the watchlist
     app.state.accepted_jobs = {}  # accepted request id -> job id (None when another worker held the lease)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "[::1]"])
 
@@ -65,6 +67,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(reports_router)
     app.include_router(notifications_router)
     app.include_router(settings_router)
+    app.include_router(watchlist_router)
 
     @app.get("/internal/identity")
     def identity(request: Request):
@@ -109,6 +112,6 @@ if __name__ == "__main__":
     deliveries = DeliveryStore(data_dir / "deliveries.sqlite")  # also the report outbox
     token = Settings.from_env().telegram_bot_token
     uvicorn.run(create_app(personal_repository=repository, market=market, jobs=JobStore(data_dir / "jobs.sqlite"), outbox=deliveries,
-                           deliveries=deliveries,
+                           deliveries=deliveries, data_dir=data_dir,
                            telegram=TelegramSender(token, client=httpx.Client()) if token else None),
                 host="127.0.0.1", port=8000, workers=1, access_log=False, proxy_headers=False)

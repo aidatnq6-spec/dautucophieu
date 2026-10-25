@@ -36,6 +36,8 @@ class MarketView(Protocol):
 
     def industry(self, entity_id: str) -> str | None: ...
 
+    def recent_closes(self, entity_id: str, n: int) -> list[PricePoint]: ...
+
 
 class EmptyMarket:
     provenance = "none"
@@ -49,16 +51,24 @@ class EmptyMarket:
     def industry(self, entity_id):
         return None
 
+    def recent_closes(self, entity_id, n):
+        return []
+
 
 @dataclass
 class SyntheticMarket:
     prices: dict[str, PricePoint] = field(default_factory=dict)
     documents: dict[str, list[EvidenceRef]] = field(default_factory=dict)
     industries: dict[str, str] = field(default_factory=dict)
+    history: dict[str, list[PricePoint]] = field(default_factory=dict)  # oldest first
     provenance: str = "synthetic"
 
     def price(self, entity_id):
         return self.prices.get(entity_id)
+
+    def recent_closes(self, entity_id, n):
+        points = self.history.get(entity_id) or ([self.prices[entity_id]] if entity_id in self.prices else [])
+        return list(points[-n:])
 
     def evidence(self, entity_id):
         return list(self.documents.get(entity_id, []))
@@ -86,6 +96,11 @@ class StoreMarket:
         if (self.today() - day).days > self.max_age_days:
             return None
         return PricePoint(view[day][0].close, day)
+
+    def recent_closes(self, entity_id, n):
+        """Last n stored closes, oldest first, whatever their age."""
+        view = self.store.latest(entity_id)
+        return [PricePoint(view[d][0].close, d) for d in sorted(view)[-n:]]
 
     def evidence(self, entity_id):
         return []

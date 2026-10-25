@@ -27,8 +27,8 @@ class ProviderUnavailable(RuntimeError):
 
 
 class VnstockProvider:
-    def __init__(self, *, market=None, fundamental=None, clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
-        self._market, self._fundamental, self._clock = market, fundamental, clock
+    def __init__(self, *, market=None, fundamental=None, listing=None, clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
+        self._market, self._fundamental, self._listing, self._clock = market, fundamental, listing, clock
 
     def _api(self):
         if self._market is None or self._fundamental is None:
@@ -38,6 +38,16 @@ class VnstockProvider:
                 raise ProviderUnavailable("vnstock is not installed; install it from vnstocks.com with your own key") from exc
             self._market, self._fundamental = self._market or Market(), self._fundamental or Fundamental()
         return self._market, self._fundamental
+
+    def index_members(self, group: str) -> list[str]:
+        """Current constituents of an index group (e.g. VN30, VN100) as listed by the source."""
+        if self._listing is None:
+            try:
+                from vnstock import Listing
+            except ImportError as exc:
+                raise ProviderUnavailable("vnstock is not installed; install it from vnstocks.com with your own key") from exc
+            self._listing = Listing()
+        return sorted({str(s).upper() for s in self._listing.symbols_by_group(group)})
 
     def fetch_prices(self, symbol: str, start: date, end: date) -> list[PriceBar]:
         market, _ = self._api()

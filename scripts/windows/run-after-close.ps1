@@ -9,6 +9,12 @@ New-Item -ItemType Directory -Force -Path $data, (Split-Path $log) | Out-Null
 $calendar = Join-Path $data 'trading-calendar.json'
 if (-not (Test-Path -LiteralPath $calendar)) { $calendar = Join-Path $script:RepoRoot "config\trading-calendar-hose-$((Get-Date).Year).json" }
 $symbols = Join-Path $data 'market-symbols.txt'
+# Index constituents change a few times a year; refresh the watchlist's VN30/VN100 labels weekly.
+$groups = Join-Path $data 'index-groups.json'
+if ((Test-Path -LiteralPath $symbols) -and (-not (Test-Path -LiteralPath $groups) -or (Get-Item -LiteralPath $groups).LastWriteTime -lt (Get-Date).AddDays(-7))) {
+    $refresh = & $python -W ignore -m investment_agent.cli index-groups --output $groups 2>$null
+    "$(Get-Date -Format o) index-groups exit=$LASTEXITCODE $refresh" | Add-Content -LiteralPath $log -Encoding UTF8
+}
 if (Test-Path -LiteralPath $symbols) {
     $sync = & $python -W ignore -m investment_agent.cli market-sync --symbols "@$symbols" --data-dir $data --calendar $calendar --days 10 2>$null
     "$(Get-Date -Format o) market-sync exit=$LASTEXITCODE $sync" | Add-Content -LiteralPath $log -Encoding UTF8

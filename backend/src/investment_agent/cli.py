@@ -27,6 +27,9 @@ def main() -> int:
     vaudit = commands.add_parser("vnstock-audit", help="depth check of Vnstock data against the 10-year requirement")
     vaudit.add_argument("--symbols", required=True, help="comma-separated tickers")
     vaudit.add_argument("--output-dir", type=Path, required=True)
+    groups = commands.add_parser("index-groups", help="save current index constituents (e.g. VN30, VN100) for the watchlist")
+    groups.add_argument("--groups", default="VN30,VN100")
+    groups.add_argument("--output", type=Path, required=True)
     sync = commands.add_parser("market-sync", help="load recent Vnstock daily prices (adjusted) into the local store")
     sync.add_argument("--symbols", required=True, help="comma-separated tickers, or @file with one ticker per line")
     sync.add_argument("--data-dir", type=Path, required=True)
@@ -35,6 +38,8 @@ def main() -> int:
     args = parser.parse_args()
     if args.command == "vnstock-audit":
         return vnstock_audit(_symbols(args.symbols), args.output_dir)
+    if args.command == "index-groups":
+        return index_groups([g.strip().upper() for g in args.groups.split(",") if g.strip()], args.output)
     if args.command == "market-sync":
         return market_sync(_symbols(args.symbols), args.data_dir, args.calendar, args.days)
     if args.command == "backup":
@@ -88,6 +93,22 @@ def vnstock_audit(symbols: list[str], output_dir: Path, provider=None, today=Non
     (output_dir / "vnstock-audit.json").write_text(json.dumps(results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     passed = sum(1 for r in results if r.get("meets_10y_prices") and r.get("meets_40_quarters"))
     print(json.dumps({"status": "ok", "symbols": len(results), "meet_10y_and_40q": passed, "file": str(output_dir / "vnstock-audit.json")}))
+    return 0
+
+
+def index_groups(groups: list[str], output: Path, provider=None, today=None) -> int:
+    from datetime import date
+    from investment_agent.market.providers.vnstock_adapter import SOURCE, ProviderUnavailable, VnstockProvider
+    provider = provider or VnstockProvider()
+    try:
+        members = {g: provider.index_members(g) for g in groups}
+    except ProviderUnavailable as exc:
+        print(json.dumps({"status": "not_configured", "reason": str(exc)}, ensure_ascii=False))
+        return 2
+    output.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"as_of": (today or date.today()).isoformat(), "source": f"vnstock:{SOURCE}", "groups": members}
+    output.write_text(json.dumps(payload, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    print(json.dumps({"status": "ok", "groups": {g: len(m) for g, m in members.items()}}))
     return 0
 
 

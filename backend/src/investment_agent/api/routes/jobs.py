@@ -31,6 +31,7 @@ def after_close(request: Request, body: AfterCloseRequest, background: Backgroun
         return error(422, "session_in_future", "Phiên chưa diễn ra.")
     accepted = uuid4().hex
     results = state.accepted_jobs
+    results[accepted] = ""  # observable as "accepted" before the background work starts
 
     def work():
         try:
@@ -53,6 +54,8 @@ def job_status(request: Request, job_id: str):
     accepted = state.accepted_jobs
     if job_id in accepted and accepted[job_id] is None:
         return {"job_id": job_id, "status": "busy", "report_id": None, "stages": []}
+    if accepted.get(job_id) == "":
+        return {"job_id": job_id, "status": "accepted", "report_id": None, "stages": []}
     record = state.jobs.get(accepted.get(job_id, job_id))
     if record is None:
         return {"job_id": job_id, "status": "accepted", "report_id": None, "stages": []} if job_id in accepted else \

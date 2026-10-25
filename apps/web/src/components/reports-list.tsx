@@ -16,7 +16,8 @@ export function ReportsList() {
   const [error, setError] = useState<string | null>(null);
   const stop = useRef(false);
   const load = useCallback(() => api<{ reports: Row[] }>("reports").then((r) => setRows(r.reports), (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải.")), []);
-  useEffect(() => { void load(); return () => { stop.current = true; }; }, [load]);
+  // Reset on (re)mount: React may run cleanup then the effect again, and polling must survive that.
+  useEffect(() => { stop.current = false; void load(); return () => { stop.current = true; }; }, [load]);
 
   async function create() {
     setError(null);

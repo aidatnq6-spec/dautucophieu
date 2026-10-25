@@ -28,6 +28,11 @@ export default defineConfig({
   timeout: 60_000,
   workers: 1,
   use: { baseURL: env.APP_ORIGIN },
+  // The backend keeps state for the whole run: onboarding starts from an empty store, the rest seed idempotently.
+  projects: [
+    { name: "onboarding", testMatch: /onboarding\.spec\.ts/ },
+    { name: "flows", testIgnore: /onboarding\.spec\.ts/, dependencies: ["onboarding"] },
+  ],
   webServer: [
     { command: "..\\..\\.venv\\Scripts\\python.exe ..\\..\\tests\\e2e\\fixture_backend.py", url: "http://127.0.0.1:8765/health", env, reuseExistingServer: false, timeout: 60_000 },
     { command: "npx next dev --hostname 127.0.0.1 --port 3100", url: "http://127.0.0.1:3100/login", env, reuseExistingServer: false, timeout: 180_000 },

@@ -55,3 +55,18 @@ def test_unknown_job_and_report(tmp_path):
     client, _ = client_with_jobs(tmp_path, clock)
     assert call(client, clock, "GET", "/internal/jobs/nope").status_code == 404
     assert call(client, clock, "GET", "/internal/reports/nope").status_code == 404
+
+
+def test_job_is_observable_before_background_work_starts(tmp_path, monkeypatch):
+    clock = Clock()
+    client, _ = client_with_jobs(tmp_path, clock)
+    from investment_agent.api.routes import jobs as jobs_route
+    seen = {}
+    real = jobs_route.run_after_close
+
+    def spy(**kw):
+        seen.update(client.app.state.accepted_jobs)  # what a poll arriving now would find
+        return real(**kw)
+    monkeypatch.setattr(jobs_route, "run_after_close", spy)
+    accepted = call(client, clock, "POST", "/internal/jobs/after-close", {"session_date": "2027-01-14"}).json()["job_id"]
+    assert accepted in seen

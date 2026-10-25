@@ -5,7 +5,8 @@ Mục chưa đánh dấu đang **not_run** (cập nhật 2026-10-25). Ghi `passe
 ## Nguồn dữ liệu (cần trước khuyến nghị thật)
 
 - [ ] Chọn nguồn được phép dùng (điều khoản gói/tài khoản đã đọc; chủ sở hữu tự đăng ký/mua nếu cần). — not_run
-- [ ] Viết adapter cho nguồn đã chọn; capability chỉ ghi `verified` khi có bằng chứng audit. — not_run
+- [x] Adapter Vnstock (chế độ hạn chế), đăng nhập key Community — passed 2026-10-25 với vnstock 5.2.0.
+- [x] Audit FPT, VCB, HPG, VHM, MWG — chạy 2026-10-25: giá từ 25/10/2018 (~8 năm, đã điều chỉnh), BCTC 8 kỳ (từ 2024-Q3), không có ngày công bố; 0/5 đạt yêu cầu 10 năm/40 quý, nên khuyến nghị thật vẫn bị chặn.
 - [ ] Audit từng ứng viên 50 mã: ≥ 10 năm, ≥ 10 kỳ năm, ≥ 40 kỳ quý, ngày công bố, sự kiện vốn, quyền sử dụng. — not_run
 - [ ] Đối chiếu một số mã với báo cáo gốc (ngân hàng, phi tài chính, chu kỳ, bất động sản, một mã chuyển sàn). — not_run
 - [ ] Kiểm tra P/E, P/B qua phát hành thêm/tách cổ phiếu và bản sửa số liệu. — not_run
@@ -20,7 +21,7 @@ Mục chưa đánh dấu đang **not_run** (cập nhật 2026-10-25). Ghi `passe
 - [x] Deploy Firestore Rules (deny client) — passed 2026-10-25T09:55Z, chủ sở hữu chạy `firebase deploy --only firestore:rules`; rules cũ của project dùng chung được sao lưu ngoài repo. Kiểm tra client bằng Rules Test API chưa chạy được (service account không có quyền); dựa vào nội dung rules: mặc định từ chối.
 - [x] Smoke test `PersonalRepository` trên Firestore thật, namespace tạm `owners/smoke-<ngẫu nhiên>` đã xóa sau khi chạy — passed 2026-10-25, 10/10: tạo revision, retry idempotent, từ chối request_id dùng lại với payload khác, CAS, giữ lịch sử, chặn ghi khi input cũ, export, khôi phục vào namespace rỗng.
 - [x] Sao lưu thật (`cli backup`) — passed 2026-10-25, bản `backups/20261025T095916Z-manual`, checksum khớp.
-- [ ] Diễn tập khôi phục từ một bản sao lưu thật vào project/thư mục riêng. — not_run (khôi phục mới được thử trong smoke test)
+- [x] Diễn tập khôi phục từ bản sao lưu thật — passed 2026-10-25, bản `20261025T135236Z-manual` (29 tài liệu cá nhân, 18 file dữ liệu): checksum khớp; file cục bộ khôi phục vào thư mục trống giống từng byte; dry-run so với dữ liệu đang dùng 29/29 giống, 0 xung đột; từ chối khi thiếu xác nhận, khi thư mục không trống, khi khác chủ sở hữu; khôi phục vào namespace tạm `owners/drill-<ngẫu nhiên>` export lại bằng đúng bản sao lưu, chạy lần hai không đổi gì; namespace tạm đã xóa.
 
 ## AI (sau khi chủ sở hữu đặt ngân sách)
 

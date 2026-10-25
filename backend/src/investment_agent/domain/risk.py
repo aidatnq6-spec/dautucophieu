@@ -5,8 +5,6 @@ instrument. Each version is pinned by a digest of its parsed content, so an
 edited file must ship under a new version instead of silently re-scoring.
 """
 
-import hashlib
-import json
 from pathlib import Path
 from typing import Literal
 
@@ -14,8 +12,9 @@ from pydantic import Field, ValidationError
 
 from .investable_capital import CapitalAssessment
 from .models import ContractModel
+from .pinned import CONFIG_DIR, InvalidPolicy, load_pinned
 
-QUESTIONNAIRE_PATH = Path(__file__).resolve().parents[4] / "config" / "risk-questionnaire.vi.json"
+QUESTIONNAIRE_PATH = CONFIG_DIR / "risk-questionnaire.vi.json"
 PINNED_DIGESTS = {
     "risk-vi-2026-10-24.1": "55245f23afdcc55e2785b071a4178f1971d208d17f4857a6c45f0f9424a60048",
 }
@@ -26,7 +25,7 @@ POINTS = {"A": 1, "B": 2, "C": 3, "D": 4}
 CONFLICTS = ("answer_conflict_loss_tolerance", "profile_conflict_emergency")
 
 
-class InvalidQuestionnaire(ValueError):
+class InvalidQuestionnaire(InvalidPolicy):
     pass
 
 
@@ -89,20 +88,12 @@ class RiskAssessment(ContractModel):
     ready_for_allocation: bool
 
 
-def _content_digest(data: dict) -> str:
-    # Parsed content, so Git line-ending conversion cannot change the digest.
-    return hashlib.sha256(json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-
-
 def load_questionnaire(path: Path = QUESTIONNAIRE_PATH) -> Questionnaire:
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data, digest = load_pinned(path, PINNED_DIGESTS)
         questionnaire = Questionnaire.model_validate(data)
-    except (OSError, ValueError) as exc:
-        raise InvalidQuestionnaire("Questionnaire unreadable") from exc
-    digest = _content_digest(data)
-    if PINNED_DIGESTS.get(questionnaire.version) != digest:
-        raise InvalidQuestionnaire("Questionnaire content does not match its pinned version")
+    except ValueError as exc:
+        raise InvalidQuestionnaire(str(exc)) from exc
     ids = [q.id for q in questionnaire.questions]
     if ids != list(range(1, 14)) or any([o.key for o in q.options] != list("ABCD") or [o.points for o in q.options] != [1, 2, 3, 4]
                                         for q in questionnaire.questions):

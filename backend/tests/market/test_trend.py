@@ -102,3 +102,12 @@ def test_run_builds_saves_and_reports_source_errors(tmp_path):
 def test_run_skips_outside_sessions_and_before_15_30(tmp_path):
     assert run_trend(tmp_path, CAL, now=datetime(2026, 10, 24, 16, tzinfo=VN), provider=FakeVn(), get=fake_get)["reason"] == "not_a_session"
     assert run_trend(tmp_path, CAL, now=datetime(2026, 10, 23, 15, 29, tzinfo=VN), provider=FakeVn(), get=fake_get)["reason"] == "before_close"
+
+
+def test_cli_trend_run_prints_a_summary(tmp_path, capsys):
+    from investment_agent.cli import trend_run
+    cal_path = tmp_path / "cal.json"
+    cal_path.write_text(json.dumps({"version": "x", "source": "HOSE notice", "holidays": [], "first": "2016-01-01", "last": "2026-12-31"}),
+                        encoding="utf-8")
+    code = trend_run(tmp_path, cal_path, now=datetime(2026, 10, 23, 15, 35, tzinfo=VN), provider=FakeVn(), get=fake_get)
+    assert code == 1 and '"BTC": "error:OSError"' in capsys.readouterr().out  # 1: a source failed, the board was still saved

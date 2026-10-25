@@ -38,6 +38,9 @@ def main() -> int:
     sync.add_argument("--index", action="store_true", help="the symbols are indices (e.g. VNINDEX), quoted in points")
     macro = commands.add_parser("macro-sync", help="fetch automatic macro indicators (FRED, Vietcombank) into data/macro")
     macro.add_argument("--data-dir", type=Path, required=True)
+    trend = commands.add_parser("trend-run", help="build the Xu hướng board after 15:30 on trading days")
+    trend.add_argument("--data-dir", type=Path, required=True)
+    trend.add_argument("--calendar", type=Path, required=True)
     sectors = commands.add_parser("industries", help="save ICB level-2 sectors of the synced tickers for the market page")
     sectors.add_argument("--symbols", required=True, help="comma-separated tickers, or @file with one ticker per line")
     sectors.add_argument("--output", type=Path, required=True)
@@ -48,6 +51,8 @@ def main() -> int:
         return index_groups([g.strip().upper() for g in args.groups.split(",") if g.strip()], args.output)
     if args.command == "market-sync":
         return market_sync(_symbols(args.symbols), args.data_dir, args.calendar, args.days, index=args.index)
+    if args.command == "trend-run":
+        return trend_run(args.data_dir, args.calendar)
     if args.command == "macro-sync":
         return macro_sync(args.data_dir)
     if args.command == "industries":
@@ -124,6 +129,24 @@ def index_groups(groups: list[str], output: Path, provider=None, today=None) -> 
 
 def _same_bar(a, b) -> bool:
     return a.model_dump(exclude={"observed_at"}) == b.model_dump(exclude={"observed_at"})
+
+
+def trend_run(data_dir: Path, calendar_path: Path, now=None, provider=None, get=None) -> int:
+    """Exit 0 when the board was built or the run was skipped, 1 when a source failed (the board is still saved)."""
+    from datetime import datetime, timezone
+    from investment_agent.market.providers.vnstock_adapter import VnstockProvider
+    from investment_agent.market.trend import run_trend
+    if get is None:
+        import httpx
+
+        def get(url):
+            response = httpx.get(url, timeout=30, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+            response.raise_for_status()
+            return response.text
+    result = run_trend(data_dir, load_calendar(calendar_path), now=now or datetime.now(timezone.utc), provider=provider or VnstockProvider(),
+                       get=get)
+    print(json.dumps(result, ensure_ascii=False))
+    return 1 if result.get("errors") else 0
 
 
 def macro_sync(data_dir: Path, get=None) -> int:

@@ -28,7 +28,7 @@ class AmendRequest(_Mutation):
     amendment: Amendment
 
 
-class _Book:
+class LedgerBook:
     """Stored payload: original events, ordered amendments and the change log."""
 
     def __init__(self, record):
@@ -75,7 +75,7 @@ def _mutate(request: Request, body: _Mutation, change):
     current = head.version if head else 0
     if body.expected_version > current or (body.expected_version and base is None):
         return write_error(VersionConflict())
-    book = _Book(base)
+    book = LedgerBook(base)
     try:
         affected_from = change(book)
         book.changes.append(Change(ledger_version=body.expected_version + 1, affected_from=affected_from))
@@ -92,7 +92,7 @@ def _mutate(request: Request, body: _Mutation, change):
         return error(422, "ledger_too_large", "Sổ vượt giới hạn lưu một bản ghi; cần tách kỳ sổ.")
     except WRITE_ERRORS as exc:
         return write_error(exc)
-    return _view(saved.version, _Book(saved))
+    return _view(saved.version, LedgerBook(saved))
 
 
 @router.get("")
@@ -105,7 +105,7 @@ def current(request: Request):
         record, stale = read_current(repo, owner, COLLECTION, RECORD)
     except RepositoryUnavailable:
         return unavailable()
-    return _view(record.version if record else 0, _Book(record), stale=stale)
+    return _view(record.version if record else 0, LedgerBook(record), stale=stale)
 
 
 @router.post("/events")

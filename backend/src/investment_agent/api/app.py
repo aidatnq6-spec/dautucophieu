@@ -6,20 +6,25 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from investment_agent.market.view import EmptyMarket
+
 from .auth import InternalAuthSettings, InternalAuthenticator, Unauthorized, require_owner
 from .routes.health import router as health_router
 from .routes.profile import router as profile_router
 from .routes.ledger import router as ledger_router
+from .routes.overview import router as overview_router
 from .routes.risk import router as risk_router
 from .routes.universe import router as universe_router
 from .routes.valuation_assumptions import router as valuation_router
 
 
-def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[[], float] = time.time, personal_repository=None) -> FastAPI:
+def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[[], float] = time.time, personal_repository=None,
+               market=None) -> FastAPI:
     """personal_repository None keeps personal routes fail-closed (503)."""
     authenticator = InternalAuthenticator(settings or InternalAuthSettings.from_env(), clock)
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     app.state.clock, app.state.personal_repository = clock, personal_repository
+    app.state.market = market or EmptyMarket()  # no licensed market source is connected yet
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "[::1]"])
 
     @app.exception_handler(RequestValidationError)
@@ -48,6 +53,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(ledger_router)
     app.include_router(universe_router)
     app.include_router(valuation_router)
+    app.include_router(overview_router)
 
     @app.get("/internal/identity")
     def identity(request: Request):

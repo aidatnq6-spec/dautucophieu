@@ -6,7 +6,7 @@ import { signInternalRequest } from "./python-client";
 import { apiError } from "./session-handlers";
 
 // Only business areas reach Python; identity and health stay on their own routes.
-const AREAS = new Set(["profile", "risk", "ledger", "universe", "valuation"]);
+const AREAS = new Set(["profile", "risk", "ledger", "universe", "valuation", "overview", "research"]);
 const SEGMENT = /^[A-Za-z0-9_-][A-Za-z0-9_.-]{0,127}$/;
 const MAX_BODY = 1_048_576;
 

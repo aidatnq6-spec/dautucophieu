@@ -13,7 +13,7 @@ from ..auth import require_owner
 from .common import WRITE_ERRORS, error, read_version, unavailable, write_error
 
 router = APIRouter(prefix="/internal/universe")
-COLLECTION, ACTIVE = "approvals", "universe"
+COLLECTION, ACTIVE, INDEX = "approvals", "universe", "universe-proposal-index"
 RequestId = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
 
 
@@ -54,6 +54,20 @@ def current(request: Request):
     return {"version": version, "active": active.model_dump(mode="json") if active else None}
 
 
+@router.get("/proposals")
+def proposals(request: Request):
+    owner = require_owner(request)
+    repo = request.app.state.personal_repository
+    if repo is None:
+        return unavailable()
+    try:
+        index = read_version(repo, owner, COLLECTION, INDEX, None)
+        rows = [read_version(repo, owner, COLLECTION, _proposal_key(pid), None) for pid in (index.payload["ids"] if index else [])]
+    except RepositoryUnavailable:
+        return unavailable()
+    return {"proposals": [r.payload for r in rows if r is not None]}
+
+
 @router.post("/proposals")
 def propose(request: Request, body: ProposalRequest):
     owner = require_owner(request)
@@ -67,6 +81,11 @@ def propose(request: Request, body: ProposalRequest):
         proposal = build_proposal(load_universe_policy(), body.proposal_id, candidates, active=active, as_of=body.as_of)
         repo.write(owner, COLLECTION, _proposal_key(body.proposal_id), {"proposal": proposal.model_dump(mode="json"), "decision": "pending"},
                    expected_version=0, request_id=body.request_id)
+        index = read_version(repo, owner, COLLECTION, INDEX, None)
+        ids = index.payload["ids"] if index else []
+        if body.proposal_id not in ids:
+            repo.write(owner, COLLECTION, INDEX, {"ids": [*ids, body.proposal_id]}, expected_version=index.version if index else 0,
+                       request_id=f"{body.request_id}-index")
     except WRITE_ERRORS as exc:
         if isinstance(exc, VersionConflict):
             return error(409, "proposal_exists", "Mã đề xuất đã tồn tại.")

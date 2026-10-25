@@ -47,6 +47,8 @@ class ValuationAssumptions(ContractModel):
     minority_interest: UnsignedAmount | None = None
     non_operating_assets: UnsignedAmount | None = None
     shares: int | None = Field(default=None, strict=True, gt=0)
+    required_margin: Ratio | None = None  # margin of safety for the buy zone; no default
+    tranche_fraction: Ratio | None = None  # share of the long-term target per buy tranche
     reinvestment_note: str = ""
     sources: tuple[NonemptyId, ...] = ()
     status: Literal["draft", "approved"] = "draft"

@@ -175,3 +175,17 @@ def test_same_day_rerun_with_restated_prices_adds_a_revision(tmp_path):
     store = PriceStore(tmp_path)
     assert len(store.revisions("FPT")) == 2
     assert store.latest("FPT")[date(2026, 10, 23)][0].close == Decimal("58300")
+
+
+class FakeListing:
+    def symbols_by_group(self, group):
+        return pd.Series({"VN30": ["FPT", "VCB"], "VN100": ["FPT", "VCB", "KDH"]}[group])
+
+
+def test_cli_index_groups_writes_members_with_date_and_source(tmp_path):
+    import json as _json
+    from investment_agent.cli import index_groups
+    p = VnstockProvider(market=FakeMarket(), fundamental=FakeFundamental(), listing=FakeListing(), clock=lambda: NOW)
+    assert index_groups(["VN30", "VN100"], tmp_path / "index-groups.json", provider=p, today=date(2026, 10, 25)) == 0
+    saved = _json.loads((tmp_path / "index-groups.json").read_text(encoding="utf-8"))
+    assert saved == {"as_of": "2026-10-25", "source": "vnstock:kbs", "groups": {"VN30": ["FPT", "VCB"], "VN100": ["FPT", "KDH", "VCB"]}}

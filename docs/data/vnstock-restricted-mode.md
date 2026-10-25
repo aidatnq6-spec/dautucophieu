@@ -42,6 +42,8 @@ Chạy lại trong cùng ngày là an toàn: giá không đổi thì bỏ qua; g
 
 Để lịch tự động cập nhật giá trước mỗi lần chạy, tạo `data\market-symbols.txt` (mỗi dòng một mã đang nắm giữ hoặc đang theo dõi). Khi có `data\prices`, server và lịch tự động dùng giá đã nạp; nếu không thì giữ chế độ không có dữ liệu.
 
+Trang **Theo dõi** liệt kê mọi mã trong `data\market-symbols.txt` với giá đóng cửa gần nhất, thay đổi trong phiên và trong 20 phiên; chỉ là dữ liệu giá, không có khuyến nghị (mã chỉ vào danh sách nghiên cứu khi có audit 10 năm). Nhãn VN30/VN100 lấy từ `data\index-groups.json`, do `cli index-groups --output data\index-groups.json` ghi kèm ngày và nguồn; lịch tự động làm mới tệp này khi đã cũ hơn 7 ngày.
+
 ## Giới hạn theo tài liệu Vnstock v5.0.1
 
 - Giá ngày tối đa 2.920 ngày, 10.000 dòng; đơn vị nghìn đồng (ứng dụng nhân 1.000 và giữ nguyên độ chính xác bằng `floating=None`).

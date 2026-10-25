@@ -42,3 +42,21 @@ test("a future session is refused", async ({ page }) => {
   await page.getByRole("button", { name: "Tạo bản tin" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "Phiên chưa diễn ra" })).toBeVisible();
 });
+
+test("a report can be previewed for Telegram and a test send needs confirmation", async ({ page }) => {
+  await openReports(page);
+  await page.getByRole("link", { name: "Phiên 2026-10-23" }).first().click();
+  await page.getByRole("button", { name: "Xem trước tin Telegram" }).click();
+  await expect(page.getByRole("region", { name: "Xem trước Telegram" })).toContainText("2026-10-23");
+
+  let asked = "";
+  page.once("dialog", (d) => { asked = d.message(); void d.dismiss(); });
+  await page.getByRole("button", { name: "Gửi thử tới Telegram" }).click();
+  await expect.poll(() => asked).toContain("Gửi thật");
+  await expect(page.getByRole("alert").filter({ hasText: "Bot Token" })).toHaveCount(0);  // dismissed: nothing sent
+
+  page.once("dialog", (d) => void d.accept());
+  await page.getByRole("button", { name: "Gửi thử tới Telegram" }).click();
+  // The fixture backend has no bot token, so the server's refusal is shown instead of a send.
+  await expect(page.getByRole("alert").filter({ hasText: "Chưa cấu hình Bot Token" })).toBeVisible();
+});

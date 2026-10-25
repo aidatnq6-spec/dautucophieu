@@ -13,6 +13,47 @@ type Report = { report_id: string; session_date: string; generated_at: string; s
   ledger_summary: { cash: string; realized_gain: string; dividend_income: string; net_contributions: string };
   narrative: { source: string; text: string }; verification_flags: string[]; previous_report_id: string | null; sources: string[] };
 
+const SEND_STATUS: Record<string, string> = {
+  sent: "Đã gửi", disabled: "Chưa bật gửi Telegram trong Cài đặt.", not_publishable: "Bản tin chưa phát hành nên không gửi.",
+  unknown: "Chưa rõ kết quả một phần đã gửi; kiểm tra nhóm Telegram trước khi gửi lại.", failed: "Gửi thất bại; xem nhóm Telegram và thử lại sau.",
+};
+
+function TelegramPanel({ reportId, publishable }: { reportId: string; publishable: boolean }) {
+  const [parts, setParts] = useState<string[] | null>(null);
+  const [result, setResult] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const run = async (work: () => Promise<void>) => {
+    setBusy(true); setFailure(null);
+    try { await work(); } catch (e) { setFailure(e instanceof ApiError ? e.failure.message : "Có lỗi xảy ra."); } finally { setBusy(false); }
+  };
+  const preview = () => run(async () => {
+    setParts((await api<{ parts: string[] }>("notifications/preview", { method: "POST", body: { report_id: reportId } })).parts);
+  });
+  const send = () => {
+    if (!window.confirm("Gửi thật bản tin này tới nhóm Telegram đã cấu hình? Mọi thành viên nhóm sẽ thấy giá trị danh mục.")) return;
+    void run(async () => {
+      const r = await api<{ status: string; parts_sent: number; parts_total: number }>("notifications/test-send",
+        { method: "POST", body: { report_id: reportId, confirm: true } });
+      setResult(r.status === "sent" ? `Đã gửi ${r.parts_sent}/${r.parts_total} phần tới Telegram.` : SEND_STATUS[r.status] ?? r.status);
+    });
+  };
+  return (
+    <section aria-label="Telegram">
+      <h2>Telegram</h2>
+      {!publishable && <p className="caption">Chỉ bản tin đã phát hành mới gửi được.</p>}
+      <div className="actions">
+        <button className="btn" disabled={busy} onClick={() => void preview()}>Xem trước tin Telegram</button>
+        <button className="btn primary" disabled={busy || !publishable} onClick={send}>Gửi thử tới Telegram</button>
+      </div>
+      {failure && <p className="errors" role="alert">{failure}</p>}
+      {result && <p className="notice" role="status">{result}</p>}
+      {parts && <div role="region" aria-label="Xem trước Telegram">
+        {parts.map((t, i) => <pre key={i} style={{ whiteSpace: "pre-wrap" }}>{parts.length > 1 && <span className="caption">Phần {i + 1}/{parts.length}{"\n"}</span>}{t}</pre>)}</div>}
+    </section>
+  );
+}
+
 export function ReportView({ reportId }: { reportId: string }) {
   const [r, setR] = useState<Report | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +80,7 @@ export function ReportView({ reportId }: { reportId: string }) {
       <h2>Kiểm tra dữ liệu</h2>
       <ul>{r.verification_flags.map((f) => <li key={f}>{NOTE_TEXT(f)}</li>)}</ul>
       {r.sources.length > 0 && <p className="caption">Nguồn: {r.sources.join(", ")}</p>}
+      <TelegramPanel reportId={r.report_id} publishable={r.status === "published"} />
     </article>
   );
 }

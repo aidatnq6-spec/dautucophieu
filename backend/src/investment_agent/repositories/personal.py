@@ -84,6 +84,7 @@ class DocumentTransaction(Protocol):
 
 class DocumentStore(Protocol):
     def atomic(self, operation: Callable[[DocumentTransaction], T]) -> T: ...
+    def dump(self, prefix: str) -> dict[str, dict]: ...
 
 
 class _MemoryTransaction:
@@ -121,6 +122,12 @@ class MemoryDocumentStore:
                 raise RepositoryUnavailable("Personal repository unavailable")
             self.documents = working
             return deepcopy(result)
+
+    def dump(self, prefix):
+        with self._lock:
+            if not self.available:
+                raise RepositoryUnavailable("Personal repository unavailable")
+            return {p: deepcopy(d) for p, d in self.documents.items() if p.startswith(prefix)}
 
 
 class PersonalRepository:
@@ -204,6 +211,36 @@ class PersonalRepository:
             tx.put(head_path, {"version": record.version})
             tx.create(request_path, {"fingerprint": fingerprint, "version": record.version})
             return record
+        return self.store.atomic(operation)
+
+    def export(self, context) -> dict[str, dict]:
+        """Every document under this owner's namespace, keyed by path relative to owners/{uid}/."""
+        self.authorize(context)
+        root = f"owners/{self.owner_uid}/"
+        return {path[len(root):]: data for path, data in self.store.dump(root).items()}
+
+    def import_documents(self, context, documents: dict[str, dict], *, dry_run: bool) -> tuple[int, int, int]:
+        """(to_create, identical, conflicts). Writes nothing unless dry_run is False and there are no conflicts."""
+        self.authorize(context)
+        root = f"owners/{self.owner_uid}/"
+        if any(not isinstance(p, str) or p.startswith("/") or ".." in p.split("/") for p in documents):
+            raise InvalidRecord("Invalid document path")
+
+        def operation(tx):
+            create = identical = conflicts = 0
+            for path, data in documents.items():
+                existing = tx.read(root + path)
+                if existing is None:
+                    create += 1
+                elif existing == data:
+                    identical += 1
+                else:
+                    conflicts += 1
+            if not dry_run and not conflicts:
+                for path, data in documents.items():
+                    if tx.read(root + path) is None:
+                        tx.create(root + path, data)
+            return create, identical, conflicts
         return self.store.atomic(operation)
 
     def require_current(self, context, versions: dict[tuple[str, str], int]):

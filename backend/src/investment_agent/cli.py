@@ -19,7 +19,13 @@ def main() -> int:
     tick = commands.add_parser("scheduled-run", help="one scheduler wake-up (Windows Task Scheduler)")
     tick.add_argument("--calendar", type=Path, required=True, help="owner-verified trading calendar JSON")
     tick.add_argument("--data-dir", type=Path, required=True)
+    backup = commands.add_parser("backup", help="local backup of data/ plus the personal Firestore export")
+    backup.add_argument("--data-dir", type=Path, required=True)
+    backup.add_argument("--backup-dir", type=Path, required=True)
+    backup.add_argument("--kind", choices=["daily", "weekly", "manual"], default="daily")
     args = parser.parse_args()
+    if args.command == "backup":
+        return run_backup(args.data_dir, args.backup_dir, args.kind)
     if args.command == "scheduled-run":
         return scheduled_run(args.calendar, args.data_dir)
     if not args.fixtures:
@@ -44,6 +50,29 @@ def load_calendar(path: Path):
         raise ValueError("calendar must name its official source")
     return TradingCalendar(version=data["version"], source=data["source"], holidays=frozenset(date.fromisoformat(d) for d in data["holidays"]),
                            first=date.fromisoformat(data["first"]), last=date.fromisoformat(data["last"]))
+
+
+def run_backup(data_dir: Path, backup_dir: Path, kind: str) -> int:
+    import os
+    from datetime import datetime, timezone
+
+    from investment_agent.api.auth import OwnerContext
+    from investment_agent.operations.backup import create_backup, export_personal, prune_backups
+    from investment_agent.repositories.firestore import personal_repository_from_env
+    from investment_agent.repositories.personal import RepositoryUnavailable
+
+    now = datetime.now(timezone.utc)
+    try:
+        repo = personal_repository_from_env()
+        export = export_personal(repo, OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "backup"), now=now)
+    except (RepositoryUnavailable, KeyError):
+        # A local-only copy is not a full backup: the personal source of truth is Firestore.
+        print(json.dumps({"status": "not_configured", "reason": "personal_export_unavailable"}))
+        return 2
+    manifest = create_backup(data_dir, backup_dir, personal_export=export, now=now, kind=kind)
+    removed = prune_backups(backup_dir)
+    print(json.dumps({"status": "ok", "backup": manifest.path.name, "files": len(manifest.files), "pruned": len(removed)}))
+    return 0
 
 
 def scheduled_run(calendar_path: Path, data_dir: Path) -> int:

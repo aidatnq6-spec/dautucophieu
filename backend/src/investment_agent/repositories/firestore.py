@@ -29,6 +29,23 @@ class FirestoreDocumentStore:
     def __init__(self, client):
         self.client = client
 
+    def dump(self, prefix):
+        """Recursive read of a namespace for backups (not transactional; run while the app is idle)."""
+        out = {}
+
+        def walk(doc_ref):
+            snapshot = doc_ref.get(timeout=30)
+            if snapshot.exists:
+                out[doc_ref.path] = snapshot.to_dict()
+            for collection in doc_ref.collections():
+                for child in collection.list_documents():
+                    walk(child)
+        try:
+            walk(self.client.document(prefix.rstrip("/")))
+        except (GoogleAPICallError, RetryError, GoogleAuthError):
+            raise RepositoryUnavailable("Personal repository unavailable") from None
+        return {p: d for p, d in out.items() if p.startswith(prefix)}
+
     def atomic(self, operation):
         @firestore.transactional
         def execute(transaction):

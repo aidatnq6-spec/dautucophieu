@@ -15,7 +15,8 @@ Dữ liệu cục bộ (`data\jobs.sqlite`, `data\deliveries.sqlite`, cache) n�
 
 `scripts\windows\run-after-close.ps1` gọi `python -m investment_agent.cli scheduled-run` một lần:
 
-- Giờ Việt Nam: 17:30 chạy phiên hôm nay; 18:30 và 20:00 chỉ chạy lại khi phiên đó chưa có bản tin đã phát hành (dữ liệu về muộn). Tối đa 3 lần cho một phiên.
+- Giờ Việt Nam: 15:30 chạy phiên hôm nay; 17:30, 18:30 và 20:00 chỉ chạy lại khi phiên đó chưa có bản tin đã phát hành (dữ liệu về muộn). Tối đa 4 lần cho một phiên. Bản tin chỉ phát hành khi mọi mã đang nắm có giá của đúng phiên đó; nguồn chưa cập nhật lúc 15:30 thì để khung sau.
+- 07:00 sáng chỉ chạy bù phiên trước nếu phiên đó chưa có bản tin (ví dụ máy tắt buổi tối); không tạo bản tin mới cho phiên chưa giao dịch.
 - Ngày nghỉ/cuối tuần không tạo phiên mới. Bản tuần/tháng tạo ở phiên giao dịch cuối của tuần/tháng theo lịch.
 - Máy bật lại sau khi bỏ lỡ: chỉ chạy bù phiên gần nhất chưa có bản tin, đếm số phiên cũ bị bỏ lỡ; không gửi hàng loạt bản tin cũ.
 - Khóa lease trong `data\jobs.sqlite` chặn hai tiến trình chạy cùng lúc.

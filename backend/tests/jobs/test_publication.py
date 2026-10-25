@@ -125,3 +125,13 @@ def test_previous_report_of_same_scope_is_linked(repo, tmp_path):
     second = run(repo, tmp_path)
     report = repo.read(OWNER, "reports", second.report_id).payload
     assert second.report_id != first.report_id and report["previous_report_id"] == first.report_id
+
+
+def test_price_from_an_earlier_session_keeps_the_report_unpublished(repo, tmp_path):
+    # An early slot can run before the vendor has today's bar; yesterday's close must not be published as today's.
+    outbox = Outbox()
+    stale = SyntheticMarket(prices={"FPT": PricePoint(Decimal(60_000), date(2026, 10, 22))}, documents=MARKET.documents)
+    result = run(repo, tmp_path, outbox=outbox, market=stale)
+    report = repo.read(OWNER, "reports", result.report_id).payload
+    assert result.status == "incomplete" and outbox.queued == []
+    assert "price_not_for_session:FPT" in report["verification_flags"]

@@ -23,21 +23,24 @@ def state(published=(), attempts=None):
 
 
 def test_nothing_before_first_slot():
-    d = decide(at("2026-10-27", "17:29"), CAL, state(published=["2026-10-26"]))
+    d = decide(at("2026-10-27", "15:29"), CAL, state(published=["2026-10-26"]))
     assert d.run is False and d.reason == "not_yet"
 
 
 def test_first_slot_runs_todays_session():
-    d = decide(at("2026-10-27", "17:30"), CAL, state(published=["2026-10-26"]))
+    d = decide(at("2026-10-27", "15:30"), CAL, state(published=["2026-10-26"]))
     assert (d.run, d.session_date, d.attempt, d.send) == (True, date(2026, 10, 27), 1, True)
 
 
 def test_retry_slots_depend_on_data_not_clock_spam():
-    s = state(published=["2026-10-26"], attempts={"2026-10-27": 1})
-    assert decide(at("2026-10-27", "18:00"), CAL, s).run is False  # waiting for the 18:30 slot
-    assert decide(at("2026-10-27", "18:30"), CAL, s).attempt == 2
-    s3 = state(published=["2026-10-26"], attempts={"2026-10-27": 3})
-    d = decide(at("2026-10-27", "21:00"), CAL, s3)
+    s1 = state(published=["2026-10-26"], attempts={"2026-10-27": 1})
+    assert decide(at("2026-10-27", "17:00"), CAL, s1).run is False  # 15:30 tried; waiting for 17:30
+    assert decide(at("2026-10-27", "17:30"), CAL, s1).attempt == 2
+    s2 = state(published=["2026-10-26"], attempts={"2026-10-27": 2})
+    assert decide(at("2026-10-27", "18:00"), CAL, s2).run is False  # waiting for the 18:30 slot
+    assert decide(at("2026-10-27", "18:30"), CAL, s2).attempt == 3
+    s4 = state(published=["2026-10-26"], attempts={"2026-10-27": 4})
+    d = decide(at("2026-10-27", "21:00"), CAL, s4)
     assert d.run is False and d.reason == "attempts_exhausted"
 
 
@@ -115,9 +118,10 @@ def tick(tmp_path, repo, now, sender=None, market=None):
                           deliveries=DeliveryStore(tmp_path / "d.sqlite"), sender=sender, cal=CAL, now=now, worker_id="sched")
 
 
-def test_tick_counts_attempts_and_stops_after_three_incomplete_runs(tmp_path):
+def test_tick_counts_attempts_and_stops_after_four_incomplete_runs(tmp_path):
     repo = PersonalRepository("owner-1", MemoryDocumentStore())
-    for hhmm, expected in (("17:31", "incomplete"), ("17:45", None), ("18:31", "incomplete"), ("20:01", "incomplete"), ("21:00", None)):
+    for hhmm, expected in (("15:31", "incomplete"), ("16:00", None), ("17:31", "incomplete"), ("18:31", "incomplete"), ("20:01", "incomplete"),
+                           ("21:00", None)):
         result = tick(tmp_path, repo, at("2026-10-27", hhmm))
         assert (result.statuses[0] if result.statuses else None) == expected, hhmm
 
@@ -143,3 +147,11 @@ def test_cli_calendar_must_name_an_official_source(tmp_path):
     path.write_text(_json.dumps({"version": "hose-2026", "source": "https://www.hsx.vn/...", "holidays": ["2026-09-02"], "first": "2026-01-01",
                                  "last": "2026-12-31"}), encoding="utf-8")
     assert not load_calendar(path).is_session(date(2026, 9, 2))
+
+
+
+def test_morning_wake_up_only_catches_up_the_previous_session():
+    d = decide(at("2026-10-27", "07:00"), CAL, state(published=["2026-10-26"]))
+    assert d.run is False and d.reason == "not_yet"  # today's session has not traded yet
+    d = decide(at("2026-10-27", "07:00"), CAL, state(published=["2026-10-23"]))
+    assert (d.run, d.reason, d.session_date) == (True, "catch_up", date(2026, 10, 26))

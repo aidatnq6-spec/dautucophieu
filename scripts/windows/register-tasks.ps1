@@ -5,7 +5,7 @@ param([switch]$Register, [switch]$Unregister)
 $name = 'InvestmentAgent-AfterClose'
 $script = Join-Path $PSScriptRoot 'run-after-close.ps1'
 $argument = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$script`""
-$times = @('17:30', '18:30', '20:00')
+$times = @('07:00', '15:30', '17:30', '18:30', '20:00')
 
 if ($Unregister) {
     if (Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue) { Unregister-ScheduledTask -TaskName $name -Confirm:$false }
@@ -22,7 +22,7 @@ $calendars = @('data\trading-calendar.json', "config\trading-calendar-hose-$((Ge
 $missing = @('.env.local') | Where-Object { -not (Test-Path -LiteralPath (Join-Path $script:RepoRoot $_)) }
 if (-not ($calendars | Where-Object { Test-Path -LiteralPath (Join-Path $script:RepoRoot $_) })) { $missing += 'lịch giao dịch năm nay' }
 if ($missing) { throw "Chưa đủ cấu hình: $($missing -join ', ')" }
-if ((Get-TimeZone).Id -ne 'SE Asia Standard Time') { throw 'Múi giờ máy không phải UTC+07 (SE Asia Standard Time); lịch 17:30 sẽ lệch.' }
+if ((Get-TimeZone).Id -ne 'SE Asia Standard Time') { throw 'Múi giờ máy không phải UTC+07 (SE Asia Standard Time); lịch chạy sẽ lệch.' }
 
 $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $argument -WorkingDirectory $script:RepoRoot
 $triggers = @($times | ForEach-Object { New-ScheduledTaskTrigger -Daily -At $_ }) + @(New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME)

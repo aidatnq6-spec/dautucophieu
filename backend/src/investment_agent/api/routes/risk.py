@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Request
-from pydantic import AwareDatetime, Field
+from pydantic import Field
 
 from investment_agent.domain.models import ContractModel
 from investment_agent.domain.profile import ConfirmedProfile
-from investment_agent.domain.risk import InvalidRiskAnswers, RiskAssessment, assess_risk, load_questionnaire
+from investment_agent.domain.risk import InvalidRiskAnswers, assess_risk, load_questionnaire
 from investment_agent.repositories.personal import IdempotencyConflict, RepositoryUnavailable
+from investment_agent.services.records import StoredRisk
 
 from ..auth import require_owner
 from .common import WRITE_ERRORS, committed_retry, error, now, read_current, unavailable, write_error
@@ -22,13 +23,6 @@ class AnswersRequest(ContractModel):
 class SaveRequest(AnswersRequest):
     expected_version: int = Field(strict=True, ge=0)
     request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
-
-
-class StoredRisk(ContractModel):
-    schema_version: str = "1"
-    assessment: RiskAssessment
-    assessed_at: AwareDatetime
-    profile_version: int | None
 
 
 def _invalid():

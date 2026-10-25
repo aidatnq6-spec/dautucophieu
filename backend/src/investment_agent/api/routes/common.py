@@ -6,7 +6,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from investment_agent.repositories.personal import IdempotencyConflict, RepositoryUnavailable, VersionConflict
-from investment_agent.repositories.personal_cache import PersonalView
+from investment_agent.services.records import read_current, read_version  # noqa: F401 (re-exported for routes)
 
 
 def error(status, code, message):
@@ -19,19 +19,6 @@ def unavailable():
 
 def now(request: Request) -> datetime:
     return datetime.fromtimestamp(request.app.state.clock(), timezone.utc)
-
-
-def read_current(repo, owner, collection, record_id):
-    """Return (record or None, stale). Raises RepositoryUnavailable."""
-    result = repo.read(owner, collection, record_id)
-    if isinstance(result, PersonalView):
-        return result.record, result.stale
-    return result, False
-
-
-def read_version(repo, owner, collection, record_id, version):
-    """Exact historical revision from the authoritative store, never the cache."""
-    return getattr(repo, "authoritative", repo).read(owner, collection, record_id, version=version)
 
 
 def committed_retry(repo, owner, collection, record_id, expected_version, request_id):

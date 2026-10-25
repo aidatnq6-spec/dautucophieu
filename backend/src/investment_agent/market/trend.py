@@ -8,6 +8,7 @@ highlighted. Missing cells carry a reason; nothing is interpolated. Not a recomm
 
 import json
 import os
+import time as time_module
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 
@@ -42,7 +43,8 @@ def _cell(closes: list[float] | None, reason: str | None = None) -> dict:
     if reason is not None:
         return {"macd": None, "rsi": None, "zone": None, "reason": reason}
     state, value = macd_state(closes), rsi_value(closes)
-    return {"macd": state, "rsi": value, "zone": zone(value), "reason": None if state or value is not None else "Chưa đủ lịch sử"}
+    # MACD needs more bars than RSI: a cell may show an RSI while its MACD is still "Chưa đủ lịch sử".
+    return {"macd": state, "rsi": value, "zone": zone(value), "reason": None if state else "Chưa đủ lịch sử"}
 
 
 def build_cells(daily, hourly, *, session_date: date | None, hourly_supported: bool) -> dict:
@@ -108,12 +110,21 @@ class SnapshotStore:
                 p.unlink()
 
 
-def _refresh(store: SeriesStore, key: str, fetch, *, today: date, full: int, refresh: int, enough: int):
+def _retry(call, pause: float):
+    """One retry after a short pause: Vnstock and the public feeds sometimes fail once and then answer."""
+    try:
+        return call()
+    except Exception:
+        time_module.sleep(pause)
+        return call()
+
+
+def _refresh(store: SeriesStore, key: str, fetch, *, today: date, full: int, refresh: int, enough: int, pause: float):
     start = today - timedelta(days=full if len(store.read(key)) < enough else refresh)
-    store.upsert(key, fetch(start))
+    store.upsert(key, _retry(lambda: fetch(start), pause))
 
 
-def run_trend(data_dir: Path, cal, *, now: datetime, provider, get) -> dict:
+def run_trend(data_dir: Path, cal, *, now: datetime, provider, get, pause: float = 3.0) -> dict:
     local = now.astimezone(VN)
     today = local.date()
     try:
@@ -134,18 +145,18 @@ def run_trend(data_dir: Path, cal, *, now: datetime, provider, get) -> dict:
             try:
                 if src["kind"] == "vn":
                     _refresh(days, f"{rid}-1d", lambda s: provider.fetch_closes(rid, s, today, interval="1D", index=src["index"]),
-                             today=today, full=FULL_DAYS, refresh=REFRESH_DAYS, enough=400)
+                             today=today, full=FULL_DAYS, refresh=REFRESH_DAYS, enough=400, pause=pause)
                     _refresh(hours, f"{rid}-1h", lambda s: provider.fetch_closes(rid, s, today, interval="1H", index=src["index"]),
-                             today=today, full=HOURLY_FULL_DAYS, refresh=HOURLY_REFRESH_DAYS, enough=1)
+                             today=today, full=HOURLY_FULL_DAYS, refresh=HOURLY_REFRESH_DAYS, enough=1, pause=pause)
                     cells = build_cells(days.read(f"{rid}-1d"), hours.read(f"{rid}-1h"), session_date=today, hourly_supported=True)
                 elif src["kind"] == "coinbase":
                     _refresh(days, f"{rid}-1d", lambda s: coinbase_closes(get, src["product"], 86400, s, today),
-                             today=today, full=FULL_DAYS, refresh=REFRESH_DAYS, enough=400)
+                             today=today, full=FULL_DAYS, refresh=REFRESH_DAYS, enough=400, pause=pause)
                     _refresh(hours, f"{rid}-1h", lambda s: coinbase_closes(get, src["product"], 3600, s, today),
-                             today=today, full=REFRESH_DAYS, refresh=7, enough=1)
+                             today=today, full=REFRESH_DAYS, refresh=7, enough=1, pause=pause)
                     cells = build_cells(days.read(f"{rid}-1d"), hours.read(f"{rid}-1h"), session_date=None, hourly_supported=True)
                 elif src["kind"] == "fred":
-                    days.upsert(f"{rid}-1d", fred_closes(get, src["series"], today - timedelta(days=FULL_DAYS)))
+                    days.upsert(f"{rid}-1d", _retry(lambda: fred_closes(get, src["series"], today - timedelta(days=FULL_DAYS)), pause))
                     cells = build_cells(days.read(f"{rid}-1d"), None, session_date=None, hourly_supported=False)
                 else:
                     cells = {f: _cell(None, src["reason"]) for f in FRAMES}

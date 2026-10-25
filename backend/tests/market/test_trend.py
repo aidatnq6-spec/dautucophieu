@@ -88,14 +88,14 @@ def fake_get(url):
 def test_run_builds_saves_and_reports_source_errors(tmp_path):
     now = datetime(2026, 10, 23, 15, 35, tzinfo=VN)
     vn = FakeVn()
-    result = run_trend(tmp_path, CAL, now=now, provider=vn, get=fake_get)
+    result = run_trend(tmp_path, CAL, now=now, provider=vn, get=fake_get, pause=0)
     assert result["status"] == "ok" and result["errors"] == {"BTC": "error:OSError"}
     snap = SnapshotStore(tmp_path / "trend").latest()
     rows = {r["id"]: r for g in snap["groups"] for r in g["rows"]}
     assert rows["FPT"]["cells"]["D1"]["macd"] == "up,>0" and rows["BTC"]["cells"]["D1"]["reason"] == "Lỗi nguồn"
     assert rows["VN10Y"]["cells"]["M"]["reason"] == "Không có nguồn miễn phí hợp lệ" and rows["US10Y"]["cells"]["H1"]["reason"] == "Nguồn chỉ có giá ngày"
     assert ("FPT", "1D", date(2026, 10, 23) - timedelta(days=2920)) in vn.calls  # first run backfills the full window
-    run_trend(tmp_path, CAL, now=now + timedelta(hours=2), provider=vn, get=fake_get)
+    run_trend(tmp_path, CAL, now=now + timedelta(hours=2), provider=vn, get=fake_get, pause=0)
     assert ("FPT", "1D", date(2026, 10, 23) - timedelta(days=60)) in vn.calls  # later runs only refresh
 
 
@@ -104,10 +104,35 @@ def test_run_skips_outside_sessions_and_before_15_30(tmp_path):
     assert run_trend(tmp_path, CAL, now=datetime(2026, 10, 23, 15, 29, tzinfo=VN), provider=FakeVn(), get=fake_get)["reason"] == "before_close"
 
 
-def test_cli_trend_run_prints_a_summary(tmp_path, capsys):
+def test_cli_trend_run_prints_a_summary(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr("investment_agent.market.trend.time_module.sleep", lambda seconds: None)
     from investment_agent.cli import trend_run
     cal_path = tmp_path / "cal.json"
     cal_path.write_text(json.dumps({"version": "x", "source": "HOSE notice", "holidays": [], "first": "2016-01-01", "last": "2026-12-31"}),
                         encoding="utf-8")
     code = trend_run(tmp_path, cal_path, now=datetime(2026, 10, 23, 15, 35, tzinfo=VN), provider=FakeVn(), get=fake_get)
     assert code == 1 and '"BTC": "error:OSError"' in capsys.readouterr().out  # 1: a source failed, the board was still saved
+
+
+def test_a_short_macd_history_is_explained_even_when_rsi_has_a_value():
+    from investment_agent.market.trend import _cell
+    c = _cell([100.0 * 1.01 ** i for i in range(20)])  # 20 bars: enough for RSI 14, not for MACD 12-26-9
+    assert c["macd"] is None and c["rsi"] is not None and c["reason"] == "Chưa đủ lịch sử"
+
+
+class FlakyVn(FakeVn):
+    """Fails the first call for each symbol, as Vnstock did for MWG and FPT on the live trial."""
+    def __init__(self):
+        super().__init__()
+        self.failed = set()
+
+    def fetch_closes(self, symbol, start, end, *, interval, index):
+        if symbol not in self.failed:
+            self.failed.add(symbol)
+            raise ConnectionError("transient")
+        return super().fetch_closes(symbol, start, end, interval=interval, index=index)
+
+
+def test_a_transient_source_error_is_retried_once(tmp_path):
+    result = run_trend(tmp_path, CAL, now=datetime(2026, 10, 23, 15, 35, tzinfo=VN), provider=FlakyVn(), get=fake_get, pause=0)
+    assert "FPT" not in result["errors"] and result["errors"] == {"BTC": "error:OSError"}

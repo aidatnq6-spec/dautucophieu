@@ -29,6 +29,11 @@ def read_current(repo, owner, collection, record_id):
     return result, False
 
 
+def read_version(repo, owner, collection, record_id, version):
+    """Exact historical revision from the authoritative store, never the cache."""
+    return getattr(repo, "authoritative", repo).read(owner, collection, record_id, version=version)
+
+
 def write_error(exc):
     if isinstance(exc, VersionConflict):
         return error(409, "version_conflict", "Dữ liệu đã được cập nhật ở nơi khác; hãy tải lại.")

@@ -9,6 +9,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from .auth import InternalAuthSettings, InternalAuthenticator, Unauthorized, require_owner
 from .routes.health import router as health_router
 from .routes.profile import router as profile_router
+from .routes.ledger import router as ledger_router
 from .routes.risk import router as risk_router
 
 
@@ -42,6 +43,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(health_router)
     app.include_router(profile_router)
     app.include_router(risk_router)
+    app.include_router(ledger_router)
 
     @app.get("/internal/identity")
     def identity(request: Request):

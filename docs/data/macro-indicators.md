@@ -9,9 +9,10 @@ Theo bảng Leading Indicator của chủ sở hữu (25/10/2026). Danh mục v�
 | Giá dầu WTI, CPI Mỹ (so cùng kỳ, tính từ CPIAUCSL), Fed qua đêm (EFFR), lợi suất 10 năm Mỹ | FRED, tệp CSV công khai | Tự động mỗi lần lịch chạy (`cli macro-sync`) |
 | Chỉ số USD rộng (DTWEXBGS) | FRED | Tự động; **thay cho DXY** — DXY của ICE là dữ liệu có bản quyền, chỉ số rộng cùng chiều nhưng khác giá trị |
 | USD/VND bán – Vietcombank | XML tỷ giá công khai của Vietcombank | Tự động |
-| USD/VND tự do, USD/VND NHNN, M2, khối ngoại mua/bán ròng, PMI Mỹ và Việt Nam, lãi suất tiền gửi 12 tháng, lợi suất 10 năm Việt Nam, liên ngân hàng qua đêm, giá trị giao dịch VN-Index | Không có nguồn miễn phí hợp lệ: Vnstock Community không cấp quyền (macro, foreign/proprietary flow), PMI thuộc ISM/S&P Global, tỷ giá tự do không có nguồn chính thức | Chủ sở hữu nhập tay trên trang, kèm ngày và link nguồn |
+| USD/VND bán – tự do và NHNN (SBV), lãi suất tiền gửi 12 tháng cột "NHTM Khác" | Trang công khai của Topi (`online.topi.vn/market/ty-gia-usd-vnd`, `/lai-suat`); robots.txt cho phép, điều khoản không cấm đọc; dữ liệu do đối tác của Topi cung cấp | Tự động, đọc từ nội dung trang; ghi theo ngày tải (trang không ghi ngày công bố). Topi đổi giao diện → báo lỗi nguồn, vẫn cho nhập tay |
+| M2, khối ngoại mua/bán ròng, PMI Mỹ và Việt Nam, lợi suất 10 năm Việt Nam, liên ngân hàng qua đêm, giá trị giao dịch VN-Index | Không có nguồn miễn phí hợp lệ: Vnstock Community không cấp quyền (macro, foreign/proprietary flow), PMI thuộc ISM/S&P Global; Investing.com chặn truy cập tự động, TradingEconomics và TradingView trả 403; drphe.github.io gọi API nội bộ của WiChart/Investing; FireAnt cần đăng nhập; CafeF tải số bằng API ẩn | Chủ sở hữu nhập tay trên trang, kèm ngày và link nguồn |
 
-Tỷ giá trung tâm và lãi suất liên ngân hàng có trên website NHNN nhưng chỉ đọc được bằng cách phân tích trang HTML; chưa làm vì dễ hỏng khi trang đổi. Biểu đồ khối ngoại và tự doanh 10 phiên cần nguồn trả phí.
+Lãi suất liên ngân hàng có trên website NHNN nhưng chỉ đọc được bằng cách phân tích trang HTML của NHNN; chưa làm. Biểu đồ khối ngoại và tự doanh 10 phiên cần nguồn trả phí.
 
 ## Xu hướng và đánh giá
 

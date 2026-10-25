@@ -15,6 +15,11 @@ test("automatic indicators show value, trend and the owner's assessment", async 
   const row = page.getByRole("table", { name: "Chỉ số vĩ mô" }).getByRole("row", { name: /Lợi suất trái phiếu 10 năm của Mỹ/ });
   for (const text of ["4,96", "Tăng", "Xấu", "Tự động"]) await expect(row).toContainText(text);
   await expect(page.getByRole("row", { name: /PMI sản xuất Việt Nam/ })).toContainText("Chưa có số liệu");
+  // Read from a web page, so a manual value stays possible when the page changes.
+  const deposit = page.getByRole("row", { name: /Lãi suất tiền gửi VND 12 tháng/ });
+  await expect(deposit).toContainText("Tự động");
+  await expect(deposit.getByRole("button", { name: "Nhập" })).toBeVisible();
+  await expect(page.getByRole("row", { name: /Lợi suất trái phiếu 10 năm của Mỹ/ }).getByRole("button", { name: "Nhập" })).toHaveCount(0);
 });
 
 test("the owner enters PMI values and sees the trend", async ({ page }) => {

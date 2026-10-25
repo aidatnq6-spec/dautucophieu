@@ -4,7 +4,8 @@ import { ApiError, api } from "../lib/api";
 import { formatDecimal, hanoiDate } from "../lib/format";
 
 type Row = { id: string; label: string; unit: string; auto: boolean; value: string | null; date: string | null; previous: string | null;
-  trend: string | null; assessment: string | null; stale: boolean; source_url: string; note: string | null };
+  trend: string | null; assessment: string | null; stale: boolean; source_url: string; note: string | null;
+  source_error: string | null; manual_allowed: boolean };
 
 /** Keeps the value's own precision (at most two places) with Vietnamese grouping. */
 const show = (v: string) => formatDecimal(v, Math.min((v.split(".")[1] ?? "").length, 2));
@@ -61,15 +62,17 @@ export function MacroView() {
               <td>{r.assessment ? <span className={`pill ${TONE[r.assessment] ?? ""}`}>{r.assessment}</span> : "—"}</td>
               <td>{r.date ?? "—"}{r.stale && <div className="caption">số liệu cũ</div>}
                 <div className="caption">{r.auto ? "Tự động" : "Nhập tay"}</div>
-                {!r.auto && editing !== r.id && <button className="btn" onClick={() => setEditing(r.id)}>Nhập</button>}
+                {r.source_error && <div className="caption negative">Lỗi nguồn lần cập nhật gần nhất{r.manual_allowed ? "; có thể nhập tay" : ""}</div>}
+                {r.manual_allowed && editing !== r.id && <button className="btn" onClick={() => setEditing(r.id)}>Nhập</button>}
                 {editing === r.id && <EntryForm row={r} onDone={(saved) => { setEditing(null); if (saved) void load(); }} />}</td>
               <td><a href={r.source_url} target="_blank" rel="noreferrer noopener">Nguồn</a></td>
             </tr>))}
           </tbody>
         </table>
       </div>
-      <p className="caption">Tự động: FRED (Fed St. Louis) và tỷ giá Vietcombank, cập nhật mỗi lần lịch chạy. Khối ngoại, tự doanh, PMI, M2, lãi suất trong nước và
-        lợi suất trái phiếu Việt Nam không có nguồn miễn phí hợp lệ nên nhập tay kèm link nguồn.</p>
+      <p className="caption">Tự động: FRED (Fed St. Louis), tỷ giá Vietcombank và trang Topi (tỷ giá tự do, NHNN, lãi suất tiền gửi; đọc từ nội dung trang nên
+        nếu Topi đổi giao diện sẽ báo lỗi nguồn và cho nhập tay), cập nhật mỗi lần lịch chạy. Khối ngoại, PMI, M2, lãi suất liên ngân hàng, lợi suất trái phiếu
+        Việt Nam và giá trị giao dịch không có nguồn miễn phí hợp lệ nên nhập tay kèm link nguồn.</p>
     </section>
   );
 }

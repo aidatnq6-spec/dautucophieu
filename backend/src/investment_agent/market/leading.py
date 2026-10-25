@@ -1,21 +1,24 @@
 """Leading macro indicators: free official feeds where they exist, owner entries for the rest.
 
 Automatic sources (checked 2026-10-25): FRED public CSV downloads (WTI, US CPI,
-EFFR, US 10-year yield, broad dollar index) and the Vietcombank exchange-rate
-XML. Everything else in the owner's sheet (free-market and SBV USD/VND, M2,
-PMIs, deposit and interbank rates, VN 10-year yield, foreign flows, VN-Index
-turnover) has no free licensed feed and is entered by the owner with a source
-link. Values are stored as decimal strings under data/macro/; nothing is
+EFFR, US 10-year yield, broad dollar index), the Vietcombank exchange-rate XML,
+and two public Topi pages (free-market and SBV USD/VND, 12-month deposit rate;
+robots.txt allows them and the terms do not forbid reading). Topi values are
+read from page text, so a layout change shows as a source error and the owner
+may enter the value by hand. Everything else in the owner's sheet (M2, PMIs,
+interbank rate, VN 10-year yield, foreign flows, VN-Index turnover) has no free
+licensed feed and is entered by the owner with a source link. Values are stored as decimal strings under data/macro/; nothing is
 estimated when a value is missing. This is a display dashboard: analysis
 evidence keeps using the vintaged series in macro.py, which these values do
 not feed.
 """
 
+import html as html_lib
 import json
 import os
 import re
 import xml.etree.ElementTree as ET
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Callable
@@ -25,6 +28,8 @@ from investment_agent.domain.pinned import CONFIG_DIR
 INDICATORS_PATH = CONFIG_DIR / "macro-indicators.json"
 FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}"
 VCB_XML = "https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx"
+TOPI_PAGE = "https://online.topi.vn/market/{page}"
+VN = timezone(timedelta(hours=7))
 _ID = re.compile(r"^[a-z0-9_]{1,40}$")
 
 
@@ -63,6 +68,34 @@ def parse_vcb_xml(text: str, *, currency: str, field: str) -> tuple[date, str]:
         return stamp, _plain(Decimal(node.get(field, "").replace(",", "")))
     except (ET.ParseError, ValueError, StopIteration, InvalidOperation) as exc:
         raise MacroError(f"vcb_unreadable:{type(exc).__name__}") from None
+
+
+def _page_text(page: str) -> str:
+    page = re.sub(r"<(script|style)\b.*?</\1>", " ", page, flags=re.S | re.I)
+    return re.sub(r"\s+", " ", html_lib.unescape(re.sub(r"<[^>]+>", " ", page))).strip()
+
+
+def parse_topi_fx(page: str, *, row: str) -> str:
+    """Sell rate (đồng) of one row of Topi's USD/VND table, e.g. "Tự do" or "SBV"."""
+    text = _page_text(page)
+    head = text.find("Bán (USD/VND)")
+    m = re.search(rf"(?<!\S){re.escape(row)} ([\d.]+) ([\d.]+)(?!\S)", text[head:]) if head >= 0 else None
+    if m is None:
+        raise MacroError("topi_fx_unreadable")
+    return _plain(Decimal(m.group(2).replace(".", "")))
+
+
+def parse_topi_rate(page: str, *, term: str, column: str) -> str:
+    """Deposit rate (%/year) for one term and bank group of Topi's deposit table, columns read from its header."""
+    text = _page_text(page)
+    head = re.search(r"Kỳ hạn ((?:NHTM \D+?)+?) (?=\d+ tháng)", text)
+    names = ["NHTM " + n.strip() for n in head.group(1).split("NHTM ") if n.strip()] if head else []
+    if column not in names:
+        raise MacroError("topi_rate_columns_changed")
+    m = re.search(rf"(?<!\d){re.escape(term)} " + " ".join([r"([\d.,]+)%"] * len(names)), text)
+    if m is None:
+        raise MacroError("topi_rate_unreadable")
+    return _plain(Decimal(m.group(names.index(column) + 1).replace(",", ".")))
 
 
 def evaluate(rule: str, values: list[str]) -> tuple[str | None, str | None]:
@@ -110,17 +143,41 @@ class MacroStore:
                        encoding="utf-8")
         os.replace(tmp, path)
 
+    def statuses(self) -> dict[str, dict]:
+        path = self.root / "_status.json"
+        return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
 
-def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str], str]) -> dict[str, str]:
-    """Fetch every automatic indicator; one failing source never stops the others."""
+    def record_statuses(self, results: dict[str, str]) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        merged = {**self.statuses(), **{k: {"status": v, "at": now} for k, v in results.items()}}
+        self.root.mkdir(parents=True, exist_ok=True)
+        tmp = self.root / "_status.tmp"
+        tmp.write_text(json.dumps(merged, ensure_ascii=False, indent=1), encoding="utf-8")
+        os.replace(tmp, self.root / "_status.json")
+
+
+def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str], str], today: date | None = None) -> dict[str, str]:
+    """Fetch every automatic indicator; one failing source never stops the others. Topi pages carry no
+    publication date, so their values are dated on the fetch day (Vietnam time)."""
+    today = today or datetime.now(VN).date()
+    pages: dict[str, str] = {}
+
+    def page(url):
+        if url not in pages:
+            pages[url] = get(url)
+        return pages[url]
     results = {}
     for ind in indicators:
         src = ind["source"]
         try:
             if src["kind"] == "fred":
-                points = parse_fred_csv(get(FRED_CSV.format(series=src["series"])), transform=src.get("transform"))
+                points = parse_fred_csv(page(FRED_CSV.format(series=src["series"])), transform=src.get("transform"))
             elif src["kind"] == "vcb":
-                points = [parse_vcb_xml(get(VCB_XML), currency=src["currency"], field=src["field"])]
+                points = [parse_vcb_xml(page(VCB_XML), currency=src["currency"], field=src["field"])]
+            elif src["kind"] == "topi" and "row" in src:
+                points = [(today, parse_topi_fx(page(TOPI_PAGE.format(page=src["page"])), row=src["row"]))]
+            elif src["kind"] == "topi":
+                points = [(today, parse_topi_rate(page(TOPI_PAGE.format(page=src["page"])), term=src["term"], column=src["column"]))]
             else:
                 continue
             if not points:
@@ -129,18 +186,22 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
             results[ind["id"]] = "ok"
         except Exception as exc:  # network, parse or source change: reported per indicator
             results[ind["id"]] = f"error:{type(exc).__name__}"
+    store.record_statuses(results)
     return results
 
 
 def macro_rows(indicators: list[dict], store: MacroStore, *, today: date) -> list[dict]:
-    rows = []
+    rows, statuses = [], store.statuses()
     for ind in indicators:
         obs = store.read(ind["id"])
+        status = statuses.get(ind["id"], {}).get("status")
         last = obs[-1] if obs else None
         trend, assessment = evaluate(ind["rule"], [o["value"] for o in obs[-2:]])
         rows.append({"id": ind["id"], "label": ind["label"], "unit": ind["unit"], "auto": ind["source"]["kind"] != "manual",
                      "value": last["value"] if last else None, "date": last["date"] if last else None,
                      "previous": obs[-2]["value"] if len(obs) >= 2 else None, "trend": trend, "assessment": assessment,
                      "stale": last is not None and (today - date.fromisoformat(last["date"])).days > ind["max_age_days"],
-                     "source_url": (last or {}).get("source_url") or ind["url"], "note": ind.get("note")})
+                     "source_url": (last or {}).get("source_url") or ind["url"], "note": ind.get("note"),
+                     "source_error": status if status not in (None, "ok") else None,
+                     "manual_allowed": ind["source"]["kind"] == "manual" or bool(ind["source"].get("manual_fallback"))})
     return rows

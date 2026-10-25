@@ -47,7 +47,7 @@ def enter(request: Request, indicator: str, body: ManualObservation):
     spec = next((i for i in load_indicators() if i["id"] == indicator), None)
     if spec is None:
         return error(404, "indicator_missing", "Không có chỉ số này.")
-    if spec["source"]["kind"] != "manual":
+    if spec["source"]["kind"] != "manual" and not spec["source"].get("manual_fallback"):
         return error(409, "indicator_automatic", "Chỉ số này được cập nhật tự động, không nhập tay.")
     try:
         value = Decimal(body.value.strip().replace(" ", "").replace(",", "."))

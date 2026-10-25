@@ -164,9 +164,13 @@ class PersonalRepository:
             return self._record(tx, collection, record_id, version or current)
         return self.store.atomic(operation)
 
-    def write(self, context, collection, record_id, payload, *, expected_version, request_id):
+    def write(self, context, collection, record_id, payload, *, expected_version, request_id, inputs: dict[tuple[str, str], int] | None = None):
+        """inputs: other records whose head versions must still match, checked inside the same transaction."""
         self.authorize(context)
         key = self.key(collection, record_id)
+        checks = [(self.key(c, r), v) for (c, r), v in (inputs or {}).items()]
+        if any(type(v) is not int or v < 1 for _, v in checks):
+            raise InvalidRecord("Explicit existing input versions required")
         if type(expected_version) is not int or expected_version < 0 or not isinstance(request_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", request_id):
             raise InvalidRecord("Invalid expected version or request ID")
         if type(payload) is not dict:
@@ -175,7 +179,7 @@ class PersonalRepository:
         payload = deepcopy(payload)
         if len(canonical(payload).encode()) > 524288:
             raise InvalidRecord("Payload too large")
-        fingerprint = digest([collection, record_id, expected_version, payload])
+        fingerprint = digest([collection, record_id, expected_version, payload, sorted(checks)])
         root = f"owners/{self.owner_uid}"
         request_path = f"{root}/mutation_requests/{request_id}"
         head_path = f"{root}/record_heads/{key}"
@@ -187,6 +191,10 @@ class PersonalRepository:
                 if previous["fingerprint"] != fingerprint:
                     raise IdempotencyConflict("Request ID has different content")
                 return self._record(tx, collection, record_id, previous["version"])
+            for input_key, input_version in checks:
+                input_head = tx.read(f"{root}/record_heads/{input_key}")
+                if input_head is None or input_head["version"] != input_version:
+                    raise VersionConflict("Input versions changed")
             head = tx.read(head_path)
             current = head["version"] if head else 0
             if current != expected_version:

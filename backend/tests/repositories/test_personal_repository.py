@@ -190,3 +190,16 @@ def test_remote_missing_record_invalidates_old_cached_copy(repo, store, tmp_path
         store.available = False
         with pytest.raises(RepositoryUnavailable):
             service.read(OWNER, "profile_versions", "main")
+
+
+def test_write_can_require_input_versions_in_the_same_transaction(repo, store):
+    write(repo)  # profile_versions/main v1
+    ok = repo.write(OWNER, "reports", "r1", {"status": "published"}, expected_version=0, request_id="rep-1",
+                    inputs={("profile_versions", "main"): 1})
+    assert ok.version == 1
+    write(repo, request_id="request-2", version=1)  # profile moves to v2
+    before = dict(store.documents)
+    with pytest.raises(VersionConflict):
+        repo.write(OWNER, "reports", "r2", {"status": "published"}, expected_version=0, request_id="rep-2",
+                   inputs={("profile_versions", "main"): 1})
+    assert store.documents == before

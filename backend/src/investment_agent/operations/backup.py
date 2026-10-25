@@ -13,7 +13,7 @@ import re
 import shutil
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ALLOWED = (re.compile(r"^prices/[^/]+/(manifest\.json|[^/]+\.parquet)$"), re.compile(r"^documents/.+\.(pdf|html|json)$"))
@@ -84,6 +84,30 @@ def create_backup(data_dir: Path, backup_root: Path, *, personal_export: dict | 
         shutil.rmtree(work, ignore_errors=True)
         raise
     return BackupManifest(path=final, kind=kind, created_at=manifest["created_at"], files=files)
+
+
+VIETNAM = timezone(timedelta(hours=7))
+EVENING_HOUR = 20  # after the last after-close slot, so the day's report is included
+
+
+def due_backup_kind(backup_root: Path, now: datetime) -> str | None:
+    """Kind of scheduled backup due at `now`, or None. At most one per Vietnam day, from the evening
+    slot on; a machine that missed an evening catches up at any hour once the last one is a day old.
+    Weekly every seven days, daily otherwise. Manual backups do not count."""
+    root, today = Path(backup_root), now.astimezone(VIETNAM)
+    taken = []
+    if root.is_dir():
+        for entry in root.iterdir():
+            m = NAME.match(entry.name)
+            if m and m.group(1) != "manual" and entry.is_dir():
+                at = datetime.strptime(entry.name[:16], "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc).astimezone(VIETNAM)
+                taken.append((at, m.group(1)))
+    if taken:
+        latest = max(at for at, _ in taken)
+        if latest.date() == today.date() or (today.hour < EVENING_HOUR and today - latest < timedelta(days=1)):
+            return None
+    recent_weekly = any(kind == "weekly" and (today.date() - at.date()).days < 7 for at, kind in taken)
+    return "daily" if recent_weekly else "weekly"
 
 
 def prune_backups(backup_root: Path, *, keep_daily: int = 7, keep_weekly: int = 4) -> list[Path]:

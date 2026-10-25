@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from investment_agent.api.auth import OwnerContext
-from investment_agent.operations.backup import BackupError, create_backup, export_personal, prune_backups
+from investment_agent.operations.backup import BackupError, create_backup, due_backup_kind, export_personal, prune_backups
 from investment_agent.operations.logging import JobLogger
 from investment_agent.operations.restore import BackupCorrupt, preview_personal_restore, restore_local, restore_personal, verify_backup
 from investment_agent.repositories.personal import MemoryDocumentStore, PersonalRepository
@@ -143,3 +143,48 @@ def test_job_log_records_only_safe_fields(tmp_path, caplog):
         log.event("compose", prompt="Thu nhập 50 triệu")
     lines = [json.loads(l) for l in (tmp_path / "jobs.log").read_text(encoding="utf-8").splitlines()]
     assert set(lines[0]) == {"time", "phase", "count", "error_code"} and SECRET not in (tmp_path / "jobs.log").read_text(encoding="utf-8")
+
+
+def _vn(day, hour):
+    return datetime(2026, 10, day, hour, tzinfo=timezone(timedelta(hours=7)))
+
+
+def _existing(root, *names):
+    for n in names:
+        (root / n).mkdir(parents=True)
+    return root
+
+
+def test_first_scheduled_backup_is_weekly(tmp_path):
+    assert due_backup_kind(tmp_path / "none", _vn(26, 20)) == "weekly"
+
+
+def test_no_backup_before_the_last_slot_when_a_recent_one_exists(tmp_path):
+    root = _existing(tmp_path, "20261025T133000Z-weekly")  # 20:30 on 25/10, Vietnam time
+    assert due_backup_kind(root, _vn(26, 17)) is None
+    assert due_backup_kind(root, _vn(26, 20)) == "daily"
+
+
+def test_at_most_one_scheduled_backup_per_vietnam_day(tmp_path):
+    root = _existing(tmp_path, "20261026T130500Z-daily")  # 20:05 on 26/10
+    assert due_backup_kind(root, _vn(26, 21)) is None
+
+
+def test_missed_evening_is_caught_up_at_any_hour(tmp_path):
+    root = _existing(tmp_path, "20261024T130000Z-daily")  # 20:00 on 24/10; machine off on 25/10
+    assert due_backup_kind(root, _vn(26, 8)) == "weekly"
+
+
+def test_weekly_once_every_seven_days_and_manual_backups_do_not_count(tmp_path):
+    root = _existing(tmp_path, "20261020T130000Z-weekly", "20261026T020000Z-manual")
+    assert due_backup_kind(root, _vn(26, 20)) == "daily"
+    assert due_backup_kind(root, _vn(27, 20)) == "weekly"
+
+
+def test_cli_auto_backup_skips_without_touching_firestore(tmp_path, monkeypatch, capsys):
+    from investment_agent import cli
+    import investment_agent.repositories.firestore as firestore
+    monkeypatch.setattr(firestore, "personal_repository_from_env", lambda: pytest.fail("Firestore must not be read"))
+    root = _existing(tmp_path / "backups", f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-daily")
+    assert cli.run_backup(tmp_path / "data", root, "auto") == 0
+    assert json.loads(capsys.readouterr().out) == {"status": "skipped", "reason": "not_due"}

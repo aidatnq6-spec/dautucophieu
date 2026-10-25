@@ -11,6 +11,10 @@
 
 Không bao giờ chép: `.env*`, log, khóa, tệp ngoài allowlist. Thiếu kết nối Firestore thì lệnh dừng (mã 2): chỉ sao chép cache cục bộ không được coi là sao lưu đầy đủ. Bản sao lưu chứa dữ liệu tài chính cá nhân: giữ trong `backups\` (Git bỏ qua), giới hạn quyền tài khoản Windows; ứng dụng không tự tải lên nơi khác.
 
+## Sao lưu tự động
+
+Tác vụ lịch `InvestmentAgent-AfterClose` gọi `backup --kind auto` sau mỗi lần chạy. Lệnh tự quyết định có cần sao lưu không: tối đa một bản mỗi ngày (giờ Việt Nam), từ 20:00 để có bản tin của ngày; nếu máy tắt lúc 20:00 thì lần chạy kế tiếp sao lưu bù khi bản gần nhất đã quá 24 giờ. Bản đầu tiên và mỗi 7 ngày một lần là `weekly`, còn lại `daily`; bản `manual` không được tính. Không đến hạn thì ghi `skipped` vào `logs\scheduler.log` và không đọc Firestore.
+
 Giữ lại 7 bản `daily` và 4 bản `weekly` mới nhất; bản `manual` không tự xóa. Việc xóa chỉ áp dụng cho thư mục nằm trực tiếp trong thư mục sao lưu đã resolve, không theo symlink/junction ra ngoài.
 
 ## Khôi phục

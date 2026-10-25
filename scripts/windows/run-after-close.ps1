@@ -14,5 +14,9 @@ if (Test-Path -LiteralPath $symbols) {
     "$(Get-Date -Format o) market-sync exit=$LASTEXITCODE $sync" | Add-Content -LiteralPath $log -Encoding UTF8
 }
 $summary = & $python -W ignore -m investment_agent.cli scheduled-run --calendar $calendar --data-dir $data 2>$null
-"$(Get-Date -Format o) exit=$LASTEXITCODE $summary" | Add-Content -LiteralPath $log -Encoding UTF8
-exit $LASTEXITCODE
+$runExit = $LASTEXITCODE
+"$(Get-Date -Format o) exit=$runExit $summary" | Add-Content -LiteralPath $log -Encoding UTF8
+# At most one backup per day, after the evening slot (or as a catch-up); retention prunes old ones.
+$backup = & $python -W ignore -m investment_agent.cli backup --kind auto --data-dir $data --backup-dir (Join-Path $script:RepoRoot 'backups') 2>$null
+"$(Get-Date -Format o) backup exit=$LASTEXITCODE $backup" | Add-Content -LiteralPath $log -Encoding UTF8
+exit $runExit

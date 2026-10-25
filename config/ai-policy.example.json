@@ -1,0 +1,20 @@
+{
+  "version": "ai-policy-example-1",
+  "status": "example_unapproved",
+  "notice": "Mẫu chính sách; chủ sở hữu phải chọn model cụ thể, đặt ngân sách USD và duyệt trước khi bật AI thật.",
+  "provider": {"data_collection": "deny", "zdr": true, "require_parameters": true},
+  "tasks": {
+    "brief": {"models": ["example/model-a", "example/model-b"], "required_parameters": ["response_format"], "max_tokens": 2000},
+    "deep": {"models": ["example/model-a"], "required_parameters": ["tools", "response_format"], "max_tokens": 6000},
+    "interactive": {"models": ["example/model-b"], "required_parameters": ["tools"], "max_tokens": 1500}
+  },
+  "budget": {
+    "monthly_usd": "0",
+    "per_request_max_usd": "0.50",
+    "per_job_max_usd": "2.00",
+    "max_concurrency": 2,
+    "price_max_age_days": 7,
+    "on_missing_price": "block"
+  },
+  "timeouts": {"connect_seconds": 10, "read_seconds": 120, "max_retries": 2}
+}

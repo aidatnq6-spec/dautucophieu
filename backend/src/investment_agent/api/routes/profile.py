@@ -1,16 +1,13 @@
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
 from pydantic import Field
 
 from investment_agent.domain.investable_capital import FinancialProfile, assess_capital
 from investment_agent.domain.models import ContractModel, SignedAmount, UnsignedAmount
 from investment_agent.domain.profile import ConfirmedProfile, profile_freshness
-from investment_agent.repositories.personal import IdempotencyConflict, RepositoryUnavailable, VersionConflict
-from investment_agent.repositories.personal_cache import PersonalView
+from investment_agent.repositories.personal import RepositoryUnavailable
 
 from ..auth import require_owner
+from .common import WRITE_ERRORS, error, now, read_current, unavailable, write_error
 
 router = APIRouter(prefix="/internal/profile")
 COLLECTION, RECORD = "profile_versions", "main"
@@ -28,21 +25,9 @@ class ConfirmRequest(AssessmentRequest):
     request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
 
 
-def _error(status, code, message):
-    return JSONResponse({"code": code, "message": message}, status_code=status)
-
-
-def _unavailable():
-    return _error(503, "personal_repository_unavailable", "Chưa kết nối được kho dữ liệu cá nhân; không ghi thay đổi.")
-
-
-def _now(request: Request) -> datetime:
-    return datetime.fromtimestamp(request.app.state.clock(), timezone.utc)
-
-
 def _view(request: Request, record, *, stale=False):
     stored = ConfirmedProfile.model_validate(record.payload)
-    freshness = profile_freshness(stored.confirmed_at, _now(request))
+    freshness = profile_freshness(stored.confirmed_at, now(request))
     if stale:
         freshness = freshness.model_copy(update={"allows_new_recommendations": False})
     return {"version": record.version, **stored.model_dump(mode="json"), "freshness": freshness.model_dump(mode="json"), "stale": stale}
@@ -59,16 +44,13 @@ def current(request: Request):
     owner = require_owner(request)
     repo = request.app.state.personal_repository
     if repo is None:
-        return _unavailable()
+        return unavailable()
     try:
-        result = repo.read(owner, COLLECTION, RECORD)
+        result, stale = read_current(repo, owner, COLLECTION, RECORD)
     except RepositoryUnavailable:
-        return _unavailable()
-    stale = False
-    if isinstance(result, PersonalView):
-        result, stale = result.record, result.stale
+        return unavailable()
     if result is None:
-        return _error(404, "profile_missing", "Chưa có hồ sơ tài chính đã xác nhận.")
+        return error(404, "profile_missing", "Chưa có hồ sơ tài chính đã xác nhận.")
     return _view(request, result, stale=stale)
 
 
@@ -77,20 +59,16 @@ def confirm(request: Request, body: ConfirmRequest):
     owner = require_owner(request)
     repo = request.app.state.personal_repository
     if repo is None:
-        return _unavailable()
+        return unavailable()
     assessment = assess_capital(body.profile, ledger_value=body.ledger_value)
     if assessment.status in {"needs_confirmation", "incomplete"}:
-        return _error(422, "profile_not_confirmable", "Cần xác nhận mục tiêu và giá trị sổ trước khi chốt vốn có thể đầu tư.")
+        return error(422, "profile_not_confirmable", "Cần xác nhận mục tiêu và giá trị sổ trước khi chốt vốn có thể đầu tư.")
     if body.reviewed_net != assessment.net:
-        return _error(409, "capital_changed", "Bảng tính vốn đã thay đổi; hãy xem lại trước khi xác nhận.")
-    stored = ConfirmedProfile(profile=body.profile, assessment=assessment, confirmed_at=_now(request))
+        return error(409, "capital_changed", "Bảng tính vốn đã thay đổi; hãy xem lại trước khi xác nhận.")
+    stored = ConfirmedProfile(profile=body.profile, assessment=assessment, confirmed_at=now(request))
     try:
         record = repo.write(owner, COLLECTION, RECORD, stored.model_dump(mode="json"),
                             expected_version=body.expected_version, request_id=body.request_id)
-    except VersionConflict:
-        return _error(409, "version_conflict", "Hồ sơ đã được cập nhật ở nơi khác; hãy tải lại.")
-    except IdempotencyConflict:
-        return _error(409, "request_reused", "Mã yêu cầu đã dùng cho nội dung khác.")
-    except RepositoryUnavailable:
-        return _unavailable()
+    except WRITE_ERRORS as exc:
+        return write_error(exc)
     return _view(request, record)

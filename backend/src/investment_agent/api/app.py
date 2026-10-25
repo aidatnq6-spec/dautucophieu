@@ -12,6 +12,7 @@ from .auth import InternalAuthSettings, InternalAuthenticator, Unauthorized, req
 from .routes.health import router as health_router
 from .routes.profile import router as profile_router
 from .routes.ledger import router as ledger_router
+from .routes.notifications import router as notifications_router
 from .routes.jobs import router as jobs_router
 from .routes.overview import router as overview_router
 from .routes.reports import router as reports_router
@@ -21,13 +22,14 @@ from .routes.valuation_assumptions import router as valuation_router
 
 
 def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[[], float] = time.time, personal_repository=None,
-               market=None, jobs=None, outbox=None) -> FastAPI:
+               market=None, jobs=None, outbox=None, telegram=None, deliveries=None) -> FastAPI:
     """personal_repository None keeps personal routes fail-closed (503)."""
     authenticator = InternalAuthenticator(settings or InternalAuthSettings.from_env(), clock)
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     app.state.clock, app.state.personal_repository = clock, personal_repository
     app.state.market = market or EmptyMarket()  # no licensed market source is connected yet
     app.state.jobs, app.state.outbox = jobs, outbox  # both required for report jobs
+    app.state.telegram, app.state.deliveries = telegram, deliveries  # sender holds the bot token; None = not configured
     app.state.accepted_jobs = {}  # accepted request id -> job id (None when another worker held the lease)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "[::1]"])
 
@@ -60,6 +62,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(overview_router)
     app.include_router(jobs_router)
     app.include_router(reports_router)
+    app.include_router(notifications_router)
 
     @app.get("/internal/identity")
     def identity(request: Request):

@@ -24,9 +24,9 @@ class Clock:
         return self.now
 
 
-def make_client(clock, repository=None, market=None, jobs=None, outbox=None):
+def make_client(clock, repository=None, market=None, jobs=None, outbox=None, telegram=None, deliveries=None):
     app = create_app(InternalAuthSettings("owner-1", TOKEN, SECRET), clock=clock, personal_repository=repository, market=market,
-                     jobs=jobs, outbox=outbox)
+                     jobs=jobs, outbox=outbox, telegram=telegram, deliveries=deliveries)
     return TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000))
 
 

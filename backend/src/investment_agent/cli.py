@@ -36,6 +36,8 @@ def main() -> int:
     sync.add_argument("--calendar", type=Path, required=True)
     sync.add_argument("--days", type=int, default=30)
     sync.add_argument("--index", action="store_true", help="the symbols are indices (e.g. VNINDEX), quoted in points")
+    macro = commands.add_parser("macro-sync", help="fetch automatic macro indicators (FRED, Vietcombank) into data/macro")
+    macro.add_argument("--data-dir", type=Path, required=True)
     sectors = commands.add_parser("industries", help="save ICB level-2 sectors of the synced tickers for the market page")
     sectors.add_argument("--symbols", required=True, help="comma-separated tickers, or @file with one ticker per line")
     sectors.add_argument("--output", type=Path, required=True)
@@ -46,6 +48,8 @@ def main() -> int:
         return index_groups([g.strip().upper() for g in args.groups.split(",") if g.strip()], args.output)
     if args.command == "market-sync":
         return market_sync(_symbols(args.symbols), args.data_dir, args.calendar, args.days, index=args.index)
+    if args.command == "macro-sync":
+        return macro_sync(args.data_dir)
     if args.command == "industries":
         return industries(_symbols(args.symbols), args.output)
     if args.command == "backup":
@@ -120,6 +124,22 @@ def index_groups(groups: list[str], output: Path, provider=None, today=None) -> 
 
 def _same_bar(a, b) -> bool:
     return a.model_dump(exclude={"observed_at"}) == b.model_dump(exclude={"observed_at"})
+
+
+def macro_sync(data_dir: Path, get=None) -> int:
+    """Exit 0 when every automatic indicator updated, 1 when some failed (each is reported)."""
+    from investment_agent.market.leading import MacroStore, fetch_auto, load_indicators
+    if get is None:
+        import httpx
+
+        def get(url):
+            response = httpx.get(url, timeout=30, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+            response.raise_for_status()
+            return response.text
+    results = fetch_auto(load_indicators(), MacroStore(data_dir), get=get)
+    failed = {k: v for k, v in results.items() if v != "ok"}
+    print(json.dumps({"status": "ok" if not failed else "partial", "results": results}))
+    return 0 if not failed else 1
 
 
 def industries(symbols: list[str], output: Path, provider=None, today=None) -> int:

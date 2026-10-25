@@ -27,6 +27,9 @@ if (Test-Path -LiteralPath $symbols) {
     $sync = & $python -W ignore -m investment_agent.cli market-sync --symbols VNINDEX --index --data-dir $data --calendar $calendar --days 10 2>$null
     "$(Get-Date -Format o) market-sync VNINDEX exit=$LASTEXITCODE $sync" | Add-Content -LiteralPath $log -Encoding UTF8
 }
+# Public macro feeds (FRED, Vietcombank); a failing source is logged and the run continues.
+$macro = & $python -W ignore -m investment_agent.cli macro-sync --data-dir $data 2>$null
+"$(Get-Date -Format o) macro-sync exit=$LASTEXITCODE $macro" | Add-Content -LiteralPath $log -Encoding UTF8
 $summary = & $python -W ignore -m investment_agent.cli scheduled-run --calendar $calendar --data-dir $data 2>$null
 $runExit = $LASTEXITCODE
 "$(Get-Date -Format o) exit=$runExit $summary" | Add-Content -LiteralPath $log -Encoding UTF8

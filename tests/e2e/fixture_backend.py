@@ -12,6 +12,7 @@ import uvicorn
 from investment_agent.api.app import create_app
 from investment_agent.api.auth import InternalAuthSettings
 from investment_agent.jobs.runner import JobStore
+from investment_agent.market.leading import MacroStore
 from investment_agent.market.view import EvidenceRef, PricePoint, SyntheticMarket
 from investment_agent.notifications.outbox import DeliveryStore
 from investment_agent.repositories.personal import MemoryDocumentStore, PersonalRepository
@@ -40,6 +41,7 @@ if __name__ == "__main__":
     with open(os.path.join(data, "industries.json"), "w", encoding="utf-8") as f:
         json.dump({"as_of": "2026-10-25", "source": "synthetic", "level": 2, "sectors": {"FPT": "Công nghệ Thông tin", "VCB": "Ngân hàng"}}, f,
                   ensure_ascii=False)
+    MacroStore(data).upsert("us10y", [(date(2026, 10, 21), "4.91"), (date(2026, 10, 23), "4.96")], entry="auto")
     app = create_app(InternalAuthSettings.from_env(), personal_repository=repository, market=MARKET,
                      jobs=JobStore(os.path.join(data, "jobs.sqlite")), outbox=deliveries, deliveries=deliveries, data_dir=data)
     uvicorn.run(app, host="127.0.0.1", port=int(os.environ["E2E_PYTHON_PORT"]), workers=1, access_log=False)

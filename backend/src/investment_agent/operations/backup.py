@@ -16,7 +16,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-ALLOWED = (re.compile(r"^prices/[^/]+/(manifest\.json|[^/]+\.parquet)$"), re.compile(r"^documents/.+\.(pdf|html|json)$"))
+ALLOWED = (re.compile(r"^prices/[^/]+/(manifest\.json|[^/]+\.parquet)$"), re.compile(r"^documents/.+\.(pdf|html|json)$"),
+           re.compile(r"^macro/[a-z0-9_]+\.json$"))  # macro values, including the owner's manual entries
 NAME = re.compile(r"^\d{8}T\d{6}Z-(daily|weekly|manual)$")
 
 

@@ -93,8 +93,22 @@ if __name__ == "__main__":
     except RepositoryUnavailable:
         repository = None  # Personal routes answer 503 until Firebase Admin is configured.
     data_dir = Path(os.environ.get("INVESTMENT_DATA_DIR", "data")).resolve()
+    from datetime import datetime
+
+    from investment_agent.cli import load_calendar
+    from investment_agent.market.prices import PriceStore
+    from investment_agent.market.view import StoreMarket
+    from zoneinfo import ZoneInfo
+
+    from investment_agent.domain.pinned import CONFIG_DIR
+    hanoi_today = lambda: datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date()  # noqa: E731
+    calendar_path = CONFIG_DIR / f"trading-calendar-hose-{hanoi_today().year}.json"
+    market = None  # EmptyMarket unless prices were synced and this year's calendar exists
+    if (data_dir / "prices").exists() and calendar_path.exists():
+        market = StoreMarket(PriceStore(data_dir), load_calendar(calendar_path), today=hanoi_today)
     deliveries = DeliveryStore(data_dir / "deliveries.sqlite")  # also the report outbox
     token = Settings.from_env().telegram_bot_token
-    uvicorn.run(create_app(personal_repository=repository, jobs=JobStore(data_dir / "jobs.sqlite"), outbox=deliveries, deliveries=deliveries,
+    uvicorn.run(create_app(personal_repository=repository, market=market, jobs=JobStore(data_dir / "jobs.sqlite"), outbox=deliveries,
+                           deliveries=deliveries,
                            telegram=TelegramSender(token, client=httpx.Client()) if token else None),
                 host="127.0.0.1", port=8000, workers=1, access_log=False, proxy_headers=False)

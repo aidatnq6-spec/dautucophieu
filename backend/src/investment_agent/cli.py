@@ -23,7 +23,19 @@ def main() -> int:
     backup.add_argument("--data-dir", type=Path, required=True)
     backup.add_argument("--backup-dir", type=Path, required=True)
     backup.add_argument("--kind", choices=["daily", "weekly", "manual"], default="daily")
+    vaudit = commands.add_parser("vnstock-audit", help="depth check of Vnstock data against the 10-year requirement")
+    vaudit.add_argument("--symbols", required=True, help="comma-separated tickers")
+    vaudit.add_argument("--output-dir", type=Path, required=True)
+    sync = commands.add_parser("market-sync", help="load recent Vnstock daily prices (adjusted) into the local store")
+    sync.add_argument("--symbols", required=True, help="comma-separated tickers, or @file with one ticker per line")
+    sync.add_argument("--data-dir", type=Path, required=True)
+    sync.add_argument("--calendar", type=Path, required=True)
+    sync.add_argument("--days", type=int, default=30)
     args = parser.parse_args()
+    if args.command == "vnstock-audit":
+        return vnstock_audit(_symbols(args.symbols), args.output_dir)
+    if args.command == "market-sync":
+        return market_sync(_symbols(args.symbols), args.data_dir, args.calendar, args.days)
     if args.command == "backup":
         return run_backup(args.data_dir, args.backup_dir, args.kind)
     if args.command == "scheduled-run":
@@ -50,6 +62,57 @@ def load_calendar(path: Path):
         raise ValueError("calendar must name its official source")
     return TradingCalendar(version=data["version"], source=data["source"], holidays=frozenset(date.fromisoformat(d) for d in data["holidays"]),
                            first=date.fromisoformat(data["first"]), last=date.fromisoformat(data["last"]))
+
+
+def _symbols(raw: str) -> list[str]:
+    text = Path(raw[1:]).read_text(encoding="utf-8") if raw.startswith("@") else raw.replace(",", "\n")
+    return [s.strip().upper() for s in text.splitlines() if s.strip() and not s.strip().startswith("#")]
+
+
+def vnstock_audit(symbols: list[str], output_dir: Path, provider=None, today=None) -> int:
+    from datetime import date
+    from investment_agent.market.providers.vnstock_adapter import ProviderUnavailable, VnstockProvider, audit_symbol
+    provider = provider or VnstockProvider()
+    today = today or date.today()
+    results = []
+    for symbol in symbols:
+        try:
+            results.append(audit_symbol(provider, symbol, today=today))
+        except ProviderUnavailable as exc:
+            print(json.dumps({"status": "not_configured", "reason": str(exc)}, ensure_ascii=False))
+            return 2
+        except Exception as exc:  # one failing symbol is recorded, the audit continues
+            results.append({"symbol": symbol, "error": type(exc).__name__})
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "vnstock-audit.json").write_text(json.dumps(results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    passed = sum(1 for r in results if r.get("meets_10y_prices") and r.get("meets_40_quarters"))
+    print(json.dumps({"status": "ok", "symbols": len(results), "meet_10y_and_40q": passed, "file": str(output_dir / "vnstock-audit.json")}))
+    return 0
+
+
+def market_sync(symbols: list[str], data_dir: Path, calendar_path: Path, days: int, provider=None, today=None) -> int:
+    from datetime import date, timedelta
+    from investment_agent.market.prices import PriceStore, ingest
+    from investment_agent.market.providers.vnstock_adapter import ProviderUnavailable, VnstockProvider
+    provider = provider or VnstockProvider()
+    today = today or date.today()
+    cal = load_calendar(calendar_path)
+    store = PriceStore(data_dir)
+    start = max(today - timedelta(days=days), cal.first)
+    loaded, failed = 0, []
+    for symbol in symbols:
+        try:
+            bars = [b for b in provider.fetch_prices(symbol, start, today) if cal.first <= b.session_date <= cal.last and cal.is_session(b.session_date)]
+            if bars:
+                ingest(store, cal, bars, revision_id=f"vnstock-{today:%Y%m%d}-{start:%Y%m%d}")
+                loaded += len(bars)
+        except ProviderUnavailable as exc:
+            print(json.dumps({"status": "not_configured", "reason": str(exc)}, ensure_ascii=False))
+            return 2
+        except Exception as exc:  # one failing symbol does not stop the others
+            failed.append({"symbol": symbol, "error": getattr(exc, "code", type(exc).__name__)})
+    print(json.dumps({"status": "ok" if not failed else "partial", "bars": loaded, "failed": failed}))
+    return 0 if not failed else 1
 
 
 def run_backup(data_dir: Path, backup_dir: Path, kind: str) -> int:
@@ -85,7 +148,11 @@ def scheduled_run(calendar_path: Path, data_dir: Path) -> int:
     from investment_agent.api.auth import OwnerContext
     from investment_agent.jobs.runner import JobStore, LeaseBusy
     from investment_agent.jobs.schedule import scheduled_tick
-    from investment_agent.market.view import EmptyMarket
+    from zoneinfo import ZoneInfo
+
+    from investment_agent.market.prices import PriceStore
+    from investment_agent.market.view import EmptyMarket, StoreMarket
+    VN = ZoneInfo("Asia/Ho_Chi_Minh")
     from investment_agent.notifications.outbox import DeliveryStore
     from investment_agent.notifications.telegram import TelegramSender
     from investment_agent.repositories.firestore import personal_repository_from_env
@@ -102,7 +169,8 @@ def scheduled_run(calendar_path: Path, data_dir: Path) -> int:
     sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client()) if settings.telegram_bot_token else None
     owner = OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
     try:
-        result = scheduled_tick(repo=repo, owner=owner, market=EmptyMarket(), jobs=JobStore(data_dir / "jobs.sqlite"),
+        market = StoreMarket(PriceStore(data_dir), cal, today=lambda: datetime.now(VN).date()) if (data_dir / "prices").exists() else EmptyMarket()
+        result = scheduled_tick(repo=repo, owner=owner, market=market, jobs=JobStore(data_dir / "jobs.sqlite"),
                                 deliveries=DeliveryStore(data_dir / "deliveries.sqlite"), sender=sender, cal=cal,
                                 now=datetime.now(timezone.utc), worker_id=f"scheduler-{os.getpid()}")
     except LeaseBusy:

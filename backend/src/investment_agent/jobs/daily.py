@@ -88,7 +88,10 @@ def _run(repo, owner, market, jobs, outbox, job_id, content, versions, snapshot,
         flags.append("universe_incomplete")
     if market.provenance != "licensed":
         flags.append(f"market_provenance:{market.provenance}")
-    complete = setup["profile"] and setup["risk"] and market.provenance != "none" and not content["quality_notes"]
+    # The latest stored price may predate the session (vendor not yet updated); that is not this session's report.
+    behind = [h["security_id"] for h in content["holdings"] if h["price_date"] and h["price_date"] < session_date.isoformat()]
+    flags += [f"price_not_for_session:{s}" for s in behind]
+    complete = setup["profile"] and setup["risk"] and market.provenance != "none" and not content["quality_notes"] and not behind
     status = "published" if complete else "incomplete"
     jobs.stage(job_id, "compose")
 

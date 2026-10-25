@@ -98,3 +98,18 @@ def test_run_record_carries_versions_and_snapshot():
     assert result.record.prompt_version == load_prompt("analysis").version == "analysis-vi-1"
     assert result.record.schema_version == "analysis-output-1" and result.record.snapshot_id == "snap-1"
     assert result.record.latency_ms >= 0
+
+
+@pytest.mark.parametrize(("field", "text", "expected"), [
+    ("summary", "Danh mục ổn; FPT có P/E 18,2 lần.", []),
+    ("summary", "FPT đang có P/E 25 lần.", ["number_mismatch"]),
+    ("market_view", "Ngân hàng rẻ: VCB P/B 2.3.", []),
+    ("market_view", "VCB có P/B 4.1, đắt hơn mặt bằng.", ["number_mismatch"]),
+    ("market_view", "Mặt bằng P/E quanh 14 lần.", []),
+    ("market_view", "Mặt bằng P/E quanh 9,5 lần.", ["number_mismatch"]),
+    ("risks", "Rủi ro định giá: FPT P/E 30.", ["number_mismatch"]),
+])
+def test_ratio_numbers_in_free_text_must_match_the_pack(field, text, expected):
+    out = json.loads(json.dumps(CASES["cases"][0]["output"]))
+    out[field] = [text] if field == "risks" else text
+    assert check(out) == expected

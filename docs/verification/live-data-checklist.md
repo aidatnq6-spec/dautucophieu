@@ -1,6 +1,6 @@
 # Checklist kiểm chứng live
 
-Mọi mục dưới đây đang **not_run** (2026-10-25). Ghi `passed`/`failed`/`not_run` kèm ngày, người chạy và bằng chứng đã che thông tin cá nhân. Không chuyển kết quả test tổng hợp thành bằng chứng chất lượng đầu tư thật.
+Mục chưa đánh dấu đang **not_run** (cập nhật 2026-10-25). Ghi `passed`/`failed`/`not_run` kèm ngày, người chạy và bằng chứng đã che thông tin cá nhân. Không chuyển kết quả test tổng hợp thành bằng chứng chất lượng đầu tư thật.
 
 ## Nguồn dữ liệu (cần trước khuyến nghị thật)
 
@@ -14,10 +14,13 @@ Mọi mục dưới đây đang **not_run** (2026-10-25). Ghi `passed`/`failed`/
 
 ## Firebase
 
-- [ ] Cấu hình service account cục bộ, owner UID, đăng nhập Google; xác nhận tài khoản khác bị từ chối. — not_run
+- [x] Cấu hình service account cục bộ (khóa ngoài repo), owner UID, đăng nhập Google — passed 2026-10-25: chủ sở hữu đăng nhập và mở trang Tổng quan.
+- [ ] Xác nhận một tài khoản Google khác bị từ chối trên môi trường thật. — not_run (đã có test tự động)
 - [ ] Chạy `test_firestore_emulator.py` với emulator (cần Java ≥ 21). — not_run
-- [ ] Deploy Firestore Rules (deny client) và indexes; kiểm tra client không đọc được dữ liệu. — not_run
-- [ ] Sao lưu thật (`cli backup`) và diễn tập khôi phục vào project/thư mục riêng. — not_run
+- [x] Deploy Firestore Rules (deny client) — passed 2026-10-25T09:55Z, chủ sở hữu chạy `firebase deploy --only firestore:rules`; rules cũ của project dùng chung được sao lưu ngoài repo. Kiểm tra client bằng Rules Test API chưa chạy được (service account không có quyền); dựa vào nội dung rules: mặc định từ chối.
+- [x] Smoke test `PersonalRepository` trên Firestore thật, namespace tạm `owners/smoke-<ngẫu nhiên>` đã xóa sau khi chạy — passed 2026-10-25, 10/10: tạo revision, retry idempotent, từ chối request_id dùng lại với payload khác, CAS, giữ lịch sử, chặn ghi khi input cũ, export, khôi phục vào namespace rỗng.
+- [x] Sao lưu thật (`cli backup`) — passed 2026-10-25, bản `backups/20261025T095916Z-manual`, checksum khớp.
+- [ ] Diễn tập khôi phục từ một bản sao lưu thật vào project/thư mục riêng. — not_run (khôi phục mới được thử trong smoke test)
 
 ## AI (sau khi chủ sở hữu đặt ngân sách)
 

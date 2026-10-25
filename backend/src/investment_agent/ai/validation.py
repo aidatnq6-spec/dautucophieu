@@ -22,6 +22,7 @@ from .tools import ToolBox
 SCHEMA_VERSION = "analysis-output-1"
 NUMBER_TOLERANCE = Decimal("0.05")
 _RATIO_PATTERNS = {"pe_ttm": re.compile(r"P/E\D{0,15}?(\d+(?:[.,]\d+)?)", re.I), "pb": re.compile(r"P/B\D{0,15}?(\d+(?:[.,]\d+)?)", re.I)}
+_SENTENCE = re.compile(r"(?<!\d)[.;!?\n]|[.;!?](?!\d)")
 _INTEGRITY = re.compile(r"chính trực|liêm chính|trong sạch|không có vi phạm|minh bạch tuyệt đối|\bintegrity\b", re.I)
 ORDER = ("number_mismatch", "allocation_exceeds_policy", "unknown_source", "unknown_ticker", "unsupported_integrity_claim",
          "missing_risk", "stale_inputs")
@@ -38,6 +39,9 @@ def validate_output(output: AnalysisOutput, payload: AiPayload, *, max_equity_we
                 actual = ratios.get(o.ticker, {}).get(key)
                 if actual is None or abs(claimed - Decimal(actual)) > NUMBER_TOLERANCE:
                     issues.add("number_mismatch")
+    for text in (output.summary, output.market_view, *output.risks):
+        if _free_text_mismatch(text, ratios):
+            issues.add("number_mismatch")
     if sum((o.target_weight or Decimal(0) for o in output.opportunities), Decimal(0)) > max_equity_weight:
         issues.add("allocation_exceeds_policy")
     evidence = {e.evidence_id for e in payload.evidence}
@@ -54,6 +58,20 @@ def validate_output(output: AnalysisOutput, payload: AiPayload, *, max_equity_we
     if now - inputs_as_of > max_input_age:
         issues.add("stale_inputs")
     return [code for code in ORDER if code in issues]
+
+
+def _free_text_mismatch(text: str, ratios: dict) -> bool:
+    """A ratio quoted outside a rationale must belong to a ticker named in the same sentence,
+    or, when the sentence names none, to some entity in the pack."""
+    for sentence in _SENTENCE.split(text):
+        named = [t for t in ratios if re.search(r"\b" + re.escape(t) + r"\b", sentence)] or list(ratios)
+        for key, pattern in _RATIO_PATTERNS.items():
+            for match in pattern.finditer(sentence):
+                claimed = Decimal(match.group(1).replace(",", "."))
+                actual = [Decimal(ratios[t][key]) for t in named if ratios[t].get(key) is not None]
+                if not any(abs(claimed - a) <= NUMBER_TOLERANCE for a in actual):
+                    return True
+    return False
 
 
 @dataclass(frozen=True)

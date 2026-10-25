@@ -140,3 +140,38 @@ def test_cli_audit_writes_report(tmp_path):
     assert vnstock_audit(["FPT", "VCB"], tmp_path, provider=provider(), today=date(2026, 10, 23)) == 0
     rows = _json.loads((tmp_path / "vnstock-audit.json").read_text(encoding="utf-8"))
     assert [r["symbol"] for r in rows] == ["FPT", "VCB"] and rows[0]["meets_40_quarters"] is False
+
+
+class RestatedEquity(FakeEquity):
+    def ohlcv(self, *a, **kw):
+        df = super().ohlcv(*a, **kw)
+        df.loc[df.index[-1], "close"] = 58.3
+        return df
+
+
+class RestatedMarket(FakeMarket):
+    def equity(self, symbol):
+        return RestatedEquity(symbol, self.calls)
+
+
+def _sync_twice(tmp_path, second_market):
+    import json as _json
+    from investment_agent.cli import market_sync
+    cal_path = tmp_path / "cal.json"
+    cal_path.write_text(_json.dumps({"version": "x", "source": "test", "holidays": [], "first": "2026-01-01", "last": "2026-12-31"}),
+                        encoding="utf-8")
+    first = market_sync(["FPT"], tmp_path, cal_path, 7, provider=provider(), today=date(2026, 10, 23))
+    later = VnstockProvider(market=second_market, fundamental=FakeFundamental(), clock=lambda: NOW + timedelta(hours=2))
+    return first, market_sync(["FPT"], tmp_path, cal_path, 7, provider=later, today=date(2026, 10, 23))
+
+
+def test_same_day_rerun_with_unchanged_prices_is_a_no_op(tmp_path):
+    assert _sync_twice(tmp_path, FakeMarket()) == (0, 0)
+    assert len(PriceStore(tmp_path).revisions("FPT")) == 1
+
+
+def test_same_day_rerun_with_restated_prices_adds_a_revision(tmp_path):
+    assert _sync_twice(tmp_path, RestatedMarket()) == (0, 0)
+    store = PriceStore(tmp_path)
+    assert len(store.revisions("FPT")) == 2
+    assert store.latest("FPT")[date(2026, 10, 23)][0].close == Decimal("58300")

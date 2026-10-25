@@ -1,6 +1,7 @@
 import "server-only";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { e2eSessionAuth } from "./e2e-auth";
 import { SessionError, type SessionAuth } from "./session";
 
 export function firebaseAuth(): SessionAuth {
@@ -15,4 +16,9 @@ export function firebaseAuth(): SessionAuth {
     const app = getApps().find((app) => app.name === name) ?? initializeApp({ credential: cert({ projectId, clientEmail, privateKey }), projectId }, name);
     return getAuth(app);
   } catch { throw new SessionError(503, "auth_unavailable", "Không thể khởi tạo xác thực."); }
+}
+
+/** Session verifier for app routes: Firebase, or the guarded e2e verifier when explicitly enabled. */
+export function sessionAuth(): SessionAuth {
+  return process.env.INVESTMENT_E2E_AUTH === "1" ? e2eSessionAuth() : firebaseAuth();
 }

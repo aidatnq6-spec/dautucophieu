@@ -22,7 +22,8 @@ def main() -> int:
     backup = commands.add_parser("backup", help="local backup of data/ plus the personal Firestore export")
     backup.add_argument("--data-dir", type=Path, required=True)
     backup.add_argument("--backup-dir", type=Path, required=True)
-    backup.add_argument("--kind", choices=["daily", "weekly", "manual"], default="daily")
+    backup.add_argument("--kind", choices=["daily", "weekly", "manual", "auto"], default="daily",
+                        help="auto: the scheduler's kind, or nothing when no backup is due")
     vaudit = commands.add_parser("vnstock-audit", help="depth check of Vnstock data against the 10-year requirement")
     vaudit.add_argument("--symbols", required=True, help="comma-separated tickers")
     vaudit.add_argument("--output-dir", type=Path, required=True)
@@ -131,11 +132,16 @@ def run_backup(data_dir: Path, backup_dir: Path, kind: str) -> int:
     from datetime import datetime, timezone
 
     from investment_agent.api.auth import OwnerContext
-    from investment_agent.operations.backup import create_backup, export_personal, prune_backups
+    from investment_agent.operations.backup import create_backup, due_backup_kind, export_personal, prune_backups
     from investment_agent.repositories.firestore import personal_repository_from_env
     from investment_agent.repositories.personal import RepositoryUnavailable
 
     now = datetime.now(timezone.utc)
+    if kind == "auto":
+        kind = due_backup_kind(backup_dir, now)
+        if kind is None:
+            print(json.dumps({"status": "skipped", "reason": "not_due"}))
+            return 0
     try:
         repo = personal_repository_from_env()
         export = export_personal(repo, OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "backup"), now=now)

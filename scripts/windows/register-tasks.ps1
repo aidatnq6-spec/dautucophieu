@@ -27,5 +27,8 @@ if ((Get-TimeZone).Id -ne 'SE Asia Standard Time') { throw 'Múi giờ máy khô
 $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $argument -WorkingDirectory $script:RepoRoot
 $triggers = @($times | ForEach-Object { New-ScheduledTaskTrigger -Daily -At $_ }) + @(New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME)
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
-Register-ScheduledTask -TaskName $name -Action $action -Trigger $triggers -Settings $settings -Description 'Bản tin sau phiên (chạy bù khi máy bật lại)' | Out-Null
-Write-Host "Đã đăng ký $name. Máy tắt hoặc ngủ thì không bảo đảm chạy đúng giờ; lần bật sau sẽ chạy bù phiên gần nhất."
+$existing = [bool](Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue)
+# -Force replaces our own task of the same name, so running -Register again updates it instead of failing.
+Register-ScheduledTask -TaskName $name -Action $action -Trigger $triggers -Settings $settings -Description 'Bản tin sau phiên (chạy bù khi máy bật lại)' `
+    -Force -ErrorAction Stop | Out-Null
+Write-Host "$(if ($existing) { 'Đã cập nhật' } else { 'Đã đăng ký' }) $name. Máy tắt hoặc ngủ thì không bảo đảm chạy đúng giờ; lần bật sau sẽ chạy bù phiên gần nhất."

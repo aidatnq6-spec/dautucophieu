@@ -31,10 +31,12 @@ Mục chưa đánh dấu đang **not_run** (cập nhật 2026-10-25). Ghi `passe
 
 ## Telegram
 
-- [ ] Đặt `TELEGRAM_BOT_TOKEN`, Group ID, xác nhận thành viên được xem dữ liệu cá nhân. — not_run
-- [ ] "Gửi thử" một bản tin đã phát hành; kiểm tra message ID, chia phần, xử lý timeout. — not_run
+- [x] Đặt `TELEGRAM_BOT_TOKEN` (trong `.env.local` ở gốc kho), Group ID, xác nhận thành viên được xem dữ liệu cá nhân — passed 2026-10-25; `getMe`/`getChat` hợp lệ, nhóm 2 thành viên (chủ sở hữu và bot).
+- [x] "Gửi thử" một bản tin đã phát hành từ trang bản tin — passed 2026-10-25: chủ sở hữu nhận được tin; outbox ghi 1/1 phần `sent` có message ID.
+- [ ] Bản tin nhiều phần và xử lý timeout trên Telegram thật. — not_run (đã có test tự động)
 
 ## Windows
 
-- [ ] `register-tasks.ps1 -Register`, kiểm tra chạy 17:30/18:30/20:00 và chạy bù khi đăng nhập. — not_run
+- [x] `register-tasks.ps1 -Register` — passed 2026-10-25: tác vụ `InvestmentAgent-AfterClose` Ready, 3 kích hoạt hằng ngày và 1 khi đăng nhập, lần chạy kế tiếp 26/10 17:30.
+- [ ] Lần chạy theo lịch đầu tiên (nạp giá, bản tin, gửi Telegram, sao lưu `daily`) và chạy bù khi đăng nhập. — not_run
 - [ ] Một phiên thật từ dữ liệu thật đến bản tin (không gửi trùng). — not_run

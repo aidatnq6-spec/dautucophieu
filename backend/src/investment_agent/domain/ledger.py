@@ -1,9 +1,9 @@
 """Pure moving-average ledger replayed in (effective_at, sequence, event_id) order.
 
 Buy fees and taxes enter cost; sell fees and taxes reduce proceeds. A sale
-releases quantity × average cost (computed as cost × sold / held so the
-division happens once), and a full sale releases the exact remaining cost, so
-cost bought always equals cost remaining plus cost released.
+releases cost × sold / shares (one division, shares including pending bonus
+shares), and selling every share releases the exact remaining cost, so cost
+bought always equals cost remaining plus cost released.
 """
 
 from collections import Counter
@@ -13,27 +13,16 @@ from typing import Annotated, Literal, Union
 
 from pydantic import Field, TypeAdapter, model_validator
 
+from .corporate_actions import (
+    ACTION_EVENTS, CashDividendEntitlement, CashDividendPayment, DividendAdjustment, EventBase, LedgerError,
+    Quantity, ShareSplit, StockDividendCredit, StockDividendEntitlement, UnsupportedAction, apply_action,
+)
 from .models import ContractModel, NonemptyId, SignedAmount, UnsignedAmount
 
-EventId = Annotated[str, Field(strict=True, pattern=r"^[A-Za-z0-9_-]{1,64}$")]
-Quantity = Annotated[int, Field(strict=True, gt=0)]
+__all__ = ["LedgerError", "LedgerEvent", "LedgerState", "parse_events", "replay", "order_key"]
 
 
-class LedgerError(ValueError):
-    def __init__(self, code: str, event_id: str | None = None):
-        super().__init__(code if event_id is None else f"{code}: {event_id}")
-        self.code, self.event_id = code, event_id
-
-
-class _Event(ContractModel):
-    event_id: EventId
-    effective_at: date
-    sequence: int = Field(strict=True, ge=0)
-    settlement_date: date | None = None
-    note: str = Field(default="", max_length=500)
-
-
-class Trade(_Event):
+class Trade(EventBase):
     type: Literal["buy", "sell"]
     security_id: NonemptyId
     quantity: Quantity
@@ -48,7 +37,7 @@ class Trade(_Event):
         return self
 
 
-class CashMovement(_Event):
+class CashMovement(EventBase):
     type: Literal["deposit", "withdrawal"]
     amount: UnsignedAmount
 
@@ -65,7 +54,7 @@ class OpeningPosition(ContractModel):
     total_cost: UnsignedAmount
 
 
-class OpeningBalance(_Event):
+class OpeningBalance(EventBase):
     """Starting point when earlier history is unavailable; prior realized gains stay unknown."""
 
     type: Literal["opening_balance"]
@@ -73,15 +62,19 @@ class OpeningBalance(_Event):
     positions: tuple[OpeningPosition, ...]
 
 
-LedgerEvent = Annotated[Union[Trade, CashMovement, OpeningBalance], Field(discriminator="type")]
+LedgerEvent = Annotated[Union[Trade, CashMovement, OpeningBalance, CashDividendEntitlement, CashDividendPayment,
+                              StockDividendEntitlement, StockDividendCredit, ShareSplit, UnsupportedAction],
+                        Field(discriminator="type")]
 _EVENTS = TypeAdapter(list[LedgerEvent])
 
 
 class Holding(ContractModel):
     security_id: NonemptyId
-    quantity: Quantity
+    quantity: int = Field(strict=True, ge=0, description="Shares credited to the account")
+    pending_quantity: int = Field(strict=True, ge=0, description="Entitled bonus/stock-dividend shares not yet credited")
     total_cost: UnsignedAmount
-    average_cost: UnsignedAmount
+    average_cost: UnsignedAmount  # over quantity + pending_quantity
+    blocked_by: tuple[str, ...] = ()
 
 
 class LedgerState(ContractModel):
@@ -91,11 +84,55 @@ class LedgerState(ContractModel):
     cash: UnsignedAmount
     positions: tuple[Holding, ...]
     realized_gain: SignedAmount
+    dividend_income: SignedAmount
+    dividend_receivable: UnsignedAmount
+    dividend_adjustments: tuple[DividendAdjustment, ...]
+    dividend_taxes_withheld: UnsignedAmount
     fees_paid: UnsignedAmount
     taxes_paid: UnsignedAmount
     deposits: UnsignedAmount
     withdrawals: UnsignedAmount
     net_contributions: SignedAmount
+
+
+class _Book:
+    def __init__(self):
+        self.cash = self.realized = self.fees = self.taxes = self.deposits = self.withdrawals = Decimal(0)
+        self.income = self.dividend_taxes = Decimal(0)
+        self.quantity: dict[str, int] = {}
+        self.pending: dict[str, int] = {}
+        self.cost: dict[str, Decimal] = {}
+        self.actions, self.receivable, self.pending_by_action = {}, {}, {}
+        self.settled, self.adjustments, self.blocked = set(), [], {}
+
+    def shares(self, security):
+        return self.quantity.get(security, 0) + self.pending.get(security, 0)
+
+    def prune(self, security):
+        if not self.shares(security):
+            for counts in (self.quantity, self.pending, self.cost):
+                counts.pop(security, None)
+
+    def trade(self, event):
+        security = event.security_id
+        if event.type == "buy":
+            outlay = event.quantity * event.price + event.fee + event.tax
+            self.cash -= outlay
+            self.quantity[security] = self.quantity.get(security, 0) + event.quantity
+            self.cost[security] = self.cost.get(security, Decimal(0)) + outlay
+        else:
+            if event.quantity > self.quantity.get(security, 0):
+                raise LedgerError("oversell", event.event_id)
+            shares = self.shares(security)
+            released = self.cost[security] if event.quantity == shares else self.cost[security] * event.quantity / shares
+            proceeds = event.quantity * event.price - event.fee - event.tax
+            self.cash += proceeds
+            self.realized += proceeds - released
+            self.cost[security] -= released
+            self.quantity[security] -= event.quantity
+            self.prune(security)
+        self.fees += event.fee
+        self.taxes += event.tax
 
 
 def parse_events(raw: list[dict]) -> list:
@@ -110,11 +147,10 @@ def _s(value: Decimal) -> str:
     return format(value, "f")
 
 
-def replay(events: list) -> LedgerState:
+def ordered_events(events: list) -> list:
     if any(n > 1 for n in Counter(e.event_id for e in events).values()):
         raise LedgerError("duplicate_event")
-    slots = Counter((e.effective_at, e.sequence) for e in events)
-    if any(n > 1 for n in slots.values()):
+    if any(n > 1 for n in Counter((e.effective_at, e.sequence) for e in events).values()):
         raise LedgerError("ambiguous_order")
     ordered = sorted(events, key=order_key)
     openings = [e for e in ordered if e.type == "opening_balance"]
@@ -122,50 +158,41 @@ def replay(events: list) -> LedgerState:
         raise LedgerError("multiple_opening_balances")
     if openings and ordered[0] is not openings[0]:
         raise LedgerError("before_opening_balance", ordered[0].event_id)
+    return ordered
 
-    cash = realized = fees = taxes = deposits = withdrawals = Decimal(0)
-    quantity: dict[str, int] = {}
-    cost: dict[str, Decimal] = {}
+
+def replay(events: list) -> LedgerState:
+    ordered = ordered_events(events)
+    book = _Book()
     for event in ordered:
         if event.type == "opening_balance":
-            cash = event.cash
+            book.cash = event.cash
             for p in event.positions:
-                quantity[p.security_id] = quantity.get(p.security_id, 0) + p.quantity
-                cost[p.security_id] = cost.get(p.security_id, Decimal(0)) + p.total_cost
+                book.quantity[p.security_id] = book.quantity.get(p.security_id, 0) + p.quantity
+                book.cost[p.security_id] = book.cost.get(p.security_id, Decimal(0)) + p.total_cost
         elif event.type == "deposit":
-            cash += event.amount
-            deposits += event.amount
+            book.cash += event.amount
+            book.deposits += event.amount
         elif event.type == "withdrawal":
-            cash -= event.amount
-            withdrawals += event.amount
-        elif event.type == "buy":
-            outlay = event.quantity * event.price + event.fee + event.tax
-            cash -= outlay
-            quantity[event.security_id] = quantity.get(event.security_id, 0) + event.quantity
-            cost[event.security_id] = cost.get(event.security_id, Decimal(0)) + outlay
-            fees += event.fee
-            taxes += event.tax
-        else:
-            held = quantity.get(event.security_id, 0)
-            if event.quantity > held:
-                raise LedgerError("oversell", event.event_id)
-            released = cost[event.security_id] if event.quantity == held else cost[event.security_id] * event.quantity / held
-            proceeds = event.quantity * event.price - event.fee - event.tax
-            cash += proceeds
-            realized += proceeds - released
-            cost[event.security_id] -= released
-            quantity[event.security_id] = held - event.quantity
-            if not quantity[event.security_id]:
-                del quantity[event.security_id], cost[event.security_id]
-            fees += event.fee
-            taxes += event.tax
-        if cash < 0:
+            book.cash -= event.amount
+            book.withdrawals += event.amount
+        elif event.type in {"buy", "sell"}:
+            book.trade(event)
+        elif isinstance(event, ACTION_EVENTS):
+            apply_action(book, event)
+        if book.cash < 0:
             raise LedgerError("cash_negative", event.event_id)
 
-    holdings = tuple(Holding(security_id=s, quantity=q, total_cost=_s(cost[s]), average_cost=_s(cost[s] / q))
-                     for s, q in sorted(quantity.items()))
+    holdings = tuple(Holding(security_id=s, quantity=book.quantity.get(s, 0), pending_quantity=book.pending.get(s, 0),
+                             total_cost=_s(book.cost[s]), average_cost=_s(book.cost[s] / book.shares(s)),
+                             blocked_by=tuple(book.blocked.get(s, ())))
+                     for s in sorted(book.cost))
     return LedgerState(
-        started_on=ordered[0].effective_at if ordered else None, realized_before_start_unknown=bool(openings),
-        event_count=len(ordered), cash=_s(cash), positions=holdings, realized_gain=_s(realized), fees_paid=_s(fees),
-        taxes_paid=_s(taxes), deposits=_s(deposits), withdrawals=_s(withdrawals), net_contributions=_s(deposits - withdrawals),
+        started_on=ordered[0].effective_at if ordered else None,
+        realized_before_start_unknown=any(e.type == "opening_balance" for e in ordered), event_count=len(ordered),
+        cash=_s(book.cash), positions=holdings, realized_gain=_s(book.realized), dividend_income=_s(book.income),
+        dividend_receivable=_s(sum(book.receivable.values(), Decimal(0))), dividend_adjustments=tuple(book.adjustments),
+        dividend_taxes_withheld=_s(book.dividend_taxes), fees_paid=_s(book.fees), taxes_paid=_s(book.taxes),
+        deposits=_s(book.deposits), withdrawals=_s(book.withdrawals),
+        net_contributions=_s(book.deposits - book.withdrawals),
     )

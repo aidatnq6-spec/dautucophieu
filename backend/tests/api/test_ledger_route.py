@@ -38,7 +38,8 @@ def test_appending_events_versions_whole_ledger(client, clock):
     assert add(client, clock, DEPOSIT, version=0, request_id="r1").json()["version"] == 1
     body = add(client, clock, BUY, version=1, request_id="r2").json()
     assert body["version"] == 2 and body["state"]["cash"] == "7997000"
-    assert body["state"]["positions"] == [{"security_id": "ent-fpt", "quantity": 100, "total_cost": "2003000", "average_cost": "20030"}]
+    assert body["state"]["positions"] == [{"security_id": "ent-fpt", "quantity": 100, "pending_quantity": 0,
+                                         "total_cost": "2003000", "average_cost": "20030", "blocked_by": []}]
     assert [e["event_id"] for e in call(client, clock, "GET", "/internal/ledger").json()["events"]] == ["d1", "b1"]
 
 

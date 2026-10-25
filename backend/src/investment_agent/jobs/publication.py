@@ -1,6 +1,6 @@
 """Report records (collection "reports") and their index. A report is written once per report_id."""
 
-from investment_agent.api.routes.common import read_version
+from investment_agent.services.records import read_version
 from investment_agent.repositories.personal import VersionConflict
 
 INDEX = "index"

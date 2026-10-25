@@ -11,13 +11,14 @@ from investment_agent.jobs.publication import get_report
 from investment_agent.notifications.outbox import NotificationSettings, deliver
 from investment_agent.notifications.render import render_report, split_message
 from investment_agent.repositories.personal import RepositoryUnavailable
+from investment_agent.services.records import NOTIFICATIONS, notification_settings
 
 from ..auth import require_owner
 from .common import WRITE_ERRORS, error, read_version, unavailable, write_error
 
 router = APIRouter(prefix="/internal/notifications")
-COLLECTION, RECORD = "settings", "notifications"
-DISABLED = NotificationSettings(enabled=False, members_may_view_personal_data=False, scheduled_enabled=False)
+COLLECTION, RECORD = NOTIFICATIONS
+current_settings = notification_settings
 
 
 class SettingsRequest(ContractModel):
@@ -37,11 +38,6 @@ class SendRequest(ReportRequest):
 class ResolveRequest(ReportRequest):
     part: int = Field(strict=True, ge=0)
     outcome: Literal["received", "not_received"]
-
-
-def current_settings(repo, owner) -> tuple[NotificationSettings, int]:
-    record = read_version(repo, owner, COLLECTION, RECORD, None)
-    return (NotificationSettings.model_validate(record.payload), record.version) if record else (DISABLED, 0)
 
 
 def _deps(request):

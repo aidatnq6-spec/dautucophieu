@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from investment_agent.api.routes.notifications import current_settings
+from investment_agent.services.records import notification_settings as current_settings
 from investment_agent.market.calendar import TradingCalendar
 from investment_agent.notifications.outbox import deliver
 

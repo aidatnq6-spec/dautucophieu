@@ -3,8 +3,9 @@
 from fastapi import APIRouter, Request
 from pydantic import Field
 
-from investment_agent.domain.models import ContractModel, Ratio
+from investment_agent.domain.models import ContractModel
 from investment_agent.repositories.personal import RepositoryUnavailable
+from investment_agent.services.records import TradingSettings, trading_settings  # noqa: F401
 
 from ..auth import require_owner
 from .common import WRITE_ERRORS, read_version, unavailable, write_error
@@ -12,19 +13,10 @@ from .common import WRITE_ERRORS, read_version, unavailable, write_error
 router = APIRouter(prefix="/internal/settings")
 
 
-class TradingSettings(ContractModel):
-    fee_rate: Ratio  # owner's broker fee as a fraction of order value, from their fee schedule
-
-
 class TradingRequest(ContractModel):
     settings: TradingSettings
     expected_version: int = Field(strict=True, ge=0)
     request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
-
-
-def trading_settings(repo, owner) -> TradingSettings | None:
-    record = read_version(repo, owner, "settings", "trading", None)
-    return TradingSettings.model_validate(record.payload) if record else None
 
 
 @router.get("/trading")

@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Request
 from pydantic import Field
 
-from investment_agent.domain.ledger import LedgerError, LedgerEvent, parse_events, replay
+from investment_agent.domain.ledger import LedgerError, LedgerEvent, replay
 from investment_agent.domain.models import ContractModel
-from investment_agent.domain.reconciliation import Amendment, Change, apply_amendments, parse_amendments
+from investment_agent.domain.reconciliation import Amendment, Change
+from investment_agent.services.records import LedgerBook
 from investment_agent.repositories.personal import InvalidRecord, RepositoryUnavailable, VersionConflict
 
 from ..auth import require_owner
@@ -26,24 +27,6 @@ class AppendRequest(_Mutation):
 
 class AmendRequest(_Mutation):
     amendment: Amendment
-
-
-class LedgerBook:
-    """Stored payload: original events, ordered amendments and the change log."""
-
-    def __init__(self, record):
-        payload = record.payload if record else {}
-        self.events = parse_events(payload.get("events", []))
-        self.amendments = parse_amendments(payload.get("amendments", []))
-        self.changes = [Change.model_validate(c) for c in payload.get("changes", [])]
-
-    def effective(self):
-        return apply_amendments(self.events, self.amendments)
-
-    def payload(self):
-        return {"schema_version": "2", "events": [e.model_dump(mode="json") for e in self.events],
-                "amendments": [a.model_dump(mode="json") for a in self.amendments],
-                "changes": [c.model_dump(mode="json") for c in self.changes]}
 
 
 def _view(version, book, *, stale=False):

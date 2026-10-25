@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Callable
 
-from investment_agent.api.routes.common import read_version
+from investment_agent.services.records import read_version
 from investment_agent.domain.pinned import content_digest
 from investment_agent.repositories.personal import VersionConflict
 from investment_agent.services.overview import compose_overview

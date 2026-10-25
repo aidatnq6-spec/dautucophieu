@@ -53,7 +53,7 @@ class SpendLedger:
                 raise BudgetError("monthly_cap")
             if self._counted(self._rows("job_id = ?", (job_id,))) + estimate > per_job:
                 raise BudgetError("per_job_cap")
-            if max_concurrency is not None and len(self._rows("status = 'reserved'", ())) >= max_concurrency:
+            if max_concurrency is not None and len(self._rows("status = 'reserved' AND month = ?", (month,))) >= max_concurrency:
                 raise BudgetError("concurrency_cap")
             rid = uuid4().hex
             self._db.execute("INSERT INTO ai_spend VALUES (?,?,?,?,?,?)", (rid, job_id, month, "reserved", format(estimate, "f"), None))

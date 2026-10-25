@@ -46,7 +46,10 @@ class TelegramSender:
             except httpx.HTTPError as exc:
                 log.warning("Telegram outcome unknown: %s", redact(str(exc), [self._token]))
                 return SendOutcome("unknown", error="timeout_or_broken_connection")
-            data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
+            try:
+                data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
+            except ValueError:
+                return SendOutcome("unknown", error="unreadable_response")
             if response.status_code == 200 and data.get("ok"):
                 return SendOutcome("sent", message_id=data["result"]["message_id"])
             if response.status_code == 429 or response.status_code >= 500:

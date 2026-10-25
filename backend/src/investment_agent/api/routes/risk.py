@@ -4,10 +4,10 @@ from pydantic import AwareDatetime, Field
 from investment_agent.domain.models import ContractModel
 from investment_agent.domain.profile import ConfirmedProfile
 from investment_agent.domain.risk import InvalidRiskAnswers, RiskAssessment, assess_risk, load_questionnaire
-from investment_agent.repositories.personal import RepositoryUnavailable
+from investment_agent.repositories.personal import IdempotencyConflict, RepositoryUnavailable
 
 from ..auth import require_owner
-from .common import WRITE_ERRORS, error, now, read_current, unavailable, write_error
+from .common import WRITE_ERRORS, committed_retry, error, now, read_current, unavailable, write_error
 
 router = APIRouter(prefix="/internal/risk")
 COLLECTION, RECORD = "risk_versions", "main"
@@ -91,6 +91,10 @@ def save(request: Request, body: SaveRequest):
     try:
         record = repo.write(owner, COLLECTION, RECORD, stored.model_dump(mode="json"),
                             expected_version=body.expected_version, request_id=body.request_id)
+    except IdempotencyConflict as exc:
+        record = committed_retry(repo, owner, COLLECTION, RECORD, body.expected_version, body.request_id)
+        if record is None:
+            return write_error(exc)
     except WRITE_ERRORS as exc:
         return write_error(exc)
     return _view(record)

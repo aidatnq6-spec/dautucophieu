@@ -6,6 +6,7 @@ and insufficient-basis recommendations, never as zeros or invented values.
 """
 
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from investment_agent.domain.allocation import Position
 from investment_agent.domain.ledger import replay
@@ -20,6 +21,7 @@ from investment_agent.api.routes.ledger import LedgerBook
 from investment_agent.api.routes.risk import StoredRisk
 from investment_agent.api.routes.settings import trading_settings
 
+VN = ZoneInfo("Asia/Ho_Chi_Minh")
 HEADLINES = {"buy_tranche": "Có đề xuất mua từng phần", "reduce": "Cân nhắc giảm tỷ trọng", "hold": "Giữ phân bổ hiện tại",
              "wait": "Chờ thêm điều kiện", "insufficient_basis": "Chưa đủ cơ sở để khuyến nghị"}
 
@@ -100,7 +102,7 @@ def compose_overview(repo, owner, market, now) -> dict:
         freshness = profile_freshness(profile.confirmed_at, now)
         if profile_stale:
             freshness = freshness.model_copy(update={"allows_new_recommendations": False})
-        power = availability(events, as_of=now.date()) if events else None
+        power = availability(events, as_of=now.astimezone(VN).date()) if events else None
         entities = sorted(set(held) | set(universe.members if universe else ()))
         for entity_id in entities:
             assumptions, version = _approved_valuation(repo, owner, entity_id)

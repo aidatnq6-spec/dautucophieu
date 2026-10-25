@@ -24,8 +24,9 @@ class Outbox:
     def __init__(self):
         self.queued = []
 
-    def enqueue(self, report_id):
-        self.queued.append(report_id)
+    def enqueue(self, report_id):  # idempotent, like DeliveryStore.enqueue
+        if report_id not in self.queued:
+            self.queued.append(report_id)
 
 
 @pytest.fixture

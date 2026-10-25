@@ -170,17 +170,25 @@ class OpenRouterGateway:
             if response.status_code != 200:
                 self.ledger.release(rid)
                 return "no_compliant_route" if response.status_code == 404 else f"http_{response.status_code}"
-            data = response.json()
-            usage = data.get("usage") or {}
-            p_tokens, c_tokens = int(usage.get("prompt_tokens") or prompt_estimate), int(usage.get("completion_tokens") or task.max_tokens)
-            reported = usage.get("cost")
-            if reported is not None:
-                cost, basis = Decimal(str(reported)), "reported"
-            else:
-                cost, basis = p_tokens * model.prompt_price + c_tokens * model.completion_price, "estimated"
-            self.ledger.settle(rid, cost)
-            message = data["choices"][0]["message"]
-            return Completion(model=data.get("model", model.id), provider=data.get("provider"), content=message.get("content"),
-                              tool_calls=tuple(message.get("tool_calls") or ()), prompt_tokens=p_tokens, completion_tokens=c_tokens,
-                              cost_usd=cost, cost_basis=basis, generation_id=data.get("id"), policy_version=self.policy.version)
+            try:
+                return self._settle(response.json(), rid, model, prompt_estimate, task)
+            except (ValueError, KeyError, TypeError, IndexError):
+                self.ledger.mark_uncertain(rid)  # charged or not is unknown; keep it counted
+                return "outcome_unknown"
         return "rate_limited"
+
+    def _settle(self, data, rid, model, prompt_estimate, task) -> Completion:
+        """Parse fully before settling, so a malformed body leaves the spend uncertain rather than settled."""
+        message = data["choices"][0]["message"]
+        usage = data.get("usage") or {}
+        p_tokens, c_tokens = int(usage.get("prompt_tokens") or prompt_estimate), int(usage.get("completion_tokens") or task.max_tokens)
+        reported = usage.get("cost")
+        if reported is not None:
+            cost, basis = Decimal(str(reported)), "reported"
+        else:
+            cost, basis = p_tokens * model.prompt_price + c_tokens * model.completion_price, "estimated"
+        completion = Completion(model=data.get("model", model.id), provider=data.get("provider"), content=message.get("content"),
+                                tool_calls=tuple(message.get("tool_calls") or ()), prompt_tokens=p_tokens, completion_tokens=c_tokens,
+                                cost_usd=cost, cost_basis=basis, generation_id=data.get("id"), policy_version=self.policy.version)
+        self.ledger.settle(rid, cost)
+        return completion

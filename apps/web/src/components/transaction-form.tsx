@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Save } from "lucide-react";
 import { ApiError, api, requestId, type ApiFailure } from "../lib/api";
-import { parseMoneyInput } from "../lib/format";
+import { parseMoneyInput, hanoiDate } from "../lib/format";
 import { FormErrors } from "./form-errors";
 
 export type LedgerEvent = { event_id: string; type: string; effective_at: string; sequence: number; security_id?: string; quantity?: number;
@@ -20,7 +20,7 @@ export const LEDGER_ERRORS: Record<string, string> = {
 
 export function TransactionForm({ ledgerVersion, events, editing, onSaved, onCancel }:
   { ledgerVersion: number; events: LedgerEvent[]; editing: LedgerEvent | null; onSaved: () => void; onCancel?: () => void }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = hanoiDate();
   const [type, setType] = useState(editing?.type ?? "deposit");
   const [day, setDay] = useState(editing?.effective_at ?? today);
   const [sequence, setSequence] = useState(String(editing?.sequence ?? events.filter((e) => e.effective_at === today).length));

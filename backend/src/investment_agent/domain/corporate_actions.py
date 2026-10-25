@@ -140,6 +140,9 @@ def apply_action(book, event):
         book.cash += event.cash_in_lieu
         book.income += event.cash_in_lieu
         book.settled.add(event.action_id)
+        if not book.shares(security) and book.cost.get(security):
+            # Cost carried by entitled shares that never arrived is released as a realized loss.
+            book.realized -= book.cost[security]
         book.prune(security)
     elif kind == "share_split":
         security = event.security_id
@@ -149,6 +152,9 @@ def apply_action(book, event):
                 if remainder:
                     raise LedgerError("fractional_split", event.event_id)
                 counts[security] = scaled
+        for action_id, shares in list(book.pending_by_action.items()):
+            if book.actions[action_id].security_id == security:
+                book.pending_by_action[action_id] = shares * event.ratio_to // event.ratio_from
         book.settled.add(event.action_id)
     else:
         book.blocked.setdefault(event.security_id, []).append(event.kind)

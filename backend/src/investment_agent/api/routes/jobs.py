@@ -13,6 +13,7 @@ from ..auth import require_owner
 from .common import error, now as request_now, unavailable
 
 router = APIRouter(prefix="/internal/jobs")
+FAILED = "!failed"
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
 
 
@@ -40,6 +41,8 @@ def after_close(request: Request, body: AfterCloseRequest, background: Backgroun
             results[accepted] = outcome.job_id
         except LeaseBusy:
             results[accepted] = None
+        except Exception:  # surfaced as failed; details stay out of the response
+            results[accepted] = FAILED
     background.add_task(work)
     # Closing the browser does not cancel the computation; the UI only stops observing it.
     return JSONResponse({"job_id": accepted, "status": "accepted"}, status_code=202)
@@ -54,6 +57,8 @@ def job_status(request: Request, job_id: str):
     accepted = state.accepted_jobs
     if job_id in accepted and accepted[job_id] is None:
         return {"job_id": job_id, "status": "busy", "report_id": None, "stages": []}
+    if accepted.get(job_id) == FAILED:
+        return {"job_id": job_id, "status": "failed", "report_id": None, "stages": [], "reason": "error"}
     if accepted.get(job_id) == "":
         return {"job_id": job_id, "status": "accepted", "report_id": None, "stages": []}
     record = state.jobs.get(accepted.get(job_id, job_id))

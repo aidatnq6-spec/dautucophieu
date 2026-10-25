@@ -14,10 +14,18 @@ export function formatVnd(value: string | null | undefined, { unit = true }: { u
 
 export function formatRatio(value: string | null | undefined, digits = 1): string {
   if (value === null || value === undefined || value === "") return "—";
-  const [i, f = ""] = value.split(".");
+  const negative = value.startsWith("-");
+  const [i, f = ""] = (negative ? value.slice(1) : value).split(".");
   const scaled = (i + (f + "0000").slice(0, 2 + digits)).replace(/^0+(?=\d)/, "");
-  const whole = scaled.slice(0, -digits) || "0";
-  return `${whole.replace(/^0+(?=\d)/, "")},${scaled.slice(-digits)}%`;
+  const whole = (scaled.slice(0, -digits) || "0").replace(/^0+(?=\d)/, "");
+  const frac = scaled.slice(-digits).padStart(digits, "0");
+  const sign = negative && /[1-9]/.test(whole + frac) ? "−" : "";
+  return `${sign}${whole},${frac}%`;
+}
+
+/** Calendar date (YYYY-MM-DD) in Asia/Ho_Chi_Minh, the timezone of trading sessions. */
+export function hanoiDate(at: Date = new Date()): string {
+  return at.toLocaleDateString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" });
 }
 
 /** Accept "500.000.000", "500 000 000" or "1234,5" from inputs; returns a canonical decimal string or null. */

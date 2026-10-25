@@ -227,19 +227,14 @@ class PersonalRepository:
             raise InvalidRecord("Invalid document path")
 
         def operation(tx):
-            create = identical = conflicts = 0
-            for path, data in documents.items():
-                existing = tx.read(root + path)
-                if existing is None:
-                    create += 1
-                elif existing == data:
-                    identical += 1
-                else:
-                    conflicts += 1
+            existing = {path: tx.read(root + path) for path in documents}  # Firestore: every read before any write
+            missing = [p for p, d in existing.items() if d is None]
+            identical = sum(1 for p, d in existing.items() if d is not None and d == documents[p])
+            conflicts = len(documents) - len(missing) - identical
+            create = len(missing)
             if not dry_run and not conflicts:
-                for path, data in documents.items():
-                    if tx.read(root + path) is None:
-                        tx.create(root + path, data)
+                for path in missing:
+                    tx.create(root + path, documents[path])
             return create, identical, conflicts
         return self.store.atomic(operation)
 

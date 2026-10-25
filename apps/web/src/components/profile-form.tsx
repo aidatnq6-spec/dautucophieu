@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Calculator, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { ApiError, api, requestId, type ApiFailure } from "../lib/api";
-import { formatVnd, parseMoneyInput } from "../lib/format";
+import { formatVnd, parseMoneyInput, hanoiDate } from "../lib/format";
 import { FormErrors } from "./form-errors";
 
 type AssetRow = { asset_id: string; kind: string; amount: string; liquidity: string; inLedger: boolean; emergency: string };
@@ -51,7 +51,7 @@ export function BreakdownTable({ assessment }: { assessment: Assessment }) {
 }
 
 export function ProfileForm({ version, onSaved }: { version: number; onSaved: () => void }) {
-  const [asOf, setAsOf] = useState(() => new Date().toISOString().slice(0, 10));
+  const [asOf, setAsOf] = useState(() => hanoiDate());
   const [reserve, setReserve] = useState("");
   const [ledgerValue, setLedgerValue] = useState("");
   const [assets, setAssets] = useState<AssetRow[]>([blankAsset()]);

@@ -14,3 +14,10 @@ import { percentToRatio } from "./format";
 it.each([["0,15", "0.0015"], ["1", "0.01"], ["12,5", "0.125"], ["100", "1"], ["101", null], ["x", null], ["0", "0"]])("percent %s", (v, out) => {
   expect(percentToRatio(v)).toBe(out);
 });
+
+import { hanoiDate } from "./format";
+it.each([["-0.02", "−2,0%"], ["-0.125", "−12,5%"], ["-0", "0,0%"]])("negative ratio %s", (v, out) => expect(formatRatio(v)).toBe(out));
+it("uses the Hanoi calendar date", () => {
+  expect(hanoiDate(new Date("2027-01-14T23:30:00Z"))).toBe("2027-01-15");
+  expect(hanoiDate(new Date("2027-01-15T16:59:00Z"))).toBe("2027-01-15");
+});

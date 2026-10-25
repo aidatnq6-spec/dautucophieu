@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { hanoiDate } from "../lib/format";
 import { ApiError, api } from "../lib/api";
 
 type Row = { report_id: string; report_kind: string; session_date: string; generated_at: string; status: string; provenance: string };
@@ -11,7 +12,7 @@ const MAX_POLLS = 30;
 
 export function ReportsList() {
   const [rows, setRows] = useState<Row[] | null>(null);
-  const [session, setSession] = useState(() => new Date().toISOString().slice(0, 10));
+  const [session, setSession] = useState(() => hanoiDate());
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const stop = useRef(false);

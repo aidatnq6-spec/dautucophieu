@@ -81,7 +81,7 @@ class DeliveryStore:
     def resolve_unknown(self, report_id, destination, part, *, outcome: Literal["received", "not_received"], version="1"):
         """Owner checked the group: a received part becomes sent, otherwise it may be retried."""
         with self._lock, self._db:
-            self._db.execute("UPDATE deliveries SET status=? WHERE report_id=? AND version=? AND destination=? AND part=? AND status='unknown'",
+            self._db.execute("UPDATE deliveries SET status=? WHERE report_id=? AND version=? AND destination=? AND part=? AND status IN ('unknown', 'sending')",
                              ("sent" if outcome == "received" else "retryable", report_id, version, destination, part))
 
     # Outbox used by the report pipeline: queued only after a report is persisted.
@@ -106,7 +106,7 @@ def deliver(report: dict, settings: NotificationSettings, sender, store: Deliver
     rid, version, dest = report["report_id"], report.get("report_version", "1"), settings.chat_id
     store.ensure(rid, version, dest, texts)
     rows = store.parts(rid, dest, version)
-    if any(r.status == "unknown" for r in rows):
+    if any(r.status in {"unknown", "sending"} for r in rows):  # "sending" left by a crash: outcome unknown
         return DeliveryResult("unknown", sum(r.status == "sent" for r in rows), len(rows))
     sent = sum(r.status == "sent" for r in rows)
     for row, text in zip(rows, texts):

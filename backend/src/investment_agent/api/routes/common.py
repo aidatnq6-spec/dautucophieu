@@ -34,6 +34,12 @@ def read_version(repo, owner, collection, record_id, version):
     return getattr(repo, "authoritative", repo).read(owner, collection, record_id, version=version)
 
 
+def committed_retry(repo, owner, collection, record_id, expected_version, request_id):
+    """The revision a request already committed, when a retry's payload differs only by a server timestamp."""
+    record = read_version(repo, owner, collection, record_id, expected_version + 1)
+    return record if record is not None and record.request_id == request_id else None
+
+
 def write_error(exc):
     if isinstance(exc, VersionConflict):
         return error(409, "version_conflict", "Dữ liệu đã được cập nhật ở nơi khác; hãy tải lại.")

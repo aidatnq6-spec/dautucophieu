@@ -63,9 +63,23 @@ def run_after_close(*, repo, owner, market, jobs: JobStore, outbox, session_date
 
     existing = read_version(repo, owner, "reports", report_id, None)
     if existing is not None:
+        # Finish what a crashed run may have left undone; both steps are idempotent.
+        append_index(repo, owner, report_id)
+        if existing.payload["status"] == "published":
+            outbox.enqueue(report_id)
         known = jobs.by_key(run_key)
         return JobResult(job_id=known["job_id"] if known else "", report_id=report_id, status=existing.payload["status"])
     job_id = jobs.acquire(run_key, worker_id=worker_id, now=now.timestamp(), ttl=LEASE_SECONDS)
+    try:
+        return _run(repo, owner, market, jobs, outbox, job_id, content, versions, snapshot, report_id, session_date, now, narrate,
+                    before_publish, report_kind, report_version)
+    except BaseException:
+        jobs.finish(job_id, "failed", report_id=report_id, reason="error")
+        raise
+
+
+def _run(repo, owner, market, jobs, outbox, job_id, content, versions, snapshot, report_id, session_date, now, narrate, before_publish,
+         report_kind, report_version) -> JobResult:
     jobs.stage(job_id, "snapshot")
 
     setup = content["setup"]

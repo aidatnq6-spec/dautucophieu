@@ -1,0 +1,12 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {"collectionGroup": "profile_versions", "fieldPath": "payload", "indexes": []},
+    {"collectionGroup": "risk_versions", "fieldPath": "payload", "indexes": []},
+    {"collectionGroup": "ledger_events", "fieldPath": "payload", "indexes": []},
+    {"collectionGroup": "approvals", "fieldPath": "payload", "indexes": []},
+    {"collectionGroup": "valuation_assumptions", "fieldPath": "payload", "indexes": []},
+    {"collectionGroup": "reports", "fieldPath": "payload", "indexes": []},
+    {"collectionGroup": "settings", "fieldPath": "payload", "indexes": []}
+  ]
+}

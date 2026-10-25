@@ -46,3 +46,9 @@ def test_manual_entry_is_refused_for_automatic_or_unknown_indicators_and_bad_inp
 def test_macro_without_personal_store_is_unavailable(tmp_path):
     clock = Clock()
     assert call(client(tmp_path, clock, repo=False), clock, "GET", "/internal/macro").status_code == 503
+
+
+def test_scraped_indicators_also_accept_a_manual_value(tmp_path):
+    clock = Clock()
+    c = client(tmp_path, clock)
+    assert call(c, clock, "POST", "/internal/macro/deposit_12m/observations", {"date": "2026-10-01", "value": "9,55"}).status_code == 200

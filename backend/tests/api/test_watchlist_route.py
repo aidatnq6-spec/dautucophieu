@@ -37,3 +37,14 @@ def test_watchlist_lists_prices_groups_and_held_flags(tmp_path):
 def test_watchlist_without_personal_store_is_unavailable(tmp_path):
     clock = Clock()
     assert call(client(tmp_path, None, clock), clock, "GET", "/internal/watchlist").status_code == 503
+
+
+def test_market_overview_has_index_breadth_sectors_and_no_macro(tmp_path):
+    clock, repo = Clock(), PersonalRepository("owner-1", MemoryDocumentStore())
+    c = client(tmp_path, repo, clock)
+    (tmp_path / "industries.json").write_text(json.dumps({"as_of": "2026-10-25", "source": "t", "level": 2,
+                                                         "sectors": {"MBB": "Ngân hàng", "FPT": "Công nghệ Thông tin"}}), encoding="utf-8")
+    body = call(c, clock, "GET", "/internal/market/overview").json()
+    assert body["index"] is None and body["breadth"] == {"up": 0, "down": 0, "flat": 0, "missing": 2}
+    assert sorted(s["sector"] for s in body["sectors"]) == ["Công nghệ Thông tin", "Ngân hàng"] and body["sectors_as_of"] == "2026-10-25"
+    assert body["macro"] == {"available": False, "reason": "source_not_entitled"}

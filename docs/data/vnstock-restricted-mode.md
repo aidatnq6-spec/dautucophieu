@@ -44,6 +44,8 @@ Chạy lại trong cùng ngày là an toàn: giá không đổi thì bỏ qua; g
 
 Trang **Theo dõi** liệt kê mọi mã trong `data\market-symbols.txt` với giá đóng cửa gần nhất, thay đổi trong phiên và trong 20 phiên; chỉ là dữ liệu giá, không có khuyến nghị (mã chỉ vào danh sách nghiên cứu khi có audit 10 năm). Nhãn VN30/VN100 lấy từ `data\index-groups.json`, do `cli index-groups --output data\index-groups.json` ghi kèm ngày và nguồn; lịch tự động làm mới tệp này khi đã cũ hơn 7 ngày.
 
+Trang **Thị trường & Ngành**: VN-Index (lưu theo điểm, `market-sync --symbols VNINDEX --index`), độ rộng (số mã tăng/giảm) và diễn biến theo ngành ICB cấp 2 của các mã đang theo dõi — trung bình cộng, không theo vốn hóa, nên mô tả danh sách theo dõi chứ không phải chỉ số ngành chính thức. Phân ngành lấy bằng `cli industries --symbols @data\market-symbols.txt --output data\industries.json` (nguồn VCI), làm mới hằng tuần. Kiểm tra ngày 25/10/2026 với gói Community: dữ liệu vĩ mô (GDP, CPI, lãi suất, cung tiền, FDI, xuất nhập khẩu) và P/E, P/B thị trường không thuộc quyền truy cập; giá chỉ số ngành HOSE (VNFIN…) trả về rỗng. Trang ghi rõ chưa có vĩ mô, không ước đoán.
+
 ## Giới hạn theo tài liệu Vnstock v5.0.1
 
 - Giá ngày tối đa 2.920 ngày, 10.000 dòng; đơn vị nghìn đồng (ứng dụng nhân 1.000 và giữ nguyên độ chính xác bằng `floating=None`).

@@ -23,6 +23,19 @@ export function formatRatio(value: string | null | undefined, digits = 1): strin
   return `${sign}${whole},${frac}%`;
 }
 
+/** A non-money decimal string (e.g. index points) with Vietnamese grouping, rounded half up to `digits` places on the string. */
+export function formatDecimal(value: string | null | undefined, digits: number): string {
+  if (value === null || value === undefined || value === "") return "—";
+  const negative = value.startsWith("-");
+  const [i, f = ""] = (negative ? value.slice(1) : value).split(".");
+  let scaled = BigInt((i + (f + "0".repeat(digits + 1)).slice(0, digits)).replace(/^0+(?=\d)/, ""));
+  if ((f[digits] ?? "0") >= "5") scaled += BigInt(1);
+  const text = scaled.toString().padStart(digits + 1, "0");
+  const whole = text.slice(0, text.length - digits).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const frac = digits ? `,${text.slice(-digits)}` : "";
+  return `${negative && /[1-9]/.test(text) ? "−" : ""}${whole}${frac}`;
+}
+
 /** Calendar date (YYYY-MM-DD) in Asia/Ho_Chi_Minh, the timezone of trading sessions. */
 export function hanoiDate(at: Date = new Date()): string {
   return at.toLocaleDateString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" });

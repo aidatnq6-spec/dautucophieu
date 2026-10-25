@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // All access goes through the owner-authorized Python repository (Task 7).
+    // Admin SDK bypasses these rules; it must enforce the owner independently.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

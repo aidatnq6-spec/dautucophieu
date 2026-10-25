@@ -1,0 +1,23 @@
+{
+  "version": "allocation-2026-10-25.1",
+  "status": "initial_unvalidated",
+  "notice": "Tỷ trọng cơ sở đã chốt. Điều kiện và giới hạn ngoại lệ là chính sách thử nghiệm ban đầu cần duyệt/kiểm chứng, không bảo đảm đa dạng hóa đủ.",
+  "baseline_equity": {
+    "very_safe": "0",
+    "cautious": "0.10",
+    "moderately_cautious": "0.25",
+    "balanced": "0.35",
+    "growth": "0.50",
+    "strong_growth": "0.60"
+  },
+  "exception": {
+    "eligible_groups": ["strong_growth"],
+    "max_equity": "0.90",
+    "min_issuers": 8,
+    "min_industries": 4,
+    "max_issuer": "0.15",
+    "max_industry": "0.30",
+    "loss_scenarios": ["0.30", "0.50", "0.60"],
+    "review_valid_days": 31
+  }
+}

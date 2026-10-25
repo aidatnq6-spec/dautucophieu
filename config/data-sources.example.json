@@ -1,0 +1,46 @@
+{
+  "schema_version": "1",
+  "evaluated_on": "2026-10-25",
+  "mode": "synthetic",
+  "live_analysis_enabled": false,
+  "target_issuers": 50,
+  "minimum_history_years": 10,
+  "providers": [
+    {
+      "provider_id": "vnstock",
+      "enabled": false,
+      "sdk_version": null,
+      "upstream_source": null,
+      "access_tier": null,
+      "capabilities": {
+        "prices": "unknown",
+        "financials": "unknown",
+        "ratios": "unknown",
+        "actions": "unknown",
+        "disclosures": "unknown",
+        "publication_timestamps": "unknown",
+        "usage_rights": "unknown"
+      },
+      "rights_evidence": null,
+      "live_audit": null
+    },
+    {
+      "provider_id": "fiinquant",
+      "enabled": false,
+      "sdk_version": null,
+      "upstream_source": null,
+      "access_tier": null,
+      "capabilities": {
+        "prices": "unknown",
+        "financials": "unknown",
+        "ratios": "unknown",
+        "actions": "unknown",
+        "disclosures": "unknown",
+        "publication_timestamps": "unknown",
+        "usage_rights": "unknown"
+      },
+      "rights_evidence": null,
+      "live_audit": null
+    }
+  ]
+}

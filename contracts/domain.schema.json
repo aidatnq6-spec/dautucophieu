@@ -1,0 +1,404 @@
+{
+  "$defs": {
+    "ApiError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Message",
+          "type": "string"
+        },
+        "job_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Job Id"
+        },
+        "correlation_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Correlation Id"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ApiError",
+      "type": "object"
+    },
+    "DeliveryStatus": {
+      "enum": [
+        "pending",
+        "sending",
+        "sent",
+        "retryable",
+        "unknown",
+        "failed"
+      ],
+      "title": "DeliveryStatus",
+      "type": "string"
+    },
+    "EntityIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "entity_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Entity Id",
+          "type": "string"
+        },
+        "ticker": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Ticker",
+          "type": "string"
+        },
+        "exchange": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Exchange",
+          "type": "string"
+        }
+      },
+      "required": [
+        "entity_id",
+        "ticker",
+        "exchange"
+      ],
+      "title": "EntityIdentity",
+      "type": "object"
+    },
+    "MissingObservation": {
+      "additionalProperties": false,
+      "description": "Unavailable value with an explicit reason.",
+      "properties": {
+        "entity_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Entity Id",
+          "type": "string"
+        },
+        "metric": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Metric",
+          "type": "string"
+        },
+        "period_end": {
+          "format": "date",
+          "title": "Period End",
+          "type": "string"
+        },
+        "published_at": {
+          "format": "date-time",
+          "title": "Published At",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "revision_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Revision Id",
+          "type": "string"
+        },
+        "source_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "unit": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Unit",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "null"
+        },
+        "quality_status": {
+          "enum": [
+            "missing",
+            "invalid"
+          ],
+          "title": "Quality Status",
+          "type": "string"
+        },
+        "provenance_mode": {
+          "$ref": "#/$defs/ProvenanceMode"
+        },
+        "missing_reason": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Missing Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "entity_id",
+        "metric",
+        "period_end",
+        "published_at",
+        "observed_at",
+        "revision_id",
+        "source_id",
+        "unit",
+        "value",
+        "quality_status",
+        "provenance_mode",
+        "missing_reason"
+      ],
+      "title": "MissingObservation",
+      "type": "object"
+    },
+    "PresentObservation": {
+      "additionalProperties": false,
+      "description": "Measured value; a missing-data explanation cannot accompany it.",
+      "properties": {
+        "entity_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Entity Id",
+          "type": "string"
+        },
+        "metric": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Metric",
+          "type": "string"
+        },
+        "period_end": {
+          "format": "date",
+          "title": "Period End",
+          "type": "string"
+        },
+        "published_at": {
+          "format": "date-time",
+          "title": "Published At",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "revision_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Revision Id",
+          "type": "string"
+        },
+        "source_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "unit": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Unit",
+          "type": "string"
+        },
+        "value": {
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+          "title": "Value",
+          "type": "string"
+        },
+        "quality_status": {
+          "enum": [
+            "verified",
+            "provisional",
+            "stale",
+            "invalid"
+          ],
+          "title": "Quality Status",
+          "type": "string"
+        },
+        "provenance_mode": {
+          "$ref": "#/$defs/ProvenanceMode"
+        },
+        "missing_reason": {
+          "default": null,
+          "title": "Missing Reason",
+          "type": "null"
+        }
+      },
+      "required": [
+        "entity_id",
+        "metric",
+        "period_end",
+        "published_at",
+        "observed_at",
+        "revision_id",
+        "source_id",
+        "unit",
+        "value",
+        "quality_status",
+        "provenance_mode"
+      ],
+      "title": "PresentObservation",
+      "type": "object"
+    },
+    "ProvenanceMode": {
+      "enum": [
+        "synthetic",
+        "historical_as_reported",
+        "latest_restated"
+      ],
+      "title": "ProvenanceMode",
+      "type": "string"
+    },
+    "ReportStatus": {
+      "enum": [
+        "building",
+        "validated",
+        "published",
+        "incomplete",
+        "failed",
+        "superseded"
+      ],
+      "title": "ReportStatus",
+      "type": "string"
+    },
+    "SnapshotVersions": {
+      "additionalProperties": false,
+      "properties": {
+        "profile_version": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Profile Version",
+          "type": "string"
+        },
+        "portfolio_version": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Portfolio Version",
+          "type": "string"
+        },
+        "universe_version": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Universe Version",
+          "type": "string"
+        },
+        "data_revision_id": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Data Revision Id",
+          "type": "string"
+        },
+        "assumption_version": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Assumption Version",
+          "type": "string"
+        },
+        "policy_version": {
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Policy Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile_version",
+        "portfolio_version",
+        "universe_version",
+        "data_revision_id",
+        "assumption_version",
+        "policy_version"
+      ],
+      "title": "SnapshotVersions",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Schema entrypoint; each field references one reusable contract.",
+  "properties": {
+    "contract_version": {
+      "const": "1",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "entity": {
+      "$ref": "#/$defs/EntityIdentity"
+    },
+    "observation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PresentObservation"
+        },
+        {
+          "$ref": "#/$defs/MissingObservation"
+        }
+      ],
+      "title": "Observation"
+    },
+    "snapshot_versions": {
+      "$ref": "#/$defs/SnapshotVersions"
+    },
+    "report_status": {
+      "$ref": "#/$defs/ReportStatus"
+    },
+    "delivery_status": {
+      "$ref": "#/$defs/DeliveryStatus"
+    },
+    "api_error": {
+      "$ref": "#/$defs/ApiError"
+    },
+    "unsigned_amount": {
+      "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+      "title": "Unsigned Amount",
+      "type": "string"
+    },
+    "ratio": {
+      "pattern": "^(?:0(?:\\.[0-9]+)?|1(?:\\.0+)?)$",
+      "title": "Ratio",
+      "type": "string"
+    }
+  },
+  "required": [
+    "contract_version",
+    "entity",
+    "observation",
+    "snapshot_versions",
+    "report_status",
+    "delivery_status",
+    "api_error",
+    "unsigned_amount",
+    "ratio"
+  ],
+  "title": "DomainContract",
+  "type": "object"
+}

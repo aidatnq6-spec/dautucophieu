@@ -1,0 +1,389 @@
+{
+  "version": "risk-vi-2026-10-24.1",
+  "language": "vi",
+  "validation_status": "draft_unvalidated",
+  "notice": "Khảo sát tổng hợp bản nháp: trộn mức sẵn lòng, khả năng tài chính, kiến thức và trải nghiệm; chưa được kiểm định tâm lý hay hiệu quả đầu tư và không phải phương pháp TOPI.",
+  "notes": {
+    "6": "Không tính cổ phiếu/tài sản khó bán vào quỹ dự phòng.",
+    "10": "Không phải giới hạn lỗ được bảo đảm.",
+    "13": "Không mô tả lợi nhuận cam kết."
+  },
+  "groups": [
+    {
+      "group": "very_safe",
+      "label": "Rất an toàn",
+      "min": 13,
+      "max": 19
+    },
+    {
+      "group": "cautious",
+      "label": "Thận trọng",
+      "min": 20,
+      "max": 26
+    },
+    {
+      "group": "moderately_cautious",
+      "label": "Thận trọng vừa phải",
+      "min": 27,
+      "max": 33
+    },
+    {
+      "group": "balanced",
+      "label": "Cân bằng",
+      "min": 34,
+      "max": 40
+    },
+    {
+      "group": "growth",
+      "label": "Tăng trưởng",
+      "min": 41,
+      "max": 46
+    },
+    {
+      "group": "strong_growth",
+      "label": "Tăng trưởng mạnh",
+      "min": 47,
+      "max": 52
+    }
+  ],
+  "questions": [
+    {
+      "id": 1,
+      "text": "Mục tiêu quan trọng nhất của khoản đầu tư?",
+      "options": [
+        {
+          "key": "A",
+          "points": 1,
+          "text": "Giữ an toàn vốn, lợi nhuận thứ yếu"
+        },
+        {
+          "key": "B",
+          "points": 2,
+          "text": "Tăng đều, chấp nhận biến động nhỏ"
+        },
+        {
+          "key": "C",
+          "points": 3,
+          "text": "Tăng dài hạn, chấp nhận giai đoạn giảm đáng kể"
+        },
+        {
+          "key": "D",
+          "points": 4,
+          "text": "Tăng trưởng cao, chấp nhận biến động lớn và mất phần đáng kể vốn"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "text": "Bao lâu nữa bắt đầu cần một phần đáng kể khoản tiền?",
+      "options": [
+        {
+          "key": "A",
+          "points": 1,
+          "text": "Dưới 1 năm"
+        },
+        {
+          "key": "B",
+          "points": 2,
+          "text": "1 đến dưới 3 năm"
+        },
+        {
+          "key": "C",
+          "points": 3,
+          "text": "3 đến dưới 5 năm"
+        },
+        {
+          "key": "D",
+          "points": 4,
+          "text": "Từ 5 năm"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "text": "Nếu đang giảm giá khi cần tiền, có thể trì hoãn bao lâu?",
+      "options": [
+        {
+          "key": "A",
+          "points": 1,
+          "text": "Không thể"
+        },
+        {
+          "key": "B",
+          "points": 2,
+          "text": "Dưới 6 tháng"
+        },
+        {
+          "key": "C",
+          "points": 3,
+          "text": "6 tháng đến dưới 2 năm"
+        },
+        {
+          "key": "D",
+          "points": 4,
+          "text": "Từ 2 năm"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "text": "Thu nhập còn dư sau chi phí thiết yếu và trả nợ?",
+      "options": [
+        {
+          "key": "A",
+          "points": 1,
+          "text": "Không dư/thường thiếu"
+        },
+        {
+          "key": "B",
+          "points": 2,
+          "text": "Dư thất thường"
+        },
+        {
+          "key": "C",
+          "points": 3,
+          "text": "Dư phần lớn các tháng"
+        },
+        {
+          "key": "D",
+          "points": 4,
+          "text": "Dư đều, vẫn dư nếu thu nhập giảm 20%"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "text": "Độ ổn định thu nhập 12 tháng tới?",
+      "options": [
+        {
+          "key": "A",
+          "points": 1,
+          "text": "Gián đoạn/nguy cơ giảm đáng kể cao"
+        },
+        {
+          "key": "B",
+          "points": 2,
+          "text": "Biến động khó đoán"
+        },
+        {
+          "key": "C",
+          "points": 3,
+          "text": "Tương đối ổn định, khó thay thế"
+        },
+        {
+          "key": "D",
+          "points": 4,
+          "text": "Ổn định, có nguồn khác/phương án thay thế khả thi"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "text": "Quỹ dự phòng đủ chi thiết yếu và trả nợ bao lâu nếu mất thu nhập?",
+      "options": [
+        {
+          "key": "A",
+          "points": 1,
+          "text": "Dưới 3 tháng"
+        },
+        {
+          "key": "B",
+          "points": 2,
+          "text": "3 đến dưới 6 tháng"
+        },
+        {
+          "key": "C",
+          "points": 3,
+          "text": "6 đến dưới 12 tháng"
+        },
+        {
+          "key": "D",
+          "points": 4,
+          "text": "Từ 12 tháng"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "text": "Mất 30% khoản đầu tư, chưa phục hồi 2 năm, ảnh hưởng thế nào?",
+      "options": [
+        {
+          "key": "A",
+          "points": 1,
+          "text": "Thiếu sinh hoạt/trả nợ"
+        },
+        {
+          "key": "B",
+          "points": 2,
+          "text": "Hoãn mục tiêu quan trọng"
+        },
+        {
+          "key": "C",
+          "points": 3,
+          "text": "Giảm chi không thiết yếu/điều chỉnh mục tiêu phụ"
+        },
+        {
+          "key": "D",
+          "points": 4,
+          "text": "Vẫn đáp ứng nghĩa vụ và mục tiêu quan trọng"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "text": "Mức hiểu biết về cổ phiếu và rủi ro?",
+      "options": [
+        {
+          "key": "A",
+          "points": 1,
+          "text": "Chưa hiểu rõ lãi/lỗ"
+        },
+        {
+          "key": "B",
+          "points": 2,
+          "text": "Biết giá tăng giảm, chưa rõ rủi ro doanh nghiệp/danh mục"
+        },
+        {
+          "key": "C",
+          "points": 3,
+          "text": "Hiểu đa dạng hóa, rủi ro doanh nghiệp, biến động và mất vốn"
+        },
+        {
+          "key": "D",
+          "points": 4,
+          "text": "Giải thích và đánh giá được ảnh hưởng đến danh mục"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "text": "Trải nghiệm đầu tư biến động giá?",
+      "options": [
+        {
+          "key": "A",
+          "points": 1,
+          "text": "Chưa đầu tư"
+        },
+        {
+          "key": "B",
+          "points": 2,
+          "text": "Có, chưa trải qua giảm trên 10%"
+        },
+        {
+          "key": "C",
+          "points": 3,
+          "text": "Trải qua giảm trên 10%, chưa có kế hoạch rõ"
+        },
+        {
+          "key": "D",
+          "points": 4,
+          "text": "Trải qua giảm trên 10%, đã đánh giá lại theo kế hoạch"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "text": "Đầu tư 100 triệu, giảm bao nhiêu trong 1 năm khiến muốn giảm rủi ro dù chưa cần tiền?",
+      "options": [
+        {
+          "key": "A",
+          "points": 1,
+          "text": "Đến 5 triệu"
+        },
+        {
+          "key": "B",
+          "points": 2,
+          "text": "Trên 5 đến 10 triệu"
+        },
+        {
+          "key": "C",
+          "points": 3,
+          "text": "Trên 10 đến 20 triệu"
+        },
+        {
+          "key": "D",
+          "points": 4,
+          "text": "Trên 20 triệu"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "text": "Danh mục giảm 20% trong 3 tháng, chưa cần tiền, chưa có thông tin triển vọng xấu đi?",
+      "options": [
+        {
+          "key": "A",
+          "points": 1,
+          "text": "Muốn bán hết"
+        },
+        {
+          "key": "B",
+          "points": 2,
+          "text": "Muốn bán bớt đáng kể"
+        },
+        {
+          "key": "C",
+          "points": 3,
+          "text": "Có thể giữ sau khi kiểm tra căn cứ"
+        },
+        {
+          "key": "D",
+          "points": 4,
+          "text": "Có thể giữ và xem xét mua thêm theo kế hoạch/giới hạn vốn"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "text": "Cảm giác khi đầu tư dài hạn từ 5 năm nhưng có năm thua lỗ và biến động mạnh?",
+      "options": [
+        {
+          "key": "A",
+          "points": 1,
+          "text": "Ảnh hưởng rõ sinh hoạt/giấc ngủ"
+        },
+        {
+          "key": "B",
+          "points": 2,
+          "text": "Lo nhiều, thường muốn giảm vốn"
+        },
+        {
+          "key": "C",
+          "points": 3,
+          "text": "Khó chịu nhưng theo được kế hoạch"
+        },
+        {
+          "key": "D",
+          "points": 4,
+          "text": "Chấp nhận nếu trong giới hạn và luận điểm còn phù hợp"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "text": "Lựa chọn đánh đổi cho khoản tiền dài hạn?",
+      "options": [
+        {
+          "key": "A",
+          "points": 1,
+          "text": "Bảo toàn, tăng trưởng thấp"
+        },
+        {
+          "key": "B",
+          "points": 2,
+          "text": "Rủi ro mất vốn nhỏ để tăng trưởng hơn"
+        },
+        {
+          "key": "C",
+          "points": 3,
+          "text": "Rủi ro mất phần đáng kể vốn để tăng trưởng dài hạn cao"
+        },
+        {
+          "key": "D",
+          "points": 4,
+          "text": "Rủi ro mất phần lớn vốn để theo đuổi tăng trưởng cao hơn nữa"
+        }
+      ]
+    }
+  ]
+}

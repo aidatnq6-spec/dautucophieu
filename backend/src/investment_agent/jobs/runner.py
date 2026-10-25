@@ -23,6 +23,7 @@ class JobStore:
         self._lock = Lock()
         self._db.execute("""CREATE TABLE IF NOT EXISTS job_runs (run_key TEXT PRIMARY KEY, job_id TEXT UNIQUE, status TEXT, stages TEXT,
                             lease_owner TEXT, lease_until REAL, report_id TEXT, reason TEXT)""")
+        self._db.execute("CREATE TABLE IF NOT EXISTS session_attempts (session TEXT PRIMARY KEY, count INTEGER)")
 
     def acquire(self, run_key: str, *, worker_id: str, now: float, ttl: float) -> str:
         with self._lock:
@@ -57,6 +58,14 @@ class JobStore:
         if row is None:
             return None
         return {"run_key": row[0], "job_id": row[1], "status": row[2], "stages": json.loads(row[3]), "report_id": row[4], "reason": row[5]}
+
+    def count_attempt(self, session: str) -> int:
+        with self._lock:
+            self._db.execute("INSERT INTO session_attempts VALUES (?, 1) ON CONFLICT(session) DO UPDATE SET count = count + 1", (session,))
+            return self._db.execute("SELECT count FROM session_attempts WHERE session = ?", (session,)).fetchone()[0]
+
+    def attempts(self) -> dict[str, int]:
+        return dict(self._db.execute("SELECT session, count FROM session_attempts").fetchall())
 
     def by_key(self, run_key: str) -> dict | None:
         row = self._db.execute("SELECT job_id FROM job_runs WHERE run_key = ?", (run_key,)).fetchone()

@@ -18,6 +18,7 @@ from investment_agent.valuation.dcf import value_assumptions
 from investment_agent.api.routes.common import read_current, read_version
 from investment_agent.api.routes.ledger import LedgerBook
 from investment_agent.api.routes.risk import StoredRisk
+from investment_agent.api.routes.settings import trading_settings
 
 HEADLINES = {"buy_tranche": "Có đề xuất mua từng phần", "reduce": "Cân nhắc giảm tỷ trọng", "hold": "Giữ phân bổ hiện tại",
              "wait": "Chờ thêm điều kiện", "insufficient_basis": "Chưa đủ cơ sở để khuyến nghị"}
@@ -89,7 +90,8 @@ def compose_overview(repo, owner, market, now) -> dict:
                          "unrealized_gain": _s(value - h.total_cost) if value is not None else None,
                          "weight_of_capital": _s(value / total) if value is not None and total else None,
                          "scope": scope[h.security_id], "quality_status": "verified" if point else "missing", "blocked_by": list(h.blocked_by)})
-    setup = {"profile": profile is not None, "risk": risk is not None, "ledger_version": ledger_rec.version if ledger_rec else 0,
+    trading = trading_settings(repo, owner)
+    setup = {"fee_rate_configured": trading is not None, "profile": profile is not None, "risk": risk is not None, "ledger_version": ledger_rec.version if ledger_rec else 0,
              "universe_version": universe_rec.version if universe_rec else 0, "universe_status": universe.status if universe else None}
     items = []
     if profile is None or risk is None:
@@ -104,7 +106,8 @@ def compose_overview(repo, owner, market, now) -> dict:
             assumptions, version = _approved_valuation(repo, owner, entity_id)
             point = market.price(entity_id)
             gaps = [*(["evidence_missing"] if not market.evidence(entity_id) else []),
-                    *(["portfolio_price_missing"] if any(n.startswith("price_missing") for n in notes) else []), "fee_rate_missing"]
+                    *(["portfolio_price_missing"] if any(n.startswith("price_missing") for n in notes) else []),
+                    *(["fee_rate_missing"] if trading is None else [])]
             rec = recommend(RecommendationInputs(
                 entity_id=entity_id, industry=market.industry(entity_id), control_group_id=None,
                 scope=scope.get(entity_id, "research"), valuation=_summary(entity_id, assumptions, version),
@@ -112,7 +115,7 @@ def compose_overview(repo, owner, market, now) -> dict:
                 analysis_gaps=tuple(gaps), governance_status="not_checked", capital=capital, risk=risk, freshness=freshness,
                 holdings=positions, held_quantity=held[entity_id].quantity if entity_id in held else 0,
                 buying_power=None if power is None or power.buying_power is None else power.buying_power,
-                buying_power_basis=power.buying_power_basis if power else "unknown", fee_rate=Decimal(0), now=now))
+                buying_power_basis=power.buying_power_basis if power else "unknown", fee_rate=trading.fee_rate if trading else Decimal(0), now=now))
             items.append(rec.model_dump(mode="json"))
         actions = [i["action"] for i in items]
         headline = next((a for a in ("buy_tranche", "reduce", "insufficient_basis", "wait") if a in actions), "hold")

@@ -1,0 +1,145 @@
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
+
+import pytest
+
+from investment_agent.jobs.runner import JobStore, LeaseBusy
+from investment_agent.jobs.schedule import ReportState, decide, report_kinds, scheduler_lease
+from investment_agent.market.calendar import TradingCalendar
+
+VN = ZoneInfo("Asia/Ho_Chi_Minh")
+# 2026-09-02 (Wed) is a holiday in this synthetic calendar; 2026-10-30 is a Friday and the month's last session.
+CAL = TradingCalendar(version="t", source="synthetic", holidays=frozenset({date(2026, 9, 2), date(2026, 9, 4)}),
+                      first=date(2026, 8, 1), last=date(2026, 12, 31))
+
+
+def at(day, hhmm):
+    h, m = map(int, hhmm.split(":"))
+    return datetime(*map(int, day.split("-")), h, m, tzinfo=VN)
+
+
+def state(published=(), attempts=None):
+    return ReportState(published=frozenset(date.fromisoformat(d) for d in published), attempts={date.fromisoformat(k): v for k, v in (attempts or {}).items()})
+
+
+def test_nothing_before_first_slot():
+    d = decide(at("2026-10-27", "17:29"), CAL, state(published=["2026-10-26"]))
+    assert d.run is False and d.reason == "not_yet"
+
+
+def test_first_slot_runs_todays_session():
+    d = decide(at("2026-10-27", "17:30"), CAL, state(published=["2026-10-26"]))
+    assert (d.run, d.session_date, d.attempt, d.send) == (True, date(2026, 10, 27), 1, True)
+
+
+def test_retry_slots_depend_on_data_not_clock_spam():
+    s = state(published=["2026-10-26"], attempts={"2026-10-27": 1})
+    assert decide(at("2026-10-27", "18:00"), CAL, s).run is False  # waiting for the 18:30 slot
+    assert decide(at("2026-10-27", "18:30"), CAL, s).attempt == 2
+    s3 = state(published=["2026-10-26"], attempts={"2026-10-27": 3})
+    d = decide(at("2026-10-27", "21:00"), CAL, s3)
+    assert d.run is False and d.reason == "attempts_exhausted"
+
+
+def test_published_session_is_not_rerun():
+    d = decide(at("2026-10-27", "20:05"), CAL, state(published=["2026-10-27"]))
+    assert d.run is False and d.reason == "already_published"
+
+
+def test_weekend_and_holiday_produce_no_new_session():
+    d = decide(at("2026-09-02", "18:00"), CAL, state(published=["2026-09-01"]))
+    assert d.run is False and d.reason == "already_published"  # holiday: latest session is 09-01
+    d = decide(at("2026-10-31", "18:00"), CAL, state(published=["2026-10-30"]))
+    assert d.run is False
+
+
+def test_resume_catches_up_only_the_latest_missed_session_and_counts_others():
+    d = decide(at("2026-10-26", "09:00"), CAL, state(published=["2026-10-21"]))  # Mon morning, missed Thu+Fri
+    assert d.run is True and d.session_date == date(2026, 10, 23) and d.missed_sessions == 1
+    assert d.send is True and d.reason == "catch_up"
+
+
+def test_old_backfill_never_sends():
+    d = decide(at("2026-10-26", "09:00"), CAL, state(published=["2026-10-21"]), backfill=date(2026, 10, 22))
+    assert d.run is True and d.session_date == date(2026, 10, 22) and d.send is False
+
+
+@pytest.mark.parametrize("session, kinds", [
+    (date(2026, 10, 27), ("after_close",)),
+    (date(2026, 10, 23), ("after_close", "weekly")),
+    (date(2026, 9, 3), ("after_close", "weekly")),    # Friday 09-04 is a holiday: Thursday closes the week
+    (date(2026, 10, 30), ("after_close", "weekly", "monthly")),
+])
+def test_weekly_and_monthly_follow_last_session(session, kinds):
+    assert report_kinds(session, CAL) == kinds
+
+
+def test_two_schedulers_cannot_run_the_same_tick(tmp_path):
+    store = JobStore(tmp_path / "jobs.sqlite")
+    now = at("2026-10-27", "17:30")
+    scheduler_lease(store, now, worker_id="a")
+    with pytest.raises(LeaseBusy):
+        scheduler_lease(store, now, worker_id="b")
+
+
+def test_naive_time_rejected():
+    with pytest.raises(ValueError):
+        decide(datetime(2026, 10, 27, 17, 30), CAL, state())
+
+
+# --- tick wiring ---------------------------------------------------------------
+
+from decimal import Decimal
+
+from investment_agent.api.auth import OwnerContext
+from investment_agent.jobs.schedule import scheduled_tick
+from investment_agent.market.view import PricePoint, SyntheticMarket
+from investment_agent.notifications.outbox import DeliveryStore, NotificationSettings
+from investment_agent.repositories.personal import MemoryDocumentStore, PersonalRepository
+
+OWNER = OwnerContext("owner-1", "owner", "scheduler")
+
+
+class FakeSender:
+    def __init__(self):
+        self.sent = []
+
+    def send(self, chat_id, text):
+        from investment_agent.notifications.telegram import SendOutcome
+        self.sent.append(text)
+        return SendOutcome("sent", message_id=len(self.sent))
+
+
+def tick(tmp_path, repo, now, sender=None, market=None):
+    return scheduled_tick(repo=repo, owner=OWNER, market=market or SyntheticMarket(), jobs=JobStore(tmp_path / "jobs.sqlite"),
+                          deliveries=DeliveryStore(tmp_path / "d.sqlite"), sender=sender, cal=CAL, now=now, worker_id="sched")
+
+
+def test_tick_counts_attempts_and_stops_after_three_incomplete_runs(tmp_path):
+    repo = PersonalRepository("owner-1", MemoryDocumentStore())
+    for hhmm, expected in (("17:31", "incomplete"), ("17:45", None), ("18:31", "incomplete"), ("20:01", "incomplete"), ("21:00", None)):
+        result = tick(tmp_path, repo, at("2026-10-27", hhmm))
+        assert (result.statuses[0] if result.statuses else None) == expected, hhmm
+
+
+def test_tick_sends_only_when_scheduled_sending_is_enabled(tmp_path):
+    repo = PersonalRepository("owner-1", MemoryDocumentStore())
+    sender = FakeSender()
+    market = SyntheticMarket(prices={"FPT": PricePoint(Decimal(1), date(2026, 10, 27))})
+    # No profile: reports stay incomplete and are never queued, so nothing is sent even when enabled.
+    settings = NotificationSettings(enabled=True, chat_id="-100123", members_may_view_personal_data=True, scheduled_enabled=True)
+    repo.write(OWNER, "settings", "notifications", settings.model_dump(mode="json"), expected_version=0, request_id="n1")
+    result = tick(tmp_path, repo, at("2026-10-27", "17:31"), sender=sender, market=market)
+    assert result.statuses == ["incomplete"] and sender.sent == []
+
+
+def test_cli_calendar_must_name_an_official_source(tmp_path):
+    import json as _json
+    from investment_agent.cli import load_calendar
+    path = tmp_path / "cal.json"
+    path.write_text(_json.dumps({"version": "x", "source": "synthetic", "holidays": [], "first": "2026-01-01", "last": "2026-12-31"}), encoding="utf-8")
+    with pytest.raises(ValueError):
+        load_calendar(path)
+    path.write_text(_json.dumps({"version": "hose-2026", "source": "https://www.hsx.vn/...", "holidays": ["2026-09-02"], "first": "2026-01-01",
+                                 "last": "2026-12-31"}), encoding="utf-8")
+    assert not load_calendar(path).is_session(date(2026, 9, 2))

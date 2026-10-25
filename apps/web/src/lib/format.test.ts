@@ -9,3 +9,8 @@ it.each([["0.125", "12,5%"], ["1", "100,0%"], ["0.6", "60,0%"]])("ratio %s", (v,
 it.each([["500.000.000", "500000000"], ["1 000", "1000"], ["12,5", "12.5"], ["-1", null], ["abc", null], ["", null]])("parses %s", (v, out) => {
   expect(parseMoneyInput(v)).toBe(out);
 });
+
+import { percentToRatio } from "./format";
+it.each([["0,15", "0.0015"], ["1", "0.01"], ["12,5", "0.125"], ["100", "1"], ["101", null], ["x", null], ["0", "0"]])("percent %s", (v, out) => {
+  expect(percentToRatio(v)).toBe(out);
+});

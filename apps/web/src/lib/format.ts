@@ -26,3 +26,15 @@ export function parseMoneyInput(raw: string): string | null {
   if (!/^(0|[1-9]\d*)(\.\d+)?$/.test(cleaned)) return null;
   return cleaned;
 }
+
+/** "0,15" (percent) → "0.0015" (ratio), by moving the decimal point on the string; null when invalid or above 100%. */
+export function percentToRatio(raw: string): string | null {
+  const v = parseMoneyInput(raw);
+  if (v === null) return null;
+  const [i, f = ""] = v.split(".");
+  const digits = (i.padStart(3, "0") + f);
+  const whole = digits.slice(0, digits.length - f.length - 2).replace(/^0+(?=\d)/, "") || "0";
+  const frac = (digits.slice(digits.length - f.length - 2)).replace(/0+$/, "");
+  if (Number(whole) > 1 || (whole === "1" && frac)) return null;
+  return frac ? `${whole}.${frac}` : whole;
+}

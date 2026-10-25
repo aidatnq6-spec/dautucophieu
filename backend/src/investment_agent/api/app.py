@@ -17,6 +17,7 @@ from .routes.jobs import router as jobs_router
 from .routes.overview import router as overview_router
 from .routes.reports import router as reports_router
 from .routes.risk import router as risk_router
+from .routes.settings import router as settings_router
 from .routes.universe import router as universe_router
 from .routes.valuation_assumptions import router as valuation_router
 
@@ -63,6 +64,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(jobs_router)
     app.include_router(reports_router)
     app.include_router(notifications_router)
+    app.include_router(settings_router)
 
     @app.get("/internal/identity")
     def identity(request: Request):
@@ -73,11 +75,26 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
 
 
 if __name__ == "__main__":
+    import os
+    from pathlib import Path
+
+    import httpx
     import uvicorn
+
+    from investment_agent.jobs.runner import JobStore
+    from investment_agent.notifications.outbox import DeliveryStore
+    from investment_agent.notifications.telegram import TelegramSender
     from investment_agent.repositories.firestore import personal_repository_from_env
     from investment_agent.repositories.personal import RepositoryUnavailable
+    from investment_agent.settings import Settings
+
     try:
         repository = personal_repository_from_env()
     except RepositoryUnavailable:
         repository = None  # Personal routes answer 503 until Firebase Admin is configured.
-    uvicorn.run(create_app(personal_repository=repository), host="127.0.0.1", port=8000, workers=1, access_log=False, proxy_headers=False)
+    data_dir = Path(os.environ.get("INVESTMENT_DATA_DIR", "data")).resolve()
+    deliveries = DeliveryStore(data_dir / "deliveries.sqlite")  # also the report outbox
+    token = Settings.from_env().telegram_bot_token
+    uvicorn.run(create_app(personal_repository=repository, jobs=JobStore(data_dir / "jobs.sqlite"), outbox=deliveries, deliveries=deliveries,
+                           telegram=TelegramSender(token, client=httpx.Client()) if token else None),
+                host="127.0.0.1", port=8000, workers=1, access_log=False, proxy_headers=False)

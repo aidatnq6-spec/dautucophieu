@@ -46,7 +46,8 @@ def buy_fpt(client, clock):
 
 def test_setup_incomplete_gives_insufficient_basis_and_no_items(client, clock):
     body = call(client, clock, "GET", "/internal/overview").json()
-    assert body["setup"] == {"profile": False, "risk": False, "ledger_version": 0, "universe_version": 0, "universe_status": None}
+    assert body["setup"] == {"fee_rate_configured": False, "profile": False, "risk": False, "ledger_version": 0, "universe_version": 0,
+                             "universe_status": None}
     assert body["decision"]["action"] == "insufficient_basis" and "setup_incomplete" in body["decision"]["reasons"]
     assert body["provenance"] == "synthetic"
 
@@ -103,3 +104,14 @@ def test_universe_proposals_are_listed_with_decisions(client, clock):
     call(client, clock, "POST", "/internal/universe/proposals/p1/reject", {"request_id": "x1"})
     listed = call(client, clock, "GET", "/internal/universe/proposals").json()["proposals"]
     assert [(p["proposal"]["proposal_id"], p["decision"]) for p in listed] == [("p1", "rejected"), ("p2", "pending")]
+
+
+def test_trading_settings_supply_the_owner_fee_rate(client, clock):
+    setup_owner(client, clock)
+    assert call(client, clock, "GET", "/internal/overview").json()["setup"]["fee_rate_configured"] is False
+    bad = call(client, clock, "PUT", "/internal/settings/trading", {"settings": {"fee_rate": 0.0015}, "expected_version": 0, "request_id": "t0"})
+    assert bad.status_code == 422
+    saved = call(client, clock, "PUT", "/internal/settings/trading", {"settings": {"fee_rate": "0.0015"}, "expected_version": 0, "request_id": "t1"})
+    assert saved.json()["settings"] == {"fee_rate": "0.0015"}
+    assert call(client, clock, "GET", "/internal/settings/trading").json()["settings"]["fee_rate"] == "0.0015"
+    assert call(client, clock, "GET", "/internal/overview").json()["setup"]["fee_rate_configured"] is True

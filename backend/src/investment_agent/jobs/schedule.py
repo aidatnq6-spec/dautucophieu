@@ -1,0 +1,135 @@
+"""Scheduling decisions in Asia/Ho_Chi_Minh for after-close reports.
+
+Slots 17:30, 18:30 and 20:00 are retry opportunities for one session, used
+only while that session has no published report (late data), never three
+identical sends. After a missed day or a machine resume only the most recent
+unpublished session is caught up; older ones are counted, and an explicit
+historical backfill never sends. Weekly and monthly reports follow the last
+trading session of the week or month in the calendar.
+"""
+
+from dataclasses import dataclass, field
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
+
+from investment_agent.api.routes.notifications import current_settings
+from investment_agent.market.calendar import TradingCalendar
+from investment_agent.notifications.outbox import deliver
+
+from .daily import run_after_close
+from .publication import get_report, list_reports
+from .runner import JobStore
+
+VN = ZoneInfo("Asia/Ho_Chi_Minh")
+SLOTS = (time(17, 30), time(18, 30), time(20, 0))
+
+
+@dataclass(frozen=True)
+class ReportState:
+    published: frozenset[date] = frozenset()
+    attempts: dict[date, int] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class Decision:
+    run: bool
+    reason: str
+    session_date: date | None = None
+    attempt: int = 0
+    send: bool = False
+    missed_sessions: int = 0
+    kinds: tuple[str, ...] = ()
+
+
+def _previous_session(cal: TradingCalendar, day: date) -> date | None:
+    d = day - timedelta(days=1)
+    while d >= cal.first:
+        if cal.is_session(d):
+            return d
+        d -= timedelta(days=1)
+    return None
+
+
+def _next_session(cal: TradingCalendar, day: date) -> date | None:
+    d = day + timedelta(days=1)
+    while d <= cal.last:
+        if cal.is_session(d):
+            return d
+        d += timedelta(days=1)
+    return None
+
+
+def report_kinds(session: date, cal: TradingCalendar) -> tuple[str, ...]:
+    nxt = _next_session(cal, session)
+    kinds = ["after_close"]
+    if nxt is None or nxt.isocalendar()[:2] != session.isocalendar()[:2]:
+        kinds.append("weekly")
+    if nxt is None or (nxt.year, nxt.month) != (session.year, session.month):
+        kinds.append("monthly")
+    return tuple(kinds)
+
+
+def decide(now: datetime, cal: TradingCalendar, state: ReportState, *, backfill: date | None = None) -> Decision:
+    if now.tzinfo is None:
+        raise ValueError("scheduler time requires timezone")
+    local = now.astimezone(VN)
+    if backfill is not None:
+        return Decision(True, "backfill", backfill, state.attempts.get(backfill, 0) + 1, send=False, kinds=report_kinds(backfill, cal))
+    today = local.date()
+    passed = sum(local.time() >= s for s in SLOTS)
+    before_first_slot = cal.is_session(today) and not passed
+    target = today if cal.is_session(today) and passed else _previous_session(cal, today)
+    if target is None:
+        return Decision(False, "no_session")
+    if target in state.published:
+        return Decision(False, "not_yet" if before_first_slot else "already_published")
+    last_published = max((d for d in state.published if d < target), default=None)
+    missed = 0
+    if last_published is not None:
+        missed = sum(1 for d in cal.sessions(last_published + timedelta(days=1), target) if d < target and d not in state.published)
+    attempts = state.attempts.get(target, 0)
+    if attempts >= len(SLOTS):
+        return Decision(False, "attempts_exhausted", target, attempts, missed_sessions=missed)
+    if target == today:
+        if attempts >= passed:
+            return Decision(False, "not_yet", target, attempts, missed_sessions=missed)
+        return Decision(True, "scheduled", target, attempts + 1, send=True, missed_sessions=missed, kinds=report_kinds(target, cal))
+    return Decision(True, "catch_up", target, attempts + 1, send=True, missed_sessions=missed, kinds=report_kinds(target, cal))
+
+
+def scheduler_lease(store: JobStore, now: datetime, *, worker_id: str, ttl: float = 900) -> str:
+    """One scheduler tick per hour bucket across processes."""
+    local = now.astimezone(VN)
+    return store.acquire(f"scheduler:{local:%Y-%m-%dT%H}", worker_id=worker_id, now=now.timestamp(), ttl=ttl)
+
+
+@dataclass(frozen=True)
+class TickResult:
+    decision: Decision
+    statuses: list[str]
+    delivered: list[str]
+
+
+def scheduled_tick(*, repo, owner, market, jobs: JobStore, deliveries, sender, cal: TradingCalendar, now: datetime, worker_id: str) -> TickResult:
+    """One scheduler wake-up: decide, run the due report kinds, then send queued reports if scheduled sending is on."""
+    scheduler_lease(jobs, now, worker_id=worker_id)
+    reports = list_reports(repo, owner)
+    published = frozenset(date.fromisoformat(r["session_date"]) for r in reports if r["status"] == "published" and r["report_kind"] == "after_close")
+    attempts = {date.fromisoformat(k): v for k, v in jobs.attempts().items()}
+    decision = decide(now, cal, ReportState(published=published, attempts=attempts))
+    statuses, delivered = [], []
+    if not decision.run:
+        return TickResult(decision, statuses, delivered)
+    jobs.count_attempt(decision.session_date.isoformat())
+    for kind in decision.kinds:
+        result = run_after_close(repo=repo, owner=owner, market=market, jobs=jobs, outbox=deliveries, session_date=decision.session_date,
+                                 now=now, worker_id=worker_id, report_kind=kind)
+        statuses.append(result.status)
+    settings, _ = current_settings(repo, owner)
+    if decision.send and settings.scheduled_enabled and sender is not None:
+        for report_id in deliveries.queued():
+            report = get_report(repo, owner, report_id)
+            if report and deliver(report, settings, sender, deliveries).status == "sent":
+                deliveries.mark_processed(report_id)
+                delivered.append(report_id)
+    return TickResult(decision, statuses, delivered)

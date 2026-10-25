@@ -78,3 +78,49 @@ def test_float_amount_is_rejected(client, clock):
 def test_unavailable_repository_refuses_mutation(client, clock, store):
     store.available = False
     assert add(client, clock, DEPOSIT, version=0, request_id="r1").status_code == 503
+
+
+def amend(client, clock, amendment, *, version, request_id):
+    return call(client, clock, "POST", "/internal/ledger/amendments", {"amendment": amendment, "expected_version": version, "request_id": request_id})
+
+
+FIX = {"amendment_id": "a1", "action": "replace", "target_event_id": "b1", "reason": "Sai giá theo sao kê",
+       "replacement": {**BUY, "effective_at": "2027-01-04", "sequence": 1, "price": "21000"}}
+
+
+def test_correction_replays_records_audit_and_change_log(client, clock):
+    add(client, clock, DEPOSIT, version=0, request_id="r1")
+    add(client, clock, BUY, version=1, request_id="r2")
+    body = amend(client, clock, FIX, version=2, request_id="r3").json()
+    assert body["version"] == 3 and body["state"]["positions"][0]["total_cost"] == "2103000"
+    assert body["audit"][0]["before"]["price"] == "20000" and body["audit"][0]["after"]["price"] == "21000"
+    assert body["changes"] == [{"ledger_version": 1, "affected_from": "2027-01-04"}, {"ledger_version": 2, "affected_from": "2027-01-05"},
+                               {"ledger_version": 3, "affected_from": "2027-01-04"}]
+    assert [e["event_id"] for e in body["original_events"]] == ["d1", "b1"]
+
+
+def test_correction_retry_is_idempotent(client, clock):
+    add(client, clock, DEPOSIT, version=0, request_id="r1")
+    add(client, clock, BUY, version=1, request_id="r2")
+    first = amend(client, clock, FIX, version=2, request_id="r3").json()
+    again = amend(client, clock, FIX, version=2, request_id="r3").json()
+    assert again["version"] == first["version"] == 3 and len(again["audit"]) == 1
+
+
+def test_cancel_then_restore_through_api(client, clock):
+    add(client, clock, DEPOSIT, version=0, request_id="r1")
+    add(client, clock, BUY, version=1, request_id="r2")
+    cancel = {"amendment_id": "a1", "action": "cancel", "target_event_id": "b1", "reason": "Nhập nhầm"}
+    assert amend(client, clock, cancel, version=2, request_id="r3").json()["state"]["positions"] == []
+    restore = {"amendment_id": "a2", "action": "restore", "target_event_id": "b1", "reason": "Khôi phục"}
+    assert amend(client, clock, restore, version=3, request_id="r4").json()["state"]["cash"] == "7997000"
+
+
+def test_correction_breaking_later_events_is_rejected(client, clock, store):
+    add(client, clock, DEPOSIT, version=0, request_id="r1")
+    add(client, clock, BUY, version=1, request_id="r2")
+    before = dict(store.documents)
+    cancel_deposit = {"amendment_id": "a1", "action": "cancel", "target_event_id": "d1", "reason": "x"}
+    response = amend(client, clock, cancel_deposit, version=2, request_id="r3")
+    assert response.status_code == 422 and response.json()["code"] == "ledger_cash_negative"
+    assert store.documents == before

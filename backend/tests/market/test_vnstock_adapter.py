@@ -189,3 +189,50 @@ def test_cli_index_groups_writes_members_with_date_and_source(tmp_path):
     assert index_groups(["VN30", "VN100"], tmp_path / "index-groups.json", provider=p, today=date(2026, 10, 25)) == 0
     saved = _json.loads((tmp_path / "index-groups.json").read_text(encoding="utf-8"))
     assert saved == {"as_of": "2026-10-25", "source": "vnstock:kbs", "groups": {"VN30": ["FPT", "VCB"], "VN100": ["FPT", "KDH", "VCB"]}}
+
+
+class FakeIndex:
+    def __init__(self, calls):
+        self.calls = calls
+
+    def ohlcv(self, start=None, end=None, interval="1D", **kw):
+        self.calls.append({"start": start, "end": end})
+        return pd.DataFrame({"time": [pd.Timestamp("2026-10-23").tz_localize(VN) + pd.Timedelta(hours=7)], "open": [1761.38],
+                             "high": [1775.19], "low": [1750.83], "close": [1774.15], "volume": [777_197_613]})
+
+
+class IndexMarket(FakeMarket):
+    def index(self, symbol):
+        return FakeIndex(self.calls)
+
+
+class IndustryListing(FakeListing):
+    def symbols_by_industries(self, source=None):
+        assert source == "vci"
+        return pd.DataFrame([{"symbol": "MBB", "icb_level": 1, "icb_name": "Ngân hàng"}, {"symbol": "MBB", "icb_level": 2, "icb_name": "Ngân hàng"},
+                             {"symbol": "SSI", "icb_level": 2, "icb_name": "Dịch vụ tài chính"}, {"symbol": "", "icb_level": 2, "icb_name": "Quỹ"}])
+
+
+def test_index_prices_stay_in_points():
+    p = VnstockProvider(market=IndexMarket(), fundamental=FakeFundamental(), clock=lambda: NOW)
+    [bar] = p.fetch_index("vnindex", date(2026, 10, 23), date(2026, 10, 23))
+    assert (bar.entity_id, bar.close, bar.currency, bar.price_basis) == ("VNINDEX", Decimal("1774.15"), "POINT", "raw")
+
+
+def test_cli_market_sync_loads_an_index(tmp_path):
+    import json as _json
+    from investment_agent.cli import market_sync
+    cal_path = tmp_path / "cal.json"
+    cal_path.write_text(_json.dumps({"version": "x", "source": "t", "holidays": [], "first": "2026-01-01", "last": "2026-12-31"}), encoding="utf-8")
+    p = VnstockProvider(market=IndexMarket(), fundamental=FakeFundamental(), clock=lambda: NOW)
+    assert market_sync(["VNINDEX"], tmp_path, cal_path, 7, provider=p, today=date(2026, 10, 23), index=True) == 0
+    assert PriceStore(tmp_path).latest("VNINDEX")[date(2026, 10, 23)][0].close == Decimal("1774.15")
+
+
+def test_cli_industries_saves_level_two_sectors_for_watched_tickers(tmp_path):
+    import json as _json
+    from investment_agent.cli import industries
+    p = VnstockProvider(market=FakeMarket(), fundamental=FakeFundamental(), listing=IndustryListing(), clock=lambda: NOW)
+    assert industries(["MBB", "SSI", "XYZ"], tmp_path / "industries.json", provider=p, today=date(2026, 10, 25)) == 0
+    saved = _json.loads((tmp_path / "industries.json").read_text(encoding="utf-8"))
+    assert saved == {"as_of": "2026-10-25", "source": "vnstock:vci", "level": 2, "sectors": {"MBB": "Ngân hàng", "SSI": "Dịch vụ tài chính"}}

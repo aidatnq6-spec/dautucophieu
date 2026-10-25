@@ -11,7 +11,7 @@ const FILTERS = [{ id: "all", label: "Tất cả" }, { id: "VN30", label: "VN30"
 const SORTS = [{ id: "ticker", label: "Mã (A–Z)" }, { id: "change_1d", label: "Thay đổi trong phiên" }, { id: "change_20d", label: "Thay đổi 20 phiên" }] as const;
 type SortId = (typeof SORTS)[number]["id"];
 
-function Change({ value }: { value: string | null }) {
+export function Change({ value }: { value: string | null }) {
   if (value === null) return <>—</>;
   const down = value.startsWith("-");
   return <span className={down ? "negative" : "positive"}>{down ? "" : "+"}{formatRatio(value, 2)}</span>;

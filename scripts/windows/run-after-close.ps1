@@ -9,15 +9,23 @@ New-Item -ItemType Directory -Force -Path $data, (Split-Path $log) | Out-Null
 $calendar = Join-Path $data 'trading-calendar.json'
 if (-not (Test-Path -LiteralPath $calendar)) { $calendar = Join-Path $script:RepoRoot "config\trading-calendar-hose-$((Get-Date).Year).json" }
 $symbols = Join-Path $data 'market-symbols.txt'
-# Index constituents change a few times a year; refresh the watchlist's VN30/VN100 labels weekly.
+# Index constituents and sectors change a few times a year; refresh the VN30/VN100 labels and ICB sectors weekly.
+$weekAgo = (Get-Date).AddDays(-7)
 $groups = Join-Path $data 'index-groups.json'
-if ((Test-Path -LiteralPath $symbols) -and (-not (Test-Path -LiteralPath $groups) -or (Get-Item -LiteralPath $groups).LastWriteTime -lt (Get-Date).AddDays(-7))) {
+if ((Test-Path -LiteralPath $symbols) -and (-not (Test-Path -LiteralPath $groups) -or (Get-Item -LiteralPath $groups).LastWriteTime -lt $weekAgo)) {
     $refresh = & $python -W ignore -m investment_agent.cli index-groups --output $groups 2>$null
     "$(Get-Date -Format o) index-groups exit=$LASTEXITCODE $refresh" | Add-Content -LiteralPath $log -Encoding UTF8
+}
+$sectors = Join-Path $data 'industries.json'
+if ((Test-Path -LiteralPath $symbols) -and (-not (Test-Path -LiteralPath $sectors) -or (Get-Item -LiteralPath $sectors).LastWriteTime -lt $weekAgo)) {
+    $refresh = & $python -W ignore -m investment_agent.cli industries --symbols "@$symbols" --output $sectors 2>$null
+    "$(Get-Date -Format o) industries exit=$LASTEXITCODE $refresh" | Add-Content -LiteralPath $log -Encoding UTF8
 }
 if (Test-Path -LiteralPath $symbols) {
     $sync = & $python -W ignore -m investment_agent.cli market-sync --symbols "@$symbols" --data-dir $data --calendar $calendar --days 10 2>$null
     "$(Get-Date -Format o) market-sync exit=$LASTEXITCODE $sync" | Add-Content -LiteralPath $log -Encoding UTF8
+    $sync = & $python -W ignore -m investment_agent.cli market-sync --symbols VNINDEX --index --data-dir $data --calendar $calendar --days 10 2>$null
+    "$(Get-Date -Format o) market-sync VNINDEX exit=$LASTEXITCODE $sync" | Add-Content -LiteralPath $log -Encoding UTF8
 }
 $summary = & $python -W ignore -m investment_agent.cli scheduled-run --calendar $calendar --data-dir $data 2>$null
 $runExit = $LASTEXITCODE

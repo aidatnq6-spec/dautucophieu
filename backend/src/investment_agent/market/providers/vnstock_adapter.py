@@ -39,30 +39,49 @@ class VnstockProvider:
             self._market, self._fundamental = self._market or Market(), self._fundamental or Fundamental()
         return self._market, self._fundamental
 
-    def index_members(self, group: str) -> list[str]:
-        """Current constituents of an index group (e.g. VN30, VN100) as listed by the source."""
+    def _listing_api(self):
         if self._listing is None:
             try:
                 from vnstock import Listing
             except ImportError as exc:
                 raise ProviderUnavailable("vnstock is not installed; install it from vnstocks.com with your own key") from exc
             self._listing = Listing()
-        return sorted({str(s).upper() for s in self._listing.symbols_by_group(group)})
+        return self._listing
+
+    def index_members(self, group: str) -> list[str]:
+        """Current constituents of an index group (e.g. VN30, VN100) as listed by the source."""
+        return sorted({str(s).upper() for s in self._listing_api().symbols_by_group(group)})
+
+    def industry_map(self, symbols: list[str], level: int = 2) -> dict[str, str]:
+        """ICB sector names at one level for the given tickers (VCI is the source that serves this listing)."""
+        frame = self._listing_api().symbols_by_industries(source="vci")
+        wanted = {s.upper() for s in symbols}
+        return {str(r["symbol"]).upper(): str(r["icb_name"]) for r in frame.to_dict("records")
+                if int(r["icb_level"]) == level and str(r["symbol"]).upper() in wanted}
+
+    def fetch_index(self, symbol: str, start: date, end: date) -> list[PriceBar]:
+        """Index levels in points, as published (no corporate-action adjustment applies)."""
+        market, _ = self._api()
+        frame = market.index(symbol.upper()).ohlcv(start=start.isoformat(), end=end.isoformat(), interval="1D", source=SOURCE)
+        return self._bars(frame, symbol.upper(), scale=Decimal(1), currency="POINT", basis="raw")
 
     def fetch_prices(self, symbol: str, start: date, end: date) -> list[PriceBar]:
         market, _ = self._api()
         symbol = symbol.upper()
         frame = market.equity(symbol).ohlcv(start=start.isoformat(), end=end.isoformat(), interval="1D", source=SOURCE, floating=None)
+        return self._bars(frame, symbol, scale=THOUSAND, currency="VND", basis="adjusted")
+
+    def _bars(self, frame, symbol: str, *, scale: Decimal, currency: str, basis: str) -> list[PriceBar]:
         observed = self._clock()
         bars = []
         for row in frame.to_dict("records"):
             try:
-                values = {k: Decimal(str(row[k])) * THOUSAND for k in ("open", "high", "low", "close")}
+                values = {k: Decimal(str(row[k])) * scale for k in ("open", "high", "low", "close")}
                 if any(not v.is_finite() for v in values.values()):
                     continue
                 bar = PriceBar(entity_id=symbol, session_date=row["time"].date(), **{k: format(v.normalize(), "f") for k, v in values.items()},
-                               volume=int(row["volume"]), currency="VND", source_id=f"vnstock:{SOURCE}", observed_at=observed,
-                               provenance_mode="latest_restated", price_basis="adjusted")
+                               volume=int(row["volume"]), currency=currency, source_id=f"vnstock:{SOURCE}", observed_at=observed,
+                               provenance_mode="latest_restated", price_basis=basis)
             except (InvalidOperation, ValidationError, TypeError, ValueError, KeyError):
                 continue
             if bar.high < max(bar.open, bar.close, bar.low) or bar.low > min(bar.open, bar.close) or bar.low <= 0:

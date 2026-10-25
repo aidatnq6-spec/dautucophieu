@@ -35,13 +35,19 @@ def main() -> int:
     sync.add_argument("--data-dir", type=Path, required=True)
     sync.add_argument("--calendar", type=Path, required=True)
     sync.add_argument("--days", type=int, default=30)
+    sync.add_argument("--index", action="store_true", help="the symbols are indices (e.g. VNINDEX), quoted in points")
+    sectors = commands.add_parser("industries", help="save ICB level-2 sectors of the synced tickers for the market page")
+    sectors.add_argument("--symbols", required=True, help="comma-separated tickers, or @file with one ticker per line")
+    sectors.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.command == "vnstock-audit":
         return vnstock_audit(_symbols(args.symbols), args.output_dir)
     if args.command == "index-groups":
         return index_groups([g.strip().upper() for g in args.groups.split(",") if g.strip()], args.output)
     if args.command == "market-sync":
-        return market_sync(_symbols(args.symbols), args.data_dir, args.calendar, args.days)
+        return market_sync(_symbols(args.symbols), args.data_dir, args.calendar, args.days, index=args.index)
+    if args.command == "industries":
+        return industries(_symbols(args.symbols), args.output)
     if args.command == "backup":
         return run_backup(args.data_dir, args.backup_dir, args.kind)
     if args.command == "scheduled-run":
@@ -116,7 +122,23 @@ def _same_bar(a, b) -> bool:
     return a.model_dump(exclude={"observed_at"}) == b.model_dump(exclude={"observed_at"})
 
 
-def market_sync(symbols: list[str], data_dir: Path, calendar_path: Path, days: int, provider=None, today=None) -> int:
+def industries(symbols: list[str], output: Path, provider=None, today=None) -> int:
+    from datetime import date
+    from investment_agent.market.providers.vnstock_adapter import ProviderUnavailable, VnstockProvider
+    provider = provider or VnstockProvider()
+    try:
+        sectors = provider.industry_map(symbols, level=2)
+    except ProviderUnavailable as exc:
+        print(json.dumps({"status": "not_configured", "reason": str(exc)}, ensure_ascii=False))
+        return 2
+    output.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"as_of": (today or date.today()).isoformat(), "source": "vnstock:vci", "level": 2, "sectors": dict(sorted(sectors.items()))}
+    output.write_text(json.dumps(payload, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    print(json.dumps({"status": "ok", "classified": len(sectors), "unclassified": len(set(symbols) - set(sectors))}))
+    return 0
+
+
+def market_sync(symbols: list[str], data_dir: Path, calendar_path: Path, days: int, provider=None, today=None, index: bool = False) -> int:
     from datetime import date, timedelta, timezone
     from investment_agent.market.prices import PriceStore, ingest
     from investment_agent.market.providers.vnstock_adapter import ProviderUnavailable, VnstockProvider
@@ -128,7 +150,8 @@ def market_sync(symbols: list[str], data_dir: Path, calendar_path: Path, days: i
     loaded, failed = 0, []
     for symbol in symbols:
         try:
-            bars = [b for b in provider.fetch_prices(symbol, start, today) if cal.first <= b.session_date <= cal.last and cal.is_session(b.session_date)]
+            fetch = provider.fetch_index if index else provider.fetch_prices
+            bars = [b for b in fetch(symbol, start, today) if cal.first <= b.session_date <= cal.last and cal.is_session(b.session_date)]
             if not bars:
                 continue
             # The scheduler syncs several times a day: unchanged prices add nothing, restated ones

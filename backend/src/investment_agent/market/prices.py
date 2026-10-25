@@ -84,8 +84,11 @@ class AdjustedRow(ContractModel):
     adjusted_close: UnsignedAmount | None
 
 
+INDEX_IDS = frozenset({"VNINDEX", "VN30", "VN100", "HNXINDEX"})  # quoted in points, never in đồng
+
+
 def _check(cal: TradingCalendar, b: PriceBar):
-    if b.currency != "VND":
+    if b.currency != ("POINT" if b.entity_id in INDEX_IDS else "VND"):
         raise PriceError("currency", b.entity_id)
     if min(b.open, b.high, b.low, b.close) <= 0:
         raise PriceError("non_positive_price", b.entity_id)

@@ -1,0 +1,28 @@
+{
+  "version": "hose-rules-2026-10-25.1",
+  "exchange": "HOSE",
+  "checked_on": "2026-10-25",
+  "round_lot": 100,
+  "odd_lot_max": 99,
+  "max_round_lot_order": 500000,
+  "tick_sizes": [
+    {"below": "10000", "tick": "10"},
+    {"below": "50000", "tick": "50"},
+    {"below": null, "tick": "100"}
+  ],
+  "daily_price_band": "0.07",
+  "settlement_cycle_days": 2,
+  "sell_tax_rate": "0.001",
+  "dividend_tax_rate": "0.05",
+  "sources": {
+    "round_lot": {"status": "official_2021_unchanged_per_broker_2025",
+                  "basis": "Quy chế giao dịch HOSE 352/QĐ-SGDHCM ngày 30/6/2021, Điều 8 (lô chẵn 100, tối đa 500.000); tài liệu DNSE 04/2025 xác nhận giữ nguyên khi vận hành KRX; lô lẻ 01 cổ phiếu theo Quy chế 22/QĐ-HĐTV ngày 16/3/2026 của SGDCK Việt Nam, Điều 34"},
+    "tick_sizes": {"status": "official_2021_unchanged_per_broker_2025", "basis": "352/QĐ-SGDHCM Điều 8 khoản 4; DNSE 04/2025"},
+    "daily_price_band": {"status": "official_2021_unchanged_per_broker_2025",
+                         "basis": "352/QĐ-SGDHCM Điều 9 khoản 6 (±7%); trường hợp đặc biệt theo Quy chế 22/QĐ-HĐTV/2026 Điều 31 khoản 3 và Phụ lục III (chưa đọc được Phụ lục III)"},
+    "settlement_cycle_days": {"status": "secondary_only",
+                              "basis": "T+2 theo tài liệu công ty chứng khoán (VNDirect, BSC); văn bản gốc Thông tư 119/2020/TT-BTC sửa đổi bởi 18/2025/TT-BTC chưa đối chiếu điều khoản"},
+    "sell_tax_rate": {"status": "law_text_quoted_by_secondary", "basis": "Luật Thuế TNCN 109/2025/QH15 (hiệu lực 01/7/2026), Điều 13: 0,1% trên giá chuyển nhượng từng lần"},
+    "dividend_tax_rate": {"status": "law_text_quoted_by_secondary", "basis": "Luật Thuế TNCN 109/2025/QH15, Điều 12: 5% trên thu nhập từ đầu tư vốn (lợi tức cổ phần)"}
+  }
+}

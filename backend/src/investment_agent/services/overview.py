@@ -9,6 +9,7 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from investment_agent.domain.allocation import Position
+from investment_agent.domain.market_rules import load_market_rules
 from investment_agent.domain.ledger import replay
 from investment_agent.domain.profile import ConfirmedProfile, profile_freshness
 from investment_agent.domain.recommendations import RecommendationInputs, ValuationSummary, recommend
@@ -117,7 +118,8 @@ def compose_overview(repo, owner, market, now) -> dict:
                 analysis_gaps=tuple(gaps), governance_status="not_checked", capital=capital, risk=risk, freshness=freshness,
                 holdings=positions, held_quantity=held[entity_id].quantity if entity_id in held else 0,
                 buying_power=None if power is None or power.buying_power is None else power.buying_power,
-                buying_power_basis=power.buying_power_basis if power else "unknown", fee_rate=trading.fee_rate if trading else Decimal(0), now=now))
+                buying_power_basis=power.buying_power_basis if power else "unknown", fee_rate=trading.fee_rate if trading else Decimal(0), now=now,
+                market_rules=load_market_rules()))
             items.append(rec.model_dump(mode="json"))
         actions = [i["action"] for i in items]
         headline = next((a for a in ("buy_tranche", "reduce", "insufficient_basis", "wait") if a in actions), "hold")

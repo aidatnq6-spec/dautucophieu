@@ -18,7 +18,9 @@ Write-Host "Lệnh: powershell.exe $argument"
 Write-Host "Kích hoạt: hằng ngày lúc $($times -join ', ') (giờ máy, cần đặt múi giờ Asia/Ho_Chi_Minh) và khi đăng nhập (chạy bù)."
 if (-not $Register) { Write-Host 'Chưa đăng ký. Chạy lại với -Register sau khi cấu hình xong.'; return }
 
-$missing = @('.env.local', 'data\trading-calendar.json') | Where-Object { -not (Test-Path -LiteralPath (Join-Path $script:RepoRoot $_)) }
+$calendars = @('data\trading-calendar.json', "config\trading-calendar-hose-$((Get-Date).Year).json")
+$missing = @('.env.local') | Where-Object { -not (Test-Path -LiteralPath (Join-Path $script:RepoRoot $_)) }
+if (-not ($calendars | Where-Object { Test-Path -LiteralPath (Join-Path $script:RepoRoot $_) })) { $missing += 'lịch giao dịch năm nay' }
 if ($missing) { throw "Chưa đủ cấu hình: $($missing -join ', ')" }
 if ((Get-TimeZone).Id -ne 'SE Asia Standard Time') { throw 'Múi giờ máy không phải UTC+07 (SE Asia Standard Time); lịch 17:30 sẽ lệch.' }
 

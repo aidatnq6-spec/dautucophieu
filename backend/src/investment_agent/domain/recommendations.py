@@ -4,9 +4,10 @@ Order of gates: research scope → basis (approved valuation, price, analysis
 gaps, profile, risk, capital) → price zone → financial capacity → buying power
 → post-trade allocation. A buy amount is the smallest of one tranche of the
 long-term target, the allocation headroom, and buying power net of the
-owner's fee rate. Lot rules are unverified, so only an amount is proposed and
-the quantity must be confirmed by the owner. A low P/B is informational and
-never relaxes any gate.
+owner's fee rate. With market rules loaded, a round-lot quantity (or an odd
+lot below 100 shares) is suggested; the owner still confirms quantity and
+buying power because the settlement cycle is only secondarily verified. A low
+P/B is informational and never relaxes any gate.
 """
 
 from dataclasses import dataclass, field
@@ -57,6 +58,7 @@ class RecommendationInputs:
     now: datetime
     history_window: tuple[date, date] | None = None
     policy: object = field(default=None)
+    market_rules: object = field(default=None)  # MarketRules; None = no quantity suggestion
 
 
 class Recommendation(ContractModel):
@@ -66,6 +68,9 @@ class Recommendation(ContractModel):
     zone: Zone | None
     amount: PlainDecimal
     shares: int | None
+    suggested_shares: int | None = None  # from market rules; the owner still confirms
+    lot_kind: Literal["round", "odd"] | None = None
+    rules_version: str | None = None
     quantity_requires_confirmation: bool
     weight_before: PlainDecimal | None
     weight_after: PlainDecimal | None
@@ -79,8 +84,21 @@ class Recommendation(ContractModel):
     pb_context: PlainDecimal | None
 
 
+def _quantity(i: RecommendationInputs, amount: Decimal) -> dict:
+    rules = i.market_rules
+    if rules is None or amount <= 0 or i.price is None:
+        return {}
+    shares = rules.round_lot_shares(amount, i.price, fee_rate=i.fee_rate)
+    kind = "round"
+    if shares == 0:  # less than one round lot affordable: odd lot (1-99 shares)
+        shares = min(int(amount // (i.price * (1 + i.fee_rate))), rules.round_lot - 1)
+        kind = "odd"
+    return {"suggested_shares": shares, "lot_kind": kind, "rules_version": rules.version} if shares else {}
+
+
 def _result(i: RecommendationInputs, action, reasons, *, zone=None, amount=Decimal(0), before=None, after=None, constraints=(), conditions=()):
     return Recommendation(entity_id=i.entity_id, action=action, reasons=tuple(reasons), zone=zone, amount=amount, shares=None,
+                          **(_quantity(i, amount) if action == "buy_tranche" else {}),
                           quantity_requires_confirmation=action == "buy_tranche", weight_before=before, weight_after=after,
                           constraints=tuple(constraints), source_ids=i.valuation.source_ids, assumption_version=i.valuation.assumption_version,
                           invalidate_conditions=tuple(conditions), price_date=i.price_date, analysis_time=i.now,

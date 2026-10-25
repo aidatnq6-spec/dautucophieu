@@ -6,6 +6,8 @@ $python = Get-RepoPython
 $data = Join-Path $script:RepoRoot 'data'
 $log = Join-Path $script:RepoRoot 'logs\scheduler.log'
 New-Item -ItemType Directory -Force -Path $data, (Split-Path $log) | Out-Null
-$summary = & $python -W ignore -m investment_agent.cli scheduled-run --calendar (Join-Path $data 'trading-calendar.json') --data-dir $data 2>$null
+$calendar = Join-Path $data 'trading-calendar.json'
+if (-not (Test-Path -LiteralPath $calendar)) { $calendar = Join-Path $script:RepoRoot "config\trading-calendar-hose-$((Get-Date).Year).json" }
+$summary = & $python -W ignore -m investment_agent.cli scheduled-run --calendar $calendar --data-dir $data 2>$null
 "$(Get-Date -Format o) exit=$LASTEXITCODE $summary" | Add-Content -LiteralPath $log -Encoding UTF8
 exit $LASTEXITCODE

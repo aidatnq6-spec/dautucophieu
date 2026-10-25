@@ -1,0 +1,18 @@
+{
+  "version": "hose-2026.2",
+  "source": "HOSE Thông báo 2294/TB-SGDHCM ngày 09/12/2025 (lịch nghỉ giao dịch năm 2026) và thông báo cập nhật lịch nghỉ Tết Dương lịch ngày 25/12/2025",
+  "source_urls": [
+    "https://cafef.vn/du-lieu/hose-2678210/hose-thong-bao-lich-nghi-giao-dich-nam-2026.chn",
+    "https://vietstock.vn/2025/12/hose-thong-bao-ve-viec-cap-nhat-lich-nghi-giao-dich-tet-duong-lich-nam-2026-830-1384826.htm"
+  ],
+  "verification": "Nội dung thông báo HOSE đọc qua bản đăng lại (CafeF, Vietstock, Thư viện Pháp luật) ngày 2026-10-25; chưa đối chiếu bản gốc trên hsx.vn. Thứ Bảy làm bù (10/01, 22/08) không tổ chức giao dịch.",
+  "first": "2026-01-01",
+  "last": "2026-12-31",
+  "holidays": [
+    "2026-01-01", "2026-01-02",
+    "2026-02-16", "2026-02-17", "2026-02-18", "2026-02-19", "2026-02-20",
+    "2026-04-27",
+    "2026-04-30", "2026-05-01",
+    "2026-08-31", "2026-09-01", "2026-09-02"
+  ]
+}

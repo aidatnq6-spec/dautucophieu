@@ -8,16 +8,25 @@ Cài Node 24 LTS, Git 2, Python 3.11 64-bit. Làm theo phần "Runtime" trong RE
 
 ## 2. Firebase (một tài khoản)
 
-1. Tạo project Firebase, bật Authentication → Google.
-2. Tạo service account (Firestore + Auth) và lấy `project_id`, `client_email`, `private_key`.
-3. Đăng nhập một lần để biết UID của bạn (Firebase Console → Authentication) và đặt `FIREBASE_OWNER_UID`.
-4. Deploy Rules mặc định từ chối client (`firebase/firestore.rules`) và indexes (`firebase/firestore.indexes.json`).
-5. Điền `.env.local`: `FIREBASE_*`, `NEXT_PUBLIC_FIREBASE_*` (cấu hình web công khai), `APP_ORIGIN=http://127.0.0.1:3000`, `PYTHON_API_ORIGIN=http://127.0.0.1:8000`, `INTERNAL_API_TOKEN` và `INTERNAL_API_HMAC_SECRET` (hai chuỗi ngẫu nhiên khác nhau, ≥ 32 ký tự).
+1. Firebase Console → tạo project; bật **Authentication → Google**; thêm `127.0.0.1` vào **Authorized domains**.
+2. Tạo **Firestore Database** (Production mode, vùng `asia-southeast1`).
+3. **Project settings → General → Your apps → Web**: đăng ký app, lấy `apiKey`.
+4. **Project settings → Service accounts → Generate new private key**: lưu file JSON **ngoài thư mục dự án**.
+5. Ghi cấu hình (không in bí mật, sinh khóa nội bộ một lần):
+   ```powershell
+   scripts\windows\configure-firebase.ps1 -ServiceAccountJson C:\path	o\key.json -WebApiKey <apiKey>
+   ```
+6. Deploy Rules chặn mọi truy cập trực tiếp từ client: `firebase login`, rồi `firebase deploy --only firestore --project <project-id>`.
+7. Build và chạy (bước 3), đăng nhập một lần bằng Google (sẽ bị từ chối vì chưa có UID), lấy UID ở **Authentication → Users**, rồi:
+   ```powershell
+   scripts\windows\configure-firebase.ps1 -OwnerUid <uid>
+   ```
+   và khởi động lại ứng dụng.
 
 ## 3. Chạy ứng dụng
 
 ```powershell
-npm.cmd --prefix apps/web run build
+scripts\windowsuild-app.ps1
 powershell -ExecutionPolicy Bypass -File scripts\windows\start-app.ps1
 ```
 

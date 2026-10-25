@@ -13,16 +13,13 @@ from investment_agent.domain.models import ContractModel, NonemptyId, SignedAmou
 
 from .disclosures import EvidenceError
 
-_HTTPS = Field(pattern=r"^https://\S+$")
-
-
 class MacroObservation(ContractModel):
     series_id: NonemptyId
     period: NonemptyId
     value: SignedAmount
     unit: Literal["percent", "VND", "index", "billion_VND", "USD_million"]
     source_id: NonemptyId
-    source_url: str = Field(pattern=r"^https://S+$")
+    source_url: str = Field(pattern=r"^https://\S+$")
     released_at: AwareDatetime
     vintage_id: NonemptyId
     provenance_mode: Literal["synthetic", "historical_as_reported", "latest_restated"]

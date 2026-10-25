@@ -22,7 +22,11 @@ Vnstock v5 không có trên PyPI; được phân phối dạng gói biên dịch
    ```powershell
    .\.venv\Scripts\python.exe -m pip install -U --extra-index-url https://vnstocks.com/api/packages vnstock
    ```
-3. Đặt `VNSTOCK_API_KEY=...` trong `.env.local` (không dán vào hội thoại hay mã).
+3. Đăng nhập một lần; Vnstock 5.2 lưu key trên máy này (không đọc từ biến môi trường). Giữ key trong `.env.local` (dòng `VNSTOCK_API_KEY=...`, không dán vào hội thoại hay mã) rồi chạy:
+   ```powershell
+   .\.venv\Scripts\python.exe -c "from vnstock import account; import re; k=re.search(r'^VNSTOCK_API_KEY=(.+)$', open('.env.local', encoding='utf-8').read(), re.M).group(1).strip(); print(account.login(k)['authenticated'])"
+   ```
+   Kết quả `True` là đã nhận key. Kiểm tra lại bằng `account.status()`.
 
 ## Lệnh
 
@@ -33,6 +37,8 @@ Vnstock v5 không có trên PyPI; được phân phối dạng gói biên dịch
 # Nạp giá 30 ngày gần nhất (chỉ phiên có trong lịch HOSE)
 .\.venv\Scripts\python.exe -m investment_agent.cli market-sync --symbols FPT,VCB --data-dir data --calendar config\trading-calendar-hose-2026.json --days 30
 ```
+
+Chạy lại trong cùng ngày là an toàn: giá không đổi thì bỏ qua; giá bị nguồn sửa lại thì lưu thành revision mới đặt tên theo thời điểm quan sát, revision cũ vẫn giữ.
 
 Để lịch tự động cập nhật giá trước mỗi lần chạy, tạo `data\market-symbols.txt` (mỗi dòng một mã đang nắm giữ hoặc đang theo dõi). Khi có `data\prices`, server và lịch tự động dùng giá đã nạp; nếu không thì giữ chế độ không có dữ liệu.
 

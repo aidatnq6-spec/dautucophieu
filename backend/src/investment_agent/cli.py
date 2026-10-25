@@ -90,8 +90,12 @@ def vnstock_audit(symbols: list[str], output_dir: Path, provider=None, today=Non
     return 0
 
 
+def _same_bar(a, b) -> bool:
+    return a.model_dump(exclude={"observed_at"}) == b.model_dump(exclude={"observed_at"})
+
+
 def market_sync(symbols: list[str], data_dir: Path, calendar_path: Path, days: int, provider=None, today=None) -> int:
-    from datetime import date, timedelta
+    from datetime import date, timedelta, timezone
     from investment_agent.market.prices import PriceStore, ingest
     from investment_agent.market.providers.vnstock_adapter import ProviderUnavailable, VnstockProvider
     provider = provider or VnstockProvider()
@@ -103,9 +107,16 @@ def market_sync(symbols: list[str], data_dir: Path, calendar_path: Path, days: i
     for symbol in symbols:
         try:
             bars = [b for b in provider.fetch_prices(symbol, start, today) if cal.first <= b.session_date <= cal.last and cal.is_session(b.session_date)]
-            if bars:
-                ingest(store, cal, bars, revision_id=f"vnstock-{today:%Y%m%d}-{start:%Y%m%d}")
-                loaded += len(bars)
+            if not bars:
+                continue
+            # The scheduler syncs several times a day: unchanged prices add nothing, restated ones
+            # become a new revision named by observation time rather than colliding with today's.
+            stored = store.latest(bars[0].entity_id)
+            if all(b.session_date in stored and _same_bar(b, stored[b.session_date][0]) for b in bars):
+                continue
+            observed = bars[0].observed_at.astimezone(timezone.utc)
+            ingest(store, cal, bars, revision_id=f"vnstock-{observed:%Y%m%dT%H%M%S}-{start:%Y%m%d}")
+            loaded += len(bars)
         except ProviderUnavailable as exc:
             print(json.dumps({"status": "not_configured", "reason": str(exc)}, ensure_ascii=False))
             return 2

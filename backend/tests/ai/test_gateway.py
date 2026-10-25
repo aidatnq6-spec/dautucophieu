@@ -196,3 +196,12 @@ def test_settings_repr_hides_secrets():
 
 def test_load_policy_from_example_file():
     assert load_ai_policy().status == "example_unapproved"
+
+
+def test_tools_are_sent_and_tool_calls_returned(tmp_path):
+    reply = httpx.Response(200, json={"id": "g", "model": "example/model-a", "choices": [{"message": {"content": None,
+        "tool_calls": [{"id": "c1", "function": {"name": "get_evidence", "arguments": "{}"}}]}}], "usage": {"cost": "0.001"}})
+    rec = Recorder(reply)
+    tools = [{"type": "function", "function": {"name": "get_evidence", "parameters": {"type": "object"}}}]
+    result = gateway(tmp_path, rec).complete("deep", MESSAGES, job_id="j1", tools=tools)
+    assert rec.requests[0]["tools"] == tools and result.tool_calls[0]["function"]["name"] == "get_evidence" and result.content is None

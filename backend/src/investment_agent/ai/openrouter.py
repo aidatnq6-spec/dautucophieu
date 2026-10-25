@@ -83,7 +83,8 @@ def load_ai_policy(path: Path = CONFIG_DIR / "ai-policy.example.json") -> AiPoli
 class Completion:
     model: str
     provider: str | None
-    content: str
+    content: str | None
+    tool_calls: tuple[dict, ...]
     prompt_tokens: int
     completion_tokens: int
     cost_usd: Decimal
@@ -104,7 +105,8 @@ class OpenRouterGateway:
             if m and m.prompt_price is not None and m.completion_price is not None and set(task.required_parameters) <= m.supported_parameters:
                 yield m
 
-    def complete(self, task_name: str, messages: list[dict], *, job_id: str, response_format: dict | None = None) -> Completion:
+    def complete(self, task_name: str, messages: list[dict], *, job_id: str, response_format: dict | None = None,
+                 tools: list[dict] | None = None) -> Completion:
         if not self.settings.openrouter_api_key:
             raise AIUnavailable("key_missing")
         if self.policy.status != "approved":
@@ -136,6 +138,8 @@ class OpenRouterGateway:
                     "provider": self.policy.provider.model_dump(), "usage": {"include": True}}
             if response_format is not None:
                 body["response_format"] = response_format
+            if tools:
+                body["tools"] = tools
             outcome = self._send(body, rid, model, prompt_estimate, task)
             if isinstance(outcome, Completion):
                 return outcome
@@ -175,7 +179,8 @@ class OpenRouterGateway:
             else:
                 cost, basis = p_tokens * model.prompt_price + c_tokens * model.completion_price, "estimated"
             self.ledger.settle(rid, cost)
-            return Completion(model=data.get("model", model.id), provider=data.get("provider"),
-                              content=data["choices"][0]["message"]["content"], prompt_tokens=p_tokens, completion_tokens=c_tokens,
+            message = data["choices"][0]["message"]
+            return Completion(model=data.get("model", model.id), provider=data.get("provider"), content=message.get("content"),
+                              tool_calls=tuple(message.get("tool_calls") or ()), prompt_tokens=p_tokens, completion_tokens=c_tokens,
                               cost_usd=cost, cost_basis=basis, generation_id=data.get("id"), policy_version=self.policy.version)
         return "rate_limited"

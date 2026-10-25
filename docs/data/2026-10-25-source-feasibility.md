@@ -65,3 +65,26 @@ Chưa có cấu hình nguồn được xác minh cho tiến trình này. Không 
 - Backend: 69 test PASS, gồm 25 test coverage.
 - CLI `data-audit --fixtures`: xuất JSON và Markdown thành công; aggregate giữ `live_eligible=false`, số doanh nghiệp live đủ điều kiện bằng 0.
 - Fixture sinh lịch ngày thường chỉ phục vụ kiểm tra logic. Không có test nào ở trên chứng minh độ phủ hoặc quyền dữ liệu thật.
+
+## Cập nhật 25/10/2026 (chiều): Vnstock v5.0.1 so với yêu cầu
+
+Đọc tài liệu [Market](https://vnstocks.com/docs/vnstock/thi-truong-market), [Fundamental](https://vnstocks.com/docs/vnstock/co-ban-fundamental) và [giấy phép](https://vnstocks.com/policies/license) (license-2026.11, công bố 24/10/2026, hiệu lực 30/11/2026, nên chưa áp dụng tại ngày đánh giá). Chưa cài thư viện và chưa gọi API.
+
+| Yêu cầu thiết kế | Vnstock Community (miễn phí, có key) | Gói Mở rộng (trả phí) |
+|---|---|---|
+| Giá ngày ≥ 10 năm | **Không đạt**: giới hạn 2.920 ngày (khoảng 8 năm), tối đa 10.000 dòng | Tài liệu không nêu giới hạn khác cho ngày |
+| Giá gốc tách khỏi giá điều chỉnh | **Không đạt**: chỉ có giá đã điều chỉnh quyền (nghìn đồng, làm tròn 2 số lẻ mặc định); `vci` và `kbs` điều chỉnh khác nhau | Như trên |
+| BCTC 10 kỳ năm / 40 kỳ quý | **Không đạt**: 8 kỳ gần nhất mỗi lần gọi | Tất cả kỳ nguồn trả về |
+| Ngày công bố, bản sửa (as-reported) | **Không có** trong tài liệu | Không có; chỉ có danh mục tài liệu `filing()` |
+| Hợp nhất / riêng | Không có tham số | Phân biệt qua `filing(doc_type="financial_report")` |
+| Cổ tức, sự kiện quyền | Không có phương thức | Chỉ qua `filing()` (nghị quyết…) |
+| Chỉ số P/E, P/B | `ratio()` (sắp thay bằng `vnstock_quant`, dùng được đến 15/01/2027) | Như trên |
+| Quyền dữ liệu | Giấy phép chỉ cho mục đích cá nhân/học tập/nghiên cứu; Vnstock **không chuyển giao quyền** với dữ liệu từ nguồn bên thứ ba (VCI, KBS…); người dùng tự xác định quyền lưu, hiển thị, chia sẻ theo điều khoản từng nguồn; không gói nào có quyền phân phối lại | Như trên |
+
+**Kết luận:** Vnstock Community không đáp ứng yêu cầu 10 năm, giá gốc và dữ liệu đúng thời điểm công bố. Gói trả phí giải quyết độ sâu BCTC nhưng theo tài liệu vẫn thiếu giá gốc, ngày công bố và sự kiện quyền dạng có cấu trúc. Gate A về nguồn **vẫn chưa đạt**. Không viết adapter Vnstock cho đến khi chủ sở hữu chọn hướng, vì kế hoạch không cho tự hạ tiêu chí.
+
+Các hướng để chủ sở hữu quyết định:
+
+1. **Đánh giá FiinQuant / FiinGroup Datafeed** (trả phí): kiểm tra gói có giá gốc + hệ số điều chỉnh, 10 năm BCTC kèm ngày công bố, sự kiện quyền, quyền lưu cục bộ, và báo giá trước khi mua.
+2. **Chạy chế độ hạn chế với Vnstock**: chỉ dữ liệu `latest_restated`, giá đã điều chỉnh, tối đa 8 năm. Ứng dụng phải gắn nhãn rõ và chặn mọi kết luận cần dữ liệu đúng thời điểm (backtest, "rẻ nhất 10 năm"). Đây là hạ tiêu chí so với thiết kế, nên cần chủ sở hữu duyệt rõ ràng.
+3. **Tự thu thập từ nguồn công bố gốc** (BCTC trên HOSE và website doanh nghiệp) kết hợp nguồn giá: công sức lớn, cần kiểm tra điều khoản từng nguồn.

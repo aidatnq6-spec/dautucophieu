@@ -127,3 +127,22 @@ def test_history_window_recorded_exactly():
     rec = recommend(inputs())
     assert rec.history_window == (date(2016, 10, 24), date(2026, 10, 23))
     assert rec.price_date == date(2026, 10, 23) and rec.analysis_time == NOW
+
+
+def test_buy_suggests_round_lot_quantity_from_market_rules():
+    from investment_agent.domain.market_rules import load_market_rules
+    rec = recommend(inputs(market_rules=load_market_rules()))
+    # 125,000,000 at 70,000 with 0.15% fee: 1,783.3 shares affordable -> 1,700 in round lots
+    assert (rec.suggested_shares, rec.lot_kind, rec.rules_version) == (1700, "round", "hose-rules-2026-10-25.1")
+    assert rec.shares is None and rec.quantity_requires_confirmation is True
+
+
+def test_small_amount_falls_back_to_odd_lot():
+    from investment_agent.domain.market_rules import load_market_rules
+    rec = recommend(inputs(market_rules=load_market_rules(), buying_power=Decimal(5_000_000)))
+    assert (rec.suggested_shares, rec.lot_kind) == (71, "odd")
+
+
+def test_without_rules_no_quantity_is_suggested():
+    rec = recommend(inputs())
+    assert rec.suggested_shares is None and rec.lot_kind is None

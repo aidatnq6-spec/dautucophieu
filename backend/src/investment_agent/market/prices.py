@@ -47,6 +47,7 @@ class PriceBar(ContractModel):
     source_id: NonemptyId
     observed_at: AwareDatetime
     provenance_mode: Literal["synthetic", "historical_as_reported", "latest_restated"]
+    price_basis: Literal["raw", "adjusted"] = "raw"  # adjusted series must never value real holdings as raw prices
 
 
 class SessionRow(ContractModel):

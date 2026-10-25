@@ -23,13 +23,13 @@ Dữ liệu cục bộ (`data\jobs.sqlite`, `data\deliveries.sqlite`, cache) n�
 
 ### Lịch giao dịch
 
-Lệnh cần `data\trading-calendar.json` do chủ sở hữu lập từ thông báo lịch nghỉ chính thức của HOSE:
+Lịch tự động dùng `data\trading-calendar.json` nếu có, nếu không thì `config\trading-calendar-hose-<năm hiện tại>.json` (đã có năm 2026, xem `docs\decisions\market-rules.md`). Định dạng khi tự lập:
 
 ```json
 {"version": "hose-2026", "source": "<đường dẫn thông báo chính thức>", "holidays": ["2026-09-02"], "first": "2026-01-02", "last": "2026-12-31"}
 ```
 
-Thiếu file hoặc `source` rỗng/`synthetic` thì lệnh thoát mã 2 và không chạy gì. Kho mã chưa kèm lịch thật vì chưa được kiểm chứng từ nguồn chính thức.
+Thiếu file hoặc `source` rỗng/`synthetic` thì lệnh thoát mã 2 và không chạy gì. Mỗi năm cần thêm lịch mới khi HOSE công bố.
 
 ### Đăng ký tác vụ
 
@@ -39,7 +39,7 @@ scripts\windows\register-tasks.ps1 -Register  # đăng ký cho người dùng hi
 scripts\windows\register-tasks.ps1 -Unregister
 ```
 
-Đăng ký yêu cầu `.env.local`, `data\trading-calendar.json` và múi giờ máy UTC+07. Tác vụ dùng đường dẫn tuyệt đối, không truyền token qua tham số, chạy ẩn, `StartWhenAvailable` để chạy bù, và không sửa tác vụ khác. Máy tắt hoặc ngủ thì không bảo đảm đúng giờ.
+Đăng ký yêu cầu `.env.local`, lịch giao dịch năm hiện tại và múi giờ máy UTC+07. Tác vụ dùng đường dẫn tuyệt đối, không truyền token qua tham số, chạy ẩn, `StartWhenAvailable` để chạy bù, và không sửa tác vụ khác. Máy tắt hoặc ngủ thì không bảo đảm đúng giờ.
 
 Nhật ký: `logs\scheduler.log` chỉ ghi thời điểm, mã thoát và tóm tắt JSON (không có bí mật hay số liệu cá nhân).
 

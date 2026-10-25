@@ -65,3 +65,30 @@ class SyntheticMarket:
 
     def industry(self, entity_id):
         return self.industries.get(entity_id)
+
+
+class StoreMarket:
+    """Latest stored close per entity from the local Parquet store (e.g. Vnstock restricted mode).
+
+    Prices older than max_age_days count as missing. No evidence documents are
+    provided, so recommendations stay insufficient while portfolio values work.
+    """
+
+    def __init__(self, store, cal, *, today, provenance: str = "vnstock_adjusted", max_age_days: int = 10, industries=None):
+        self.store, self.cal, self.today, self.provenance = store, cal, today, provenance
+        self.max_age_days, self.industries = max_age_days, industries or {}
+
+    def price(self, entity_id):
+        view = self.store.latest(entity_id)
+        if not view:
+            return None
+        day = max(view)
+        if (self.today() - day).days > self.max_age_days:
+            return None
+        return PricePoint(view[day][0].close, day)
+
+    def evidence(self, entity_id):
+        return []
+
+    def industry(self, entity_id):
+        return self.industries.get(entity_id)

@@ -7,7 +7,8 @@ import { ACTION_LABEL, REASON_TEXT, label } from "./labels";
 
 export type Item = { entity_id: string; action: string; reasons: string[]; amount: string; quantity_requires_confirmation: boolean;
   zone: { buy_below: string; fair_value: string; margin_of_safety: string; position: string } | null; source_ids: string[];
-  assumption_version: number | null; invalidate_conditions: string[]; price_date: string | null; analysis_time: string };
+  assumption_version: number | null; invalidate_conditions: string[]; price_date: string | null; analysis_time: string;
+  suggested_shares?: number | null; lot_kind?: "round" | "odd" | null };
 export type Decision = { action: string; headline: string; reasons: string[] };
 
 function ItemDetail({ item }: { item: Item }) {
@@ -23,7 +24,9 @@ function ItemDetail({ item }: { item: Item }) {
         <div data-testid={`reasons-${item.entity_id}`}>
           <ul>{item.reasons.map((r) => <li key={r}>{label(REASON_TEXT, r)}</li>)}</ul>
           {item.zone && <p>Vùng mua ≤ {formatVnd(item.zone.buy_below)} · giá trị cơ sở {formatVnd(item.zone.fair_value)}</p>}
-          {item.action === "buy_tranche" && <p>Số tiền đề xuất: {formatVnd(item.amount)} · số lượng cần bạn xác nhận theo quy tắc giao dịch.</p>}
+          {item.action === "buy_tranche" && <p>Số tiền đề xuất: {formatVnd(item.amount)}
+            {item.suggested_shares ? ` · gợi ý ${item.suggested_shares.toLocaleString("vi-VN")} cổ phiếu (${item.lot_kind === "odd" ? "lô lẻ" : "lô chẵn"})` : ""}
+            {" "}· hãy xác nhận số lượng và tiền khả dụng với công ty chứng khoán trước khi đặt lệnh.</p>}
           <p className="caption">Giả định định giá: {item.assumption_version ? `phiên bản ${item.assumption_version}` : "chưa có"} ·
             Ngày giá: {item.price_date ?? "chưa có"} · Phân tích lúc {new Date(item.analysis_time).toLocaleString("vi-VN")}</p>
           {item.source_ids.length > 0 && (

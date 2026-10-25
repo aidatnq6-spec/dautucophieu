@@ -34,9 +34,9 @@ Mở http://127.0.0.1:3000 → Đăng nhập bằng Google. Tài khoản khác U
 
 - **Nguồn dữ liệu thị trường**: ứng dụng hiện dùng `EmptyMarket` — không có giá, tài liệu hay báo cáo tài chính thật, nên mọi khuyến nghị là "chưa đủ cơ sở" và bản tin là "thiếu dữ liệu". Cần chọn nguồn được phép dùng và viết adapter (xem `docs/data/2026-10-25-source-feasibility.md`).
 - **Danh sách 50 mã**: chỉ hoàn chỉnh khi mọi mã đạt audit nguồn đã xác minh và bạn xác nhận phiên bản chính sách ngưỡng (`config/universe-policy.json`).
-- **Lịch giao dịch**: lập `data\trading-calendar.json` từ lịch nghỉ chính thức HOSE trước khi đăng ký lịch tự động.
+- **Lịch giao dịch**: đã có lịch 2026 (`config\trading-calendar-hose-2026.json`); thêm lịch năm sau khi HOSE công bố.
 - **AI**: chính sách mẫu chưa duyệt, ngân sách 0 USD. Muốn bật: tạo key OpenRouter, chọn model có endpoint ZDR, đặt ngân sách, chạy bộ đánh giá (`docs/verification/model-evaluation.md`).
-- **Quy tắc T+, lô, thuế**: chưa kiểm chứng từ nguồn chính thức; ứng dụng chỉ đề xuất số tiền và cần bạn xác nhận số lượng.
+- **Quy tắc giao dịch**: lô, bước giá, biên độ, thuế đã ghi kèm căn cứ (`docs\decisions\market-rules.md`); T+2 mới có nguồn thứ cấp. Khuyến nghị gợi ý số lượng theo lô nhưng bạn vẫn xác nhận trước khi đặt lệnh.
 
 ## 6. Lịch, sao lưu, dừng
 

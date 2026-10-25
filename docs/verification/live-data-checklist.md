@@ -9,8 +9,8 @@ Mọi mục dưới đây đang **not_run** (2026-10-25). Ghi `passed`/`failed`/
 - [ ] Audit từng ứng viên 50 mã: ≥ 10 năm, ≥ 10 kỳ năm, ≥ 40 kỳ quý, ngày công bố, sự kiện vốn, quyền sử dụng. — not_run
 - [ ] Đối chiếu một số mã với báo cáo gốc (ngân hàng, phi tài chính, chu kỳ, bất động sản, một mã chuyển sàn). — not_run
 - [ ] Kiểm tra P/E, P/B qua phát hành thêm/tách cổ phiếu và bản sửa số liệu. — not_run
-- [ ] Lập `data\trading-calendar.json` từ lịch nghỉ chính thức HOSE, ghi nguồn. — not_run
-- [ ] Đối chiếu quy tắc T+, lô, thuế/phí hiện hành vào `docs\decisions\market-rules.md`. — not_run
+- [x] Lịch nghỉ HOSE 2026 (`config/trading-calendar-hose-2026.json`) theo Thông báo 2294/TB-SGDHCM và bản cập nhật 25/12/2025 — passed 2026-10-25 qua bản đăng lại; còn đối chiếu bản gốc hsx.vn.
+- [x] Lô, bước giá, biên độ, thuế ghi vào `docs\decisions\market-rules.md` kèm căn cứ — passed 2026-10-25 (một phần): còn Phụ lục III của 22/QĐ-HĐTV/2026 và điều khoản T+2 gốc.
 
 ## Firebase
 

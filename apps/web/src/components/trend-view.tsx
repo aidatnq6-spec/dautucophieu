@@ -11,39 +11,59 @@ type Snapshot = { session_date: string; generated_at: string; previous_date: str
 const FRAMES = ["M", "W", "D1", "H4", "H1"];
 const ZONE: Record<string, string> = { overbought: "quá mua", oversold: "quá bán", neutral: "trung tính" };
 
-function MacdCell({ c }: { c: Cell }) {
-  if (!c.macd) return <td className="trend-gap">—{c.reason && <div className="caption">{c.reason}</div>}</td>;
-  return (
-    <td className={`trend-macd ${c.macd.startsWith("up") ? "up" : "down"}${c.macd_changed ? " changed" : ""}`}>
-      {c.macd}{c.macd_changed && c.previous_macd && <div className="caption">trước: {c.previous_macd}</div>}
-    </td>
-  );
+/** "down,<0" may wrap after the comma so a narrow card never needs a scrollbar. */
+function MacdText({ value }: { value: string }) {
+  const [dir, sign] = value.split(",");
+  return <>{dir},<wbr />{sign}</>;
 }
 
-function RsiCell({ c }: { c: Cell }) {
-  if (c.rsi === null) return <td className="trend-gap">—</td>;
-  return (
-    <td className={`num trend-rsi ${c.zone ?? ""}${c.rsi_changed ? " changed" : ""}`}>
-      {c.rsi}{c.rsi_changed && c.previous_zone && <div className="caption">trước: {ZONE[c.previous_zone] ?? c.previous_zone}</div>}
-    </td>
-  );
+/** One line per distinct reason, naming its frames: "H4, H1: Nguồn chỉ có giá ngày". */
+function notes(row: Row): string[] {
+  const reasons = new Map<string, string[]>();
+  for (const f of FRAMES) {
+    const r = row.cells[f]?.reason;
+    if (r) reasons.set(r, [...(reasons.get(r) ?? []), f]);
+  }
+  const changed = FRAMES.flatMap((f) => {
+    const c = row.cells[f];
+    return [
+      ...(c?.macd_changed && c.previous_macd ? [`${f} MACD trước: ${c.previous_macd}`] : []),
+      ...(c?.rsi_changed && c.previous_zone ? [`${f} RSI trước: ${ZONE[c.previous_zone] ?? c.previous_zone}`] : []),
+    ];
+  });
+  return [...[...reasons].map(([r, fs]) => `${fs.join(", ")}: ${r}`), ...(changed.length ? [`Đổi so với phiên trước — ${changed.join("; ")}`] : [])];
 }
 
 function Card({ row }: { row: Row }) {
   return (
-    <div className="trend-card">
+    <section className="trend-card" aria-label={row.label}>
       <h3>{row.label}</h3>
-      <div className="tablewrap">
-        <table aria-label={row.label}>
-          <thead><tr><th>Chỉ báo</th>{FRAMES.map((f) => <th key={f}>{f}</th>)}</tr></thead>
-          <tbody>
-            <tr><th scope="row">MACD</th>{FRAMES.map((f) => <MacdCell key={f} c={row.cells[f]} />)}</tr>
-            <tr><th scope="row">RSI</th>{FRAMES.map((f) => <RsiCell key={f} c={row.cells[f]} />)}</tr>
-          </tbody>
-        </table>
-      </div>
-      {row.note && <p className="caption">{row.note}</p>}
-    </div>
+      <table className="trend-table" aria-label={row.label}>
+        <colgroup><col className="trend-head-col" />{FRAMES.map((f) => <col key={f} />)}</colgroup>
+        <thead><tr><th scope="col"><span className="visually-hidden">Chỉ báo</span></th>{FRAMES.map((f) => <th key={f} scope="col">{f}</th>)}</tr></thead>
+        <tbody>
+          <tr>
+            <th scope="row">MACD</th>
+            {FRAMES.map((f) => {
+              const c = row.cells[f];
+              if (!c?.macd) return <td key={f} className="trend-gap" title={c?.reason ?? undefined}>—</td>;
+              return <td key={f} className={`trend-macd ${c.macd.startsWith("up") ? "up" : "down"}${c.macd_changed ? " changed" : ""}`}
+                title={c.macd_changed && c.previous_macd ? `trước: ${c.previous_macd}` : undefined}><MacdText value={c.macd} /></td>;
+            })}
+          </tr>
+          <tr>
+            <th scope="row">RSI</th>
+            {FRAMES.map((f) => {
+              const c = row.cells[f];
+              if (c?.rsi === null || c?.rsi === undefined) return <td key={f} className="trend-gap" title={c?.reason ?? undefined}>—</td>;
+              return <td key={f} className={`trend-rsi ${c.zone ?? ""}${c.rsi_changed ? " changed" : ""}`}
+                title={c.zone ? ZONE[c.zone] : undefined}>{c.rsi}</td>;
+            })}
+          </tr>
+        </tbody>
+      </table>
+      {[...notes(row), ...(row.note ? [row.note] : [])].map((n) => <p key={n} className="trend-note">{n}</p>)}
+    </section>
   );
 }
 
@@ -58,7 +78,15 @@ export function TrendView() {
     <>
       <p className="notice">Phiên {data.session_date} · lập lúc {new Date(data.generated_at).toLocaleString("vi-VN")} ·{" "}
         {data.previous_date ? `ô viền đậm là ô đổi trạng thái so với phiên ${data.previous_date}` : "chưa có phiên trước để so sánh"}.
-        MACD 12-26-9 (up/down: so với đường tín hiệu; &gt;0/&lt;0: so với mức 0), RSI 14. Chỉ để theo dõi, không phải khuyến nghị.</p>
+        Chỉ để theo dõi, không phải khuyến nghị.</p>
+      <div className="trend-legend" aria-label="Chú thích">
+        <span className="trend-macd up">up</span> MACD trên đường tín hiệu
+        <span className="trend-macd down">down</span> MACD dưới đường tín hiệu
+        <span>&gt;0 / &lt;0: MACD so với mức 0</span>
+        <span className="trend-rsi overbought">RSI ≥ 70</span> quá mua
+        <span className="trend-rsi oversold">RSI ≤ 30</span> quá bán
+        <span className="trend-macd changed">viền</span> vừa đổi
+      </div>
       {data.groups.map((g) => (
         <section key={g.id} className="surface" aria-label={g.label}>
           <h2>{g.label}</h2>

@@ -12,6 +12,7 @@ from .routes.profile import router as profile_router
 from .routes.ledger import router as ledger_router
 from .routes.risk import router as risk_router
 from .routes.universe import router as universe_router
+from .routes.valuation_assumptions import router as valuation_router
 
 
 def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[[], float] = time.time, personal_repository=None) -> FastAPI:
@@ -46,6 +47,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(risk_router)
     app.include_router(ledger_router)
     app.include_router(universe_router)
+    app.include_router(valuation_router)
 
     @app.get("/internal/identity")
     def identity(request: Request):

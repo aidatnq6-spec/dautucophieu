@@ -23,7 +23,7 @@ main.content{padding:28px 36px;max-width:1400px;width:100%;margin:0 auto;min-wid
 .surface h2{font-size:17px;margin:0 0 8px}
 .notice{padding:10px 14px;background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:6px;margin-bottom:22px;color:var(--warn-ink)}
 .pill{display:inline-block;padding:3px 10px;border-radius:5px;font-size:12px;font-weight:600;background:#e9effc;color:#2853a7}
-.pill.good{background:#e8f3ee;color:#146647}.pill.warn{background:#fff0cf;color:#82530c}
+.pill.good{background:#e8f3ee;color:#146647}.pill.warn{background:#fff0cf;color:#82530c}.pill.bad{background:#fbe9ea;color:#9c2f36}
 .formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
 .field{display:grid;gap:6px;min-width:0}
 .field input,.field select,.field textarea{padding:10px;border:1px solid var(--line);border-radius:6px;width:100%;background:#fff;color:var(--ink);min-width:0}

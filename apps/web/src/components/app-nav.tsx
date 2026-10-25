@@ -1,11 +1,12 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpenText, Briefcase, ChartLine, Eye, House, Search, Settings, UserRound } from "lucide-react";
+import { BookOpenText, Briefcase, ChartLine, Eye, Globe, House, Search, Settings, UserRound } from "lucide-react";
 
 const LINKS = [
   { href: "/", label: "Tổng quan", icon: House },
   { href: "/portfolio", label: "Danh mục & giao dịch", icon: Briefcase },
+  { href: "/macro", label: "Vĩ mô", icon: Globe },
   { href: "/market", label: "Thị trường & Ngành", icon: ChartLine },
   { href: "/watchlist", label: "Theo dõi", icon: Eye },
   { href: "/research", label: "Nghiên cứu", icon: Search },

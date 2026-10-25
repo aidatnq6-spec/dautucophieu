@@ -42,6 +42,8 @@ Ratio = Annotated[
     WithJsonSchema(_RATIO_SCHEMA),
 ]
 NonemptyId = Annotated[str, Field(strict=True, min_length=1, pattern=r"\S")]
+# Output-only: computed Decimals built in Python, always serialised without exponents.
+PlainDecimal = Annotated[Decimal, PlainSerializer(_plain_decimal, return_type=str)]
 
 
 class ContractModel(BaseModel):

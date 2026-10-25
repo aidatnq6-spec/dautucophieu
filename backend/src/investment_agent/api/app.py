@@ -13,6 +13,7 @@ from .routes.health import router as health_router
 from .routes.profile import router as profile_router
 from .routes.ledger import router as ledger_router
 from .routes.macro import router as macro_router
+from .routes.trend import router as trend_router
 from .routes.notifications import router as notifications_router
 from .routes.jobs import router as jobs_router
 from .routes.overview import router as overview_router
@@ -70,6 +71,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(settings_router)
     app.include_router(watchlist_router)
     app.include_router(macro_router)
+    app.include_router(trend_router)
 
     @app.get("/internal/identity")
     def identity(request: Request):

@@ -65,6 +65,22 @@ class VnstockProvider:
         frame = market.index(symbol.upper()).ohlcv(start=start.isoformat(), end=end.isoformat(), interval="1D", source=SOURCE)
         return self._bars(frame, symbol.upper(), scale=Decimal(1), currency="POINT", basis="raw")
 
+    def fetch_closes(self, symbol: str, start: date, end: date, *, interval: str, index: bool) -> list[tuple[datetime, str]]:
+        """Closes only, for indicators ("1D" or "1H"). Units follow the source (thousand đồng for stocks, points for
+        indices); MACD direction/sign and RSI do not depend on the unit."""
+        market, _ = self._api()
+        handle = market.index(symbol.upper()) if index else market.equity(symbol.upper())
+        frame = handle.ohlcv(start=start.isoformat(), end=end.isoformat(), interval=interval)
+        out = []
+        for row in frame.to_dict("records"):
+            try:
+                value = Decimal(str(row["close"]))
+            except (InvalidOperation, KeyError):
+                continue
+            if value.is_finite() and value > 0:
+                out.append((row["time"].to_pydatetime(), format(value.normalize(), "f")))
+        return out
+
     def fetch_prices(self, symbol: str, start: date, end: date) -> list[PriceBar]:
         market, _ = self._api()
         symbol = symbol.upper()

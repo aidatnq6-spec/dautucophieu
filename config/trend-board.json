@@ -1,0 +1,25 @@
+{
+ "version": "trend-2026-10-25.1",
+ "groups": [
+  {"id": "macro", "label": "Vĩ mô", "rows": [
+   {"id": "DXY", "label": "DXY", "source": {"kind": "fred", "series": "DTWEXBGS"}, "note": "Gần đúng: chỉ số USD rộng của FRED; DXY của ICE là dữ liệu có bản quyền."},
+   {"id": "US10Y", "label": "US10Y", "source": {"kind": "fred", "series": "DGS10"}},
+   {"id": "VN10Y", "label": "VN10Y", "source": {"kind": "none", "reason": "Không có nguồn miễn phí hợp lệ"}},
+   {"id": "GOLD", "label": "Vàng", "source": {"kind": "coinbase", "product": "PAXG-USD"}, "note": "Gần đúng: PAXG, token bám giá vàng."},
+   {"id": "USOIL", "label": "Dầu WTI", "source": {"kind": "fred", "series": "DCOILWTICO"}},
+   {"id": "BTC", "label": "Bitcoin", "source": {"kind": "coinbase", "product": "BTC-USD"}}]},
+  {"id": "index", "label": "Chỉ số", "rows": [
+   {"id": "VNINDEX", "label": "VN-Index", "source": {"kind": "vn", "index": true}},
+   {"id": "VN30", "label": "VN30", "source": {"kind": "vn", "index": true}}]},
+  {"id": "stocks", "label": "Cổ phiếu", "rows": [
+   {"id": "MBB", "label": "MBB", "source": {"kind": "vn", "index": false}},
+   {"id": "CTG", "label": "CTG", "source": {"kind": "vn", "index": false}},
+   {"id": "ACB", "label": "ACB", "source": {"kind": "vn", "index": false}},
+   {"id": "SSI", "label": "SSI", "source": {"kind": "vn", "index": false}},
+   {"id": "HPG", "label": "HPG", "source": {"kind": "vn", "index": false}},
+   {"id": "KDH", "label": "KDH", "source": {"kind": "vn", "index": false}},
+   {"id": "MWG", "label": "MWG", "source": {"kind": "vn", "index": false}},
+   {"id": "FPT", "label": "FPT", "source": {"kind": "vn", "index": false}},
+   {"id": "PNJ", "label": "PNJ", "source": {"kind": "vn", "index": false}}]}
+ ]
+}

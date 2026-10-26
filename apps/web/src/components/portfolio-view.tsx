@@ -6,6 +6,7 @@ import { ApiError, api, requestId, type ApiFailure } from "../lib/api";
 import { formatVnd } from "../lib/format";
 import { FormErrors } from "./form-errors";
 import { LEDGER_ERRORS, TYPE_LABEL, TransactionForm, type LedgerEvent } from "./transaction-form";
+import { ConcentrationView } from "./concentration-view";
 
 type Holding = { security_id: string; quantity: number; pending_quantity: number; total_cost: string; average_cost: string; blocked_by: string[] };
 type LedgerView = { version: number; events: LedgerEvent[]; original_events: LedgerEvent[]; audit: { amendment_id: string; action: string; target_event_id: string }[];
@@ -71,6 +72,8 @@ export function PortfolioView() {
         </div>
         <p className="caption">Lãi/lỗ chưa thực hiện cần giá thị trường đã xác minh; chưa có giá thì không tính bằng 0.</p>
       </section>
+
+      <ConcentrationView />
 
       <section className="surface">
         <h2>Cổ phiếu đang nắm giữ</h2>

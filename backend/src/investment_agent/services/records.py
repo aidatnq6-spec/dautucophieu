@@ -76,6 +76,22 @@ class ValuationSettings(ContractModel):
         return self
 
 
+class PortfolioSettings(ContractModel):
+    """Owner's display threshold for concentration (one ticker or one sector, on investable capital); not an allocation rule."""
+    concentration_limit: Ratio = Decimal("0.25")
+
+    @model_validator(mode="after")
+    def _sensible(self):
+        if not Decimal("0") < self.concentration_limit <= Decimal("1"):
+            raise ValueError("concentration limit must be above 0 and at most 100%")
+        return self
+
+
+def portfolio_settings(repo, owner) -> tuple[PortfolioSettings, int]:
+    record = read_version(repo, owner, "settings", "portfolio", None)
+    return (PortfolioSettings.model_validate(record.payload), record.version) if record else (PortfolioSettings(), 0)
+
+
 def valuation_settings(repo, owner) -> tuple[ValuationSettings, int]:
     record = read_version(repo, owner, "settings", "valuation", None)
     return (ValuationSettings.model_validate(record.payload), record.version) if record else (ValuationSettings(), 0)

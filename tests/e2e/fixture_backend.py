@@ -104,6 +104,12 @@ if __name__ == "__main__":
                    "proprietary": {"status": "missing", "reason": "Chưa có nguồn miễn phí"},
                    "news": {"status": "ok", "items": [{"title": "FPT ký hợp đồng AI lớn", "url": "https://example.invalid/fpt-news", "source": "CafeF",
                                                        "published": "2026-10-23T10:00:00+07:00"}]}}, f, ensure_ascii=False)
+    # Hiệu quả danh mục: weekday closes from the synthetic buy (02/02/2026) to 30/04/2026 for FPT (thousand đồng) and VN-Index.
+    perf_days = [date(2026, 2, 2) + timedelta(days=i) for i in range(88) if (date(2026, 2, 2) + timedelta(days=i)).weekday() < 5]
+    SeriesStore(os.path.join(data, "trend-sources")).upsert("FPT-1d", [(datetime.combine(d, datetime.min.time()), str(50 + i * 0.2))
+                                                                       for i, d in enumerate(perf_days)])
+    SeriesStore(os.path.join(data, "trend-sources")).upsert("VNINDEX-1d", [(datetime.combine(d, datetime.min.time()), str(1200 + i))
+                                                                           for i, d in enumerate(perf_days)])
     MacroStore(data).upsert("us10y", [(date(2026, 10, 21), "4.91"), (date(2026, 10, 23), "4.96")], entry="auto")
     app = create_app(InternalAuthSettings.from_env(), personal_repository=repository, market=MARKET,
                      jobs=JobStore(os.path.join(data, "jobs.sqlite")), outbox=deliveries, deliveries=deliveries, data_dir=data)

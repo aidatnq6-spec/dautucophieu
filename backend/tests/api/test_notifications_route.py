@@ -82,3 +82,16 @@ def test_without_bot_token_sending_is_unavailable(tmp_path):
     assert call(client, clock, "GET", "/internal/notifications/settings").json()["bot_token_configured"] is False
     response = call(client, clock, "POST", "/internal/notifications/test-send", {"report_id": "c" * 32, "confirm": True})
     assert response.status_code == 503 and response.json()["code"] == "telegram_not_configured"
+
+
+def test_test_send_after_the_report_was_already_delivered_sends_a_fresh_copy(tmp_path):
+    """26/10/2026: the report had gone out at 15:57; a later 'Gửi thử' said 'Đã gửi 1/1' but sent nothing."""
+    client, clock, calls = setup(tmp_path, [httpx.Response(200, json={"ok": True, "result": {"message_id": 5}}),
+                                            httpx.Response(200, json={"ok": True, "result": {"message_id": 6}})])
+    save_settings(client, clock)
+    send = lambda: call(client, clock, "POST", "/internal/notifications/test-send", {"report_id": REPORT["report_id"], "confirm": True}).json()
+    assert send()["status"] == "sent" and len(calls) == 1
+    again = send()
+    assert again["status"] == "sent" and again["copy"] is True and len(calls) == 2
+    parts = call(client, clock, "GET", f"/internal/notifications/deliveries/{REPORT['report_id']}").json()["parts"]
+    assert parts == [{"index": 0, "count": 1, "status": "sent", "message_id": 5}]  # the report's own delivery record is untouched

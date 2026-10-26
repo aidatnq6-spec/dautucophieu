@@ -82,3 +82,12 @@ def test_board_values_every_symbol_with_peers_from_the_same_sector():
     assert rows["AAA"]["held"] is True and rows["AAA"]["verdict"] in {"cheap", "fair", "expensive"}
     assert rows["EEE"]["verdict"] == "insufficient" and rows["EEE"]["sector"] == "Chưa phân ngành"
     assert board["settings"] == {"required_return": "0.13", "long_term_growth": "0.05", "threshold": "0.2"}
+
+
+def test_listed_shares_stand_in_when_eps_is_not_reported():
+    r = record()
+    for y in r["years"].values():
+        del y["eps"]
+    r["shares_outstanding"] = "1000000"
+    m = metrics(r, today=TODAY, year_end_prices=PRICES)
+    assert m is not None and m["shares"] == Decimal(1000000) and m["eps_ttm"] == Decimal(2200)

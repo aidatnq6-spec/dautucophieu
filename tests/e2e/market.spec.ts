@@ -21,7 +21,7 @@ test("market page shows the index, breadth and sectors, and says macro data is m
   await expect(sectors.getByRole("row", { name: /Công nghệ Thông tin/ })).toContainText("+14,00%");
   await expect(sectors.getByRole("row", { name: /Ngân hàng/ })).toContainText("—");
 
-  await expect(page.getByRole("region", { name: "Vĩ mô" })).toContainText("Chưa có dữ liệu vĩ mô");
+  await expect(page.getByRole("region", { name: "Vĩ mô" })).toHaveCount(0);  // macro lives on its own Vĩ mô tab
   await expect(page.getByText(/không phải khuyến nghị/)).toBeVisible();
 });
 

@@ -7,6 +7,7 @@ import { formatVnd } from "../lib/format";
 import { FormErrors } from "./form-errors";
 import { LEDGER_ERRORS, TYPE_LABEL, TransactionForm, type LedgerEvent } from "./transaction-form";
 import { ConcentrationView } from "./concentration-view";
+import { PerformanceView } from "./performance-view";
 
 type Holding = { security_id: string; quantity: number; pending_quantity: number; total_cost: string; average_cost: string; blocked_by: string[] };
 type LedgerView = { version: number; events: LedgerEvent[]; original_events: LedgerEvent[]; audit: { amendment_id: string; action: string; target_event_id: string }[];
@@ -74,6 +75,7 @@ export function PortfolioView() {
       </section>
 
       <ConcentrationView />
+      <PerformanceView />
 
       <section className="surface">
         <h2>Cổ phiếu đang nắm giữ</h2>

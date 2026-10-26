@@ -110,3 +110,4 @@ legend{font-weight:600;padding:0 6px}
 .cc-fill{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--brand)}.cc-fill.over{background:var(--bad)}
 .cc-limit{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
 .cc-try{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}.cc-try .field{flex:1 1 160px;min-width:0}
+.pf-index{fill:none;stroke:var(--muted);stroke-width:2;stroke-dasharray:5 4}.pf-label{fill:var(--brand);font-weight:600}

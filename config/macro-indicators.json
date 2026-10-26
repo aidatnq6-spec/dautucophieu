@@ -88,7 +88,11 @@
    "rule": "down",
    "max_age_days": 35,
    "source": {
-    "kind": "manual"
+    "kind": "stockbiz",
+    "page": "money-supply-m2",
+    "monthly": true,
+    "scale": "1000",
+    "manual_fallback": true
    },
    "url": "https://www.sbv.gov.vn"
   },
@@ -112,7 +116,9 @@
    "rule": "pmi",
    "max_age_days": 35,
    "source": {
-    "kind": "manual"
+    "kind": "tradingeconomics_pmi",
+    "country": "united-states",
+    "manual_fallback": true
    },
    "url": "https://vn.investing.com/economic-calendar/manufacturing-pmi-829"
   },
@@ -123,7 +129,9 @@
    "rule": "pmi",
    "max_age_days": 35,
    "source": {
-    "kind": "manual"
+    "kind": "tradingeconomics_pmi",
+    "country": "vietnam",
+    "manual_fallback": true
    },
    "url": "https://drphe.github.io/BM/chart.html"
   },
@@ -173,7 +181,9 @@
    "rule": "up",
    "max_age_days": 7,
    "source": {
-    "kind": "manual"
+    "kind": "stockbiz",
+    "page": "10-year-government-bond-yield",
+    "manual_fallback": true
    },
    "url": "https://tradingeconomics.com/vietnam/government-bond-yield"
   },
@@ -184,7 +194,9 @@
    "rule": "up",
    "max_age_days": 7,
    "source": {
-    "kind": "manual"
+    "kind": "stockbiz",
+    "page": "interbank-rate",
+    "manual_fallback": true
    },
    "url": "https://www.sbv.gov.vn"
   },

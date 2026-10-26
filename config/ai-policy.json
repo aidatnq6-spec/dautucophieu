@@ -4,7 +4,7 @@
   "notice": "Chủ sở hữu duyệt ngày 26/10/2026: AI chỉ đọc nội dung báo cáo vĩ mô, ngành, chiến lược công khai (ACBS, World Bank); không gửi danh mục, danh sách theo dõi hay định giá; ngân sách 2 USD/tháng.",
   "provider": {"data_collection": "deny", "zdr": true, "require_parameters": true},
   "tasks": {
-    "insights": {"models": ["openai/gpt-6-luna", "deepseek/deepseek-v4-flash"], "required_parameters": ["response_format"], "max_tokens": 2500}
+    "insights": {"models": ["openai/gpt-6-luna", "deepseek/deepseek-v4-flash"], "required_parameters": ["response_format"], "max_tokens": 4000}
   },
   "budget": {
     "monthly_usd": "2",

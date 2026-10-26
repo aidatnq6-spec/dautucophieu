@@ -22,3 +22,10 @@ def test_start_is_logged_before_env_loading_and_any_step():
 def test_finish_is_logged_before_exit():
     ls = lines()
     assert "finish exit=" in ls[-2] and ls[-1] == "exit $runExit"
+
+
+def test_market_snapshot_runs_before_the_brief_is_built():
+    ls = lines()
+    snap = next(i for i, l in enumerate(ls) if "investment_agent.cli brief-snapshot" in l)
+    assert snap < next(i for i, l in enumerate(ls) if "investment_agent.cli scheduled-run" in l)
+    assert snap > next(i for i, l in enumerate(ls) if "investment_agent.cli trend-run" in l)

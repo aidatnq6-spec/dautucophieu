@@ -49,6 +49,9 @@ def main() -> int:
     sectors = commands.add_parser("industries", help="save ICB level-2 sectors of the synced tickers for the market page")
     sectors.add_argument("--symbols", required=True, help="comma-separated tickers, or @file with one ticker per line")
     sectors.add_argument("--output", type=Path, required=True)
+    brief = commands.add_parser("brief-snapshot", help="public market snapshot of the latest session for the after-close brief")
+    brief.add_argument("--data-dir", type=Path, required=True)
+    brief.add_argument("--calendar", type=Path, required=True)
     ins = commands.add_parser("insights-run", help="read new public ACBS/World Bank reports with AI (public text only), then Telegram")
     ins.add_argument("--data-dir", type=Path, required=True)
     ins.add_argument("--calendar", type=Path, required=True)
@@ -73,6 +76,8 @@ def main() -> int:
         return run_backup(args.data_dir, args.backup_dir, args.kind)
     if args.command == "scheduled-run":
         return scheduled_run(args.calendar, args.data_dir)
+    if args.command == "brief-snapshot":
+        return brief_snapshot_cli(args.data_dir, args.calendar)
     if args.command == "insights-run":
         return insights_cli(args.data_dir, args.calendar, min_hours=args.min_hours)
     if not args.fixtures:
@@ -317,6 +322,60 @@ def scheduled_run(calendar_path: Path, data_dir: Path) -> int:
     d = result.decision
     print(json.dumps({"status": "ok", "run": d.run, "reason": d.reason, "session": d.session_date.isoformat() if d.session_date else None,
                       "missed_sessions": d.missed_sessions, "reports": result.statuses, "delivered": len(result.delivered)}))
+    return 0
+
+
+LISTING_MAX_AGE_DAYS = 7
+
+
+def brief_snapshot_cli(data_dir: Path, calendar_path: Path, *, listing=None, board=None, http_get=None, now=None) -> int:
+    """Builds data/brief/<latest session>.json; prints which sections are ok. Each source failing only blanks its section."""
+    from datetime import datetime, timedelta, timezone
+
+    from investment_agent.brief.snapshot import BriefStore, build_snapshot, latest_session
+    from investment_agent.jobs.schedule import _previous_session
+    from investment_agent.market.series import SeriesStore
+
+    try:
+        cal = load_calendar(calendar_path)
+    except (OSError, ValueError, KeyError) as exc:
+        print(json.dumps({"status": "not_configured", "reason": type(exc).__name__}))
+        return 2
+    now = now or datetime.now(timezone.utc)
+    session = latest_session(now, cal)
+    if session is None:
+        print(json.dumps({"status": "no_session"}))
+        return 0
+    if listing is None or board is None or http_get is None:
+        import httpx
+
+        from investment_agent.market.providers import vnstock_adapter as va
+        client = httpx.Client(follow_redirects=True, timeout=httpx.Timeout(30, connect=10), headers={"User-Agent": USER_AGENT})
+
+        def fetch(url: str) -> str:
+            response = client.get(url)
+            response.raise_for_status()
+            return response.text
+        listing, board, http_get = listing or va.hose_listing, board or va.price_board, http_get or fetch
+    cache = data_dir / "hose-listing.json"
+
+    def cached_listing():
+        try:
+            saved = json.loads(cache.read_text(encoding="utf-8"))
+            if now - datetime.fromisoformat(saved["at"]) < timedelta(days=LISTING_MAX_AGE_DAYS):
+                return saved["listing"]
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+        fresh = listing()
+        cache.write_text(json.dumps({"at": now.isoformat(), "listing": fresh}, ensure_ascii=False), encoding="utf-8")
+        return fresh
+
+    series = SeriesStore(data_dir / "trend-sources")
+    snap = build_snapshot(session_date=session, previous_session=_previous_session(cal, session), now=now, listing=cached_listing,
+                          board=board, series=lambda index_id: series.read(f"{index_id}-1d"), hose_get=http_get, rss_get=http_get,
+                          store=BriefStore(data_dir))
+    print(json.dumps({"status": "ok", "session": session.isoformat(),
+                      "sections": {k: v["status"] for k, v in snap.items() if isinstance(v, dict) and "status" in v}}, ensure_ascii=False))
     return 0
 
 

@@ -15,6 +15,8 @@ test("weights by ticker and sector on investable capital, with cash, against the
   await openPortfolio(page);
   const box = page.getByRole("region", { name: "Phân bổ và rủi ro tập trung" });
   await expect(box).toContainText("ngưỡng 25%");
+  await expect(box).toContainText("tính theo giá mua");
+  await expect(box.getByRole("table", { name: "Tỷ trọng theo mã" }).getByRole("columnheader", { name: "Giá vốn" })).toBeVisible();
   await expect(box.getByRole("table", { name: "Tỷ trọng theo mã" }).getByRole("row", { name: /FPT/ })).toContainText(/\d+(,\d)?%/);
   // One ticker per sector: the sector table would repeat the ticker table, so it is replaced by a one-line note.
   await expect(box.getByRole("table", { name: "Tỷ trọng theo ngành" })).toHaveCount(0);

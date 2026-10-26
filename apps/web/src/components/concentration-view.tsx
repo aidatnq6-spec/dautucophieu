@@ -49,33 +49,33 @@ export function ConcentrationView() {
       {!view ? <p className="muted fx-loading" role="status">Đang tải…</p> : view.status === "no_capital" ? (
         <p className="muted">Chưa có vốn có thể đầu tư trong hồ sơ tài chính, nên chưa tính được tỷ trọng.</p>
       ) : <>
-        <p className="caption">Tỷ trọng trên {view.basis === "equity_budget" ? "vốn dành cho cổ phiếu" : "vốn có thể đầu tư"} ({formatVnd(view.capital)}), ngưỡng {limitText} cho một mã hoặc một ngành (sửa trong Cài đặt).
+        <p className="caption">Tỷ trọng trên {view.basis === "equity_budget" ? "vốn dành cho cổ phiếu" : "vốn có thể đầu tư"} ({formatVnd(view.capital)}), tính theo giá mua; ngưỡng {limitText} cho một mã hoặc một ngành (sửa trong Cài đặt).
           Chỉ để theo dõi, không phải khuyến nghị.</p>
         {view.basis !== "equity_budget" && <p className="caption">Chưa nhập tổng tài sản tài chính: <Link href="/profile">nhập ở Hồ sơ & rủi ro</Link> để tính
           trên vốn dành cho cổ phiếu theo khẩu vị rủi ro.</p>}
         {view.what_if && <p className="notice">Chỉ là thử: {Number(view.what_if.amount) >= 0 ? "mua thêm" : "bán bớt"} {view.what_if.symbol}{" "}
           {formatVnd(String(Math.abs(Number(view.what_if.amount))))}; không ghi vào sổ. <button className="btn" type="button" onClick={() => void load()}>Bỏ thử</button></p>}
         <table className="fv-table cc-table" aria-label="Tỷ trọng theo mã">
-          <thead><tr><th>Mã</th><th>Ngành</th><th className="num">Giá trị</th><th>Tỷ trọng</th></tr></thead>
+          <thead><tr><th>Mã</th><th>Ngành</th><th className="num">Giá vốn</th><th>Tỷ trọng</th></tr></thead>
           <tbody>{view.tickers.map((t) => <tr key={t.symbol} className={t.over ? "cc-over" : ""}>
             <td data-label="Mã"><strong>{t.symbol}</strong></td>
             <td data-label="Ngành">{t.sector}</td>
-            <td data-label="Giá trị" className="num">{t.value ? formatVnd(t.value) : "Chưa có giá"}</td>
+            <td data-label="Giá vốn" className="num">{t.value ? formatVnd(t.value) : "—"}</td>
             <td data-label="Tỷ trọng">{t.weight ? <><Bar weight={t.weight} limit={view.limit} over={t.over} /> {pct(t.weight)}
               {t.over && <span className="pill bad"> vượt {limitText}</span>}</> : "—"}</td>
           </tr>)}
           {view.cash && <tr><td data-label="Mã"><strong>Còn trống</strong></td>
             <td data-label="Ngành">chưa dùng của {view.basis === "equity_budget" ? "vốn cho cổ phiếu" : "vốn có thể đầu tư"}</td>
-            <td data-label="Giá trị" className="num">{formatVnd(view.cash.value)}</td><td data-label="Tỷ trọng">{pct(view.cash.weight)}</td></tr>}
+            <td data-label="Giá vốn" className="num">{formatVnd(view.cash.value)}</td><td data-label="Tỷ trọng">{pct(view.cash.weight)}</td></tr>}
           </tbody>
         </table>
         {!sectorsAddInformation(view.sectors) ? <p className="caption">Mỗi ngành chỉ có 1 mã nên tỷ trọng ngành bằng tỷ trọng mã.</p> :
         <table className="fv-table cc-table" aria-label="Tỷ trọng theo ngành">
-          <thead><tr><th>Ngành</th><th>Mã</th><th className="num">Giá trị</th><th>Tỷ trọng</th></tr></thead>
+          <thead><tr><th>Ngành</th><th>Mã</th><th className="num">Giá vốn</th><th>Tỷ trọng</th></tr></thead>
           <tbody>{view.sectors.map((s) => <tr key={s.sector} className={s.over ? "cc-over" : ""}>
             <td data-label="Ngành"><strong>{s.sector}</strong></td>
             <td data-label="Mã">{s.symbols.join(", ")}</td>
-            <td data-label="Giá trị" className="num">{formatVnd(s.value)}</td>
+            <td data-label="Giá vốn" className="num">{formatVnd(s.value)}</td>
             <td data-label="Tỷ trọng"><Bar weight={s.weight} limit={view.limit} over={s.over} /> {pct(s.weight)}
               {s.over && <span className="pill bad"> vượt {limitText}</span>}</td>
           </tr>)}</tbody>

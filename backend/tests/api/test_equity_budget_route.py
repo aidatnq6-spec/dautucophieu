@@ -48,7 +48,7 @@ def test_concentration_is_measured_on_the_stock_budget_once_set():
     assert before["basis"] == "investable_capital" and before["capital"] == "1000000000"
     save(c, clock, "100000000")  # 35% → 35,000,000 for stocks
     after = call(c, clock, "GET", "/internal/concentration").json()
-    assert after["basis"] == "equity_budget" and after["capital"] == "35000000" and after["tickers"][0]["weight"] == "0.1714"
+    assert after["basis"] == "equity_budget" and after["capital"] == "35000000" and after["tickers"][0]["weight"] == "0.1429"  # cost 5 triệu
 
 
 def test_invalid_totals_are_refused():

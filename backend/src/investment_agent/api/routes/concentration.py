@@ -1,4 +1,4 @@
-"""Concentration on the Danh mục page: weight of each held ticker and sector on investable capital, with an optional what-if."""
+"""Concentration on the Danh mục page: weight of each held ticker and sector (at cost) on the stock budget or investable capital, with a what-if."""
 
 from decimal import Decimal, InvalidOperation
 
@@ -47,7 +47,9 @@ def _view(request: Request, symbol: str | None = None, amount: str | None = None
         investable = budget["budget"]
     data_dir = request.app.state.data_dir
     sectors = load_sectors(data_dir)[0] if data_dir is not None else {}
-    base = {**concentration(view["holdings"], capital=investable, sectors=sectors, limit=settings.concentration_limit), "basis": basis}
+    # Valued at cost (what was put in), as the owner chose, so "Còn trống" matches the Hồ sơ page.
+    at_cost = [{**h, "market_value": h["total_cost"]} for h in view["holdings"] if h["quantity"] + h["pending_quantity"] > 0]
+    base = {**concentration(at_cost, capital=investable, sectors=sectors, limit=settings.concentration_limit), "basis": basis, "valued_at": "cost"}
     if not symbol or amount is None or base["status"] != "ok":
         return base
     try:

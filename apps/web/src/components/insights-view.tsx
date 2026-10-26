@@ -26,7 +26,7 @@ const SOURCE: Record<string, string> = { acbs: "ACBS", worldbank: "World Bank" }
 const STATUS: Record<Report["status"], string> = { ok: "Đã đọc", no_text: "Không trích được văn bản", no_reliable_claims: "Không có nhận định đáng tin" };
 const STOPPED: Record<string, string> = { budget_exceeded: "đã hết ngân sách AI tháng này", key_missing: "chưa cấu hình AI",
   catalog_stale: "bảng giá model đã cũ", no_eligible_model: "không có model được duyệt khả dụng", policy_not_approved: "chính sách AI chưa duyệt",
-  concurrency_cap: "một lượt gọi AI trước chưa kết thúc" };
+  concurrency_cap: "một lượt gọi AI trước chưa kết thúc", catalog_unavailable: "không tải được bảng giá model từ OpenRouter" };
 const FAILED: Record<string, string> = { download_failed: "không tải được tệp", request_over_budget: "báo cáo quá dài so với giới hạn mỗi lần gọi",
   provider_error: "nhà cung cấp AI lỗi", network_unavailable: "mất mạng", outcome_unknown: "không rõ kết quả lượt gọi AI", rate_limited: "AI đang quá tải" };
 const day = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");

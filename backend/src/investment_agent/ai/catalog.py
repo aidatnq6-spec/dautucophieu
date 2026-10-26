@@ -52,11 +52,13 @@ def load_catalog(path, get, *, now: datetime, max_age_days: int = 7) -> Catalog:
     from datetime import timedelta
     from pathlib import Path
     path = Path(path)
-    if path.is_file():
+    try:
         cached = json.loads(path.read_text(encoding="utf-8"))
         fetched_at = datetime.fromisoformat(cached["fetched_at"])
         if now - fetched_at < timedelta(days=max_age_days):
             return parse_catalog(cached["payload"], fetched_at=fetched_at)
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        pass  # missing or corrupt cache: refetch
     payload = json.loads(get(MODELS_URL))
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"fetched_at": now.isoformat(), "payload": payload}), encoding="utf-8")

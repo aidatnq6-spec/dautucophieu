@@ -30,7 +30,7 @@ def due(data_dir: Path, *, now, min_hours: float) -> bool:
     path = Path(data_dir) / "insights" / "status.json"
     try:
         last = datetime.fromisoformat(json.loads(path.read_text(encoding="utf-8"))["at"])
-    except (OSError, ValueError, KeyError):
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
         return True
     return now - last >= timedelta(hours=min_hours)
 
@@ -40,6 +40,11 @@ def _write(path: Path, payload: dict) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
     os.replace(tmp, path)
+
+
+def record_status(data_dir: Path, *, now, out: dict) -> None:
+    """Last run result for the page (why nothing new appeared)."""
+    _write(Path(data_dir) / "insights" / "status.json", {"at": now.isoformat(), **out})
 
 
 def insights_run(data_dir: Path, *, ssi_get, discover, download, pages, gateway, notify, now, sleep) -> dict:
@@ -57,5 +62,5 @@ def insights_run(data_dir: Path, *, ssi_get, discover, download, pages, gateway,
                            sectors=allowed_sectors(data_dir), now=now, sleep=sleep)
     if notify is not None:
         out["telegram"] = notify(store)
-    _write(root / "status.json", {"at": now.isoformat(), **out})
+    record_status(data_dir, now=now, out=out)
     return out

@@ -2,8 +2,9 @@
 
 Automatic sources (checked 2026-10-25): FRED public CSV downloads (WTI, US CPI,
 EFFR, US 10-year yield, broad dollar index), the Vietcombank exchange-rate XML,
-and two public Topi pages (free-market and SBV USD/VND, 12-month deposit rate;
-robots.txt allows them and the terms do not forbid reading). Topi values are
+two public Topi pages (free-market and SBV USD/VND, 12-month deposit rate;
+robots.txt allows them and the terms do not forbid reading), and HOSE's statistics
+service (net foreign trading and total HOSE trading value, per trading day). Topi values are
 read from page text, so a layout change shows as a source error and the owner
 may enter the value by hand. Everything else in the owner's sheet (M2, PMIs,
 interbank rate, VN 10-year yield, foreign flows, VN-Index turnover) has no free
@@ -29,6 +30,9 @@ INDICATORS_PATH = CONFIG_DIR / "macro-indicators.json"
 FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}"
 VCB_XML = "https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx"
 TOPI_PAGE = "https://online.topi.vn/market/{page}"
+# HOSE's own statistics service behind hsx.vn (robots.txt allows all); one trading day per call, values in million đồng.
+HOSE_FOREIGN = "https://api.hsx.vn/mk/api/v1/market/foreign-trading-value-report?fromDate={day}&toDate={day}"
+HOSE_DAYS = 7
 VN = timezone(timedelta(hours=7))
 _ID = re.compile(r"^[a-z0-9_]{1,40}$")
 
@@ -96,6 +100,23 @@ def parse_topi_rate(page: str, *, term: str, column: str) -> str:
     if m is None:
         raise MacroError("topi_rate_unreadable")
     return _plain(Decimal(m.group(names.index(column) + 1).replace(",", ".")))
+
+
+def parse_hose_foreign(text: str) -> dict[str, str] | None:
+    """Net foreign buy-sell and total HOSE trading value (incl. put-through) in billion đồng; None on a day without trading."""
+    try:
+        rows = json.loads(text)["data"]
+    except (ValueError, KeyError, TypeError):
+        raise MacroError("hose_unreadable") from None
+    if not rows:
+        return None
+    by_type = {r.get("trading_type_name"): r for r in rows}
+    try:
+        net = Decimal(by_type["Mua - Bán"]["foreign_trading_value"].replace(",", ""))
+        market = Decimal(by_type["Mua"]["market_value"].replace(",", ""))
+    except (KeyError, AttributeError, InvalidOperation):
+        raise MacroError("hose_layout_changed") from None
+    return {"net": _plain(net / 1000), "market_value": _plain(market / 1000)}
 
 
 def evaluate(rule: str, values: list[str]) -> tuple[str | None, str | None]:
@@ -176,6 +197,10 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
                 points = [parse_vcb_xml(page(VCB_XML), currency=src["currency"], field=src["field"])]
             elif src["kind"] == "topi" and "row" in src:
                 points = [(today, parse_topi_fx(page(TOPI_PAGE.format(page=src["page"])), row=src["row"]))]
+            elif src["kind"] == "hose":
+                days = [today - timedelta(days=i) for i in range(HOSE_DAYS - 1, -1, -1)]
+                parsed = [(d, parse_hose_foreign(page(HOSE_FOREIGN.format(day=d.isoformat())))) for d in days]
+                points = [(d, p[src["field"]]) for d, p in parsed if p is not None]
             elif src["kind"] == "topi":
                 points = [(today, parse_topi_rate(page(TOPI_PAGE.format(page=src["page"])), term=src["term"], column=src["column"]))]
             else:

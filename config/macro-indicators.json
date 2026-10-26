@@ -1,5 +1,5 @@
 {
- "version": "macro-2026-10-25.2",
+ "version": "macro-2026-10-26.3",
  "notice": "Quy tắc đánh giá theo bảng Leading Indicator của chủ sở hữu (25/10/2026). bad_when: up = tăng là Xấu; down = giảm là Xấu; sign = âm là Xấu; pmi = Tốt khi trên 50 và không giảm.",
  "indicators": [
   {
@@ -94,14 +94,16 @@
   },
   {
    "id": "foreign_net",
-   "label": "Khối ngoại mua/bán ròng hôm nay (tỷ đồng)",
+   "label": "Khối ngoại mua/bán ròng trên HOSE (tỷ đồng)",
    "unit": "tỷ đồng",
    "rule": "sign",
    "max_age_days": 4,
    "source": {
-    "kind": "manual"
+    "kind": "hose",
+    "field": "net",
+    "manual_fallback": true
    },
-   "url": "https://fireant.vn/dashboard"
+   "url": "https://www.hsx.vn"
   },
   {
    "id": "us_pmi",
@@ -188,14 +190,16 @@
   },
   {
    "id": "vnindex_value",
-   "label": "Giá trị giao dịch VN-Index (tỷ đồng)",
+   "label": "Giá trị giao dịch toàn sàn HOSE, gồm thỏa thuận (tỷ đồng)",
    "unit": "tỷ đồng",
    "rule": "down",
    "max_age_days": 4,
    "source": {
-    "kind": "manual"
+    "kind": "hose",
+    "field": "market_value",
+    "manual_fallback": true
    },
-   "url": "https://s.cafef.vn/lich-su-giao-dich-vnindex-1.chn"
+   "url": "https://www.hsx.vn"
   }
  ]
 }

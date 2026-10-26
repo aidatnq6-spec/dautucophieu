@@ -24,7 +24,8 @@ VCB = ('<ExrateList><DateTime>10/25/2026 9:30:00 PM</DateTime>'
 def test_indicators_config_lists_auto_and_manual_rows():
     ind = load_indicators()
     assert len(ind) == 16 and {i["id"] for i in ind if i["source"]["kind"] != "manual"} == {
-        "dollar_broad", "wti", "us_cpi_yoy", "usd_vnd_vcb", "fed_effr", "us10y", "usd_vnd_free", "usd_vnd_sbv", "deposit_12m"}
+        "dollar_broad", "wti", "us_cpi_yoy", "usd_vnd_vcb", "fed_effr", "us10y", "usd_vnd_free", "usd_vnd_sbv", "deposit_12m",
+        "foreign_net", "vnindex_value"}
 
 
 def test_fred_csv_skips_missing_values_and_cpi_becomes_year_on_year():
@@ -123,3 +124,35 @@ def test_topi_values_are_dated_on_the_fetch_day_and_failures_are_recorded(tmp_pa
     rows = {r["id"]: r for r in macro_rows(load_indicators(), store, today=date(2026, 10, 25))}
     assert rows["usd_vnd_free"]["source_error"] is None and rows["deposit_12m"]["source_error"] == "error:OSError"
     assert rows["deposit_12m"]["manual_allowed"] is True and rows["us10y"]["manual_allowed"] is False
+
+
+# HOSE's foreign-trading report as served for 23/10/2026 (values in million đồng); weekends return no rows.
+HOSE_2310 = json.dumps({"data": [
+    {"trading_type_name": "Mua", "foreign_trading_value": "1,896,838.66", "market_value": "17,010,236.60", "percent": "11.15 %"},
+    {"trading_type_name": "Bán", "foreign_trading_value": "2,374,562.09", "market_value": "", "percent": "13.96 %"},
+    {"trading_type_name": "Mua - Bán", "foreign_trading_value": "-477,723.43", "market_value": "", "percent": ""}], "success": True, "message": None})
+HOSE_EMPTY = json.dumps({"data": [], "success": True, "message": None})
+
+
+def test_hose_report_gives_net_foreign_value_and_market_value_in_billions():
+    from investment_agent.market.leading import parse_hose_foreign
+    assert parse_hose_foreign(HOSE_2310) == {"net": "-477.72343", "market_value": "17010.2366"}
+    assert parse_hose_foreign(HOSE_EMPTY) is None
+    with pytest.raises(MacroError):
+        parse_hose_foreign("<html>Request Rejected</html>")
+
+
+def test_hose_indicators_collect_the_last_trading_days(tmp_path):
+    seen = []
+
+    def get(url):
+        seen.append(url)
+        if "api.hsx.vn" not in url:
+            raise OSError("offline")
+        return HOSE_2310 if "fromDate=2026-10-23&toDate=2026-10-23" in url or "fromDate=2026-10-22&toDate=2026-10-22" in url else HOSE_EMPTY
+    store = MacroStore(tmp_path)
+    result = fetch_auto(load_indicators(), store, get=get, today=date(2026, 10, 25))
+    assert result["foreign_net"] == "ok" and result["vnindex_value"] == "ok"
+    assert [(o["date"], o["value"]) for o in store.read("foreign_net")] == [("2026-10-22", "-477.72343"), ("2026-10-23", "-477.72343")]
+    assert store.read("vnindex_value")[-1]["value"] == "17010.2366"
+    assert len([u for u in seen if "api.hsx.vn" in u]) == 7  # one call per day, shared by both indicators

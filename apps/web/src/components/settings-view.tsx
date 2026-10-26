@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Save } from "lucide-react";
 import { ApiError, api, requestId, type ApiFailure } from "../lib/api";
 import { formatRatio, percentToRatio } from "../lib/format";
+import { AiStatusSection } from "./ai-status";
 import { FormErrors } from "./form-errors";
 
 type Notify = { enabled: boolean; chat_id: string | null; members_may_view_personal_data: boolean; scheduled_enabled: boolean };
@@ -88,9 +89,8 @@ export function SettingsView() {
         <p>Chạy lúc 15:30, thử lại 17:30, 18:30 và 20:00 (giờ Việt Nam) chỉ khi giá của phiên chưa về đủ; 07:00 sáng và khi máy bật lại sẽ chạy bù phiên gần nhất chưa có bản tin.
           Bản tin lịch sử bổ sung không được gửi hàng loạt.</p>
         <p className="notice">Máy tắt hoặc ngủ thì không bảo đảm chạy đúng giờ. Đăng ký lịch bằng <code>scripts\windows\register-tasks.ps1 -Register</code> sau khi cấu hình xong.</p>
-        <h2>AI</h2>
-        <p>Chính sách AI mẫu chưa được duyệt và ngân sách bằng 0: bản tin dùng số liệu đã kiểm chứng, không gọi mô hình.</p>
       </section>
+      <AiStatusSection />
     </>
   );
 }

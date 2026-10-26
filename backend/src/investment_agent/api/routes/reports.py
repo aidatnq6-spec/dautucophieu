@@ -33,4 +33,14 @@ def report(request: Request, report_id: str):
         found = None
     except RepositoryUnavailable:
         return unavailable()
-    return found if found else error(404, "report_missing", "Không tìm thấy bản tin.")
+    if not found:
+        return error(404, "report_missing", "Không tìm thấy bản tin.")
+    from investment_agent.brief.view import market_for_session
+
+    from .watchlist import held_tickers
+    try:
+        held = held_tickers(request)
+    except RepositoryUnavailable:
+        held = set()
+    # The Firestore record stays write-once; the public market section is read from data/brief by session date.
+    return {**found, "market": market_for_session(request.app.state.data_dir, held)(found.get("session_date"))}

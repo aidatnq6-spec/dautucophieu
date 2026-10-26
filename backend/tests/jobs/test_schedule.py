@@ -174,7 +174,7 @@ def test_a_manually_created_report_of_the_current_session_is_sent_on_the_next_wa
     monkeypatch.setattr(sched, "get_report", lambda repo, owner, rid: reports.get(rid))
     sent = []
 
-    def fake_deliver(report, settings, sender, store):
+    def fake_deliver(report, settings, sender, store, market=None):
         sent.append(report["report_id"])
         return type("R", (), {"status": "sent"})()
     monkeypatch.setattr(sched, "deliver", fake_deliver)
@@ -185,3 +185,21 @@ def test_a_manually_created_report_of_the_current_session_is_sent_on_the_next_wa
                             sender=FakeSender(), cal=CAL, now=at("2026-10-27", "17:31"), worker_id="sched")
     assert result.decision.reason == "already_published" and result.delivered == ["today"] and sent == ["today"]
     assert store.queued() == ["old"]  # an older session's report is not sent late
+
+
+def test_queued_reports_are_rendered_with_their_sessions_market_snapshot(tmp_path, monkeypatch):
+    import investment_agent.jobs.schedule as sched
+    repo = PersonalRepository("owner-1", MemoryDocumentStore())
+    settings = NotificationSettings(enabled=True, chat_id="-100123", members_may_view_personal_data=True, scheduled_enabled=True)
+    repo.write(OWNER, "settings", "notifications", settings.model_dump(mode="json"), expected_version=0, request_id="n1")
+    reports = {"today": {"report_id": "today", "report_kind": "after_close", "session_date": "2026-10-27", "status": "published"}}
+    monkeypatch.setattr(sched, "list_reports", lambda repo, owner: list(reports.values()))
+    monkeypatch.setattr(sched, "get_report", lambda repo, owner, rid: reports.get(rid))
+    seen = []
+    monkeypatch.setattr(sched, "deliver", lambda report, s, sender, store, market=None: seen.append(market) or type("R", (), {"status": "sent"})())
+    store = DeliveryStore(tmp_path / "d.sqlite")
+    store.enqueue("today")
+    scheduled_tick(repo=repo, owner=OWNER, market=SyntheticMarket(), jobs=JobStore(tmp_path / "jobs.sqlite"), deliveries=store,
+                   sender=FakeSender(), cal=CAL, now=at("2026-10-27", "17:31"), worker_id="sched",
+                   market_for=lambda session: {"session_date": session})
+    assert seen == [{"session_date": "2026-10-27"}]

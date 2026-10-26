@@ -100,3 +100,6 @@ legend{font-weight:600;padding:0 6px}
   .fx-loading{animation:none;background:none;color:var(--muted)}
   .trend-macd.changed,.trend-rsi.changed{animation:none}
 }
+.bm h3{font-size:15px;margin:14px 0 4px}.bm p{margin:4px 0}.bm-list{margin:4px 0;padding-left:18px}.bm-list li{margin:4px 0;overflow-wrap:anywhere}
+.bm-sectors,.bm-tickers{list-style:none;margin:4px 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:4px 16px}
+.bm-tickers .pill{margin-left:6px}

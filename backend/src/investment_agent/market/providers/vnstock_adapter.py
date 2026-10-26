@@ -157,3 +157,43 @@ def audit_symbol(provider: VnstockProvider, symbol: str, *, today: date, years: 
         "meets_40_quarters": len(periods) >= 40, "line_items": sorted({str(r.get("id")) for r in rows if r.get("id")}),
         "publication_dates": False,
     }
+
+
+BOARD_FIELDS = {"listing": ("symbol", "trading_date", "ref_price", "icb_code2"),
+                "match": ("match_price", "accumulated_value", "accumulated_volume", "foreign_buy_volume", "foreign_sell_volume",
+                          "foreign_buy_value", "foreign_sell_value")}
+
+
+def _plain(value):
+    return value.item() if hasattr(value, "item") else value
+
+
+def flatten_board(frame) -> list[dict]:
+    """Vnstock's price board has (group, field) columns; keep the fields the brief uses as one flat dict per symbol."""
+    wanted = [(g, f) for g, fields in BOARD_FIELDS.items() for f in fields if (g, f) in frame.columns]
+    return [{f: _plain(row[(g, f)]) for g, f in wanted} for _, row in frame.iterrows()]
+
+
+def hose_listing() -> dict:
+    """HOSE stock symbols with their ICB level-2 code, and level-2 names (VCI listing; one call each)."""
+    try:
+        from vnstock import Listing
+    except ImportError as exc:
+        raise ProviderUnavailable("vnstock is not installed; install it from vnstocks.com with your own key") from exc
+    listing = Listing(source="VCI")
+    frame = listing.symbols_by_exchange()
+    rows = [r for r in frame.to_dict("records") if r.get("exchange") in ("HSX", "HOSE") and r.get("type") == "STOCK"]
+    symbols = sorted(str(r["symbol"]).upper() for r in rows)
+    codes = {str(r["symbol"]).upper(): str(r["icb_code2"]) for r in rows if r.get("icb_code2")}
+    icb = listing.industries_icb()
+    names = {str(r["icb_code"]): str(r["icb_name"]) for r in icb.to_dict("records") if int(r["level"]) == 2}
+    return {"symbols": symbols, "icb_names": names, "icb_codes": codes}
+
+
+def price_board(symbols: list[str]) -> list[dict]:
+    """Whole-board snapshot in one call (Vnstock accepts up to 500 symbols); Community tier allows it."""
+    try:
+        from vnstock import Trading
+    except ImportError as exc:
+        raise ProviderUnavailable("vnstock is not installed; install it from vnstocks.com with your own key") from exc
+    return flatten_board(Trading(source="VCI").price_board(list(symbols)[:500]))

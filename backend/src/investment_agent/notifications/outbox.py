@@ -59,12 +59,21 @@ class DeliveryStore:
             self._db.execute("""CREATE TABLE IF NOT EXISTS deliveries (report_id TEXT, version TEXT, destination TEXT, part INTEGER, parts INTEGER,
                                 digest TEXT, status TEXT, message_id INTEGER, attempts INTEGER, PRIMARY KEY (report_id, version, destination, part))""")
             self._db.execute("CREATE TABLE IF NOT EXISTS outbox (report_id TEXT PRIMARY KEY, status TEXT)")
+            self._db.execute("""CREATE TABLE IF NOT EXISTS delivery_texts (report_id TEXT, version TEXT, destination TEXT, part INTEGER, text TEXT,
+                                PRIMARY KEY (report_id, version, destination, part))""")
 
     def ensure(self, report_id, version, destination, texts):
         with self._lock, self._db:
             for i, text in enumerate(texts):
-                self._db.execute("INSERT OR IGNORE INTO deliveries VALUES (?,?,?,?,?,?,?,?,?)",
-                                 (report_id, version, destination, i, len(texts), hashlib.sha256(text.encode()).hexdigest(), "pending", None, 0))
+                inserted = self._db.execute("INSERT OR IGNORE INTO deliveries VALUES (?,?,?,?,?,?,?,?,?)",
+                                            (report_id, version, destination, i, len(texts), hashlib.sha256(text.encode()).hexdigest(), "pending", None, 0))
+                if inserted.rowcount:
+                    self._db.execute("INSERT OR IGNORE INTO delivery_texts VALUES (?,?,?,?,?)", (report_id, version, destination, i, text))
+
+    def texts(self, report_id, version, destination) -> list[str]:
+        """The text of each part as frozen at the first attempt (empty for deliveries made before texts were kept)."""
+        return [r[0] for r in self._db.execute("SELECT text FROM delivery_texts WHERE report_id=? AND version=? AND destination=? ORDER BY part",
+                                               (report_id, version, destination)).fetchall()]
 
     def _rows(self, report_id, version, destination):
         return self._db.execute("SELECT part, parts, status, message_id FROM deliveries WHERE report_id=? AND version=? AND destination=? ORDER BY part",
@@ -97,15 +106,18 @@ class DeliveryStore:
             self._db.execute("UPDATE outbox SET status='processed' WHERE report_id=?", (report_id,))
 
 
-def deliver(report: dict, settings: NotificationSettings, sender, store: DeliveryStore) -> DeliveryResult:
+def deliver(report: dict, settings: NotificationSettings, sender, store: DeliveryStore, market: dict | None = None) -> DeliveryResult:
     if not settings.enabled:
         return DeliveryResult("disabled")
     if report["status"] != "published":
         return DeliveryResult("not_publishable")
-    texts = split_message(render_report(report))
+    texts = split_message(render_report(report, market))
     rid, version, dest = report["report_id"], report.get("report_version", "1"), settings.chat_id
     store.ensure(rid, version, dest, texts)
     rows = store.parts(rid, dest, version)
+    frozen = store.texts(rid, version, dest)
+    if len(frozen) == len(rows):
+        texts = frozen  # the market snapshot may have changed since the first attempt; keep the message whole and consistent
     if any(r.status in {"unknown", "sending"} for r in rows):  # "sending" left by a crash: outcome unknown
         return DeliveryResult("unknown", sum(r.status == "sent" for r in rows), len(rows))
     sent = sum(r.status == "sent" for r in rows)

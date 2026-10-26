@@ -86,6 +86,24 @@ if __name__ == "__main__":
     with open(os.path.join(data, "insights", "ssi.json"), "w", encoding="utf-8") as f:
         json.dump({"at": "synthetic", "titles": [{"title": "Cập nhật Ngành Thép mẫu", "kind": "ngành", "date": "2026-10-20",
                                                   "url": "https://example.invalid/ssi-thep"}]}, f, ensure_ascii=False)
+    # After-close brief: synthetic public market snapshot for session 2026-10-23 (no network in tests).
+    os.makedirs(os.path.join(data, "brief"), exist_ok=True)
+    with open(os.path.join(data, "brief", "2026-10-23.json"), "w", encoding="utf-8") as f:
+        json.dump({"session_date": "2026-10-23", "updated_at": "2026-10-23T15:40:00+07:00",
+                   "indices": {"status": "ok", "rows": [{"id": "VNINDEX", "status": "ok", "close": "1658.52", "change": "12.30", "pct": "0.0075"},
+                                                        {"id": "VN30", "status": "missing", "reason": "Chưa có giá chỉ số phiên này"}]},
+                   "board": {"status": "ok", "trading_date": "2026-10-23", "value_matched_bn": "17010.24", "volume_matched": 605225925,
+                             "breadth": {"up": 180, "down": 150, "flat": 50, "no_trade": 27},
+                             "foreign": {"buy_volume": 70754422, "sell_volume": 90395166, "buy_value_bn": "1896.84", "sell_value_bn": "2374.56",
+                                         "net_value_bn": "-477.72", "top_sell": [{"symbol": "VHM", "net_value_bn": "-210.50"}],
+                                         "top_buy": [{"symbol": "FPT", "net_value_bn": "45.00"}]},
+                             "sectors": [{"sector": "Công nghệ Thông tin", "pct": "0.0120", "count": 9}, {"sector": "Ngân hàng", "pct": "-0.0040", "count": 27}],
+                             "symbols": {"FPT": {"price": 57000, "ref": 55000, "change": 2000, "pct": "0.0364", "sector": "Công nghệ Thông tin"},
+                                         "VCB": {"price": 61000, "ref": 61000, "change": 0, "pct": "0.0000", "sector": "Ngân hàng"}}},
+                   "hose": {"status": "missing", "reason": "HOSE chưa công bố"},
+                   "proprietary": {"status": "missing", "reason": "Chưa có nguồn miễn phí"},
+                   "news": {"status": "ok", "items": [{"title": "FPT ký hợp đồng AI lớn", "url": "https://example.invalid/fpt-news", "source": "CafeF",
+                                                       "published": "2026-10-23T10:00:00+07:00"}]}}, f, ensure_ascii=False)
     MacroStore(data).upsert("us10y", [(date(2026, 10, 21), "4.91"), (date(2026, 10, 23), "4.96")], entry="auto")
     app = create_app(InternalAuthSettings.from_env(), personal_repository=repository, market=MARKET,
                      jobs=JobStore(os.path.join(data, "jobs.sqlite")), outbox=deliveries, deliveries=deliveries, data_dir=data)

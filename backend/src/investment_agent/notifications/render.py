@@ -22,7 +22,67 @@ def vnd(value: str | None) -> str:
     return f"{'−' if negative and grouped != '0' else ''}{grouped} đ"
 
 
-def render_report(report: dict) -> str:
+def _num(value, places: int = 2, sign: bool = False) -> str:
+    """Vietnamese grouping (1.234,56) with a real minus sign; sign=True adds '+' to positives."""
+    d = float(value)
+    whole = f"{abs(d):,.{places}f}".replace(",", " ").replace(".", ",").replace(" ", ".")
+    return ("−" if d < 0 else "+" if sign and d > 0 else "") + whole
+
+
+def _pct(value) -> str:
+    return _num(float(value) * 100, 2, sign=True) + "%"
+
+
+def _missing(name: str, section: dict | None) -> str:
+    return f"{name}: chưa có số liệu ({(section or {}).get('reason', 'không rõ lý do')})"
+
+
+def render_market_brief(report: dict, market: dict) -> str:
+    """Short phone version agreed on 2026-10-26: market first, holdings' prices, a few news, one portfolio line, reminders."""
+    day = report["session_date"]
+    lines = [f"BẢN TIN SAU PHIÊN {day[8:10]}/{day[5:7]}/{day[:4]}", ""]
+    for row in (market.get("indices") or {}).get("rows", []):
+        name = "VN-Index" if row["id"] == "VNINDEX" else row["id"]
+        lines.append(f"{name} {_num(row['close'])} ({_num(row['change'], sign=True)} điểm, {_pct(row['pct'])})" if row["status"] == "ok"
+                     else _missing(name, row))
+    board, hose = market.get("board") or {}, market.get("hose") or {}
+    if board.get("status") == "ok":
+        b, f = board["breadth"], board["foreign"]
+        lines += [f"Giá trị khớp lệnh HOSE: {_num(board['value_matched_bn'])} tỷ đồng ({_num(board['volume_matched'], 0)} cp)"]
+        if hose.get("status") == "ok":
+            lines.append(f"HOSE công bố tổng (gồm thỏa thuận): {_num(hose['total_value_bn'])} tỷ đồng")
+        lines += [f"Độ rộng: {b['up']} tăng · {b['down']} giảm · {b['flat']} đứng giá · {b['no_trade']} không giao dịch",
+                  f"Khối ngoại: mua {_num(f['buy_value_bn'])} tỷ · bán {_num(f['sell_value_bn'])} tỷ · ròng {_num(f['net_value_bn'], sign=True)} tỷ"]
+        if f["top_sell"]:
+            lines.append("Bán ròng mạnh: " + "; ".join(f"{x['symbol']} {_num(x['net_value_bn'], sign=True)} tỷ" for x in f["top_sell"]))
+        if f["top_buy"]:
+            lines.append("Mua ròng mạnh: " + "; ".join(f"{x['symbol']} {_num(x['net_value_bn'], sign=True)} tỷ" for x in f["top_buy"]))
+    else:
+        lines.append(_missing("Bảng giá cả sàn (giá trị, độ rộng, khối ngoại, ngành)", board))
+    lines.append(_missing("Tự doanh", market.get("proprietary")))
+    if board.get("status") == "ok" and board["sectors"]:
+        lines += ["", "NGÀNH"] + [f"- {s['sector']} {_pct(s['pct'])} ({s['count']} mã)" for s in board["sectors"]]
+    held = [t for t in market.get("tickers", []) if t["held"]][:3]
+    if held:
+        lines += ["", "MÃ ĐANG NẮM"] + [f"- {t['symbol']} {_num(t['price'], 0)} ({_pct(t['pct'])})" if t["pct"] is not None
+                                        else f"- {t['symbol']}: chưa giao dịch phiên này" if t.get("state") == "no_trade"
+                                        else f"- {t['symbol']}: chưa có giá" for t in held]
+    news = market.get("news") or {}
+    if news.get("status") == "ok" and news["items"]:
+        lines += ["", "TIN NÓNG"] + [f"- {n['title']} ({n['source']})" for n in news["items"][:5]]
+    lines += ["", f"Danh mục: {report['decision']['headline']}"]
+    if report.get("reminders"):
+        lines += ["", "NHẮC CẬP NHẬT SỐ LIỆU VĨ MÔ (nhập ở trang Vĩ mô)"] + [f"- {r}" for r in report["reminders"]]
+    lines += ["", "Xem bản đầy đủ trong ứng dụng, mục Bản tin sau phiên.", "Chỉ để theo dõi, không phải khuyến nghị."]
+    return "\n".join(lines)
+
+
+def render_report(report: dict, market: dict | None = None) -> str:
+    if market:
+        try:
+            return render_market_brief(report, market)
+        except (KeyError, TypeError, ValueError, AttributeError):
+            pass  # a snapshot of another shape: fall back to the full text rather than not sending
     s = report["ledger_summary"]
     lines = [f"BẢN TIN SAU PHIÊN {report['session_date']}", f"(dữ liệu {report['provenance']})", "",
              f"KẾT LUẬN: {report['decision']['headline']}", "", "DANH MỤC",

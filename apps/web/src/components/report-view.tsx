@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
 import { formatVnd } from "../lib/format";
+import { BriefMarket, type MarketSection } from "./brief-market";
 import { HoldingsTable, type HoldingRow } from "./holdings-table";
 import { ACTION_LABEL, NOTE_TEXT, REASON_TEXT, label } from "./labels";
 import { REPORT_STATUS } from "./reports-list";
@@ -11,7 +12,14 @@ type Report = { report_id: string; session_date: string; generated_at: string; s
   decision: { action: string; headline: string; reasons: string[] }; holdings: HoldingRow[];
   items: { entity_id: string; action: string; reasons: string[]; source_ids: string[] }[];
   ledger_summary: { cash: string; realized_gain: string; dividend_income: string; net_contributions: string };
-  narrative: { source: string; text: string }; verification_flags: string[]; previous_report_id: string | null; sources: string[] };
+  narrative: { source: string; text: string }; verification_flags: string[]; previous_report_id: string | null; sources: string[];
+  market?: MarketSection | null };
+
+function sameReasons(items: Report["items"]): string[] | null {
+  if (items.length < 2) return null;
+  const key = (i: Report["items"][number]) => `${i.action}|${i.reasons.join(",")}`;
+  return items.every((i) => key(i) === key(items[0])) ? [label(ACTION_LABEL, items[0].action), ...items[0].reasons.map((x) => label(REASON_TEXT, x))] : null;
+}
 
 const SEND_STATUS: Record<string, string> = {
   sent: "Đã gửi", disabled: "Chưa bật gửi Telegram trong Cài đặt.", not_publishable: "Bản tin chưa phát hành nên không gửi.",
@@ -67,18 +75,21 @@ export function ReportView({ reportId }: { reportId: string }) {
       <p className="caption">Ngày phiên {r.session_date} · tạo lúc {new Date(r.generated_at).toLocaleString("vi-VN")} · dữ liệu {r.provenance}
         {r.previous_report_id && <> · <Link href={`/reports/${r.previous_report_id}`}>bản trước cùng phạm vi</Link></>}</p>
       {r.status !== "published" && <p className="notice">Bản tin chưa đủ dữ liệu: không gửi Telegram và không dùng để ra quyết định mới.</p>}
-      <h2>Kết luận</h2>
+      <BriefMarket market={r.market ?? null} session={r.session_date} />
+      <h2>Danh mục: kết luận</h2>
       <p><strong>{r.decision.headline}</strong></p>
       <ul>{r.decision.reasons.map((x) => <li key={x}>{label(REASON_TEXT, x)}</li>)}</ul>
       <h2>Danh mục</h2>
       <p>Tiền trong sổ {formatVnd(r.ledger_summary.cash)} · lãi/lỗ đã thực hiện {formatVnd(r.ledger_summary.realized_gain)} · cổ tức ròng {formatVnd(r.ledger_summary.dividend_income)}</p>
-      <HoldingsTable rows={r.holdings} />
+      <HoldingsTable rows={r.holdings} showScope={false} />
       <h2>Cơ hội và cảnh báo</h2>
-      <ul>{r.items.map((i) => <li key={i.entity_id}><strong>{i.entity_id}</strong>: {label(ACTION_LABEL, i.action)} — {i.reasons.map((x) => label(REASON_TEXT, x)).join("; ")}</li>)}</ul>
-      <h2>Nhận định {r.narrative.source === "ai" ? "(AI, đã kiểm tra)" : "(số liệu đã kiểm chứng, không dùng AI)"}</h2>
-      <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.85 }}>{r.narrative.text}</p>
-      <h2>Kiểm tra dữ liệu</h2>
-      <ul>{r.verification_flags.map((f) => <li key={f}>{NOTE_TEXT(f)}</li>)}</ul>
+      {(() => {
+        const same = sameReasons(r.items);
+        return same ? <p>Tất cả mã ({r.items.map((i) => i.entity_id).join(", ")}): {same[0]} — {same.slice(1).join("; ")}</p>
+          : <ul>{r.items.map((i) => <li key={i.entity_id}><strong>{i.entity_id}</strong>: {label(ACTION_LABEL, i.action)} — {i.reasons.map((x) => label(REASON_TEXT, x)).join("; ")}</li>)}</ul>;
+      })()}
+      <h2 className="caption">Kiểm tra dữ liệu</h2>
+      <ul className="caption">{r.verification_flags.map((f) => <li key={f}>{NOTE_TEXT(f)}</li>)}</ul>
       {r.sources.length > 0 && <p className="caption">Nguồn: {r.sources.join(", ")}</p>}
       <TelegramPanel reportId={r.report_id} publishable={r.status === "published"} />
     </article>

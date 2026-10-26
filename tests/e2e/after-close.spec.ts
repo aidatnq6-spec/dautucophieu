@@ -19,11 +19,11 @@ test("creating an after-close report shows progress and a readable brief", async
   await expect(page.getByRole("status")).toContainText(/Đã phát hành|Thiếu dữ liệu/);
   await page.getByRole("link", { name: "Phiên 2026-10-23" }).first().click();
   await expect(page.getByRole("heading", { name: "Bản tin phiên 2026-10-23" })).toBeVisible();
-  for (const heading of ["Kết luận", "Danh mục", "Cơ hội và cảnh báo", "Kiểm tra dữ liệu"]) {
-    await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+  for (const heading of ["Thị trường phiên 23/10", "Danh mục: kết luận", "Danh mục", "Cơ hội và cảnh báo", "Kiểm tra dữ liệu"]) {
+    await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
   }
-  await expect(page.getByText("market_provenance:synthetic")).toBeVisible();
-  await expect(page.getByText("(số liệu đã kiểm chứng, không dùng AI)")).toBeVisible();
+  await expect(page.getByText("Nguồn giá: synthetic")).toBeVisible();
+  await expect(page.getByText("(số liệu đã kiểm chứng, không dùng AI)")).toHaveCount(0);  // narrative section dropped (duplicated the table)
 });
 
 test("re-running the same session does not create a second report", async ({ page }) => {
@@ -47,7 +47,7 @@ test("a report can be previewed for Telegram and a test send needs confirmation"
   await openReports(page);
   await page.getByRole("link", { name: "Phiên 2026-10-23" }).first().click();
   await page.getByRole("button", { name: "Xem trước tin Telegram" }).click();
-  await expect(page.getByRole("region", { name: "Xem trước Telegram" })).toContainText("2026-10-23");
+  await expect(page.getByRole("region", { name: "Xem trước Telegram" })).toContainText("BẢN TIN SAU PHIÊN 23/10/2026");
 
   let asked = "";
   page.once("dialog", (d) => { asked = d.message(); void d.dismiss(); });

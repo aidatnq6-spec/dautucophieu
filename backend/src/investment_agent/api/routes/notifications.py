@@ -74,6 +74,18 @@ def _report(repo, owner, report_id):
     return get_report(repo, owner, report_id)
 
 
+def _market(request: Request, report: dict) -> dict | None:
+    """The brief's public market snapshot with local ordering; None when there is none (old reports keep their old text)."""
+    from investment_agent.brief.view import market_for_session
+
+    from .watchlist import held_tickers
+    try:
+        held = held_tickers(request)
+    except RepositoryUnavailable:
+        held = set()
+    return market_for_session(request.app.state.data_dir, held)(report.get("session_date"))
+
+
 @router.post("/preview")
 def preview(request: Request, body: ReportRequest):
     owner, repo, _ = _deps(request)
@@ -82,7 +94,7 @@ def preview(request: Request, body: ReportRequest):
     report = _report(repo, owner, body.report_id)
     if report is None:
         return error(404, "report_missing", "Không tìm thấy bản tin.")
-    return {"parts": split_message(render_report(report)), "status": report["status"]}
+    return {"parts": split_message(render_report(report, _market(request, report))), "status": report["status"]}
 
 
 @router.post("/test-send")
@@ -99,7 +111,7 @@ def test_send(request: Request, body: SendRequest):
     report = _report(repo, owner, body.report_id)
     if report is None:
         return error(404, "report_missing", "Không tìm thấy bản tin.")
-    result = deliver(report, settings, state.telegram, state.deliveries)
+    result = deliver(report, settings, state.telegram, state.deliveries, _market(request, report))
     return {"status": result.status, "parts_sent": result.parts_sent, "parts_total": result.parts_total}
 
 

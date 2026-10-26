@@ -54,7 +54,8 @@ def window_items(items: list[dict], *, since: datetime, until: datetime) -> list
 
 
 def _mentions(title: str, symbol: str) -> bool:
-    return re.search(rf"(?<!\w){re.escape(symbol)}(?!\w)", title) is not None
+    # Whole word, and not the tail of a dotted name such as "TP.HCM" (HCM is also a ticker).
+    return re.search(rf"(?<![\w.]){re.escape(symbol)}(?!\w)", title) is not None
 
 
 def pick_news(items: list[dict], *, watched: list[str], held: set[str], sector_names: set[str], limit: int) -> list[dict]:

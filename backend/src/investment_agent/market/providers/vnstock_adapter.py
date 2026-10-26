@@ -182,10 +182,12 @@ def hose_listing() -> dict:
         raise ProviderUnavailable("vnstock is not installed; install it from vnstocks.com with your own key") from exc
     listing = Listing(source="VCI")
     frame = listing.symbols_by_exchange()
-    symbols = sorted(str(r["symbol"]).upper() for r in frame.to_dict("records") if r.get("exchange") in ("HSX", "HOSE") and r.get("type") == "STOCK")
+    rows = [r for r in frame.to_dict("records") if r.get("exchange") in ("HSX", "HOSE") and r.get("type") == "STOCK"]
+    symbols = sorted(str(r["symbol"]).upper() for r in rows)
+    codes = {str(r["symbol"]).upper(): str(r["icb_code2"]) for r in rows if r.get("icb_code2")}
     icb = listing.industries_icb()
     names = {str(r["icb_code"]): str(r["icb_name"]) for r in icb.to_dict("records") if int(r["level"]) == 2}
-    return {"symbols": symbols, "icb_names": names}
+    return {"symbols": symbols, "icb_names": names, "icb_codes": codes}
 
 
 def price_board(symbols: list[str]) -> list[dict]:

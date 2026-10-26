@@ -78,3 +78,10 @@ def test_price_board_columns_are_flattened():
     assert flatten_board(frame) == [{"symbol": "FPT", "trading_date": "2026-10-26", "ref_price": 57000, "icb_code2": "9500",
                                      "match_price": 56000, "accumulated_value": 572175.08, "accumulated_volume": 10104800,
                                      "foreign_buy_volume": 1, "foreign_sell_volume": 2, "foreign_buy_value": 3, "foreign_sell_value": 4}]
+
+
+def test_sector_codes_come_from_the_listing_when_the_board_has_none(tmp_path):
+    board = [{**BOARD[0], "icb_code2": None}]
+    listing = lambda: {"symbols": ["FPT"], "icb_names": {"9500": "Công nghệ Thông tin"}, "icb_codes": {"FPT": "9500"}}
+    snap = build_snapshot(**deps(tmp_path, board=lambda s: board, listing=listing))
+    assert snap["board"]["sectors"][0]["sector"] == "Công nghệ Thông tin"

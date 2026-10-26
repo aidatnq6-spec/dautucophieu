@@ -66,7 +66,10 @@ def build_snapshot(*, session_date: date, previous_session: date | None, now: da
         sections["indices"] = _missing("Không đọc được giá chỉ số")
     try:
         info = listing()
-        sections["board"] = summarise_board(board(info["symbols"]), session_date=session_date, icb_names=info["icb_names"])
+        codes = info.get("icb_codes") or {}
+        # The board leaves icb_code2 empty (checked 26/10/2026); the listing carries each symbol's level-2 code.
+        records = [{**r, "icb_code2": r.get("icb_code2") or codes.get(r.get("symbol"))} for r in board(info["symbols"])]
+        sections["board"] = summarise_board(records, session_date=session_date, icb_names=info["icb_names"])
     except Exception:
         sections["board"] = _missing("Không tải được bảng giá cả sàn")
     try:

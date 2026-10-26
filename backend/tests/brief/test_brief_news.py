@@ -38,3 +38,9 @@ def test_held_outranks_watched_outranks_sector_and_macro():
     assert out[0]["reason"] == "HPG" and out[3]["reason"] == "vĩ mô"
     # "MBB" is a whole-word match only: "MBBank" does not count as MBB.
     assert all("MBBank" not in i["title"] for i in pick_news(items, watched=["MBB"], held=set(), sector_names=set(), limit=10))
+
+
+def test_city_name_tp_hcm_is_not_the_ticker_hcm():
+    items = [item("Cận cảnh Vành đai 3 TP.HCM tăng tốc", 1), item("HCM tăng vốn điều lệ", 2)]
+    out = pick_news(items, watched=["HCM"], held=set(), sector_names=set(), limit=5)
+    assert [i["title"] for i in out] == ["HCM tăng vốn điều lệ"]

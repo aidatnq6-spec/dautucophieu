@@ -37,9 +37,10 @@ VOLUME = json.dumps({"data": [
 
 def test_hose_report_in_billions_and_shares():
     out = parse_hose(VALUE, VOLUME)
-    assert out == {"status": "ok", "total_value_bn": "17010.24", "total_volume": 8_438_955_550,
+    # Volumes are in lots of 100 shares: on 26/10 HOSE's 367,186.06 matched the board's 34.2 million foreign shares bought.
+    assert out == {"status": "ok", "total_value_bn": "17010.24", "total_volume": 843_895_555,
                    "foreign": {"buy_value_bn": "1896.84", "sell_value_bn": "2374.56", "net_value_bn": "-477.72",
-                               "buy_volume": 707_544_220, "sell_volume": 903_951_660}}
+                               "buy_volume": 70_754_422, "sell_volume": 90_395_166}}
 
 
 def test_hose_not_yet_published_or_changed():

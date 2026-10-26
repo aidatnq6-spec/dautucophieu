@@ -16,7 +16,7 @@ def test_cli_writes_the_session_snapshot_and_caches_the_listing(tmp_path, capsys
     (tmp_path / "cal.json").write_text(json.dumps(CAL), encoding="utf-8")
     SeriesStore(tmp_path / "trend-sources").upsert("VNINDEX-1d", [(datetime(2026, 10, 23), "1658.52"), (datetime(2026, 10, 26), "1650.12")])
     calls = []
-    listing = lambda: calls.append(1) or {"symbols": ["FPT"], "icb_names": {"9500": "Công nghệ Thông tin"}}
+    listing = lambda: calls.append(1) or {"symbols": ["FPT"], "icb_names": {"9500": "Công nghệ Thông tin"}, "icb_codes": {"FPT": "9500"}}
     run = lambda: brief_snapshot_cli(tmp_path, tmp_path / "cal.json", listing=listing, board=lambda s: BOARD,
                                      http_get=lambda url: json.dumps({"data": []}) if "hsx" in url else "<rss></rss>",
                                      now=datetime(2026, 10, 26, 15, 40, tzinfo=VN))

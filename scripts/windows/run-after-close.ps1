@@ -1,11 +1,14 @@
 ﻿# One scheduler wake-up. Task Scheduler calls this at 07:00, 15:30, 17:30, 18:30, 20:00 and at logon (catch-up).
 # Secrets come from .env.local; nothing secret is passed on the command line or written to the log.
 . (Join-Path $PSScriptRoot 'common.ps1')
+$log = Join-Path $script:RepoRoot 'logs\scheduler.log'
+New-Item -ItemType Directory -Force -Path (Split-Path $log) | Out-Null
+# First line of every wake-up, before anything that can stall: a run stopped early still leaves a trace.
+"$(Get-Date -Format o) start pid=$PID" | Add-Content -LiteralPath $log -Encoding UTF8
 Import-LocalEnv
 $python = Get-RepoPython
 $data = Join-Path $script:RepoRoot 'data'
-$log = Join-Path $script:RepoRoot 'logs\scheduler.log'
-New-Item -ItemType Directory -Force -Path $data, (Split-Path $log) | Out-Null
+New-Item -ItemType Directory -Force -Path $data | Out-Null
 $calendar = Join-Path $data 'trading-calendar.json'
 if (-not (Test-Path -LiteralPath $calendar)) { $calendar = Join-Path $script:RepoRoot "config\trading-calendar-hose-$((Get-Date).Year).json" }
 $symbols = Join-Path $data 'market-symbols.txt'
@@ -47,4 +50,5 @@ $runExit = $LASTEXITCODE
 # At most one backup per day, after the evening slot (or as a catch-up); retention prunes old ones.
 $backup = & $python -W ignore -m investment_agent.cli backup --kind auto --data-dir $data --backup-dir (Join-Path $script:RepoRoot 'backups') 2>$null
 "$(Get-Date -Format o) backup exit=$LASTEXITCODE $backup" | Add-Content -LiteralPath $log -Encoding UTF8
+"$(Get-Date -Format o) finish exit=$runExit pid=$PID" | Add-Content -LiteralPath $log -Encoding UTF8
 exit $runExit

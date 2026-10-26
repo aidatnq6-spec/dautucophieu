@@ -7,7 +7,7 @@ from investment_agent.domain.allocation import load_allocation_policy
 from investment_agent.domain.equity_budget import equity_budget
 from investment_agent.domain.ledger import replay
 from investment_agent.domain.profile import ConfirmedProfile
-from investment_agent.services.records import LedgerBook, StoredRisk, read_current, read_version
+from investment_agent.services.records import LedgerBook, StoredRisk, effective_risk, read_current, read_version
 
 RECORD = ("settings", "equity_budget")
 PROTECTED = {"emergency_reserve", "due_within_12_months"}
@@ -22,7 +22,8 @@ def budget_view(repo, owner) -> tuple[dict, int]:
     risk, _ = read_current(repo, owner, "risk_versions", "main")
     lines = ConfirmedProfile.model_validate(profile.payload).assessment.lines if profile else ()
     deductions = sum((line.amount for line in lines if line.kind == "deduction" and line.reason in PROTECTED), Decimal(0))
-    group = StoredRisk.model_validate(risk.payload).assessment.group if risk else None
+    effective = effective_risk(repo, owner, StoredRisk.model_validate(risk.payload).assessment if risk else None)
+    group = effective.group if effective else None
     positions = replay(list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)).positions
     held_cost = sum((p.total_cost for p in positions if p.quantity + p.pending_quantity > 0), Decimal(0))
     budget = equity_budget(total=Decimal(stored.payload["total"]), deductions=deductions, group=group,

@@ -5,10 +5,9 @@ import { ApiError, api } from "../lib/api";
 import { formatVnd } from "../lib/format";
 import { EquityBudget } from "./equity-budget";
 import { BreakdownTable, STATUS_LABEL, WARNING_LABEL, type Assessment } from "./profile-form";
-import { FLAG_LABEL, GROUP_LABEL, type RiskAssessment } from "./risk-survey";
+import { RiskSection } from "./risk-section";
 
 type ProfileView = { version: number; assessment: Assessment; confirmed_at: string; freshness: { status: string; allows_new_recommendations: boolean } };
-type RiskView = { version: number; assessment: RiskAssessment; assessed_at: string };
 const FRESHNESS: Record<string, string> = { current: "Còn hiệu lực", refresh_soon: "Sắp đến hạn rà soát tháng",
   reconfirm_required: "Cần xác nhận lại trước khuyến nghị mới" };
 
@@ -26,10 +25,10 @@ function useRecord<T>(path: string) {
 
 export function ProfileSummary() {
   const profile = useRecord<ProfileView>("profile");
-  const risk = useRecord<RiskView>("risk");
-  if (profile.error || risk.error) return <p className="errors" role="alert">{profile.error ?? risk.error}</p>;
-  if (profile.value === undefined || risk.value === undefined) return <p className="muted fx-loading" role="status">Đang tải…</p>;
-  const p = profile.value, r = risk.value;
+  const [riskChanges, setRiskChanges] = useState(0);
+  if (profile.error) return <p className="errors" role="alert">{profile.error}</p>;
+  if (profile.value === undefined) return <p className="muted fx-loading" role="status">Đang tải…</p>;
+  const p = profile.value;
   return (
     <>
       <section className="surface">
@@ -42,15 +41,8 @@ export function ProfileSummary() {
           {p.assessment.warnings.map((w) => <p key={w.code} className="notice">{WARNING_LABEL[w.code] ?? w.code}: {formatVnd(w.amount)}</p>)}
         </>)}
       </section>
-      <section className="surface">
-        <h2>Khảo sát rủi ro</h2>
-        {!r ? <p className="notice">Chưa có kết quả khảo sát.</p> : (<>
-          <p><span className="pill">{GROUP_LABEL[r.assessment.group]} · {r.assessment.total} điểm</span></p>
-          <p className="caption">Khảo sát tổng hợp bản nháp, chưa được kiểm định · {r.assessment.questionnaire_version}</p>
-          <ul>{r.assessment.flags.map((f) => <li key={f.code}>{FLAG_LABEL[f.code] ?? f.code}</li>)}</ul>
-        </>)}
-      </section>
-      <EquityBudget />
+      <RiskSection onChanged={() => setRiskChanges((n) => n + 1)} />
+      <EquityBudget key={riskChanges} />
     </>
   );
 }

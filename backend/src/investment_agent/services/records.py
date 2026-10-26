@@ -4,6 +4,7 @@ Lives below the API layer so jobs and services never import from api.routes.
 """
 
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import AwareDatetime, model_validator
 
@@ -51,6 +52,28 @@ class StoredRisk(ContractModel):
     assessment: RiskAssessment
     assessed_at: AwareDatetime
     profile_version: int | None
+
+
+RISK_GROUPS = ("very_safe", "cautious", "moderately_cautious", "balanced", "growth", "strong_growth")
+RISK_OVERRIDE = ("settings", "risk_override")
+
+
+class RiskOverride(ContractModel):
+    """Group chosen by hand on Hồ sơ & rủi ro; replaces the survey group everywhere until cleared. None = use the survey."""
+    group: Literal["very_safe", "cautious", "moderately_cautious", "balanced", "growth", "strong_growth"] | None = None
+
+
+def risk_override(repo, owner) -> tuple[RiskOverride, int]:
+    record = read_version(repo, owner, *RISK_OVERRIDE, None)
+    return (RiskOverride.model_validate(record.payload), record.version) if record else (RiskOverride(), 0)
+
+
+def effective_risk(repo, owner, assessment: RiskAssessment | None) -> RiskAssessment | None:
+    """The survey assessment with the owner's manual group applied (score and answers stay the survey's)."""
+    if assessment is None:
+        return None
+    chosen, _ = risk_override(repo, owner)
+    return assessment.model_copy(update={"group": chosen.group}) if chosen.group else assessment
 
 
 class TradingSettings(ContractModel):

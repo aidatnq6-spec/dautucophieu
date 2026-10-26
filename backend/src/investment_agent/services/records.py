@@ -79,11 +79,14 @@ class ValuationSettings(ContractModel):
 class PortfolioSettings(ContractModel):
     """Owner's display threshold for concentration (one ticker or one sector, on investable capital); not an allocation rule."""
     concentration_limit: Ratio = Decimal("0.25")
+    journal_review_threshold: Ratio = Decimal("0.15")  # Nhật ký: remind again each time the price moves this much from the recorded price
 
     @model_validator(mode="after")
     def _sensible(self):
         if not Decimal("0") < self.concentration_limit <= Decimal("1"):
             raise ValueError("concentration limit must be above 0 and at most 100%")
+        if not Decimal("0.01") <= self.journal_review_threshold <= Decimal("1"):
+            raise ValueError("journal review threshold must be between 1% and 100%")
         return self
 
 

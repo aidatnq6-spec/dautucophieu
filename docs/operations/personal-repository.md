@@ -20,7 +20,7 @@ owners/{uid}/record_heads/{hash(collection,record_id)}
 owners/{uid}/mutation_requests/{request_id}
 ```
 
-Các collection được phép: profile_versions, risk_versions, ledger_events, approvals, valuation_assumptions, reports, settings. Mỗi mutation đọc request record và head trước; sau đó tạo revision, cập nhật head và tạo request record trong một Firestore transaction. Request ID thuộc namespace owner, dùng cho một mutation duy nhất. Không đặt TTL xóa request record trong bản này vì sẽ làm thay đổi ý nghĩa retry.
+Các collection được phép: profile_versions, risk_versions, ledger_events, approvals, valuation_assumptions, reports, settings, journal. Mỗi mutation đọc request record và head trước; sau đó tạo revision, cập nhật head và tạo request record trong một Firestore transaction. Request ID thuộc namespace owner, dùng cho một mutation duy nhất. Không đặt TTL xóa request record trong bản này vì sẽ làm thay đổi ý nghĩa retry.
 
 Version ở Task 7 có phạm vi từng record. Khi sổ có nhiều event, Task 11 phải tạo phiên bản aggregate/transaction phù hợp để bảo đảm quy tắc tồn kho và thứ tự trên toàn sổ; không suy CAS một record thành CAS toàn danh mục.
 

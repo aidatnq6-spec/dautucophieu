@@ -64,3 +64,13 @@ legend{font-weight:600;padding:0 6px}
 .trend-legend{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12px;color:var(--muted);margin:0 0 12px}
 .trend-legend .trend-macd,.trend-legend .trend-rsi{padding:2px 6px}
 .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.fv-table{width:100%;border-collapse:collapse;font-size:14px}
+.fv-table th,.fv-table td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+.fv-detail ul{margin:6px 0;padding-left:18px}.fv-detail li{margin:4px 0}
+@media (max-width:700px){
+  .fv-table thead{display:none}
+  .fv-table,.fv-table tbody,.fv-table tr,.fv-table td{display:block;width:100%}
+  .fv-table tr{border:1px solid var(--line);border-radius:8px;margin:0 0 10px;padding:6px 10px}
+  .fv-table td{border:0;padding:4px 0;text-align:left}
+  .fv-table td[data-label]::before{content:attr(data-label) ": ";color:var(--muted);font-size:12px}
+}

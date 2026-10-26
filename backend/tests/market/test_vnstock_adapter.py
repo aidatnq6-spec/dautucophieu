@@ -236,3 +236,42 @@ def test_cli_industries_saves_level_two_sectors_for_watched_tickers(tmp_path):
     assert industries(["MBB", "SSI", "XYZ"], tmp_path / "industries.json", provider=p, today=date(2026, 10, 25)) == 0
     saved = _json.loads((tmp_path / "industries.json").read_text(encoding="utf-8"))
     assert saved == {"as_of": "2026-10-25", "source": "vnstock:vci", "level": 2, "sectors": {"MBB": "Ngân hàng", "SSI": "Dịch vụ tài chính"}}
+
+
+class PreOpenIndex:
+    """Vnstock's daily index rows on 26/10/2026 before the open: a zero-volume placeholder for today,
+    and (as on the 07:11 run) the same session twice."""
+    def __init__(self, calls):
+        self.calls = calls
+
+    def ohlcv(self, start=None, end=None, interval="1D", **kw):
+        t = lambda d: pd.Timestamp(d).tz_localize(VN) + pd.Timedelta(hours=7)  # noqa: E731
+        return pd.DataFrame({"time": [t("2026-10-23"), t("2026-10-23"), t("2026-10-26")],
+                             "open": [1761.38, 1757.6, 1774.15], "high": [1775.19, 1775.19, 1774.15], "low": [1750.83, 1750.83, 1774.15],
+                             "close": [1774.15, 1774.15, 1774.15], "volume": [777197613, 640986900, 0]})
+
+
+class PreOpenMarket(FakeMarket):
+    def index(self, symbol):
+        return PreOpenIndex(self.calls)
+
+    def equity(self, symbol):
+        return PreOpenIndex(self.calls)
+
+
+def test_preopen_placeholders_are_dropped_and_a_repeated_session_keeps_the_last_row():
+    p = VnstockProvider(market=PreOpenMarket(), fundamental=FakeFundamental(), clock=lambda: NOW)
+    bars = p.fetch_index("VNINDEX", date(2026, 10, 23), date(2026, 10, 26))
+    assert [(b.session_date, b.volume) for b in bars] == [(date(2026, 10, 23), 640986900)]
+    closes = p.fetch_closes("VNINDEX", date(2026, 10, 23), date(2026, 10, 26), interval="1D", index=True)
+    assert [t.date() for t, _ in closes] == [date(2026, 10, 23)]
+
+
+def test_market_sync_survives_a_repeated_session_from_the_source(tmp_path):
+    import json as _json
+    from investment_agent.cli import market_sync
+    cal_path = tmp_path / "cal.json"
+    cal_path.write_text(_json.dumps({"version": "x", "source": "t", "holidays": [], "first": "2026-01-01", "last": "2026-12-31"}), encoding="utf-8")
+    p = VnstockProvider(market=PreOpenMarket(), fundamental=FakeFundamental(), clock=lambda: NOW)
+    assert market_sync(["VNINDEX"], tmp_path, cal_path, 7, provider=p, today=date(2026, 10, 26), index=True) == 0
+    assert sorted(PriceStore(tmp_path).latest("VNINDEX")) == [date(2026, 10, 23)]

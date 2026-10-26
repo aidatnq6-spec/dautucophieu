@@ -30,6 +30,9 @@ if (Test-Path -LiteralPath $symbols) {
 # Public macro feeds (FRED, Vietcombank); a failing source is logged and the run continues.
 $macro = & $python -W ignore -m investment_agent.cli macro-sync --data-dir $data 2>$null
 "$(Get-Date -Format o) macro-sync exit=$LASTEXITCODE $macro" | Add-Content -LiteralPath $log -Encoding UTF8
+# Public research reports (ACBS, World Bank): AI reads public report text only; at most 3 new reports, once per 6 hours.
+$ins = & $python -W ignore -m investment_agent.cli insights-run --data-dir $data --calendar $calendar 2>$null
+"$(Get-Date -Format o) insights-run exit=$LASTEXITCODE $ins" | Add-Content -LiteralPath $log -Encoding UTF8
 # Xu hướng board (MACD/RSI over M, W, D1, H4, H1) from 15:30 on trading days; skips itself otherwise.
 $trend = & $python -W ignore -m investment_agent.cli trend-run --data-dir $data --calendar $calendar 2>$null
 "$(Get-Date -Format o) trend-run exit=$LASTEXITCODE $trend" | Add-Content -LiteralPath $log -Encoding UTF8

@@ -2,23 +2,20 @@
 
 from fastapi import APIRouter, Request
 
-from investment_agent.domain.ledger import replay
 from investment_agent.market.sectors import breadth, index_summary, load_sectors, sector_rows
 from investment_agent.market.watchlist import load_watchlist, watchlist_rows
 from investment_agent.repositories.personal import RepositoryUnavailable
-from investment_agent.services.records import LedgerBook
+from investment_agent.services.holdings_view import held_from_repo
 
 from ..auth import require_owner
-from .common import read_version, unavailable
+from .common import unavailable
 
 router = APIRouter(prefix="/internal")
 
 
 def held_tickers(request: Request) -> set[str]:
     """Tickers with shares in the owner's ledger; raises RepositoryUnavailable."""
-    owner, repo = require_owner(request), request.app.state.personal_repository
-    book = LedgerBook(read_version(repo, owner, "ledger_events", "main", None))
-    return {p.security_id for p in replay(list(book.effective().events)).positions if p.quantity + p.pending_quantity > 0}
+    return held_from_repo(request.app.state.personal_repository, require_owner(request))
 
 
 def _rows(request: Request):

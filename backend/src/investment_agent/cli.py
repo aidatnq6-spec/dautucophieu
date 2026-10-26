@@ -49,6 +49,10 @@ def main() -> int:
     sectors = commands.add_parser("industries", help="save ICB level-2 sectors of the synced tickers for the market page")
     sectors.add_argument("--symbols", required=True, help="comma-separated tickers, or @file with one ticker per line")
     sectors.add_argument("--output", type=Path, required=True)
+    ins = commands.add_parser("insights-run", help="read new public ACBS/World Bank reports with AI (public text only), then Telegram")
+    ins.add_argument("--data-dir", type=Path, required=True)
+    ins.add_argument("--calendar", type=Path, required=True)
+    ins.add_argument("--min-hours", type=float, default=6, help="skip when the previous run is more recent than this")
     args = parser.parse_args()
     if args.command == "vnstock-audit":
         return vnstock_audit(_symbols(args.symbols), args.output_dir)
@@ -69,6 +73,8 @@ def main() -> int:
         return run_backup(args.data_dir, args.backup_dir, args.kind)
     if args.command == "scheduled-run":
         return scheduled_run(args.calendar, args.data_dir)
+    if args.command == "insights-run":
+        return insights_cli(args.data_dir, args.calendar, min_hours=args.min_hours)
     if not args.fixtures:
         parser.error("data-audit currently requires --fixtures; live provider audits are not configured")
     reports = [audit_case(case) for case in load_fixture_cases(FIXTURES)]
@@ -311,6 +317,118 @@ def scheduled_run(calendar_path: Path, data_dir: Path) -> int:
     d = result.decision
     print(json.dumps({"status": "ok", "run": d.run, "reason": d.reason, "session": d.session_date.isoformat() if d.session_date else None,
                       "missed_sessions": d.missed_sessions, "reports": result.statuses, "delivered": len(result.delivered)}))
+    return 0
+
+
+USER_AGENT = "investment-agent/0.1 (personal use)"
+MAX_PDF_BYTES = 40 * 1024 * 1024
+
+
+def _insight_notifier(data_dir: Path, calendar_path: Path, settings, client, now):
+    """notify(store) for insights_run, or None when Telegram or the personal store is not configured.
+
+    Ticker linking (watchlist, Định giá verdicts, holdings) happens here, locally, after the model call.
+    """
+    import os
+    from zoneinfo import ZoneInfo
+
+    from investment_agent.api.auth import OwnerContext
+    from investment_agent.insights.summary import link, summarise
+    from investment_agent.insights.telegram import render_insight, send_new
+    from investment_agent.market.prices import PriceStore
+    from investment_agent.market.sectors import load_sectors
+    from investment_agent.market.view import EmptyMarket, StoreMarket
+    from investment_agent.notifications.telegram import TelegramSender
+    from investment_agent.repositories.firestore import personal_repository_from_env
+    from investment_agent.repositories.personal import RepositoryUnavailable
+    from investment_agent.services.holdings_view import fair_value_board, held_from_repo
+    from investment_agent.services.records import notification_settings
+
+    if not settings.telegram_bot_token:
+        return None
+    try:
+        repo = personal_repository_from_env()
+        owner = OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
+        notify_settings, _ = notification_settings(repo, owner)
+    except (OSError, ValueError, KeyError, RepositoryUnavailable):
+        return None
+    sectors = load_sectors(data_dir)[0]
+    try:
+        today = now.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date()
+        market = StoreMarket(PriceStore(data_dir), load_calendar(calendar_path), today=lambda: today) if (data_dir / "prices").exists() else EmptyMarket()
+        held = held_from_repo(repo, owner)
+        rows = fair_value_board(data_dir, market, repo, owner, held=held, today=today)["rows"]
+    except Exception:  # message still goes out, without verdicts
+        held, rows = set(), []
+    render = lambda record: render_insight(record, link(summarise([record]), sectors=sectors, valuation_rows=rows, held=held)["sectors"])
+    sender = TelegramSender(settings.telegram_bot_token, client=client)
+    return lambda store: send_new(store, sender, notify_settings, render)
+
+
+def insights_cli(data_dir: Path, calendar_path: Path, *, min_hours: float = 6) -> int:
+    """Prints a JSON summary without secrets or report contents."""
+    import time
+    from datetime import datetime, timezone
+
+    import httpx
+
+    from investment_agent.ai.budget import SpendLedger
+    from investment_agent.ai.catalog import load_catalog
+    from investment_agent.ai.openrouter import OpenRouterGateway, load_ai_policy
+    from investment_agent.domain.pinned import CONFIG_DIR
+    from investment_agent.insights.pdf import extract_pages
+    from investment_agent.insights.run import due, insights_run
+    from investment_agent.insights.sources import discover_acbs, discover_worldbank
+    from investment_agent.insights.store import InsightStore
+    from investment_agent.settings import Settings
+
+    now = datetime.now(timezone.utc)
+    if not due(data_dir, now=now, min_hours=min_hours):
+        print(json.dumps({"status": "skipped", "reason": "recent_run"}))
+        return 0
+    client = httpx.Client(follow_redirects=True, timeout=httpx.Timeout(60, connect=15), headers={"User-Agent": USER_AGENT})
+
+    def get(url: str) -> str:
+        time.sleep(1)  # polite pacing between page fetches
+        response = client.get(url)
+        response.raise_for_status()
+        return response.text
+
+    def download(url: str) -> bytes:
+        with client.stream("GET", url) as response:
+            response.raise_for_status()
+            data = b""
+            for chunk in response.iter_bytes():
+                data += chunk
+                if len(data) > MAX_PDF_BYTES:
+                    raise ValueError("report file too large")
+        return data
+
+    store = InsightStore(data_dir / "insights")
+
+    def discover(since):
+        refs = []
+        for source in (lambda: discover_acbs(get, since=since, known=lambda slug: store.read("acbs", slug) is not None),
+                       lambda: discover_worldbank(get, since=since)):
+            try:
+                refs += source()
+            except Exception:  # one source down does not block the other
+                pass
+        return refs
+
+    settings = Settings.from_env()
+    gateway = None
+    if settings.openrouter_api_key:
+        try:
+            catalog = load_catalog(data_dir / "ai" / "catalog.json", get, now=now)
+        except Exception:
+            print(json.dumps({"status": "catalog_unavailable"}))
+            return 1
+        gateway = OpenRouterGateway(settings, load_ai_policy(CONFIG_DIR / "ai-policy.json"), catalog,
+                                    SpendLedger(data_dir / "ai" / "spend.sqlite"), client=httpx.Client())
+    out = insights_run(data_dir, ssi_get=get, discover=discover, download=download, pages=extract_pages, gateway=gateway,
+                       notify=_insight_notifier(data_dir, calendar_path, settings, httpx.Client(), now), now=now, sleep=time.sleep)
+    print(json.dumps(out, ensure_ascii=False))
     return 0
 
 

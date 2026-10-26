@@ -44,3 +44,20 @@ def parse_catalog(payload: dict, *, fetched_at: datetime) -> Catalog:
         models[m["id"]] = CatalogModel(id=m["id"], prompt_price=_price(pricing.get("prompt")), completion_price=_price(pricing.get("completion")),
                                        supported_parameters=frozenset(m.get("supported_parameters") or ()), context_length=m.get("context_length"))
     return Catalog(models=models, fetched_at=fetched_at)
+
+
+def load_catalog(path, get, *, now: datetime, max_age_days: int = 7) -> Catalog:
+    """Catalog from a local cache younger than max_age_days, else refetched via get(MODELS_URL) and cached."""
+    import json
+    from datetime import timedelta
+    from pathlib import Path
+    path = Path(path)
+    if path.is_file():
+        cached = json.loads(path.read_text(encoding="utf-8"))
+        fetched_at = datetime.fromisoformat(cached["fetched_at"])
+        if now - fetched_at < timedelta(days=max_age_days):
+            return parse_catalog(cached["payload"], fetched_at=fetched_at)
+    payload = json.loads(get(MODELS_URL))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"fetched_at": now.isoformat(), "payload": payload}), encoding="utf-8")
+    return parse_catalog(payload, fetched_at=now)

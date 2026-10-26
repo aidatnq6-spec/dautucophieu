@@ -37,7 +37,7 @@ def test_pmi_aggregator_requires_value_and_named_publication_month():
 def test_indicators_config_lists_auto_and_manual_rows():
     ind = load_indicators()
     assert len(ind) == 16 and {i["id"] for i in ind if i["source"]["kind"] != "manual"} == {
-        "dollar_broad", "wti", "us_cpi_yoy", "usd_vnd_vcb", "fed_effr", "us10y", "usd_vnd_free", "usd_vnd_sbv", "deposit_12m",
+        "dxy", "wti", "us_cpi_yoy", "usd_vnd_vcb", "fed_effr", "us10y", "usd_vnd_free", "usd_vnd_sbv", "deposit_12m",
         "foreign_net", "vnindex_value", "m2_vn", "vn10y", "vn_interbank_on", "vn_pmi"}  # us_pmi: manual since 26/10/2026 (sources block bots)
 
 
@@ -232,3 +232,34 @@ def test_no_pmi_headline_today_is_not_an_error(tmp_path):
     get = lambda url: "<rss></rss>" if url.endswith(".rss") else (_ for _ in ()).throw(OSError("offline"))
     result = fetch_auto(load_indicators(), MacroStore(tmp_path), get=get, today=date(2026, 10, 20))
     assert result["vn_pmi"] == "ok"  # nothing new to record; the overdue reminder covers a missed month
+
+
+ECB = """<?xml version="1.0" encoding="UTF-8"?><gesmes:Envelope><Cube>
+<Cube time="2026-10-23"><Cube currency="USD" rate="1.1623"/><Cube currency="JPY" rate="177.80"/><Cube currency="GBP" rate="0.87035"/>
+<Cube currency="CAD" rate="1.6297"/><Cube currency="SEK" rate="10.9940"/><Cube currency="CHF" rate="0.9254"/></Cube>
+<Cube time="2026-10-22"><Cube currency="USD" rate="1.1630"/><Cube currency="JPY" rate="177.40"/><Cube currency="GBP" rate="0.87100"/>
+<Cube currency="CAD" rate="1.6310"/><Cube currency="SEK" rate="11.0010"/><Cube currency="CHF" rate="0.9260"/></Cube>
+<Cube time="2026-10-21"><Cube currency="USD" rate="1.1650"/></Cube>
+</Cube></gesmes:Envelope>"""
+
+
+def test_dxy_is_computed_from_ecb_reference_rates_with_the_ice_formula():
+    from investment_agent.market.leading import parse_ecb_dxy
+    points = parse_ecb_dxy(ECB)
+    assert [d for d, _ in points] == [date(2026, 10, 22), date(2026, 10, 23)]  # a day missing a currency is skipped
+    # DXY = 50.14348112 × EURUSD^-0.576 × USDJPY^0.136 × GBPUSD^-0.119 × USDCAD^0.091 × USDSEK^0.042 × USDCHF^0.036
+    eurusd, usdjpy, gbpusd = 1.1623, 177.80 / 1.1623, 1.1623 / 0.87035
+    usdcad, usdsek, usdchf = 1.6297 / 1.1623, 10.9940 / 1.1623, 0.9254 / 1.1623
+    expected = 50.14348112 * eurusd ** -0.576 * usdjpy ** 0.136 * gbpusd ** -0.119 * usdcad ** 0.091 * usdsek ** 0.042 * usdchf ** 0.036
+    assert points[-1][1] == f"{expected:.2f}"
+    with pytest.raises(MacroError):
+        parse_ecb_dxy("<html>maintenance</html>")
+
+
+def test_first_macro_row_is_dxy_from_ecb(tmp_path):
+    ind = load_indicators()
+    assert ind[0]["id"] == "dxy" and ind[0]["source"] == {"kind": "ecb_dxy"} and "dollar_broad" not in {i["id"] for i in ind}
+    get = lambda url: ECB if "ecb.europa.eu" in url else (_ for _ in ()).throw(OSError("offline"))
+    store = MacroStore(tmp_path)
+    assert fetch_auto(ind, store, get=get, today=date(2026, 10, 26))["dxy"] == "ok"
+    assert store.read("dxy")[-1]["date"] == "2026-10-23"

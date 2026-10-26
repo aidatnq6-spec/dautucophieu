@@ -1,19 +1,18 @@
 {
- "version": "macro-2026-10-26.5",
+ "version": "macro-2026-10-26.6",
  "notice": "Quy tắc đánh giá theo bảng Leading Indicator của chủ sở hữu (25/10/2026). bad_when: up = tăng là Xấu; down = giảm là Xấu; sign = âm là Xấu; pmi = Tốt khi trên 50 và không giảm.",
  "indicators": [
   {
-   "id": "dollar_broad",
-   "label": "Chỉ số USD rộng (thay cho DXY)",
+   "id": "dxy",
+   "label": "DXY (tính từ tỷ giá ECB theo công thức ICE)",
    "unit": "điểm",
    "rule": "up",
-   "max_age_days": 14,
+   "max_age_days": 7,
    "source": {
-    "kind": "fred",
-    "series": "DTWEXBGS"
+    "kind": "ecb_dxy"
    },
-   "url": "https://fred.stlouisfed.org/series/DTWEXBGS",
-   "note": "DXY của ICE là dữ liệu có bản quyền; FRED công bố chỉ số USD rộng, cùng chiều nhưng khác giá trị."
+   "url": "https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html",
+   "note": "Gần đúng DXY của ICE (dữ liệu có bản quyền): tính từ tỷ giá tham chiếu ECB, thường lệch dưới 0,2 điểm; ECB công bố khoảng 21–22 giờ (giờ VN) ngày làm việc."
   },
   {
    "id": "wti",

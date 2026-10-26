@@ -33,6 +33,9 @@ VCB_XML = "https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.as
 TOPI_PAGE = "https://online.topi.vn/market/{page}"
 STOCKBIZ_PAGE = "https://stockbiz.vn/en/macro/data/{page}"
 TE_PAGE = "https://tradingeconomics.com/{country}/manufacturing-pmi"
+# ECB euro reference rates, last 90 days (public, robots.txt allows); DXY is computed from them with ICE's published formula.
+ECB_90D = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
+DXY_WEIGHTS = {"EUR": -0.576, "JPY": 0.136, "GBP": -0.119, "CAD": 0.091, "SEK": 0.042, "CHF": 0.036}
 # HOSE's own statistics service behind hsx.vn (robots.txt allows all); one trading day per call, values in million đồng.
 HOSE_FOREIGN = "https://api.hsx.vn/mk/api/v1/market/foreign-trading-value-report?fromDate={day}&toDate={day}"
 HOSE_DAYS = 7
@@ -139,6 +142,28 @@ def parse_te_pmi(page: str, *, year: int) -> list[tuple[date, str]]:
     if not points:
         raise MacroError("pmi_unreadable")
     return sorted(set(points))
+
+
+def parse_ecb_dxy(xml: str) -> list[tuple[date, str]]:
+    """US Dollar Index from ECB reference rates (units per euro): ICE's formula
+    50.14348112 × EURUSD^-0.576 × USDJPY^0.136 × GBPUSD^-0.119 × USDCAD^0.091 × USDSEK^0.042 × USDCHF^0.036.
+    ICE's own DXY is proprietary; this tracks it closely (the ECB fixes at 14:15 CET, so values differ slightly)."""
+    days = re.findall(r'<Cube time="(\d{4}-\d{2}-\d{2})">(.*?)</Cube>\s*(?=<Cube time|</Cube>)', xml, re.S)
+    points = []
+    for day, block in days:
+        per_eur = {k: float(v) for k, v in re.findall(r'currency="([A-Z]{3})" rate="([\d.]+)"', block)}
+        if not all(k in per_eur for k in ("USD", "JPY", "GBP", "CAD", "SEK", "CHF")):
+            continue
+        usd = per_eur["USD"]
+        quotes = {"EUR": usd, "JPY": per_eur["JPY"] / usd, "GBP": usd / per_eur["GBP"], "CAD": per_eur["CAD"] / usd,
+                  "SEK": per_eur["SEK"] / usd, "CHF": per_eur["CHF"] / usd}  # EURUSD, USDJPY, GBPUSD, USDCAD, USDSEK, USDCHF
+        value = 50.14348112
+        for ccy, weight in DXY_WEIGHTS.items():
+            value *= quotes[ccy] ** weight
+        points.append((date.fromisoformat(day), f"{value:.2f}"))
+    if not points:
+        raise MacroError("ecb_unreadable")
+    return sorted(points)
 
 
 _PMI_OTHER = re.compile(r"(?i)(mỹ|trung quốc|nhật bản|hàn quốc|châu âu|eurozone|asean|toàn cầu|đức|ấn độ|thái lan|indonesia)")
@@ -270,6 +295,8 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
                 points = parse_stockbiz_series(page(STOCKBIZ_PAGE.format(page=src["page"])), monthly=src.get("monthly", False), scale=src.get("scale", "1"))
             elif src["kind"] == "tradingeconomics_pmi":
                 points = parse_te_pmi(page(TE_PAGE.format(country=src["country"])), year=today.year)
+            elif src["kind"] == "ecb_dxy":
+                points = parse_ecb_dxy(page(ECB_90D))
             elif src["kind"] == "news_pmi":
                 from investment_agent.brief.news import FEEDS, parse_rss
                 items, failed = [], 0

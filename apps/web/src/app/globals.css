@@ -105,3 +105,8 @@ legend{font-weight:600;padding:0 6px}
 .bm-tickers .pill{margin-left:6px}
 .brief-holdings td,.brief-holdings th{white-space:normal}
 @media (min-width:701px){.brief-holdings .num{text-align:right}}
+.cc-table td,.cc-table th{white-space:normal}.cc-table{margin-bottom:14px}.cc-over td{background:color-mix(in srgb,var(--bad) 7%,transparent)}
+.cc-bar{position:relative;display:inline-block;width:120px;max-width:40%;height:8px;border-radius:4px;background:var(--line);vertical-align:middle;margin-right:6px}
+.cc-fill{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--brand)}.cc-fill.over{background:var(--bad)}
+.cc-limit{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+.cc-try{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}.cc-try .field{flex:1 1 160px;min-width:0}

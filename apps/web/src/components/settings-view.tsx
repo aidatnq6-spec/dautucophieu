@@ -5,6 +5,7 @@ import { ApiError, api, requestId, type ApiFailure } from "../lib/api";
 import { formatRatio, percentToRatio } from "../lib/format";
 import { AiStatusSection } from "./ai-status";
 import { FormErrors } from "./form-errors";
+import { PortfolioSettingsSection } from "./portfolio-settings";
 
 type Notify = { enabled: boolean; chat_id: string | null; members_may_view_personal_data: boolean; scheduled_enabled: boolean };
 type NotifyView = { version: number; settings: Notify; bot_token_configured: boolean };
@@ -72,6 +73,7 @@ export function SettingsView() {
         </div>
         <div className="actions"><button className="btn primary" onClick={() => void save("valuation")}><Save size={16} aria-hidden="true" />Lưu định giá</button></div>
       </section>
+      <PortfolioSettingsSection />
       <section className="surface">
         <h2>Telegram</h2>
         <p>Bot Token: {notify.bot_token_configured ? "đã cấu hình phía máy chủ" : "chưa cấu hình (đặt TELEGRAM_BOT_TOKEN trong .env.local trên máy chủ)"}. Ứng dụng không nhận token qua giao diện.</p>

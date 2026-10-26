@@ -11,8 +11,31 @@ function Gain({ value }: { value: string | null }) {
   return <span className={loss ? "negative" : "positive"}>{loss ? "Lỗ " : "Lãi "}{formatVnd(value)}</span>;
 }
 
-export function HoldingsTable({ rows, showScope = true }: { rows: HoldingRow[]; showScope?: boolean }) {
+function SignedGain({ value }: { value: string | null }) {
+  if (value === null) return <>—</>;
+  const sign = value.startsWith("-") ? "−" : Number(value) > 0 ? "+" : "";
+  return <span className={sign === "−" ? "negative" : sign ? "positive" : ""}>{sign}{formatVnd(value.replace(/^-/, ""))}</span>;
+}
+
+/** brief: the after-close brief's compact form — no weight or scope column, signed coloured gains, no horizontal scroller. */
+export function HoldingsTable({ rows, showScope = true, brief = false }: { rows: HoldingRow[]; showScope?: boolean; brief?: boolean }) {
   if (!rows.length) return <p className="muted">Chưa có cổ phiếu trong sổ.</p>;
+  if (brief) return (
+    <table aria-label="Danh mục đang nắm giữ" className="fv-table brief-holdings">
+      <thead><tr><th>Mã</th><th className="num">Số lượng</th><th className="num">Giá vốn bình quân (đ/cp)</th><th className="num">Giá (ngày)</th>
+        <th className="num">Giá trị</th><th className="num">Lãi/lỗ chưa thực hiện</th></tr></thead>
+      <tbody>{rows.map((r) => (
+        <tr key={r.security_id}>
+          <td data-label="Mã"><strong>{r.security_id}</strong></td>
+          <td data-label="Số lượng" className="num">{r.quantity.toLocaleString("vi-VN")}{r.pending_quantity ? ` (+${r.pending_quantity.toLocaleString("vi-VN")} chờ về)` : ""}</td>
+          <td data-label="Giá vốn bình quân" className="num">{formatVnd(r.average_cost, { unit: false })}</td>
+          <td data-label="Giá (ngày)" className="num">{r.price ? `${formatVnd(r.price, { unit: false })} (${r.price_date})` : "Chưa có giá"}</td>
+          <td data-label="Giá trị" className="num">{formatVnd(r.market_value)}</td>
+          <td data-label="Lãi/lỗ chưa thực hiện" className="num gain"><SignedGain value={r.unrealized_gain} /></td>
+        </tr>))}
+      </tbody>
+    </table>
+  );
   return (
     <div className="tablewrap">
       <table aria-label="Danh mục đang nắm giữ">

@@ -40,3 +40,19 @@ test("no horizontal scroll on the brief at 375px", async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+for (const width of [1280, 375]) {
+  test(`the brief's holdings table: signed coloured gains, no weight column, no scroller at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await openBrief(page);
+    const table = page.getByRole("table", { name: "Danh mục đang nắm giữ" });
+    await expect(table.getByRole("columnheader", { name: /Tỷ trọng/ })).toHaveCount(0);
+    const gain = table.locator("td.gain").first();
+    await expect(gain).toHaveText(/^[+−]\d/);  // a sign, no "Lãi"/"Lỗ" word
+    for (const cell of await table.locator("td.gain").all()) await expect(cell).not.toHaveText(/Lãi|Lỗ/);
+    const scrollers = await page.evaluate(() => [...document.querySelectorAll("main *")]
+      .filter((el) => el.scrollWidth > el.clientWidth + 1 && ["auto", "scroll"].includes(getComputedStyle(el).overflowX)).length);
+    expect(scrollers).toBe(0);
+  });
+}
+

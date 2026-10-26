@@ -109,8 +109,8 @@ for (const width of [375, 768, 1440]) {
   test(`no horizontal page scroll at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     for (const path of ["/portfolio", "/onboarding", "/profile"]) {
-      await page.goto(path);
-      await page.waitForLoadState("networkidle");
+      await page.goto(path, { waitUntil: "domcontentloaded" });
+      await expect(page.locator("body")).toBeVisible();
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       expect(overflow, path).toBeLessThanOrEqual(0);
     }

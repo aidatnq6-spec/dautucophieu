@@ -18,8 +18,12 @@ def market_view(snapshot: dict | None, *, watched: list[str], held: set[str], ne
         return None
     board = snapshot.get("board") or {}
     symbols = board.get("symbols") or {}
-    row = lambda s: {"symbol": s, **{k: (symbols.get(s) or {}).get(k) for k in ("price", "change", "pct")}, "held": s in held,
-                     "sector": (symbols.get(s) or {}).get("sector")}
+    priced = board.get("status") == "ok"
+
+    def row(s):
+        r = symbols.get(s) or {}
+        state = "no_price" if not priced or s not in symbols else "no_trade" if r.get("pct") is None else "ok"
+        return {"symbol": s, **{k: r.get(k) for k in ("price", "change", "pct")}, "held": s in held, "sector": r.get("sector"), "state": state}
     first = [row(s) for s in sorted(held)]
     others = [row(s) for s in watched if s not in held]
     others.sort(key=lambda r: -abs(Decimal(r["pct"])) if r["pct"] is not None else 1)
@@ -36,5 +40,12 @@ def market_for_session(data_dir: Path | None, held: set[str]):
     """session date (ISO) -> market view, reading data/brief on demand; None when there is no data dir or snapshot."""
     if data_dir is None:
         return lambda session: None
-    store, watched = BriefStore(Path(data_dir)), list(load_watchlist(Path(data_dir)).symbols)
-    return lambda session: market_view(store.read(session), watched=watched, held=held) if session else None
+
+    def view(session):
+        # The market section is an extra: a corrupt watchlist or snapshot only drops it, never the brief or its delivery.
+        try:
+            watched = list(load_watchlist(Path(data_dir)).symbols)
+            return market_view(BriefStore(Path(data_dir)).read(session), watched=watched, held=held) if session else None
+        except Exception:
+            return None
+    return view

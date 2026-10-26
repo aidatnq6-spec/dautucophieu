@@ -65,7 +65,8 @@ def render_market_brief(report: dict, market: dict) -> str:
     held = [t for t in market.get("tickers", []) if t["held"]][:3]
     if held:
         lines += ["", "MÃ ĐANG NẮM"] + [f"- {t['symbol']} {_num(t['price'], 0)} ({_pct(t['pct'])})" if t["pct"] is not None
-                                        else f"- {t['symbol']}: chưa giao dịch phiên này" for t in held]
+                                        else f"- {t['symbol']}: chưa giao dịch phiên này" if t.get("state") == "no_trade"
+                                        else f"- {t['symbol']}: chưa có giá" for t in held]
     news = market.get("news") or {}
     if news.get("status") == "ok" and news["items"]:
         lines += ["", "TIN NÓNG"] + [f"- {n['title']} ({n['source']})" for n in news["items"][:5]]
@@ -78,7 +79,10 @@ def render_market_brief(report: dict, market: dict) -> str:
 
 def render_report(report: dict, market: dict | None = None) -> str:
     if market:
-        return render_market_brief(report, market)
+        try:
+            return render_market_brief(report, market)
+        except (KeyError, TypeError, ValueError, AttributeError):
+            pass  # a snapshot of another shape: fall back to the full text rather than not sending
     s = report["ledger_summary"]
     lines = [f"BẢN TIN SAU PHIÊN {report['session_date']}", f"(dữ liệu {report['provenance']})", "",
              f"KẾT LUẬN: {report['decision']['headline']}", "", "DANH MỤC",

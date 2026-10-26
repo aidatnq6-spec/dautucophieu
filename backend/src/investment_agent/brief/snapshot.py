@@ -30,9 +30,10 @@ class BriefStore:
         key = session.isoformat() if isinstance(session, date) else str(session)
         try:
             date.fromisoformat(key)
-            return json.loads((self.root / f"{key}.json").read_text(encoding="utf-8"))
+            data = json.loads((self.root / f"{key}.json").read_text(encoding="utf-8"))
         except (ValueError, OSError):
             return None
+        return data if isinstance(data, dict) else None
 
     def write(self, snapshot: dict) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
@@ -83,7 +84,10 @@ def build_snapshot(*, session_date: date, previous_session: date | None, now: da
             items += parse_rss(rss_get(url), source)
         except Exception:
             failures += 1
-    if failures == len(FEEDS):
+    earlier = (store.read(session_date) or {}).get("news") or {}
+    if earlier.get("status") == "ok":
+        items += earlier.get("items", [])  # RSS only carries the latest items; keep what this session already had
+    if failures == len(FEEDS) and earlier.get("status") != "ok":
         sections["news"] = _missing("Không tải được nguồn tin")
     else:
         since = datetime.combine(previous_session or session_date - timedelta(days=1), CLOSE, tzinfo=VN)

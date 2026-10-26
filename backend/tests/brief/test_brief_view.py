@@ -17,7 +17,8 @@ SNAP = {"session_date": "2026-10-26", "updated_at": "x",
 def test_held_first_even_outside_watchlist_then_biggest_moves():
     v = market_view(SNAP, watched=["ACB", "VCB", "FPT"], held={"KDH"})
     assert [t["symbol"] for t in v["tickers"]] == ["KDH", "VCB", "FPT", "ACB"]
-    assert v["tickers"][0] == {"symbol": "KDH", "price": None, "change": None, "pct": None, "held": True, "sector": "Bất động sản"}
+    assert v["tickers"][0] == {"symbol": "KDH", "price": None, "change": None, "pct": None, "held": True, "sector": "Bất động sản",
+                               "state": "no_trade"}
     assert "XYZ" not in [t["symbol"] for t in v["tickers"]]
 
 

@@ -8,7 +8,8 @@ type Foreign = { buy_volume: number; sell_volume: number; buy_value_bn: string; 
 type Board = { status: "ok"; value_matched_bn: string; volume_matched: number; breadth: { up: number; down: number; flat: number; no_trade: number };
   foreign: Foreign; sectors: { sector: string; pct: string; count: number }[] } | Missing;
 type Hose = { status: "ok"; total_value_bn: string; total_volume: number; foreign: Omit<Foreign, "top_sell" | "top_buy"> } | Missing;
-type Ticker = { symbol: string; price: number | null; change: number | null; pct: string | null; held: boolean; sector: string | null };
+type Ticker = { symbol: string; price: number | null; change: number | null; pct: string | null; held: boolean; sector: string | null;
+  state?: "ok" | "no_trade" | "no_price" };
 type News = { status: "ok"; items: { title: string; url: string; source: string; published: string; reason: string }[] } | Missing;
 export type MarketSection = { session_date: string; updated_at: string; indices: { status: string; rows: IndexRow[] } | Missing; board: Board;
   hose: Hose; proprietary: Missing; tickers: Ticker[]; news: News };
@@ -65,7 +66,7 @@ export function BriefMarket({ market, session }: { market: MarketSection | null;
       <h3>Mã đang theo dõi</h3>
       <ul className="bm-tickers" aria-label="Mã đang theo dõi">{tickers.map((t) => <li key={t.symbol}>
         {t.held ? <strong>{t.symbol}</strong> : t.symbol}{t.held && <span className="pill good">Đang nắm</span>}{" "}
-        {t.pct === null ? <span className="muted">chưa giao dịch</span>
+        {t.pct === null ? <span className="muted">{t.state === "no_trade" ? "chưa giao dịch" : "chưa có giá"}</span>
           : <>{num(t.price ?? 0, 0)} <span className={tone(t.change)}>{signed(t.change ?? 0, 0)} ({pct(t.pct)})</span></>}</li>)}</ul>
       {market.tickers.length > tickers.length || all ? <button className="btn" aria-expanded={all} onClick={() => setAll(!all)}>
         {all ? "Thu gọn" : `Xem thêm ${market.tickers.length - tickers.length} mã`}</button> : null}

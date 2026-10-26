@@ -8,6 +8,7 @@ import html
 import re
 from datetime import datetime
 from email.utils import parsedate_to_datetime
+from zoneinfo import ZoneInfo
 
 from investment_agent.insights.sources import safe_url
 
@@ -17,6 +18,7 @@ FEEDS = (("CafeF", "https://cafef.vn/thi-truong-chung-khoan.rss"), ("CafeF", "ht
 MACRO_KEYWORDS = ("lãi suất", "tỷ giá", "fed", "gdp", "cpi", "lạm phát", "nhnn", "ngân hàng nhà nước", "thuế quan", "xuất khẩu",
                   "nhập khẩu", "fdi", "trái phiếu chính phủ", "room tín dụng")
 _ITEM = re.compile(r"<item\b.*?</item>", re.S)
+VN = ZoneInfo("Asia/Ho_Chi_Minh")
 
 
 def _tag(block: str, name: str) -> str:
@@ -34,7 +36,7 @@ def parse_rss(xml: str, source: str) -> list[dict]:
         except (TypeError, ValueError):
             continue
         if title and url and published.tzinfo is not None:
-            out.append({"title": title, "url": url, "source": source, "published": published.isoformat()})
+            out.append({"title": title, "url": url, "source": source, "published": published.astimezone(VN).isoformat()})
     return out
 
 
@@ -44,7 +46,7 @@ def _norm(title: str) -> str:
 
 def window_items(items: list[dict], *, since: datetime, until: datetime) -> list[dict]:
     seen, out = set(), []
-    for it in sorted(items, key=lambda i: i["published"], reverse=True):
+    for it in sorted(items, key=lambda i: datetime.fromisoformat(i["published"]), reverse=True):
         when = datetime.fromisoformat(it["published"])
         key = _norm(it["title"])
         if since <= when <= until and key not in seen:
@@ -70,6 +72,6 @@ def pick_news(items: list[dict], *, watched: list[str], held: set[str], sector_n
         score = 3 if hit_held else 2 if hit_watch else 1 if (hit_sector or hit_macro) else 0
         if score:
             reason = hit_held or hit_watch or hit_sector or "vĩ mô"
-            scored.append((score, it["published"], {**it, "reason": reason}))
+            scored.append((score, datetime.fromisoformat(it["published"]), {**it, "reason": reason}))
     ordered = sorted(scored, key=lambda x: (x[0], x[1]), reverse=True)
     return [x[2] for x in ordered[:limit]]

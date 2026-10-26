@@ -5,7 +5,7 @@ import { Activity, BookOpenText, Briefcase, ChartLine, Eye, Globe, House, Newspa
 
 const LINKS = [
   { href: "/", label: "Tổng quan", icon: House },
-  { href: "/portfolio", label: "Danh mục & giao dịch", icon: Briefcase },
+  { href: "/portfolio", label: "Danh mục & Giao dịch", icon: Briefcase },
   { href: "/macro", label: "Vĩ mô", icon: Globe },
   { href: "/insights", label: "Nhận định", icon: Newspaper },
   { href: "/trend", label: "Xu hướng", icon: Activity },

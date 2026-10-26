@@ -71,3 +71,22 @@ test("Nghiên cứu is no longer in the menu but its pages still open from links
   await page.goto("/research");
   await expect(page.getByRole("heading", { name: "Nghiên cứu có căn cứ." })).toBeVisible();
 });
+
+for (const width of [1280, 800]) {
+  test(`every menu label stays on one line at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/watchlist");
+    const links = page.getByRole("navigation", { name: "Điều hướng chính" }).getByRole("link");
+    for (let i = 0; i < await links.count(); i++) {
+      const box = await links.nth(i).boundingBox();
+      expect(box!.height, await links.nth(i).innerText()).toBeLessThan(52);  // one line: 12px padding × 2 + ~22px text
+    }
+  });
+}
+
+test("the app is named Đầu tư Cổ phiếu in the sidebar and the browser tab", async ({ page }) => {
+  await page.goto("/watchlist");
+  await expect(page.locator(".brand")).toHaveText("Đầu tư Cổ phiếu");
+  await expect(page).toHaveTitle("Đầu tư Cổ phiếu");
+  await expect(page.getByRole("navigation", { name: "Điều hướng chính" }).getByRole("link", { name: "Danh mục & Giao dịch", exact: true })).toBeVisible();
+});

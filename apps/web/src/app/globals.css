@@ -10,11 +10,11 @@ a{color:#2155b3}
 .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
 .btn:disabled{opacity:.6;cursor:not-allowed}
 .btn.text{border:0;background:none;padding:4px 0;color:#2155b3}
-.shell{display:grid;grid-template-columns:224px minmax(0,1fr);min-height:100vh}
+.shell{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
 .side{background:var(--paper);border-right:1px solid var(--line);padding:28px 18px;display:flex;flex-direction:column}
 .brand{font-size:21px;font-weight:700;letter-spacing:-.6px;padding:0 12px;margin-bottom:24px}.brand span{color:var(--brand)}
 .nav{display:grid;gap:6px}
-.nav a{text-decoration:none;color:var(--ink);padding:12px;border-radius:7px;display:flex;gap:12px;align-items:center}
+.nav a{text-decoration:none;color:var(--ink);padding:12px;border-radius:7px;display:flex;gap:12px;align-items:center;white-space:nowrap}
 .nav a[aria-current=page]{background:#eaf0fc;color:#214fae;font-weight:600}
 main.content{padding:28px 36px;max-width:1400px;width:100%;margin:0 auto;min-width:0}
 .pagehead h1{font-size:28px;letter-spacing:-.7px;line-height:1.25;margin:0 0 6px}
@@ -45,7 +45,7 @@ legend{font-weight:600;padding:0 6px}
 .steps li{padding:6px 12px;border-radius:20px;border:1px solid var(--line);background:#fff;font-size:13px}
 .steps li[aria-current=step]{background:var(--ink);color:#fff;border-color:var(--ink)}
 .wrap{overflow-wrap:anywhere;white-space:normal}
-@media(max-width:900px){main.content{padding:20px}.shell{grid-template-columns:180px minmax(0,1fr)}}
+@media(max-width:900px){main.content{padding:20px}.shell{grid-template-columns:224px minmax(0,1fr)}.side{padding:20px 10px}.nav a{gap:10px;padding:12px 10px}}
 @media(max-width:650px){.shell{display:block}.side{padding:14px;border-right:0;border-bottom:1px solid var(--line)}.brand{margin-bottom:8px}.nav{display:flex;overflow-x:auto}.nav a{white-space:nowrap;padding:10px}main.content{padding:18px 14px}.pagehead h1{font-size:24px}.surface{padding:16px}}
 .trend-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
 .trend-card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--paper);min-width:0}

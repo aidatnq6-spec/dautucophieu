@@ -141,6 +141,30 @@ def parse_te_pmi(page: str, *, year: int) -> list[tuple[date, str]]:
     return sorted(set(points))
 
 
+_PMI_OTHER = re.compile(r"(?i)(mỹ|trung quốc|nhật bản|hàn quốc|châu âu|eurozone|asean|toàn cầu|đức|ấn độ|thái lan|indonesia)")
+
+
+def parse_news_pmi(items: list[dict]) -> list[tuple[date, str]]:
+    """S&P Global Vietnam Manufacturing PMI from news headlines (CafeF, Vietstock, Vneconomy RSS), e.g.
+    "PMI ngành sản xuất Việt Nam tháng 9 đạt 51,9 điểm". The publisher's own pages block automated reading, so only
+    headlines that name Việt Nam, the month and the value are used; anything vaguer is skipped. Dated to the month's end."""
+    found: dict[date, str] = {}
+    for it in sorted(items, key=lambda i: i["published"]):
+        title = it["title"]
+        if "PMI" not in title or not re.search(r"(?i)việt nam", title) or _PMI_OTHER.search(title):
+            continue
+        month_m = re.search(r"tháng\s*(\d{1,2})(?:\s*/\s*(\d{4}))?", title)
+        value_m = re.search(r"(?<![\d,.])(\d{2})[,.](\d{1,2})(?![\d,.])", title[month_m.end():]) if month_m else None
+        if not value_m:
+            continue
+        month, value = int(month_m.group(1)), Decimal(f"{value_m.group(1)}.{value_m.group(2)}")
+        published = datetime.fromisoformat(it["published"]).astimezone(VN).date()
+        year = int(month_m.group(2)) if month_m.group(2) else (published.year - 1 if month > published.month else published.year)
+        if 1 <= month <= 12 and Decimal(30) <= value <= Decimal(70):
+            found[date(year, month, calendar.monthrange(year, month)[1])] = _plain(value)
+    return sorted(found.items())
+
+
 def parse_hose_foreign(text: str) -> dict[str, str] | None:
     """Net foreign buy-sell and total HOSE trading value (incl. put-through) in billion đồng; None on a day without trading."""
     try:
@@ -246,6 +270,20 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
                 points = parse_stockbiz_series(page(STOCKBIZ_PAGE.format(page=src["page"])), monthly=src.get("monthly", False), scale=src.get("scale", "1"))
             elif src["kind"] == "tradingeconomics_pmi":
                 points = parse_te_pmi(page(TE_PAGE.format(country=src["country"])), year=today.year)
+            elif src["kind"] == "news_pmi":
+                from investment_agent.brief.news import FEEDS, parse_rss
+                items, failed = [], 0
+                for source, url in FEEDS:
+                    try:
+                        items += parse_rss(page(url), source)
+                    except Exception:
+                        failed += 1
+                if failed == len(FEEDS):
+                    raise MacroError("news_unreachable")
+                points = parse_news_pmi(items)
+                if not points:  # no PMI headline in today's feeds: nothing new, not a failure
+                    results[ind["id"]] = "ok"
+                    continue
             else:
                 continue
             if not points:

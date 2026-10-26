@@ -38,7 +38,7 @@ def test_indicators_config_lists_auto_and_manual_rows():
     ind = load_indicators()
     assert len(ind) == 16 and {i["id"] for i in ind if i["source"]["kind"] != "manual"} == {
         "dollar_broad", "wti", "us_cpi_yoy", "usd_vnd_vcb", "fed_effr", "us10y", "usd_vnd_free", "usd_vnd_sbv", "deposit_12m",
-        "foreign_net", "vnindex_value", "m2_vn", "vn10y", "vn_interbank_on", "us_pmi", "vn_pmi"}
+        "foreign_net", "vnindex_value", "m2_vn", "vn10y", "vn_interbank_on", "vn_pmi"}  # us_pmi: manual since 26/10/2026 (sources block bots)
 
 
 def test_fred_csv_skips_missing_values_and_cpi_becomes_year_on_year():
@@ -187,3 +187,48 @@ def test_reminders_name_manual_indicators_that_are_missing_or_overdue(tmp_path):
 def test_monthly_and_weekly_update_rhythm_is_configured():
     ages = {i["id"]: i["max_age_days"] for i in load_indicators()}
     assert (ages["us_pmi"], ages["vn_pmi"], ages["m2_vn"], ages["vn10y"], ages["vn_interbank_on"]) == (35, 35, 35, 7, 7)
+
+
+def news(title, published="2026-10-01T09:30:00+07:00"):
+    return {"title": title, "url": "https://cafef.vn/x.chn", "source": "CafeF", "published": published}
+
+
+def test_vietnam_pmi_is_read_from_news_headlines():
+    from investment_agent.market.leading import parse_news_pmi
+    items = [news("PMI ngành sản xuất Việt Nam tháng 9 đạt 51,9 điểm, cao nhất 6 tháng"),
+             news("PMI tháng 8/2026 của Việt Nam giảm xuống 49,8 điểm", "2026-09-01T09:00:00+07:00"),
+             news("PMI sản xuất Mỹ tháng 9 đạt 55,9 điểm"),               # another country
+             news("PMI Trung Quốc tháng 9 tăng lên 50,3"),
+             news("Chỉ số PMI của Việt Nam tiếp tục tăng"),                # no month or value
+             news("PMI Việt Nam tháng 12 đạt 50,1 điểm", "2027-01-02T09:00:00+07:00")]
+    assert parse_news_pmi(items) == [(date(2026, 8, 31), "49.8"), (date(2026, 9, 30), "51.9"), (date(2026, 12, 31), "50.1")]
+
+
+def test_december_pmi_reported_in_january_is_dated_to_the_previous_year():
+    from investment_agent.market.leading import parse_news_pmi
+    assert parse_news_pmi([news("PMI Việt Nam tháng 12 ở mức 48,5 điểm", "2027-01-03T09:00:00+07:00")]) == [(date(2026, 12, 31), "48.5")]
+
+
+def test_us_pmi_is_manual_and_vietnam_pmi_comes_from_the_news_feeds(tmp_path):
+    rss = ('<rss><item><title>PMI ngành sản xuất Việt Nam tháng 9 đạt 51,9 điểm</title><link>https://cafef.vn/pmi.chn</link>'
+           '<pubDate>Wed, 01 Oct 2026 09:30:00 +0700</pubDate></item></rss>')
+    seen = []
+
+    def get(url):
+        seen.append(url)
+        if url.endswith(".rss"):
+            return rss
+        raise OSError("offline")
+    store = MacroStore(tmp_path)
+    result = fetch_auto(load_indicators(), store, get=get, today=date(2026, 10, 2))
+    assert result["vn_pmi"] == "ok" and store.read("vn_pmi")[-1]["value"] == "51.9" and store.read("vn_pmi")[-1]["date"] == "2026-09-30"
+    assert "us_pmi" not in result and not any("tradingeconomics" in u for u in seen)
+    rows = {r["id"]: r for r in macro_rows(load_indicators(), store, today=date(2026, 10, 2))}
+    assert rows["us_pmi"]["auto"] is False and rows["us_pmi"]["manual_allowed"] is True
+    assert rows["vn_pmi"]["auto"] is True and rows["vn_pmi"]["manual_allowed"] is True
+
+
+def test_no_pmi_headline_today_is_not_an_error(tmp_path):
+    get = lambda url: "<rss></rss>" if url.endswith(".rss") else (_ for _ in ()).throw(OSError("offline"))
+    result = fetch_auto(load_indicators(), MacroStore(tmp_path), get=get, today=date(2026, 10, 20))
+    assert result["vn_pmi"] == "ok"  # nothing new to record; the overdue reminder covers a missed month

@@ -21,6 +21,11 @@ function Bar({ weight, limit, over }: { weight: string; limit: string; over: boo
   );
 }
 
+/** With one ticker per sector the sector table repeats the ticker table; show it only when some sector groups several tickers. */
+export function sectorsAddInformation(sectors: { symbols: string[] }[]): boolean {
+  return sectors.some((s) => s.symbols.length > 1);
+}
+
 /** Weights of held tickers and sectors on investable capital, flagged above the owner's limit; what-if is not recorded. */
 export function ConcentrationView() {
   const [view, setView] = useState<View | null>(null);
@@ -59,10 +64,12 @@ export function ConcentrationView() {
             <td data-label="Tỷ trọng">{t.weight ? <><Bar weight={t.weight} limit={view.limit} over={t.over} /> {pct(t.weight)}
               {t.over && <span className="pill bad"> vượt {limitText}</span>}</> : "—"}</td>
           </tr>)}
-          {view.cash && <tr><td data-label="Mã"><strong>Tiền mặt</strong></td><td data-label="Ngành">chưa đầu tư</td>
+          {view.cash && <tr><td data-label="Mã"><strong>Còn trống</strong></td>
+            <td data-label="Ngành">chưa dùng của {view.basis === "equity_budget" ? "vốn cho cổ phiếu" : "vốn có thể đầu tư"}</td>
             <td data-label="Giá trị" className="num">{formatVnd(view.cash.value)}</td><td data-label="Tỷ trọng">{pct(view.cash.weight)}</td></tr>}
           </tbody>
         </table>
+        {!sectorsAddInformation(view.sectors) ? <p className="caption">Mỗi ngành chỉ có 1 mã nên tỷ trọng ngành bằng tỷ trọng mã.</p> :
         <table className="fv-table cc-table" aria-label="Tỷ trọng theo ngành">
           <thead><tr><th>Ngành</th><th>Mã</th><th className="num">Giá trị</th><th>Tỷ trọng</th></tr></thead>
           <tbody>{view.sectors.map((s) => <tr key={s.sector} className={s.over ? "cc-over" : ""}>
@@ -72,7 +79,7 @@ export function ConcentrationView() {
             <td data-label="Tỷ trọng"><Bar weight={s.weight} limit={view.limit} over={s.over} /> {pct(s.weight)}
               {s.over && <span className="pill bad"> vượt {limitText}</span>}</td>
           </tr>)}</tbody>
-        </table>
+        </table>}
         {view.missing_prices.length > 0 && <p className="caption">Chưa có giá: {view.missing_prices.join(", ")} (chưa tính vào tỷ trọng).</p>}
         <form className="cc-try" onSubmit={tryIt}>
           <label className="field">Mã<input value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} maxLength={10} /></label>

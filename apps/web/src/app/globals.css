@@ -74,3 +74,4 @@ legend{font-weight:600;padding:0 6px}
   .fv-table td{border:0;padding:4px 0;text-align:left}
   .fv-table td[data-label]::before{content:attr(data-label) ": ";color:var(--muted);font-size:12px}
 }
+.macro-manual{background:#fff4c2}.macro-manual td{border-color:#ecd98a}

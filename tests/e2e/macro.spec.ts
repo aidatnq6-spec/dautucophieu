@@ -34,7 +34,7 @@ test("the owner enters PMI values and sees the trend", async ({ page }) => {
     await form.getByRole("button", { name: "Lưu" }).click();
     await expect(form).toHaveCount(0);
   }
-  for (const text of ["51,9", "Giảm", "Xấu", "Nhập tay"]) await expect(row()).toContainText(text);
+  for (const text of ["51,9", "Giảm", "Xấu", "Tự động"]) await expect(row()).toContainText(text);
 });
 
 test("no horizontal page scroll on the macro page at 375px", async ({ page }) => {
@@ -44,15 +44,11 @@ test("no horizontal page scroll on the macro page at 375px", async ({ page }) =>
   expect(overflow).toBeLessThanOrEqual(0);
 });
 
-test("the five hand-entered rows sit at the bottom, highlighted in yellow", async ({ page }) => {
+test("the five newly automated rows retain a manual fallback", async ({ page }) => {
   await openMacro(page);
-  const rows = page.getByRole("table", { name: "Chỉ số vĩ mô" }).locator("tbody tr");
-  const labels = await rows.locator("td:nth-child(2)").allInnerTexts();
-  const lastFive = labels.slice(-5).map((t) => t.split("\n")[0]);
-  expect(lastFive.sort()).toEqual(["Cung tiền M2 Việt Nam (tỷ đồng)", "Lãi suất liên ngân hàng VN qua đêm", "Lợi suất trái phiếu 10 năm của Việt Nam",
-    "PMI sản xuất Mỹ", "PMI sản xuất Việt Nam"].sort());
-  const backgrounds = await rows.evaluateAll((trs) => trs.map((tr) => getComputedStyle(tr).backgroundColor));
-  expect(new Set(backgrounds.slice(-5)).size).toBe(1);
-  expect(backgrounds.slice(-5)[0]).not.toBe(backgrounds[0]);
-  expect(await rows.last().locator("td").first().innerText()).toBe(String(labels.length));  // numbering follows the new order
+  for (const label of [/Cung tiền M2/, /PMI sản xuất Mỹ/, /PMI sản xuất Việt Nam/, /10 năm của Việt Nam/, /liên ngân hàng VN qua đêm/]) {
+    const row = page.getByRole("row", { name: label });
+    await expect(row).toContainText("Tự động");
+    await expect(row.getByRole("button", { name: "Nhập" })).toBeVisible();
+  }
 });

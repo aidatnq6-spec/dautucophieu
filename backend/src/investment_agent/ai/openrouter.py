@@ -132,7 +132,8 @@ class OpenRouterGateway:
                 rid = self.ledger.reserve(job_id, estimate, monthly=budget.monthly_usd, per_request=budget.per_request_max_usd,
                                           per_job=budget.per_job_max_usd, now=now, max_concurrency=budget.max_concurrency)
             except BudgetError as exc:
-                last = "budget_exceeded" if exc.code != "concurrency_cap" else "concurrency_cap"
+                # Only the monthly cap means the budget is gone; a too-large request or job is that request's problem.
+                last = {"monthly_cap": "budget_exceeded", "concurrency_cap": "concurrency_cap"}.get(exc.code, "request_over_budget")
                 continue
             body = {"model": model.id, "messages": messages, "max_tokens": task.max_tokens,
                     "provider": self.policy.provider.model_dump(), "usage": {"include": True}}

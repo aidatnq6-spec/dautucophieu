@@ -172,7 +172,7 @@ def test_estimate_too_expensive_blocks_before_network(tmp_path):
                           "example/model-b": {"pricing": {"prompt": "0.01", "completion": "0.01"}}})
     with pytest.raises(AIUnavailable) as e:
         gateway(tmp_path, rec, catalog=cat).complete("brief", MESSAGES, job_id="j1")
-    assert e.value.code == "budget_exceeded" and rec.requests == []
+    assert e.value.code == "request_over_budget" and rec.requests == []
 
 
 def test_redaction_masks_keys_and_telegram_urls():

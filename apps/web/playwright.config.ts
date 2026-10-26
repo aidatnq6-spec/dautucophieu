@@ -14,8 +14,8 @@ const session = process.env.INVESTMENT_E2E_SESSION ?? randomBytes(24).toString("
 process.env.INVESTMENT_E2E_SESSION = session;
 const env = {
   FIREBASE_OWNER_UID: "e2e-owner",
-  INTERNAL_API_TOKEN: randomBytes(24).toString("hex"),
-  INTERNAL_API_HMAC_SECRET: randomBytes(24).toString("hex"),
+  INTERNAL_API_TOKEN: process.env.INTERNAL_API_TOKEN ?? randomBytes(24).toString("hex"),
+  INTERNAL_API_HMAC_SECRET: process.env.INTERNAL_API_HMAC_SECRET ?? randomBytes(24).toString("hex"),
   APP_ORIGIN: "http://127.0.0.1:3100",
   PYTHON_API_ORIGIN: "http://127.0.0.1:8765",
   E2E_PYTHON_PORT: "8765",
@@ -33,7 +33,7 @@ export default defineConfig({
     { name: "onboarding", testMatch: /onboarding\.spec\.ts/ },
     { name: "flows", testIgnore: /onboarding\.spec\.ts/, dependencies: ["onboarding"] },
   ],
-  webServer: [
+  webServer: process.env.E2E_EXTERNAL_SERVERS ? undefined : [
     { command: "..\\..\\.venv\\Scripts\\python.exe ..\\..\\tests\\e2e\\fixture_backend.py", url: "http://127.0.0.1:8765/health", env, reuseExistingServer: false, timeout: 60_000 },
     { command: "npx next dev --hostname 127.0.0.1 --port 3100", url: "http://127.0.0.1:3100/login", env, reuseExistingServer: false, timeout: 180_000 },
   ],

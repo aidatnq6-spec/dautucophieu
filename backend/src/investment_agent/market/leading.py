@@ -19,6 +19,7 @@ import json
 import os
 import re
 import xml.etree.ElementTree as ET
+import calendar
 from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
@@ -30,6 +31,8 @@ INDICATORS_PATH = CONFIG_DIR / "macro-indicators.json"
 FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}"
 VCB_XML = "https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx"
 TOPI_PAGE = "https://online.topi.vn/market/{page}"
+STOCKBIZ_PAGE = "https://stockbiz.vn/en/macro/data/{page}"
+TE_PAGE = "https://tradingeconomics.com/{country}/manufacturing-pmi"
 # HOSE's own statistics service behind hsx.vn (robots.txt allows all); one trading day per call, values in million đồng.
 HOSE_FOREIGN = "https://api.hsx.vn/mk/api/v1/market/foreign-trading-value-report?fromDate={day}&toDate={day}"
 HOSE_DAYS = 7
@@ -100,6 +103,42 @@ def parse_topi_rate(page: str, *, term: str, column: str) -> str:
     if m is None:
         raise MacroError("topi_rate_unreadable")
     return _plain(Decimal(m.group(names.index(column) + 1).replace(",", ".")))
+
+
+def parse_stockbiz_series(page: str, *, monthly: bool = False, scale: str = "1") -> list[tuple[date, str]]:
+    """Parse Stockbiz recent readings; monthly observations use the actual period end, never fetch day."""
+    text = _page_text(page)
+    pattern = r"(?<!\d)(\d{1,2})/(\d{4})\s*(?:\||Â·)?\s*([\d.,]+)" if monthly else r"(?<!\d)(\d{1,2})/(\d{1,2})/(\d{4})\s*(?:\||Â·)?\s*([\d.,]+)%?"
+    points = {}
+    for match in re.finditer(pattern, text):
+        try:
+            if monthly:
+                month, year, raw = int(match[1]), int(match[2]), match[3]
+                day = date(year, month, calendar.monthrange(year, month)[1])
+            else:
+                month, dom, year, raw = int(match[1]), int(match[2]), int(match[3]), match[4]
+                day = date(year, month, dom)
+            normalized = raw.replace(".", "").replace(",", ".") if monthly else raw.replace(",", "")
+            points[day] = _plain(Decimal(normalized) * Decimal(scale))
+        except (ValueError, InvalidOperation):
+            continue
+    if not points:
+        raise MacroError("stockbiz_unreadable")
+    return sorted(points.items())
+
+
+def parse_te_pmi(page: str, *, year: int) -> list[tuple[date, str]]:
+    text = _page_text(page)
+    months = {name.lower(): n for n, name in enumerate(calendar.month_name) if name}
+    matches = re.findall(r"Manufacturing PMI[^.]{0,180}?(?:to|at)\s+([\d.]+)\s+points?\s+in\s+([A-Za-z]+)", text, re.I)
+    points = []
+    for raw, name in matches:
+        month = months.get(name.lower())
+        if month:
+            points.append((date(year, month, calendar.monthrange(year, month)[1]), _plain(Decimal(raw))))
+    if not points:
+        raise MacroError("pmi_unreadable")
+    return sorted(set(points))
 
 
 def parse_hose_foreign(text: str) -> dict[str, str] | None:
@@ -203,6 +242,10 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
                 points = [(d, p[src["field"]]) for d, p in parsed if p is not None]
             elif src["kind"] == "topi":
                 points = [(today, parse_topi_rate(page(TOPI_PAGE.format(page=src["page"])), term=src["term"], column=src["column"]))]
+            elif src["kind"] == "stockbiz":
+                points = parse_stockbiz_series(page(STOCKBIZ_PAGE.format(page=src["page"])), monthly=src.get("monthly", False), scale=src.get("scale", "1"))
+            elif src["kind"] == "tradingeconomics_pmi":
+                points = parse_te_pmi(page(TE_PAGE.format(country=src["country"])), year=today.year)
             else:
                 continue
             if not points:

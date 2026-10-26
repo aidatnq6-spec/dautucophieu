@@ -13,7 +13,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest --passWithNoTests",
-    "test:e2e": "playwright test"
+    "test:e2e": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../scripts/windows/test-e2e.ps1"
   },
   "dependencies": {
     "firebase": "13.1.0",

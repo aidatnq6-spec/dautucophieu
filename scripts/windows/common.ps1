@@ -3,8 +3,10 @@ $ErrorActionPreference = 'Stop'
 $script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 
 function Import-LocalEnv {
-    $file = Join-Path $script:RepoRoot '.env.local'
-    if (-not (Test-Path -LiteralPath $file)) { throw "Thiếu $file (tạo từ .env.example; không đưa vào Git)." }
+    $rootFile = Join-Path $script:RepoRoot '.env.local'
+    $webFile = Join-Path $script:RepoRoot 'apps\web\.env.local'
+    $file = if (Test-Path -LiteralPath $rootFile) { $rootFile } elseif (Test-Path -LiteralPath $webFile) { $webFile } else { $rootFile }
+    if (-not (Test-Path -LiteralPath $file)) { throw "Thiếu .env.local ở thư mục gốc hoặc apps\web (tạo từ .env.example; không đưa vào Git)." }
     foreach ($line in Get-Content -LiteralPath $file -Encoding UTF8) {
         if ($line -match '^\s*#' -or $line -notmatch '^\s*([A-Z0-9_]+)\s*=\s*(.*)$') { continue }
         $value = $Matches[2].Trim()

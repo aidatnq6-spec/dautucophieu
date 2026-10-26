@@ -148,7 +148,7 @@ export function ProfileForm({ version, onSaved }: { version: number; onSaved: ()
       <button type="button" className="btn" onClick={() => { setAssets((r) => [...r, blankAsset()]); changed(); }}><Plus size={16} aria-hidden="true" />Thêm tài sản</button>
 
       <h3>Mục tiêu và khoản chi lớn</h3>
-      <p className="caption">Nhập số tiền còn thiếu sau nguồn thu chắc chắn đã dành; chi thường xuyên đã được thu nhập đáp ứng thì không cần nhập.</p>
+      <p className="caption">Nhập tổng số tiền cần cho mục tiêu trước khi trừ nguồn bù đã dành; ứng dụng sẽ chỉ trừ phần còn thiếu. Chi thường xuyên đã được thu nhập đáp ứng thì không cần nhập.</p>
       {goals.map((g, i) => (
         <fieldset key={g.goal_id}>
           <legend>Mục tiêu {i + 1}</legend>

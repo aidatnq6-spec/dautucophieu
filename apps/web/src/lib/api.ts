@@ -13,18 +13,34 @@ async function csrfToken(): Promise<string> {
   return csrf;
 }
 
-/** Calls the Python business API through the authenticated Next proxy. */
-export async function api<T>(path: string, init: { method?: "GET" | "POST" | "PUT"; body?: unknown } = {}): Promise<T> {
-  const method = init.method ?? "GET";
+function clearCsrf() {
+  csrf = null;
+}
+
+async function request(path: string, method: "GET" | "POST" | "PUT", body: unknown, retryCsrf: boolean): Promise<Response> {
   const headers: Record<string, string> = {};
   if (method !== "GET") {
     headers["content-type"] = "application/json";
     headers["x-csrf-token"] = await csrfToken();
   }
+  const response = await fetch(`/api/internal/${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body),
+    cache: "no-store", credentials: "same-origin" });
+  if (retryCsrf && method !== "GET" && response.status === 403) {
+    const failure = await response.clone().json().catch(() => ({}));
+    if (failure.code === "invalid_csrf") {
+      clearCsrf();
+      return request(path, method, body, false);
+    }
+  }
+  return response;
+}
+
+/** Calls the Python business API through the authenticated Next proxy. */
+export async function api<T>(path: string, init: { method?: "GET" | "POST" | "PUT"; body?: unknown } = {}): Promise<T> {
+  const method = init.method ?? "GET";
   let response: Response;
   try {
-    response = await fetch(`/api/internal/${path}`, { method, headers, body: init.body === undefined ? undefined : JSON.stringify(init.body),
-      cache: "no-store", credentials: "same-origin" });
+    response = await request(path, method, init.body, true);
   } catch {
     throw new ApiError({ status: 0, code: "network", message: "Không kết nối được ứng dụng.", fields: [] });
   }

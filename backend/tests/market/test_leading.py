@@ -4,7 +4,7 @@ from datetime import date
 import pytest
 
 from investment_agent.market.leading import (
-    MacroError, MacroStore, evaluate, fetch_auto, load_indicators, macro_rows, parse_fred_csv, parse_topi_fx, parse_topi_rate, parse_vcb_xml,
+    MacroError, MacroStore, evaluate, fetch_auto, load_indicators, macro_rows, parse_fred_csv, parse_stockbiz_series, parse_te_pmi, parse_topi_fx, parse_topi_rate, parse_vcb_xml,
 )
 
 FRED_CPI = "observation_date,CPIAUCSL\n2025-08-01,322.0\n2025-09-01,324.0\n2026-08-01,333.5\n2026-09-01,336.298\n"
@@ -21,11 +21,24 @@ VCB = ('<ExrateList><DateTime>10/25/2026 9:30:00 PM</DateTime>'
        '<Exrate CurrencyCode="USD" CurrencyName="US DOLLAR" Buy="25,610.00" Transfer="25,640.00" Sell="26,020.00" /></ExrateList>')
 
 
+def test_stockbiz_series_uses_period_dates_and_converts_m2_to_billion_vnd():
+    m2 = "Recent readings 7/2026 | 20.456 nghìn tỷ đồng 6/2026 | 20.415 nghìn tỷ đồng Source: State Bank of Vietnam"
+    rate = "Recent readings 10/23/2026 | 4.49% 10/22/2026 | 4.48% Source: Hanoi Stock Exchange"
+    assert parse_stockbiz_series(m2, monthly=True, scale="1000") == [(date(2026, 6, 30), "20415000"), (date(2026, 7, 31), "20456000")]
+    assert parse_stockbiz_series(rate) == [(date(2026, 10, 22), "4.48"), (date(2026, 10, 23), "4.49")]
+
+
+def test_pmi_aggregator_requires_value_and_named_publication_month():
+    assert parse_te_pmi("Vietnam Manufacturing PMI decreased to 51.9 points in September.", year=2026) == [(date(2026, 9, 30), "51.9")]
+    with pytest.raises(MacroError):
+        parse_te_pmi("Manufacturing PMI data is coming soon", year=2026)
+
+
 def test_indicators_config_lists_auto_and_manual_rows():
     ind = load_indicators()
     assert len(ind) == 16 and {i["id"] for i in ind if i["source"]["kind"] != "manual"} == {
         "dollar_broad", "wti", "us_cpi_yoy", "usd_vnd_vcb", "fed_effr", "us10y", "usd_vnd_free", "usd_vnd_sbv", "deposit_12m",
-        "foreign_net", "vnindex_value"}
+        "foreign_net", "vnindex_value", "m2_vn", "vn10y", "vn_interbank_on", "us_pmi", "vn_pmi"}
 
 
 def test_fred_csv_skips_missing_values_and_cpi_becomes_year_on_year():
@@ -79,7 +92,7 @@ def test_rows_show_value_trend_assessment_age_and_entry_kind(tmp_path):
     assert {k: rows["us10y"][k] for k in ("value", "date", "previous", "trend", "assessment", "stale", "auto")} == {
         "value": "4.96", "date": "2026-10-23", "previous": "4.91", "trend": "Tăng", "assessment": "Xấu", "stale": False, "auto": True}
     assert rows["vn_pmi"]["trend"] == "Giảm" and rows["vn_pmi"]["assessment"] == "Xấu" and rows["vn_pmi"]["source_url"] == "https://example.vn/pmi"
-    assert rows["m2_vn"]["value"] is None and rows["m2_vn"]["auto"] is False
+    assert rows["m2_vn"]["value"] is None and rows["m2_vn"]["auto"] is True
     old = {r["id"]: r for r in macro_rows(load_indicators(), store, today=date(2026, 11, 20))}
     assert old["us10y"]["stale"] is True
 

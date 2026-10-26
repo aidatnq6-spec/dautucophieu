@@ -29,3 +29,9 @@ def test_market_snapshot_runs_before_the_brief_is_built():
     snap = next(i for i, l in enumerate(ls) if "investment_agent.cli brief-snapshot" in l)
     assert snap < next(i for i, l in enumerate(ls) if "investment_agent.cli scheduled-run" in l)
     assert snap > next(i for i, l in enumerate(ls) if "investment_agent.cli trend-run" in l)
+
+
+def test_corporate_events_are_synced_on_every_wake_up():
+    ls = lines()
+    step = next(i for i, l in enumerate(ls) if "investment_agent.cli events-sync" in l)
+    assert step < next(i for i, l in enumerate(ls) if "investment_agent.cli scheduled-run" in l)

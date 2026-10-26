@@ -15,7 +15,7 @@ export function ResearchEntity({ entityId }: { entityId: string }) {
     .then(setData, (e) => setError(e instanceof ApiError ? e.failure.message : "Không tải được dữ liệu.")), [entityId]);
   useEffect(() => { void load(); }, [load]);
   if (error) return <p className="errors" role="alert">{error}</p>;
-  if (!data) return <p className="muted">Đang tải…</p>;
+  if (!data) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   return (
     <>
       <div className="pagehead"><h1>{data.entity_id}</h1>

@@ -100,7 +100,7 @@ export function MultipleCharts({ symbol }: { symbol: string }) {
     api<History>(`fairvalue/history/${encodeURIComponent(symbol)}`).then(setData, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải."));
   }, [symbol]);
   if (error) return <p className="errors" role="alert">{error}</p>;
-  if (!data) return <p className="muted">Đang tải biểu đồ…</p>;
+  if (!data) return <p className="muted fx-loading" role="status">Đang tải biểu đồ…</p>;
   if (data.reason) return <p className="muted">Chưa vẽ được biểu đồ P/E, P/B: {data.reason}.</p>;
   return (
     <section aria-label={`Biểu đồ P/E và P/B ${symbol}`}>

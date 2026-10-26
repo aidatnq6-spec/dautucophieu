@@ -23,7 +23,7 @@ export function UniverseReview() {
     catch (e) { if (e instanceof ApiError) setFailure(e.failure); }
   }
 
-  if (!active) return <><FormErrors failure={failure} /><p className="muted">Đang tải…</p></>;
+  if (!active) return <><FormErrors failure={failure} /><p className="muted fx-loading" role="status">Đang tải…</p></>;
   const a = active.active;
   return (
     <>

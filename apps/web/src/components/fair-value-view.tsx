@@ -34,7 +34,7 @@ export function FairValueView() {
   const rows = useMemo(() => (board?.rows ?? []).filter((r) => filter === "all" || (filter === "held" ? r.held : r.verdict === filter))
     .sort((a, b) => (a.gap === null ? 1 : b.gap === null ? -1 : Number(a.gap) - Number(b.gap))), [board, filter]);
   if (error) return <p className="errors" role="alert">{error}</p>;
-  if (!board) return <p className="muted">Đang tải…</p>;
+  if (!board) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   const s = board.settings;
   return (
     <section className="surface">

@@ -85,3 +85,18 @@ legend{font-weight:600;padding:0 6px}
   .fv-table td[data-label]::before{content:attr(data-label) ": ";color:var(--muted);font-size:12px}
 }
 .macro-manual{background:#fff4c2}.macro-manual td{border-color:#ecd98a}
+
+/* Text effects adapted from colorion CSS Text Effects (https://github.com/ckissi/colorion-text-effects, MIT):
+   Borealis aurora (brand), Ghostwrite shimmer (loading), Soft-Blur bloom reduced to a glow (changed trend cells).
+   Colours use the app tokens; every effect stops under prefers-reduced-motion. */
+.brand span{background:linear-gradient(115deg,var(--brand),#0f8fbf,var(--brand),#0f8fbf) 0 0/300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:fx-aurora 7s linear infinite}
+@keyframes fx-aurora{to{background-position:300% 50%}}
+.fx-loading{color:transparent;background:linear-gradient(90deg,color-mix(in srgb,var(--muted) 45%,transparent) 0 40%,var(--muted) 46%,var(--ink) 50%,var(--muted) 54%,color-mix(in srgb,var(--muted) 45%,transparent) 60% 100%) 0 0/300% 100%;-webkit-background-clip:text;background-clip:text;animation:fx-shimmer 2.8s linear infinite}
+@keyframes fx-shimmer{to{background-position:300% 0}}
+.trend-macd.changed,.trend-rsi.changed{animation:fx-glow 1.4s ease-in-out 3}
+@keyframes fx-glow{50%{box-shadow:inset 0 0 0 2px var(--ink),0 0 10px 2px color-mix(in srgb,var(--brand) 55%,transparent)}}
+@media (prefers-reduced-motion:reduce){
+  .brand span{animation:none;background:none;color:var(--brand)}
+  .fx-loading{animation:none;background:none;color:var(--muted)}
+  .trend-macd.changed,.trend-rsi.changed{animation:none}
+}

@@ -50,7 +50,7 @@ export function SettingsView() {
     } catch (e) { if (e instanceof ApiError) setFailure(e.failure); }
   }
 
-  if (!notify || !form || !trading || !valuation) return <><FormErrors failure={failure} /><p className="muted">Đang tải…</p></>;
+  if (!notify || !form || !trading || !valuation) return <><FormErrors failure={failure} /><p className="muted fx-loading" role="status">Đang tải…</p></>;
   const set = (patch: Partial<Notify>) => setForm({ ...form, ...patch });
   return (
     <>

@@ -16,7 +16,7 @@ export function OverviewView() {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { api<Overview>("overview").then(setData, (e) => setError(e instanceof ApiError ? e.failure.message : "Không tải được tổng quan.")); }, []);
   if (error) return <p className="errors" role="alert">{error}</p>;
-  if (!data) return <p className="muted">Đang tải…</p>;
+  if (!data) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   return (
     <>
       {data.provenance === "synthetic" && <p className="notice"><strong>Dữ liệu thị trường tổng hợp</strong> để kiểm thử: không phải giá hay khuyến nghị thật.</p>}

@@ -16,7 +16,7 @@ export function MarketView() {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { api<Overview>("market/overview").then(setData, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
   if (error) return <p className="errors" role="alert">{error}</p>;
-  if (!data) return <p className="muted">Đang tải…</p>;
+  if (!data) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   const { index: ix, breadth: b } = data;
   return (
     <>

@@ -44,7 +44,7 @@ export function PortfolioView() {
     } catch (e) { if (e instanceof ApiError) setFailure({ ...e.failure, message: LEDGER_ERRORS[e.failure.code] ?? e.failure.message }); }
   }
 
-  if (!ledger) return <><FormErrors failure={failure} /><p className="muted">Đang tải sổ…</p></>;
+  if (!ledger) return <><FormErrors failure={failure} /><p className="muted fx-loading" role="status">Đang tải sổ…</p></>;
   const active = new Set(ledger.events.map((e) => e.event_id));
   const cancelled = ledger.original_events.filter((e) => !active.has(e.event_id));
   const s = ledger.state;

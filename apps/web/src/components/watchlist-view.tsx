@@ -30,7 +30,7 @@ export function WatchlistView() {
     return [...kept].sort((a, b) => (b[sort] === null ? -1 : a[sort] === null ? 1 : Number(b[sort]) - Number(a[sort])));
   }, [data, filter, sort]);
   if (error) return <p className="errors" role="alert">{error}</p>;
-  if (!data) return <p className="muted">Đang tải…</p>;
+  if (!data) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   if (!data.rows.length) return <p className="muted">Chưa có mã nào trong data\market-symbols.txt.</p>;
   return (
     <section className="surface">

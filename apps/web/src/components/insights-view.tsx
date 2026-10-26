@@ -75,7 +75,7 @@ export function InsightsView() {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { api<Data>("insights").then(setData, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
   if (error) return <p className="errors" role="alert">{error}</p>;
-  if (!data) return <p className="muted">Đang tải…</p>;
+  if (!data) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   const { summary, run } = data;
   const stopped = run?.status.startsWith("stopped:") ? STOPPED[run.status.slice(8)] ?? run.status.slice(8) : null;
   return (

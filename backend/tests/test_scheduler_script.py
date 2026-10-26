@@ -35,3 +35,9 @@ def test_corporate_events_are_synced_on_every_wake_up():
     ls = lines()
     step = next(i for i, l in enumerate(ls) if "investment_agent.cli events-sync" in l)
     assert step < next(i for i, l in enumerate(ls) if "investment_agent.cli scheduled-run" in l)
+
+
+def test_journal_reviews_run_on_every_wake_up():
+    ls = lines()
+    step = next(i for i, l in enumerate(ls) if "investment_agent.cli journal-review" in l)
+    assert step < next(i for i, l in enumerate(ls) if "investment_agent.cli scheduled-run" in l)

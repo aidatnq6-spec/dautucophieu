@@ -12,6 +12,7 @@ from .auth import InternalAuthSettings, InternalAuthenticator, Unauthorized, req
 from .routes.concentration import router as concentration_router
 from .routes.events import router as events_router
 from .routes.fairvalue import router as fairvalue_router
+from .routes.journal import router as journal_router
 from .routes.performance import router as performance_router
 from .routes.insights import router as insights_router
 from .routes.health import router as health_router
@@ -79,6 +80,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(trend_router)
     app.include_router(fairvalue_router)
     app.include_router(events_router)
+    app.include_router(journal_router)
     app.include_router(performance_router)
     app.include_router(concentration_router)
     app.include_router(insights_router)

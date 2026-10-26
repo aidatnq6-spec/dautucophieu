@@ -4,6 +4,7 @@ import { Save } from "lucide-react";
 import { ApiError, api, requestId, type ApiFailure } from "../lib/api";
 import { parseMoneyInput, hanoiDate } from "../lib/format";
 import { FormErrors } from "./form-errors";
+import { EmotionFields, saveJournal } from "./journal-view";
 
 export type LedgerEvent = { event_id: string; type: string; effective_at: string; sequence: number; security_id?: string; quantity?: number;
   price?: string; fee?: string; tax?: string; amount?: string; settlement_date?: string | null; note?: string; [k: string]: unknown };
@@ -43,6 +44,9 @@ export function TransactionForm({ ledgerVersion, events, editing, onSaved, onCan
     ? (editing.positions as { security_id: string; quantity: number; total_cost: string }[]).map((p) => `${p.security_id},${p.quantity},${p.total_cost}`).join("\n") : "");
   const [settlement, setSettlement] = useState(editing?.settlement_date ?? "");
   const [reason, setReason] = useState("");
+  const [why, setWhy] = useState("");
+  const [emotion, setEmotion] = useState("");
+  const [emotionNote, setEmotionNote] = useState("");
   const [failure, setFailure] = useState<ApiFailure | null>(null);
   const [local, setLocal] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -102,6 +106,11 @@ export function TransactionForm({ ledgerVersion, events, editing, onSaved, onCan
           target_event_id: editing.event_id, replacement: ev, reason: reason.trim() }, expected_version: ledgerVersion, request_id: requestId() } });
       } else {
         await api("ledger/events", { method: "POST", body: { event: ev, expected_version: ledgerVersion, request_id: requestId() } });
+        if (trade && (why.trim() || emotion)) {
+          // The trade is already in the ledger; a journal failure must not undo or repeat it.
+          await saveJournal({ symbol: String(ev.security_id), kind: type, reason: why.trim(), emotion: emotion || null, emotion_note: emotionNote.trim(),
+            ledger_event_id: ev.event_id }).catch(() => undefined);
+        }
       }
       onSaved();
     } catch (e) {
@@ -124,6 +133,11 @@ export function TransactionForm({ ledgerVersion, events, editing, onSaved, onCan
           <label className="field">Phí thực tế (đ)<input inputMode="numeric" value={fee} onChange={(e) => setFee(e.target.value)} /></label>
           <label className="field">Thuế thực tế (đ)<input inputMode="numeric" value={tax} onChange={(e) => setTax(e.target.value)} /></label>
           <label className="field">Ngày thanh toán (theo sao kê)<input type="date" value={settlement} onChange={(e) => setSettlement(e.target.value)} /></label>
+          {!editing && <>
+            <label className="field">Lý do ra quyết định<textarea value={why} maxLength={4000} onChange={(e) => setWhy(e.target.value)}
+              placeholder="Không bắt buộc; lưu vào Nhật ký" /></label>
+            <EmotionFields emotion={emotion} note={emotionNote} onEmotion={setEmotion} onNote={setEmotionNote} />
+          </>}
         </>) : type === "opening_balance" ? (<>
           <label className="field">Tiền mặt đầu kỳ (đ)<input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
           <label className="field">Vị thế đầu kỳ<textarea value={openingPositions} onChange={(e) => setOpeningPositions(e.target.value)}

@@ -11,7 +11,7 @@ from typing import Any, Callable, Protocol, TypeVar
 
 from investment_agent.api.auth import OwnerContext
 
-COLLECTIONS = frozenset({"profile_versions", "risk_versions", "ledger_events", "approvals", "valuation_assumptions", "reports", "settings"})
+COLLECTIONS = frozenset({"profile_versions", "risk_versions", "ledger_events", "approvals", "valuation_assumptions", "reports", "settings", "journal"})
 T = TypeVar("T")
 
 

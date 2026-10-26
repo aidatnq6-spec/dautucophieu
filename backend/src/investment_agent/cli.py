@@ -49,6 +49,8 @@ def main() -> int:
     sectors = commands.add_parser("industries", help="save ICB level-2 sectors of the synced tickers for the market page")
     sectors.add_argument("--symbols", required=True, help="comma-separated tickers, or @file with one ticker per line")
     sectors.add_argument("--output", type=Path, required=True)
+    journal = commands.add_parser("journal-review", help="Nhật ký: Telegram reminder when a price moved another threshold step")
+    journal.add_argument("--data-dir", type=Path, required=True)
     events = commands.add_parser("events-sync", help="corporate events of watched tickers; Telegram reminder 5 days ahead")
     events.add_argument("--data-dir", type=Path, required=True)
     brief = commands.add_parser("brief-snapshot", help="public market snapshot of the latest session for the after-close brief")
@@ -78,6 +80,8 @@ def main() -> int:
         return run_backup(args.data_dir, args.backup_dir, args.kind)
     if args.command == "scheduled-run":
         return scheduled_run(args.calendar, args.data_dir)
+    if args.command == "journal-review":
+        return journal_cli(args.data_dir)
     if args.command == "events-sync":
         return events_cli(args.data_dir)
     if args.command == "brief-snapshot":
@@ -333,6 +337,43 @@ def scheduled_run(calendar_path: Path, data_dir: Path) -> int:
     d = result.decision
     print(json.dumps({"status": "ok", "run": d.run, "reason": d.reason, "session": d.session_date.isoformat() if d.session_date else None,
                       "missed_sessions": d.missed_sessions, "reports": result.statuses, "delivered": len(result.delivered)}))
+    return 0
+
+
+def journal_cli(data_dir: Path) -> int:
+    """Remind the owner of what they wrote when a journalled ticker moved another threshold step (default 15%) from the recorded price."""
+    import os
+    import uuid
+    from decimal import Decimal
+
+    import httpx
+
+    from investment_agent.api.auth import OwnerContext
+    from investment_agent.market.series import SeriesStore
+    from investment_agent.notifications.render import split_message
+    from investment_agent.notifications.telegram import TelegramSender
+    from investment_agent.repositories.firestore import personal_repository_from_env
+    from investment_agent.services.journal import read_journal, review_run
+    from investment_agent.services.records import notification_settings, portfolio_settings
+    from investment_agent.settings import Settings
+
+    settings = Settings.from_env()
+    repo = personal_repository_from_env()
+    owner = OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
+    chosen, _ = notification_settings(repo, owner)
+    if not (settings.telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
+        return 0
+    series = SeriesStore(Path(data_dir) / "trend-sources")
+    prices = {}
+    for symbol in {e.symbol for e in read_journal(repo, owner)[0]}:
+        if closes := series.read(f"{symbol}-1d"):  # last close, thousand đồng
+            prices[symbol] = Decimal(str(closes[-1][1])) * 1000
+    sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
+    out = review_run(repo, owner, prices=prices, threshold=portfolio_settings(repo, owner)[0].journal_review_threshold,
+                     send=lambda text: all(sender.send(chosen.chat_id, part).status == "sent" for part in split_message(text)),
+                     request_id=f"journal-review-{uuid.uuid4().hex[:16]}")
+    print(json.dumps(out))
     return 0
 
 

@@ -1,5 +1,5 @@
 {
- "version": "macro-2026-10-26.4",
+ "version": "macro-2026-10-26.5",
  "notice": "Quy tắc đánh giá theo bảng Leading Indicator của chủ sở hữu (25/10/2026). bad_when: up = tăng là Xấu; down = giảm là Xấu; sign = âm là Xấu; pmi = Tốt khi trên 50 và không giảm.",
  "indicators": [
   {
@@ -116,11 +116,10 @@
    "rule": "pmi",
    "max_age_days": 35,
    "source": {
-    "kind": "tradingeconomics_pmi",
-    "country": "united-states",
-    "manual_fallback": true
+    "kind": "manual"
    },
-   "url": "https://vn.investing.com/economic-calendar/manufacturing-pmi-829"
+   "url": "https://vn.investing.com/economic-calendar/manufacturing-pmi-829",
+   "note": "Nhập tay: S&P Global và TradingEconomics chặn đọc tự động."
   },
   {
    "id": "vn_pmi",
@@ -129,11 +128,11 @@
    "rule": "pmi",
    "max_age_days": 35,
    "source": {
-    "kind": "tradingeconomics_pmi",
-    "country": "vietnam",
+    "kind": "news_pmi",
     "manual_fallback": true
    },
-   "url": "https://drphe.github.io/BM/chart.html"
+   "url": "https://drphe.github.io/BM/chart.html",
+   "note": "Tự động từ tiêu đề tin CafeF/Vietstock/Vneconomy khi S&P Global công bố; nhập tay nếu tháng nào không có tin."
   },
   {
    "id": "fed_effr",

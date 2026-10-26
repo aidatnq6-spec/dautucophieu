@@ -44,11 +44,15 @@ test("no horizontal page scroll on the macro page at 375px", async ({ page }) =>
   expect(overflow).toBeLessThanOrEqual(0);
 });
 
-test("the five newly automated rows retain a manual fallback", async ({ page }) => {
+test("automated rows with a manual fallback, and US PMI entered by hand", async ({ page }) => {
   await openMacro(page);
-  for (const label of [/Cung tiền M2/, /PMI sản xuất Mỹ/, /PMI sản xuất Việt Nam/, /10 năm của Việt Nam/, /liên ngân hàng VN qua đêm/]) {
+  for (const label of [/Cung tiền M2/, /PMI sản xuất Việt Nam/, /10 năm của Việt Nam/, /liên ngân hàng VN qua đêm/]) {
     const row = page.getByRole("row", { name: label });
     await expect(row).toContainText("Tự động");
     await expect(row.getByRole("button", { name: "Nhập" })).toBeVisible();
   }
+  // Since 26/10/2026 the US PMI publishers block automated reading: hand entry only.
+  const us = page.getByRole("row", { name: /PMI sản xuất Mỹ/ });
+  await expect(us).toContainText("Nhập tay");
+  await expect(us.getByRole("button", { name: "Nhập" })).toBeVisible();
 });

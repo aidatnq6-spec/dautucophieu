@@ -42,6 +42,9 @@ $trend = & $python -W ignore -m investment_agent.cli trend-run --data-dir $data 
 # Public market snapshot of the latest session for the brief (whole-HOSE board, indices, HOSE statistics, news RSS).
 $brief = & $python -W ignore -m investment_agent.cli brief-snapshot --data-dir $data --calendar $calendar 2>$null
 "$(Get-Date -Format o) brief-snapshot exit=$LASTEXITCODE $brief" | Add-Content -LiteralPath $log -Encoding UTF8
+# Corporate events of watched tickers (dividends, issues, shareholder meetings): refreshed daily, reminder 5 days ahead.
+$events = & $python -W ignore -m investment_agent.cli events-sync --data-dir $data 2>$null
+"$(Get-Date -Format o) events-sync exit=$LASTEXITCODE $events" | Add-Content -LiteralPath $log -Encoding UTF8
 # Statements for the Định giá page: from the 20:00 slot, refresh the 8 stalest tickers (about 3 minutes, paced for Vnstock's limit).
 if ((Get-Date).Hour -ge 20) {
     $fund = & $python -W ignore -m investment_agent.cli fundamentals-sync --data-dir $data --limit 8 2>$null

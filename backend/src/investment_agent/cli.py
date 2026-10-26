@@ -49,6 +49,8 @@ def main() -> int:
     sectors = commands.add_parser("industries", help="save ICB level-2 sectors of the synced tickers for the market page")
     sectors.add_argument("--symbols", required=True, help="comma-separated tickers, or @file with one ticker per line")
     sectors.add_argument("--output", type=Path, required=True)
+    events = commands.add_parser("events-sync", help="corporate events of watched tickers; Telegram reminder 5 days ahead")
+    events.add_argument("--data-dir", type=Path, required=True)
     brief = commands.add_parser("brief-snapshot", help="public market snapshot of the latest session for the after-close brief")
     brief.add_argument("--data-dir", type=Path, required=True)
     brief.add_argument("--calendar", type=Path, required=True)
@@ -76,6 +78,8 @@ def main() -> int:
         return run_backup(args.data_dir, args.backup_dir, args.kind)
     if args.command == "scheduled-run":
         return scheduled_run(args.calendar, args.data_dir)
+    if args.command == "events-sync":
+        return events_cli(args.data_dir)
     if args.command == "brief-snapshot":
         return brief_snapshot_cli(args.data_dir, args.calendar)
     if args.command == "insights-run":
@@ -329,6 +333,52 @@ def scheduled_run(calendar_path: Path, data_dir: Path) -> int:
     d = result.decision
     print(json.dumps({"status": "ok", "run": d.run, "reason": d.reason, "session": d.session_date.isoformat() if d.session_date else None,
                       "missed_sessions": d.missed_sessions, "reports": result.statuses, "delivered": len(result.delivered)}))
+    return 0
+
+
+def events_cli(data_dir: Path) -> int:
+    """Refresh watched tickers' corporate events (paced for Vnstock) and send the 5-day reminder once per event."""
+    import os
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    import httpx
+
+    from investment_agent.market.corporate_events import events_run, render_reminders
+    from investment_agent.notifications.render import split_message
+    from investment_agent.notifications.telegram import TelegramSender
+    from investment_agent.settings import Settings
+
+    try:
+        from vnstock import Company
+    except ImportError:
+        print(json.dumps({"status": "not_configured", "reason": "vnstock_missing"}))
+        return 2
+    now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
+    settings = Settings.from_env()
+
+    def notify(due):
+        if not settings.telegram_bot_token:
+            return False
+        from investment_agent.api.auth import OwnerContext
+        from investment_agent.repositories.firestore import personal_repository_from_env
+        from investment_agent.services.holdings_view import held_from_repo
+        from investment_agent.services.records import notification_settings
+        repo = personal_repository_from_env()
+        owner = OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
+        chosen, _ = notification_settings(repo, owner)
+        if not (chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):
+            return False
+        try:
+            held = held_from_repo(repo, owner)
+        except Exception:
+            held = set()
+        sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
+        text = render_reminders(due, held=held, today=now.date())
+        return all(sender.send(chosen.chat_id, part).status == "sent" for part in split_message(text))
+
+    out = events_run(data_dir, fetch=lambda symbol: Company(source="VCI", symbol=symbol).events().to_dict("records"), notify=notify, now=now)
+    print(json.dumps(out, ensure_ascii=False))
     return 0
 
 

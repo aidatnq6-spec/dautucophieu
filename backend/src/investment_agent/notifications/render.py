@@ -32,6 +32,8 @@ def render_report(report: dict) -> str:
                      f" · giá ngày {h['price_date'] or 'chưa có'}")
     lines += ["", "THỊ TRƯỜNG", report["narrative"]["text"], "", "CƠ HỘI"]
     lines += [f"- {i['entity_id']}: {ACTIONS.get(i['action'], i['action'])} ({', '.join(i['reasons'])})" for i in report["items"]] or ["- Không có"]
+    if report.get("reminders"):
+        lines += ["", "NHẮC CẬP NHẬT SỐ LIỆU VĨ MÔ (nhập ở trang Vĩ mô)"] + [f"- {r}" for r in report["reminders"]]
     lines += ["", "RỦI RO VÀ GIỚI HẠN DỮ LIỆU"] + [f"- {f}" for f in report["verification_flags"]] + \
              ["- Khuyến nghị không tự đặt lệnh; kiểm tra lại trước khi giao dịch."]
     if report.get("sources"):

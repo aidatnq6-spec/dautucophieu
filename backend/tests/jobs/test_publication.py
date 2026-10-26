@@ -135,3 +135,14 @@ def test_price_from_an_earlier_session_keeps_the_report_unpublished(repo, tmp_pa
     report = repo.read(OWNER, "reports", result.report_id).payload
     assert result.status == "incomplete" and outbox.queued == []
     assert "price_not_for_session:FPT" in report["verification_flags"]
+
+
+def test_reminders_travel_with_the_report_and_render_in_the_telegram_text(repo, tmp_path):
+    from investment_agent.notifications.render import render_report
+    result = run_after_close(repo=repo, owner=OWNER, market=MARKET, jobs=JobStore(tmp_path / "jobs.sqlite"), outbox=Outbox(), session_date=SESSION,
+                             now=RUN_AT, worker_id="w1", reminders=["PMI sản xuất Việt Nam đã 36 ngày chưa cập nhật"])
+    report = repo.read(OWNER, "reports", result.report_id).payload
+    assert report["reminders"] == ["PMI sản xuất Việt Nam đã 36 ngày chưa cập nhật"]
+    text = render_report(report)
+    assert "NHẮC CẬP NHẬT SỐ LIỆU VĨ MÔ" in text and "- PMI sản xuất Việt Nam đã 36 ngày chưa cập nhật" in text
+    assert "NHẮC CẬP NHẬT" not in render_report({**report, "reminders": []})

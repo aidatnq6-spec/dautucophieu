@@ -156,3 +156,21 @@ def test_hose_indicators_collect_the_last_trading_days(tmp_path):
     assert [(o["date"], o["value"]) for o in store.read("foreign_net")] == [("2026-10-22", "-477.72343"), ("2026-10-23", "-477.72343")]
     assert store.read("vnindex_value")[-1]["value"] == "17010.2366"
     assert len([u for u in seen if "api.hsx.vn" in u]) == 7  # one call per day, shared by both indicators
+
+
+def test_reminders_name_manual_indicators_that_are_missing_or_overdue(tmp_path):
+    from investment_agent.market.leading import macro_reminders
+    store = MacroStore(tmp_path)
+    store.upsert("vn_pmi", [(date(2026, 9, 20), "51.9")], entry="manual")   # 36 days old, monthly → overdue
+    store.upsert("us_pmi", [(date(2026, 10, 1), "55.9")], entry="manual")   # 25 days old → fine
+    store.upsert("vn10y", [(date(2026, 10, 25), "4.58")], entry="manual")   # fresh weekly value
+    store.upsert("us10y", [(date(2026, 9, 1), "4.9")], entry="auto")       # automatic only: never a reminder
+    got = macro_reminders(load_indicators(), store, today=date(2026, 10, 26))
+    assert "PMI sản xuất Việt Nam đã 36 ngày chưa cập nhật" in got
+    assert "Cung tiền M2 Việt Nam (tỷ đồng) chưa có số liệu" in got
+    assert not any("PMI sản xuất Mỹ" in r or "10 năm của Việt Nam" in r or "Mỹ" in r and "Lợi suất" in r for r in got)
+
+
+def test_monthly_and_weekly_update_rhythm_is_configured():
+    ages = {i["id"]: i["max_age_days"] for i in load_indicators()}
+    assert (ages["us_pmi"], ages["vn_pmi"], ages["m2_vn"], ages["vn10y"], ages["vn_interbank_on"]) == (35, 35, 35, 7, 7)

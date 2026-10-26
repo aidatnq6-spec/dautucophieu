@@ -26,6 +26,14 @@ class ProviderUnavailable(RuntimeError):
     pass
 
 
+def _traded(row: dict) -> bool:
+    """False for the placeholder row Vnstock returns for today before the open (volume 0), and for no-trade days."""
+    try:
+        return int(row.get("volume")) > 0
+    except (TypeError, ValueError):
+        return False
+
+
 class VnstockProvider:
     def __init__(self, *, market=None, fundamental=None, listing=None, company=None,
                  clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
@@ -73,15 +81,17 @@ class VnstockProvider:
         market, _ = self._api()
         handle = market.index(symbol.upper()) if index else market.equity(symbol.upper())
         frame = handle.ohlcv(start=start.isoformat(), end=end.isoformat(), interval=interval)
-        out = []
+        out: dict[datetime, str] = {}
         for row in frame.to_dict("records"):
+            if not _traded(row):
+                continue
             try:
                 value = Decimal(str(row["close"]))
             except (InvalidOperation, KeyError):
                 continue
             if value.is_finite() and value > 0:
-                out.append((row["time"].to_pydatetime(), format(value.normalize(), "f")))
-        return out
+                out[row["time"].to_pydatetime()] = format(value.normalize(), "f")  # a repeated timestamp keeps the last row
+        return sorted(out.items())
 
     def fundamentals_frames(self, symbol: str) -> dict:
         """Annual and quarterly income statement and balance sheet rows (long format) plus company events."""
@@ -108,8 +118,10 @@ class VnstockProvider:
 
     def _bars(self, frame, symbol: str, *, scale: Decimal, currency: str, basis: str) -> list[PriceBar]:
         observed = self._clock()
-        bars = []
+        bars: dict[date, PriceBar] = {}
         for row in frame.to_dict("records"):
+            if not _traded(row):
+                continue
             try:
                 values = {k: Decimal(str(row[k])) * scale for k in ("open", "high", "low", "close")}
                 if any(not v.is_finite() for v in values.values()):
@@ -121,8 +133,8 @@ class VnstockProvider:
                 continue
             if bar.high < max(bar.open, bar.close, bar.low) or bar.low > min(bar.open, bar.close) or bar.low <= 0:
                 continue  # inconsistent row: dropped, never repaired or zero-filled
-            bars.append(bar)
-        return bars
+            bars[bar.session_date] = bar  # the source sometimes repeats a session; the last row wins
+        return [bars[d] for d in sorted(bars)]
 
     def statement_rows(self, symbol: str, period: str = "quarter") -> list[dict]:
         _, fundamental = self._api()

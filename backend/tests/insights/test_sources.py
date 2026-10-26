@@ -62,3 +62,17 @@ def test_acbs_does_not_refetch_detail_pages_of_known_reports():
     get = lambda url: fetched.append(url) or acbs_get(url)
     assert discover_acbs(get, since=date(2026, 8, 27), known=lambda slug: slug == "cap-nhat-vi-mo-thang-10-2026") == []
     assert not any("cap-nhat-vi-mo" in u for u in fetched)
+
+
+def test_very_long_acbs_slugs_get_a_short_stable_id():
+    """26/10/2026: a 140-character ACBS slug made the store reject the id and the whole ACBS discovery came back empty."""
+    from investment_agent.insights.store import _ID
+    slug = "cap-nhat-nhanh-kinh-te-vi-mo-ngay-17-09-2026-fed-tang-lai-suat-25-diem-co-ban-fomc-van-de-ngo-it-nhat-mot-lan-tang-them-trong-nam-2026"
+    listing = f'<a href="/trung-tam-phan-tich/chi-tiet/{slug}">x</a>'
+    detail = '<h1>Fed</h1><a href="https://acbs.com.vn/acbsmedia/2026/09/Fed.pdf">pdf</a>'
+    get = lambda url: listing if url.endswith("bao-cao-tong-quan") else detail
+    seen = []
+    refs = discover_acbs(get, since=date(2026, 8, 27), known=lambda ref_id: seen.append(ref_id) or False)
+    assert len(refs) == 1 and _ID.fullmatch(refs[0].ref_id) and len(refs[0].ref_id) <= 120
+    assert refs[0].ref_id == discover_acbs(get, since=date(2026, 8, 27))[0].ref_id  # stable across runs
+    assert seen == [refs[0].ref_id]  # 'known' is asked with the same safe id the store uses

@@ -16,7 +16,7 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
   return (
     <div className="shell">
       <aside className="side">
-        <div className="brand">Đầu tư<span> dài hạn</span></div>
+        <div className="brand">Đầu tư<span> Cổ phiếu</span></div>
         <AppNav />
       </aside>
       <main className="content" id="main">{children}</main>

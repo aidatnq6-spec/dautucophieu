@@ -44,6 +44,8 @@ export function MacroView() {
   useEffect(() => { void load(); }, [load]);
   if (error) return <p className="errors" role="alert">{error}</p>;
   if (!rows) return <p className="muted">Đang tải…</p>;
+  // Hand-entered indicators last, highlighted, so they are easy to find after a Telegram reminder.
+  const ordered = [...rows.filter((r) => r.auto), ...rows.filter((r) => !r.auto)];
   const tally = rows.reduce((t, r) => ({ ...t, [r.assessment ?? "—"]: (t[r.assessment ?? "—"] ?? 0) + 1 }), {} as Record<string, number>);
   return (
     <section className="surface">
@@ -52,8 +54,8 @@ export function MacroView() {
       <div className="tablewrap">
         <table aria-label="Chỉ số vĩ mô">
           <thead><tr><th>STT</th><th>Biến số</th><th className="num">Hiện tại</th><th>Xu hướng</th><th>Đánh giá</th><th>Cập nhật</th><th>Nguồn</th></tr></thead>
-          <tbody>{rows.map((r, i) => (
-            <tr key={r.id}>
+          <tbody>{ordered.map((r, i) => (
+            <tr key={r.id} className={r.auto ? undefined : "macro-manual"}>
               <td>{i + 1}</td>
               <td>{r.label}{r.note && <div className="caption">{r.note}</div>}</td>
               <td className="num">{r.value ? <>{show(r.value)} <span className="caption">{r.unit}</span></> : <span className="muted">Chưa có số liệu</span>}

@@ -8,7 +8,9 @@ import json
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
-from .leading import FRED_CSV, parse_fred_csv
+from .leading import ECB_90D, FRED_CSV, parse_ecb_dxy, parse_fred_csv
+
+ECB_FULL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.xml"  # all reference rates since 1999 (a few MB)
 
 COINBASE = "https://api.exchange.coinbase.com/products/{product}/candles?granularity={g}&start={s}&end={e}"
 
@@ -30,3 +32,9 @@ def coinbase_closes(get, product: str, granularity: int, start: date, end: date)
 def fred_closes(get, series: str, start: date) -> list[tuple[datetime, str]]:
     text = get(FRED_CSV.format(series=series) + f"&cosd={start.isoformat()}")
     return [(datetime(d.year, d.month, d.day), v) for d, v in parse_fred_csv(text)]
+
+
+def ecb_dxy_closes(get, *, have: int, enough: int = 400) -> list[tuple[datetime, str]]:
+    """DXY by ICE's formula from ECB reference rates: the full history until the series is long enough, then the last 90 days."""
+    points = parse_ecb_dxy(get(ECB_FULL if have < enough else ECB_90D))
+    return [(datetime(d.year, d.month, d.day), v) for d, v in points]

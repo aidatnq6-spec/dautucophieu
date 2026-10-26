@@ -82,6 +82,8 @@ def fake_get(url):
         g = int(url.split("granularity=")[1].split("&")[0])
         start = datetime.fromisoformat(url.split("start=")[1].split("&")[0].replace("Z", "+00:00"))
         return json.dumps([[int((start + timedelta(seconds=g * i)).timestamp()), 1, 2, 1, str(100 + i), 1] for i in range(300)])
+    if "ecb.europa.eu" in url:
+        return ecb_xml(daily(1200))
     return "observation_date,X\n" + "\n".join(f"{d.date()},{v}" for d, v in daily(1200))
 
 
@@ -154,3 +156,28 @@ def test_a_later_run_the_same_day_does_not_refetch_fresh_vietnamese_series(tmp_p
     first = len(vn.calls)
     run_trend(tmp_path, CAL, now=now + timedelta(hours=2), provider=vn, get=fake_get, pause=0, pace=0)
     assert len(vn.calls) == first  # every VN series already ends on today's session
+
+
+def ecb_xml(points):
+    """ECB reference-rate XML whose EUR/USD moves with the given series (other currencies fixed), newest first like the ECB."""
+    days = "".join(f'<Cube time="{d.date()}"><Cube currency="USD" rate="{1 + v / 1000:.5f}"/><Cube currency="JPY" rate="170"/>'
+                   f'<Cube currency="GBP" rate="0.87"/><Cube currency="CAD" rate="1.6"/><Cube currency="SEK" rate="11"/>'
+                   f'<Cube currency="CHF" rate="0.93"/></Cube>' for d, v in reversed(points))
+    return f"<gesmes:Envelope><Cube>{days}</Cube></gesmes:Envelope>"
+
+
+def test_dxy_row_is_computed_from_ecb_in_its_own_series(tmp_path):
+    from investment_agent.market.series import SeriesStore
+    seen = []
+    get = lambda url: seen.append(url) or fake_get(url)
+    run_trend(tmp_path, CAL, now=datetime(2026, 10, 23, 15, 35, tzinfo=VN), provider=FakeVn(), get=get, pause=0, pace=0)
+    rows = {r["id"]: r for g in SnapshotStore(tmp_path / "trend").latest()["groups"] for r in g["rows"]}
+    assert rows["DXY"]["cells"]["D1"]["macd"] is not None and rows["DXY"]["cells"]["H4"]["reason"] == "Nguồn chỉ có giá ngày"
+    assert "ECB" in rows["DXY"]["note"]
+    stored = SeriesStore(tmp_path / "trend-sources").read("DXY-ecb-1d")
+    assert len(stored) == 1200 and 50 < stored[-1][1] < 200  # a DXY level, kept apart from FRED's broad index history
+    assert any(u.endswith("eurofxref-hist.xml") for u in seen)  # first run: the full history
+    seen.clear()
+    run_trend(tmp_path, CAL, now=datetime(2026, 10, 26, 15, 35, tzinfo=VN), provider=FakeVn(), get=get, pause=0, pace=0)
+    assert any(u.endswith("eurofxref-hist-90d.xml") for u in seen) and not any(u.endswith("eurofxref-hist.xml") for u in seen)
+

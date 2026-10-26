@@ -322,6 +322,7 @@ def scheduled_run(calendar_path: Path, data_dir: Path) -> int:
 
 USER_AGENT = "investment-agent/0.1 (personal use)"
 MAX_PDF_BYTES = 40 * 1024 * 1024
+MAX_PDF_SECONDS = 180
 
 
 def _insight_notifier(data_dir: Path, calendar_path: Path, settings, client, now):
@@ -330,9 +331,11 @@ def _insight_notifier(data_dir: Path, calendar_path: Path, settings, client, now
     Ticker linking (watchlist, Định giá verdicts, holdings) happens here, locally, after the model call.
     """
     import os
+    from datetime import timedelta
     from zoneinfo import ZoneInfo
 
     from investment_agent.api.auth import OwnerContext
+    from investment_agent.insights.pipeline import FIRST_WINDOW_DAYS as WINDOW_DAYS
     from investment_agent.insights.summary import link, linking_sectors, summarise
     from investment_agent.insights.telegram import render_insight, send_new
     from investment_agent.market.watchlist import load_watchlist
@@ -353,8 +356,8 @@ def _insight_notifier(data_dir: Path, calendar_path: Path, settings, client, now
         notify_settings, _ = notification_settings(repo, owner)
     except (OSError, ValueError, KeyError, RepositoryUnavailable):
         return None
+    today = now.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date()
     try:
-        today = now.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date()
         market = StoreMarket(PriceStore(data_dir), load_calendar(calendar_path), today=lambda: today) if (data_dir / "prices").exists() else EmptyMarket()
         held = held_from_repo(repo, owner)
         rows = fair_value_board(data_dir, market, repo, owner, held=held, today=today)["rows"]
@@ -363,7 +366,8 @@ def _insight_notifier(data_dir: Path, calendar_path: Path, settings, client, now
     sectors = linking_sectors(load_sectors(data_dir)[0], watched=set(load_watchlist(data_dir).symbols), held=held)
     render = lambda record: render_insight(record, link(summarise([record]), sectors=sectors, valuation_rows=rows, held=held)["sectors"])
     sender = TelegramSender(settings.telegram_bot_token, client=client)
-    return lambda store: send_new(store, sender, notify_settings, render)
+    since = (today - timedelta(days=WINDOW_DAYS)).isoformat()
+    return lambda store: send_new(store, sender, notify_settings, render, since=since)
 
 
 def insights_cli(data_dir: Path, calendar_path: Path, *, min_hours: float = 6) -> int:
@@ -377,8 +381,9 @@ def insights_cli(data_dir: Path, calendar_path: Path, *, min_hours: float = 6) -
     from investment_agent.ai.catalog import load_catalog
     from investment_agent.ai.openrouter import OpenRouterGateway, load_ai_policy
     from investment_agent.domain.pinned import CONFIG_DIR
+    from investment_agent.insights.download import fetch_pdf
     from investment_agent.insights.pdf import extract_pages
-    from investment_agent.insights.run import due, insights_run
+    from investment_agent.insights.run import due, insights_run, record_status
     from investment_agent.insights.sources import discover_acbs, discover_worldbank
     from investment_agent.insights.store import InsightStore
     from investment_agent.settings import Settings
@@ -396,14 +401,7 @@ def insights_cli(data_dir: Path, calendar_path: Path, *, min_hours: float = 6) -
         return response.text
 
     def download(url: str) -> bytes:
-        with client.stream("GET", url) as response:
-            response.raise_for_status()
-            data = b""
-            for chunk in response.iter_bytes():
-                data += chunk
-                if len(data) > MAX_PDF_BYTES:
-                    raise ValueError("report file too large")
-        return data
+        return fetch_pdf(client, url, max_bytes=MAX_PDF_BYTES, max_seconds=MAX_PDF_SECONDS)
 
     store = InsightStore(data_dir / "insights")
 
@@ -423,7 +421,9 @@ def insights_cli(data_dir: Path, calendar_path: Path, *, min_hours: float = 6) -
         try:
             catalog = load_catalog(data_dir / "ai" / "catalog.json", get, now=now)
         except Exception:
-            print(json.dumps({"status": "catalog_unavailable"}))
+            out = {"status": "stopped:catalog_unavailable", "processed": []}
+            record_status(data_dir, now=now, out=out)
+            print(json.dumps(out))
             return 1
         gateway = OpenRouterGateway(settings, load_ai_policy(CONFIG_DIR / "ai-policy.json"), catalog,
                                     SpendLedger(data_dir / "ai" / "spend.sqlite"), client=httpx.Client())

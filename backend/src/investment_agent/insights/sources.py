@@ -8,7 +8,7 @@ import json
 import re
 from dataclasses import dataclass
 from datetime import date
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 ACBS_LIST = "https://acbs.com.vn/trung-tam-phan-tich/bao-cao-tong-quan"
 WB_API = ("https://search.worldbank.org/api/v2/wds?format=json&countrycode_exact=VN&rows=50&sort=docdt&order=desc"
@@ -37,6 +37,15 @@ class ReportRef:
     published: date
 
 
+def safe_url(url) -> str | None:
+    """The URL when it is a plain http(s) link with a host; anything else (javascript:, data:, file:) is dropped."""
+    if not isinstance(url, str):
+        return None
+    url = url.strip()
+    parsed = urlparse(url)
+    return url if parsed.scheme in ("http", "https") and parsed.netloc else None
+
+
 def _text(fragment: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", fragment))).strip()
 
@@ -46,7 +55,7 @@ def discover_acbs(get, *, since: date, known=lambda slug: False) -> list[ReportR
     refs, seen = [], set()
     for m in _ACBS_LINK.finditer(get(ACBS_LIST)):
         page_url, slug, title = urljoin(ACBS_LIST, m.group(1)), m.group(2), _text(m.group(3))
-        if slug in seen or known(slug) or _ACBS_SKIP.search(slug):
+        if slug in seen or known(slug) or _ACBS_SKIP.search(slug) or not safe_url(page_url):
             continue
         seen.add(slug)
         detail = get(page_url)
@@ -56,8 +65,9 @@ def discover_acbs(get, *, since: date, known=lambda slug: False) -> list[ReportR
         published = date(int(pdf.group(2)), int(pdf.group(3)), 1)
         h1 = _ACBS_H1.search(detail)
         title = (_text(h1.group(1)) if h1 else "") or title  # list anchors carry only the category label
-        if published >= since.replace(day=1):
-            refs.append(ReportRef("acbs", slug, title, page_url, urljoin(page_url, pdf.group(1)), published))
+        pdf_url = safe_url(urljoin(page_url, pdf.group(1)))
+        if pdf_url and published >= since.replace(day=1):
+            refs.append(ReportRef("acbs", slug, title, page_url, pdf_url, published))
     return refs
 
 
@@ -68,8 +78,9 @@ def discover_worldbank(get, *, since: date) -> list[ReportRef]:
             continue
         title = re.sub(r"\s+", " ", d.get("display_title", "")).strip()
         published = date.fromisoformat(d["docdt"][:10])
-        if d.get("docty") in {"Report", "Brief"} and _WB_TITLE.search(title) and d.get("pdfurl") and published >= since:
-            refs.append(ReportRef("worldbank", doc_id, title, d["pdfurl"], d["pdfurl"], published))
+        pdf_url = safe_url(d.get("pdfurl"))
+        if d.get("docty") in {"Report", "Brief"} and _WB_TITLE.search(title) and pdf_url and published >= since:
+            refs.append(ReportRef("worldbank", doc_id, title, pdf_url, pdf_url, published))
     return sorted(refs, key=lambda r: r.published, reverse=True)
 
 
@@ -77,8 +88,8 @@ def ssi_titles(get, *, limit: int = 10) -> list[dict]:
     out, seen = [], set()
     for kind, url in SSI_PAGES.items():
         for m in _SSI_ITEM.finditer(get(url)):
-            full = urljoin(url, m.group(5))
-            if full in seen:
+            full = safe_url(urljoin(url, m.group(5)))
+            if not full or full in seen:
                 continue
             seen.add(full)
             title = _text(m.group(1)) or m.group(6).replace("-", " ").capitalize()

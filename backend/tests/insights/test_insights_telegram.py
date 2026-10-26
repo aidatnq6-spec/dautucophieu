@@ -50,19 +50,19 @@ def test_new_reports_are_sent_once_and_marked(tmp_path):
     store.save(RECORD)
     store.save({**RECORD, "ref_id": "bad", "status": "no_reliable_claims", "insight": None})
     sender = Sender()
-    assert send_new(store, sender, ON, lambda r: "msg " + r["ref_id"]) == {"sent": 1, "failed": 0}
+    assert send_new(store, sender, ON, lambda r: "msg " + r["ref_id"], since="2026-01-01") == {"sent": 1, "failed": 0}
     assert sender.sent == [("-1001234", "(1/1)\nmsg vi-mo-10")]  # split_message numbers the parts
     assert store.read("acbs", "vi-mo-10")["telegram_sent"] is True
-    assert send_new(store, sender, ON, lambda r: "again") == {"sent": 0, "failed": 0}
+    assert send_new(store, sender, ON, lambda r: "again", since="2026-01-01") == {"sent": 0, "failed": 0}
 
 
 def test_nothing_is_sent_when_scheduled_sending_is_off_or_fails(tmp_path):
     store = InsightStore(tmp_path)
     store.save(RECORD)
     sender = Sender()
-    assert send_new(store, sender, SimpleNamespace(enabled=True, scheduled_enabled=False, chat_id="-1001234"), lambda r: "x") == {"sent": 0, "failed": 0}
+    assert send_new(store, sender, SimpleNamespace(enabled=True, scheduled_enabled=False, chat_id="-1001234"), lambda r: "x", since="2026-01-01") == {"sent": 0, "failed": 0}
     assert sender.sent == []
-    assert send_new(store, Sender("failed"), ON, lambda r: "x") == {"sent": 0, "failed": 1}
+    assert send_new(store, Sender("failed"), ON, lambda r: "x", since="2026-01-01") == {"sent": 0, "failed": 1}
     assert store.read("acbs", "vi-mo-10")["telegram_sent"] is False
 
 

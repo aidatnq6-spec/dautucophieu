@@ -35,18 +35,25 @@ def render_insight(record: dict, linked_sectors: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def send_new(store, sender, settings, render) -> dict:
-    """Send every verified, not-yet-sent report; mark it sent only when every part went out."""
+def send_new(store, sender, settings, render, *, since: str) -> dict:
+    """Send every verified, not-yet-sent report published on or after since (ISO date), so switching Telegram on later
+    does not flood the chat with old reports. A message that fails part-way resumes at the failed part next run."""
     if not (settings.enabled and settings.scheduled_enabled and settings.chat_id):
         return {"sent": 0, "failed": 0}
     sent = failed = 0
     for record in store.all():
-        if record.get("status") != "ok" or record.get("telegram_sent"):
+        if record.get("status") != "ok" or record.get("telegram_sent") or record["published"] < since:
             continue
-        outcomes = [sender.send(settings.chat_id, part) for part in split_message(render(record))]
-        if all(o.status == "sent" for o in outcomes):
-            store.save({**record, "telegram_sent": True})
+        parts = split_message(render(record))
+        done = int(record.get("telegram_parts_sent") or 0)
+        for part in parts[done:]:
+            if sender.send(settings.chat_id, part).status != "sent":
+                break
+            done += 1
+        if done >= len(parts):
+            store.save({**record, "telegram_sent": True, "telegram_parts_sent": done})
             sent += 1
         else:
+            store.save({**record, "telegram_parts_sent": done})
             failed += 1
     return {"sent": sent, "failed": failed}

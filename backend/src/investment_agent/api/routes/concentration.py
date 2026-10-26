@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request
 from investment_agent.domain.concentration import concentration, simulate
 from investment_agent.market.sectors import load_sectors
 from investment_agent.repositories.personal import RepositoryUnavailable
+from investment_agent.services.equity_budget import budget_view
 from investment_agent.services.overview import compose_overview
 from investment_agent.services.records import portfolio_settings
 
@@ -35,13 +36,18 @@ def _view(request: Request, symbol: str | None = None, amount: str | None = None
     try:
         view = compose_overview(repo, owner, request.app.state.market, request_now(request))
         settings, _ = portfolio_settings(repo, owner)
+        budget, _ = budget_view(repo, owner)
     except RepositoryUnavailable:
         return unavailable()
     capital = view["capital"]
     investable = capital["investable_capital"] if capital and capital.get("status") == "ready" else None
+    # Once the owner has entered total financial assets, weights are measured on the money set aside for stocks.
+    basis = "equity_budget" if budget["status"] == "ok" else "investable_capital"
+    if basis == "equity_budget":
+        investable = budget["budget"]
     data_dir = request.app.state.data_dir
     sectors = load_sectors(data_dir)[0] if data_dir is not None else {}
-    base = concentration(view["holdings"], capital=investable, sectors=sectors, limit=settings.concentration_limit)
+    base = {**concentration(view["holdings"], capital=investable, sectors=sectors, limit=settings.concentration_limit), "basis": basis}
     if not symbol or amount is None or base["status"] != "ok":
         return base
     try:

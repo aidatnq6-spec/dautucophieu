@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
 import { formatVnd } from "../lib/format";
+import { EquityBudget } from "./equity-budget";
 import { BreakdownTable, STATUS_LABEL, WARNING_LABEL, type Assessment } from "./profile-form";
 import { FLAG_LABEL, GROUP_LABEL, type RiskAssessment } from "./risk-survey";
 
@@ -49,6 +50,7 @@ export function ProfileSummary() {
           <ul>{r.assessment.flags.map((f) => <li key={f.code}>{FLAG_LABEL[f.code] ?? f.code}</li>)}</ul>
         </>)}
       </section>
+      <EquityBudget />
     </>
   );
 }

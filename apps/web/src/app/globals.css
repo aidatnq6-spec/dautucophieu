@@ -121,3 +121,9 @@ legend{font-weight:600;padding:0 6px}
 .jr-addnote{display:flex;flex-wrap:wrap;gap:8px}
 .jr-addnote input{flex:1 1 200px;min-width:0}
 @media (max-width:600px){.jr-move{margin-left:0;flex-basis:100%}}
+.eb-form{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px}
+.eb-form .field{flex:1 1 240px;min-width:0}
+.eb-result{display:grid;gap:6px;margin:14px 0 0}
+.eb-result>div{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;padding:6px 0;border-bottom:1px solid var(--line, #e5e9f0)}
+.eb-result dt{color:var(--muted, #5b6474)}.eb-result dd{margin:0;font-variant-numeric:tabular-nums}
+.eb-result .eb-main dt,.eb-result .eb-main dd{font-weight:700;color:inherit;font-size:17px}

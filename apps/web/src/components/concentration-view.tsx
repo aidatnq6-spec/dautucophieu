@@ -1,11 +1,12 @@
 "use client";
+import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
 import { formatVnd } from "../lib/format";
 
 type Ticker = { symbol: string; sector: string; value: string | null; weight: string | null; over: boolean };
 type Sector = { sector: string; value: string; weight: string; over: boolean; symbols: string[] };
-type View = { status: "ok" | "no_capital"; limit: string; capital: string | null; tickers: Ticker[]; sectors: Sector[];
+type View = { status: "ok" | "no_capital"; basis?: "equity_budget" | "investable_capital"; limit: string; capital: string | null; tickers: Ticker[]; sectors: Sector[];
   cash: { value: string; weight: string } | null; missing_prices: string[]; what_if?: { symbol: string; amount: string } };
 
 const pct = (v: string) => `${(Number(v) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`;
@@ -43,8 +44,10 @@ export function ConcentrationView() {
       {!view ? <p className="muted fx-loading" role="status">Đang tải…</p> : view.status === "no_capital" ? (
         <p className="muted">Chưa có vốn có thể đầu tư trong hồ sơ tài chính, nên chưa tính được tỷ trọng.</p>
       ) : <>
-        <p className="caption">Tỷ trọng trên vốn có thể đầu tư ({formatVnd(view.capital)}), ngưỡng {limitText} cho một mã hoặc một ngành (sửa trong Cài đặt).
+        <p className="caption">Tỷ trọng trên {view.basis === "equity_budget" ? "vốn dành cho cổ phiếu" : "vốn có thể đầu tư"} ({formatVnd(view.capital)}), ngưỡng {limitText} cho một mã hoặc một ngành (sửa trong Cài đặt).
           Chỉ để theo dõi, không phải khuyến nghị.</p>
+        {view.basis !== "equity_budget" && <p className="caption">Chưa nhập tổng tài sản tài chính: <Link href="/profile">nhập ở Hồ sơ & rủi ro</Link> để tính
+          trên vốn dành cho cổ phiếu theo khẩu vị rủi ro.</p>}
         {view.what_if && <p className="notice">Chỉ là thử: {Number(view.what_if.amount) >= 0 ? "mua thêm" : "bán bớt"} {view.what_if.symbol}{" "}
           {formatVnd(String(Math.abs(Number(view.what_if.amount))))}; không ghi vào sổ. <button className="btn" type="button" onClick={() => void load()}>Bỏ thử</button></p>}
         <table className="fv-table cc-table" aria-label="Tỷ trọng theo mã">

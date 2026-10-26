@@ -1,6 +1,7 @@
 """Telegram settings and owner-initiated sending. The bot token lives in the server
 environment only: it is never accepted, stored or returned here."""
 
+from uuid import uuid4
 from typing import Literal
 
 from fastapi import APIRouter, Request
@@ -111,8 +112,13 @@ def test_send(request: Request, body: SendRequest):
     report = _report(repo, owner, body.report_id)
     if report is None:
         return error(404, "report_missing", "Không tìm thấy bản tin.")
+    rows = state.deliveries.parts(report["report_id"], settings.chat_id or "", report.get("report_version", "1")) if settings.chat_id else []
+    copy = bool(rows) and all(r.status == "sent" for r in rows)
+    if copy:
+        # Already delivered: send a fresh copy under its own delivery key, leaving the report's delivery record as it is.
+        report = {**report, "report_version": f"test-{uuid4().hex[:12]}"}
     result = deliver(report, settings, state.telegram, state.deliveries, _market(request, report))
-    return {"status": result.status, "parts_sent": result.parts_sent, "parts_total": result.parts_total}
+    return {"status": result.status, "parts_sent": result.parts_sent, "parts_total": result.parts_total, "copy": copy}
 
 
 @router.get("/deliveries/{report_id}")

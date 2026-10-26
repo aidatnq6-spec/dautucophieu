@@ -41,9 +41,10 @@ function TelegramPanel({ reportId, publishable }: { reportId: string; publishabl
   const send = () => {
     if (!window.confirm("Gửi thật bản tin này tới nhóm Telegram đã cấu hình? Mọi thành viên nhóm sẽ thấy giá trị danh mục.")) return;
     void run(async () => {
-      const r = await api<{ status: string; parts_sent: number; parts_total: number }>("notifications/test-send",
+      const r = await api<{ status: string; parts_sent: number; parts_total: number; copy?: boolean }>("notifications/test-send",
         { method: "POST", body: { report_id: reportId, confirm: true } });
-      setResult(r.status === "sent" ? `Đã gửi ${r.parts_sent}/${r.parts_total} phần tới Telegram.` : SEND_STATUS[r.status] ?? r.status);
+      setResult(r.status === "sent" ? (r.copy ? `Bản tin này đã gửi trước đó; vừa gửi thêm một bản mới (${r.parts_total} phần) tới Telegram.`
+        : `Đã gửi ${r.parts_sent}/${r.parts_total} phần tới Telegram.`) : SEND_STATUS[r.status] ?? r.status);
     });
   };
   return (

@@ -1,5 +1,5 @@
 {
- "version": "macro-2026-10-26.3",
+ "version": "macro-2026-10-26.4",
  "notice": "Quy tắc đánh giá theo bảng Leading Indicator của chủ sở hữu (25/10/2026). bad_when: up = tăng là Xấu; down = giảm là Xấu; sign = âm là Xấu; pmi = Tốt khi trên 50 và không giảm.",
  "indicators": [
   {
@@ -86,7 +86,7 @@
    "label": "Cung tiền M2 Việt Nam (tỷ đồng)",
    "unit": "tỷ đồng",
    "rule": "down",
-   "max_age_days": 120,
+   "max_age_days": 35,
    "source": {
     "kind": "manual"
    },
@@ -110,7 +110,7 @@
    "label": "PMI sản xuất Mỹ",
    "unit": "điểm",
    "rule": "pmi",
-   "max_age_days": 45,
+   "max_age_days": 35,
    "source": {
     "kind": "manual"
    },
@@ -121,7 +121,7 @@
    "label": "PMI sản xuất Việt Nam",
    "unit": "điểm",
    "rule": "pmi",
-   "max_age_days": 45,
+   "max_age_days": 35,
    "source": {
     "kind": "manual"
    },
@@ -171,7 +171,7 @@
    "label": "Lợi suất trái phiếu 10 năm của Việt Nam",
    "unit": "%",
    "rule": "up",
-   "max_age_days": 14,
+   "max_age_days": 7,
    "source": {
     "kind": "manual"
    },

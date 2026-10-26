@@ -215,6 +215,19 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
     return results
 
 
+def macro_reminders(indicators: list[dict], store: MacroStore, *, today: date) -> list[str]:
+    """Indicators the owner can enter by hand that have no value yet or are older than their update rhythm (max_age_days)."""
+    out = []
+    for r in macro_rows(indicators, store, today=today):
+        if not r["manual_allowed"]:
+            continue
+        if r["value"] is None:
+            out.append(f"{r['label']} chưa có số liệu")
+        elif r["stale"]:
+            out.append(f"{r['label']} đã {(today - date.fromisoformat(r['date'])).days} ngày chưa cập nhật")
+    return out
+
+
 def macro_rows(indicators: list[dict], store: MacroStore, *, today: date) -> list[dict]:
     rows, statuses = [], store.statuses()
     for ind in indicators:

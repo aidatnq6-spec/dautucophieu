@@ -297,7 +297,9 @@ def scheduled_run(calendar_path: Path, data_dir: Path) -> int:
     owner = OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
     try:
         market = StoreMarket(PriceStore(data_dir), cal, today=lambda: datetime.now(VN).date()) if (data_dir / "prices").exists() else EmptyMarket()
-        result = scheduled_tick(repo=repo, owner=owner, market=market, jobs=JobStore(data_dir / "jobs.sqlite"),
+        from investment_agent.market.leading import MacroStore, load_indicators, macro_reminders
+        reminders = macro_reminders(load_indicators(), MacroStore(data_dir), today=datetime.now(VN).date())
+        result = scheduled_tick(repo=repo, owner=owner, market=market, jobs=JobStore(data_dir / "jobs.sqlite"), reminders=reminders,
                                 deliveries=DeliveryStore(data_dir / "deliveries.sqlite"), sender=sender, cal=cal,
                                 now=datetime.now(timezone.utc), worker_id=f"scheduler-{os.getpid()}")
     except LeaseBusy:

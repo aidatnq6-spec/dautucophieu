@@ -112,7 +112,8 @@ class TickResult:
     delivered: list[str]
 
 
-def scheduled_tick(*, repo, owner, market, jobs: JobStore, deliveries, sender, cal: TradingCalendar, now: datetime, worker_id: str) -> TickResult:
+def scheduled_tick(*, repo, owner, market, jobs: JobStore, deliveries, sender, cal: TradingCalendar, now: datetime, worker_id: str,
+                   reminders: list[str] | tuple = ()) -> TickResult:
     """One scheduler wake-up: decide, run the due report kinds, then send queued reports if scheduled sending is on."""
     scheduler_lease(jobs, now, worker_id=worker_id)
     reports = list_reports(repo, owner)
@@ -125,7 +126,7 @@ def scheduled_tick(*, repo, owner, market, jobs: JobStore, deliveries, sender, c
     jobs.count_attempt(decision.session_date.isoformat())
     for kind in decision.kinds:
         result = run_after_close(repo=repo, owner=owner, market=market, jobs=jobs, outbox=deliveries, session_date=decision.session_date,
-                                 now=now, worker_id=worker_id, report_kind=kind)
+                                 now=now, worker_id=worker_id, report_kind=kind, reminders=reminders)
         statuses.append(result.status)
     settings, _ = current_settings(repo, owner)
     if decision.send and settings.scheduled_enabled and sender is not None:

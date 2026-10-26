@@ -53,7 +53,8 @@ def _previous(repo, owner, kind: str) -> str | None:
 
 def run_after_close(*, repo, owner, market, jobs: JobStore, outbox, session_date: date, now: datetime, worker_id: str,
                     narrate: Callable[[dict], str] | None = None, before_publish: Callable[[], None] | None = None,
-                    report_kind: str = "after_close", report_version: str = "1") -> JobResult:
+                    report_kind: str = "after_close", report_version: str = "1", reminders: list[str] | tuple = ()) -> JobResult:
+    """reminders: owner-facing notes (e.g. overdue manual macro values) carried in the report; not part of its inputs."""
     content = compose_overview(repo, owner, market, now)
     versions = content["input_versions"]
     market_inputs = {h["security_id"]: [h["price"], h["price_date"]] for h in content["holdings"]}
@@ -72,14 +73,14 @@ def run_after_close(*, repo, owner, market, jobs: JobStore, outbox, session_date
     job_id = jobs.acquire(run_key, worker_id=worker_id, now=now.timestamp(), ttl=LEASE_SECONDS)
     try:
         return _run(repo, owner, market, jobs, outbox, job_id, content, versions, snapshot, report_id, session_date, now, narrate,
-                    before_publish, report_kind, report_version)
+                    before_publish, report_kind, report_version, list(reminders))
     except BaseException:
         jobs.finish(job_id, "failed", report_id=report_id, reason="error")
         raise
 
 
 def _run(repo, owner, market, jobs, outbox, job_id, content, versions, snapshot, report_id, session_date, now, narrate, before_publish,
-         report_kind, report_version) -> JobResult:
+         report_kind, report_version, reminders=()) -> JobResult:
     jobs.stage(job_id, "snapshot")
 
     setup = content["setup"]
@@ -112,7 +113,7 @@ def _run(repo, owner, market, jobs, outbox, job_id, content, versions, snapshot,
         "input_versions": versions, "input_snapshot": snapshot, "decision": content["decision"], "holdings": content["holdings"],
         "items": content["items"], "ledger_summary": {k: ledger[k] for k in ("cash", "realized_gain", "dividend_income", "dividend_receivable", "net_contributions")},
         "narrative": narrative, "verification_flags": flags, "previous_report_id": _previous(repo, owner, report_kind),
-        "sources": sorted({s for i in content["items"] for s in i["source_ids"]}),
+        "sources": sorted({s for i in content["items"] for s in i["source_ids"]}), "reminders": list(reminders),
     }
     if before_publish:
         before_publish()

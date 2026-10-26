@@ -42,3 +42,49 @@ def test_store_round_trips_and_lists_stale_tickers_oldest_first(tmp_path):
     s.save(build_record("MBB", FRAMES, datetime(2026, 10, 25, tzinfo=timezone.utc)))
     assert s.read("FPT")["years"]["2025"]["eps"] == "2000" and s.read("VCB") is None
     assert s.stale(["MBB", "FPT", "VCB"], now=NOW, max_age_days=7) == ["VCB", "FPT"]  # missing first, then oldest
+
+
+from datetime import date, timedelta
+
+from investment_agent.market.fundamentals import sync_fundamentals
+from investment_agent.market.series import SeriesStore
+
+
+class FakeProvider:
+    def __init__(self, fail_once=()):
+        self.calls, self.fail = [], set(fail_once)
+
+    def fundamentals_frames(self, symbol):
+        self.calls.append(("frames", symbol))
+        if symbol in self.fail:
+            self.fail.discard(symbol)
+            raise RuntimeError("60/60 lượt gọi")
+        return FRAMES
+
+    def fetch_closes(self, symbol, start, end, *, interval, index):
+        self.calls.append(("closes", symbol, start))
+        return [(datetime(2025, 12, 31), "26")]
+
+
+def test_sync_refreshes_the_stalest_tickers_and_their_daily_closes(tmp_path):
+    store, series, p, waits = FundamentalsStore(tmp_path / "f"), SeriesStore(tmp_path / "s"), FakeProvider(fail_once={"MBB"}), []
+    out = sync_fundamentals(store, series, ["MBB", "FPT", "VCB"], provider=p, now=NOW, limit=2, sleep=waits.append)
+    assert out == {"updated": ["FPT", "MBB"], "errors": {}} or out == {"updated": ["MBB", "FPT"], "errors": {}}
+    assert store.read("VCB") is None and 65 in waits  # MBB failed once, waited, then succeeded
+    assert ("closes", "FPT", NOW.date() - timedelta(days=2920)) in p.calls and series.read("FPT-1d")
+
+
+def test_sync_records_a_second_failure_and_moves_on(tmp_path):
+    class Broken(FakeProvider):
+        def fundamentals_frames(self, symbol):
+            raise RuntimeError("down")
+    out = sync_fundamentals(FundamentalsStore(tmp_path / "f"), SeriesStore(tmp_path / "s"), ["MBB"], provider=Broken(), now=NOW, limit=8,
+                            sleep=lambda s: None)
+    assert out == {"updated": [], "errors": {"MBB": "error:RuntimeError"}}
+
+
+def test_cli_fundamentals_sync_reads_the_watchlist(tmp_path, capsys):
+    from investment_agent.cli import fundamentals_sync
+    (tmp_path / "market-symbols.txt").write_text("FPT\n", encoding="utf-8")
+    assert fundamentals_sync(tmp_path, limit=8, provider=FakeProvider(), now=NOW, sleep=lambda s: None) == 0
+    assert '"updated": ["FPT"]' in capsys.readouterr().out

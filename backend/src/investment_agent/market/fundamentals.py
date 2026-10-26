@@ -8,7 +8,8 @@ decimal strings in đồng, one JSON file per ticker under data/fundamentals.
 import json
 import os
 import re
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -92,3 +93,35 @@ class FundamentalsStore:
             if fetched is None or (now - fetched).days >= max_age_days:
                 ages.append((fetched is not None, fetched or now, s))
         return [s for _, _, s in sorted(ages)]
+
+
+PACE_SECONDS, RETRY_WAIT_SECONDS = 15, 65
+
+
+def _with_retry(call, sleep):
+    try:
+        return call()
+    except Exception:
+        sleep(RETRY_WAIT_SECONDS)  # usually the 60-calls-per-minute limit
+        return call()
+
+
+def sync_fundamentals(store: "FundamentalsStore", series, symbols: list[str], *, provider, now, limit: int | None,
+                      max_age_days: int = 7, sleep=time.sleep) -> dict:
+    """Refresh statements (and 8 years of daily closes for year-end prices) for the stalest tickers, paced for the rate limit."""
+    todo = store.stale(symbols, now=now, max_age_days=max_age_days)
+    todo = todo if limit is None else todo[:limit]
+    updated, errors, today = [], {}, now.date()
+    for i, sym in enumerate(todo):
+        if i:
+            sleep(PACE_SECONDS)
+        try:
+            frames = _with_retry(lambda: provider.fundamentals_frames(sym), sleep)
+            key = f"{sym}-1d"
+            start = today - timedelta(days=2920 if len(series.read(key)) < 400 else 60)
+            series.upsert(key, _with_retry(lambda: provider.fetch_closes(sym, start, today, interval="1D", index=False), sleep))
+            store.save(build_record(sym, frames, now))
+            updated.append(sym)
+        except Exception as exc:  # one ticker never stops the others
+            errors[sym] = f"error:{type(exc).__name__}"
+    return {"updated": updated, "errors": errors}

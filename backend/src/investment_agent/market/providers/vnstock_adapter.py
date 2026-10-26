@@ -27,8 +27,10 @@ class ProviderUnavailable(RuntimeError):
 
 
 class VnstockProvider:
-    def __init__(self, *, market=None, fundamental=None, listing=None, clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
+    def __init__(self, *, market=None, fundamental=None, listing=None, company=None,
+                 clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
         self._market, self._fundamental, self._listing, self._clock = market, fundamental, listing, clock
+        self._company = company  # callable symbol -> object with .events(); vnstock Company(source="VCI") when None
 
     def _api(self):
         if self._market is None or self._fundamental is None:
@@ -80,6 +82,21 @@ class VnstockProvider:
             if value.is_finite() and value > 0:
                 out.append((row["time"].to_pydatetime(), format(value.normalize(), "f")))
         return out
+
+    def fundamentals_frames(self, symbol: str) -> dict:
+        """Annual and quarterly income statement and balance sheet rows (long format) plus company events."""
+        _, fundamental = self._api()
+        eq = fundamental.equity(symbol.upper())
+        if self._company is None:
+            try:
+                from vnstock import Company
+            except ImportError as exc:
+                raise ProviderUnavailable("vnstock is not installed; install it from vnstocks.com with your own key") from exc
+            self._company = lambda sym: Company(source="VCI", symbol=sym)
+        frames = {"income_year": eq.income_statement(period="year", format="long"), "balance_year": eq.balance_sheet(period="year", format="long"),
+                  "income_quarter": eq.income_statement(period="quarter", format="long"),
+                  "balance_quarter": eq.balance_sheet(period="quarter", format="long"), "events": self._company(symbol.upper()).events()}
+        return {k: v.to_dict("records") for k, v in frames.items()}
 
     def fetch_prices(self, symbol: str, start: date, end: date) -> list[PriceBar]:
         market, _ = self._api()

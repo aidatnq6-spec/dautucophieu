@@ -310,7 +310,14 @@ def scheduled_run(calendar_path: Path, data_dir: Path) -> int:
         market = StoreMarket(PriceStore(data_dir), cal, today=lambda: datetime.now(VN).date()) if (data_dir / "prices").exists() else EmptyMarket()
         from investment_agent.market.leading import MacroStore, load_indicators, macro_reminders
         reminders = macro_reminders(load_indicators(), MacroStore(data_dir), today=datetime.now(VN).date())
+        from investment_agent.brief.view import market_for_session
+        from investment_agent.services.holdings_view import held_from_repo
+        try:
+            held = held_from_repo(repo, owner)
+        except RepositoryUnavailable:
+            held = set()
         result = scheduled_tick(repo=repo, owner=owner, market=market, jobs=JobStore(data_dir / "jobs.sqlite"), reminders=reminders,
+                                market_for=market_for_session(data_dir, held),
                                 deliveries=DeliveryStore(data_dir / "deliveries.sqlite"), sender=sender, cal=cal,
                                 now=datetime.now(timezone.utc), worker_id=f"scheduler-{os.getpid()}")
     except LeaseBusy:

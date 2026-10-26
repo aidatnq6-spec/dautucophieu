@@ -3,7 +3,12 @@ machine). Runs on the owner's machine only; nothing here is sent to a model."""
 
 from decimal import Decimal
 
+from pathlib import Path
+
+from investment_agent.market.watchlist import load_watchlist
+
 from .news import pick_news
+from .snapshot import BriefStore
 
 NEWS_LIMIT = 8
 
@@ -25,3 +30,11 @@ def market_view(snapshot: dict | None, *, watched: list[str], held: set[str], ne
     view = {k: snapshot.get(k) for k in ("session_date", "updated_at", "indices", "hose", "proprietary")}
     view["board"] = {k: v for k, v in board.items() if k != "symbols"}
     return {**view, "tickers": first + others, "news": news}
+
+
+def market_for_session(data_dir: Path | None, held: set[str]):
+    """session date (ISO) -> market view, reading data/brief on demand; None when there is no data dir or snapshot."""
+    if data_dir is None:
+        return lambda session: None
+    store, watched = BriefStore(Path(data_dir)), list(load_watchlist(Path(data_dir)).symbols)
+    return lambda session: market_view(store.read(session), watched=watched, held=held) if session else None

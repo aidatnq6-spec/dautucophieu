@@ -97,12 +97,12 @@ class DeliveryStore:
             self._db.execute("UPDATE outbox SET status='processed' WHERE report_id=?", (report_id,))
 
 
-def deliver(report: dict, settings: NotificationSettings, sender, store: DeliveryStore) -> DeliveryResult:
+def deliver(report: dict, settings: NotificationSettings, sender, store: DeliveryStore, market: dict | None = None) -> DeliveryResult:
     if not settings.enabled:
         return DeliveryResult("disabled")
     if report["status"] != "published":
         return DeliveryResult("not_publishable")
-    texts = split_message(render_report(report))
+    texts = split_message(render_report(report, market))
     rid, version, dest = report["report_id"], report.get("report_version", "1"), settings.chat_id
     store.ensure(rid, version, dest, texts)
     rows = store.parts(rid, dest, version)

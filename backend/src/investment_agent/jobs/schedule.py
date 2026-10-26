@@ -113,7 +113,7 @@ class TickResult:
 
 
 def scheduled_tick(*, repo, owner, market, jobs: JobStore, deliveries, sender, cal: TradingCalendar, now: datetime, worker_id: str,
-                   reminders: list[str] | tuple = ()) -> TickResult:
+                   reminders: list[str] | tuple = (), market_for=lambda session: None) -> TickResult:
     """One scheduler wake-up: decide, run the due report kinds, then send queued reports if scheduled sending is on."""
     scheduler_lease(jobs, now, worker_id=worker_id)
     reports = list_reports(repo, owner)
@@ -124,7 +124,7 @@ def scheduled_tick(*, repo, owner, market, jobs: JobStore, deliveries, sender, c
     if not decision.run:
         if decision.reason == "already_published":
             # Published by hand (Tạo bản tin) before the slot: still send it, but only for the current session.
-            delivered = _send_queued(repo, owner, deliveries, sender, session=decision.session_date)
+            delivered = _send_queued(repo, owner, deliveries, sender, session=decision.session_date, market_for=market_for)
         return TickResult(decision, statuses, delivered)
     jobs.count_attempt(decision.session_date.isoformat())
     for kind in decision.kinds:
@@ -132,11 +132,11 @@ def scheduled_tick(*, repo, owner, market, jobs: JobStore, deliveries, sender, c
                                  now=now, worker_id=worker_id, report_kind=kind, reminders=reminders)
         statuses.append(result.status)
     if decision.send:
-        delivered = _send_queued(repo, owner, deliveries, sender)
+        delivered = _send_queued(repo, owner, deliveries, sender, market_for=market_for)
     return TickResult(decision, statuses, delivered)
 
 
-def _send_queued(repo, owner, deliveries, sender, *, session: date | None = None) -> list[str]:
+def _send_queued(repo, owner, deliveries, sender, *, session: date | None = None, market_for=lambda session: None) -> list[str]:
     """Send queued reports when scheduled sending is on; with session, only that session's reports."""
     settings, _ = current_settings(repo, owner)
     if not settings.scheduled_enabled or sender is None:
@@ -146,7 +146,7 @@ def _send_queued(repo, owner, deliveries, sender, *, session: date | None = None
         report = get_report(repo, owner, report_id)
         if not report or (session is not None and report.get("session_date") != session.isoformat()):
             continue
-        if deliver(report, settings, sender, deliveries).status == "sent":
+        if deliver(report, settings, sender, deliveries, market_for(report.get("session_date"))).status == "sent":
             deliveries.mark_processed(report_id)
             delivered.append(report_id)
     return delivered

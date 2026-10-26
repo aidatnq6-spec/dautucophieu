@@ -44,7 +44,7 @@ def normalise(text: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^\w\s]|_", " ", text)).strip()
 
 
-MIN_QUOTE_WORDS, MIN_QUOTE_CHARS = 4, 15  # a word or a number alone is not evidence
+MIN_QUOTE_WORDS, MIN_QUOTE_CHARS = 6, 25  # a short phrase or a number alone is not evidence
 
 
 def _page(value) -> int:
@@ -58,7 +58,8 @@ def _found(item: dict, pages: list[str]) -> bool:
     q = normalise(quote)
     if len(q.split()) < MIN_QUOTE_WORDS or len(q) < MIN_QUOTE_CHARS:
         return False
-    return f" {q} " in f" {normalise(pages[page - 1])} "  # whole words only
+    # pypdf splits Vietnamese syllables with spaces and line breaks ("T ổng m ức"), so compare with all whitespace removed.
+    return q.replace(" ", "") in normalise(pages[page - 1]).replace(" ", "")
 
 
 def _items(value) -> list[dict]:

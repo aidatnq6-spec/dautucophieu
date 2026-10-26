@@ -56,7 +56,9 @@ def test_validate_survives_non_string_fields():
 
 
 def test_short_or_partial_word_quotes_do_not_count_as_evidence():
-    cases = [("ng", 2), ("ngân hàng", 2), ("7,5%", 1), ("ăng trưởng GDP quý III đạt", 1)]
+    # Whitespace is ignored when matching (pypdf splits syllables), so word boundaries cannot be checked; a quote must
+    # instead be long enough (6 words, 25 characters) that it can only come from the report itself.
+    cases = [("ng", 2), ("ngân hàng", 2), ("7,5%", 1), ("ăng trưởng GDP", 1)]
     for quote, page in cases:
         raw = {"sectors": [{"sector": "Ngân hàng", "effect": "benefit", "reason": "x", "quote": quote, "page": page}],
                "macro_now": {"view": "favourable", "reasons": [{"text": "x", "quote": quote, "page": page}]}}
@@ -69,3 +71,19 @@ def test_macro_view_without_any_verified_reason_is_not_kept():
            "macro_outlook": {"view": "unfavourable", "reasons": []}, "sectors": []}
     out = validate(raw, PAGES, SECTORS)
     assert out["macro_now"] == {"view": None, "reasons": []} and out["macro_outlook"]["view"] is None
+
+
+def test_quotes_match_pdf_text_with_syllables_split_by_spaces_and_newlines():
+    """26/10/2026: pypdf splits Vietnamese syllables ("T\n ổng  \nm\nức"); verbatim quotes were all dropped."""
+    broken = ["T\n ổng  \nm\nức bán l\nẻ hàng hóa và doanh thu d\nịch v\nụ tiêu dùng tăng 14,12% so v\nới cùng k\nỳ"]
+    raw = {"macro_now": {"view": "favourable", "reasons": [
+        {"text": "Bán lẻ tăng", "quote": "Tổng mức bán lẻ hàng hóa và doanh thu dịch vụ tiêu dùng tăng 14,12%", "page": 1}]},
+        "macro_outlook": {"view": "neutral", "reasons": []}, "sectors": []}
+    out = validate(raw, broken, SECTORS)
+    assert len(out["macro_now"]["reasons"]) == 1 and out["macro_now"]["view"] == "favourable"
+
+
+def test_quotes_still_need_enough_words_to_be_evidence():
+    raw = {"macro_now": {"view": "favourable", "reasons": [{"text": "x", "quote": "Tăng trưởng GDP quý III", "page": 1}]},
+           "macro_outlook": {"view": "neutral", "reasons": []}, "sectors": []}
+    assert validate(raw, PAGES, SECTORS)["macro_now"]["reasons"] == []  # 5 words: too short to count

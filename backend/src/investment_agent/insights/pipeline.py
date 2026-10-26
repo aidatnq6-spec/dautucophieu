@@ -14,13 +14,20 @@ STOPPING = {"key_missing", "policy_not_approved", "budget_not_configured", "budg
             "no_eligible_model", "unknown_task", "concurrency_cap"}
 
 
-def _parse(content, texts, sectors) -> dict | None:
-    """Model output is untrusted: anything that is not a JSON object of the expected shape yields no insight."""
+def _parse(content, texts, sectors) -> tuple[dict | None, str | None]:
+    """Model output is untrusted: anything that is not a JSON object of the expected shape yields no insight, with the reason."""
+    if not isinstance(content, str) or not content.strip():
+        return None, "empty_answer"
     try:
-        raw = json.loads(content) if isinstance(content, str) else None
-        return validate(raw, texts, sectors) if isinstance(raw, dict) else None
+        raw = json.loads(content)
+    except ValueError:
+        return None, "invalid_json"  # usually an answer cut off by the token limit
+    if not isinstance(raw, dict):
+        return None, "not_an_object"
+    try:
+        return validate(raw, texts, sectors), None
     except Exception:
-        return None
+        return None, "unexpected_shape"
 
 
 def run_insights(*, store, discover, download, pages, gateway, sectors, now, sleep) -> dict:
@@ -63,9 +70,9 @@ def run_insights(*, store, discover, download, pages, gateway, sectors, now, sle
                 return {"status": f"stopped:{exc.code}", "processed": processed, "skipped": len(todo) - len(processed), "errors": errors}
             fail(key, exc.code)
             continue
-        insight = _parse(done.content, texts, sectors)
+        insight, problem = _parse(done.content, texts, sectors)
         claims = insight and (insight["macro_now"]["reasons"] or insight["macro_outlook"]["reasons"] or insight["sectors"])
         store.save({**record, "status": "ok" if claims else "no_reliable_claims", "insight": insight, "model": done.model,
-                    "cost_usd": str(done.cost_usd)})
+                    "cost_usd": str(done.cost_usd), "answer_problem": problem, "completion_tokens": done.completion_tokens})
         processed.append(key)
     return {"status": "ok", "processed": processed, "skipped": 0, "errors": errors}

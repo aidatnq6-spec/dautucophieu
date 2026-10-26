@@ -62,3 +62,12 @@ test("an issuer without data shows limits, not a buy action", async ({ page }) =
   await expect(page.getByText("Chưa có tài liệu nguồn cho mã này")).toBeVisible();
   await expect(page.getByRole("button", { name: /^Mua/ })).toHaveCount(0);
 });
+
+test("Nghiên cứu is no longer in the menu but its pages still open from links", async ({ page }) => {
+  await page.goto("/watchlist");
+  const nav = page.getByRole("navigation", { name: "Điều hướng chính" });
+  await expect(nav.getByRole("link", { name: "Theo dõi" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Nghiên cứu" })).toHaveCount(0);
+  await page.goto("/research");
+  await expect(page.getByRole("heading", { name: "Nghiên cứu có căn cứ." })).toBeVisible();
+});

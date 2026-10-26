@@ -67,6 +67,9 @@ legend{font-weight:600;padding:0 6px}
 .fv-table{width:100%;border-collapse:collapse;font-size:14px}
 .fv-table th,.fv-table td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
 .fv-detail ul{margin:6px 0;padding-left:18px}.fv-detail li{margin:4px 0}
+.ins-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px;margin-bottom:16px}
+.ins-card h2{margin-top:0}.ins-reasons,.ins-list{margin:6px 0;padding-left:18px}.ins-reasons li,.ins-list li{margin:6px 0;overflow-wrap:anywhere}
+.ins-table td{white-space:normal}.ins-claim{margin:0 0 6px;overflow-wrap:anywhere}.ins-ticker{display:inline-block;margin:0 10px 6px 0;white-space:nowrap}
 @media (max-width:700px){
   .fv-table thead{display:none}
   .fv-table,.fv-table tbody,.fv-table tr,.fv-table td{display:block;width:100%}

@@ -11,6 +11,7 @@ import uvicorn
 
 from investment_agent.api.app import create_app
 from investment_agent.api.auth import InternalAuthSettings
+from investment_agent.insights.store import InsightStore
 from investment_agent.jobs.runner import JobStore
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.leading import MacroStore
@@ -66,6 +67,20 @@ if __name__ == "__main__":
         "quarters": {q: {"npat": "250000000", "equity": "10000000000"} for q in ("2025-Q2", "2025-Q3", "2025-Q4", "2026-Q1", "2026-Q2")},
         "dividends": [{"date": f"{y}-07-01", "cash": "500"} for y in range(2021, 2026)] + [{"date": "2026-07-01", "cash": "500"}], "issues": []})
     SeriesStore(os.path.join(data, "trend-sources")).upsert("FPT-1d", [(datetime(y, 12, 31), "12") for y in range(2020, 2026)])
+    # Nhận định: two synthetic verified report records published 5 and 20 days ago, one SSI title.
+    def _insight(ref, days, view, sectors):
+        return {"source": "acbs", "ref_id": ref, "title": f"Báo cáo mẫu {ref}", "page_url": f"https://example.invalid/{ref}",
+                "pdf_url": f"https://example.invalid/{ref}.pdf", "published": (date.today() - timedelta(days=days)).isoformat(),
+                "status": "ok", "telegram_sent": True, "model": "synthetic", "cost_usd": "0",
+                "insight": {"macro_now": {"view": view, "reasons": [{"text": f"Tăng trưởng GDP vững ({ref})", "quote": "GDP tăng 7,5%", "page": 1}]},
+                            "macro_outlook": {"view": "neutral", "reasons": [{"text": "Lãi suất neo cao", "quote": "lãi suất cao", "page": 2}]},
+                            "sectors": [{"sector": s, "effect": e, "reason": f"Lý do {s}", "quote": "q", "page": 3} for s, e in sectors], "dropped": 0}}
+    insights = InsightStore(os.path.join(data, "insights"))
+    insights.save(_insight("mau-1", 5, "favourable", [("Công nghệ Thông tin", "benefit"), ("Ngân hàng", "harm")]))
+    insights.save(_insight("mau-2", 20, "favourable", [("Ngân hàng", "benefit")]))
+    with open(os.path.join(data, "insights", "ssi.json"), "w", encoding="utf-8") as f:
+        json.dump({"at": "synthetic", "titles": [{"title": "Cập nhật Ngành Thép mẫu", "kind": "ngành", "date": "2026-10-20",
+                                                  "url": "https://example.invalid/ssi-thep"}]}, f, ensure_ascii=False)
     MacroStore(data).upsert("us10y", [(date(2026, 10, 21), "4.91"), (date(2026, 10, 23), "4.96")], entry="auto")
     app = create_app(InternalAuthSettings.from_env(), personal_repository=repository, market=MARKET,
                      jobs=JobStore(os.path.join(data, "jobs.sqlite")), outbox=deliveries, deliveries=deliveries, data_dir=data)

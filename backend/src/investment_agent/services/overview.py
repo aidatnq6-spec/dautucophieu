@@ -17,7 +17,7 @@ from investment_agent.domain.settlement import availability
 from investment_agent.market.universe import UniverseVersion, research_scope
 from investment_agent.valuation.assumptions import ValuationAssumptions
 from investment_agent.valuation.dcf import value_assumptions
-from investment_agent.services.records import LedgerBook, StoredRisk, read_current, read_version, trading_settings
+from investment_agent.services.records import LedgerBook, StoredRisk, effective_risk, read_current, read_version, trading_settings
 
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
 HEADLINES = {"buy_tranche": "Có đề xuất mua từng phần", "reduce": "Cân nhắc giảm tỷ trọng", "hold": "Giữ phân bổ hiện tại",
@@ -69,7 +69,7 @@ def compose_overview(repo, owner, market, now) -> dict:
     state = replay(events)
     universe = UniverseVersion.model_validate(universe_rec.payload) if universe_rec else None
     profile = ConfirmedProfile.model_validate(profile_rec.payload) if profile_rec else None
-    risk = StoredRisk.model_validate(risk_rec.payload).assessment if risk_rec else None
+    risk = effective_risk(repo, owner, StoredRisk.model_validate(risk_rec.payload).assessment if risk_rec else None)
     capital = profile.assessment if profile else None
     total = capital.investable_capital if capital and capital.status == "ready" else None
 
@@ -122,7 +122,7 @@ def compose_overview(repo, owner, market, now) -> dict:
         headline = next((a for a in ("buy_tranche", "reduce", "insufficient_basis", "wait") if a in actions), "hold")
         decision = {"action": headline, "headline": HEADLINES[headline],
                     "reasons": sorted({r for i in items if i["action"] == headline for r in i["reasons"]})}
-    return {"provenance": market.provenance, "as_of": now.isoformat(), "setup": setup, "decision": decision,
+    return {"provenance": market.provenance, "as_of": now.isoformat(), "setup": setup, "decision": decision, "risk_group": risk.group if risk else None,
             "capital": capital.model_dump(mode="json") if capital else None, "ledger": state.model_dump(mode="json"),
             "holdings": holdings, "items": items, "quality_notes": notes,
             "input_versions": {"profile_versions/main": profile_rec.version if profile_rec else 0, "risk_versions/main": risk_rec.version if risk_rec else 0,

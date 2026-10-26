@@ -44,6 +44,7 @@ pydantic==2.12.5
 pydantic-core==2.41.5
 pygments==2.21.0
 pyjwt==2.15.1
+pypdf==5.1.0
 pytest==9.0.2
 python-dateutil==3.0.0
 pytz==2026.5

@@ -51,11 +51,6 @@ export function MarketView() {
         </div>
         {data.sectors_as_of && <p className="caption">Phân ngành ICB cấp 2 theo nguồn ngày {data.sectors_as_of}.</p>}
       </section>
-      <section className="surface" aria-label="Vĩ mô">
-        <h2>Vĩ mô</h2>
-        <p className="muted">Chưa có dữ liệu vĩ mô: GDP, CPI, lãi suất, cung tiền, FDI và xuất nhập khẩu không có trong gói Vnstock miễn phí.
-          Ứng dụng không ước đoán thay. Cần nguồn trả phí hoặc số liệu bạn tự nhập từ Tổng cục Thống kê và Ngân hàng Nhà nước.</p>
-      </section>
     </>
   );
 }

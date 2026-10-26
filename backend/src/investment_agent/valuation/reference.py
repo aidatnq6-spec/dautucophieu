@@ -58,15 +58,18 @@ def year_end_prices(points, *, today: date) -> dict[int, Decimal]:
 
 
 def metrics(record: dict, *, today: date, year_end_prices: dict[int, Decimal]) -> dict | None:
-    years = record["years"]
-    annual = [y for y in sorted(years) if _d(years[y].get("npat")) and _d(years[y].get("eps"))]
+    years, listed = record["years"], _d(record.get("shares_outstanding"))
+    annual = [y for y in sorted(years) if _d(years[y].get("npat")) and (_d(years[y].get("eps")) or listed)]
     if not annual:
         return None
     latest_year = annual[-1]
-    shares = _d(years[latest_year]["npat"]) / _d(years[latest_year]["eps"])
-    for issue in record.get("issues", []):
-        if f"{latest_year}-12-31" < issue["date"] <= today.isoformat():
-            shares *= 1 + Decimal(issue["ratio"])
+    if _d(years[latest_year].get("eps")):
+        shares = _d(years[latest_year]["npat"]) / _d(years[latest_year]["eps"])
+        for issue in record.get("issues", []):
+            if f"{latest_year}-12-31" < issue["date"] <= today.isoformat():
+                shares *= 1 + Decimal(issue["ratio"])
+    else:  # no EPS reported (securities firms): the company overview's listed shares, already current
+        shares = listed
     shares = shares.quantize(Decimal(1), ROUND_HALF_UP)
     quarters = record["quarters"]
     with_profit = [q for q in sorted(quarters) if _d(quarters[q].get("npat")) is not None]

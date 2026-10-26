@@ -14,6 +14,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 NPAT, EPS, EQUITY = "IS_PROFIT_AFTER_TAX_FOR_SHAREHOLDERS_OF_PARENT_COMPANY", "IS_BASIC_EARNINGS_PER_SHARE", "BS_EQUITY"
+NET_PROFIT = "IS_NET_PROFIT_AFTER_TAX"  # securities firms report only this line, and no EPS
 _CASH = re.compile(r"tiền mặt.*?([\d][\d.,]*)\s*VND", re.I)
 _RATIO = re.compile(r"tỉ lệ\s*([\d]+(?:[.,]\d+)?)\s*%", re.I)
 _SYMBOL = re.compile(r"^[A-Z0-9]{1,10}$")
@@ -34,6 +35,10 @@ def _by_period(rows: list[dict], names: dict[str, str]) -> dict[str, dict[str, s
         value = _num(r.get("value")) if key else None
         if value is not None:
             out.setdefault(str(r["period"]), {})[key] = value
+    for figures in out.values():  # parent-company profit when reported, otherwise net profit
+        net = figures.pop("net_profit", None)
+        if "npat" not in figures and net is not None and "npat" in names.values():
+            figures["npat"] = net
     return dict(sorted(out.items()))
 
 
@@ -58,10 +63,13 @@ def _events(rows: list[dict]) -> tuple[list[dict], list[dict]]:
 
 def build_record(symbol: str, frames: dict, fetched_at: datetime) -> dict:
     dividends, issues = _events(frames["events"])
+    overview = (frames.get("overview") or [{}])[0]
     return {"symbol": symbol.upper(), "fetched_at": fetched_at.isoformat(), "source": "vnstock:vci",
-            "years": _by_period(frames["income_year"] + frames["balance_year"], {NPAT: "npat", EPS: "eps", EQUITY: "equity"}),
-            "quarters": _by_period(frames["income_quarter"] + frames["balance_quarter"], {NPAT: "npat", EQUITY: "equity"}),
-            "dividends": dividends, "issues": issues}
+            "years": _by_period(frames["income_year"] + frames["balance_year"], {NPAT: "npat", NET_PROFIT: "net_profit", EPS: "eps", EQUITY: "equity"}),
+            "quarters": _by_period(frames["income_quarter"] + frames["balance_quarter"], {NPAT: "npat", NET_PROFIT: "net_profit", EQUITY: "equity"}),
+            "dividends": dividends, "issues": issues,
+            # Listed shares from the company overview: the share count when no EPS is reported (securities firms).
+            "shares_outstanding": _num(overview.get("outstanding_shares"))}
 
 
 class FundamentalsStore:

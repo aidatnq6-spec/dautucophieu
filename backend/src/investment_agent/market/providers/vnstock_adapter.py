@@ -95,7 +95,9 @@ class VnstockProvider:
             self._company = lambda sym: Company(source="VCI", symbol=sym)
         frames = {"income_year": eq.income_statement(period="year", format="long"), "balance_year": eq.balance_sheet(period="year", format="long"),
                   "income_quarter": eq.income_statement(period="quarter", format="long"),
-                  "balance_quarter": eq.balance_sheet(period="quarter", format="long"), "events": self._company(symbol.upper()).events()}
+                  "balance_quarter": eq.balance_sheet(period="quarter", format="long")}
+        company = self._company(symbol.upper())
+        frames.update(events=company.events(), overview=company.overview())
         return {k: v.to_dict("records") for k, v in frames.items()}
 
     def fetch_prices(self, symbol: str, start: date, end: date) -> list[PriceBar]:

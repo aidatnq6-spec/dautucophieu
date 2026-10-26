@@ -88,3 +88,22 @@ def test_cli_fundamentals_sync_reads_the_watchlist(tmp_path, capsys):
     (tmp_path / "market-symbols.txt").write_text("FPT\n", encoding="utf-8")
     assert fundamentals_sync(tmp_path, limit=8, provider=FakeProvider(), now=NOW, sleep=lambda s: None) == 0
     assert '"updated": ["FPT"]' in capsys.readouterr().out
+
+
+def test_securities_firms_fall_back_to_net_profit_and_listed_shares():
+    # Securities firms (e.g. SSI) report no parent-company profit line and no EPS (checked 2026-10-26).
+    frames = {**FRAMES, "income_year": rows("2025", IS_NET_PROFIT_AFTER_TAX=4.1e9), "income_quarter": rows("2026-Q2", IS_NET_PROFIT_AFTER_TAX=1.2e9),
+              "overview": [{"outstanding_shares": 3001302333.0, "issue_share": 3003293801}]}
+    r = build_record("SSI", frames, NOW)
+    assert r["years"]["2025"]["npat"] == "4100000000" and r["quarters"]["2026-Q2"]["npat"] == "1200000000"
+    assert r["shares_outstanding"] == "3001302333"
+    parent = build_record("FPT", {**FRAMES, "income_year": FRAMES["income_year"] + rows("2025", IS_NET_PROFIT_AFTER_TAX=9e9)}, NOW)
+    assert parent["years"]["2025"]["npat"] == "2000000000"  # the parent-company line wins when both exist
+
+
+def test_cli_can_refresh_named_tickers_now_even_when_recent(tmp_path, capsys):
+    from investment_agent.cli import fundamentals_sync
+    (tmp_path / "market-symbols.txt").write_text("FPT\nSSI\n", encoding="utf-8")
+    FundamentalsStore(tmp_path / "fundamentals").save(build_record("SSI", FRAMES, NOW))  # fresh, so not stale
+    assert fundamentals_sync(tmp_path, limit=8, symbols=["SSI"], provider=FakeProvider(), now=NOW, sleep=lambda s: None) == 0
+    assert '"updated": ["SSI"]' in capsys.readouterr().out

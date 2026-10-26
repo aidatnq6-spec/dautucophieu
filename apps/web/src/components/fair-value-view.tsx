@@ -15,7 +15,7 @@ const VERDICT: Record<Row["verdict"], { label: string; tone: string }> = {
 };
 const INPUT: Record<string, string> = { eps: "EPS", bvps: "Giá trị sổ sách/cp", pe_median: "P/E trung vị", pb_median: "P/B trung vị", years: "Số năm",
   base: "Cơ sở", peer_median: "Trung vị cùng ngành", peers: "Số mã cùng ngành", roe: "ROE", justified_pb: "P/B hợp lý",
-  dividend_ttm: "Cổ tức tiền 12 tháng", paying_years: "Số năm trả cổ tức" };
+  dividend_avg3: "Cổ tức tiền bình quân 3 năm", paying_years: "Số năm trả cổ tức" };
 const pct = (v: string) => formatRatio(v, 1);
 
 function inputText(k: string, v: string | number) {

@@ -28,7 +28,7 @@ def test_metrics_derive_shares_ttm_eps_bvps_roe_and_history():
     assert (m["shares"], m["eps_ttm"], m["bvps"]) == (Decimal(1000000), Decimal(2200), Decimal(16000))
     assert m["roe"].quantize(Decimal("0.0001")) == Decimal("0.1467")
     assert m["pe_history"] == {2021: 15, 2022: 12, 2023: 10, 2024: 14, 2025: 13}
-    assert m["pb_history"][2021] == Decimal("1.5") and m["dividend_ttm"] == Decimal(2000) and m["paying_years"] == 5
+    assert m["pb_history"][2021] == Decimal("1.5") and m["dividend_avg3"] == Decimal(1000) and m["paying_years"] == 5
     assert m["latest_year"] == "2025" and m["latest_quarter"] == "2026-Q2"
 
 
@@ -43,7 +43,7 @@ def test_each_method_on_the_hand_computed_case():
     got = {x["method"]: x["value"] for x in methods_for(["pe_history", "pb_history", "pe_peers", "pb_peers", "justified_pb", "ddm", "pe_normalized"],
                                                         m, peers, Settings())}
     assert got == {"pe_history": Decimal(28600), "pb_history": Decimal(24000), "pe_peers": Decimal(26400), "pb_peers": Decimal(32000),
-                   "justified_pb": Decimal(19333), "ddm": Decimal(26250), "pe_normalized": Decimal(17420)}
+                   "justified_pb": Decimal(19333), "ddm": Decimal(13125), "pe_normalized": Decimal(17420)}
 
 
 def test_methods_explain_why_they_do_not_apply():
@@ -91,3 +91,15 @@ def test_listed_shares_stand_in_when_eps_is_not_reported():
     r["shares_outstanding"] = "1000000"
     m = metrics(r, today=TODAY, year_end_prices=PRICES)
     assert m is not None and m["shares"] == Decimal(1000000) and m["eps_ttm"] == Decimal(2200)
+
+
+def test_dividends_use_the_average_of_the_last_three_full_years():
+    # NT2's real schedule: payouts fall just outside a 12-month window (21/10/2025, 29/10/2026 not yet ex-right).
+    r = record()
+    r["dividends"] = [{"date": "2023-03-23", "cash": "1000"}, {"date": "2023-09-14", "cash": "1500"}, {"date": "2024-03-14", "cash": "700"},
+                      {"date": "2025-01-17", "cash": "800"}, {"date": "2025-10-21", "cash": "700"}, {"date": "2026-10-29", "cash": "1000"},
+                      {"date": "2021-02-05", "cash": "1000"}, {"date": "2022-04-04", "cash": "1000"}]
+    m = metrics(r, today=TODAY, year_end_prices=PRICES)
+    assert m["dividend_avg3"].quantize(Decimal("0.01")) == Decimal("1566.67")  # (2,500 + 700 + 1,500) / 3
+    [ddm] = methods_for(["ddm"], m, {"pe": [], "pb": []}, Settings())
+    assert ddm["value"] == Decimal(20563)  # 1,566.67 × 1.05 / 0.08

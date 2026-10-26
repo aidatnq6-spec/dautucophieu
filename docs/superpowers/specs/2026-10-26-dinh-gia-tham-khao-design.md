@@ -75,7 +75,7 @@ Giới hạn: 60 lượt gọi mỗi phút, và mỗi lần lấy một báo cá
 3. **P/E cùng ngành**: EPS TTM × trung vị P/E hiện tại của các mã cùng ngành ICB cấp 2 trong 50 mã. Cần ít nhất 3 mã khác có EPS TTM dương.
 4. **P/B cùng ngành**: tương tự, dùng P/B.
 5. **P/B hợp lý theo ROE**: BVPS × (ROE − g) / (r − g), với r = 13%, g = 5%. Không áp dụng khi ROE ≤ g.
-6. **Chiết khấu cổ tức (Gordon)**: D₁ = cổ tức tiền mặt mỗi cổ phiếu năm gần nhất × (1 + g); giá trị = D₁ / (r − g). Chỉ áp dụng khi trả cổ tức tiền mặt ít nhất 4 trong 5 năm gần nhất. Cổ tức lấy từ sự kiện công ty, tính theo đồng mỗi cổ phiếu ở thời điểm chi trả.
+6. **Chiết khấu cổ tức (Gordon)**: D₁ = cổ tức tiền mặt mỗi cổ phiếu **bình quân 3 năm dương lịch gần nhất** × (1 + g); giá trị = D₁ / (r − g). Chủ sở hữu duyệt đổi từ "12 tháng gần nhất" ngày 26/10/2026, vì ngày chi trả lệch vài ngày quanh mốc 12 tháng làm NT2 tính ra cổ tức bằng 0. Chỉ áp dụng khi trả cổ tức tiền mặt ít nhất 4 trong 5 năm gần nhất. Cổ tức lấy từ sự kiện công ty, tính theo đồng mỗi cổ phiếu ở thời điểm chi trả.
 7. **P/E trên lợi nhuận bình quân (cho ngành chu kỳ)**: (bình quân LNST 8 năm / số cổ phiếu hiện tại) × trung vị P/E các năm.
 
 ### Phương án theo ngành (tôi chọn, theo tên ICB cấp 2)

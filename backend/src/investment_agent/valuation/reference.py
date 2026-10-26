@@ -8,7 +8,7 @@ means no verdict.
 """
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
 UNCLASSIFIED = "Chưa phân ngành"
@@ -89,15 +89,17 @@ def metrics(record: dict, *, today: date, year_end_prices: dict[int, Decimal]) -
         if eq and eq > 0:
             pb_history[int(y)] = price * shares / eq
     npats = [_d(years[y]["npat"]) for y in sorted(years) if _d(years[y].get("npat")) is not None]
-    year_ago = (today - timedelta(days=365)).isoformat()
     divs = record.get("dividends", [])
+    # Average cash dividend of the last three full calendar years: payout dates drift by days around a 12-month window.
+    recent = range(today.year - 3, today.year)
+    dividend_avg3 = sum((Decimal(d["cash"]) for d in divs if int(d["date"][:4]) in recent), Decimal(0)) / len(recent)
     paying = {int(d["date"][:4]) for d in divs if today.year - 5 <= int(d["date"][:4]) <= today.year - 1}
     return {"shares": shares, "eps_ttm": npat_ttm / shares if npat_ttm is not None else None,
             "bvps": equity_now / shares if equity_now is not None else None,
             "roe": npat_ttm / ((equity_now + equity_prev) / 2) if None not in (npat_ttm, equity_now, equity_prev) else None,
             "pe_history": pe_history, "pb_history": pb_history,
             "eps_normalized": (sum(npats) / len(npats)) / shares if npats else None,
-            "dividend_ttm": sum((Decimal(d["cash"]) for d in divs if year_ago < d["date"] <= today.isoformat()), Decimal(0)),
+            "dividend_avg3": dividend_avg3,
             "paying_years": len(paying), "latest_year": latest_year, "latest_quarter": latest_quarter}
 
 
@@ -140,12 +142,12 @@ def _method(name: str, m: dict, peers: dict, s: Settings) -> dict:
         pb = (roe - g) / (r - g)
         return _result(name, bvps * pb, bvps=bvps, roe=roe, justified_pb=pb)
     if name == "ddm":
-        d = m["dividend_ttm"]
+        d = m["dividend_avg3"]
         if m["paying_years"] < MIN_PAYING_YEARS or not d:
             return _result(name, reason=f"Cần trả cổ tức tiền mặt ít nhất {MIN_PAYING_YEARS} trong 5 năm gần nhất")
         if r <= g:
             return _result(name, reason="Lợi suất yêu cầu phải lớn hơn tăng trưởng")
-        return _result(name, d * (1 + g) / (r - g), dividend_ttm=d, paying_years=m["paying_years"])
+        return _result(name, d * (1 + g) / (r - g), dividend_avg3=d, paying_years=m["paying_years"])
     raise ValueError(name)
 
 

@@ -3,6 +3,7 @@
 Checked 2026-10-26: ACBS PDFs and the World Bank API are public; SSI PDFs need a login, so only titles are used.
 """
 
+import hashlib
 import html
 import json
 import re
@@ -50,12 +51,22 @@ def _text(fragment: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", fragment))).strip()
 
 
-def discover_acbs(get, *, since: date, known=lambda slug: False) -> list[ReportRef]:
-    """known(slug) True skips the detail-page fetch for reports already processed."""
+MAX_ID = 120
+
+
+def safe_id(slug: str) -> str:
+    """Report id the store accepts: the slug itself, or for over-long slugs a stable prefix plus a short hash."""
+    if len(slug) <= MAX_ID:
+        return slug
+    return f"{slug[:MAX_ID - 13]}-{hashlib.sha1(slug.encode()).hexdigest()[:12]}"
+
+
+def discover_acbs(get, *, since: date, known=lambda ref_id: False) -> list[ReportRef]:
+    """known(ref_id) True skips the detail-page fetch for reports already processed."""
     refs, seen = [], set()
     for m in _ACBS_LINK.finditer(get(ACBS_LIST)):
         page_url, slug, title = urljoin(ACBS_LIST, m.group(1)), m.group(2), _text(m.group(3))
-        if slug in seen or known(slug) or _ACBS_SKIP.search(slug) or not safe_url(page_url):
+        if slug in seen or _ACBS_SKIP.search(slug) or not safe_url(page_url) or known(safe_id(slug)):
             continue
         seen.add(slug)
         detail = get(page_url)
@@ -67,7 +78,7 @@ def discover_acbs(get, *, since: date, known=lambda slug: False) -> list[ReportR
         title = (_text(h1.group(1)) if h1 else "") or title  # list anchors carry only the category label
         pdf_url = safe_url(urljoin(page_url, pdf.group(1)))
         if pdf_url and published >= since.replace(day=1):
-            refs.append(ReportRef("acbs", slug, title, page_url, pdf_url, published))
+            refs.append(ReportRef("acbs", safe_id(slug), title, page_url, pdf_url, published))
     return refs
 
 

@@ -449,8 +449,7 @@ def insights_cli(data_dir: Path, calendar_path: Path, *, min_hours: float = 6) -
     from investment_agent.domain.pinned import CONFIG_DIR
     from investment_agent.insights.download import fetch_pdf
     from investment_agent.insights.pdf import extract_pages
-    from investment_agent.insights.run import due, insights_run, record_status
-    from investment_agent.insights.sources import discover_acbs, discover_worldbank
+    from investment_agent.insights.run import discover_sources, due, insights_run, record_status
     from investment_agent.insights.store import InsightStore
     from investment_agent.settings import Settings
 
@@ -471,15 +470,10 @@ def insights_cli(data_dir: Path, calendar_path: Path, *, min_hours: float = 6) -
 
     store = InsightStore(data_dir / "insights")
 
+    source_errors: dict[str, str] = {}
+
     def discover(since):
-        refs = []
-        for source in (lambda: discover_acbs(get, since=since, known=lambda slug: store.read("acbs", slug) is not None),
-                       lambda: discover_worldbank(get, since=since)):
-            try:
-                refs += source()
-            except Exception:  # one source down does not block the other
-                pass
-        return refs
+        return discover_sources(get, store, since=since, errors=source_errors)
 
     settings = Settings.from_env()
     gateway = None
@@ -495,6 +489,9 @@ def insights_cli(data_dir: Path, calendar_path: Path, *, min_hours: float = 6) -
                                     SpendLedger(data_dir / "ai" / "spend.sqlite"), client=httpx.Client())
     out = insights_run(data_dir, ssi_get=get, discover=discover, download=download, pages=extract_pages, gateway=gateway,
                        notify=_insight_notifier(data_dir, calendar_path, settings, httpx.Client(), now), now=now, sleep=time.sleep)
+    if source_errors:
+        out["source_errors"] = source_errors
+        record_status(data_dir, now=now, out=out)
     print(json.dumps(out, ensure_ascii=False))
     return 0
 

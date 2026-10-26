@@ -90,3 +90,16 @@ def test_cli_skips_without_network_when_the_last_run_is_recent(tmp_path, capsys)
     (tmp_path / "insights" / "status.json").write_text(json.dumps({"at": datetime.now(timezone.utc).isoformat()}), encoding="utf-8")
     assert insights_cli(tmp_path, tmp_path / "cal.json", min_hours=6) == 0
     assert json.loads(capsys.readouterr().out) == {"status": "skipped", "reason": "recent_run"}
+
+
+def test_a_failing_source_is_reported_not_silently_empty(tmp_path, monkeypatch):
+    import investment_agent.insights.sources as sources
+    from investment_agent.insights.run import discover_sources
+    from investment_agent.insights.store import InsightStore
+    def boom(get, *, since, known):
+        raise ValueError("boom")
+    monkeypatch.setattr(sources, "discover_acbs", boom)
+    monkeypatch.setattr(sources, "discover_worldbank", lambda get, *, since: [REF])
+    errors = {}
+    refs = discover_sources(lambda url: "", InsightStore(tmp_path), since=date(2026, 8, 27), errors=errors)
+    assert refs == [REF] and errors == {"acbs": "ValueError"}

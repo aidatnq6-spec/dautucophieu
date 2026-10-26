@@ -10,6 +10,7 @@ from pathlib import Path
 
 from investment_agent.market.sectors import load_sectors
 
+from . import sources
 from .pipeline import run_insights
 from .sources import ssi_titles
 from .store import InsightStore
@@ -23,6 +24,23 @@ ICB_LEVEL2 = ("Bán lẻ", "Bảo hiểm", "Bất động sản", "Công nghệ 
 def allowed_sectors(data_dir: Path) -> list[str]:
     local = sorted(set(load_sectors(data_dir)[0].values()) - set(ICB_LEVEL2))
     return list(ICB_LEVEL2) + local
+
+
+def discover_sources(get, store, *, since, errors: dict) -> list:
+    """ACBS then World Bank; a failing source is recorded in errors (source -> exception name) instead of vanishing."""
+    def known(ref_id: str) -> bool:
+        try:
+            return store.read("acbs", ref_id) is not None
+        except ValueError:
+            return False
+    refs = []
+    for name, find in (("acbs", lambda: sources.discover_acbs(get, since=since, known=known)),
+                       ("worldbank", lambda: sources.discover_worldbank(get, since=since))):
+        try:
+            refs += find()
+        except Exception as exc:
+            errors[name] = type(exc).__name__
+    return refs
 
 
 def due(data_dir: Path, *, now, min_hours: float) -> bool:

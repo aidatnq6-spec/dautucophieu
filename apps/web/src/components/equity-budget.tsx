@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Calculator } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
-import { formatRatio, formatVnd, parseMoneyInput } from "../lib/format";
+import { formatRatio, formatVnd, groupDigitsInput, parseMoneyInput } from "../lib/format";
 import { GROUP_LABEL } from "./risk-survey";
 
 type Budget = { status: "no_total" | "no_risk" | "ok"; total?: string; deductions?: string; base?: string; group?: string; ratio?: string;
@@ -36,7 +36,7 @@ export function EquityBudget() {
       <p className="caption">Tổng tài sản tài chính gồm tiền gửi, trái phiếu, cổ phiếu, vàng, tiền số. Trừ quỹ dự phòng và các khoản phải chi trong 12 tháng
         (theo hồ sơ tài chính), rồi nhân tỷ trọng cổ phiếu của nhóm khẩu vị. Trang Danh mục tính tỷ trọng từng mã trên con số này.</p>
       <form className="eb-form" onSubmit={(e) => { e.preventDefault(); void save(); }}>
-        <label className="field">Tổng tài sản tài chính (đ)<input inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} disabled={!view} /></label>
+        <label className="field">Tổng tài sản tài chính (đ)<input inputMode="numeric" value={value} onChange={(e) => setValue(groupDigitsInput(e.target.value))} disabled={!view} /></label>
         <button type="submit" className="btn primary" disabled={!view}><Calculator size={16} aria-hidden="true" />Tính vốn cho cổ phiếu</button>
       </form>
       {message && <p className="errors" role="alert">{message}</p>}

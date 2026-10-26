@@ -11,7 +11,9 @@ test("entering total financial assets shows the money for stocks and room left a
   await expect(page.getByText("Chưa nhập tổng tài sản tài chính")).toBeVisible();
   await page.goto("/profile");
   const box = page.getByRole("region", { name: "Vốn dành cho cổ phiếu" });
-  await box.getByLabel("Tổng tài sản tài chính (đ)").fill("100.000.000.000");
+  await box.getByLabel("Tổng tài sản tài chính (đ)").fill("");
+  await box.getByLabel("Tổng tài sản tài chính (đ)").pressSequentially("100000000000");
+  await expect(box.getByLabel("Tổng tài sản tài chính (đ)")).toHaveValue("100.000.000.000");
   await box.getByRole("button", { name: "Tính vốn cho cổ phiếu" }).click();
   await expect(box).toContainText("Cân bằng");
   await expect(box).toContainText("35%");

@@ -29,3 +29,14 @@ it("formatDecimal groups thousands and rounds half up on the string", () => {
   expect(formatDecimal("-12.5", 1)).toBe("−12,5");
   expect(formatDecimal(null, 2)).toBe("—");
 });
+
+import { groupDigitsInput } from "./format";
+
+it("groupDigitsInput groups whole đồng by thousands while typing and drops anything else", () => {
+  expect(groupDigitsInput("1000000")).toBe("1.000.000");
+  expect(groupDigitsInput("1800000000")).toBe("1.800.000.000");
+  expect(groupDigitsInput("1.80000")).toBe("180.000");
+  expect(groupDigitsInput("12a3 4")).toBe("1.234");
+  expect(groupDigitsInput("007")).toBe("7");
+  expect(groupDigitsInput("")).toBe("");
+});

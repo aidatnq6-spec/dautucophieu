@@ -2,6 +2,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { ApiError, api } from "../lib/api";
 import { formatRatio, formatVnd } from "../lib/format";
+import { MultipleCharts } from "./multiple-chart";
 
 type Method = { method: string; label: string; value: string | null; reason: string | null; inputs: Record<string, string | number> };
 type Row = { symbol: string; sector: string; price: string | null; fair: string | null; low: string | null; high: string | null; gap: string | null;
@@ -67,6 +68,7 @@ export function FairValueView() {
                 </ul>
                 <p className="caption">Số cổ phiếu ước tính từ lợi nhuận / EPS năm {r.latest_year ?? "—"} và các đợt phát hành sau đó; có thể lệch vài phần trăm.</p>
               </section>
+              <MultipleCharts symbol={r.symbol} />
             </td></tr>}
           </Fragment>))}
         </tbody>

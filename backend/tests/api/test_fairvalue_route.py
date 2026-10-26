@@ -34,3 +34,18 @@ def test_fairvalue_lists_every_watched_ticker_with_methods(tmp_path):
     assert all(isinstance(m["value"], (str, type(None))) for m in rows["FPT"]["methods"])
     assert rows["VCB"]["verdict"] == "insufficient" and rows["VCB"]["reason"] == "Chưa có báo cáo tài chính"
     assert body["settings"]["threshold"] == "0.2"
+
+
+def test_history_gives_monthly_pe_pb_for_a_watched_ticker_only(tmp_path):
+    (tmp_path / "market-symbols.txt").write_text("FPT\n", encoding="utf-8")
+    years = {str(y): {"npat": "1000000000", "eps": "1000", "equity": "10000000000"} for y in range(2018, 2026)}
+    FundamentalsStore(tmp_path / "fundamentals").save({"symbol": "FPT", "fetched_at": "2026-10-26T00:00:00+00:00", "source": "t",
+                                                      "years": years, "quarters": {}, "dividends": [], "issues": []})
+    SeriesStore(tmp_path / "trend-sources").upsert("FPT-1d", [(datetime(2025, m, 28), "12") for m in range(1, 13)])
+    clock = Clock()
+    app = create_app(InternalAuthSettings("owner-1", TOKEN, SECRET), clock=clock, personal_repository=PersonalRepository("owner-1", MemoryDocumentStore()),
+                     market=SyntheticMarket(prices={}), data_dir=tmp_path)
+    client = TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000))
+    body = call(client, clock, "GET", "/internal/fairvalue/history/FPT").json()
+    assert body["symbol"] == "FPT" and len(body["pe"]["points"]) == 12 and body["pe"]["latest"] == "12.00" and body["pb"]["latest"] == "1.20"
+    assert call(client, clock, "GET", "/internal/fairvalue/history/ZZZ").status_code == 404

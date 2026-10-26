@@ -24,6 +24,27 @@ test("each watched ticker gets a fair-value range and a verdict, with the method
   await expect(page.getByText(/Lợi suất yêu cầu 13,0%/)).toBeVisible();
 });
 
+test("the detail of a ticker charts its monthly P/E and P/B against their own history", async ({ page }) => {
+  await openPage(page);
+  await page.getByRole("button", { name: "Chi tiết FPT" }).click();
+  const pe = page.getByRole("figure", { name: "P/E lịch sử FPT" });
+  await expect(pe).toBeVisible();
+  await expect(pe).toContainText("Trung vị");
+  await expect(pe).toContainText("Hiện tại");
+  await expect(page.getByRole("figure", { name: "P/B lịch sử FPT" })).toBeVisible();
+  await pe.getByText("Bảng số liệu").click();
+  await expect(pe.getByRole("table")).toContainText("12/2025");
+});
+
+test("no horizontal scroll with the P/E chart open at 375px", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 900 });
+  await openPage(page);
+  await page.getByRole("button", { name: "Chi tiết FPT" }).click();
+  await expect(page.getByRole("figure", { name: "P/E lịch sử FPT" })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});
+
 test("no horizontal scroll on the valuation page at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 900 });
   await openPage(page);

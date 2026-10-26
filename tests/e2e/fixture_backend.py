@@ -67,6 +67,9 @@ if __name__ == "__main__":
         "quarters": {q: {"npat": "250000000", "equity": "10000000000"} for q in ("2025-Q2", "2025-Q3", "2025-Q4", "2026-Q1", "2026-Q2")},
         "dividends": [{"date": f"{y}-07-01", "cash": "500"} for y in range(2021, 2026)] + [{"date": "2026-07-01", "cash": "500"}], "issues": []})
     SeriesStore(os.path.join(data, "trend-sources")).upsert("FPT-1d", [(datetime(y, 12, 31), "12") for y in range(2020, 2026)])
+    # Month-end closes that move around (P/E chart); the 31 December closes above stay 12 for the valuation tests.
+    SeriesStore(os.path.join(data, "trend-sources")).upsert("FPT-1d", [(datetime(y, m, 28), str(12 + ((y * 12 + m) % 9) - 4))
+                                                                       for y in range(2020, 2026) for m in range(1, 12)])
     # Nhận định: two synthetic verified report records published 5 and 20 days ago, one SSI title.
     def _insight(ref, days, view, sectors):
         return {"source": "acbs", "ref_id": ref, "title": f"Báo cáo mẫu {ref}", "page_url": f"https://example.invalid/{ref}",

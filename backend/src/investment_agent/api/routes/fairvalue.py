@@ -1,14 +1,19 @@
 """Reference valuation of the watched tickers (Định giá page): computed on request from stored statements."""
 
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Request
 
+from investment_agent.market.fundamentals import FundamentalsStore
+from investment_agent.market.series import SeriesStore
+from investment_agent.market.watchlist import load_watchlist
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.holdings_view import fair_value_board
+from investment_agent.valuation.history import monthly_multiples
 
 from ..auth import require_owner
-from .common import now, unavailable
+from .common import error, now, unavailable
 from .watchlist import held_tickers
 
 router = APIRouter(prefix="/internal")
@@ -30,3 +35,18 @@ def fairvalue(request: Request):
         for m in row["methods"]:
             m["value"] = str(m["value"]) if m["value"] is not None else None
     return board
+
+
+@router.get("/fairvalue/history/{symbol}")
+def fairvalue_history(symbol: str, request: Request):
+    """Monthly P/E and P/B of one watched ticker (public statements and prices only; nothing personal)."""
+    require_owner(request)
+    data_dir = request.app.state.data_dir
+    if data_dir is None:
+        return unavailable()
+    data_dir, symbol = Path(data_dir), symbol.upper()
+    if symbol not in load_watchlist(data_dir).symbols:
+        return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
+    out = monthly_multiples(FundamentalsStore(data_dir / "fundamentals").read(symbol), SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"),
+                            today=now(request).astimezone(VN).date())
+    return {"symbol": symbol, **out}

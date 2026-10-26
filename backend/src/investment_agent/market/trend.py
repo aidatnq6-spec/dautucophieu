@@ -17,6 +17,7 @@ from investment_agent.domain.pinned import CONFIG_DIR
 from .indicators import four_hourly, macd_state, monthly, rsi_value, weekly
 from .series import SeriesStore
 from .trend_sources import coinbase_closes, fred_closes
+from .watchlist import load_watchlist
 
 BOARD_PATH = CONFIG_DIR / "trend-board.json"
 FRAMES = ("M", "W", "D1", "H4", "H1")
@@ -119,12 +120,28 @@ def _retry(call, pause: float):
         return call()
 
 
-def _refresh(store: SeriesStore, key: str, fetch, *, today: date, full: int, refresh: int, enough: int, pause: float):
-    start = today - timedelta(days=full if len(store.read(key)) < enough else refresh)
+def _refresh(store: SeriesStore, key: str, fetch, *, today: date, full: int, refresh: int, enough: int, pause: float,
+             fresh_through: date | None = None, pace: float = 0):
+    points = store.read(key)
+    if fresh_through is not None and points and points[-1][0].date() >= fresh_through:
+        return  # already holds this session's bars (a later slot the same day)
+    if pace:
+        time_module.sleep(pace)  # Vnstock Community allows 60 calls a minute
+    start = today - timedelta(days=full if len(points) < enough else refresh)
     store.upsert(key, _retry(lambda: fetch(start), pause))
 
 
-def run_trend(data_dir: Path, cal, *, now: datetime, provider, get, pause: float = 3.0) -> dict:
+def _board(data_dir: Path) -> list[dict]:
+    """Configured groups, with the stock group following the watchlist (data/market-symbols.txt) when there is one."""
+    groups, symbols = load_board(), load_watchlist(data_dir).symbols
+    for g in groups:
+        if g["id"] == "stocks" and symbols:
+            g["rows"] = [{"id": s, "label": s, "source": {"kind": "vn", "index": False}} for s in symbols]
+    return groups
+
+
+def run_trend(data_dir: Path, cal, *, now: datetime, provider, get, pause: float = 65.0, pace: float = 1.5) -> dict:
+    """pause: wait before the single retry (long enough to clear Vnstock's per-minute limit); pace: gap between Vnstock calls."""
     local = now.astimezone(VN)
     today = local.date()
     try:
@@ -138,16 +155,17 @@ def run_trend(data_dir: Path, cal, *, now: datetime, provider, get, pause: float
     days, hours = SeriesStore(data_dir / "trend-sources"), SeriesStore(data_dir / "intraday")
     errors: dict[str, str] = {}
     groups = []
-    for group in load_board():
+    for group in _board(data_dir):
         rows = []
         for row in group["rows"]:
             src, rid = row["source"], row["id"]
             try:
                 if src["kind"] == "vn":
                     _refresh(days, f"{rid}-1d", lambda s: provider.fetch_closes(rid, s, today, interval="1D", index=src["index"]),
-                             today=today, full=FULL_DAYS, refresh=REFRESH_DAYS, enough=400, pause=pause)
+                             today=today, full=FULL_DAYS, refresh=REFRESH_DAYS, enough=400, pause=pause, fresh_through=today, pace=pace)
                     _refresh(hours, f"{rid}-1h", lambda s: provider.fetch_closes(rid, s, today, interval="1H", index=src["index"]),
-                             today=today, full=HOURLY_FULL_DAYS, refresh=HOURLY_REFRESH_DAYS, enough=1, pause=pause)
+                             today=today, full=HOURLY_FULL_DAYS, refresh=HOURLY_REFRESH_DAYS, enough=1, pause=pause, fresh_through=today,
+                             pace=pace)
                     cells = build_cells(days.read(f"{rid}-1d"), hours.read(f"{rid}-1h"), session_date=today, hourly_supported=True)
                 elif src["kind"] == "coinbase":
                     _refresh(days, f"{rid}-1d", lambda s: coinbase_closes(get, src["product"], 86400, s, today),

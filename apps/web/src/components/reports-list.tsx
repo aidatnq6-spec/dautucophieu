@@ -45,7 +45,7 @@ export function ReportsList() {
       </section>
       <section className="surface">
         <h2>Các bản tin</h2>
-        {!rows ? <p className="muted">Đang tải…</p> : rows.length === 0 ? <p className="muted">Chưa có bản tin.</p> : (
+        {!rows ? <p className="muted fx-loading" role="status">Đang tải…</p> : rows.length === 0 ? <p className="muted">Chưa có bản tin.</p> : (
           <ul>{rows.map((r) => (
             <li key={r.report_id}><Link href={`/reports/${r.report_id}`}>Phiên {r.session_date}</Link> · <span className="pill">{REPORT_STATUS[r.status] ?? r.status}</span>
               {" "}<span className="caption">tạo lúc {new Date(r.generated_at).toLocaleString("vi-VN")}{r.provenance !== "licensed" ? ` · dữ liệu ${r.provenance}` : ""}</span></li>))}</ul>

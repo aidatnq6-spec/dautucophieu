@@ -48,7 +48,7 @@ export function RiskSurvey({ version, onSaved }: { version: number; onSaved: (re
     finally { setBusy(false); }
   }
 
-  if (!form) return <p className="muted">Đang tải bộ câu hỏi…</p>;
+  if (!form) return <p className="muted fx-loading" role="status">Đang tải bộ câu hỏi…</p>;
   return (
     <form onSubmit={(e) => { e.preventDefault(); void submit(); }} aria-label="Khảo sát rủi ro">
       <p className="notice">{form.notice} Phiên bản: {form.version}.</p>

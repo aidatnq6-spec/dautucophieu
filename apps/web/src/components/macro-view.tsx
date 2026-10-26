@@ -43,7 +43,7 @@ export function MacroView() {
   const load = useCallback(() => api<{ rows: Row[] }>("macro").then((d) => setRows(d.rows), (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải.")), []);
   useEffect(() => { void load(); }, [load]);
   if (error) return <p className="errors" role="alert">{error}</p>;
-  if (!rows) return <p className="muted">Đang tải…</p>;
+  if (!rows) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   // Hand-entered indicators last, highlighted, so they are easy to find after a Telegram reminder.
   const ordered = [...rows.filter((r) => r.auto), ...rows.filter((r) => !r.auto)];
   const tally = rows.reduce((t, r) => ({ ...t, [r.assessment ?? "—"]: (t[r.assessment ?? "—"] ?? 0) + 1 }), {} as Record<string, number>);

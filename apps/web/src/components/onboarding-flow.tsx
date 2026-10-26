@@ -30,7 +30,7 @@ export function OnboardingFlow() {
   useEffect(() => { void load(); }, [load]);
 
   if (error) return <p className="errors" role="alert">{error}</p>;
-  if (!profile || !risk) return <p className="muted">Đang tải…</p>;
+  if (!profile || !risk) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   const group = (risk.data?.assessment as { group?: string } | undefined)?.group;
   return (
     <>

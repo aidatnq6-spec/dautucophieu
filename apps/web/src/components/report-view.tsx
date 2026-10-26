@@ -59,7 +59,7 @@ export function ReportView({ reportId }: { reportId: string }) {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { api<Report>(`reports/${encodeURIComponent(reportId)}`).then(setR, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, [reportId]);
   if (error) return <p className="errors" role="alert">{error}</p>;
-  if (!r) return <p className="muted">Đang tải…</p>;
+  if (!r) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   return (
     <article className="surface brief" style={{ maxWidth: 880, margin: "0 auto", padding: "32px 40px" }}>
       <div className="row"><h1 style={{ fontFamily: "Georgia, 'Times New Roman', serif", margin: 0 }}>Bản tin phiên {r.session_date}</h1>

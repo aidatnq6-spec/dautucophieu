@@ -27,7 +27,7 @@ export function ProfileSummary() {
   const profile = useRecord<ProfileView>("profile");
   const risk = useRecord<RiskView>("risk");
   if (profile.error || risk.error) return <p className="errors" role="alert">{profile.error ?? risk.error}</p>;
-  if (profile.value === undefined || risk.value === undefined) return <p className="muted">Đang tải…</p>;
+  if (profile.value === undefined || risk.value === undefined) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   const p = profile.value, r = risk.value;
   return (
     <>

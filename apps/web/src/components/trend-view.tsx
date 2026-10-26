@@ -72,7 +72,7 @@ export function TrendView() {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { api<{ snapshot: Snapshot | null }>("trend").then((d) => setData(d.snapshot), (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
   if (error) return <p className="errors" role="alert">{error}</p>;
-  if (data === undefined) return <p className="muted">Đang tải…</p>;
+  if (data === undefined) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   if (data === null) return <p className="muted">Chưa có bảng: bảng được lập tự động từ 15:30 mỗi phiên giao dịch.</p>;
   return (
     <>

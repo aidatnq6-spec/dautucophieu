@@ -155,3 +155,33 @@ def test_morning_wake_up_only_catches_up_the_previous_session():
     assert d.run is False and d.reason == "not_yet"  # today's session has not traded yet
     d = decide(at("2026-10-27", "07:00"), CAL, state(published=["2026-10-23"]))
     assert (d.run, d.reason, d.session_date) == (True, "catch_up", date(2026, 10, 26))
+
+
+def test_already_published_names_the_session():
+    d = decide(at("2026-10-27", "20:05"), CAL, state(published=["2026-10-27"]))
+    assert d.session_date == date(2026, 10, 27)
+
+
+def test_a_manually_created_report_of_the_current_session_is_sent_on_the_next_wake_up(tmp_path, monkeypatch):
+    """26/10/2026: the owner pressed Tạo bản tin before the 15:30 run; the scheduler then saw 'already_published' and never sent it."""
+    import investment_agent.jobs.schedule as sched
+    repo = PersonalRepository("owner-1", MemoryDocumentStore())
+    settings = NotificationSettings(enabled=True, chat_id="-100123", members_may_view_personal_data=True, scheduled_enabled=True)
+    repo.write(OWNER, "settings", "notifications", settings.model_dump(mode="json"), expected_version=0, request_id="n1")
+    reports = {"today": {"report_id": "today", "report_kind": "after_close", "session_date": "2026-10-27", "status": "published"},
+               "old": {"report_id": "old", "report_kind": "after_close", "session_date": "2026-10-26", "status": "published"}}
+    monkeypatch.setattr(sched, "list_reports", lambda repo, owner: list(reports.values()))
+    monkeypatch.setattr(sched, "get_report", lambda repo, owner, rid: reports.get(rid))
+    sent = []
+
+    def fake_deliver(report, settings, sender, store):
+        sent.append(report["report_id"])
+        return type("R", (), {"status": "sent"})()
+    monkeypatch.setattr(sched, "deliver", fake_deliver)
+    store = DeliveryStore(tmp_path / "d.sqlite")
+    store.enqueue("old")
+    store.enqueue("today")
+    result = scheduled_tick(repo=repo, owner=OWNER, market=SyntheticMarket(), jobs=JobStore(tmp_path / "jobs.sqlite"), deliveries=store,
+                            sender=FakeSender(), cal=CAL, now=at("2026-10-27", "17:31"), worker_id="sched")
+    assert result.decision.reason == "already_published" and result.delivered == ["today"] and sent == ["today"]
+    assert store.queued() == ["old"]  # an older session's report is not sent late

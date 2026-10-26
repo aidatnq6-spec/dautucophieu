@@ -88,15 +88,15 @@ def fake_get(url):
 def test_run_builds_saves_and_reports_source_errors(tmp_path):
     now = datetime(2026, 10, 23, 15, 35, tzinfo=VN)
     vn = FakeVn()
-    result = run_trend(tmp_path, CAL, now=now, provider=vn, get=fake_get, pause=0)
+    result = run_trend(tmp_path, CAL, now=now, provider=vn, get=fake_get, pause=0, pace=0)
     assert result["status"] == "ok" and result["errors"] == {"BTC": "error:OSError"}
     snap = SnapshotStore(tmp_path / "trend").latest()
     rows = {r["id"]: r for g in snap["groups"] for r in g["rows"]}
     assert rows["FPT"]["cells"]["D1"]["macd"] == "up,>0" and rows["BTC"]["cells"]["D1"]["reason"] == "Lỗi nguồn"
     assert rows["VN10Y"]["cells"]["M"]["reason"] == "Không có nguồn miễn phí hợp lệ" and rows["US10Y"]["cells"]["H1"]["reason"] == "Nguồn chỉ có giá ngày"
     assert ("FPT", "1D", date(2026, 10, 23) - timedelta(days=2920)) in vn.calls  # first run backfills the full window
-    run_trend(tmp_path, CAL, now=now + timedelta(hours=2), provider=vn, get=fake_get, pause=0)
-    assert ("FPT", "1D", date(2026, 10, 23) - timedelta(days=60)) in vn.calls  # later runs only refresh
+    run_trend(tmp_path, CAL, now=datetime(2026, 10, 26, 15, 35, tzinfo=VN), provider=vn, get=fake_get, pause=0, pace=0)
+    assert ("FPT", "1D", date(2026, 10, 26) - timedelta(days=60)) in vn.calls  # the next session only refreshes
 
 
 def test_run_skips_outside_sessions_and_before_15_30(tmp_path):
@@ -134,5 +134,23 @@ class FlakyVn(FakeVn):
 
 
 def test_a_transient_source_error_is_retried_once(tmp_path):
-    result = run_trend(tmp_path, CAL, now=datetime(2026, 10, 23, 15, 35, tzinfo=VN), provider=FlakyVn(), get=fake_get, pause=0)
+    result = run_trend(tmp_path, CAL, now=datetime(2026, 10, 23, 15, 35, tzinfo=VN), provider=FlakyVn(), get=fake_get, pause=0, pace=0)
     assert "FPT" not in result["errors"] and result["errors"] == {"BTC": "error:OSError"}
+
+
+def test_the_stock_group_follows_the_watchlist(tmp_path):
+    (tmp_path / "market-symbols.txt").write_text("MBB\nSIP\nNT2\n", encoding="utf-8")
+    run_trend(tmp_path, CAL, now=datetime(2026, 10, 23, 15, 35, tzinfo=VN), provider=FakeVn(), get=fake_get, pause=0, pace=0)
+    groups = {g["id"]: g for g in SnapshotStore(tmp_path / "trend").latest()["groups"]}
+    assert [r["id"] for r in groups["stocks"]["rows"]] == ["MBB", "SIP", "NT2"]
+    assert [r["id"] for r in groups["index"]["rows"]] == ["VNINDEX", "VN30"]  # indices and macro rows stay as configured
+
+
+def test_a_later_run_the_same_day_does_not_refetch_fresh_vietnamese_series(tmp_path):
+    (tmp_path / "market-symbols.txt").write_text("MBB\n", encoding="utf-8")
+    vn = FakeVn()
+    now = datetime(2026, 10, 23, 15, 35, tzinfo=VN)
+    run_trend(tmp_path, CAL, now=now, provider=vn, get=fake_get, pause=0, pace=0)
+    first = len(vn.calls)
+    run_trend(tmp_path, CAL, now=now + timedelta(hours=2), provider=vn, get=fake_get, pause=0, pace=0)
+    assert len(vn.calls) == first  # every VN series already ends on today's session

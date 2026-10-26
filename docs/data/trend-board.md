@@ -6,7 +6,7 @@ Thiết kế: `docs/superpowers/specs/2026-10-25-xu-huong-design.md`. Danh sách
 
 | Nhóm | M · W · D1 | H4 · H1 | Nguồn |
 |---|---|---|---|
-| 9 cổ phiếu, VN-Index, VN30 | Có | Có (H4 ghép từ H1) | Vnstock: nến ngày và nến 1 giờ |
+| Cổ phiếu trong `data\market-symbols.txt` (50 mã), VN-Index, VN30 | Có | Có (H4 ghép từ H1) | Vnstock: nến ngày và nến 1 giờ. Nhóm Cổ phiếu theo danh sách theo dõi; lần chạy sau trong ngày không tải lại mã đã có nến của phiên; giãn 1,5 giây giữa các lần gọi, lỗi thì chờ 65 giây rồi thử lại |
 | Bitcoin | Có | Có | Coinbase Exchange, nến công khai, không cần tài khoản |
 | Vàng | Gần đúng | Gần đúng | PAXG-USD trên Coinbase (token bám giá vàng); không có giá vàng miễn phí hợp lệ |
 | Dầu WTI, US10Y | Có | Không | FRED (`DCOILWTICO`, `DGS10`), một giá mỗi ngày |

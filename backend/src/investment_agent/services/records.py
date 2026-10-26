@@ -3,7 +3,9 @@
 Lives below the API layer so jobs and services never import from api.routes.
 """
 
-from pydantic import AwareDatetime
+from decimal import Decimal
+
+from pydantic import AwareDatetime, model_validator
 
 from investment_agent.domain.ledger import parse_events
 from investment_agent.domain.models import ContractModel, Ratio
@@ -58,6 +60,25 @@ class TradingSettings(ContractModel):
 def trading_settings(repo, owner) -> TradingSettings | None:
     record = read_version(repo, owner, "settings", "trading", None)
     return TradingSettings.model_validate(record.payload) if record else None
+
+
+class ValuationSettings(ContractModel):
+    required_return: Ratio = Decimal("0.13")
+    long_term_growth: Ratio = Decimal("0.05")
+    threshold: Ratio = Decimal("0.2")
+
+    @model_validator(mode="after")
+    def _sensible(self):
+        if self.required_return <= self.long_term_growth:
+            raise ValueError("required return must exceed long-term growth")
+        if not Decimal("0") < self.threshold < Decimal("1"):
+            raise ValueError("threshold must be between 0 and 1")
+        return self
+
+
+def valuation_settings(repo, owner) -> tuple[ValuationSettings, int]:
+    record = read_version(repo, owner, "settings", "valuation", None)
+    return (ValuationSettings.model_validate(record.payload), record.version) if record else (ValuationSettings(), 0)
 
 
 NOTIFICATIONS = ("settings", "notifications")

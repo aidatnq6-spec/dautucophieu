@@ -16,7 +16,7 @@ from investment_agent.domain.pinned import CONFIG_DIR
 
 from .indicators import four_hourly, macd_state, monthly, rsi_value, weekly
 from .series import SeriesStore
-from .trend_sources import coinbase_closes, fred_closes
+from .trend_sources import coinbase_closes, ecb_dxy_closes, fred_closes
 from .watchlist import load_watchlist
 
 BOARD_PATH = CONFIG_DIR / "trend-board.json"
@@ -173,6 +173,11 @@ def run_trend(data_dir: Path, cal, *, now: datetime, provider, get, pause: float
                     _refresh(hours, f"{rid}-1h", lambda s: coinbase_closes(get, src["product"], 3600, s, today),
                              today=today, full=REFRESH_DAYS, refresh=7, enough=1, pause=pause)
                     cells = build_cells(days.read(f"{rid}-1d"), hours.read(f"{rid}-1h"), session_date=None, hourly_supported=True)
+                elif src["kind"] == "ecb_dxy":
+                    # Own series key: the row used FRED's broad dollar index before, a different level that must not be mixed in.
+                    key = f"{rid}-ecb-1d"
+                    days.upsert(key, _retry(lambda: ecb_dxy_closes(get, have=len(days.read(key))), pause))
+                    cells = build_cells(days.read(key), None, session_date=None, hourly_supported=False)
                 elif src["kind"] == "fred":
                     days.upsert(f"{rid}-1d", _retry(lambda: fred_closes(get, src["series"], today - timedelta(days=FULL_DAYS)), pause))
                     cells = build_cells(days.read(f"{rid}-1d"), None, session_date=None, hourly_supported=False)

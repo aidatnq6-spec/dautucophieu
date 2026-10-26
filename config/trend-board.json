@@ -1,8 +1,8 @@
 {
- "version": "trend-2026-10-25.1",
+ "version": "trend-2026-10-26.1",
  "groups": [
   {"id": "macro", "label": "Vĩ mô", "rows": [
-   {"id": "DXY", "label": "DXY", "source": {"kind": "fred", "series": "DTWEXBGS"}, "note": "Gần đúng: chỉ số USD rộng của FRED; DXY của ICE là dữ liệu có bản quyền."},
+   {"id": "DXY", "label": "DXY", "source": {"kind": "ecb_dxy"}, "note": "DXY tính từ tỷ giá tham chiếu ECB theo công thức ICE (gần đúng, thường lệch dưới 0,2 điểm); ECB chỉ có giá ngày."},
    {"id": "US10Y", "label": "US10Y", "source": {"kind": "fred", "series": "DGS10"}},
    {"id": "VN10Y", "label": "VN10Y", "source": {"kind": "none", "reason": "Không có nguồn miễn phí hợp lệ"}},
    {"id": "GOLD", "label": "Vàng", "source": {"kind": "coinbase", "product": "PAXG-USD"}, "note": "Gần đúng: PAXG, token bám giá vàng."},

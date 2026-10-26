@@ -88,4 +88,5 @@ test("the app is named Đầu tư Cổ phiếu in the sidebar and the browser ta
   await page.goto("/watchlist");
   await expect(page.locator(".brand")).toHaveText("Đầu tư Cổ phiếu");
   await expect(page).toHaveTitle("Đầu tư Cổ phiếu");
+  await expect(page.getByRole("navigation", { name: "Điều hướng chính" }).getByRole("link", { name: "Danh mục & Giao dịch", exact: true })).toBeVisible();
 });

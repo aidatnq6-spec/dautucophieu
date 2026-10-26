@@ -78,6 +78,8 @@ if __name__ == "__main__":
     insights = InsightStore(os.path.join(data, "insights"))
     insights.save(_insight("mau-1", 5, "favourable", [("Công nghệ Thông tin", "benefit"), ("Ngân hàng", "harm")]))
     insights.save(_insight("mau-2", 20, "favourable", [("Ngân hàng", "benefit")]))
+    with open(os.path.join(data, "insights", "status.json"), "w", encoding="utf-8") as f:
+        json.dump({"at": datetime.now().astimezone().isoformat(), "status": "ok", "processed": [], "errors": {"acbs:loi-mau": "download_failed"}}, f)
     with open(os.path.join(data, "insights", "ssi.json"), "w", encoding="utf-8") as f:
         json.dump({"at": "synthetic", "titles": [{"title": "Cập nhật Ngành Thép mẫu", "kind": "ngành", "date": "2026-10-20",
                                                   "url": "https://example.invalid/ssi-thep"}]}, f, ensure_ascii=False)

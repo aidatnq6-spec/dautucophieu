@@ -10,7 +10,8 @@ def _macro(records: list[dict], key: str) -> dict:
     reasons = []
     for r in records:
         block = r["insight"][key]
-        votes[block["view"]] += 1
+        if block["view"] in votes:  # None: no verified reason, so not a vote
+            votes[block["view"]] += 1
         reasons += [{**x, "source": r["source"], "title": r["title"], "url": r["page_url"]} for x in block["reasons"]]
     best = max(votes.values())
     top = [v for v in VIEWS if votes[v] == best]
@@ -29,6 +30,11 @@ def summarise(records: list[dict]) -> dict:
     rows = [{"sector": name, **v, "mixed": v["benefit"] > 0 and v["harm"] > 0} for name, v in sectors.items()]
     rows.sort(key=lambda x: (-(x["benefit"] - x["harm"]), x["sector"]))
     return {"reports": len(ok), "macro_now": _macro(ok, "macro_now"), "macro_outlook": _macro(ok, "macro_outlook"), "sectors": rows}
+
+
+def linking_sectors(all_sectors: dict[str, str], *, watched: set[str], held: set[str]) -> dict[str, str]:
+    """Sector of each watched or held ticker; other synced tickers are not shown."""
+    return {s: sec for s, sec in all_sectors.items() if s in watched or s in held}
 
 
 def link(summary: dict, *, sectors: dict[str, str], valuation_rows: list[dict], held: set[str]) -> dict:

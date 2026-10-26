@@ -44,32 +44,49 @@ def normalise(text: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^\w\s]|_", " ", text)).strip()
 
 
+MIN_QUOTE_WORDS, MIN_QUOTE_CHARS = 4, 15  # a word or a number alone is not evidence
+
+
 def _page(value) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) else 0
 
 
 def _found(item: dict, pages: list[str]) -> bool:
-    q, page = normalise(item.get("quote", "")), _page(item.get("page"))
-    return bool(q) and 1 <= page <= len(pages) and q in normalise(pages[page - 1])
+    quote, page = item.get("quote"), _page(item.get("page"))
+    if not isinstance(quote, str) or not 1 <= page <= len(pages):
+        return False
+    q = normalise(quote)
+    if len(q.split()) < MIN_QUOTE_WORDS or len(q) < MIN_QUOTE_CHARS:
+        return False
+    return f" {q} " in f" {normalise(pages[page - 1])} "  # whole words only
 
 
 def _items(value) -> list[dict]:
     return [x for x in value if isinstance(x, dict)] if isinstance(value, list) else []
 
 
+def _str(value) -> str:
+    return value if isinstance(value, str) else ""
+
+
 def validate(raw: dict, pages: list[str], sectors: list[str]) -> dict:
-    """Keep only claims whose quote is on the cited page and whose sector is in the closed list; count the rest."""
+    """Keep only claims whose quote is on the cited page and whose sector is in the closed list; count the rest.
+
+    A macro view with no verified reason is dropped (view None) rather than trusted on the model's word.
+    """
     dropped, allowed, out = 0, set(sectors), {}
+    raw = raw if isinstance(raw, dict) else {}
     for key in ("macro_now", "macro_outlook"):
         block = raw.get(key) if isinstance(raw.get(key), dict) else {}
         given = _items(block.get("reasons"))
-        reasons = [{"text": str(r.get("text", "")), "quote": str(r["quote"]), "page": r["page"]} for r in given if _found(r, pages)]
+        reasons = [{"text": _str(r.get("text")), "quote": r["quote"], "page": r["page"]} for r in given if _found(r, pages)]
         dropped += len(given) - len(reasons)
-        view = block.get("view") if block.get("view") in VIEWS else "neutral"
-        out[key] = {"view": view, "reasons": reasons}
+        view = block.get("view") if isinstance(block.get("view"), str) and block.get("view") in VIEWS else "neutral"
+        out[key] = {"view": view if reasons else None, "reasons": reasons}
     given = _items(raw.get("sectors"))
-    kept = [{"sector": s["sector"], "effect": s["effect"], "reason": str(s.get("reason", "")), "quote": str(s["quote"]), "page": s["page"]}
-            for s in given if s.get("sector") in allowed and s.get("effect") in ("benefit", "harm") and _found(s, pages)]
+    kept = [{"sector": s["sector"], "effect": s["effect"], "reason": _str(s.get("reason")), "quote": s["quote"], "page": s["page"]}
+            for s in given if isinstance(s.get("sector"), str) and s["sector"] in allowed
+            and isinstance(s.get("effect"), str) and s["effect"] in ("benefit", "harm") and _found(s, pages)]
     dropped += len(given) - len(kept)
     out["sectors"], out["dropped"] = kept, dropped
     return out

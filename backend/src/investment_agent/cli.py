@@ -333,8 +333,9 @@ def _insight_notifier(data_dir: Path, calendar_path: Path, settings, client, now
     from zoneinfo import ZoneInfo
 
     from investment_agent.api.auth import OwnerContext
-    from investment_agent.insights.summary import link, summarise
+    from investment_agent.insights.summary import link, linking_sectors, summarise
     from investment_agent.insights.telegram import render_insight, send_new
+    from investment_agent.market.watchlist import load_watchlist
     from investment_agent.market.prices import PriceStore
     from investment_agent.market.sectors import load_sectors
     from investment_agent.market.view import EmptyMarket, StoreMarket
@@ -352,7 +353,6 @@ def _insight_notifier(data_dir: Path, calendar_path: Path, settings, client, now
         notify_settings, _ = notification_settings(repo, owner)
     except (OSError, ValueError, KeyError, RepositoryUnavailable):
         return None
-    sectors = load_sectors(data_dir)[0]
     try:
         today = now.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date()
         market = StoreMarket(PriceStore(data_dir), load_calendar(calendar_path), today=lambda: today) if (data_dir / "prices").exists() else EmptyMarket()
@@ -360,6 +360,7 @@ def _insight_notifier(data_dir: Path, calendar_path: Path, settings, client, now
         rows = fair_value_board(data_dir, market, repo, owner, held=held, today=today)["rows"]
     except Exception:  # message still goes out, without verdicts
         held, rows = set(), []
+    sectors = linking_sectors(load_sectors(data_dir)[0], watched=set(load_watchlist(data_dir).symbols), held=held)
     render = lambda record: render_insight(record, link(summarise([record]), sectors=sectors, valuation_rows=rows, held=held)["sectors"])
     sender = TelegramSender(settings.telegram_bot_token, client=client)
     return lambda store: send_new(store, sender, notify_settings, render)

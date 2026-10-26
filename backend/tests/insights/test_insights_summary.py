@@ -37,3 +37,16 @@ def test_link_adds_watchlist_tickers_valuation_and_held_warnings():
     assert bank["held_warning"] == []
     estate = next(x for x in out["sectors"] if x["sector"] == "Bất động sản")
     assert estate["held_warning"] == ["KDH"]
+
+
+def test_unverified_macro_views_are_not_votes():
+    r = rec("acbs", "a", "favourable", [s("Ngân hàng", "benefit")])
+    r["insight"]["macro_now"] = {"view": None, "reasons": []}
+    out = summarise([r])
+    assert out["macro_now"]["votes"] == {"favourable": 0, "neutral": 0, "unfavourable": 0} and out["macro_now"]["consensus"] == "none"
+
+
+def test_linking_covers_watched_and_held_tickers_only():
+    from investment_agent.insights.summary import linking_sectors
+    all_sectors = {"BID": "Ngân hàng", "MBB": "Ngân hàng", "XYZ": "Ngân hàng", "KDH": "Bất động sản"}
+    assert linking_sectors(all_sectors, watched={"BID"}, held={"KDH"}) == {"BID": "Ngân hàng", "KDH": "Bất động sản"}

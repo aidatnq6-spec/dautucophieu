@@ -64,3 +64,8 @@ def test_nothing_is_sent_when_scheduled_sending_is_off_or_fails(tmp_path):
     assert sender.sent == []
     assert send_new(store, Sender("failed"), ON, lambda r: "x") == {"sent": 0, "failed": 1}
     assert store.read("acbs", "vi-mo-10")["telegram_sent"] is False
+
+
+def test_message_says_so_when_a_report_has_no_verified_macro_view():
+    rec = {**RECORD, "insight": {**RECORD["insight"], "macro_outlook": {"view": None, "reasons": []}}}
+    assert "6–12 tháng: không có nhận định kiểm chứng được" in render_insight(rec, linked(rec))

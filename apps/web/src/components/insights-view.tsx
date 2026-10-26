@@ -11,7 +11,7 @@ type Sector = { sector: string; benefit: number; harm: number; mixed: boolean; c
   tickers: { symbol: string; verdict: Verdict; held: boolean }[]; held_warning: string[] };
 type Report = { source: string; ref_id: string; title: string; url: string; published: string; status: "ok" | "no_text" | "no_reliable_claims" };
 type Data = { summary: { reports: number; macro_now: Macro; macro_outlook: Macro; sectors: Sector[] }; reports: Report[];
-  ssi: { title: string; kind: string; date: string; url: string }[]; run: { at: string; status: string } | null; ai_configured: boolean; window_days: number };
+  ssi: { title: string; kind: string; date: string; url: string }[]; run: { at: string; status: string; errors?: Record<string, string> } | null; ai_configured: boolean; window_days: number };
 
 const CONSENSUS: Record<Macro["consensus"], { label: string; tone: string }> = {
   favourable: { label: "Thuận lợi", tone: "good" }, neutral: { label: "Trung tính", tone: "" }, unfavourable: { label: "Bất lợi", tone: "bad" },
@@ -25,7 +25,10 @@ const VERDICT: Record<Verdict, { label: string; tone: string }> = {
 const SOURCE: Record<string, string> = { acbs: "ACBS", worldbank: "World Bank" };
 const STATUS: Record<Report["status"], string> = { ok: "Đã đọc", no_text: "Không trích được văn bản", no_reliable_claims: "Không có nhận định đáng tin" };
 const STOPPED: Record<string, string> = { budget_exceeded: "đã hết ngân sách AI tháng này", key_missing: "chưa cấu hình AI",
-  catalog_stale: "bảng giá model đã cũ", no_eligible_model: "không có model được duyệt khả dụng", policy_not_approved: "chính sách AI chưa duyệt" };
+  catalog_stale: "bảng giá model đã cũ", no_eligible_model: "không có model được duyệt khả dụng", policy_not_approved: "chính sách AI chưa duyệt",
+  concurrency_cap: "một lượt gọi AI trước chưa kết thúc" };
+const FAILED: Record<string, string> = { download_failed: "không tải được tệp", request_over_budget: "báo cáo quá dài so với giới hạn mỗi lần gọi",
+  provider_error: "nhà cung cấp AI lỗi", network_unavailable: "mất mạng", outcome_unknown: "không rõ kết quả lượt gọi AI", rate_limited: "AI đang quá tải" };
 const day = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
 
 function MacroCard({ title, macro, total }: { title: string; macro: Macro; total: number }) {
@@ -81,6 +84,8 @@ export function InsightsView() {
         việc ghép với mã theo dõi và Định giá làm trên máy của bạn. Mỗi nhận định kèm câu trích nguyên văn để kiểm tra. Tham khảo, không phải khuyến nghị đầu tư.</p>
       {!data.ai_configured && <p className="errors" role="status">Chưa cấu hình AI: thêm OPENROUTER_API_KEY vào .env.local rồi khởi động lại ứng dụng.</p>}
       {stopped && <p className="errors" role="status">Lần chạy {day(run!.at)} dừng đọc báo cáo mới: {stopped}.</p>}
+      {run?.errors && Object.keys(run.errors).length > 0 && <p className="caption" role="status">Lần chạy {day(run.at)}: {Object.keys(run.errors).length} báo cáo
+        chưa đọc được ({[...new Set(Object.values(run.errors))].map((c) => FAILED[c] ?? c).join("; ")}); sẽ thử lại tối đa 3 lần.</p>}
       <div className="ins-grid">
         <MacroCard title="Vĩ mô hiện tại" macro={summary.macro_now} total={summary.reports} />
         <MacroCard title="Triển vọng 6–12 tháng" macro={summary.macro_outlook} total={summary.reports} />

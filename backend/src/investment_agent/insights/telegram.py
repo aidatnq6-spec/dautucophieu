@@ -19,9 +19,9 @@ def _tickers(row: dict, warn: bool) -> str:
 def render_insight(record: dict, linked_sectors: list[dict]) -> str:
     ins = record["insight"]
     lines = [f"NHẬN ĐỊNH MỚI · {SOURCE_VI.get(record['source'], record['source'])}", record["title"], "",
-             f"Vĩ mô hiện tại: {VIEW_VI[ins['macro_now']['view']]}"]
+             f"Vĩ mô hiện tại: {VIEW_VI.get(ins['macro_now']['view'], 'không có nhận định kiểm chứng được')}"]
     lines += [f"• {r['text']}" for r in ins["macro_now"]["reasons"]]
-    lines.append(f"6–12 tháng: {VIEW_VI[ins['macro_outlook']['view']]}")
+    lines.append(f"6–12 tháng: {VIEW_VI.get(ins['macro_outlook']['view'], 'không có nhận định kiểm chứng được')}")
     lines += [f"• {r['text']}" for r in ins["macro_outlook"]["reasons"]]
     for effect, sign, heading in (("benefit", "+", "Ngành hưởng lợi"), ("harm", "−", "Ngành bất lợi")):
         # Most-cited first; on a tie, sectors with watched tickers first, since those are the ones the owner can act on.

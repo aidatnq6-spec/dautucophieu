@@ -23,6 +23,7 @@ test("macro verdicts, sectors linked to watched tickers, reports read and SSI ti
   await expect(page.getByRole("list", { name: "Báo cáo đã đọc" })).toContainText("Báo cáo mẫu mau-1");
   await expect(page.getByRole("link", { name: "Cập nhật Ngành Thép mẫu" })).toBeVisible();
   await expect(page.getByText(/không phải khuyến nghị/)).toBeVisible();
+  await expect(page.getByText(/1 báo cáo chưa đọc được.*không tải được tệp/)).toBeVisible();
 });
 
 test("no horizontal scroll on the insights page at 375px", async ({ page }) => {

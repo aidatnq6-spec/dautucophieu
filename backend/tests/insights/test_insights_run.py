@@ -45,14 +45,14 @@ SSI = ('<a class="titlePost" href="javascript:void(0)">Báo cáo ngành thép</a
 class Gateway:
     def complete(self, task, messages, *, job_id, response_format=None, tools=None):
         from investment_agent.ai.openrouter import Completion
-        raw = {"macro_now": {"view": "favourable", "reasons": [{"text": "GDP tốt", "quote": "GDP tăng", "page": 1}]},
+        raw = {"macro_now": {"view": "favourable", "reasons": [{"text": "GDP tốt", "quote": "GDP tăng mạnh trong quý", "page": 1}]},
                "macro_outlook": {"view": "neutral", "reasons": []}, "sectors": []}
         return Completion("m/a", "p", json.dumps(raw), (), 10, 10, Decimal("0.001"), "reported", None, "v")
 
 
 def run(tmp_path, gateway, notify=None, ssi_get=lambda url: SSI):
     return insights_run(tmp_path, ssi_get=ssi_get, discover=lambda since: [REF], download=lambda url: b"pdf",
-                        pages=lambda data: ["GDP tăng mạnh"], gateway=gateway, notify=notify, now=NOW, sleep=lambda s: None)
+                        pages=lambda data: ["GDP tăng mạnh trong quý ba"], gateway=gateway, notify=notify, now=NOW, sleep=lambda s: None)
 
 
 def test_run_without_key_reports_not_configured_and_keeps_ssi_titles(tmp_path):

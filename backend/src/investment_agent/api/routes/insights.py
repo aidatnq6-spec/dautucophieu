@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Request
 
 from investment_agent.insights.store import InsightStore
-from investment_agent.insights.summary import link, summarise
+from investment_agent.insights.summary import link, linking_sectors, summarise
 from investment_agent.market.sectors import load_sectors
 from investment_agent.market.watchlist import load_watchlist
 from investment_agent.repositories.personal import RepositoryUnavailable
@@ -43,7 +43,7 @@ def insights(request: Request):
     except RepositoryUnavailable:
         return unavailable()
     watched = set(load_watchlist(data_dir).symbols)
-    sectors = {s: sec for s, sec in load_sectors(data_dir)[0].items() if s in watched}
+    sectors = linking_sectors(load_sectors(data_dir)[0], watched=watched, held=held)
     store = InsightStore(data_dir / "insights")
     summary = link(summarise(store.recent(today, days=WINDOW_DAYS)), sectors=sectors, valuation_rows=rows, held=held)
     reports = [{"source": r["source"], "ref_id": r["ref_id"], "title": r["title"], "url": r["page_url"], "published": r["published"],

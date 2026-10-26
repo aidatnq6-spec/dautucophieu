@@ -40,8 +40,32 @@ def test_validate_keeps_quoted_claims_and_drops_invented_or_unknown_ones():
 def test_validate_survives_malformed_model_output():
     out = validate({"macro_now": {"view": "great", "reasons": [{"text": "x", "quote": "Tăng trưởng GDP", "page": "one"}]},
                     "sectors": "none"}, PAGES, SECTORS)
-    assert out["macro_now"] == {"view": "neutral", "reasons": []} and out["macro_outlook"]["reasons"] == [] and out["sectors"] == []
+    assert out["macro_now"] == {"view": None, "reasons": []} and out["macro_outlook"]["reasons"] == [] and out["sectors"] == []
 
 
 def test_normalise_ignores_case_spacing_and_punctuation():
     assert normalise("  Lãi suất   THẤP, hỗ-trợ ") == normalise("lãi suất thấp hỗ trợ")
+
+
+def test_validate_survives_non_string_fields():
+    raw = {"macro_now": {"view": ["favourable"], "reasons": [{"text": "x", "quote": {"q": 1}, "page": 1}]},
+           "sectors": [{"sector": ["Ngân hàng"], "effect": "benefit", "reason": "x", "quote": "lãi suất thấp hỗ trợ ngành ngân hàng", "page": 2},
+                       {"sector": "Ngân hàng", "effect": {"x": 1}, "reason": "x", "quote": "lãi suất thấp hỗ trợ ngành ngân hàng", "page": 2}]}
+    out = validate(raw, PAGES, SECTORS)
+    assert out["sectors"] == [] and out["macro_now"]["reasons"] == [] and out["dropped"] == 3
+
+
+def test_short_or_partial_word_quotes_do_not_count_as_evidence():
+    cases = [("ng", 2), ("ngân hàng", 2), ("7,5%", 1), ("ăng trưởng GDP quý III đạt", 1)]
+    for quote, page in cases:
+        raw = {"sectors": [{"sector": "Ngân hàng", "effect": "benefit", "reason": "x", "quote": quote, "page": page}],
+               "macro_now": {"view": "favourable", "reasons": [{"text": "x", "quote": quote, "page": page}]}}
+        out = validate(raw, PAGES, SECTORS)
+        assert out["sectors"] == [] and out["macro_now"]["reasons"] == [], quote
+
+
+def test_macro_view_without_any_verified_reason_is_not_kept():
+    raw = {"macro_now": {"view": "favourable", "reasons": [{"text": "bịa", "quote": "Lạm phát vượt mười phần trăm năm nay", "page": 1}]},
+           "macro_outlook": {"view": "unfavourable", "reasons": []}, "sectors": []}
+    out = validate(raw, PAGES, SECTORS)
+    assert out["macro_now"] == {"view": None, "reasons": []} and out["macro_outlook"]["view"] is None

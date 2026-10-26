@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BookOpenText, Briefcase, ChartLine, Eye, Globe, House, Search, Settings, UserRound } from "lucide-react";
+import { Activity, BookOpenText, Briefcase, ChartLine, Eye, Globe, House, Scale, Search, Settings, UserRound } from "lucide-react";
 
 const LINKS = [
   { href: "/", label: "Tổng quan", icon: House },
@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/trend", label: "Xu hướng", icon: Activity },
   { href: "/market", label: "Thị trường & Ngành", icon: ChartLine },
   { href: "/watchlist", label: "Theo dõi", icon: Eye },
+  { href: "/fair-value", label: "Định giá", icon: Scale },
   { href: "/research", label: "Nghiên cứu", icon: Search },
   { href: "/reports", label: "Bản tin sau phiên", icon: BookOpenText },
   { href: "/profile", label: "Hồ sơ & rủi ro", icon: UserRound },

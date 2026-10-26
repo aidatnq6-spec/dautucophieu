@@ -38,6 +38,10 @@ def main() -> int:
     sync.add_argument("--index", action="store_true", help="the symbols are indices (e.g. VNINDEX), quoted in points")
     macro = commands.add_parser("macro-sync", help="fetch automatic macro indicators (FRED, Vietcombank) into data/macro")
     macro.add_argument("--data-dir", type=Path, required=True)
+    fsync = commands.add_parser("fundamentals-sync", help="refresh statements for the Định giá page (paced for Vnstock's limit)")
+    fsync.add_argument("--data-dir", type=Path, required=True)
+    fsync.add_argument("--limit", type=int, default=8)
+    fsync.add_argument("--all", action="store_true", help="every watched ticker, for the first load")
     trend = commands.add_parser("trend-run", help="build the Xu hướng board after 15:30 on trading days")
     trend.add_argument("--data-dir", type=Path, required=True)
     trend.add_argument("--calendar", type=Path, required=True)
@@ -51,6 +55,8 @@ def main() -> int:
         return index_groups([g.strip().upper() for g in args.groups.split(",") if g.strip()], args.output)
     if args.command == "market-sync":
         return market_sync(_symbols(args.symbols), args.data_dir, args.calendar, args.days, index=args.index)
+    if args.command == "fundamentals-sync":
+        return fundamentals_sync(args.data_dir, limit=None if args.all else args.limit)
     if args.command == "trend-run":
         return trend_run(args.data_dir, args.calendar)
     if args.command == "macro-sync":
@@ -129,6 +135,19 @@ def index_groups(groups: list[str], output: Path, provider=None, today=None) -> 
 
 def _same_bar(a, b) -> bool:
     return a.model_dump(exclude={"observed_at"}) == b.model_dump(exclude={"observed_at"})
+
+
+def fundamentals_sync(data_dir: Path, *, limit: int | None, provider=None, now=None, sleep=None) -> int:
+    import time
+    from datetime import datetime, timezone
+    from investment_agent.market.fundamentals import FundamentalsStore, sync_fundamentals
+    from investment_agent.market.providers.vnstock_adapter import VnstockProvider
+    from investment_agent.market.series import SeriesStore
+    from investment_agent.market.watchlist import load_watchlist
+    out = sync_fundamentals(FundamentalsStore(data_dir / "fundamentals"), SeriesStore(data_dir / "trend-sources"), list(load_watchlist(data_dir).symbols),
+                            provider=provider or VnstockProvider(), now=now or datetime.now(timezone.utc), limit=limit, sleep=sleep or time.sleep)
+    print(json.dumps(out, ensure_ascii=False))
+    return 1 if out["errors"] else 0
 
 
 def trend_run(data_dir: Path, calendar_path: Path, now=None, provider=None, get=None) -> int:

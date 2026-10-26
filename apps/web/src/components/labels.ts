@@ -18,6 +18,12 @@ export const REASON_TEXT: Record<string, string> = {
 export const SCOPE_LABEL: Record<string, string> = {
   research: "Trong danh sách nghiên cứu", held_outside_universe: "Ngoài danh sách nghiên cứu", removed_stop_buy: "Đã loại khỏi danh sách",
 };
-export const NOTE_TEXT = (note: string) => note.startsWith("price_missing:") ? `Chưa có giá đã xác minh cho ${note.split(":")[1]}: giá trị danh mục chưa đầy đủ`
+const FLAG_TEXT: Record<string, string> = {
+  universe_incomplete: "Danh sách nghiên cứu chưa hoàn tất", ai_not_configured: "Chưa bật AI: phần nhận định dùng số liệu đã kiểm chứng",
+  ai_unavailable: "AI tạm không dùng được: phần nhận định dùng số liệu đã kiểm chứng",
+};
+export const NOTE_TEXT = (note: string) => FLAG_TEXT[note] ? FLAG_TEXT[note]
+  : note.startsWith("market_provenance:") ? `Nguồn giá: ${note.split(":")[1] === "vnstock_adjusted" ? "Vnstock, giá đã điều chỉnh" : note.split(":")[1]}`
+  : note.startsWith("price_missing:") ? `Chưa có giá đã xác minh cho ${note.split(":")[1]}: giá trị danh mục chưa đầy đủ`
   : note.startsWith("price_not_for_session:") ? `Giá của ${note.split(":")[1]} chưa cập nhật cho phiên này: chờ lần chạy sau` : note;
 export const label = (map: Record<string, string>, code: string) => map[code] ?? code;

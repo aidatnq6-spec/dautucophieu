@@ -11,13 +11,13 @@ function Gain({ value }: { value: string | null }) {
   return <span className={loss ? "negative" : "positive"}>{loss ? "Lỗ " : "Lãi "}{formatVnd(value)}</span>;
 }
 
-export function HoldingsTable({ rows }: { rows: HoldingRow[] }) {
+export function HoldingsTable({ rows, showScope = true }: { rows: HoldingRow[]; showScope?: boolean }) {
   if (!rows.length) return <p className="muted">Chưa có cổ phiếu trong sổ.</p>;
   return (
     <div className="tablewrap">
       <table aria-label="Danh mục đang nắm giữ">
         <thead><tr><th>Mã</th><th className="num">Số lượng</th><th className="num">Giá vốn bình quân (đ/cp)</th><th className="num">Giá (ngày)</th>
-          <th className="num">Giá trị</th><th className="num">Lãi/lỗ chưa thực hiện</th><th className="num">Tỷ trọng / vốn có thể đầu tư</th><th>Phạm vi</th></tr></thead>
+          <th className="num">Giá trị</th><th className="num">Lãi/lỗ chưa thực hiện</th><th className="num">Tỷ trọng / vốn có thể đầu tư</th>{showScope && <th>Phạm vi</th>}</tr></thead>
         <tbody>{rows.map((r) => (
           <tr key={r.security_id} data-testid={`overview-${r.security_id}`}>
             <td><strong>{r.security_id}</strong></td>
@@ -27,7 +27,7 @@ export function HoldingsTable({ rows }: { rows: HoldingRow[] }) {
             <td className="num">{formatVnd(r.market_value)}</td>
             <td className="num"><Gain value={r.unrealized_gain} /></td>
             <td className="num">{formatRatio(r.weight_of_capital)}</td>
-            <td>{label(SCOPE_LABEL, r.scope)}{r.blocked_by.length ? " · có sự kiện chưa hỗ trợ" : ""}</td>
+            {showScope && <td>{label(SCOPE_LABEL, r.scope)}{r.blocked_by.length ? " · có sự kiện chưa hỗ trợ" : ""}</td>}
           </tr>))}
         </tbody>
       </table>

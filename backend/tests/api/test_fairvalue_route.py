@@ -1,0 +1,36 @@
+import json
+from datetime import date, datetime, timezone
+from decimal import Decimal
+
+from fastapi.testclient import TestClient
+
+from investment_agent.api.app import create_app
+from investment_agent.api.auth import InternalAuthSettings
+from investment_agent.market.fundamentals import FundamentalsStore
+from investment_agent.market.series import SeriesStore
+from investment_agent.market.view import PricePoint, SyntheticMarket
+from investment_agent.repositories.personal import MemoryDocumentStore, PersonalRepository
+
+from signed_client import SECRET, TOKEN, Clock, call
+
+
+def test_fairvalue_lists_every_watched_ticker_with_methods(tmp_path):
+    (tmp_path / "market-symbols.txt").write_text("FPT\nVCB\n", encoding="utf-8")
+    (tmp_path / "industries.json").write_text(json.dumps({"as_of": "2026-10-25", "source": "t", "level": 2,
+                                                         "sectors": {"FPT": "Công nghệ Thông tin", "VCB": "Ngân hàng"}}), encoding="utf-8")
+    years = {str(y): {"npat": "1000000000", "eps": "1000", "equity": "10000000000"} for y in range(2020, 2026)}
+    quarters = {q: {"npat": "250000000", "equity": "10000000000"} for q in ("2025-Q2", "2025-Q3", "2025-Q4", "2026-Q1", "2026-Q2")}
+    divs = [{"date": f"{y}-07-01", "cash": "500"} for y in range(2021, 2026)] + [{"date": "2026-07-01", "cash": "500"}]
+    FundamentalsStore(tmp_path / "fundamentals").save({"symbol": "FPT", "fetched_at": "2026-10-26T00:00:00+00:00", "source": "t",
+                                                      "years": years, "quarters": quarters, "dividends": divs, "issues": []})
+    SeriesStore(tmp_path / "trend-sources").upsert("FPT-1d", [(datetime(y, 12, 31), "12") for y in range(2020, 2026)])
+    market = SyntheticMarket(prices={"FPT": PricePoint(Decimal(9000), date(2027, 1, 14))})
+    clock = Clock()
+    app = create_app(InternalAuthSettings("owner-1", TOKEN, SECRET), clock=clock, personal_repository=PersonalRepository("owner-1", MemoryDocumentStore()),
+                     market=market, data_dir=tmp_path)
+    body = call(TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000)), clock, "GET", "/internal/fairvalue").json()
+    rows = {r["symbol"]: r for r in body["rows"]}
+    assert rows["FPT"]["fair"] is not None and rows["FPT"]["verdict"] in {"cheap", "fair", "expensive"}
+    assert all(isinstance(m["value"], (str, type(None))) for m in rows["FPT"]["methods"])
+    assert rows["VCB"]["verdict"] == "insufficient" and rows["VCB"]["reason"] == "Chưa có báo cáo tài chính"
+    assert body["settings"]["threshold"] == "0.2"

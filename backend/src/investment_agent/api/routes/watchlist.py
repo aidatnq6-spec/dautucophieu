@@ -14,13 +14,17 @@ from .common import read_version, unavailable
 router = APIRouter(prefix="/internal")
 
 
-def _rows(request: Request):
-    """(watchlist, rows) with held flags from the ledger; raises RepositoryUnavailable."""
+def held_tickers(request: Request) -> set[str]:
+    """Tickers with shares in the owner's ledger; raises RepositoryUnavailable."""
     owner, repo = require_owner(request), request.app.state.personal_repository
     book = LedgerBook(read_version(repo, owner, "ledger_events", "main", None))
-    held = {p.security_id for p in replay(list(book.effective().events)).positions if p.quantity + p.pending_quantity > 0}
+    return {p.security_id for p in replay(list(book.effective().events)).positions if p.quantity + p.pending_quantity > 0}
+
+
+def _rows(request: Request):
+    """(watchlist, rows) with held flags from the ledger; raises RepositoryUnavailable."""
     wl = load_watchlist(request.app.state.data_dir)
-    return wl, watchlist_rows(request.app.state.market, wl, held=held)
+    return wl, watchlist_rows(request.app.state.market, wl, held=held_tickers(request))
 
 
 @router.get("/watchlist")

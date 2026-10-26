@@ -59,3 +59,9 @@ export function percentToRatio(raw: string): string | null {
   if (Number(whole) > 1 || (whole === "1" && frac)) return null;
   return frac ? `${whole}.${frac}` : whole;
 }
+
+/** Whole-đồng input as typed: keep digits only and group thousands with dots ("1000000" → "1.000.000"). */
+export function groupDigitsInput(raw: string): string {
+  const digits = raw.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}

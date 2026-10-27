@@ -17,6 +17,7 @@ router = APIRouter(prefix="/internal")
 
 class BudgetRequest(ContractModel):
     total: str = Field(max_length=24)
+    reserve: str | None = Field(default=None, max_length=24)  # None = use the profile's emergency reserve and 12-month needs
     expected_version: int = Field(strict=True, ge=0)
     request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
 
@@ -44,8 +45,17 @@ def put_budget(request: Request, body: BudgetRequest):
         return error(422, "invalid_total", "Tổng tài sản không hợp lệ.")
     if not total.is_finite() or total < 0 or total != total.to_integral_value():
         return error(422, "invalid_total", "Tổng tài sản phải là số đồng không âm.")
+    reserve = None
+    if body.reserve is not None:
+        try:
+            reserve = Decimal(body.reserve)
+        except InvalidOperation:
+            return error(422, "invalid_reserve", "Quỹ dự phòng không hợp lệ.")
+        if not reserve.is_finite() or reserve < 0 or reserve != reserve.to_integral_value():
+            return error(422, "invalid_reserve", "Quỹ dự phòng phải là số đồng không âm.")
+    payload = {"total": format(total, "f"), "reserve": format(reserve, "f") if reserve is not None else None}
     try:
-        repo.write(owner, *RECORD, {"total": format(total, "f")}, expected_version=body.expected_version, request_id=body.request_id)
+        repo.write(owner, *RECORD, payload, expected_version=body.expected_version, request_id=body.request_id)
         budget, version = budget_view(repo, owner)
     except WRITE_ERRORS as exc:
         return write_error(exc)

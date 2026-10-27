@@ -47,3 +47,9 @@ def test_drawdown_check_runs_on_every_wake_up():
     ls = lines()
     step = next(i for i, l in enumerate(ls) if "investment_agent.cli drawdown-check" in l)
     assert step < next(i for i, l in enumerate(ls) if "investment_agent.cli scheduled-run" in l)
+
+
+def test_contribution_reminder_runs_on_every_wake_up():
+    ls = lines()
+    step = next(i for i, l in enumerate(ls) if "investment_agent.cli contribution-remind" in l)
+    assert step < next(i for i, l in enumerate(ls) if "investment_agent.cli scheduled-run" in l)

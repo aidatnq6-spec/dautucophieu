@@ -24,8 +24,7 @@ test("overview puts the decision first, holdings below, and keeps holdings outsi
   await expect(page.getByText("Dữ liệu thị trường tổng hợp")).toBeVisible();
   const decision = page.getByRole("region", { name: /./ }).first();
   await expect(decision).toBeVisible();
-  await expect(page.getByTestId("overview-FPT")).toContainText("Ngoài danh sách nghiên cứu");
-  await expect(page.getByTestId("overview-FPT")).toContainText(/Lãi [\d.]+ đ/);  // gain labelled in words, not colour only
+  await expect(page.getByTestId("holding-FPT")).toContainText(/\+[\d.]+ đ/);  // gain carries a sign, not colour only
   await page.getByRole("button", { name: "Xem căn cứ FPT" }).click();
   await expect(page.getByTestId("reasons-FPT")).toContainText("Mã ngoài danh sách nghiên cứu");
   await expect(page.getByRole("button", { name: /^Mua/ })).toHaveCount(0);

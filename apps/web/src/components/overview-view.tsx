@@ -14,7 +14,10 @@ type Overview = { provenance: string; as_of: string; setup: { profile: boolean; 
 export function OverviewView() {
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [budget, setBudget] = useState<string | null>(null);
   useEffect(() => { api<Overview>("overview").then(setData, (e) => setError(e instanceof ApiError ? e.failure.message : "Không tải được tổng quan.")); }, []);
+  // Once total financial assets are entered, the rest of the app measures on the stock budget; say the same here.
+  useEffect(() => { api<{ budget: { status: string; budget?: string } }>("equity-budget").then((v) => setBudget(v.budget.status === "ok" ? v.budget.budget ?? null : null), () => setBudget(null)); }, []);
   if (error) return <p className="errors" role="alert">{error}</p>;
   if (!data) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   return (
@@ -26,10 +29,10 @@ export function OverviewView() {
       <DecisionSummary decision={data.decision} items={data.items} />
       <section className="surface">
         <div className="row"><h2>Cổ phiếu đang nắm giữ</h2><Link href="/portfolio">Sổ giao dịch</Link></div>
-        <p className="caption">Vốn có thể đầu tư: {formatVnd(data.capital?.investable_capital ?? null)} · Tiền trong sổ: {formatVnd(data.ledger.cash)}</p>
+        <p className="caption">{budget !== null ? `Vốn dành cho cổ phiếu: ${formatVnd(budget)}` : `Vốn có thể đầu tư: ${formatVnd(data.capital?.investable_capital ?? null)}`}
+          {" "}· Tiền trong sổ: {formatVnd(data.ledger.cash)}</p>
         <HoldingsTable rows={data.holdings} />
         {data.quality_notes.map((n) => <p key={n} className="caption">{NOTE_TEXT(n)}</p>)}
-        <p className="caption">Chưa hiển thị tỷ suất sinh lời theo thời gian (TWR/XIRR) vì chưa kiểm chứng dòng tiền.</p>
       </section>
     </>
   );

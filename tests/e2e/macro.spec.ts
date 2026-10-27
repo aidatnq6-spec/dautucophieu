@@ -56,3 +56,11 @@ test("automated rows with a manual fallback, and US PMI entered by hand", async 
   await expect(us).toContainText("Nhập tay");
   await expect(us.getByRole("button", { name: "Nhập" })).toBeVisible();
 });
+
+test("the rate cycle line says which rates it reads and waits for six months of Vietnam data", async ({ page }) => {
+  await openMacro(page);
+  const box = page.getByRole("region", { name: "Mốc chu kỳ lãi suất" });
+  await expect(box).toBeVisible();
+  await expect(box).toContainText("chưa đủ 6 tháng dữ liệu Việt Nam");
+  await expect(box).toContainText("không phải khuyến nghị");
+});

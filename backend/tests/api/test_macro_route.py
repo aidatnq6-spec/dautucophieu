@@ -52,3 +52,14 @@ def test_scraped_indicators_also_accept_a_manual_value(tmp_path):
     clock = Clock()
     c = client(tmp_path, clock)
     assert call(c, clock, "POST", "/internal/macro/deposit_12m/observations", {"date": "2026-10-01", "value": "9,55"}).status_code == 200
+
+
+def test_rate_cycle_uses_the_us_as_a_labelled_reference_until_vietnam_has_six_months(tmp_path):
+    clock = Clock()  # 2027-01-15
+    store = MacroStore(tmp_path)
+    store.upsert("deposit_12m", [(date(2026, 10, 25), "5.63"), (date(2027, 1, 14), "5.60")], entry="auto")
+    store.upsert("fed_effr", [(date(2026, 7, 1), "4.33"), (date(2027, 1, 14), "3.80")], entry="auto")
+    store.upsert("us10y", [(date(2026, 7, 1), "4.40"), (date(2027, 1, 14), "4.30")], entry="auto")
+    body = call(client(tmp_path, clock), clock, "GET", "/internal/macro/cycle").json()
+    assert body["basis"] == "us_reference" and body["phase"] == "down"
+    assert body["vietnam_since"] == "2026-10-25" and body["vietnam_ready_on"] == "2027-04-25"

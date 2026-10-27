@@ -36,9 +36,9 @@ def test_pmi_aggregator_requires_value_and_named_publication_month():
 
 def test_indicators_config_lists_auto_and_manual_rows():
     ind = load_indicators()
-    assert len(ind) == 16 and {i["id"] for i in ind if i["source"]["kind"] != "manual"} == {
+    assert len(ind) == 17 and {i["id"] for i in ind if i["source"]["kind"] != "manual"} == {
         "dxy", "wti", "us_cpi_yoy", "usd_vnd_vcb", "fed_effr", "us10y", "usd_vnd_free", "usd_vnd_sbv", "deposit_12m",
-        "foreign_net", "vnindex_value", "m2_vn", "vn10y", "vn_interbank_on", "vn_pmi"}  # us_pmi: manual since 26/10/2026 (sources block bots)
+        "foreign_net", "vnindex_value", "m2_vn", "vn10y", "vn_interbank_on", "vn_pmi", "vn_cpi_yoy"}  # us_pmi: manual since 26/10/2026 (sources block bots)
 
 
 def test_fred_csv_skips_missing_values_and_cpi_becomes_year_on_year():
@@ -263,3 +263,37 @@ def test_first_macro_row_is_dxy_from_ecb(tmp_path):
     store = MacroStore(tmp_path)
     assert fetch_auto(ind, store, get=get, today=date(2026, 10, 26))["dxy"] == "ok"
     assert store.read("dxy")[-1]["date"] == "2026-10-23"
+
+
+def test_vietnam_cpi_year_on_year_is_read_from_news_headlines():
+    from investment_agent.market.leading import parse_news_cpi
+    items = [news("CPI tháng 10 tăng 0,2% so với tháng trước, tăng 3,2% so với cùng kỳ", "2026-11-06T10:00:00+07:00"),
+             news("Chỉ số giá tiêu dùng tháng 9/2026 tăng 3,38% so với cùng kỳ năm trước", "2026-10-06T10:00:00+07:00"),
+             news("CPI bình quân 10 tháng tăng 3,3% so với cùng kỳ", "2026-11-06T10:05:00+07:00"),     # an average, not the month
+             news("Lạm phát Mỹ tháng 9 tăng 3,1% so với cùng kỳ", "2026-10-15T20:00:00+07:00"),        # another country
+             news("CPI Mỹ tháng 9 tăng 3,1% so với cùng kỳ", "2026-10-15T20:05:00+07:00"),             # another country, named
+             news("CPI tháng 10 tăng nhẹ", "2026-11-06T11:00:00+07:00"),                                 # no year-on-year value
+             news("CPI tháng 12 giảm 0,5% so với cùng kỳ", "2027-01-06T10:00:00+07:00")]
+    assert parse_news_cpi(items) == [(date(2026, 9, 30), "3.38"), (date(2026, 10, 31), "3.2"), (date(2026, 12, 31), "-0.5")]
+
+
+def test_vietnam_cpi_is_an_automatic_indicator_with_a_manual_fallback():
+    ind = {i["id"]: i for i in load_indicators()}
+    assert ind["vn_cpi_yoy"]["source"] == {"kind": "news_cpi", "manual_fallback": True} and ind["vn_cpi_yoy"]["unit"] == "%"
+
+
+def test_one_feed_read_serves_both_pmi_and_cpi(tmp_path):
+    rss = ('<rss><item><title>PMI ngành sản xuất Việt Nam tháng 10 đạt 50,8 điểm</title><link>https://cafef.vn/a.chn</link>'
+           '<pubDate>Mon, 02 Nov 2026 09:30:00 +0700</pubDate></item>'
+           '<item><title>CPI tháng 10 tăng 3,2% so với cùng kỳ</title><link>https://cafef.vn/b.chn</link>'
+           '<pubDate>Fri, 06 Nov 2026 10:00:00 +0700</pubDate></item></rss>')
+    seen = []
+
+    def get(url):
+        seen.append(url)
+        return rss if url.endswith(".rss") or "rss" in url else (_ for _ in ()).throw(OSError("offline"))
+    store = MacroStore(tmp_path)
+    wanted = [i for i in load_indicators() if i["id"] in ("vn_pmi", "vn_cpi_yoy")]
+    assert fetch_auto(wanted, store, get=get, today=date(2026, 11, 6)) == {"vn_pmi": "ok", "vn_cpi_yoy": "ok"}
+    assert store.read("vn_cpi_yoy")[-1]["value"] == "3.2" and store.read("vn_pmi")[-1]["value"] == "50.8"
+    assert len(seen) == len(set(seen))  # each feed fetched once

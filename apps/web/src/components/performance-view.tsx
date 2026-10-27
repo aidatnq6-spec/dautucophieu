@@ -6,6 +6,8 @@ import { formatVnd } from "../lib/format";
 type Point = { date: string; portfolio: string; vnindex: string; value: string };
 type Perf = { series: Point[]; monthly: { month: string; portfolio: string; vnindex: string }[];
   total: { portfolio: string; vnindex: string; since: string; days: number } | null; skipped_days: string[];
+  benchmarks?: { days: number | null; deposit: string | null; deposit_rate: string | null; inflation: string | null; cpi_yoy: string | null;
+    cpi_month: string | null; real: string | null };
   contributions: { symbol: string; cost: string; value: string | null; unrealized: string | null }[]; realized_gain: string; ledger_started_on: string | null };
 
 const H = 220, PAD = { top: 12, right: 70, bottom: 24, left: 40 };
@@ -60,6 +62,22 @@ function Chart({ series }: { series: Point[] }) {
   );
 }
 
+const rate = (v: string) => Number(v).toLocaleString("vi-VN", { maximumFractionDigits: 2 });
+
+/** The same period at the 12-month deposit rate and at the latest CPI, and the portfolio's return after inflation. */
+function Benchmarks({ b }: { b: NonNullable<Perf["benchmarks"]> }) {
+  return (
+    <ul className="perf-bench" aria-label="So với gửi tiết kiệm và lạm phát">
+      <li>Gửi tiết kiệm 12 tháng{b.deposit_rate ? ` (${rate(b.deposit_rate)}%/năm)` : ""}: {b.deposit !== null
+        ? <strong className={tone(b.deposit)}>{pct(b.deposit)}</strong> : <span className="muted">chưa có lãi suất</span>}</li>
+      <li>Lạm phát{b.cpi_yoy && b.cpi_month ? ` (CPI ${rate(b.cpi_yoy)}% so cùng kỳ, tháng ${b.cpi_month.slice(5, 7)}/${b.cpi_month.slice(0, 4)})` : ""}:{" "}
+        {b.inflation !== null ? <strong>{pct(b.inflation)}</strong> : <span className="muted">chưa có số CPI (tự lấy từ tin khi Tổng cục Thống kê công bố, hoặc nhập tay ở Vĩ mô)</span>}</li>
+      <li>Lợi suất thực (danh mục sau khi trừ lạm phát): {b.real !== null
+        ? <strong data-testid="real-return" className={tone(b.real)}>{pct(b.real)}</strong> : <span className="muted">chưa tính được</span>}</li>
+    </ul>
+  );
+}
+
 /** Time-weighted performance since the ledger starts (deposits and withdrawals excluded) vs VN-Index, and gains on cost by ticker. */
 export function PerformanceView() {
   const [p, setP] = useState<Perf | null>(null);
@@ -73,6 +91,7 @@ export function PerformanceView() {
           so với VN-Index cùng các phiên. Chỉ để theo dõi, không phải khuyến nghị.</p>
         {p.total && <p>Danh mục <strong className={tone(p.total.portfolio)}>{pct(p.total.portfolio)}</strong> · VN-Index{" "}
           <strong className={tone(p.total.vnindex)}>{pct(p.total.vnindex)}</strong> <span className="caption">từ {day(p.total.since)}, {p.total.days} phiên</span></p>}
+        {p.total && p.benchmarks && <Benchmarks b={p.benchmarks} />}
         {p.series.length >= 2 ? <Chart series={p.series} />
           : <p className="muted">Mới có {p.series.length} phiên có giá đủ để tính; biểu đồ sẽ dài dần theo thời gian.</p>}
         {p.monthly.length > 0 && <table className="fv-table cc-table" aria-label="Lợi nhuận theo tháng">

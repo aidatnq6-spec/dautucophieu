@@ -21,7 +21,7 @@ def test_macro_lists_every_indicator(tmp_path):
     MacroStore(tmp_path).upsert("us10y", [(date(2026, 10, 21), "4.91"), (date(2026, 10, 23), "4.96")], entry="auto")
     body = call(client(tmp_path, clock), clock, "GET", "/internal/macro").json()
     rows = {r["id"]: r for r in body["rows"]}
-    assert len(rows) == 16 and rows["us10y"]["assessment"] == "Xấu" and rows["vn_pmi"]["value"] is None
+    assert len(rows) == 17 and rows["us10y"]["assessment"] == "Xấu" and rows["vn_pmi"]["value"] is None
 
 
 def test_owner_enters_a_manual_value_with_its_source(tmp_path):

@@ -41,3 +41,22 @@ def test_without_index_history_there_is_no_series_but_gains_still_show(tmp_path)
     c, clock = client(tmp_path, with_series=False)
     body = call(c, clock, "GET", "/internal/performance").json()
     assert body["series"] == [] and body["total"] is None and body["contributions"][0]["unrealized"] == "1000000"
+
+
+def test_deposit_inflation_and_real_return_cover_the_same_period(tmp_path):
+    from datetime import date
+    from investment_agent.market.leading import MacroStore
+    store = MacroStore(tmp_path)
+    store.upsert("deposit_12m", [(date(2027, 1, 7), "6")], entry="auto")
+    store.upsert("vn_cpi_yoy", [(date(2026, 12, 31), "3.65")], entry="auto")
+    c, clock = client(tmp_path)
+    b = call(c, clock, "GET", "/internal/performance").json()["benchmarks"]
+    # 05/01 → 07/01 is 2 days: (1.06)^(2/365) − 1 and (1.0365)^(2/365) − 1; real = 1.01 / (1 + inflation) − 1
+    assert b == {"days": 2, "deposit": "0.0003", "deposit_rate": "6", "inflation": "0.0002", "cpi_yoy": "3.65", "cpi_month": "2026-12-31",
+                 "real": "0.0098"}
+
+
+def test_without_cpi_the_real_return_says_so_instead_of_guessing(tmp_path):
+    c, clock = client(tmp_path)
+    b = call(c, clock, "GET", "/internal/performance").json()["benchmarks"]
+    assert b["inflation"] is None and b["real"] is None and b["deposit"] is None and b["days"] == 2

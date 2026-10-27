@@ -64,3 +64,19 @@ def performance(events: list, *, closes: dict[str, dict[date, float]], index: di
     for point in series:
         point.pop("_level"), point.pop("_index")
     return {"series": series, "monthly": monthly, "total": total, "skipped_days": skipped}
+
+
+def benchmarks(total: dict | None, *, end: str | None, deposit_rate: str | None, cpi: tuple[str, str] | None) -> dict:
+    """Saving at the 12-month deposit rate and inflation at the latest CPI (year on year), both scaled to the same period as the
+    portfolio's return; real return = portfolio after inflation. Missing inputs stay None, never guessed."""
+    if not total or not end:
+        return {"days": None, "deposit": None, "deposit_rate": deposit_rate, "inflation": None, "cpi_yoy": cpi[1] if cpi else None,
+                "cpi_month": cpi[0] if cpi else None, "real": None}
+    days = (date.fromisoformat(end) - date.fromisoformat(total["since"])).days
+    scale = lambda annual: Decimal(str((1 + float(Decimal(annual) / 100)) ** (days / 365) - 1))  # noqa: E731
+    deposit = scale(deposit_rate) if deposit_rate is not None else None
+    inflation = scale(cpi[1]) if cpi else None
+    real = (1 + Decimal(total["portfolio"])) / (1 + inflation) - 1 if inflation is not None else None
+    q = lambda d: str(d.quantize(_Q4, ROUND_HALF_UP)) if d is not None else None  # noqa: E731
+    return {"days": days, "deposit": q(deposit), "deposit_rate": deposit_rate, "inflation": q(inflation), "cpi_yoy": cpi[1] if cpi else None,
+            "cpi_month": cpi[0] if cpi else None, "real": q(real)}

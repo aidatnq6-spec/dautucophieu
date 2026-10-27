@@ -73,3 +73,30 @@ def test_a_reserve_entered_by_hand_replaces_the_profile_deduction():
 def test_a_negative_reserve_is_refused():
     c, clock = client()
     assert call(c, clock, "PUT", "/internal/equity-budget", {"total": "2000000000", "reserve": "-1", "expected_version": 0, "request_id": "eb1"}).status_code == 422
+
+
+def test_layers_add_up_to_the_total_with_stocks_and_cash_from_the_ledger_and_build_the_pyramid():
+    c, clock = client()  # Cân bằng 35%; ledger: 100 tr deposited, FPT bought for 5 tr → 95 tr cash, 5 tr stocks at cost
+    ok = call(c, clock, "PUT", "/internal/equity-budget", {"layers": {"deposit": "300000000", "bond": "0", "gold": "100000000", "crypto": "0"},
+                                                          "reserve": "100000000", "expected_version": 0, "request_id": "eb1"})
+    assert ok.status_code == 200
+    b = call(c, clock, "GET", "/internal/equity-budget").json()["budget"]
+    assert b["total"] == "600000000"  # 100 reserve + 300 deposits + 95 ledger cash + 100 gold + 5 stocks at cost
+    p = b["pyramid"]
+    amounts = {l["id"]: l["amount"] for l in p["layers"]}
+    assert amounts == {"reserve": "100000000", "deposit": "395000000", "bond": "0", "gold": "100000000", "stocks": "5000000", "crypto": "0"}
+    assert b["layers"] == {"deposit": "300000000", "bond": "0", "gold": "100000000", "crypto": "0"}
+
+
+def test_a_single_total_still_works_without_a_pyramid():
+    c, clock = client()
+    save(c, clock, "2000000000")
+    b = call(c, clock, "GET", "/internal/equity-budget").json()["budget"]
+    assert b["total"] == "2000000000" and b["pyramid"] is None
+
+
+def test_negative_layers_are_refused():
+    c, clock = client()
+    bad = call(c, clock, "PUT", "/internal/equity-budget", {"layers": {"deposit": "-1", "bond": "0", "gold": "0", "crypto": "0"},
+                                                           "expected_version": 0, "request_id": "eb1"})
+    assert bad.status_code == 422

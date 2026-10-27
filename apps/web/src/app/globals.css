@@ -146,3 +146,10 @@ legend{font-weight:600;padding:0 6px}
 main h2{scroll-margin-top:16px}
 @media(max-width:650px){.page-jumps{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}.page-jumps button{white-space:nowrap}main h2{scroll-margin-top:120px}}
 .perf-bench{margin:4px 0 12px;padding-left:18px}.perf-bench li{margin:3px 0;overflow-wrap:anywhere}
+/* Tháp tài sản: bottom layer last in the list but drawn at the bottom; each layer up is a little narrower. */
+.pyr{display:flex;flex-direction:column-reverse;gap:6px;list-style:none;margin:16px 0;padding:0}
+.pyr-layer{margin-inline:calc(var(--step) * 3%);padding:8px 12px;border:1px solid var(--line);border-radius:7px;background:var(--paper);display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px}
+.pyr-layer.pyr-short{border-color:var(--warn-line);background:var(--warn-bg)}.pyr-layer.pyr-over{border-color:#e7b8bc;background:#fbf1f2}
+.pyr-layer.pyr-fixed{background:#eef3f8}
+.pyr-figs{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-variant-numeric:tabular-nums}
+@media(max-width:650px){.pyr-layer{margin-inline:calc(var(--step) * 1%)}}

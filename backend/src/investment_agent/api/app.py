@@ -34,6 +34,7 @@ from .routes.settings import router as settings_router
 from .routes.universe import router as universe_router
 from .routes.valuation_assumptions import router as valuation_router
 from .routes.watchlist import router as watchlist_router
+from .routes.wealth_check import router as wealth_check_router
 
 
 def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[[], float] = time.time, personal_repository=None,
@@ -91,6 +92,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(glance_router)
     app.include_router(drawdown_router)
     app.include_router(buy_check_router)
+    app.include_router(wealth_check_router)
     app.include_router(performance_router)
     app.include_router(concentration_router)
     app.include_router(insights_router)

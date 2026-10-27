@@ -48,6 +48,9 @@ $events = & $python -W ignore -m investment_agent.cli events-sync --data-dir $da
 # Nhat ky: remind what was written when a journalled ticker moved another 15% (threshold in Cai dat).
 $journal = & $python -W ignore -m investment_agent.cli journal-review --data-dir $data 2>$null
 "$(Get-Date -Format o) journal-review exit=$LASTEXITCODE $journal" | Add-Content -LiteralPath $log -Encoding UTF8
+# Ke hoach sut giam: full price history once per ticker, then a reminder when a holding falls past the threshold below cost.
+$drawdown = & $python -W ignore -m investment_agent.cli drawdown-check --data-dir $data 2>$null
+"$(Get-Date -Format o) drawdown-check exit=$LASTEXITCODE $drawdown" | Add-Content -LiteralPath $log -Encoding UTF8
 # Statements for the Định giá page: from the 20:00 slot, refresh the 8 stalest tickers (about 3 minutes, paced for Vnstock's limit).
 if ((Get-Date).Hour -ge 20) {
     $fund = & $python -W ignore -m investment_agent.cli fundamentals-sync --data-dir $data --limit 8 2>$null

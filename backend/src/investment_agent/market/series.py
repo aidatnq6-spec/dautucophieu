@@ -28,7 +28,7 @@ class SeriesStore:
             return []
         return [(datetime.fromisoformat(t), float(v)) for t, v in json.loads(path.read_text(encoding="utf-8"))["points"]]
 
-    def upsert(self, key: str, points: list[tuple[datetime, str]], *, keep: int = 6000) -> None:
+    def upsert(self, key: str, points: list[tuple[datetime, str]], *, keep: int = 9000) -> None:  # ~36 years of sessions (full history for drawdowns)
         path = self._path(key)
         merged = {t: v for t, v in (json.loads(path.read_text(encoding="utf-8"))["points"] if path.is_file() else [])}
         for t, v in points:

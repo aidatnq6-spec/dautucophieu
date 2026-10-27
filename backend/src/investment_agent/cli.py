@@ -49,6 +49,8 @@ def main() -> int:
     sectors = commands.add_parser("industries", help="save ICB level-2 sectors of the synced tickers for the market page")
     sectors.add_argument("--symbols", required=True, help="comma-separated tickers, or @file with one ticker per line")
     sectors.add_argument("--output", type=Path, required=True)
+    drawdown = commands.add_parser("drawdown-check", help="full price history for drawdowns; Telegram when a holding falls past the threshold")
+    drawdown.add_argument("--data-dir", type=Path, required=True)
     journal = commands.add_parser("journal-review", help="Nhật ký: Telegram reminder when a price moved another threshold step")
     journal.add_argument("--data-dir", type=Path, required=True)
     events = commands.add_parser("events-sync", help="corporate events of watched tickers; Telegram reminder 5 days ahead")
@@ -80,6 +82,8 @@ def main() -> int:
         return run_backup(args.data_dir, args.backup_dir, args.kind)
     if args.command == "scheduled-run":
         return scheduled_run(args.calendar, args.data_dir)
+    if args.command == "drawdown-check":
+        return drawdown_cli(args.data_dir)
     if args.command == "journal-review":
         return journal_cli(args.data_dir)
     if args.command == "events-sync":
@@ -337,6 +341,47 @@ def scheduled_run(calendar_path: Path, data_dir: Path) -> int:
     d = result.decision
     print(json.dumps({"status": "ok", "run": d.run, "reason": d.reason, "session": d.session_date.isoformat() if d.session_date else None,
                       "missed_sessions": d.missed_sessions, "reports": result.statuses, "delivered": len(result.delivered)}))
+    return 0
+
+
+def drawdown_cli(data_dir: Path) -> int:
+    """Fill full daily history for VN-Index and held tickers (once each, paced for Vnstock), then remind once per threshold crossing."""
+    import os
+    import time
+    import uuid
+
+    import httpx
+
+    from investment_agent.api.auth import OwnerContext
+    from investment_agent.notifications.render import split_message
+    from investment_agent.notifications.telegram import TelegramSender
+    from investment_agent.repositories.firestore import personal_repository_from_env
+    from investment_agent.services.drawdown import drawdown_run
+    from investment_agent.services.records import notification_settings
+    from investment_agent.settings import Settings
+
+    try:
+        from vnstock import Quote
+    except ImportError:
+        print(json.dumps({"status": "not_configured", "reason": "vnstock_missing"}))
+        return 2
+    settings = Settings.from_env()
+    repo = personal_repository_from_env()
+    owner = OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
+    chosen, _ = notification_settings(repo, owner)
+
+    def fetch(symbol, start, end):
+        time.sleep(1.5)  # Vnstock Community allows 60 calls a minute
+        frame = Quote(symbol=symbol, source="VCI").history(start=start.isoformat(), end=end.isoformat(), interval="1D")
+        return [(row["time"].to_pydatetime(), str(row["close"])) for _, row in frame.iterrows()] if frame is not None else []
+
+    def send(text):
+        if not (settings.telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):
+            return False
+        sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
+        return all(sender.send(chosen.chat_id, part).status == "sent" for part in split_message(text))
+    out = drawdown_run(repo, owner, data_dir, fetch=fetch, send=send, request_id=f"drawdown-{uuid.uuid4().hex[:16]}")
+    print(json.dumps(out))
     return 0
 
 

@@ -6,7 +6,7 @@ M = Decimal(1_000_000)
 
 
 def layers(**amounts):
-    base = {"reserve": 100, "deposit": 0, "bond": 0, "gold": 0, "stocks": 0, "crypto": 0}
+    base = {"reserve": 100, "cash": 0, "deposit": 0, "bond": 0, "gold": 0, "stocks": 0, "crypto": 0}
     return {k: Decimal(v) * M for k, v in {**base, **amounts}.items()}
 
 
@@ -18,10 +18,10 @@ def test_targets_follow_the_risk_group_and_the_video_rules():
     p = asset_pyramid(layers(deposit=200, gold=100, stocks=600, crypto=50, bond=50), deductions=Decimal(100) * M, stock_ratio=Decimal("0.60"))
     assert p["total"] == "1100000000" and p["base"] == "1000000000"
     t = {i: (l["target_min"], l["target_max"]) for i, l in by_id(p).items()}
-    assert t == {"reserve": (None, None), "deposit": ("0.10", "0.30"), "bond": ("0", "0.10"), "gold": ("0.10", "0.15"),
+    assert t == {"reserve": (None, None), "cash": (None, None), "deposit": ("0.10", "0.30"), "bond": ("0", "0.10"), "gold": ("0.10", "0.15"),
                  "stocks": ("0.55", "0.60"), "crypto": ("0", "0.05")}
-    assert [l["id"] for l in p["layers"]] == ["reserve", "deposit", "bond", "gold", "stocks", "crypto"]  # bottom to top
-    assert {i: l["status"] for i, l in by_id(p).items()} == {"reserve": "fixed", "deposit": "ok", "bond": "ok", "gold": "ok", "stocks": "ok",
+    assert [l["id"] for l in p["layers"]] == ["reserve", "cash", "deposit", "bond", "gold", "stocks", "crypto"]  # bottom to top
+    assert {i: l["status"] for i, l in by_id(p).items()} == {"reserve": "fixed", "cash": "with_deposit", "deposit": "ok", "bond": "ok", "gold": "ok", "stocks": "ok",
                                                               "crypto": "ok"}
     assert p["warnings"] == []
 
@@ -44,3 +44,11 @@ def test_a_cautious_group_leaves_more_room_for_deposits():
 def test_nothing_left_after_the_reserve_has_no_shares():
     p = asset_pyramid(layers(reserve=100), deductions=Decimal(100) * M, stock_ratio=Decimal("0.60"))
     assert p["base"] == "0" and all(l["share"] is None for l in p["layers"] if l["id"] != "reserve")
+
+
+def test_cash_is_its_own_row_but_shares_the_deposit_target():
+    p = asset_pyramid(layers(cash=60, deposit=40, gold=150, stocks=600, bond=100, crypto=50), deductions=Decimal(100) * M, stock_ratio=Decimal("0.60"))
+    l = by_id(p)
+    assert l["cash"]["amount"] == "60000000" and l["cash"]["share"] == "0.0600" and l["cash"]["status"] == "with_deposit"
+    assert l["deposit"]["amount"] == "40000000" and l["deposit"]["share"] == "0.1000" and l["deposit"]["status"] == "ok"  # 4% + 6% cash
+    assert l["deposit"]["with_cash"] is True

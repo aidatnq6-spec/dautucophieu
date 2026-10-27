@@ -16,10 +16,12 @@ type View = { version: number; budget: Budget };
 
 const pct = (r: string) => formatRatio(r, 1).replace(",0%", "%");
 const whole = (r: string) => formatRatio(r, 1).replace(",0%", "").replace("%", "");
-const NAME: Record<string, string> = { reserve: "Dự phòng", deposit: "Tiền gửi", bond: "Trái phiếu", gold: "Vàng", stocks: "Cổ phiếu", crypto: "Tiền số" };
-const NOTE: Record<string, string> = { reserve: "quỹ dự phòng và khoản chi 12 tháng", deposit: "kể cả tiền mặt trong tài khoản chứng khoán",
+const NAME: Record<string, string> = { reserve: "Dự phòng", cash: "Tiền mặt", deposit: "Tiền gửi", bond: "Trái phiếu", gold: "Vàng", stocks: "Cổ phiếu", crypto: "Tiền số" };
+const NOTE: Record<string, string> = { reserve: "quỹ dự phòng và khoản chi 12 tháng", cash: "trong tài khoản chứng khoán, lấy từ sổ giao dịch",
+  deposit: "% và mục tiêu tính cùng tiền mặt",
   stocks: "theo giá mua, từ sổ giao dịch" };
-const STATUS: Record<string, [string, string]> = { short: ["thiếu", "warn"], ok: ["đủ", "good"], over: ["vượt", "bad"], fixed: ["cố định", ""] };
+const STATUS: Record<string, [string, string]> = { short: ["thiếu", "warn"], ok: ["đủ", "good"], over: ["vượt", "bad"], fixed: ["cố định", ""],
+  with_deposit: ["tính chung mục tiêu với tiền gửi", ""] };
 const INPUTS: [keyof Layers, string][] = [["deposit", "Tiền gửi (đ)"], ["bond", "Trái phiếu (đ)"], ["gold", "Vàng (đ)"], ["crypto", "Tiền số (đ)"]];
 
 function target(l: Layer) {
@@ -87,7 +89,8 @@ export function EquityBudget() {
   return (
     <section className="surface" aria-label="Tháp tài sản">
       <h2>Tháp tài sản</h2>
-      <p className="caption">Nhập số tiền bạn đang có ở từng lớp; cổ phiếu (theo giá mua) và tiền mặt trong tài khoản chứng khoán lấy từ sổ giao dịch.
+      <p className="caption">Nhập số tiền bạn đang có ở từng lớp; cổ phiếu (theo giá mua) và tiền mặt trong tài khoản chứng khoán lấy từ sổ giao dịch
+        (tiền mặt tính chung mục tiêu với tiền gửi).
         Tổng tài sản là tổng các lớp. Mục tiêu tính trên phần còn lại sau quỹ dự phòng: vàng 10–15%, trái phiếu tối đa 10%, cổ phiếu theo khẩu vị,
         tiền số tối đa 5%, tiền gửi là phần còn lại. Xây từ dưới lên. Trang Danh mục tính tỷ trọng từng mã trên vốn dành cho cổ phiếu.</p>
       <form className="eb-form" onSubmit={(e) => { e.preventDefault(); void save(); }}>

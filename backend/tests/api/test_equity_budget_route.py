@@ -84,7 +84,8 @@ def test_layers_add_up_to_the_total_with_stocks_and_cash_from_the_ledger_and_bui
     assert b["total"] == "600000000"  # 100 reserve + 300 deposits + 95 ledger cash + 100 gold + 5 stocks at cost
     p = b["pyramid"]
     amounts = {l["id"]: l["amount"] for l in p["layers"]}
-    assert amounts == {"reserve": "100000000", "deposit": "395000000", "bond": "0", "gold": "100000000", "stocks": "5000000", "crypto": "0"}
+    assert amounts == {"reserve": "100000000", "cash": "95000000", "deposit": "300000000", "bond": "0", "gold": "100000000", "stocks": "5000000",
+                       "crypto": "0"}
     assert b["layers"] == {"deposit": "300000000", "bond": "0", "gold": "100000000", "crypto": "0"}
 
 

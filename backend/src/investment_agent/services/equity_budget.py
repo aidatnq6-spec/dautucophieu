@@ -34,7 +34,7 @@ def budget_view(repo, owner) -> tuple[dict, int]:
     layers = stored.payload.get("layers")
     amounts = None
     if layers:  # Tháp tài sản: the total is the sum of the layers, with the reserve as the bottom layer
-        amounts = {"reserve": deductions, "deposit": Decimal(layers["deposit"]) + state.cash, "bond": Decimal(layers["bond"]),
+        amounts = {"reserve": deductions, "cash": state.cash, "deposit": Decimal(layers["deposit"]), "bond": Decimal(layers["bond"]),
                    "gold": Decimal(layers["gold"]), "stocks": held_cost, "crypto": Decimal(layers["crypto"])}
     total = sum(amounts.values(), Decimal(0)) if amounts else Decimal(stored.payload["total"])
     budget = equity_budget(total=total, deductions=deductions, group=group, ratios=ratios, held_cost=held_cost)

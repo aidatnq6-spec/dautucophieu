@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AppNav } from "../../components/app-nav";
+import { BackToTop } from "../../components/back-to-top";
 import { sessionAuth } from "../../lib/server/firebase-admin";
 import { SESSION_COOKIE, sessionConfig, verifyOwnerSession } from "../../lib/server/session";
 
@@ -20,6 +21,7 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
         <AppNav />
       </aside>
       <main className="content" id="main">{children}</main>
+      <BackToTop />
     </div>
   );
 }

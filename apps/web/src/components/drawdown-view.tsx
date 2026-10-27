@@ -6,7 +6,18 @@ import { formatRatio, formatVnd } from "../lib/format";
 type Fall = { depth: string; peak: string; trough: string; recovered: string | null };
 type Row = { symbol: string; since: string | null; max: Fall | null; current: { depth: string; peak: string } | null; price: string | null;
   cost: string | null; vs_cost: string | null; hit: boolean };
-type Data = { threshold: string; rows: Row[] };
+type Watch = { symbol: string; since: string | null; max: Fall | null; current: { depth: string; peak: string } | null };
+type Data = { threshold: string; rows: Row[]; watch?: Watch[] };
+
+const INDEX_NAME: Record<string, string> = { VNINDEX: "VN-Index", VN30: "VN30" };
+
+function Falls({ r }: { r: Watch }) {
+  return <>
+    <td data-label="Giảm sâu nhất">{r.max ? <><Signed value={r.max.depth} />
+      <div className="caption">{/[1-9]/.test(r.max.depth) ? `${day(r.max.peak)} → ${day(r.max.trough)}, ` : ""}{recovery(r.max)}</div></> : "—"}</td>
+    <td data-label="Đang giảm từ đỉnh">{r.current ? <><Signed value={r.current.depth} /><div className="caption">đỉnh {day(r.current.peak)}</div></> : "—"}</td>
+  </>;
+}
 
 const day = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 const pct = (r: string) => formatRatio(r, 1);
@@ -42,16 +53,26 @@ export function DrawdownView() {
         <table className="fv-table cc-table" aria-label="Sụt giảm theo mã">
           <thead><tr><th>Mã</th><th>Giảm sâu nhất</th><th>Đang giảm từ đỉnh</th><th className="num">So với giá vốn</th></tr></thead>
           <tbody>{d.rows.map((r) => <tr key={r.symbol} className={r.hit ? "cc-over" : ""}>
-            <td data-label="Mã"><strong>{r.symbol === "VNINDEX" ? "VN-Index" : r.symbol}</strong>
+            <td data-label="Mã"><strong>{INDEX_NAME[r.symbol] ?? r.symbol}</strong>
               {r.since && <div className="caption">dữ liệu từ {day(r.since)}</div>}</td>
-            <td data-label="Giảm sâu nhất">{r.max ? <><Signed value={r.max.depth} />
-              <div className="caption">{/[1-9]/.test(r.max.depth) ? `${day(r.max.peak)} → ${day(r.max.trough)}, ` : ""}{recovery(r.max)}</div></> : "—"}</td>
-            <td data-label="Đang giảm từ đỉnh">{r.current ? <><Signed value={r.current.depth} /><div className="caption">đỉnh {day(r.current.peak)}</div></> : "—"}</td>
-            <td data-label="So với giá vốn" className="num">{r.symbol === "VNINDEX" ? <span className="muted">—</span> : <>
+            <Falls r={r} />
+            <td data-label="So với giá vốn" className="num">{INDEX_NAME[r.symbol] ? <span className="muted">—</span> : <>
               <Signed value={r.vs_cost} />{r.hit && <span className="pill bad"> chạm ngưỡng</span>}
               {r.cost && <div className="caption">giá vốn {formatVnd(r.cost, { unit: false })}</div>}</>}</td>
           </tr>)}</tbody>
         </table>
+        {d.watch && d.watch.length > 0 && <details className="dd-watch">
+          <summary>Các mã đang theo dõi ({d.watch.length})</summary>
+          <p className="caption">Mã trong danh sách theo dõi mà bạn chưa nắm, mã đang giảm sâu nhất từ đỉnh xếp trước. Không có nhắc Telegram cho các mã này.</p>
+          <table className="fv-table cc-table" aria-label="Sụt giảm các mã đang theo dõi">
+            <thead><tr><th>Mã</th><th>Giảm sâu nhất</th><th>Đang giảm từ đỉnh</th></tr></thead>
+            <tbody>{d.watch.map((r) => <tr key={r.symbol}>
+              <td data-label="Mã"><strong>{r.symbol}</strong>{r.since ? <div className="caption">dữ liệu từ {day(r.since)}</div>
+                : <div className="caption">chưa có dữ liệu giá</div>}</td>
+              <Falls r={r} />
+            </tr>)}</tbody>
+          </table>
+        </details>}
       </>}
     </section>
   );

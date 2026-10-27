@@ -51,7 +51,7 @@ test("a lower layer short while a higher one is over says to build from the bott
   await seedOwner(page);
   await page.goto("/profile");
   const box = page.getByRole("region", { name: "Tháp tài sản" });
-  await enterLayers(box, { deposit: "0", gold: "0", crypto: "100000000" });  // crypto far above 5%, gold below 10%
+  await enterLayers(box, { deposit: "0", gold: "0", crypto: "100000000000" });  // crypto far above 5% whatever the shared ledger holds; gold below 10%
   await expect(box.getByTestId("layer-gold")).toContainText("thiếu");
   await expect(box.getByTestId("layer-crypto")).toContainText("vượt");
   await expect(box.locator(".notice").filter({ hasText: /^Vàng đang thiếu/ })).toContainText(/Vàng đang thiếu .* Tiền số đã\s+vượt mục tiêu/);

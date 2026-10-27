@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
 import { formatVnd } from "../lib/format";
 import { EquityBudget } from "./equity-budget";
+import { WealthCheck } from "./wealth-check";
 import { BreakdownTable, STATUS_LABEL, WARNING_LABEL, type Assessment } from "./profile-form";
 import { RiskSection } from "./risk-section";
 
@@ -42,6 +43,7 @@ export function ProfileSummary() {
         </>)}
       </section>
       <RiskSection onChanged={() => setRiskChanges((n) => n + 1)} />
+      <WealthCheck />
       <EquityBudget key={riskChanges} />
     </>
   );

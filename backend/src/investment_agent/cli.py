@@ -49,6 +49,8 @@ def main() -> int:
     sectors = commands.add_parser("industries", help="save ICB level-2 sectors of the synced tickers for the market page")
     sectors.add_argument("--symbols", required=True, help="comma-separated tickers, or @file with one ticker per line")
     sectors.add_argument("--output", type=Path, required=True)
+    contrib = commands.add_parser("contribution-remind", help="Góp vốn đều: Telegram once a month from the contribution day until it is met")
+    contrib.add_argument("--data-dir", type=Path, required=True)
     drawdown = commands.add_parser("drawdown-check", help="full price history for drawdowns; Telegram when a holding falls past the threshold")
     drawdown.add_argument("--data-dir", type=Path, required=True)
     journal = commands.add_parser("journal-review", help="Nhật ký: Telegram reminder when a price moved another threshold step")
@@ -82,6 +84,8 @@ def main() -> int:
         return run_backup(args.data_dir, args.backup_dir, args.kind)
     if args.command == "scheduled-run":
         return scheduled_run(args.calendar, args.data_dir)
+    if args.command == "contribution-remind":
+        return contribution_cli()
     if args.command == "drawdown-check":
         return drawdown_cli(args.data_dir)
     if args.command == "journal-review":
@@ -341,6 +345,39 @@ def scheduled_run(calendar_path: Path, data_dir: Path) -> int:
     d = result.decision
     print(json.dumps({"status": "ok", "run": d.run, "reason": d.reason, "session": d.session_date.isoformat() if d.session_date else None,
                       "missed_sessions": d.missed_sessions, "reports": result.statuses, "delivered": len(result.delivered)}))
+    return 0
+
+
+def contribution_cli() -> int:
+    """Remind once a month, from the plan's day, while this month's deposits are below the planned contribution."""
+    import os
+    import uuid
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    import httpx
+
+    from investment_agent.api.auth import OwnerContext
+    from investment_agent.notifications.render import split_message
+    from investment_agent.notifications.telegram import TelegramSender
+    from investment_agent.repositories.firestore import personal_repository_from_env
+    from investment_agent.services.contributions import remind_run
+    from investment_agent.services.records import notification_settings
+    from investment_agent.settings import Settings
+
+    settings = Settings.from_env()
+    repo = personal_repository_from_env()
+    owner = OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
+    chosen, _ = notification_settings(repo, owner)
+
+    def send(text):
+        if not (settings.telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):
+            return False
+        sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
+        return all(sender.send(chosen.chat_id, part).status == "sent" for part in split_message(text))
+    out = remind_run(repo, owner, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date(), send=send,
+                     request_id=f"contribution-{uuid.uuid4().hex[:16]}")
+    print(json.dumps(out))
     return 0
 
 

@@ -74,3 +74,25 @@ def test_exposure_is_the_share_of_held_cost_in_each_class():
     e = exposure(results, {"GAS": Decimal(300), "HAH": Decimal(100), "FPT": Decimal(500), "NEW": Decimal(100)})
     assert e == {"total": "1000", "oil": {"benefit": "0.3", "hurt": "0.1"}, "usd": {"benefit": "0", "hurt": "0.1"}, "insufficient": "0.1"}
     assert exposure(results, {}) is None
+
+
+def test_a_longer_span_uses_more_weeks_and_all_uses_every_common_week():
+    rng, index, oil, usd = market(weeks=600, seed=9)
+    closes = walk(stock(rng, index, oil, usd, b_oil=0.2))
+    args = {"index": walk(index), "oil": walk(oil), "usd": walk(usd)}
+    assert sensitivity(closes, **args)["weeks"] == 156
+    ten = sensitivity(closes, weeks=520, **args)
+    full = sensitivity(closes, weeks=None, **args)
+    assert (ten["weeks"], full["weeks"]) == (520, 600)
+    assert full["from"] == closes[0][0].isoformat() and ten["from"] == closes[80][0].isoformat()  # first close of the span
+    assert full["oil"]["class"] == "benefit"
+
+
+def test_a_zero_or_negative_close_in_old_data_is_skipped_not_divided_by():
+    """27/10/2026: over the full history a watched ticker has a 0 close (as NT2 had), which divided by zero."""
+    rng, index, oil, usd = market(weeks=200, seed=4)
+    closes = walk(stock(rng, index, oil, usd, b_oil=0.2))
+    closes[10] = (closes[10][0], Decimal(0))
+    closes[11] = (closes[11][0], Decimal(-1))
+    s = sensitivity(closes, index=walk(index), oil=walk(oil), usd=walk(usd), weeks=None)
+    assert s["status"] == "ok" and s["weeks"] == 198 and s["oil"]["class"] == "benefit"

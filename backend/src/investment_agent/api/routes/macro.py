@@ -12,7 +12,7 @@ from investment_agent.domain.models import ContractModel
 from investment_agent.domain.macro_chain import RATES, macro_chain
 from investment_agent.domain.ledger import replay
 from investment_agent.domain.rate_cycle import US, VIETNAM, rate_cycle
-from investment_agent.domain.sensitivity import exposure, sensitivity
+from investment_agent.domain.sensitivity import SPANS, exposure, sensitivity
 from investment_agent.market.leading import MacroStore, load_indicators, macro_rows
 from investment_agent.market.series import SeriesStore
 from investment_agent.market.watchlist import load_watchlist
@@ -73,8 +73,16 @@ def chain(request: Request):
 
 @router.get("/sensitivity")
 def sensitivity_view(request: Request):
-    """Độ nhạy với giá dầu và đồng USD: held tickers (largest cost first), then the watchlist; computed here on public prices."""
+    return sensitivity_span(request, "3y")
+
+
+@router.get("/sensitivity/{span}")
+def sensitivity_span(request: Request, span: str):
+    """Độ nhạy với giá dầu và đồng USD over 3 years, 10 years or every common week: held tickers (largest cost first), then the
+    watchlist; computed here on public prices."""
     owner, repo = require_owner(request), request.app.state.personal_repository
+    if span not in SPANS:
+        return error(404, "span_missing", "Khoảng đo phải là 3y, 10y hoặc all.")
     store = _store(request)
     if repo is None or store is None:
         return unavailable()
@@ -91,8 +99,8 @@ def sensitivity_view(request: Request):
     symbols = held + [s for s in load_watchlist(Path(request.app.state.data_dir)).symbols if s not in costs]
     results = {}
     for symbol in symbols:
-        results[symbol] = sensitivity(closes(symbol), index=index, oil=factor["oil"], usd=factor["usd"])
-    return {"factors": {k: v[-1][0].isoformat() if v else None for k, v in factor.items()},
+        results[symbol] = sensitivity(closes(symbol), index=index, oil=factor["oil"], usd=factor["usd"], weeks=SPANS[span])
+    return {"span": span, "factors": {k: v[-1][0].isoformat() if v else None for k, v in factor.items()},
             "rows": [{"symbol": s, "held": s in costs, **results[s]} for s in symbols], "exposure": exposure(results, costs)}
 
 

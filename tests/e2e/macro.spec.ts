@@ -71,6 +71,12 @@ test("oil and dollar sensitivity lists held tickers first and says what the doll
   await expect(fpt).toContainText("chưa đủ dữ liệu");
   // nothing held can be measured yet: no "0% … 0%" shares, only how much is unmeasured
   await expect(box.getByTestId("sensitivity-exposure")).toHaveText("100% vốn ở mã chưa đủ dữ liệu để đo.");
+  // the span can be widened; the reading reloads for it
+  const spans = box.getByRole("radiogroup", { name: "Khoảng đo" });
+  await expect(spans.getByLabel("3 năm")).toBeChecked();
+  await spans.getByLabel("Toàn bộ").check();
+  await expect(box).toContainText("toàn bộ lịch sử chung");
+  await expect(box.getByRole("row", { name: /FPT/ })).toContainText("đang nắm");
 });
 
 test("no horizontal page scroll on the macro page at 375px", async ({ page }) => {

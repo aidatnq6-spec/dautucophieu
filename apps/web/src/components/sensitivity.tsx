@@ -4,10 +4,13 @@ import { ApiError, api } from "../lib/api";
 import { formatRatio } from "../lib/format";
 
 type Reading = { beta: string; t: string; class: "benefit" | "hurt" | "unclear" };
-type Row = { symbol: string; held: boolean; status: "ok" | "insufficient"; weeks: number; oil?: Reading; usd?: Reading };
+type Row = { symbol: string; held: boolean; status: "ok" | "insufficient"; weeks: number; from?: string; oil?: Reading; usd?: Reading };
 type Exposure = { total: string; oil: { benefit: string; hurt: string }; usd: { benefit: string; hurt: string }; insufficient: string };
-type View = { factors: { oil: string | null; usd: string | null }; rows: Row[]; exposure: Exposure | null };
+type View = { span: Span; factors: { oil: string | null; usd: string | null }; rows: Row[]; exposure: Exposure | null };
 
+type Span = "3y" | "10y" | "all";
+const SPANS: [Span, string, string][] = [["3y", "3 năm", "khoảng 3 năm gần nhất"], ["10y", "10 năm", "khoảng 10 năm gần nhất"],
+  ["all", "Toàn bộ", "toàn bộ lịch sử chung của mã, VN-Index, giá dầu (từ 1986) và chỉ số USD (từ 2006)"]];
 const pct = (r: string) => formatRatio(r, 1).replace(",0%", "%");
 const CLASS: Record<string, [string, string]> = { benefit: ["hưởng lợi", "good"], hurt: ["chịu thiệt", "bad"], unclear: ["không rõ", ""] };
 const day = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
@@ -23,23 +26,29 @@ function Cell({ r, step }: { r: Reading; step: number }) {
 function Table({ rows, label }: { rows: Row[]; label: string }) {
   return (
     <table className="fv-table cc-table" aria-label={label}>
-      <thead><tr><th>Mã</th><th className="num">Khi dầu tăng 10%</th><th className="num">Khi USD mạnh lên 1%</th><th className="num">Số tuần</th></tr></thead>
+      <thead><tr><th>Mã</th><th className="num">Khi dầu tăng 10%</th><th className="num">Khi USD mạnh lên 1%</th><th className="num">Số tuần</th><th>Từ</th></tr></thead>
       <tbody>{rows.map((r) => <tr key={r.symbol}>
         <td data-label="Mã"><strong>{r.symbol}</strong>{r.held && <span className="pill"> đang nắm</span>}</td>
         {r.status === "ok" ? <>
           <td data-label="Khi dầu tăng 10%" className="num"><Cell r={r.oil!} step={0.1} /></td>
           <td data-label="Khi USD mạnh lên 1%" className="num"><Cell r={r.usd!} step={0.01} /></td>
         </> : <td colSpan={2} data-label="Độ nhạy" className="muted">chưa đủ dữ liệu (cần ít nhất 52 tuần)</td>}
-        <td data-label="Số tuần" className="num">{r.weeks}</td></tr>)}</tbody>
+        <td data-label="Số tuần" className="num">{r.weeks}</td><td data-label="Từ">{r.from ? day(r.from) : "—"}</td></tr>)}</tbody>
     </table>
   );
 }
 
 /** How each held or watched ticker moved with oil and the US dollar beyond the market, over three years of weekly closes. */
 export function Sensitivity() {
+  const [span, setSpan] = useState<Span>("3y");
   const [v, setV] = useState<View | null>(null);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { api<View>("macro/sensitivity").then(setV, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
+  useEffect(() => {
+    let live = true;  // a slower answer for an earlier span must not replace the chosen one
+    api<View>(`macro/sensitivity/${span}`).then((x) => { if (live) { setV(x); setError(null); } },
+      (e) => { if (live) setError(e instanceof ApiError ? e.failure.message : "Lỗi tải."); });
+    return () => { live = false; };
+  }, [span]);
   const clear = (r: Row) => r.held || (r.status === "ok" && (r.oil!.class !== "unclear" || r.usd!.class !== "unclear"));
   const shown = v?.rows.filter(clear) ?? [];
   const rest = v?.rows.filter((r) => !clear(r)) ?? [];
@@ -47,7 +56,11 @@ export function Sensitivity() {
   return (
     <section className="surface" aria-label="Độ nhạy với giá dầu và đồng USD">
       <h2>Độ nhạy với giá dầu và đồng USD</h2>
-      <p className="caption">Đo trên giá đóng cửa theo tuần trong khoảng 3 năm: khi dầu (WTI) hoặc đồng USD biến động, giá mã thường đi thêm bao nhiêu so với
+      <div className="actions" role="radiogroup" aria-label="Khoảng đo">
+        {SPANS.map(([id, label]) => <label key={id} className="choice"><input type="radio" name="sensitivity-span" checked={span === id}
+          onChange={() => setSpan(id)} />{label}</label>)}
+      </div>
+      <p className="caption">Đo trên giá đóng cửa theo tuần, {SPANS.find(([id]) => id === span)![2]}: khi dầu (WTI) hoặc đồng USD biến động, giá mã thường đi thêm bao nhiêu so với
         VN-Index. “Hưởng lợi”/“chịu thiệt” chỉ khi quan hệ đủ rõ để khó là ngẫu nhiên; còn lại là “không rõ”. Đồng USD đo bằng chỉ số USD rộng của Fed
         (so với rổ tiền tệ), không phải tỷ giá VND. Quan hệ trong quá khứ, không bảo đảm lặp lại; không phải khuyến nghị.</p>
       {error && <p className="errors" role="alert">{error}</p>}

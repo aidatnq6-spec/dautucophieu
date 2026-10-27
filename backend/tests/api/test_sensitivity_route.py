@@ -68,3 +68,14 @@ def test_without_factor_history_every_row_is_insufficient(tmp_path):
         (tmp_path / "macro" / f"{key}.json").unlink()
     body = call(c, clock, "GET", "/internal/macro/sensitivity").json()
     assert body["factors"] == {"oil": None, "usd": None} and all(r["status"] == "insufficient" for r in body["rows"])
+
+
+def test_the_span_is_chosen_in_the_path(tmp_path):
+    c, clock = client(tmp_path)
+    three = call(c, clock, "GET", "/internal/macro/sensitivity/3y").json()
+    full = call(c, clock, "GET", "/internal/macro/sensitivity/all").json()
+    assert three["span"] == "3y" and full["span"] == "all"
+    gas = lambda body: next(r for r in body["rows"] if r["symbol"] == "GAS")  # noqa: E731
+    assert (gas(three)["weeks"], gas(full)["weeks"]) == (156, 160)
+    assert call(c, clock, "GET", "/internal/macro/sensitivity/10y").json()["span"] == "10y"
+    assert call(c, clock, "GET", "/internal/macro/sensitivity/5y").status_code == 404

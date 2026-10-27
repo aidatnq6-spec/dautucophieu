@@ -28,3 +28,16 @@ def test_without_contributions_growth_alone_counts_and_very_long_horizons_say_so
 def test_no_capital_yet_still_gives_the_requirement():
     p = passive_income(target=Decimal(10_000_000), rate=Decimal("6"), capital=None, contribution=Decimal(8_000_000), today=TODAY)
     assert p["required"] == "2000000000" and p["income_now"] is None and p["months"] is not None
+
+
+def test_income_now_is_counted_layer_by_layer():
+    from investment_agent.domain.passive_income import income_by_layer
+    lines = income_by_layer(deposit=Decimal(843_522_000), deposit_rate=Decimal("5.63"), bond=Decimal(150_200_000), bond_rate=Decimal("7"),
+                            dividends_12m=Decimal(12_000_000))
+    assert lines == {"deposit": "3957524", "bond": "876167", "dividends": "1000000", "total": "5833691"}  # per month; gold, cash, crypto pay nothing
+
+
+def test_a_given_income_now_replaces_capital_times_rate():
+    p = passive_income(target=Decimal(10_000_000), rate=Decimal("6"), capital=Decimal(1_000_000_000), contribution=Decimal(0), today=TODAY,
+                       income_now=Decimal(4_000_000))
+    assert p["income_now"] == "4000000" and p["progress"] == "0.4000"

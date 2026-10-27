@@ -4,6 +4,7 @@ import { Save } from "lucide-react";
 import { ApiError, api, requestId, type ApiFailure } from "../lib/api";
 import { parseMoneyInput, hanoiDate } from "../lib/format";
 import { FormErrors } from "./form-errors";
+import { BuyCheck } from "./buy-check";
 import { EmotionFields, saveJournal } from "./journal-view";
 
 export type LedgerEvent = { event_id: string; type: string; effective_at: string; sequence: number; security_id?: string; quantity?: number;
@@ -51,6 +52,11 @@ export function TransactionForm({ ledgerVersion, events, editing, onSaved, onCan
   const [local, setLocal] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const trade = type === "buy" || type === "sell";
+  // Quantity × price + fee, for the check before a buy; null until both are valid.
+  const buyCost = () => {
+    const q = Number(quantity), p = parseMoneyInput(price), f = parseMoneyInput(fee || "0");
+    return /^[1-9]\d*$/.test(quantity) && p !== null && Number(p) > 0 ? q * Number(p) + Number(f ?? 0) : null;
+  };
 
   function event(): LedgerEvent | null {
     const problems: string[] = [];
@@ -133,6 +139,7 @@ export function TransactionForm({ ledgerVersion, events, editing, onSaved, onCan
           <label className="field">Phí thực tế (đ)<input inputMode="numeric" value={fee} onChange={(e) => setFee(e.target.value)} /></label>
           <label className="field">Thuế thực tế (đ)<input inputMode="numeric" value={tax} onChange={(e) => setTax(e.target.value)} /></label>
           <label className="field">Ngày thanh toán (theo sao kê)<input type="date" value={settlement} onChange={(e) => setSettlement(e.target.value)} /></label>
+          {!editing && type === "buy" && <BuyCheck symbol={ticker.trim().toUpperCase()} amount={buyCost()} />}
           {!editing && <>
             <label className="field">Lý do ra quyết định<textarea value={why} maxLength={4000} onChange={(e) => setWhy(e.target.value)}
               placeholder="Không bắt buộc; lưu vào Nhật ký" /></label>

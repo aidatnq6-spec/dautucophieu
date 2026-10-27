@@ -11,8 +11,14 @@ def _ratio(value: float) -> str:
     return str(Decimal(str(value)).quantize(_Q4, ROUND_HALF_UP))
 
 
+def _priced(points: list[tuple[datetime, float]]) -> list[tuple[datetime, float]]:
+    """Only real prices: the source sometimes returns 0 for very old sessions (NT2), which would divide by zero."""
+    return [p for p in points if p[1] > 0]
+
+
 def max_drawdown(points: list[tuple[datetime, float]]) -> dict | None:
     """Deepest close-to-close fall from a running peak: depth (≤ 0), peak and trough dates, and the first date back at the peak."""
+    points = _priced(points)
     if not points:
         return None
     peak_i, best = 0, (0.0, 0, 0)
@@ -29,6 +35,7 @@ def max_drawdown(points: list[tuple[datetime, float]]) -> dict | None:
 
 
 def current_drawdown(points: list[tuple[datetime, float]]) -> dict | None:
+    points = _priced(points)
     if not points:
         return None
     peak = max(points, key=lambda p: p[1])

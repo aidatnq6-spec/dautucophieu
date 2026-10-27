@@ -46,3 +46,13 @@ def test_a_failed_window_leaves_the_series_unfinished_for_the_next_run(tmp_path)
     except OSError:
         pass
     assert not history_complete(tmp_path, "KDH-1d") and len(store.read("KDH-1d")) == 1
+
+
+def test_zero_closes_from_the_source_are_not_stored(tmp_path):
+    store = SeriesStore(tmp_path)
+    store.upsert("NT2-1d", [(datetime(2020, 1, 10), "10")])
+
+    def fetch(start, end):
+        return [(datetime(2020, 1, 8), "0"), (datetime(2020, 1, 9), "9.5")] if end >= date(2020, 1, 9) else []
+    assert backfill_history(store, "NT2-1d", fetch, root=tmp_path) == 1
+    assert [p[0].date() for p in store.read("NT2-1d")] == [date(2020, 1, 9), date(2020, 1, 10)]

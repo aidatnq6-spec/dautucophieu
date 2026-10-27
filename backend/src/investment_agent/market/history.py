@@ -46,7 +46,10 @@ def backfill_history(store: SeriesStore, key: str, fetch, *, root: Path, earlies
         older = [p for p in fetch(earliest, oldest - timedelta(days=1)) if p[0].date() < oldest]
         if not older:
             break
-        store.upsert(key, older)
-        added += len(older)
+        priced = [p for p in older if float(p[1]) > 0]  # the source sometimes returns 0 for very old sessions
+        if not priced:
+            break
+        store.upsert(key, priced)
+        added += len(priced)
     _mark(root, key)
     return added

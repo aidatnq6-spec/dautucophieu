@@ -28,7 +28,23 @@ const nextId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${count
 const blankAsset = (): AssetRow => ({ asset_id: nextId("asset"), kind: "deposit", amount: "", liquidity: "liquid", inLedger: false, emergency: "" });
 const blankGoal = (): GoalRow => ({ goal_id: nextId("goal"), due_date: "", amount: "", funded: "", preserve_capital: false, deferrable: false, confirmed: false });
 
-export function BreakdownTable({ assessment }: { assessment: Assessment }) {
+const FIXED_NAME: Record<string, string> = { ledger: "Sổ danh mục", emergency_reserve: "Quỹ dự phòng" };
+
+/** Readable names for breakdown refs: assets by their kind (numbered when a kind repeats), goals by their due date. */
+export function refNames(assets: { asset_id: string; kind: string }[], goals: { goal_id: string; due_date: string }[] = []): Record<string, string> {
+  const kindName = Object.fromEntries(KINDS) as Record<string, string>;
+  const count: Record<string, number> = {}, seen: Record<string, number> = {};
+  for (const a of assets) count[a.kind] = (count[a.kind] ?? 0) + 1;
+  const names: Record<string, string> = {};
+  for (const a of assets) {
+    seen[a.kind] = (seen[a.kind] ?? 0) + 1;
+    names[a.asset_id] = `${kindName[a.kind] ?? "Tài sản"}${count[a.kind] > 1 ? ` ${seen[a.kind]}` : ""}`;
+  }
+  for (const g of goals) if (g.due_date) names[g.goal_id] = `Mục tiêu hạn ${g.due_date.slice(8, 10)}/${g.due_date.slice(5, 7)}/${g.due_date.slice(0, 4)}`;
+  return names;
+}
+
+export function BreakdownTable({ assessment, names = {} }: { assessment: Assessment; names?: Record<string, string> }) {
   return (
     <div className="tablewrap">
       <table aria-label="Bảng tính vốn có thể đầu tư">
@@ -36,7 +52,7 @@ export function BreakdownTable({ assessment }: { assessment: Assessment }) {
         <tbody>
           {assessment.lines.map((l, i) => (
             <tr key={`${l.ref}-${i}`}>
-              <td className="wrap">{l.ref}</td>
+              <td className="wrap">{names[l.ref] ?? FIXED_NAME[l.ref] ?? l.ref}</td>
               <td>{{ included: "Tính vào", excluded: "Không tính", deduction: "Trừ ra", not_deducted: "Không trừ" }[l.kind] ?? l.kind}</td>
               <td className="wrap">{REASON_LABEL[l.reason] ?? l.reason}</td>
               <td className="num">{l.kind === "deduction" ? "−" : ""}{formatVnd(l.amount)}</td>
@@ -171,7 +187,7 @@ export function ProfileForm({ version, onSaved }: { version: number; onSaved: ()
         <section className="surface" aria-live="polite" style={{ marginTop: 18 }}>
           <div className="row"><h2>Bảng tính để bạn duyệt</h2>
             <span className={`pill ${assessment.status === "ready" ? "good" : "warn"}`}>{STATUS_LABEL[assessment.status] ?? assessment.status}</span></div>
-          <BreakdownTable assessment={assessment} />
+          <BreakdownTable assessment={assessment} names={refNames(assets, goals)} />
           {assessment.warnings.map((w) => <p key={w.code} className="notice">{WARNING_LABEL[w.code] ?? w.code}: {formatVnd(w.amount)}</p>)}
           <div className="actions">
             <button type="button" className="btn primary" disabled={busy || !["ready", "not_suitable"].includes(assessment.status)} onClick={() => void confirm()}>

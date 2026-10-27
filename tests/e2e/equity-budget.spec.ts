@@ -57,6 +57,22 @@ test("a lower layer short while a higher one is over says to build from the bott
   await expect(box.locator(".notice").filter({ hasText: /^Vàng đang thiếu/ })).toContainText(/Vàng đang thiếu .* Tiền số đã\s+vượt mục tiêu/);
 });
 
+test("money for more stocks comes from layers above their ceiling, after filling the layers below their minimum", async ({ page }) => {
+  await seedOwner(page);
+  await page.goto("/profile");
+  const box = page.getByRole("region", { name: "Tháp tài sản" });
+  await enterLayers(box, { deposit: "100000000000", gold: "0" });  // deposits far above their ceiling; gold below its 10% minimum
+  const funding = box.getByRole("region", { name: "Nguồn tiền để mua thêm cổ phiếu" });
+  await expect(funding.getByTestId("funding-source-deposit")).toContainText("Tiền gửi + tiền mặt");
+  await expect(funding.getByTestId("funding-source-bond")).toContainText("không lấy");
+  // gold is filled first, by exactly its shortfall
+  const goldGap = (await box.getByTestId("layer-gold").locator(".pill").innerText()).replace(/^thiếu /, "");
+  await expect(funding.getByTestId("funding-fill-gold")).toContainText(goldGap);
+  // the surplus is large, so what can be bought is the room left in the stock target
+  await expect(funding.getByTestId("funding-buyable")).toHaveText(await funding.getByTestId("funding-room").innerText());
+  await expect(funding).toContainText("không phải khuyến nghị");
+});
+
 test("the reserve can be entered by hand, and cleared to use the profile again", async ({ page }) => {
   await seedOwner(page);
   await page.goto("/profile");

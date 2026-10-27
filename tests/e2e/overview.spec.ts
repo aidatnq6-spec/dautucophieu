@@ -34,3 +34,25 @@ test("no horizontal scroll on Tổng quan at 1280px and 375px", async ({ page })
     expect(overflow, `${width}px`).toBeLessThanOrEqual(0);
   }
 });
+
+test("the page is titled Tổng quan, with quick numbers and one list of things worth a look", async ({ page }) => {
+  await seedOwner(page);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1, name: "Tổng quan" })).toBeVisible();
+  await expect(page.getByText("Một góc nhìn rõ ràng sau mỗi phiên.")).toHaveCount(0);
+  const numbers = page.getByRole("region", { name: "Số liệu nhanh" });
+  await expect(numbers).toContainText("Giá trị danh mục");
+  await expect(numbers).toContainText("Lãi/lỗ chưa thực hiện");
+  await expect(numbers.getByTestId("kpi-value")).toHaveText(/[\d.]+ đ/);
+  const watch = page.getByRole("region", { name: "Cần để ý" });
+  await expect(watch).toBeVisible();
+  await expect(watch).toContainText(/Không có gì cần để ý hôm nay|Sự kiện|Vượt ngưỡng|Nhật ký/);
+});
+
+test("no horizontal scroll with the quick numbers at 375px", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 900 });
+  await page.goto("/");
+  await expect(page.getByRole("region", { name: "Số liệu nhanh" })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});

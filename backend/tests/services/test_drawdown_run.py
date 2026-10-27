@@ -45,6 +45,24 @@ def test_a_failed_send_is_retried_next_run(tmp_path):
     repo = repo_holding_kdh()
     SeriesStore(tmp_path / "trend-sources").upsert("KDH-1d", [(datetime(2026, 10, 26), "14.75")])
     out = drawdown_run(repo, OWNER, tmp_path, fetch=lambda *a: [], send=lambda t: False, request_id="r1")
-    assert out == {"alerts": 1, "sent": False, "history": {"KDH": 0, "VNINDEX": 0}}
+    assert out == {"alerts": 1, "sent": False, "history": {"KDH": 0}}  # series with no stored closes yet are not backfilled
     out = drawdown_run(repo, OWNER, tmp_path, fetch=lambda *a: [], send=lambda t: True, request_id="r2")
     assert out["alerts"] == 1 and out["sent"] is True
+
+
+def test_history_is_filled_for_watched_tickers_a_few_at_a_time_holdings_first(tmp_path):
+    repo = repo_holding_kdh()
+    (tmp_path / "market-symbols.txt").write_text("FPT\nHPG\nKDH\nVCB\n", encoding="utf-8")
+    series = SeriesStore(tmp_path / "trend-sources")
+    for s in ("KDH", "FPT", "HPG", "VCB", "VNINDEX", "VN30"):
+        series.upsert(f"{s}-1d", [(datetime(2026, 10, 26), "10")])
+    fetched = []
+
+    def fetch(symbol, start, end):
+        fetched.append(symbol)
+        return []
+    first = drawdown_run(repo, OWNER, tmp_path, fetch=fetch, send=lambda t: True, request_id="r1", backfill_limit=3)
+    assert list(first["history"]) == ["VNINDEX", "VN30", "KDH"]  # indices and holdings first
+    second = drawdown_run(repo, OWNER, tmp_path, fetch=fetch, send=lambda t: True, request_id="r2", backfill_limit=3)
+    assert list(second["history"]) == ["FPT", "HPG", "VCB"]
+    assert drawdown_run(repo, OWNER, tmp_path, fetch=fetch, send=lambda t: True, request_id="r3", backfill_limit=3)["history"] == {}

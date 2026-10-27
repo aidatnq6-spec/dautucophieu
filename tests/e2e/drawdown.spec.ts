@@ -16,6 +16,16 @@ test("Danh mục shows the deepest fall, the fall now and price against cost for
   await expect(box).toContainText("không phải khuyến nghị");
 });
 
+test("the watched tickers are listed apart, folded until opened", async ({ page }) => {
+  await page.goto("/portfolio");
+  const box = page.getByRole("region", { name: "Kế hoạch sụt giảm" });
+  const more = box.getByText(/^Các mã đang theo dõi \(\d+\)$/);
+  await expect(more).toBeVisible();
+  await expect(box.getByRole("table", { name: "Sụt giảm các mã đang theo dõi" })).toBeHidden();
+  await more.click();
+  await expect(box.getByRole("table", { name: "Sụt giảm các mã đang theo dõi" })).toBeVisible();
+});
+
 test("the threshold is set in Cài đặt", async ({ page }) => {
   await page.goto("/settings");
   await expect(page.getByLabel("Kế hoạch sụt giảm: nhắc khi giá thấp hơn giá vốn (%)")).toHaveValue("30");

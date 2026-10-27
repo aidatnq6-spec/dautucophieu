@@ -157,3 +157,4 @@ main h2{scroll-margin-top:16px}
 .buy-check{grid-column:1/-1;padding:10px 14px;border-radius:7px;border:1px solid var(--line)}
 .buy-check.warn{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn-ink)}.buy-check.ok{background:#eef7f2;border-color:#bfe0cf}
 .buy-check ul{margin:6px 0;padding-left:18px}.buy-check p{margin:6px 0}
+.dd-watch{margin-top:14px}.dd-watch summary{cursor:pointer;color:var(--brand);font-weight:600;padding:6px 0}

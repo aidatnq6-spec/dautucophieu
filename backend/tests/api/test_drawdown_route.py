@@ -43,3 +43,17 @@ def test_the_threshold_is_set_in_settings_and_flags_tickers_below_it(tmp_path):
     assert call(c, clock, "GET", "/internal/drawdown").json()["threshold"] == "0.1"
     bad = call(c, clock, "PUT", "/internal/settings/portfolio", {"settings": {"drawdown_threshold": "1.5"}, "expected_version": 1, "request_id": "pf2"})
     assert bad.status_code == 422
+
+
+def test_vn30_and_the_watched_tickers_are_listed_apart_from_holdings(tmp_path):
+    (tmp_path / "market-symbols.txt").write_text("FPT\nHPG\nVCB\n", encoding="utf-8")
+    series = SeriesStore(tmp_path / "trend-sources")
+    series.upsert("VN30-1d", [(datetime(2008, 1, 2), "1000"), (datetime(2008, 1, 3), "700")])
+    series.upsert("HPG-1d", [(datetime(2008, 1, 2), "30"), (datetime(2008, 1, 3), "15")])
+    c, clock = client(tmp_path)
+    body = call(c, clock, "GET", "/internal/drawdown").json()
+    assert [r["symbol"] for r in body["rows"]] == ["VNINDEX", "VN30", "FPT"]
+    assert body["rows"][1]["max"]["depth"] == "-0.3000" and body["rows"][1]["vs_cost"] is None
+    watch = body["watch"]
+    assert [r["symbol"] for r in watch] == ["HPG", "VCB"]  # deepest current fall first; FPT is held so not repeated
+    assert watch[0]["current"]["depth"] == "-0.5000" and watch[1]["max"] is None  # VCB has no stored closes yet

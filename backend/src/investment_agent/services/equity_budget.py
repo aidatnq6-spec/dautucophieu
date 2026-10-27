@@ -4,12 +4,14 @@ needs due within 12 months from the confirmed profile, times the equity ratio of
 from decimal import Decimal
 
 from investment_agent.domain.allocation import load_allocation_policy
+from investment_agent.domain.asset_pyramid import asset_pyramid
 from investment_agent.domain.equity_budget import equity_budget
 from investment_agent.domain.ledger import replay
 from investment_agent.domain.profile import ConfirmedProfile
 from investment_agent.services.records import LedgerBook, StoredRisk, effective_risk, read_current, read_version
 
 RECORD = ("settings", "equity_budget")
+LAYERS = ("deposit", "bond", "gold", "crypto")  # entered by hand; stocks (at cost) and ledger cash come from the ledger
 PROTECTED = {"emergency_reserve", "due_within_12_months"}
 
 
@@ -26,11 +28,18 @@ def budget_view(repo, owner) -> tuple[dict, int]:
     deductions = Decimal(manual) if manual is not None else from_profile
     effective = effective_risk(repo, owner, StoredRisk.model_validate(risk.payload).assessment if risk else None)
     group = effective.group if effective else None
-    positions = replay(list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)).positions
-    held_cost = sum((p.total_cost for p in positions if p.quantity + p.pending_quantity > 0), Decimal(0))
-    budget = equity_budget(total=Decimal(stored.payload["total"]), deductions=deductions, group=group,
-                           ratios=dict(load_allocation_policy().baseline_equity), held_cost=held_cost)
+    state = replay(list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events))
+    held_cost = sum((p.total_cost for p in state.positions if p.quantity + p.pending_quantity > 0), Decimal(0))
+    ratios = dict(load_allocation_policy().baseline_equity)
+    layers = stored.payload.get("layers")
+    amounts = None
+    if layers:  # Tháp tài sản: the total is the sum of the layers, with the reserve as the bottom layer
+        amounts = {"reserve": deductions, "deposit": Decimal(layers["deposit"]) + state.cash, "bond": Decimal(layers["bond"]),
+                   "gold": Decimal(layers["gold"]), "stocks": held_cost, "crypto": Decimal(layers["crypto"])}
+    total = sum(amounts.values(), Decimal(0)) if amounts else Decimal(stored.payload["total"])
+    budget = equity_budget(total=total, deductions=deductions, group=group, ratios=ratios, held_cost=held_cost)
     if budget["status"] == "ok":
+        pyramid = asset_pyramid(amounts, deductions=deductions, stock_ratio=ratios[group]) if amounts else None
         budget = {**budget, "deductions_source": "manual" if manual is not None else "profile", "profile_deductions": format(from_profile, "f"),
-                  "reserve": manual}
+                  "reserve": manual, "layers": layers, "pyramid": pyramid}
     return budget, stored.version

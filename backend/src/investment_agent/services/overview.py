@@ -17,6 +17,7 @@ from investment_agent.domain.settlement import availability
 from investment_agent.market.universe import UniverseVersion, research_scope
 from investment_agent.valuation.assumptions import ValuationAssumptions
 from investment_agent.valuation.dcf import value_assumptions
+from investment_agent.repositories.personal import prefetch
 from investment_agent.services.records import LedgerBook, StoredRisk, effective_risk, read_current, read_version, trading_settings
 
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
@@ -53,7 +54,13 @@ def _summary(entity_id, assumptions, version) -> ValuationSummary:
                             source_ids=assumptions.sources)
 
 
+# Records every overview needs; read together up front (in parallel) instead of one Firestore round trip at a time.
+OVERVIEW_RECORDS = [("profile_versions", "main"), ("risk_versions", "main"), ("ledger_events", "main"), ("approvals", "universe"),
+                    ("settings", "trading"), ("settings", "risk_override")]
+
+
 def _load(repo, owner):
+    prefetch(getattr(repo, "authoritative", repo), owner, OVERVIEW_RECORDS)
     profile, profile_stale = read_current(repo, owner, "profile_versions", "main")
     risk, _ = read_current(repo, owner, "risk_versions", "main")
     ledger = read_version(repo, owner, "ledger_events", "main", None)
@@ -102,6 +109,7 @@ def compose_overview(repo, owner, market, now) -> dict:
             freshness = freshness.model_copy(update={"allows_new_recommendations": False})
         power = availability(events, as_of=now.astimezone(VN).date()) if events else None
         entities = sorted(set(held) | set(universe.members if universe else ()))
+        prefetch(getattr(repo, "authoritative", repo), owner, [("valuation_assumptions", e) for e in entities])
         for entity_id in entities:
             assumptions, version = _approved_valuation(repo, owner, entity_id)
             point = market.price(entity_id)

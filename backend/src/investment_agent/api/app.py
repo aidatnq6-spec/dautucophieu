@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from investment_agent.market.view import EmptyMarket
+from investment_agent.repositories.personal import read_scope
 
 from .auth import InternalAuthSettings, InternalAuthenticator, Unauthorized, require_owner
 from .routes.concentration import router as concentration_router
@@ -60,7 +61,8 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
                 if len(body) > 1_048_576:
                     return JSONResponse({"code": "request_too_large", "message": "Yêu cầu quá lớn."}, status_code=413, headers={"Cache-Control": "no-store"})
                 request.state.owner = authenticator.verify(request, body)
-            response = await call_next(request)
+            with read_scope():  # each personal record is read from Firestore at most once per request
+                response = await call_next(request)
         except Unauthorized:
             response = JSONResponse({"code": "unauthorized", "message": "Yêu cầu nội bộ không hợp lệ."}, status_code=401)
         response.headers["Cache-Control"] = "no-store"

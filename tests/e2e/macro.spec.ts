@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { signIn } from "./helpers";
+import { seedOwner, signIn } from "./helpers";
 
 // Synthetic fixture data only: US 10-year yield 4.91 → 4.96 (automatic); every manual indicator starts empty.
 test.describe.configure({ mode: "serial" });
@@ -58,6 +58,19 @@ test("the impact chain shows five links, says what is missing, and reads inflati
   await expect(inflation).toContainText("Tăng");
   await expect(inflation).toContainText("tạo áp lực");
   await expect(page.getByRole("region", { name: "Chuỗi tác động vĩ mô" }).getByTestId("chain-summary")).toContainText(/Đang tạo áp lực:.*lạm phát/);
+});
+
+test("oil and dollar sensitivity lists held tickers first and says what the dollar measure is", async ({ page }) => {
+  await seedOwner(page);  // holds FPT; the e2e data has no oil or dollar history, so every reading waits for data
+  await openMacro(page);
+  const box = page.getByRole("region", { name: "Độ nhạy với giá dầu và đồng USD" });
+  await expect(box).toContainText("không phải tỷ giá VND");
+  await expect(box).toContainText("không phải khuyến nghị");
+  const fpt = box.getByRole("row", { name: /FPT/ });
+  await expect(fpt).toContainText("đang nắm");
+  await expect(fpt).toContainText("chưa đủ dữ liệu");
+  // nothing held can be measured yet: no "0% … 0%" shares, only how much is unmeasured
+  await expect(box.getByTestId("sensitivity-exposure")).toHaveText("100% vốn ở mã chưa đủ dữ liệu để đo.");
 });
 
 test("no horizontal page scroll on the macro page at 375px", async ({ page }) => {

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AppNav } from "../../components/app-nav";
 import { BackToTop } from "../../components/back-to-top";
+import { PageJumps } from "../../components/page-jumps";
 import { sessionAuth } from "../../lib/server/firebase-admin";
 import { SESSION_COOKIE, sessionConfig, verifyOwnerSession } from "../../lib/server/session";
 
@@ -20,7 +21,7 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
         <div className="brand">Đầu tư<span> Cổ phiếu</span></div>
         <AppNav />
       </aside>
-      <main className="content" id="main">{children}</main>
+      <main className="content" id="main"><PageJumps />{children}</main>
       <BackToTop />
     </div>
   );

@@ -5,7 +5,7 @@ It describes and flags; it never names a ticker or tells the owner to buy or sel
 
 from decimal import ROUND_HALF_UP, Decimal
 
-ORDER = ("reserve", "deposit", "bond", "gold", "stocks", "crypto")  # bottom to top
+ORDER = ("reserve", "cash", "deposit", "bond", "gold", "stocks", "crypto")  # bottom to top; cash shares the deposit target
 GOLD, BOND_MAX, CRYPTO_MAX, STOCK_BAND = (Decimal("0.10"), Decimal("0.15")), Decimal("0.10"), Decimal("0.05"), Decimal("0.05")
 
 
@@ -30,20 +30,24 @@ def asset_pyramid(amounts: dict[str, Decimal], *, deductions: Decimal, stock_rat
     out = []
     for layer in ORDER:
         amount = amounts.get(layer, Decimal(0))
-        if layer == "reserve":
-            out.append({"id": layer, "amount": format(amount, "f"), "share": None, "target_min": None, "target_max": None,
-                        "status": "fixed", "gap": None})
+        if layer in ("reserve", "cash"):
+            share = amount / base if layer == "cash" and base > 0 else None
+            out.append({"id": layer, "amount": format(amount, "f"), "target_min": None, "target_max": None, "gap": None,
+                        "share": str(share.quantize(Decimal("0.0001"), ROUND_HALF_UP)) if share is not None else None,
+                        "status": "fixed" if layer == "reserve" else "with_deposit"})
             continue
         low, high = ranges[layer]
-        share = amount / base if base > 0 else None
+        held = amount + (amounts.get("cash", Decimal(0)) if layer == "deposit" else 0)  # deposits are judged together with cash
+        share = held / base if base > 0 else None
         status, gap = "ok", None
         if share is not None and share < low:
-            status, gap = "short", (low * base - amount)
+            status, gap = "short", (low * base - held)
         elif share is not None and share > high:
-            status, gap = "over", (amount - high * base)
+            status, gap = "over", (held - high * base)
         out.append({"id": layer, "amount": format(amount, "f"), "share": str(share.quantize(Decimal("0.0001"), ROUND_HALF_UP)) if share is not None else None,
                     "target_min": _r(low), "target_max": _r(high), "status": status,
-                    "gap": format(gap.quantize(Decimal(1), ROUND_HALF_UP), "f") if gap is not None else None})
+                    "gap": format(gap.quantize(Decimal(1), ROUND_HALF_UP), "f") if gap is not None else None,
+                    **({"with_cash": True} if layer == "deposit" else {})})
     warnings = []
     for i, layer in enumerate(out):
         if layer["status"] == "short":

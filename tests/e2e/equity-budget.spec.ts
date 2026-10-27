@@ -32,7 +32,10 @@ test("layers add up to the total, build the pyramid and give the money for stock
   await enterLayers(box, { deposit: "300000000", gold: "100000000" });
   await expect(box.getByLabel("Tiền gửi (đ)")).toHaveValue("300.000.000");
   const pyramid = box.getByRole("list", { name: "Các lớp tài sản, từ dưới lên" });
-  for (const label of ["Dự phòng", "Tiền gửi", "Trái phiếu", "Vàng", "Cổ phiếu", "Tiền số"]) await expect(pyramid).toContainText(label);
+  for (const label of ["Dự phòng", "Tiền mặt", "Tiền gửi", "Trái phiếu", "Vàng", "Cổ phiếu", "Tiền số"]) await expect(pyramid).toContainText(label);
+  await expect(pyramid.getByTestId("layer-cash")).toContainText("tính chung mục tiêu với tiền gửi");
+  await expect(pyramid.getByTestId("layer-deposit")).not.toContainText("tiền mặt trong tài khoản");
+  await expect(pyramid.getByTestId("layer-deposit")).toContainText("300.000.000 đ");
   await expect(pyramid.getByTestId("layer-gold")).toContainText("mục tiêu 10–15%");
   await expect(box).toContainText("Cân bằng");
   // Other specs may confirm a profile with a reserve or add FPT buys: expect (shown total − shown deduction) × 35%.

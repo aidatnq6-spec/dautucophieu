@@ -153,3 +153,4 @@ main h2{scroll-margin-top:16px}
 .pyr-layer.pyr-fixed{background:#eef3f8}
 .pyr-figs{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-variant-numeric:tabular-nums}
 @media(max-width:650px){.pyr-layer{margin-inline:calc(var(--step) * 1%)}}
+.pyr-layer.pyr-with_deposit{background:#f5f8fb}

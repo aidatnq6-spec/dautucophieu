@@ -32,6 +32,7 @@ class GoalRequest(ContractModel):
     target: str = Field(max_length=24)
     rate: str | None = Field(default=None, max_length=8)  # percent per year; None = the 12-month deposit rate
     bond_rate: str | None = Field(default=None, max_length=8)  # coupon of the bonds held, percent per year; None = 7
+    stock_rate: str | None = Field(default=None, max_length=8)  # yearly yield the owner expects from stocks; None = last year's cash dividends
     expected_version: int = Field(strict=True, ge=0)
     request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
 
@@ -66,7 +67,9 @@ def _view(request: Request, repo, owner) -> dict:
         layers = {l["id"]: Decimal(l["amount"]) for l in pyramid["layers"]}
         bond_rate = (record.payload.get("bond_rate") if record else None) or BOND_RATE
         income = income_by_layer(deposit=layers.get("deposit", Decimal(0)), deposit_rate=Decimal(default_rate), bond=layers.get("bond", Decimal(0)),
-                                 bond_rate=Decimal(bond_rate), dividends_12m=dividends_last_year(data_dir, repo, owner, today))
+                                 bond_rate=Decimal(bond_rate), dividends_12m=dividends_last_year(data_dir, repo, owner, today),
+                                 stocks=layers.get("stocks", Decimal(0)),
+                                 stock_rate=Decimal(record.payload["stock_rate"]) if record and record.payload.get("stock_rate") else None)
     result = None
     if record is not None:
         rate = record.payload.get("rate") or default_rate
@@ -98,6 +101,7 @@ def put_passive_income(request: Request, body: GoalRequest):
         target = Decimal(body.target)
         rate = Decimal(body.rate) if body.rate is not None else None
         bond_rate = Decimal(body.bond_rate) if body.bond_rate is not None else None
+        stock_rate = Decimal(body.stock_rate) if body.stock_rate is not None else None
     except InvalidOperation:
         return error(422, "invalid_goal", "Mục tiêu và tỷ suất phải là số.")
     if not target.is_finite() or target <= 0 or target != target.to_integral_value():
@@ -106,8 +110,11 @@ def put_passive_income(request: Request, body: GoalRequest):
         return error(422, "invalid_rate", "Tỷ suất giả định từ 0,1% đến 30%/năm.")
     if bond_rate is not None and not (bond_rate.is_finite() and Decimal(0) <= bond_rate <= Decimal(30)):
         return error(422, "invalid_rate", "Lãi suất trái phiếu từ 0% đến 30%/năm.")
+    if stock_rate is not None and not (stock_rate.is_finite() and Decimal(0) <= stock_rate <= Decimal(50)):
+        return error(422, "invalid_rate", "Lợi suất cổ phiếu từ 0% đến 50%/năm.")
     payload = {"target": format(target, "f"), "rate": format(rate, "f") if rate is not None else None,
-               "bond_rate": format(bond_rate, "f") if bond_rate is not None else None}
+               "bond_rate": format(bond_rate, "f") if bond_rate is not None else None,
+               "stock_rate": format(stock_rate, "f") if stock_rate is not None else None}
     try:
         repo.write(owner, *RECORD, payload, expected_version=body.expected_version, request_id=body.request_id)
         return _view(request, repo, owner)

@@ -41,3 +41,10 @@ def test_a_given_income_now_replaces_capital_times_rate():
     p = passive_income(target=Decimal(10_000_000), rate=Decimal("6"), capital=Decimal(1_000_000_000), contribution=Decimal(0), today=TODAY,
                        income_now=Decimal(4_000_000))
     assert p["income_now"] == "4000000" and p["progress"] == "0.4000"
+
+
+def test_a_stock_rate_entered_by_hand_replaces_the_dividends():
+    from investment_agent.domain.passive_income import income_by_layer
+    lines = income_by_layer(deposit=Decimal(0), deposit_rate=Decimal("5.63"), bond=Decimal(0), bond_rate=Decimal("7"), dividends_12m=Decimal(12_000_000),
+                            stocks=Decimal(802_743_828), stock_rate=Decimal("12"))
+    assert lines["stocks"] == "8027438" and lines["dividends"] == "0" and lines["total"] == "8027438"  # 802,7 tr × 12% / 12

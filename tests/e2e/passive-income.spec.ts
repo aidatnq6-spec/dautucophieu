@@ -46,3 +46,17 @@ test("income today is counted layer by layer: deposits, bonds at their coupon, l
   await expect(lines).toContainText("Vàng, tiền mặt, tiền số: không tạo dòng tiền");
   await expect(box).toContainText(/~[\d.]+ đ\/tháng · đạt \d{1,3}(,\d)?% mục tiêu/);  // e.g. "đạt 22% mục tiêu", never "0,22%"
 });
+
+test("a stock yield entered by hand replaces last year's dividends", async ({ page }) => {
+  await page.goto("/profile");
+  const box = page.getByRole("region", { name: "Mục tiêu dòng tiền thụ động" });
+  await expect(box.getByLabel("Lợi suất cổ phiếu (%/năm)")).toBeEnabled();
+  await box.getByLabel("Lợi suất cổ phiếu (%/năm)").fill("12");
+  await box.getByRole("button", { name: "Tính mục tiêu" }).click();
+  const lines = box.getByRole("list", { name: "Dòng tiền hiện tại theo lớp" });
+  await expect(lines).toContainText(/Cổ phiếu \(12%\/năm, bạn nhập\): [\d.]+ đ\/tháng/);
+  await expect(lines).not.toContainText("Cổ tức tiền mặt 12 tháng");
+  await box.getByLabel("Lợi suất cổ phiếu (%/năm)").fill("");
+  await box.getByRole("button", { name: "Tính mục tiêu" }).click();
+  await expect(lines).toContainText("Cổ tức tiền mặt 12 tháng");
+});

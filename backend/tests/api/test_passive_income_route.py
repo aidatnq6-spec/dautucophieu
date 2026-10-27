@@ -59,3 +59,15 @@ def test_income_now_comes_from_deposits_bonds_and_last_years_cash_dividends(tmp_
     body = call(c, clock, "GET", "/internal/passive-income").json()
     assert body["income"] == {"deposit": "3000000", "bond": "700000", "dividends": "16667", "total": "3716667"}  # 100 × 2.000 đ a year
     assert body["result"]["income_now"] == "3716667" and body["goal"]["bond_rate"] == "7"
+
+
+def test_the_stock_rate_is_stored_and_used(tmp_path):
+    c, clock = client(tmp_path)
+    call(c, clock, "PUT", "/internal/equity-budget", {"layers": {"deposit": "0", "bond": "0", "gold": "0", "crypto": "0"}, "reserve": "0",
+                                                     "expected_version": 0, "request_id": "eb1"})
+    call(c, clock, "PUT", "/internal/passive-income", {"target": "10000000", "rate": None, "bond_rate": None, "stock_rate": "12", "expected_version": 0,
+                                                       "request_id": "pi1"})
+    body = call(c, clock, "GET", "/internal/passive-income").json()
+    assert body["goal"]["stock_rate"] == "12" and body["income"]["stocks"] == "50000" and body["income"]["dividends"] == "0"  # 5 tr at cost × 12% / 12
+    bad = call(c, clock, "PUT", "/internal/passive-income", {"target": "10000000", "rate": None, "stock_rate": "90", "expected_version": 1, "request_id": "pi2"})
+    assert bad.status_code == 422

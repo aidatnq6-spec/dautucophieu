@@ -82,7 +82,7 @@ export function ReportView({ reportId }: { reportId: string }) {
       <ul>{r.decision.reasons.map((x) => <li key={x}>{label(REASON_TEXT, x)}</li>)}</ul>
       <h2>Danh mục</h2>
       <p>Tiền trong sổ {formatVnd(r.ledger_summary.cash)} · lãi/lỗ đã thực hiện {formatVnd(r.ledger_summary.realized_gain)} · cổ tức ròng {formatVnd(r.ledger_summary.dividend_income)}</p>
-      <HoldingsTable rows={r.holdings} brief />
+      <HoldingsTable rows={r.holdings} />
       <h2>Cơ hội và cảnh báo</h2>
       {(() => {
         const same = sameReasons(r.items);

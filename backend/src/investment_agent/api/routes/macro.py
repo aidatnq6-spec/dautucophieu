@@ -1,6 +1,7 @@
 """Leading macro indicators: automatic values from free feeds plus the owner's entries."""
 
 from datetime import date
+from pathlib import Path
 from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
 
@@ -8,8 +9,10 @@ from fastapi import APIRouter, Request
 from pydantic import Field
 
 from investment_agent.domain.models import ContractModel
+from investment_agent.domain.macro_chain import RATES, macro_chain
 from investment_agent.domain.rate_cycle import US, VIETNAM, rate_cycle
 from investment_agent.market.leading import MacroStore, load_indicators, macro_rows
+from investment_agent.market.series import SeriesStore
 
 from ..auth import require_owner
 from .common import error, now, unavailable
@@ -48,6 +51,19 @@ def cycle(request: Request):
         return unavailable()
     series = {i: [(date.fromisoformat(o["date"]), o["value"]) for o in store.read(i)] for i in (*VIETNAM, *US)}
     return rate_cycle(series, today=now(request).astimezone(VN).date())
+
+
+@router.get("/chain")
+def chain(request: Request):
+    """Chuỗi tác động vĩ mô: oil → inflation → rates → foreign flows → VN-Index, each link's direction over about a month."""
+    require_owner(request)
+    store = _store(request)
+    if store is None:
+        return unavailable()
+    series = {i: [(date.fromisoformat(o["date"]), Decimal(o["value"])) for o in store.read(i)] for i in ("wti", "vn_cpi_yoy", *RATES, "foreign_net")}
+    index = SeriesStore(Path(request.app.state.data_dir) / "trend-sources").read("VNINDEX-1d")
+    series["vnindex"] = [(t.date(), Decimal(str(v))) for t, v in index]
+    return macro_chain(series, today=now(request).astimezone(VN).date())
 
 
 @router.post("/{indicator}/observations")

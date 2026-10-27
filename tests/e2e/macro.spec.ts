@@ -37,6 +37,29 @@ test("the owner enters PMI values and sees the trend", async ({ page }) => {
   for (const text of ["51,9", "Giảm", "Xấu", "Tự động"]) await expect(row()).toContainText(text);
 });
 
+test("the impact chain shows five links, says what is missing, and reads inflation once it is entered", async ({ page }) => {
+  await openMacro(page);
+  const chain = page.getByRole("region", { name: "Chuỗi tác động vĩ mô" });
+  const links = chain.getByRole("list", { name: "Các mắt xích, từ giá dầu đến VN-Index" }).getByRole("listitem");
+  await expect(links).toHaveText([/Giá dầu/, /Lạm phát Việt Nam/, /Lãi suất Việt Nam/, /Khối ngoại/, /VN-Index/]);
+  await expect(chain).toContainText("không phải khuyến nghị");
+  // Months before the 03/2026 figure performance.spec enters, so either order leaves CPI rising: 2,0 → 2,9 (→ 3,2).
+  for (const [day, value] of [["2026-01-31", "2,0"], ["2026-02-28", "2,9"]]) {
+    await page.getByRole("row", { name: /Lạm phát Việt Nam/ }).getByRole("button", { name: "Nhập" }).click();
+    const form = page.getByRole("form", { name: "Nhập Lạm phát Việt Nam (CPI, so cùng kỳ)" });
+    await form.getByLabel("Ngày số liệu").fill(day);
+    await form.getByLabel("Giá trị").fill(value);
+    await form.getByRole("button", { name: "Lưu" }).click();
+    await expect(form).toHaveCount(0);
+  }
+  await openMacro(page);
+  const inflation = page.getByRole("region", { name: "Chuỗi tác động vĩ mô" }).getByTestId("chain-inflation");
+  await expect(inflation).toContainText(/2,9%|3,2%/);
+  await expect(inflation).toContainText("Tăng");
+  await expect(inflation).toContainText("tạo áp lực");
+  await expect(page.getByRole("region", { name: "Chuỗi tác động vĩ mô" }).getByTestId("chain-summary")).toContainText(/Đang tạo áp lực:.*lạm phát/);
+});
+
 test("no horizontal page scroll on the macro page at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 900 });
   await openMacro(page);

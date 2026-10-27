@@ -297,3 +297,22 @@ def test_one_feed_read_serves_both_pmi_and_cpi(tmp_path):
     assert fetch_auto(wanted, store, get=get, today=date(2026, 11, 6)) == {"vn_pmi": "ok", "vn_cpi_yoy": "ok"}
     assert store.read("vn_cpi_yoy")[-1]["value"] == "3.2" and store.read("vn_pmi")[-1]["value"] == "50.8"
     assert len(seen) == len(set(seen))  # each feed fetched once
+
+
+def test_factor_series_keep_five_years_of_fred_history(tmp_path):
+    """Độ nhạy với giá dầu và đồng USD needs about three years of weekly moves; the macro table keeps only the latest 400 days."""
+    from investment_agent.market.leading import FACTORS, fetch_factors
+    asked = []
+
+    def get(url):
+        asked.append(url)
+        rows = "".join(f"20{y:02d}-01-0{d},{70 + y}.{d}\n" for y in range(19, 27) for d in range(2, 9))
+        return "observation_date,X\n" + rows + "2026-01-09,.\n"
+    store = MacroStore(tmp_path)
+    assert fetch_factors(store, get=get, today=date(2026, 10, 27)) == {"factor_oil": "ok", "factor_usd": "ok"}
+    assert FACTORS == {"factor_oil": "DCOILWTICO", "factor_usd": "DTWEXBGS"}
+    assert all("cosd=2021-10-27" in u for u in asked) and any("DCOILWTICO" in u for u in asked) and any("DTWEXBGS" in u for u in asked)
+    oil = store.read("factor_oil")
+    assert len(oil) == 56 and oil[0]["date"] == "2019-01-02" and oil[-1] == {**oil[-1], "date": "2026-01-08", "value": "96.8"}
+    assert fetch_factors(store, get=lambda url: (_ for _ in ()).throw(OSError("offline")), today=date(2026, 10, 27)) == {
+        "factor_oil": "error:OSError", "factor_usd": "error:OSError"}

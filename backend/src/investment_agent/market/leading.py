@@ -349,6 +349,28 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
     return results
 
 
+# Long daily history for Độ nhạy với giá dầu và đồng USD (not shown in the macro table): WTI and the Fed's broad US dollar index.
+FACTORS = {"factor_oil": "DCOILWTICO", "factor_usd": "DTWEXBGS"}
+FACTOR_YEARS = 5
+
+
+def fetch_factors(store: MacroStore, *, get: Callable[[str], str], today: date | None = None) -> dict[str, str]:
+    """Five years of each factor from FRED's public CSV; a failing series is reported and the other still updates."""
+    today = today or datetime.now(VN).date()
+    start = today.replace(year=today.year - FACTOR_YEARS, day=min(today.day, 28) if today.month == 2 else today.day)
+    results = {}
+    for key, series in FACTORS.items():
+        try:
+            points = parse_fred_csv(get(FRED_CSV.format(series=series) + f"&cosd={start.isoformat()}"))
+            if not points:
+                raise MacroError("no_observations")
+            store.upsert(key, points, entry="auto")
+            results[key] = "ok"
+        except Exception as exc:
+            results[key] = f"error:{type(exc).__name__}"
+    return results
+
+
 def macro_reminders(indicators: list[dict], store: MacroStore, *, today: date) -> list[str]:
     """Indicators the owner can enter by hand that have no value yet or are older than their update rhythm (max_age_days)."""
     out = []

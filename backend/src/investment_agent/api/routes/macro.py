@@ -10,9 +10,14 @@ from pydantic import Field
 
 from investment_agent.domain.models import ContractModel
 from investment_agent.domain.macro_chain import RATES, macro_chain
+from investment_agent.domain.ledger import replay
 from investment_agent.domain.rate_cycle import US, VIETNAM, rate_cycle
+from investment_agent.domain.sensitivity import exposure, sensitivity
 from investment_agent.market.leading import MacroStore, load_indicators, macro_rows
 from investment_agent.market.series import SeriesStore
+from investment_agent.market.watchlist import load_watchlist
+from investment_agent.repositories.personal import RepositoryUnavailable
+from investment_agent.services.records import LedgerBook, read_version
 
 from ..auth import require_owner
 from .common import error, now, unavailable
@@ -64,6 +69,31 @@ def chain(request: Request):
     index = SeriesStore(Path(request.app.state.data_dir) / "trend-sources").read("VNINDEX-1d")
     series["vnindex"] = [(t.date(), Decimal(str(v))) for t, v in index]
     return macro_chain(series, today=now(request).astimezone(VN).date())
+
+
+@router.get("/sensitivity")
+def sensitivity_view(request: Request):
+    """Độ nhạy với giá dầu và đồng USD: held tickers (largest cost first), then the watchlist; computed here on public prices."""
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    store = _store(request)
+    if repo is None or store is None:
+        return unavailable()
+    try:
+        state = replay(list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events))
+    except RepositoryUnavailable:
+        return unavailable()
+    costs = {p.security_id: p.total_cost for p in state.positions if p.quantity + p.pending_quantity > 0}
+    factor = {k: [(date.fromisoformat(o["date"]), Decimal(o["value"])) for o in store.read(f"factor_{k}")] for k in ("oil", "usd")}
+    prices = SeriesStore(Path(request.app.state.data_dir) / "trend-sources")
+    closes = lambda symbol: [(t.date(), Decimal(str(v))) for t, v in prices.read(f"{symbol}-1d")]  # noqa: E731
+    index = closes("VNINDEX")
+    held = sorted(costs, key=lambda s: costs[s], reverse=True)
+    symbols = held + [s for s in load_watchlist(Path(request.app.state.data_dir)).symbols if s not in costs]
+    results = {}
+    for symbol in symbols:
+        results[symbol] = sensitivity(closes(symbol), index=index, oil=factor["oil"], usd=factor["usd"])
+    return {"factors": {k: v[-1][0].isoformat() if v else None for k, v in factor.items()},
+            "rows": [{"symbol": s, "held": s in costs, **results[s]} for s in symbols], "exposure": exposure(results, costs)}
 
 
 @router.post("/{indicator}/observations")

@@ -154,3 +154,6 @@ main h2{scroll-margin-top:16px}
 .pyr-figs{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-variant-numeric:tabular-nums}
 @media(max-width:650px){.pyr-layer{margin-inline:calc(var(--step) * 1%)}}
 .pyr-layer.pyr-with_deposit{background:#f5f8fb}
+.buy-check{grid-column:1/-1;padding:10px 14px;border-radius:7px;border:1px solid var(--line)}
+.buy-check.warn{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn-ink)}.buy-check.ok{background:#eef7f2;border-color:#bfe0cf}
+.buy-check ul{margin:6px 0;padding-left:18px}.buy-check p{margin:6px 0}

@@ -2,13 +2,16 @@
 the rule that the savings rate should be at least one's age in percent."""
 
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Request
 from pydantic import Field
 
+from investment_agent.domain.lifestyle import lifestyle_inflation
 from investment_agent.domain.models import ContractModel
 from investment_agent.domain.wealth_check import wealth_check
+from investment_agent.market.leading import MacroStore
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.records import read_version
 
@@ -28,13 +31,19 @@ class WealthRequest(ContractModel):
     request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
 
 
+def _cpi(request: Request) -> str | None:
+    data_dir = request.app.state.data_dir
+    points = MacroStore(Path(data_dir)).read("vn_cpi_yoy") if data_dir is not None else []
+    return points[-1]["value"] if points else None
+
+
 def _view(request: Request, record) -> dict:
     if record is None:
-        return {"version": 0, "inputs": None, "check": None}
-    p = record.payload
-    check = wealth_check(income=Decimal(p["income"]), expenses=Decimal(p["expenses"]), birth_year=p["birth_year"],
-                         today=now(request).astimezone(VN).date())
-    return {"version": record.version, "inputs": p, "check": check}
+        return {"version": 0, "inputs": None, "check": None, "lifestyle": None}
+    p, today = record.payload, now(request).astimezone(VN).date()
+    check = wealth_check(income=Decimal(p["income"]), expenses=Decimal(p["expenses"]), birth_year=p["birth_year"], today=today)
+    lifestyle = lifestyle_inflation(p.get("history") or {}, cpi=_cpi(request), today=today)
+    return {"version": record.version, "inputs": p, "check": check, "lifestyle": lifestyle}
 
 
 @router.get("/wealth-check")
@@ -63,7 +72,14 @@ def put_wealth_check(request: Request, body: WealthRequest):
     this_year = now(request).astimezone(VN).year
     if not this_year - 100 <= body.birth_year <= this_year - 15:
         return error(422, "invalid_birth_year", "Năm sinh không hợp lệ.")
-    payload = {"income": format(income, "f"), "expenses": format(expenses, "f"), "birth_year": body.birth_year}
+    month = now(request).astimezone(VN).strftime("%Y-%m")
+    try:
+        previous = read_version(repo, owner, *RECORD, None)
+    except RepositoryUnavailable:
+        return unavailable()
+    # Lạm phát lối sống: one entry per month (the latest save of the month wins), kept with the inputs.
+    history = {**((previous.payload.get("history") or {}) if previous else {}), month: {"income": format(income, "f"), "expenses": format(expenses, "f")}}
+    payload = {"income": format(income, "f"), "expenses": format(expenses, "f"), "birth_year": body.birth_year, "history": history}
     try:
         record = repo.write(owner, *RECORD, payload, expected_version=body.expected_version, request_id=body.request_id)
     except WRITE_ERRORS as exc:

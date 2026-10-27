@@ -18,6 +18,7 @@ from .routes.equity_budget import router as equity_budget_router
 from .routes.events import router as events_router
 from .routes.fairvalue import router as fairvalue_router
 from .routes.glance import router as glance_router
+from .routes.intangibles import router as intangibles_router
 from .routes.journal import router as journal_router
 from .routes.passive_income import router as passive_income_router
 from .routes.performance import router as performance_router
@@ -97,6 +98,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(wealth_check_router)
     app.include_router(contributions_router)
     app.include_router(passive_income_router)
+    app.include_router(intangibles_router)
     app.include_router(performance_router)
     app.include_router(concentration_router)
     app.include_router(insights_router)

@@ -4,6 +4,7 @@ import { Calculator } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatRatio, formatVnd, groupDigitsInput, parseMoneyInput } from "../lib/format";
 import { GROUP_LABEL } from "./risk-survey";
+import type { IntangiblesView } from "./intangibles";
 
 type Layer = { id: string; amount: string; share: string | null; target_min: string | null; target_max: string | null;
   status: "fixed" | "short" | "ok" | "over"; gap: string | null };
@@ -31,7 +32,7 @@ function target(l: Layer) {
 }
 
 /** Tháp tài sản: layers from the bottom up against their targets, the total they add up to, and the money for stocks it gives. */
-function PyramidView({ p }: { p: Pyramid }) {
+function PyramidView({ p, intangibles }: { p: Pyramid; intangibles: IntangiblesView["year"] | null }) {
   return (
     <>
       <ol className="pyr" aria-label="Các lớp tài sản, từ dưới lên">
@@ -49,6 +50,10 @@ function PyramidView({ p }: { p: Pyramid }) {
             </li>
           );
         })}
+        {intangibles && <li className="pyr-layer pyr-intangible" data-testid="pyramid-intangibles" style={{ ["--step" as string]: -1 }}>
+          <div className="pyr-name"><strong>Tài sản vô hình: năm nay {formatVnd(intangibles.spent)}</strong>
+            <span className="caption"> · đế của tháp, đầu tư vào bản thân; không tính vào tổng tài sản</span></div>
+        </li>}
       </ol>
       {p.warnings.map((w) => {
         const short = p.layers.find((l) => l.id === w.short)!;
@@ -65,6 +70,8 @@ export function EquityBudget() {
   const [values, setValues] = useState<Layers>({ deposit: "", bond: "", gold: "", crypto: "" });
   const [reserve, setReserve] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [intangibles, setIntangibles] = useState<IntangiblesView["year"] | null>(null);
+  useEffect(() => { api<IntangiblesView>("intangibles").then((v) => setIntangibles(v.year), () => setIntangibles(null)); }, []);
   useEffect(() => {
     api<View>("equity-budget").then((v) => {
       setView(v);
@@ -104,7 +111,7 @@ export function EquityBudget() {
       {message && <p className="errors" role="alert">{message}</p>}
       {b?.status === "ok" && !b.pyramid && <p className="notice">Đang dùng tổng tài sản nhập một con số ({formatVnd(b.total)}). Nhập số tiền từng lớp ở trên để xem tháp tài sản.</p>}
       {b?.status === "no_risk" && <p className="notice">Chưa có kết quả khảo sát rủi ro nên chưa biết tỷ trọng cổ phiếu.</p>}
-      {b?.status === "ok" && b.pyramid && <PyramidView p={b.pyramid} />}
+      {b?.status === "ok" && b.pyramid && <PyramidView p={b.pyramid} intangibles={intangibles} />}
       {b?.status === "ok" && <dl className="eb-result">
         <div><dt>Tổng tài sản tài chính</dt><dd data-testid="equity-total">{formatVnd(b.total)}</dd></div>
         <div><dt>Trừ quỹ dự phòng và khoản chi 12 tháng <span className="caption">({b.deductions_source === "manual" ? "nhập tay" : "theo hồ sơ"})</span></dt>

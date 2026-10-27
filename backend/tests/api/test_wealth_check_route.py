@@ -14,14 +14,15 @@ def save(c, clock, body, version=0, rid="wc1"):
 
 def test_nothing_entered_yet():
     c, clock = client()
-    assert call(c, clock, "GET", "/internal/wealth-check").json() == {"version": 0, "inputs": None, "check": None}
+    assert call(c, clock, "GET", "/internal/wealth-check").json() == {"version": 0, "inputs": None, "check": None, "lifestyle": None}
 
 
 def test_saved_inputs_give_the_check_with_the_age_this_year():
     c, clock = client()
     assert save(c, clock, {"income": "25000000", "expenses": "17000000", "birth_year": 1989}).status_code == 200
     body = call(c, clock, "GET", "/internal/wealth-check").json()
-    assert body["version"] == 1 and body["inputs"] == {"income": "25000000", "expenses": "17000000", "birth_year": 1989}
+    assert body["version"] == 1 and {k: body["inputs"][k] for k in ("income", "expenses", "birth_year")} == {"income": "25000000", "expenses": "17000000",
+                                                                                                          "birth_year": 1989}
     assert body["check"]["age"] == 38 and body["check"]["target"] == "0.38" and body["check"]["status"] == "short"  # 2027
 
 
@@ -31,3 +32,12 @@ def test_bad_inputs_are_refused():
     assert save(c, clock, {"income": "-5", "expenses": "1", "birth_year": 1989}).status_code == 422
     assert save(c, clock, {"income": "10", "expenses": "1", "birth_year": 1850}).status_code == 422
     assert save(c, clock, {"income": "abc", "expenses": "1", "birth_year": 1989}).status_code == 422
+
+
+def test_each_save_keeps_that_months_figures_for_the_lifestyle_check():
+    c, clock = client()  # 2027-01-15
+    save(c, clock, {"income": "25000000", "expenses": "17000000", "birth_year": 1989})
+    save(c, clock, {"income": "26000000", "expenses": "18000000", "birth_year": 1989}, version=1, rid="wc2")
+    body = call(c, clock, "GET", "/internal/wealth-check").json()
+    assert body["inputs"]["history"] == {"2027-01": {"income": "26000000", "expenses": "18000000"}}  # one entry per month, the latest wins
+    assert body["lifestyle"]["verdict"] is None and body["lifestyle"]["ready_on"] == "2027-07"

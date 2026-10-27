@@ -68,14 +68,9 @@ test("onboarding confirms the reviewed capital breakdown and the 13-question sur
 
   await page.goto("/profile");
   await expect(page.getByText("Cân bằng · 39 điểm")).toBeVisible();
-  // one compact line; the reviewed breakdown sits behind "Xem chi tiết", with readable names instead of internal ids
-  const capital = page.getByRole("region", { name: "Vốn có thể đầu tư" });
-  await expect(capital).toContainText("Vốn có thể đầu tư lúc xác nhận: 600.000.000 đ");
-  const details = capital.getByRole("table", { name: "Bảng tính vốn có thể đầu tư" });
-  await expect(details).toBeHidden();
-  await capital.getByText("Xem chi tiết").click();
-  await expect(details).toContainText("Tiền gửi");
-  await expect(details).not.toContainText("asset-");
+  // a current profile needs no attention: the capital section is hidden (it shows only when the profile is due or must be reconfirmed)
+  await expect(page.getByRole("region", { name: "Tháp tài sản" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Vốn có thể đầu tư" })).toHaveCount(0);
 });
 
 test("trades show moving-average cost and realised gain; a correction replays the ledger", async ({ page }) => {

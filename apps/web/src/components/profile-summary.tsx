@@ -6,6 +6,7 @@ import { formatVnd } from "../lib/format";
 import { EquityBudget } from "./equity-budget";
 import { WealthCheck } from "./wealth-check";
 import { Contributions } from "./contributions";
+import { PassiveIncome } from "./passive-income";
 import { BreakdownTable, STATUS_LABEL, WARNING_LABEL, type Assessment } from "./profile-form";
 import { RiskSection } from "./risk-section";
 
@@ -46,6 +47,7 @@ export function ProfileSummary() {
       <RiskSection onChanged={() => setRiskChanges((n) => n + 1)} />
       <WealthCheck />
       <Contributions />
+      <PassiveIncome />
       <EquityBudget key={riskChanges} />
     </>
   );

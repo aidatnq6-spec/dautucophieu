@@ -2,11 +2,13 @@
 import { useEffect, useState } from "react";
 import { ArrowUp } from "lucide-react";
 
-/** Appears once the page has scrolled past one screen; scrolls back smoothly (instantly when reduced motion is preferred). */
+const SHOW_AFTER = 300;  // px: early enough that every tab which scrolls at all gets the button
+
+/** Appears once the page has scrolled a little; scrolls back smoothly (instantly when reduced motion is preferred). */
 export function BackToTop() {
   const [shown, setShown] = useState(false);
   useEffect(() => {
-    const update = () => setShown(window.scrollY > window.innerHeight);
+    const update = () => setShown(window.scrollY > SHOW_AFTER);
     update();
     window.addEventListener("scroll", update, { passive: true });
     return () => window.removeEventListener("scroll", update);

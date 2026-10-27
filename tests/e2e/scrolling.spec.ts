@@ -48,3 +48,16 @@ test("the page scrollbar uses the app's colours", async ({ page }) => {
   const color = await page.evaluate(() => getComputedStyle(document.documentElement).scrollbarColor);
   expect(color).not.toBe("auto");
 });
+
+test("every tab shows the back-to-top button after a short scroll", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  const hrefs = await nav(page).getByRole("link").evaluateAll((links) => links.map((a) => a.getAttribute("href")!));
+  expect(hrefs.length).toBeGreaterThan(10);
+  for (const href of hrefs) {
+    await page.goto(href);
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(() => { (document.querySelector("main") as HTMLElement).style.minHeight = "2000px"; window.scrollTo(0, 400); });
+    await expect(page.getByRole("button", { name: "Lên đầu trang" }), href).toBeVisible();
+  }
+});

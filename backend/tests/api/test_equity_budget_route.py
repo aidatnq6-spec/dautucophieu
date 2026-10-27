@@ -55,3 +55,21 @@ def test_invalid_totals_are_refused():
     c, clock = client()
     assert save(c, clock, "-5").status_code == 422
     assert save(c, clock, "abc").status_code == 422
+
+
+def test_a_reserve_entered_by_hand_replaces_the_profile_deduction():
+    c, clock = client({**PROFILE, "emergency_reserve": "100000000",
+                       "assets": [{"asset_id": "cash", "kind": "deposit", "amount": "1000000000", "liquidity": "liquid", "earmarks": [{"purpose": "emergency", "amount": "100000000"}]}]})
+    ok = call(c, clock, "PUT", "/internal/equity-budget", {"total": "2000000000", "reserve": "300000000", "expected_version": 0, "request_id": "eb1"})
+    assert ok.status_code == 200
+    b = call(c, clock, "GET", "/internal/equity-budget").json()["budget"]
+    assert b["deductions"] == "300000000" and b["deductions_source"] == "manual" and b["budget"] == "595000000"  # (2 tỷ − 300 tr) × 35%
+    assert b["profile_deductions"] == "100000000"
+    call(c, clock, "PUT", "/internal/equity-budget", {"total": "2000000000", "reserve": None, "expected_version": 1, "request_id": "eb2"})
+    b = call(c, clock, "GET", "/internal/equity-budget").json()["budget"]
+    assert b["deductions"] == "100000000" and b["deductions_source"] == "profile"
+
+
+def test_a_negative_reserve_is_refused():
+    c, clock = client()
+    assert call(c, clock, "PUT", "/internal/equity-budget", {"total": "2000000000", "reserve": "-1", "expected_version": 0, "request_id": "eb1"}).status_code == 422

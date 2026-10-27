@@ -36,3 +36,25 @@ test("no horizontal scroll on the profile page at 375px", async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test("the reserve can be entered by hand, and cleared to use the profile again", async ({ page }) => {
+  await seedOwner(page);
+  await page.goto("/profile");
+  const box = page.getByRole("region", { name: "Vốn dành cho cổ phiếu" });
+  const total = box.getByLabel("Tổng tài sản tài chính (đ)");
+  await total.fill("");
+  await total.pressSequentially("100000000000");
+  const reserve = box.getByLabel("Quỹ dự phòng và khoản chi 12 tháng (đ)");
+  await reserve.fill("");
+  await reserve.pressSequentially("500000000");
+  await expect(reserve).toHaveValue("500.000.000");
+  await box.getByRole("button", { name: "Tính vốn cho cổ phiếu" }).click();
+  await expect(box.getByTestId("equity-deductions")).toHaveText("−500.000.000 đ");
+  await expect(box).toContainText("(nhập tay)");
+  await expect(box.getByTestId("equity-budget")).toHaveText("34.825.000.000 đ");  // (100 tỷ − 500 triệu) × 35%
+
+  await reserve.fill("");
+  await box.getByRole("button", { name: "Tính vốn cho cổ phiếu" }).click();
+  await expect(box).toContainText("(theo hồ sơ)");
+  await expect(box).not.toContainText("(nhập tay)");
+});

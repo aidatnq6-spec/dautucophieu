@@ -21,11 +21,16 @@ def budget_view(repo, owner) -> tuple[dict, int]:
     profile, _ = read_current(repo, owner, "profile_versions", "main")
     risk, _ = read_current(repo, owner, "risk_versions", "main")
     lines = ConfirmedProfile.model_validate(profile.payload).assessment.lines if profile else ()
-    deductions = sum((line.amount for line in lines if line.kind == "deduction" and line.reason in PROTECTED), Decimal(0))
+    from_profile = sum((line.amount for line in lines if line.kind == "deduction" and line.reason in PROTECTED), Decimal(0))
+    manual = stored.payload.get("reserve")  # entered by hand on Hồ sơ & rủi ro; replaces the profile figure for this calculation only
+    deductions = Decimal(manual) if manual is not None else from_profile
     effective = effective_risk(repo, owner, StoredRisk.model_validate(risk.payload).assessment if risk else None)
     group = effective.group if effective else None
     positions = replay(list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)).positions
     held_cost = sum((p.total_cost for p in positions if p.quantity + p.pending_quantity > 0), Decimal(0))
     budget = equity_budget(total=Decimal(stored.payload["total"]), deductions=deductions, group=group,
                            ratios=dict(load_allocation_policy().baseline_equity), held_cost=held_cost)
+    if budget["status"] == "ok":
+        budget = {**budget, "deductions_source": "manual" if manual is not None else "profile", "profile_deductions": format(from_profile, "f"),
+                  "reserve": manual}
     return budget, stored.version

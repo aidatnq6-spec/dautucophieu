@@ -14,13 +14,13 @@ from fastapi import APIRouter, Request
 from investment_agent.domain.journal import due_reviews
 from investment_agent.domain.ledger import replay
 from investment_agent.domain.time_weighted import performance
-from investment_agent.jobs.publication import list_reports
+from investment_agent.jobs.publication import latest_report
 from investment_agent.market.corporate_events import REMINDED_KINDS, EventStore
 from investment_agent.market.series import SeriesStore
-from investment_agent.repositories.personal import RepositoryUnavailable
+from investment_agent.repositories.personal import RepositoryUnavailable, prefetch
 from investment_agent.services.equity_budget import budget_view
 from investment_agent.services.journal import read_journal
-from investment_agent.services.overview import compose_overview
+from investment_agent.services.overview import OVERVIEW_RECORDS, compose_overview
 from investment_agent.services.records import LedgerBook, portfolio_settings, read_version
 
 from ..auth import require_owner
@@ -44,13 +44,16 @@ def glance(request: Request):
         return unavailable()
     market, data_dir = request.app.state.market, request.app.state.data_dir
     today = now(request).astimezone(VN).date()
+    # Everything this page reads, fetched together; later reads in this request reuse them.
+    prefetch(getattr(repo, "authoritative", repo), owner, [*OVERVIEW_RECORDS, ("settings", "equity_budget"), ("settings", "portfolio"),
+                                                          ("journal", "main"), ("reports", "index")])
     try:
         view = compose_overview(repo, owner, market, now(request))
         events = list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)
         budget, _ = budget_view(repo, owner)
         entries, _ = read_journal(repo, owner)
         threshold = portfolio_settings(repo, owner)[0].journal_review_threshold
-        reports = list_reports(repo, owner)
+        latest = latest_report(repo, owner)
     except RepositoryUnavailable:
         return unavailable()
     held = [h for h in view["holdings"] if h["quantity"] + h["pending_quantity"] > 0]
@@ -103,7 +106,6 @@ def glance(request: Request):
             prices[e.symbol] = point.price
     reviews = [{"entry_id": d["entry"].entry_id, "symbol": d["entry"].symbol, "kind": d["entry"].kind, "change": d["change"]}
                for d in due_reviews(entries, prices=prices, threshold=threshold)]
-    latest = reports[-1] if reports else None
     return {"session_date": session.isoformat() if session else None, "kpis": kpis,
             "attention": {"events": upcoming, "over_limit": over, "journal_reviews": reviews,
                           "latest_report": {"report_id": latest["report_id"], "session_date": latest["session_date"]} if latest else None}}

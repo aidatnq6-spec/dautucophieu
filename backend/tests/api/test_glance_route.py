@@ -61,3 +61,27 @@ def test_nothing_to_watch_is_said_plainly(tmp_path):
     EventStore(tmp_path).save("FPT", [], fetched_at="2027-01-15T07:00:00+07:00")
     a = call(c, clock, "GET", "/internal/glance").json()["attention"]
     assert a["events"] == [] and a["over_limit"] == [] and a["journal_reviews"] == []
+
+
+def test_one_page_view_reads_each_personal_record_once(tmp_path):
+    from investment_agent.repositories.personal import PersonalRepository as Repo
+
+    reads = []
+    original = Repo.read
+
+    def counting(self, context, collection, record_id, *, version=None):
+        reads.append((collection, record_id, version))
+        return original(self, context, collection, record_id, version=version)
+
+    c, clock = client(tmp_path)
+    store = c.app.state.personal_repository.store
+    trips = []
+    real_atomic = store.atomic
+    store.atomic = lambda op: trips.append(1) or real_atomic(op)
+    Repo.read = counting
+    try:
+        assert call(c, clock, "GET", "/internal/glance").status_code == 200
+    finally:
+        Repo.read = original
+    assert len(reads) > len(trips)  # the same records are asked for many times...
+    assert len(trips) == len(set(reads))  # ...but each one costs a single store round trip per request

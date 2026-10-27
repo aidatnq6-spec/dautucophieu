@@ -1,5 +1,8 @@
 """Owner-authorized, immutable personal revisions with transactional CAS."""
 
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from contextvars import ContextVar, copy_context
 from copy import deepcopy
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
@@ -13,6 +16,37 @@ from investment_agent.api.auth import OwnerContext
 
 COLLECTIONS = frozenset({"profile_versions", "risk_versions", "ledger_events", "approvals", "valuation_assumptions", "reports", "settings", "journal"})
 T = TypeVar("T")
+
+# Reads already made during the current request, keyed by (owner, collection, record id, version). Each Firestore read is a
+# transaction (~0.3 s), and one page view asks for the same records many times. Only active inside read_scope(); cleared by writes.
+_REQUEST_READS: ContextVar[dict | None] = ContextVar("personal_request_reads", default=None)
+
+
+@contextmanager
+def read_scope():
+    """One request: a record is read from the store once, then reused until the request writes something."""
+    token = _REQUEST_READS.set({})
+    try:
+        yield
+    finally:
+        _REQUEST_READS.reset(token)
+
+
+def prefetch(repo, context, records) -> None:
+    """Read several records at once (in parallel) into the current request's reads; a no-op outside read_scope().
+
+    Errors are left for the later, real read to raise where it is handled."""
+    if _REQUEST_READS.get() is None or not records:
+        return
+
+    def one(record):
+        try:
+            repo.read(context, *record)
+        except Exception:  # noqa: BLE001 - the caller's own read reports it
+            pass
+    contexts = [copy_context() for _ in records]  # taken here, in the request's context, so the workers share its reads
+    with ThreadPoolExecutor(max_workers=min(8, len(records))) as pool:
+        list(pool.map(lambda pair: pair[0].run(one, pair[1]), zip(contexts, records)))
 
 
 class OwnerDenied(Exception):
@@ -169,7 +203,14 @@ class PersonalRepository:
             if version is not None and version > current:
                 return None
             return self._record(tx, collection, record_id, version or current)
-        return self.store.atomic(operation)
+        reads = _REQUEST_READS.get()
+        memo = (self.owner_uid, collection, record_id, version)
+        if reads is not None and memo in reads:
+            return deepcopy(reads[memo])
+        record = self.store.atomic(operation)
+        if reads is not None:
+            reads[memo] = deepcopy(record)
+        return record
 
     def write(self, context, collection, record_id, payload, *, expected_version, request_id, inputs: dict[tuple[str, str], int] | None = None):
         """inputs: other records whose head versions must still match, checked inside the same transaction."""
@@ -211,7 +252,11 @@ class PersonalRepository:
             tx.put(head_path, {"version": record.version})
             tx.create(request_path, {"fingerprint": fingerprint, "version": record.version})
             return record
-        return self.store.atomic(operation)
+        try:
+            return self.store.atomic(operation)
+        finally:
+            if (reads := _REQUEST_READS.get()) is not None:
+                reads.clear()  # anything read earlier in this request may now be stale (also after an ambiguous failure)
 
     def export(self, context) -> dict[str, dict]:
         """Every document under this owner's namespace, keyed by path relative to owners/{uid}/."""

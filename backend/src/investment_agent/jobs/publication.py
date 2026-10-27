@@ -1,7 +1,7 @@
 """Report records (collection "reports") and their index. A report is written once per report_id."""
 
 from investment_agent.services.records import read_version
-from investment_agent.repositories.personal import VersionConflict
+from investment_agent.repositories.personal import VersionConflict, prefetch
 
 INDEX = "index"
 
@@ -21,15 +21,29 @@ def append_index(repo, owner, report_id: str, *, attempts: int = 5):
     raise VersionConflict("Report index busy")
 
 
+SUMMARY = ("report_id", "report_kind", "session_date", "generated_at", "status", "provenance")
+
+
 def list_reports(repo, owner) -> list[dict]:
     head = read_version(repo, owner, "reports", INDEX, None)
+    ids = head.payload["ids"] if head else []
+    prefetch(getattr(repo, "authoritative", repo), owner, [("reports", i) for i in ids])  # all at once, not one round trip each
     rows = []
-    for report_id in (head.payload["ids"] if head else []):
+    for report_id in ids:
         record = read_version(repo, owner, "reports", report_id, None)
         if record:
-            p = record.payload
-            rows.append({k: p[k] for k in ("report_id", "report_kind", "session_date", "generated_at", "status", "provenance")})
+            rows.append({k: record.payload[k] for k in SUMMARY})
     return rows
+
+
+def latest_report(repo, owner) -> dict | None:
+    """Summary of the newest report (the index is in publication order): two reads, however many reports exist."""
+    head = read_version(repo, owner, "reports", INDEX, None)
+    for report_id in reversed(head.payload["ids"] if head else []):
+        record = read_version(repo, owner, "reports", report_id, None)
+        if record:
+            return {k: record.payload[k] for k in SUMMARY}
+    return None
 
 
 def get_report(repo, owner, report_id: str) -> dict | None:

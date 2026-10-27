@@ -146,3 +146,19 @@ def test_reminders_travel_with_the_report_and_render_in_the_telegram_text(repo, 
     text = render_report(report)
     assert "NHẮC CẬP NHẬT SỐ LIỆU VĨ MÔ" in text and "- PMI sản xuất Việt Nam đã 36 ngày chưa cập nhật" in text
     assert "NHẮC CẬP NHẬT" not in render_report({**report, "reminders": []})
+
+
+def test_latest_report_reads_only_the_index_and_the_newest_report():
+    from investment_agent.jobs.publication import INDEX, append_index, latest_report
+
+    r = PersonalRepository("owner-1", MemoryDocumentStore())
+    assert latest_report(r, OWNER) is None
+    for n, day in enumerate(["2026-10-22", "2026-10-23", "2026-10-26"]):
+        r.write(OWNER, "reports", f"rep{n}", {"report_id": f"rep{n}", "report_kind": "market", "session_date": day, "generated_at": f"{day}T11:00:00+00:00",
+                                              "status": "published", "provenance": "vnstock"}, expected_version=0, request_id=f"r{n}")
+        append_index(r, OWNER, f"rep{n}")
+    read = []
+    original = r.read
+    r.read = lambda ctx, collection, record_id, **k: read.append(record_id) or original(ctx, collection, record_id, **k)
+    assert latest_report(r, OWNER)["session_date"] == "2026-10-26"
+    assert read == [INDEX, "rep2"]

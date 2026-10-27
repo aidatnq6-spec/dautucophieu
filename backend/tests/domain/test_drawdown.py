@@ -42,3 +42,10 @@ def test_a_ticker_crossing_the_threshold_alerts_once_and_rearms_after_recovering
 def test_tickers_without_a_price_or_cost_are_left_alone():
     alerts, alerted = threshold_alerts({"MBB": {"price": None, "cost": "20456"}}, threshold="0.30", alerted={"MBB"})
     assert alerts == [] and alerted == {"MBB"}
+
+
+def test_zero_or_negative_closes_from_the_source_are_ignored():
+    series = pts((1, 0), (2, 100), (3, 0), (4, 50), (5, 80))  # Vnstock returned 0 for some very old NT2 sessions
+    assert max_drawdown(series) == {"depth": "-0.5000", "peak": "2008-01-02", "trough": "2008-01-04", "recovered": None}
+    assert current_drawdown(series) == {"depth": "-0.2000", "peak": "2008-01-02"}
+    assert max_drawdown(pts((1, 0), (2, 0))) is None and current_drawdown(pts((1, 0))) is None

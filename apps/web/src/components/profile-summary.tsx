@@ -5,6 +5,8 @@ import { ApiError, api } from "../lib/api";
 import { formatVnd } from "../lib/format";
 import { EquityBudget } from "./equity-budget";
 import { WealthCheck } from "./wealth-check";
+import { LifestyleInflation } from "./lifestyle";
+import { Intangibles } from "./intangibles";
 import { Contributions } from "./contributions";
 import { PassiveIncome } from "./passive-income";
 import { BreakdownTable, STATUS_LABEL, WARNING_LABEL, type Assessment } from "./profile-form";
@@ -29,6 +31,8 @@ function useRecord<T>(path: string) {
 export function ProfileSummary() {
   const profile = useRecord<ProfileView>("profile");
   const [riskChanges, setRiskChanges] = useState(0);
+  const [wealthSaves, setWealthSaves] = useState(0);
+  const [intangibleChanges, setIntangibleChanges] = useState(0);
   if (profile.error) return <p className="errors" role="alert">{profile.error}</p>;
   if (profile.value === undefined) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   const p = profile.value;
@@ -45,10 +49,12 @@ export function ProfileSummary() {
         </>)}
       </section>
       <RiskSection onChanged={() => setRiskChanges((n) => n + 1)} />
-      <WealthCheck />
+      <WealthCheck onSaved={() => setWealthSaves((n) => n + 1)} />
+      <LifestyleInflation refresh={wealthSaves} />
       <Contributions />
       <PassiveIncome />
-      <EquityBudget key={riskChanges} />
+      <Intangibles onChanged={() => setIntangibleChanges((n) => n + 1)} />
+      <EquityBudget key={`${riskChanges}-${intangibleChanges}`} />
     </>
   );
 }

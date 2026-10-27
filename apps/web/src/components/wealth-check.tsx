@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HeartPulse } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatRatio, formatVnd, groupDigitsInput, parseMoneyInput } from "../lib/format";
@@ -10,16 +10,17 @@ type View = { version: number; inputs: { income: string; expenses: string; birth
 const pct = (r: string) => formatRatio(r, 1).replace(",0%", "%");
 
 /** Savings rate against VWA's rule of thumb (at least one's age in percent). The owner's own figures; it reports, never advises. */
-export function WealthCheck() {
+export function WealthCheck({ onSaved }: { onSaved?: () => void } = {}) {
   const [view, setView] = useState<View | null>(null);
   const [income, setIncome] = useState("");
   const [expenses, setExpenses] = useState("");
   const [year, setYear] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const filled = useRef(false);  // saved figures fill the inputs once; a later load must not overwrite what is being typed
   useEffect(() => {
     api<View>("wealth-check").then((v) => {
-      setView(v);
-      if (v.inputs) { setIncome(formatVnd(v.inputs.income, { unit: false })); setExpenses(formatVnd(v.inputs.expenses, { unit: false })); setYear(String(v.inputs.birth_year)); }
+      setView((current) => current ?? v);
+      if (v.inputs && !filled.current) { filled.current = true; setIncome(formatVnd(v.inputs.income, { unit: false })); setExpenses(formatVnd(v.inputs.expenses, { unit: false })); setYear(String(v.inputs.birth_year)); }
     }, (e) => setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải."));
   }, []);
   async function save() {
@@ -30,7 +31,7 @@ export function WealthCheck() {
     }
     try {
       setView(await api<View>("wealth-check", { method: "PUT", body: { income: i, expenses: e, birth_year: y, expected_version: view.version, request_id: requestId() } }));
-      setMessage(null);
+      setMessage(null); onSaved?.();
     } catch (err) { setMessage(err instanceof ApiError ? err.failure.message : "Lỗi lưu."); }
   }
   const c = view?.check;

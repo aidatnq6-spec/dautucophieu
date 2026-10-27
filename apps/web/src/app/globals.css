@@ -160,3 +160,4 @@ main h2{scroll-margin-top:16px}
 .dd-watch{margin-top:14px}.dd-watch summary{cursor:pointer;color:var(--brand);font-weight:600;padding:6px 0}
 .contrib-months{list-style:none;padding:0;margin:8px 0 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
 .contrib-months li{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:6px 8px;border:1px solid var(--line);border-radius:6px}
+.pyr-layer.pyr-intangible{order:-1;margin-inline:0;background:#f4f1fb;border-style:dashed}

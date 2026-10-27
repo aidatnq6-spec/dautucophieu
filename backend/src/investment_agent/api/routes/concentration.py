@@ -20,16 +20,16 @@ router = APIRouter(prefix="/internal")
 
 @router.get("/concentration")
 def get_concentration(request: Request):
-    return _view(request)
+    return concentration_view(request)
 
 
 @router.get("/concentration/whatif/{symbol}/{amount}")
 def what_if(request: Request, symbol: str, amount: str):
     """Path parameters, not a query string: the web proxy signs and forwards the path only."""
-    return _view(request, symbol, amount)
+    return concentration_view(request, symbol, amount)
 
 
-def _view(request: Request, symbol: str | None = None, amount: str | None = None):
+def concentration_view(request: Request, symbol: str | None = None, amount: str | None = None):
     owner, repo = require_owner(request), request.app.state.personal_repository
     if repo is None:
         return unavailable()

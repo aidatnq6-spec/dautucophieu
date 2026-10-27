@@ -6,6 +6,7 @@ import { formatVnd } from "../lib/format";
 import { DecisionSummary, type Decision, type Item } from "./decision-summary";
 import { HoldingsTable, type HoldingRow } from "./holdings-table";
 import { NOTE_TEXT } from "./labels";
+import { QuickNumbers, WorthALook, day, type Glance } from "./overview-glance";
 
 type Overview = { provenance: string; as_of: string; setup: { profile: boolean; risk: boolean; universe_version: number; universe_status: string | null };
   decision: Decision; items: Item[]; holdings: HoldingRow[]; quality_notes: string[];
@@ -15,17 +16,24 @@ export function OverviewView() {
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [budget, setBudget] = useState<string | null>(null);
+  const [glance, setGlance] = useState<Glance | null>(null);
   useEffect(() => { api<Overview>("overview").then(setData, (e) => setError(e instanceof ApiError ? e.failure.message : "Không tải được tổng quan.")); }, []);
   // Once total financial assets are entered, the rest of the app measures on the stock budget; say the same here.
+  useEffect(() => { api<Glance>("glance").then(setGlance, () => setGlance(null)); }, []);
   useEffect(() => { api<{ budget: { status: string; budget?: string } }>("equity-budget").then((v) => setBudget(v.budget.status === "ok" ? v.budget.budget ?? null : null), () => setBudget(null)); }, []);
-  if (error) return <p className="errors" role="alert">{error}</p>;
-  if (!data) return <p className="muted fx-loading" role="status">Đang tải…</p>;
+  const head = <div className="pagehead"><h1>Tổng quan</h1>
+    <p className="muted">{glance?.session_date ? `Phiên ${day(glance.session_date)}` : "Kết luận trước, danh mục ngay bên dưới."}</p></div>;
+  if (error) return <>{head}<p className="errors" role="alert">{error}</p></>;
+  if (!data) return <>{head}<p className="muted fx-loading" role="status">Đang tải…</p></>;
   return (
     <>
+      {head}
       {data.provenance === "synthetic" && <p className="notice"><strong>Dữ liệu thị trường tổng hợp</strong> để kiểm thử: không phải giá hay khuyến nghị thật.</p>}
       {data.provenance === "none" && <p className="notice">Chưa kết nối nguồn dữ liệu thị trường được phép dùng: chưa có giá và khuyến nghị thật.</p>}
       {(!data.setup.profile || !data.setup.risk) && <p className="notice">Chưa hoàn tất hồ sơ và khảo sát. <Link href="/onboarding">Thiết lập ngay</Link></p>}
       {data.setup.universe_status !== "complete" && <p className="caption">Danh sách 50 mã nghiên cứu chưa được duyệt đầy đủ (phiên bản {data.setup.universe_version}).</p>}
+      {glance && <QuickNumbers g={glance} />}
+      {glance && <WorthALook g={glance} />}
       <DecisionSummary decision={data.decision} items={data.items} />
       <section className="surface">
         <div className="row"><h2>Cổ phiếu đang nắm giữ</h2><Link href="/portfolio">Sổ giao dịch</Link></div>

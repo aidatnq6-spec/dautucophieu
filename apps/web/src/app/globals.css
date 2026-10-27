@@ -145,3 +145,4 @@ legend{font-weight:600;padding:0 6px}
 .page-jumps button:hover{border-color:var(--brand);background:#eaf0fc}
 main h2{scroll-margin-top:16px}
 @media(max-width:650px){.page-jumps{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}.page-jumps button{white-space:nowrap}main h2{scroll-margin-top:120px}}
+.perf-bench{margin:4px 0 12px;padding-left:18px}.perf-bench li{margin:3px 0;overflow-wrap:anywhere}

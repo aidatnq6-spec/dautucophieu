@@ -6,7 +6,8 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Request
 
 from investment_agent.domain.ledger import replay
-from investment_agent.domain.time_weighted import performance
+from investment_agent.domain.time_weighted import benchmarks, performance
+from investment_agent.market.leading import MacroStore
 from investment_agent.market.series import SeriesStore
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.overview import compose_overview
@@ -43,5 +44,9 @@ def get_performance(request: Request):
                      for h in overview["holdings"]]
     contributions.sort(key=lambda c: abs(float(c["unrealized"])) if c["unrealized"] is not None else -1, reverse=True)
     state = replay(events)
-    return {**result, "contributions": contributions, "realized_gain": str(state.realized_gain),
+    latest = lambda key: (MacroStore(Path(data_dir)).read(key) or [None])[-1] if data_dir is not None else None  # noqa: E731
+    deposit, cpi = latest("deposit_12m"), latest("vn_cpi_yoy")
+    bench = benchmarks(result["total"], end=result["series"][-1]["date"] if result["series"] else None,
+                       deposit_rate=deposit["value"] if deposit else None, cpi=(cpi["date"], cpi["value"]) if cpi else None)
+    return {**result, "benchmarks": bench, "contributions": contributions, "realized_gain": str(state.realized_gain),
             "ledger_started_on": state.started_on.isoformat() if state.started_on else None}

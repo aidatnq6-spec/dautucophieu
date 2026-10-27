@@ -134,6 +134,19 @@
    "note": "Tự động từ tiêu đề tin CafeF/Vietstock/Vneconomy khi S&P Global công bố; nhập tay nếu tháng nào không có tin."
   },
   {
+   "id": "vn_cpi_yoy",
+   "label": "Lạm phát Việt Nam (CPI, so cùng kỳ)",
+   "unit": "%",
+   "rule": "up",
+   "max_age_days": 40,
+   "source": {
+    "kind": "news_cpi",
+    "manual_fallback": true
+   },
+   "url": "https://www.gso.gov.vn/",
+   "note": "Tự động từ tiêu đề tin CafeF/Vietstock/Vneconomy khi Tổng cục Thống kê công bố (khoảng ngày 6 hằng tháng); nhập tay nếu tháng nào không có tin."
+  },
+  {
    "id": "fed_effr",
    "label": "Lãi suất USD Fed qua đêm (EFFR)",
    "unit": "%/năm",

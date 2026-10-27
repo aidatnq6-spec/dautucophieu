@@ -166,7 +166,7 @@ def parse_ecb_dxy(xml: str) -> list[tuple[date, str]]:
     return sorted(points)
 
 
-_PMI_OTHER = re.compile(r"(?i)(mỹ|trung quốc|nhật bản|hàn quốc|châu âu|eurozone|asean|toàn cầu|đức|ấn độ|thái lan|indonesia)")
+_PMI_OTHER = re.compile(r"(?i)\b(mỹ|trung quốc|nhật bản|hàn quốc|châu âu|eurozone|asean|toàn cầu|đức|ấn độ|thái lan|indonesia)\b")
 
 
 def parse_news_pmi(items: list[dict]) -> list[tuple[date, str]]:
@@ -186,6 +186,32 @@ def parse_news_pmi(items: list[dict]) -> list[tuple[date, str]]:
         published = datetime.fromisoformat(it["published"]).astimezone(VN).date()
         year = int(month_m.group(2)) if month_m.group(2) else (published.year - 1 if month > published.month else published.year)
         if 1 <= month <= 12 and Decimal(30) <= value <= Decimal(70):
+            found[date(year, month, calendar.monthrange(year, month)[1])] = _plain(value)
+    return sorted(found.items())
+
+
+_CPI_NAME = re.compile(r"(?i)\bCPI\b|chỉ số giá tiêu dùng")
+_CPI_YOY = re.compile(r"(?i)(tăng|giảm)\s*(\d{1,2})(?:[,.](\d{1,2}))?\s*%\s*so với cùng kỳ")
+
+
+def parse_news_cpi(items: list[dict]) -> list[tuple[date, str]]:
+    """Vietnam's CPI, year on year, from news headlines (CafeF, Vietstock, Vneconomy RSS), e.g. "CPI tháng 10 tăng 0,2% so với tháng
+    trước, tăng 3,2% so với cùng kỳ". Needs the month and a "% so với cùng kỳ" figure; averages ("bình quân") and other countries
+    are skipped. Dated to the month's end, like PMI."""
+    found: dict[date, str] = {}
+    for it in sorted(items, key=lambda i: i["published"]):
+        title = it["title"]
+        if not _CPI_NAME.search(title) or _PMI_OTHER.search(title):
+            continue
+        month_m = re.search(r"tháng\s*(\d{1,2})(?:\s*/\s*(\d{4}))?", title)
+        yoy = next((m for m in _CPI_YOY.finditer(title) if "bình quân" not in title[:m.start()].lower()), None) if month_m else None
+        if not yoy or "bình quân" in title[:month_m.start()].lower():
+            continue
+        month = int(month_m.group(1))
+        value = Decimal(f"{yoy.group(2)}.{yoy.group(3) or 0}") * (-1 if yoy.group(1).lower() == "giảm" else 1)
+        published = datetime.fromisoformat(it["published"]).astimezone(VN).date()
+        year = int(month_m.group(2)) if month_m.group(2) else (published.year - 1 if month > published.month else published.year)
+        if 1 <= month <= 12 and Decimal(-10) <= value <= Decimal(30):
             found[date(year, month, calendar.monthrange(year, month)[1])] = _plain(value)
     return sorted(found.items())
 
@@ -297,18 +323,18 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
                 points = parse_te_pmi(page(TE_PAGE.format(country=src["country"])), year=today.year)
             elif src["kind"] == "ecb_dxy":
                 points = parse_ecb_dxy(page(ECB_90D))
-            elif src["kind"] == "news_pmi":
+            elif src["kind"] in ("news_pmi", "news_cpi"):
                 from investment_agent.brief.news import FEEDS, parse_rss
                 items, failed = [], 0
-                for source, url in FEEDS:
+                for source, url in FEEDS:  # page() caches by URL, so PMI and CPI share one read of each feed
                     try:
                         items += parse_rss(page(url), source)
                     except Exception:
                         failed += 1
                 if failed == len(FEEDS):
                     raise MacroError("news_unreachable")
-                points = parse_news_pmi(items)
-                if not points:  # no PMI headline in today's feeds: nothing new, not a failure
+                points = (parse_news_pmi if src["kind"] == "news_pmi" else parse_news_cpi)(items)
+                if not points:  # no such headline in today's feeds: nothing new, not a failure
                     results[ind["id"]] = "ok"
                     continue
             else:

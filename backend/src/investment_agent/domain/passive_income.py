@@ -17,11 +17,27 @@ def _month_after(today: date, months: int) -> str:
     return f"{today.year + y:04d}-{m + 1:02d}"
 
 
-def passive_income(*, target: Decimal, rate: Decimal, capital: Decimal | None, contribution: Decimal, today: date) -> dict:
-    """target: đồng per month; rate: percent per year (> 0); capital: investable assets now (None when unknown)."""
+def income_by_layer(*, deposit: Decimal, deposit_rate: Decimal, bond: Decimal, bond_rate: Decimal, dividends_12m: Decimal,
+                    stocks: Decimal = Decimal(0), stock_rate: Decimal | None = None) -> dict:
+    """What today's assets actually pay per month: deposits at the deposit rate, bonds at their coupon, stocks their cash dividends of
+    the last 12 months, or, when the owner sets a stock rate (gains taken by selling count too), stocks at cost × that rate.
+    Gold, cash and crypto pay nothing."""
+    lines = {"deposit": deposit * deposit_rate / 100 / 12, "bond": bond * bond_rate / 100 / 12}
+    if stock_rate is not None:
+        lines.update(stocks=stocks * stock_rate / 100 / 12, dividends=Decimal(0))
+    else:
+        lines["dividends"] = dividends_12m / 12
+    return {**{k: _vnd(v) for k, v in lines.items()}, "total": _vnd(sum(lines.values(), Decimal(0)))}
+
+
+def passive_income(*, target: Decimal, rate: Decimal, capital: Decimal | None, contribution: Decimal, today: date,
+                   income_now: Decimal | None = None) -> dict:
+    """target: đồng per month; rate: percent per year (> 0) for the capital needed and the projection; capital: investable assets now
+    (None when unknown); income_now: what the assets pay today when known layer by layer, else capital × rate."""
     yearly = rate / 100
     required = target * 12 / yearly
-    income_now = capital * yearly / 12 if capital is not None else None
+    if income_now is None:
+        income_now = capital * yearly / 12 if capital is not None else None
     progress = min(income_now / target, Decimal(1)) if income_now is not None else None
     value, months, monthly = capital or Decimal(0), 0, yearly / 12
     while value < required and months < HORIZON_MONTHS:

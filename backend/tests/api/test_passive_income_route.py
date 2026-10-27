@@ -25,7 +25,8 @@ def client(tmp_path):
 def test_no_goal_yet_offers_the_deposit_rate_as_the_default(tmp_path):
     c, clock = client(tmp_path)
     body = call(c, clock, "GET", "/internal/passive-income").json()
-    assert body == {"version": 0, "goal": None, "default_rate": "6", "result": None, "capital": None, "contribution": "0"}
+    assert body == {"version": 0, "goal": None, "default_rate": "6", "default_bond_rate": "7", "income": None, "result": None, "capital": None,
+                    "contribution": "0"}
 
 
 def test_the_goal_uses_the_pyramid_capital_the_monthly_plan_and_the_default_rate(tmp_path):
@@ -43,3 +44,30 @@ def test_bad_goals_are_refused(tmp_path):
     c, clock = client(tmp_path)
     for goal in ({"target": "0", "rate": None}, {"target": "abc", "rate": None}, {"target": "1000000", "rate": "0"}, {"target": "1000000", "rate": "60"}):
         assert call(c, clock, "PUT", "/internal/passive-income", {**goal, "expected_version": 0, "request_id": "pi2"}).status_code == 422
+
+
+def test_income_now_comes_from_deposits_bonds_and_last_years_cash_dividends(tmp_path):
+    from investment_agent.market.corporate_events import EventStore
+    from test_events_route import ev
+    fpt_dividend = {**ev(1, "FPT", "dividend_cash", "2026-12-10"), "value_per_share": 2000.0}   # within the last 12 months
+    old_dividend = {**ev(2, "FPT", "dividend_cash", "2025-06-10"), "value_per_share": 1500.0}   # older: not counted
+    EventStore(tmp_path).save("FPT", [fpt_dividend, old_dividend], fetched_at="2027-01-15T07:00:00+07:00")
+    c, clock = client(tmp_path)  # deposit rate 6%; FPT 100 shares
+    call(c, clock, "PUT", "/internal/equity-budget", {"layers": {"deposit": "600000000", "bond": "120000000", "gold": "50000000", "crypto": "0"},
+                                                     "reserve": "0", "expected_version": 0, "request_id": "eb1"})
+    call(c, clock, "PUT", "/internal/passive-income", {"target": "10000000", "rate": None, "bond_rate": "7", "expected_version": 0, "request_id": "pi1"})
+    body = call(c, clock, "GET", "/internal/passive-income").json()
+    assert body["income"] == {"deposit": "3000000", "bond": "700000", "dividends": "16667", "total": "3716667"}  # 100 × 2.000 đ a year
+    assert body["result"]["income_now"] == "3716667" and body["goal"]["bond_rate"] == "7"
+
+
+def test_the_stock_rate_is_stored_and_used(tmp_path):
+    c, clock = client(tmp_path)
+    call(c, clock, "PUT", "/internal/equity-budget", {"layers": {"deposit": "0", "bond": "0", "gold": "0", "crypto": "0"}, "reserve": "0",
+                                                     "expected_version": 0, "request_id": "eb1"})
+    call(c, clock, "PUT", "/internal/passive-income", {"target": "10000000", "rate": None, "bond_rate": None, "stock_rate": "12", "expected_version": 0,
+                                                       "request_id": "pi1"})
+    body = call(c, clock, "GET", "/internal/passive-income").json()
+    assert body["goal"]["stock_rate"] == "12" and body["income"]["stocks"] == "50000" and body["income"]["dividends"] == "0"  # 5 tr at cost × 12% / 12
+    bad = call(c, clock, "PUT", "/internal/passive-income", {"target": "10000000", "rate": None, "stock_rate": "90", "expected_version": 1, "request_id": "pi2"})
+    assert bad.status_code == 422

@@ -63,3 +63,19 @@ def test_rate_cycle_uses_the_us_as_a_labelled_reference_until_vietnam_has_six_mo
     body = call(client(tmp_path, clock), clock, "GET", "/internal/macro/cycle").json()
     assert body["basis"] == "us_reference" and body["phase"] == "down"
     assert body["vietnam_since"] == "2026-10-25" and body["vietnam_ready_on"] == "2027-04-25"
+
+
+def test_macro_chain_reads_the_stored_series_and_the_vn_index(tmp_path):
+    from datetime import datetime
+    from investment_agent.market.series import SeriesStore
+    clock = Clock()  # 2027-01-15
+    store = MacroStore(tmp_path)
+    store.upsert("wti", [(date(2026, 12, 1), "100"), (date(2027, 1, 14), "90")], entry="auto")
+    store.upsert("foreign_net", [(date(2027, 1, 13), "300"), (date(2027, 1, 14), "120.5")], entry="auto")
+    SeriesStore(tmp_path / "trend-sources").upsert("VNINDEX-1d", [(datetime(2026, 12, 10), "1600"), (datetime(2027, 1, 14), "1700")])
+    body = call(client(tmp_path, clock), clock, "GET", "/internal/macro/chain").json()
+    n = {x["id"]: x for x in body["nodes"]}
+    assert (n["oil"]["direction"], n["oil"]["effect"]) == ("down", "support")
+    assert (n["foreign"]["direction"], n["foreign"]["latest"]["value"]) == ("buy", "420.5")
+    assert (n["vnindex"]["direction"], n["vnindex"]["latest"]["value"]) == ("up", "1700")
+    assert body["missing"] == ["inflation", "rates"]

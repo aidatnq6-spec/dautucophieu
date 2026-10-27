@@ -162,3 +162,10 @@ main h2{scroll-margin-top:16px}
 .contrib-months{list-style:none;padding:0;margin:8px 0 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
 .contrib-months li{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:6px 8px;border:1px solid var(--line);border-radius:6px}
 .pyr-layer.pyr-intangible{order:-1;margin-inline:0;background:#f4f1fb;border-style:dashed}
+.chain{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:22px;list-style:none;padding:0;margin:12px 0}
+.chain-node{position:relative;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--paper)}
+.chain-node:not(:last-child)::after{content:"→";position:absolute;right:-18px;top:50%;transform:translateY(-50%);color:var(--muted, #5b6474);font-weight:700}
+.chain-node p{margin:4px 0}.chain-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 8px;align-items:center}
+.chain-move{font-weight:600}.chain-parts{list-style:none;padding:0;margin:4px 0}.chain-parts li{margin:2px 0}
+.chain-pressure{border-color:#e7b8bc;background:#fbf1f2}.chain-support{border-color:#b7dcc9;background:#f1f8f4}.chain-missing{border-style:dashed}
+@media (max-width:900px){.chain{grid-template-columns:1fr;gap:20px}.chain-node:not(:last-child)::after{content:"↓";right:auto;left:50%;top:auto;bottom:-19px;transform:translateX(-50%)}}

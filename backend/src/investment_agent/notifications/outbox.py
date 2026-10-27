@@ -48,6 +48,7 @@ class DeliveryResult:
     status: Literal["disabled", "not_publishable", "sent", "retryable", "unknown", "failed"]
     parts_sent: int = 0
     parts_total: int = 0
+    parts_new: int = 0  # sent by this call; 0 when every part had already gone out
 
 
 class DeliveryStore:
@@ -120,7 +121,7 @@ def deliver(report: dict, settings: NotificationSettings, sender, store: Deliver
         texts = frozen  # the market snapshot may have changed since the first attempt; keep the message whole and consistent
     if any(r.status in {"unknown", "sending"} for r in rows):  # "sending" left by a crash: outcome unknown
         return DeliveryResult("unknown", sum(r.status == "sent" for r in rows), len(rows))
-    sent = sum(r.status == "sent" for r in rows)
+    sent = before = sum(r.status == "sent" for r in rows)
     for row, text in zip(rows, texts):
         if row.status == "sent":
             continue
@@ -130,6 +131,6 @@ def deliver(report: dict, settings: NotificationSettings, sender, store: Deliver
         outcome = sender.send(dest, text)
         store.set(rid, version, dest, row.index, outcome.status, outcome.message_id)
         if outcome.status != "sent":
-            return DeliveryResult(outcome.status, sent, len(rows))
+            return DeliveryResult(outcome.status, sent, len(rows), sent - before)
         sent += 1
-    return DeliveryResult("sent", sent, len(rows))
+    return DeliveryResult("sent", sent, len(rows), sent - before)

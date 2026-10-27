@@ -21,6 +21,7 @@ from investment_agent.domain.pinned import CONFIG_DIR, load_pinned
 POLICY_PATH = CONFIG_DIR / "universe-policy.json"
 PINNED_DIGESTS = {
     "universe-2026-10-25.1": "a92fc5bb4bba2c75a0c7c4dd0f4f936c1fc1cf86a682c3702c0a384d6bfb8ce4",
+    "universe-2026-10-27.1": "34735d03527f2e2daf194472a045fd668b7ec3e16112876beeb4973ff1a91454",
 }
 
 
@@ -42,6 +43,7 @@ class UniversePolicy(ContractModel):
     min_trading_session_ratio: Ratio
     min_market_cap: UnsignedAmount
     max_metrics_age_days: int = Field(strict=True, ge=1)
+    history_exceptions: dict[str, str] = {}  # ticker -> why the owner keeps it despite a shorter history; waives only that rule
 
 
 class CoverageEvidence(ContractModel):
@@ -116,7 +118,7 @@ def evaluate_candidate(policy: UniversePolicy, c: Candidate, *, as_of: date) -> 
         reasons.append("evidence_not_verified")
     if not c.evidence.eligible:
         reasons.append("coverage_not_eligible")
-    if c.evidence.history_years < policy.min_history_years:
+    if c.evidence.history_years < policy.min_history_years and c.ticker not in policy.history_exceptions:
         reasons.append("history_below_minimum")
     m = c.metrics
     if m is None:

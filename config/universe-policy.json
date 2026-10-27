@@ -1,12 +1,16 @@
 {
-  "version": "universe-2026-10-25.1",
-  "status": "proposed_unconfirmed",
-  "notice": "Ngưỡng thanh khoản, phiên giao dịch và vốn hóa là đề xuất sơ bộ chưa chốt; thay đổi cần người dùng xác nhận. Không dùng P/E/P/B thấp làm điều kiện đầu vào.",
+  "version": "universe-2026-10-27.1",
+  "status": "confirmed",
+  "notice": "Bộ tiêu chí đã được chủ sở hữu chốt ngày 27/10/2026: HOSE, lịch sử ít nhất 10 năm (tính cả thời gian niêm yết HNX trước đó), giá trị khớp lệnh bình quân 6 tháng từ 5 tỷ đồng, giao dịch ít nhất 90% số phiên, vốn hóa từ 2.000 tỷ đồng. Không dùng P/E/P/B thấp làm điều kiện đầu vào. Thay đổi cần chủ sở hữu xác nhận lại.",
   "target_size": 50,
   "exchange": "HOSE",
   "min_history_years": 10,
   "min_avg_matched_value_6m": "5000000000",
   "min_trading_session_ratio": "0.90",
   "min_market_cap": "2000000000000",
-  "max_metrics_age_days": 31
+  "max_metrics_age_days": 31,
+  "history_exceptions": {
+    "TCB": "Lịch sử trên HOSE từ 06/2018, dưới 10 năm; chủ sở hữu giữ có chủ ý.",
+    "GVR": "Lịch sử trên HOSE từ 03/2018, dưới 10 năm; chủ sở hữu giữ có chủ ý."
+  }
 }

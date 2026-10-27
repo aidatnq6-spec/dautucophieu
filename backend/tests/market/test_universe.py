@@ -1,5 +1,6 @@
 import json
 from datetime import date
+from decimal import Decimal
 
 import pytest
 
@@ -71,9 +72,10 @@ def test_approving_49_is_not_a_full_universe(policy):
 
 
 def test_full_verified_list_is_complete_only_under_confirmed_policy(policy):
-    unconfirmed = approve(policy, build_proposal(policy, "p1", full(), active=None, as_of=AS_OF), active=None, actor="owner")
+    proposed = policy.model_copy(update={"status": "proposed_unconfirmed"})
+    unconfirmed = approve(proposed, build_proposal(proposed, "p1", full(), active=None, as_of=AS_OF), active=None, actor="owner")
     assert unconfirmed.status == "incomplete" and unconfirmed.gaps == ("policy_unconfirmed",)
-    confirmed = policy.model_copy(update={"status": "confirmed"})
+    confirmed = proposed.model_copy(update={"status": "confirmed"})
     approved = approve(confirmed, build_proposal(confirmed, "p1", full(), active=None, as_of=AS_OF), active=None, actor="owner")
     assert approved.complete and len(approved.members) == 50
 
@@ -126,3 +128,20 @@ def test_policy_is_pinned(tmp_path):
     path.write_text(json.dumps(data), encoding="utf-8")
     with pytest.raises(InvalidPolicy):
         load_universe_policy(path)
+
+
+def test_policy_is_confirmed_by_the_owner_with_tcb_and_gvr_kept_as_history_exceptions(policy):
+    """27/10/2026: the owner confirmed the thresholds and kept TCB and GVR although their HOSE history is under 10 years."""
+    assert policy.status == "confirmed" and policy.version == "universe-2026-10-27.1"
+    assert (policy.min_history_years, policy.min_avg_matched_value_6m, policy.min_trading_session_ratio, policy.min_market_cap) == (
+        10, 5000000000, Decimal("0.90"), 2000000000000)
+    assert set(policy.history_exceptions) == {"TCB", "GVR"}
+
+
+def test_a_history_exception_waives_only_the_history_rule(policy):
+    short = {"source": "verified_audit", "eligible": True, "live_eligible": True, "history_years": 8, "gaps": []}
+    assert evaluate_candidate(policy, candidate(1, ticker="TCB", evidence=short), as_of=AS_OF).reasons == ()
+    assert evaluate_candidate(policy, candidate(1, ticker="ACB", evidence=short), as_of=AS_OF).reasons == ("history_below_minimum",)
+    thin = candidate(1, ticker="GVR", evidence=short, metrics={"as_of": "2026-10-23", "avg_matched_value_6m": "1", "trading_session_ratio": "0.98",
+                                                              "market_cap": "5000000000000"})
+    assert evaluate_candidate(policy, thin, as_of=AS_OF).reasons == ("liquidity_below",)

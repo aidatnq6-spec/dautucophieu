@@ -8,7 +8,9 @@ import type { IntangiblesView } from "./intangibles";
 
 type Layer = { id: string; amount: string; share: string | null; target_min: string | null; target_max: string | null;
   status: "fixed" | "short" | "ok" | "over"; gap: string | null };
-type Pyramid = { total: string; base: string; layers: Layer[]; warnings: { short: string; over: string[] }[] };
+type Funding = { sources: { id: string; surplus: string }[]; pool: string; fills: { id: string; amount: string }[]; left_for_stocks: string;
+  stock_room: string; buyable: string; from_cash: string; to_raise: string };
+type Pyramid = { total: string; base: string; layers: Layer[]; warnings: { short: string; over: string[] }[]; funding?: Funding };
 type Layers = { deposit: string; bond: string; gold: string; crypto: string };
 type Budget = { status: "no_total" | "no_risk" | "ok"; total?: string; deductions?: string; base?: string; group?: string; ratio?: string;
   budget?: string; held_cost?: string; held_weight?: string | null; room?: string | null; over?: string | null;
@@ -61,6 +63,32 @@ function PyramidView({ p, intangibles }: { p: Pyramid; intangibles: IntangiblesV
           vượt mục tiêu: theo nguyên tắc tháp tài sản, nên bổ sung lớp dưới trước.</p>;
       })}
     </>
+  );
+}
+
+const SOURCE: Record<string, string> = { deposit: "Tiền gửi + tiền mặt", bond: "Trái phiếu", gold: "Vàng", crypto: "Tiền số" };
+
+/** Where more money for stocks could come from: what sits above each layer's ceiling, after filling layers below their minimum first
+ * (the owner's rule). A calculation on the owner's figures, not advice; never from a short layer or the reserve. */
+function FundingView({ f }: { f: Funding }) {
+  return (
+    <section className="eb-funding" aria-label="Nguồn tiền để mua thêm cổ phiếu">
+      <h3>Nguồn tiền để mua thêm cổ phiếu</h3>
+      <p className="caption">Chỉ lấy phần vượt mức trần của từng lớp; phần này bù các lớp đang dưới mức tối thiểu trước, còn lại mới dành cho cổ phiếu.
+        Không lấy từ lớp đang thiếu hay quỹ dự phòng. Phép tính trên số bạn nhập, không phải khuyến nghị.</p>
+      <dl className="eb-result">
+        {f.sources.map((s) => <div key={s.id} data-testid={`funding-source-${s.id}`}><dt>{SOURCE[s.id]} <span className="caption">(phần vượt mức trần)</span></dt>
+          <dd>{s.surplus === "0" ? <span className="muted">0 đ · không lấy</span> : formatVnd(s.surplus)}</dd></div>)}
+        <div><dt>Tổng phần dư</dt><dd>{formatVnd(f.pool)}</dd></div>
+        {f.fills.map((x) => <div key={x.id} data-testid={`funding-fill-${x.id}`}><dt>Bù {NAME[x.id].toLowerCase()} lên mức tối thiểu trước</dt>
+          <dd>−{formatVnd(x.amount)}</dd></div>)}
+        <div><dt>Còn lại cho cổ phiếu</dt><dd>{formatVnd(f.left_for_stocks)}</dd></div>
+        <div><dt>Còn trống trong vốn dành cho cổ phiếu</dt><dd data-testid="funding-room">{formatVnd(f.stock_room)}</dd></div>
+        <div className="eb-main"><dt>Có thể mua thêm <span className="caption">(số nhỏ hơn của hai dòng trên)</span></dt>
+          <dd data-testid="funding-buyable">{formatVnd(f.buyable)}</dd></div>
+        {f.buyable !== "0" && <div><dt>Trong đó</dt><dd>tiền mặt sẵn trong tài khoản {formatVnd(f.from_cash)} · cần rút hoặc bán thêm {formatVnd(f.to_raise)}</dd></div>}
+      </dl>
+    </section>
   );
 }
 
@@ -119,8 +147,9 @@ export function EquityBudget() {
         <div><dt>Nhóm khẩu vị</dt><dd>{GROUP_LABEL[b.group!] ?? b.group} → tỷ trọng cổ phiếu {pct(b.ratio!)}</dd></div>
         <div className="eb-main"><dt>Vốn dành cho cổ phiếu</dt><dd data-testid="equity-budget">{formatVnd(b.budget)}</dd></div>
         <div><dt>Đang nắm (theo giá mua): {formatVnd(b.held_cost)}{b.held_weight ? ` (${pct(b.held_weight)})` : ""}</dt>
-          <dd>{b.over ? <span className="negative">Đã vượt {formatVnd(b.over)}</span> : <>còn có thể mua thêm {formatVnd(b.room)}</>}</dd></div>
+          <dd>{b.over ? <span className="negative">Đã vượt {formatVnd(b.over)}</span> : <>còn trống {formatVnd(b.room)}</>}</dd></div>
       </dl>}
+      {b?.status === "ok" && b.pyramid?.funding && <FundingView f={b.pyramid.funding} />}
     </section>
   );
 }

@@ -131,6 +131,7 @@ legend{font-weight:600;padding:0 6px}
 .eb-result>div{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;padding:6px 0;border-bottom:1px solid var(--line, #e5e9f0)}
 .eb-result dt{color:var(--muted, #5b6474)}.eb-result dd{margin:0;font-variant-numeric:tabular-nums}
 .eb-result .eb-main dt,.eb-result .eb-main dd{font-weight:700;color:inherit;font-size:17px}
+.eb-funding{margin-top:22px;padding-top:4px}.eb-funding h3{margin:0 0 4px;font-size:16px}
 .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px 18px}
 .kpi-row>div{display:flex;flex-direction:column;gap:2px;min-width:0}
 .kpi-label{font-size:13px;color:var(--muted)}
@@ -158,6 +159,7 @@ main h2{scroll-margin-top:16px}
 .buy-check.warn{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn-ink)}.buy-check.ok{background:#eef7f2;border-color:#bfe0cf}
 .buy-check ul{margin:6px 0;padding-left:18px}.buy-check p{margin:6px 0}
 .dd-watch{margin-top:14px}.dd-watch summary{cursor:pointer;color:var(--brand);font-weight:600;padding:6px 0}
+.pc-details{margin-top:8px}.pc-details summary{cursor:pointer;color:var(--brand);font-weight:600;padding:6px 0}
 .contrib-months{list-style:none;padding:0;margin:8px 0 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
 .contrib-months li{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:6px 8px;border:1px solid var(--line);border-radius:6px}
 .pyr-layer.pyr-intangible{order:-1;margin-inline:0;background:#f4f1fb;border-style:dashed}

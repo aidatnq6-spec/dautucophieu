@@ -176,7 +176,7 @@ def test_a_manually_created_report_of_the_current_session_is_sent_on_the_next_wa
 
     def fake_deliver(report, settings, sender, store, market=None):
         sent.append(report["report_id"])
-        return type("R", (), {"status": "sent"})()
+        return type("R", (), {"status": "sent", "parts_new": 1})()
     monkeypatch.setattr(sched, "deliver", fake_deliver)
     store = DeliveryStore(tmp_path / "d.sqlite")
     store.enqueue("old")
@@ -196,10 +196,30 @@ def test_queued_reports_are_rendered_with_their_sessions_market_snapshot(tmp_pat
     monkeypatch.setattr(sched, "list_reports", lambda repo, owner: list(reports.values()))
     monkeypatch.setattr(sched, "get_report", lambda repo, owner, rid: reports.get(rid))
     seen = []
-    monkeypatch.setattr(sched, "deliver", lambda report, s, sender, store, market=None: seen.append(market) or type("R", (), {"status": "sent"})())
+    monkeypatch.setattr(sched, "deliver", lambda report, s, sender, store, market=None: seen.append(market) or type("R", (), {"status": "sent", "parts_new": 1})())
     store = DeliveryStore(tmp_path / "d.sqlite")
     store.enqueue("today")
     scheduled_tick(repo=repo, owner=OWNER, market=SyntheticMarket(), jobs=JobStore(tmp_path / "jobs.sqlite"), deliveries=store,
                    sender=FakeSender(), cal=CAL, now=at("2026-10-27", "17:31"), worker_id="sched",
                    market_for=lambda session: {"session_date": session})
     assert seen == [{"session_date": "2026-10-27"}]
+
+
+def test_a_report_whose_parts_were_all_sent_before_is_not_counted_as_delivered_again(tmp_path, monkeypatch):
+    """27/10/2026: the log said delivered 1 on every wake-up for a report already sent at 15:30, though nothing new went out."""
+    import investment_agent.jobs.schedule as sched
+    repo = PersonalRepository("owner-1", MemoryDocumentStore())
+    settings = NotificationSettings(enabled=True, chat_id="-100123", members_may_view_personal_data=True, scheduled_enabled=True)
+    repo.write(OWNER, "settings", "notifications", settings.model_dump(mode="json"), expected_version=0, request_id="n1")
+    report = {"report_id": "today", "report_kind": "after_close", "session_date": "2026-10-27", "status": "published"}
+    monkeypatch.setattr(sched, "list_reports", lambda repo, owner: [report])
+    monkeypatch.setattr(sched, "get_report", lambda repo, owner, rid: report if rid == "today" else None)
+    import investment_agent.notifications.outbox as outbox
+    monkeypatch.setattr(outbox, "render_report", lambda report, market=None: "Bản tin")
+    store, sender = DeliveryStore(tmp_path / "d.sqlite"), FakeSender()
+    store.enqueue("today")
+    assert outbox.deliver(report, settings, sender, store).status == "sent"  # sent outside the scheduler, e.g. by the owner from the app
+    result = scheduled_tick(repo=repo, owner=OWNER, market=SyntheticMarket(), jobs=JobStore(tmp_path / "jobs.sqlite"), deliveries=store,
+                            sender=sender, cal=CAL, now=at("2026-10-27", "17:31"), worker_id="sched")
+    assert result.delivered == [] and len(sender.sent) == 1
+    assert store.queued() == []  # still taken off the queue

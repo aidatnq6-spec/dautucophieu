@@ -146,7 +146,9 @@ def _send_queued(repo, owner, deliveries, sender, *, session: date | None = None
         report = get_report(repo, owner, report_id)
         if not report or (session is not None and report.get("session_date") != session.isoformat()):
             continue
-        if deliver(report, settings, sender, deliveries, market_for(report.get("session_date"))).status == "sent":
+        result = deliver(report, settings, sender, deliveries, market_for(report.get("session_date")))
+        if result.status == "sent":
             deliveries.mark_processed(report_id)
-            delivered.append(report_id)
+            if result.parts_new:  # already sent elsewhere (e.g. from the app): off the queue, but not counted as delivered again
+                delivered.append(report_id)
     return delivered

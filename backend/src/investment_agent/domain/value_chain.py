@@ -44,20 +44,22 @@ def read_indicator(indicator: str, points: Points, *, today: date, max_age_days:
     if indicator == "foreign_net":
         window = points[-FOREIGN_SESSIONS:]
         net = sum((v for _, v in window), Decimal(0))
-        return {**out, "direction": "up" if net > 0 else "down" if net < 0 else "flat", "change": _plain(net), "from": window[0][0].isoformat()}
+        return {**out, "direction": "up" if net > 0 else "down" if net < 0 else "flat", "change": _plain(net), "kind": "net",
+                "from": window[0][0].isoformat()}
     if len(points) < 2:
-        return {**out, "direction": None, "change": None, "from": None}
+        return {**out, "direction": None, "change": None, "kind": None, "from": None}
     if indicator in PMI:
         before = points[-2][1]
         direction = "up" if last >= 50 and last >= before else "down" if last < 50 and last <= before else "flat"
-        return {**out, "direction": direction, "change": _pp(last - before), "from": points[-2][0].isoformat()}
+        return {**out, "direction": direction, "change": _pp(last - before), "kind": "points", "from": points[-2][0].isoformat()}
     (start, then), _ = _base(points)
     if indicator in POINT_BANDS:
         change = last - then
-        return {**out, "direction": _direction(change, POINT_BANDS[indicator]), "change": _pp(change), "from": start.isoformat()}
+        return {**out, "direction": _direction(change, POINT_BANDS[indicator]), "change": _pp(change), "kind": "points",
+                "from": start.isoformat()}
     band = SHARE_BANDS.get(indicator, COMMODITY_BAND)
     change = last / then - 1 if then else Decimal(0)
-    return {**out, "direction": _direction(change, band), "change": _ratio(change), "from": start.isoformat()}
+    return {**out, "direction": _direction(change, band), "change": _ratio(change), "kind": "ratio", "from": start.isoformat()}
 
 
 def factor_status(when_up: str, reading: dict | None) -> str:

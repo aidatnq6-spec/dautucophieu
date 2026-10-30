@@ -20,14 +20,14 @@ def test_weight_follows_the_reported_share(share, weight):
 
 def test_relative_move_over_a_month():
     r = read_indicator("wti", series(("2026-09-25", "60"), ("2026-10-28", "63.6")), today=TODAY, max_age_days=7)
-    assert (r["direction"], r["change"], r["from"], r["date"], r["stale"]) == ("up", "0.06", "2026-09-25", "2026-10-28", False)
+    assert (r["direction"], r["change"], r["kind"], r["from"], r["date"], r["stale"]) == ("up", "0.06", "ratio", "2026-09-25", "2026-10-28", False)
     flat = read_indicator("wti", series(("2026-09-25", "60"), ("2026-10-28", "62")), today=TODAY, max_age_days=7)
     assert flat["direction"] == "flat"
 
 
 def test_rates_move_in_percentage_points():
     r = read_indicator("vn_interbank_on", series(("2026-09-28", "4.5"), ("2026-10-29", "4.6")), today=TODAY, max_age_days=7)
-    assert (r["direction"], r["change"]) == ("flat", "0.10")
+    assert (r["direction"], r["change"], r["kind"]) == ("flat", "0.10", "points")
     r = read_indicator("vn_interbank_on", series(("2026-09-28", "4.5"), ("2026-10-29", "4.8")), today=TODAY, max_age_days=7)
     assert r["direction"] == "up"
 
@@ -35,7 +35,7 @@ def test_rates_move_in_percentage_points():
 def test_foreign_flows_read_the_sign_of_twenty_sessions():
     days = [(TODAY - timedelta(days=i)).isoformat() for i in range(25, 0, -1)]
     r = read_indicator("foreign_net", series(*[(d, "500" if i < 5 else "-100") for i, d in enumerate(days)]), today=TODAY, max_age_days=4)
-    assert (r["direction"], r["change"]) == ("down", "-2000")  # the five early buying days are outside the 20 sessions
+    assert (r["direction"], r["change"], r["kind"]) == ("down", "-2000", "net")  # the five early buying days are outside the 20 sessions
 
 
 def test_pmi_reads_its_level_against_fifty():

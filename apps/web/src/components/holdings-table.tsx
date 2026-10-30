@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { formatVnd } from "../lib/format";
 
 export type HoldingRow = { security_id: string; quantity: number; pending_quantity: number; total_cost: string; average_cost: string; price: string | null;
@@ -19,7 +20,7 @@ export function HoldingsTable({ rows }: { rows: HoldingRow[] }) {
         <th className="num">Giá trị</th><th className="num">Lãi/lỗ chưa thực hiện</th></tr></thead>
       <tbody>{rows.map((r) => (
         <tr key={r.security_id} data-testid={`holding-${r.security_id}`}>
-          <td data-label="Mã"><strong>{r.security_id}</strong></td>
+          <td data-label="Mã"><Link href={`/research/${r.security_id}`}><strong>{r.security_id}</strong></Link></td>
           <td data-label="Số lượng" className="num">{r.quantity.toLocaleString("vi-VN")}{r.pending_quantity ? ` (+${r.pending_quantity.toLocaleString("vi-VN")} chờ về)` : ""}</td>
           <td data-label="Giá vốn bình quân" className="num">{formatVnd(r.average_cost, { unit: false })}</td>
           <td data-label="Giá (ngày)" className="num">{r.price ? `${formatVnd(r.price, { unit: false })} (${r.price_date})` : "Chưa có giá"}</td>

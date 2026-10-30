@@ -22,7 +22,7 @@ const VERDICT: Record<Verdict, { label: string; tone: string }> = {
   cheap: { label: "Rẻ", tone: "good" }, fair: { label: "Hợp lý", tone: "" }, expensive: { label: "Đắt", tone: "bad" },
   insufficient: { label: "Chưa đủ dữ liệu", tone: "warn" },
 };
-const SOURCE: Record<string, string> = { acbs: "ACBS", worldbank: "World Bank" };
+export const SOURCE: Record<string, string> = { acbs: "ACBS", worldbank: "World Bank" };
 const STATUS: Record<Report["status"], string> = { ok: "Đã đọc", no_text: "Không trích được văn bản", no_reliable_claims: "Không có nhận định đáng tin" };
 const STOPPED: Record<string, string> = { budget_exceeded: "đã hết ngân sách AI tháng này", key_missing: "chưa cấu hình AI",
   catalog_stale: "bảng giá model đã cũ", no_eligible_model: "không có model được duyệt khả dụng", policy_not_approved: "chính sách AI chưa duyệt",

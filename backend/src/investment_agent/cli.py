@@ -38,6 +38,8 @@ def main() -> int:
     sync.add_argument("--index", action="store_true", help="the symbols are indices (e.g. VNINDEX), quoted in points")
     macro = commands.add_parser("macro-sync", help="fetch automatic macro indicators (FRED, Vietcombank) into data/macro")
     macro.add_argument("--data-dir", type=Path, required=True)
+    ivs = commands.add_parser("index-valuation-sync", help="fetch daily P/E and P/B of VNINDEX and VN30 (VNDirect) into data/index-valuation")
+    ivs.add_argument("--data-dir", type=Path, required=True)
     fsync = commands.add_parser("fundamentals-sync", help="refresh statements for the Định giá page (paced for Vnstock's limit)")
     fsync.add_argument("--data-dir", type=Path, required=True)
     fsync.add_argument("--limit", type=int, default=8)
@@ -78,6 +80,8 @@ def main() -> int:
         return trend_run(args.data_dir, args.calendar)
     if args.command == "macro-sync":
         return macro_sync(args.data_dir)
+    if args.command == "index-valuation-sync":
+        return index_valuation_sync(args.data_dir)
     if args.command == "industries":
         return industries(_symbols(args.symbols), args.output)
     if args.command == "backup":
@@ -212,6 +216,26 @@ def macro_sync(data_dir: Path, get=None) -> int:
     results = fetch_auto(load_indicators(), MacroStore(data_dir), get=get)
     results.update(fetch_factors(MacroStore(data_dir), get=get))  # long oil and US dollar history for the sensitivity reading
     results.update(fetch_commodities(MacroStore(data_dir), get=get))  # monthly world prices for Chuỗi giá trị
+    failed = {k: v for k, v in results.items() if v != "ok"}
+    print(json.dumps({"status": "ok" if not failed else "partial", "results": results}))
+    return 0 if not failed else 1
+
+
+def index_valuation_sync(data_dir: Path, get=None, today=None) -> int:
+    """Exit 0 when the four index series updated, 1 when some failed (each is reported)."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from investment_agent.market.index_valuation import fetch_index_valuation
+    from investment_agent.market.series import SeriesStore
+    if get is None:
+        import httpx
+
+        def get(url):
+            response = httpx.get(url, timeout=60, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+            response.raise_for_status()
+            return response.text
+    today = today or datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date()
+    results = fetch_index_valuation(SeriesStore(data_dir / "index-valuation"), get=get, today=today)
     failed = {k: v for k, v in results.items() if v != "ok"}
     print(json.dumps({"status": "ok" if not failed else "partial", "results": results}))
     return 0 if not failed else 1

@@ -120,6 +120,12 @@ if __name__ == "__main__":
                                   _ev(2, "FPT", "insider", -2, "Nguyễn Văn A - Đăng kí Mua 10,000 FPT")], fetched_at="2026-10-26T15:40:00+07:00")
     EventStore(data).save("VCB", [_ev(1, "VCB", "meeting", 10, "VCB - Tổ chức ĐHĐCĐ bất thường 2026")], fetched_at="2026-10-26T15:40:00+07:00")
     MacroStore(data).upsert("us10y", [(date(2026, 10, 21), "4.91"), (date(2026, 10, 23), "4.96")], entry="auto")
+    # Định giá chỉ số: VN30 at P/E 15 and P/B 2 for six years, today P/E 12 at 1,800 points (fair 2,025, −11,1%); VNINDEX has no multiples.
+    ix_days = [datetime.combine(date.today() - timedelta(days=i), datetime.min.time()) for i in range(6 * 365, 0, -1)
+               if (date.today() - timedelta(days=i)).weekday() < 5]
+    SeriesStore(os.path.join(data, "index-valuation")).upsert("VN30-pe-1d", [(d, "15") for d in ix_days[:-1]] + [(ix_days[-1], "12")])
+    SeriesStore(os.path.join(data, "index-valuation")).upsert("VN30-pb-1d", [(d, "2") for d in ix_days])
+    SeriesStore(os.path.join(data, "trend-sources")).upsert("VN30-1d", [(ix_days[-1], "1800")])
     # Chuỗi giá trị: oil up 10% over a month (bad for plastic pipe, good for drilling and gas) and world rubber up (good for rubber).
     MacroStore(data).upsert("wti", [(date.today() - timedelta(days=35), "60"), (date.today() - timedelta(days=1), "66")], entry="auto")
     MacroStore(data).upsert("com_rubber", [(date.today() - timedelta(days=60), "120"), (date.today() - timedelta(days=30), "130")], entry="auto")

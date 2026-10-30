@@ -49,3 +49,21 @@ def test_history_gives_monthly_pe_pb_for_a_watched_ticker_only(tmp_path):
     body = call(client, clock, "GET", "/internal/fairvalue/history/FPT").json()
     assert body["symbol"] == "FPT" and len(body["pe"]["points"]) == 12 and body["pe"]["latest"] == "12.00" and body["pb"]["latest"] == "1.20"
     assert call(client, clock, "GET", "/internal/fairvalue/history/ZZZ").status_code == 404
+
+
+def test_fairvalue_values_the_two_indices_from_their_stored_multiples(tmp_path):
+    from datetime import timedelta
+    (tmp_path / "market-symbols.txt").write_text("FPT\n", encoding="utf-8")
+    clock = Clock()
+    today = date(2027, 1, 15)  # the signed client's clock
+    days = [datetime.combine(today - timedelta(days=i), datetime.min.time()) for i in range(1, 6 * 365) if (today - timedelta(days=i)).weekday() < 5][::-1]
+    store = SeriesStore(tmp_path / "index-valuation")
+    store.upsert("VNINDEX-pe-1d", [(d, "15") for d in days[:-1]] + [(days[-1], "12")])
+    store.upsert("VNINDEX-pb-1d", [(d, "2") for d in days])
+    SeriesStore(tmp_path / "trend-sources").upsert("VNINDEX-1d", [(days[-1], "1800")])
+    app = create_app(InternalAuthSettings("owner-1", TOKEN, SECRET), clock=clock, personal_repository=PersonalRepository("owner-1", MemoryDocumentStore()),
+                     market=SyntheticMarket(prices={}), data_dir=tmp_path)
+    body = call(TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000)), clock, "GET", "/internal/fairvalue").json()
+    rows = {r["symbol"]: r for r in body["indices"]}
+    assert rows["VNINDEX"]["fair"] == "2025.00" and rows["VNINDEX"]["close"] == "1800.00" and rows["VNINDEX"]["verdict"] == "fair"
+    assert rows["VN30"]["verdict"] == "insufficient" and {m["reason"] for m in rows["VN30"]["methods"]} == {"Chưa có số liệu"}

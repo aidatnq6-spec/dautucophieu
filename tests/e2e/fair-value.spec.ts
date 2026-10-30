@@ -54,3 +54,16 @@ test("no horizontal scroll on the valuation page at 375px", async ({ page }) => 
     .filter((el) => el.scrollWidth > el.clientWidth + 1 && ["auto", "scroll"].includes(getComputedStyle(el).overflowX)).length);
   expect(scrollers).toBe(0);
 });
+
+test("VNINDEX and VN30 are valued from their P/E and P/B against a five-year median", async ({ page }) => {
+  await openPage(page);
+  const table = page.getByRole("table", { name: "Định giá chỉ số" });
+  const vn30 = table.getByRole("row", { name: /VN30/ });
+  await expect(vn30).toContainText("1.800,00");
+  await expect(vn30).toContainText("2.025,00");
+  await expect(vn30).toContainText("−11,1%");
+  await expect(vn30).toContainText("Hợp lý");
+  await expect(vn30).toContainText("trung vị 5 năm 15,00");
+  await expect(table.getByRole("row", { name: /VN-Index/ })).toContainText("Chưa có số liệu");
+  await expect(page.getByText(/lợi nhuận bốn quý gần nhất/)).toBeVisible();
+});

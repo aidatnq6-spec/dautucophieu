@@ -49,14 +49,16 @@ function IndexTable({ rows }: { rows: IndexRow[] }) {
   const multiple = (m: Method | undefined) => !m ? "—" : m.value
     ? <>{formatDecimal(String(m.inputs.now), 2)} <span className="caption">· trung vị 5 năm {formatDecimal(String(m.inputs.median), 2)}</span></>
     : <span className="muted">{m.reason}</span>;
+  const [open, setOpen] = useState<string | null>(null);
   return (
     <>
       <h2>Chỉ số thị trường</h2>
       <table className="fv-table" aria-label="Định giá chỉ số">
         <thead><tr><th>Chỉ số</th><th className="num">Điểm</th><th className="num">Mức hợp lý</th><th className="num">Chênh lệch</th><th>Kết luận</th>
-          <th>P/E</th><th>P/B</th><th>Số liệu</th></tr></thead>
+          <th>P/E</th><th>P/B</th><th>Số liệu</th><th /></tr></thead>
         <tbody>{rows.map((r) => (
-          <tr key={r.symbol}>
+          <Fragment key={r.symbol}>
+          <tr>
             <td data-label="Chỉ số"><strong>{r.name}</strong></td>
             <td data-label="Điểm" className="num">{r.close ? formatDecimal(r.close, 2) : "—"}</td>
             <td data-label="Mức hợp lý" className="num">{r.fair ? <>{formatDecimal(r.fair, 2)}<div className="caption">{formatDecimal(r.low, 2)} – {formatDecimal(r.high, 2)}</div></> : "—"}</td>
@@ -65,7 +67,11 @@ function IndexTable({ rows }: { rows: IndexRow[] }) {
             <td data-label="P/E">{multiple(r.methods.find((m) => m.method === "pe_history"))}</td>
             <td data-label="P/B">{multiple(r.methods.find((m) => m.method === "pb_history"))}</td>
             <td data-label="Số liệu">{r.as_of ? vnDate(r.as_of) : "—"}</td>
-          </tr>))}
+            <td><button className="btn" aria-expanded={open === r.symbol} onClick={() => setOpen(open === r.symbol ? null : r.symbol)}
+              aria-label={`Chi tiết ${r.name}`}>Chi tiết</button></td>
+          </tr>
+          {open === r.symbol && <tr className="fv-detail"><td colSpan={9}><MultipleCharts symbol={r.symbol} /></td></tr>}
+          </Fragment>))}
         </tbody>
       </table>
       <p className="caption">P/E, P/B chỉ số theo ngày từ VNDirect; mức hợp lý = điểm × trung vị 5 năm / hiện tại, trung vị của hai phương án.

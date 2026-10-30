@@ -55,3 +55,14 @@ def test_short_history_old_data_or_a_missing_close_give_reasons_not_numbers():
 
     row = value_index("VN30", pe=[], pb=[], closes=[], settings=Settings(), today=TODAY)
     assert row["verdict"] == "insufficient" and {m["reason"] for m in row["methods"]} == {"Chưa có số liệu"}
+
+
+def test_monthly_chart_covers_five_years_with_the_daily_median_and_spread():
+    from investment_agent.valuation.index_reference import index_monthly_multiples
+    pe = _daily(date(2019, 1, 1), date(2026, 10, 29), lambda i: 10.0 + (i % 2) * 10) + [(datetime(2026, 10, 30), 12.0)]
+    out = index_monthly_multiples("VNINDEX", pe=pe, pb=pe)
+    assert out["kind"] == "index" and out["reason"] is None
+    assert out["from"] == "2021-11" and out["to"] == "2026-10"  # months after 30/10/2021
+    assert out["pe"]["points"][-1] == {"month": "2026-10", "value": "12.00", "year": None}
+    assert out["pe"]["latest"] == "12.00" and out["pe"]["median"] is not None and out["pe"]["sd"] is not None
+    assert index_monthly_multiples("VN30", pe=[], pb=[])["reason"] == "Chưa có số liệu P/E, P/B"

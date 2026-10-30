@@ -5,6 +5,7 @@ verdict rule as the ticker board (median of methods, ±threshold from Cài đặ
 reason and no value; fewer than two values means no verdict.
 """
 
+import statistics
 from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -44,6 +45,33 @@ def _method(name: str, points: Points, closes: dict[date, Decimal], today: date)
     return {**out, "value": (close * median / now).quantize(_P2, ROUND_HALF_UP),
             "inputs": {"now": str(now.quantize(_P2, ROUND_HALF_UP)), "median": str(median.quantize(_P2, ROUND_HALF_UP)),
                        "since": since.isoformat(), "points": len(window)}}
+
+
+def _monthly(points: Points, since: date) -> dict:
+    """Month-end values after `since`; median and spread from the daily values of the same window, as the board uses."""
+    window = [(t.date(), Decimal(str(v))) for t, v in points if t.date() > since]
+    month_end: dict[str, Decimal] = {}
+    for day, v in window:
+        month_end[day.strftime("%Y-%m")] = v  # last value of the month wins
+    values = [v for _, v in window]
+    sd = Decimal(str(statistics.pstdev(float(v) for v in values))) if values else None
+    return {"points": [{"month": m, "value": str(v.quantize(_P2, ROUND_HALF_UP)), "year": None} for m, v in sorted(month_end.items())],
+            "median": str(_median(values).quantize(_P2, ROUND_HALF_UP)) if values else None,
+            "sd": str(sd.quantize(_P2, ROUND_HALF_UP)) if sd is not None else None,
+            "latest": str(values[-1].quantize(_P2, ROUND_HALF_UP)) if values else None}
+
+
+def index_monthly_multiples(index: str, *, pe: Points, pb: Points) -> dict:
+    """Charts of P/E and P/B for Định giá → Chi tiết: the last five years, same shape as the tickers' monthly history."""
+    latest = max((p[-1][0].date() for p in (pe, pb) if p), default=None)
+    if latest is None:
+        empty = {"points": [], "median": None, "sd": None, "latest": None}
+        return {"symbol": index, "kind": "index", "pe": empty, "pb": empty, "shares": None, "from": None, "to": None,
+                "reason": "Chưa có số liệu P/E, P/B"}
+    since = _years_before(latest, WINDOW_YEARS)
+    out = {"pe": _monthly(pe, since), "pb": _monthly(pb, since)}
+    months = [p["month"] for s in out.values() for p in s["points"]]
+    return {"symbol": index, "kind": "index", **out, "shares": None, "from": min(months), "to": max(months), "reason": None}
 
 
 def value_index(index: str, *, pe: Points, pb: Points, closes: Points, settings: Settings, today: date) -> dict:

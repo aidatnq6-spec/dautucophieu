@@ -73,3 +73,12 @@ def test_score_weights_major_minor_small():
 ])
 def test_label(shares, approved, expected):
     assert label(shares, approved=approved) == expected
+
+
+def test_trading_value_compares_twenty_session_averages_not_one_session():
+    """One block-deal day must not flip the securities card: vnindex_value reads 20-session averages a month apart."""
+    days = [TODAY - timedelta(days=i) for i in range(70, 0, -1)]
+    values = ["20000"] * len(days)
+    values[-1] = "40000"  # a single block-deal session doubles turnover
+    r = read_indicator("vnindex_value", [(d, Decimal(v)) for d, v in zip(days, values)], today=TODAY, max_age_days=4)
+    assert r["direction"] == "flat" and r["change"] == "0.05"  # (19×20,000 + 40,000)/20 = 21,000 against 20,000

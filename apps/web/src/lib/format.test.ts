@@ -40,3 +40,10 @@ it("groupDigitsInput groups whole đồng by thousands while typing and drops an
   expect(groupDigitsInput("007")).toBe("7");
   expect(groupDigitsInput("")).toBe("");
 });
+
+it("formatRatio with no decimals gives whole percents", () => {
+  expect(formatRatio("0.35", 0)).toBe("35%");
+  expect(formatRatio("0.05", 0)).toBe("5%");
+  expect(formatRatio("0.9", 0)).toBe("90%");
+  expect(formatRatio("-0.004", 0)).toBe("0%");
+});

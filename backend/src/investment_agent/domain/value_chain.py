@@ -8,7 +8,7 @@ factors chính 3, phụ 2, nhỏ 1. Descriptive only: no recommendation, no mode
 from datetime import date
 from decimal import Decimal
 
-from .macro_chain import FOREIGN_SESSIONS, _base, _plain, _pp, _ratio
+from .macro_chain import FOREIGN_SESSIONS, MONTH, _base, _plain, _pp, _ratio
 
 WEIGHTS = {"major": 3, "minor": 2, "small": 1}
 MAJOR_SHARE, MINOR_SHARE = Decimal("0.25"), Decimal("0.10")
@@ -21,6 +21,7 @@ SHARE_BANDS = {"wti": Decimal("0.05"), "dxy": Decimal("0.02"), "usd_vnd_free": D
 COMMODITY_BAND = Decimal("0.05")
 POINT_BANDS = {**{r: Decimal("0.25") for r in RATES}, "vn_cpi_yoy": Decimal("0.2"), "us_cpi_yoy": Decimal("0.2")}
 PMI = ("vn_pmi", "us_pmi")
+AVERAGED = {"vnindex_value": 20}  # sessions averaged on each side of the month-long comparison
 
 Points = list[tuple[date, Decimal]]
 
@@ -52,6 +53,15 @@ def read_indicator(indicator: str, points: Points, *, today: date, max_age_days:
         before = points[-2][1]
         direction = "up" if last >= 50 and last >= before else "down" if last < 50 and last <= before else "flat"
         return {**out, "direction": direction, "change": _pp(last - before), "kind": "points", "from": points[-2][0].isoformat()}
+    if indicator in AVERAGED:  # one block-deal or quiet session must not flip the reading
+        n = AVERAGED[indicator]
+        base_index = max(i for i, (d, _) in enumerate(points) if d <= last_day - MONTH) if points[0][0] <= last_day - MONTH else 0
+        now_avg = sum((v for _, v in points[-n:]), Decimal(0)) / len(points[-n:])
+        before = points[max(0, base_index - n + 1):base_index + 1]
+        then_avg = sum((v for _, v in before), Decimal(0)) / len(before)
+        change = now_avg / then_avg - 1 if then_avg else Decimal(0)
+        return {**out, "direction": _direction(change, SHARE_BANDS[indicator]), "change": _ratio(change), "kind": "ratio",
+                "from": points[base_index][0].isoformat()}
     (start, then), _ = _base(points)
     if indicator in POINT_BANDS:
         change = last - then

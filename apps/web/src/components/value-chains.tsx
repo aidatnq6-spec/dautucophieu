@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
 import { formatDecimal, formatRatio } from "../lib/format";
 
@@ -29,7 +29,7 @@ const pct = (v: string) => `${Math.round(Number(v) * 100)}%`;
 
 function share(s: string) {
   const [lo, hi] = s.split("-");
-  return hi ? `${formatRatio(lo, 0).replace(",0", "")}–${formatRatio(hi, 0).replace(",0", "")}` : formatRatio(lo, 0).replace(",0", "");
+  return hi ? `${formatRatio(lo, 0).slice(0, -1)}–${formatRatio(hi, 0)}` : formatRatio(lo, 0);
 }
 
 function move(r: Reading) {
@@ -91,7 +91,6 @@ export function ValueChains() {
   useEffect(() => { api<Data>("market/value-chains").then(setData, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
   if (error) return <p className="errors" role="alert">{error}</p>;
   if (!data) return <p className="muted fx-loading" role="status">Đang tải…</p>;
-  const current = data.chains.find((c) => c.id === open);
   return (
     <section className="surface" aria-label="Chuỗi giá trị">
       <h2>Chuỗi giá trị</h2>
@@ -99,14 +98,16 @@ export function ValueChains() {
         (yếu tố chính tính 3, phụ 2, nhỏ 1). Đây là bức tranh mô tả, không đưa ra lời khuyên mua bán.</p>
       {data.chains.length === 0 && <p className="muted">Chưa có chuỗi giá trị nào.</p>}
       <div className="vc-cards">{data.chains.map((c) => (
-        <button key={c.id} className="vc-card" aria-expanded={open === c.id} onClick={() => setOpen(open === c.id ? null : c.id)}>
+        <Fragment key={c.id}>
+        <button className="vc-card" aria-expanded={open === c.id} onClick={() => setOpen(open === c.id ? null : c.id)}>
           <span className="vc-card-head"><strong>{c.name}</strong>
             {c.label ? <span className={`pill ${LABEL[c.label].tone}`}>{LABEL[c.label].text}</span> : <span className="pill warn">Chưa duyệt</span>}</span>
           <Bar score={c.score} />
           <span className="caption">{c.symbols.map((s) => s.symbol).join(", ")}{c.symbols.some((s) => s.held) && " · có mã đang nắm"}</span>
-        </button>))}
+        </button>
+        {open === c.id && <Diagram chain={c} sources={data.sources} />}
+        </Fragment>))}
       </div>
-      {current && <Diagram chain={current} sources={data.sources} />}
       {data.uncovered.length > 0 && <p className="caption">Chưa có chuỗi giá trị cho: {data.uncovered.join(", ")}.</p>}
     </section>
   );

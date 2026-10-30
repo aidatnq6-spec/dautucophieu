@@ -18,6 +18,8 @@ test("each chain is a card; a card opens its sourced Đầu vào → Trung gian 
   await expect(rubber).toContainText("tốt 100%");
   await rubber.click();
   await expect(rubber).toHaveAttribute("aria-expanded", "true");
+  // The diagram opens right under the card that was clicked, not after all the cards.
+  await expect(section.locator('button[aria-expanded="true"] + section')).toHaveAttribute("aria-label", "Chuỗi giá trị Cao su tự nhiên");
   const diagram = page.getByRole("region", { name: "Chuỗi giá trị Cao su tự nhiên" });
   for (const stage of ["Đầu vào", "Trung gian", "Đầu ra"]) await expect(diagram.getByRole("heading", { name: stage })).toBeVisible();
   await expect(diagram).toContainText("Giá cao su: tốt");
@@ -38,7 +40,9 @@ test("no horizontal scroll with a chain open at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 900 });
   const section = await openSection(page);
   await section.getByRole("button", { name: /Phân bón/ }).click();
-  await expect(page.getByRole("region", { name: "Chuỗi giá trị Phân bón" })).toBeVisible();
+  const fertiliser = page.getByRole("region", { name: "Chuỗi giá trị Phân bón" });
+  await expect(fertiliser).toContainText("70–80% giá thành");  // a reported share shows as whole percents
+  await fertiliser.scrollIntoViewIfNeeded();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });

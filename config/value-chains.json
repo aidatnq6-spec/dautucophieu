@@ -1180,7 +1180,7 @@
      "when_up": "bad",
      "weight": "major",
      "share": "0.70-0.80",
-     "why": "Giá khí là yếu tố quan trọng nhất của giá thành urê; DPM có thể huy động khí LNG",
+     "why": "Giá khí là yếu tố quan trọng nhất của giá thành urê; DPM có thể huy động khí LNG. Giá LNG Nhật Bản chỉ là thước đo gần đúng cho giá khí đầu vào",
      "refs": [
       {
        "source": "acbs-fert",
@@ -1453,14 +1453,18 @@
    "factors": [
     {
      "id": "hydrology",
-     "label": "Thủy văn (El Nino)",
+     "label": "Lượng nước về hồ thủy điện",
      "stage": "input",
      "indicator": null,
      "when_up": "good",
      "weight": "major",
      "share": null,
-     "why": "El Nino quay lại làm giảm sản lượng thủy điện",
+     "why": "Nhiều nước thì thủy điện phát nhiều hơn; El Nino quay lại sẽ làm giảm sản lượng thủy điện",
      "refs": [
+      {
+       "source": "acbs-ree",
+       "page": 2
+      },
       {
        "source": "acbs-hdg",
        "page": 3

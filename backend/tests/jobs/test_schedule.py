@@ -34,14 +34,16 @@ def test_first_slot_runs_todays_session():
 
 def test_retry_slots_depend_on_data_not_clock_spam():
     s1 = state(published=["2026-10-26"], attempts={"2026-10-27": 1})
-    assert decide(at("2026-10-27", "17:00"), CAL, s1).run is False  # 15:30 tried; waiting for 17:30
-    assert decide(at("2026-10-27", "17:30"), CAL, s1).attempt == 2
+    assert decide(at("2026-10-27", "17:30"), CAL, s1).run is False  # 15:30 tried; the only retry is at 20:00
+    assert decide(at("2026-10-27", "20:00"), CAL, s1).attempt == 2
     s2 = state(published=["2026-10-26"], attempts={"2026-10-27": 2})
-    assert decide(at("2026-10-27", "18:00"), CAL, s2).run is False  # waiting for the 18:30 slot
-    assert decide(at("2026-10-27", "18:30"), CAL, s2).attempt == 3
-    s4 = state(published=["2026-10-26"], attempts={"2026-10-27": 4})
-    d = decide(at("2026-10-27", "21:00"), CAL, s4)
+    d = decide(at("2026-10-27", "21:00"), CAL, s2)
     assert d.run is False and d.reason == "attempts_exhausted"
+
+
+def test_morning_wakeup_only_catches_up_the_previous_session():
+    d = decide(at("2026-10-28", "08:30"), CAL, state(published=["2026-10-26"], attempts={"2026-10-27": 1}))
+    assert (d.run, d.reason, d.session_date, d.attempt) == (True, "catch_up", date(2026, 10, 27), 2)
 
 
 def test_published_session_is_not_rerun():
@@ -118,10 +120,9 @@ def tick(tmp_path, repo, now, sender=None, market=None):
                           deliveries=DeliveryStore(tmp_path / "d.sqlite"), sender=sender, cal=CAL, now=now, worker_id="sched")
 
 
-def test_tick_counts_attempts_and_stops_after_four_incomplete_runs(tmp_path):
+def test_tick_counts_attempts_and_stops_after_two_incomplete_runs(tmp_path):
     repo = PersonalRepository("owner-1", MemoryDocumentStore())
-    for hhmm, expected in (("15:31", "incomplete"), ("16:00", None), ("17:31", "incomplete"), ("18:31", "incomplete"), ("20:01", "incomplete"),
-                           ("21:00", None)):
+    for hhmm, expected in (("15:31", "incomplete"), ("16:00", None), ("17:31", None), ("20:01", "incomplete"), ("21:00", None)):
         result = tick(tmp_path, repo, at("2026-10-27", hhmm))
         assert (result.statuses[0] if result.statuses else None) == expected, hhmm
 
@@ -133,7 +134,7 @@ def test_tick_sends_only_when_scheduled_sending_is_enabled(tmp_path):
     # No profile: reports stay incomplete and are never queued, so nothing is sent even when enabled.
     settings = NotificationSettings(enabled=True, chat_id="-100123", members_may_view_personal_data=True, scheduled_enabled=True)
     repo.write(OWNER, "settings", "notifications", settings.model_dump(mode="json"), expected_version=0, request_id="n1")
-    result = tick(tmp_path, repo, at("2026-10-27", "17:31"), sender=sender, market=market)
+    result = tick(tmp_path, repo, at("2026-10-27", "15:31"), sender=sender, market=market)
     assert result.statuses == ["incomplete"] and sender.sent == []
 
 

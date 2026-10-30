@@ -1,10 +1,10 @@
 """Scheduling decisions in Asia/Ho_Chi_Minh for after-close reports.
 
-Slots 15:30, 17:30, 18:30 and 20:00 are attempts for one session, used only
+Slots 15:30 and 20:00 are attempts for one session, used only
 while that session has no published report (late data), never repeated
 identical sends. A report needs every holding priced for that session, so an
 early slot that runs before the vendor's close simply leaves it to the next.
-Wake-ups outside the slots (07:00, logon) only catch up an earlier session. After a missed day or a machine resume only the most recent
+Wake-ups outside the slots (08:30, logon) only catch up an earlier session. After a missed day or a machine resume only the most recent
 unpublished session is caught up; older ones are counted, and an explicit
 historical backfill never sends. Weekly and monthly reports follow the last
 trading session of the week or month in the calendar.
@@ -23,7 +23,7 @@ from .publication import get_report, list_reports
 from .runner import JobStore
 
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
-SLOTS = (time(15, 30), time(17, 30), time(18, 30), time(20, 0))
+SLOTS = (time(15, 30), time(20, 0))
 
 
 @dataclass(frozen=True)

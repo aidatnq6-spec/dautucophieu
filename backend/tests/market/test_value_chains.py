@@ -46,6 +46,7 @@ def test_a_sourced_chain_loads(tmp_path):
     lambda d: d["chains"][0]["stages"].update(middle=[]),                                    # an empty stage
     lambda d: d["chains"][0].update(factors=[]),                                             # no factor at all
     lambda d: d["chains"][0].update(status="checked"),
+    lambda d: d["sources"]["acbs-ht1"].update(date="28/10/2026"),
 ])
 def test_unsourced_or_inconsistent_chains_are_rejected(tmp_path, edit):
     with pytest.raises((ValidationError, ValueError)):
@@ -57,5 +58,20 @@ def test_a_factor_without_a_stored_series_is_allowed(tmp_path):
     assert load_value_chains(write(tmp_path, doc)).chains[0].factors[0].indicator is None
 
 
+def test_a_source_dated_by_month_alone_is_allowed(tmp_path):
+    assert load_value_chains(write(tmp_path, changed(lambda d: d["sources"]["acbs-ht1"].update(date="2026-06")))).sources["acbs-ht1"].date == "2026-06"
+
+
 def test_the_committed_config_loads():
     load_value_chains()
+
+
+# The 50 watched tickers on 30/10/2026, as listed in the spec (data\ is not in Git).
+WATCHED_2026_10_30 = ("MBB ACB BID CTG SHB STB TCB VCB EIB KDH VHM VIC KBC DXG NLG IJC MSN VNM VHC KDC SBT ANV PAN GVR DCM DPM PHR DPR "
+                      "GAS REE NT2 HDG GMD PVT VSC HAH SSI HCM VND BMP CTD VCG FPT CMG MWG DGW HPG BVH PNJ PVD").split()
+
+
+def test_the_committed_config_gives_every_watched_ticker_one_chain():
+    chains = load_value_chains().chains
+    owned = [s for c in chains for s in c.symbols]
+    assert len(WATCHED_2026_10_30) == 50 and sorted(owned) == sorted(WATCHED_2026_10_30)

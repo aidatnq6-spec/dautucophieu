@@ -1,5 +1,2179 @@
 {
  "version": "2026-10-30",
- "sources": {},
- "chains": []
+ "sources": {
+  "acbs-bank": {
+   "title": "Ngành Ngân hàng 2026F – Tăng trưởng giảm tốc",
+   "publisher": "ACBS",
+   "date": "2026-06",
+   "url": "https://acbs.com.vn/acbsmedia/2026/06/Nganh-Ngan-hang-2026F-Tang-truong-giam-toc.pdf"
+  },
+  "acbs-strategy-0926": {
+   "title": "Chuyển động thị trường – tháng 9/2026",
+   "publisher": "ACBS",
+   "date": "2026-09",
+   "url": "https://acbs.com.vn/acbsmedia/2026/09/202609_MonthlyStrategy_VN_Final-1.pdf"
+  },
+  "acbs-s301": {
+   "title": "Cập nhật nhanh: Thuế quan theo Mục 301 và các tác động đối với Việt Nam",
+   "publisher": "ACBS",
+   "date": "2026-09",
+   "url": "https://acbs.com.vn/acbsmedia/2026/09/202608_MacroUpdate_Section301_VN.pdf"
+  },
+  "vietcap-bvh": {
+   "title": "BVH – KQKD nửa đầu năm 2026 duy trì ổn định (Báo cáo ĐHCĐ)",
+   "publisher": "Vietcap (qua smoney.com.vn)",
+   "date": "2026-06-29",
+   "url": "https://smoney.com.vn/media/analyst_reports/2026/07/bvh-kqkd-nua-dau-nam-2026-duy-tri-on-dinh-cung-ke-hoach-5-nam-qu_UXznb5s.pdf"
+  },
+  "acbs-kdh": {
+   "title": "Cập nhật KDH – MUA",
+   "publisher": "ACBS",
+   "date": "2026-05-08",
+   "url": "https://acbs.com.vn/acbsmedia/2026/05/KDH_Cap-nhat_8.5.2026.pdf"
+  },
+  "acbs-kbc": {
+   "title": "Cập nhật KBC – MUA",
+   "publisher": "ACBS",
+   "date": "2026-03-09",
+   "url": "https://acbs.com.vn/acbsmedia/2026/03/KBC_Cap-nhat_9.3.2026.pdf"
+  },
+  "acbs-infra": {
+   "title": "Báo cáo ngành xây dựng hạ tầng: Vượt gió ngược, đón sóng lớn",
+   "publisher": "ACBS",
+   "date": "2026-06",
+   "url": "https://acbs.com.vn/acbsmedia/2026/06/Bao-cao-dau-tu-cong-2H2026.pdf"
+  },
+  "acbs-ctd": {
+   "title": "Báo cáo cập nhật CTD",
+   "publisher": "ACBS",
+   "date": "2026-10-09",
+   "url": "https://acbs.com.vn/acbsmedia/2026/10/CTD-Cap-nhat-09.10.2026.pdf"
+  },
+  "acbs-bmp": {
+   "title": "Cập nhật nhanh BMP – MUA (Q3/2026)",
+   "publisher": "ACBS",
+   "date": "2026-10",
+   "url": "https://acbs.com.vn/acbsmedia/2026/10/BMP_Cap-nhat-nhanh-Q3-2026.pdf"
+  },
+  "acbs-hpg": {
+   "title": "Cập nhật HPG – MUA",
+   "publisher": "ACBS",
+   "date": "2026-08-06",
+   "url": "https://acbs.com.vn/acbsmedia/2026/08/HPG_Cap-nhat-6.8.2026-1.pdf"
+  },
+  "acbs-gvr": {
+   "title": "Cập nhật nhanh GVR – ĐHCĐ 2026",
+   "publisher": "ACBS",
+   "date": "2026-06-17",
+   "url": "https://acbs.com.vn/acbsmedia/2026/06/GVR_2026-AGM-VN.pdf"
+  },
+  "acbs-fert": {
+   "title": "Cập nhật ngành phân bón: Chiến sự Trung Đông đẩy mạnh giá phân bón",
+   "publisher": "ACBS",
+   "date": "2026-03",
+   "url": "https://acbs.com.vn/acbsmedia/2026/03/Phan-bon-1H.2026.pdf"
+  },
+  "acbs-dcm": {
+   "title": "DCM – Cập nhật nhanh ĐHCĐ 2026",
+   "publisher": "ACBS",
+   "date": "2026-04-28",
+   "url": "https://acbs.com.vn/acbsmedia/2026/04/DCM_2026-Cap-nhat-nhanh-280426.pdf"
+  },
+  "acbs-dpm": {
+   "title": "DPM – Cập nhật nhanh ĐHCĐ 2026",
+   "publisher": "ACBS",
+   "date": "2026-04-24",
+   "url": "https://acbs.com.vn/acbsmedia/2026/04/DPM_2026-Cap-nhat-nhanh-240426.pdf"
+  },
+  "acbs-oilgas": {
+   "title": "Báo cáo ngành Dầu khí 2H.2026",
+   "publisher": "ACBS",
+   "date": "2026-05",
+   "url": "https://acbs.com.vn/acbsmedia/2026/05/Bao-cao-nganh-Dau-khi_2H.2026.pdf"
+  },
+  "acbs-pvd": {
+   "title": "PVD – Cập nhật nhanh ĐHCĐ 2026",
+   "publisher": "ACBS",
+   "date": "2026-04-28",
+   "url": "https://acbs.com.vn/acbsmedia/2026/04/PVD_2026-Cap-nhat-nhanh-280426.pdf"
+  },
+  "acbs-gas": {
+   "title": "GAS – Cập nhật nhanh",
+   "publisher": "ACBS",
+   "date": "2026-08-04",
+   "url": "https://acbs.com.vn/acbsmedia/2026/08/GAS_Cap-nhat-nhanh-04.08.2026.pdf"
+  },
+  "acbs-ree": {
+   "title": "Cập nhật REE – MUA (Q1/2026)",
+   "publisher": "ACBS",
+   "date": "2026-06",
+   "url": "https://acbs.com.vn/acbsmedia/2026/06/REE_VN_Update_Q1-26.pdf"
+  },
+  "acbs-hdg": {
+   "title": "Cập nhật HDG – KHẢ QUAN (Q1/2026)",
+   "publisher": "ACBS",
+   "date": "2026-05",
+   "url": "https://acbs.com.vn/acbsmedia/2026/05/HDG_VN_Update_Q1_26.pdf"
+  },
+  "acbs-gmd": {
+   "title": "Cập nhật GMD – TRUNG LẬP (Q2/2026)",
+   "publisher": "ACBS",
+   "date": "2026-08",
+   "url": "https://acbs.com.vn/acbsmedia/2026/08/GMD_Cap-nhat-Q2-2026.pdf"
+  },
+  "acbs-pvt": {
+   "title": "Cập nhật PVT – MUA (KQKD Q2/2026)",
+   "publisher": "ACBS",
+   "date": "2026-08",
+   "url": "https://acbs.com.vn/acbsmedia/2026/08/PVT_Cap-nhat-KQKD-Q2-2026.pdf"
+  },
+  "acbs-hah": {
+   "title": "Cập nhật nhanh HAH – KHẢ QUAN",
+   "publisher": "ACBS",
+   "date": "2026-02-05",
+   "url": "https://acbs.com.vn/acbsmedia/2026/02/HAH_Ca%CC%A3%CC%82p-nha%CC%A3%CC%82t-nhanh-05.02.26.pdf"
+  },
+  "acbs-vnm": {
+   "title": "Cập nhật VNM – MUA",
+   "publisher": "ACBS",
+   "date": "2026-05-11",
+   "url": "https://acbs.com.vn/acbsmedia/2026/05/VNM-by-ACBS_Update-_11.05.2026-VN.pdf"
+  },
+  "tct-sbt": {
+   "title": "TTC AgriS (SBT): Tiêu thụ đường vượt mốc triệu tấn, đẩy mạnh đa dạng hoá thị trường xuất khẩu",
+   "publisher": "Tạp chí Công Thương",
+   "date": "2025-05-05",
+   "url": "https://tapchicongthuong.vn/ttc-agris--sbt-tieu-thu-duong-vuot-moc-trieu-tan--day-manh-da-dang-hoa-thi-truong-xuat-khau-140097.htm"
+  },
+  "acbs-msn": {
+   "title": "MSN – Cập nhật nhanh",
+   "publisher": "ACBS",
+   "date": "2026-04-24",
+   "url": "https://acbs.com.vn/acbsmedia/2026/04/MSN_Cap-nhat-nhanh-24.04.2026-1.pdf"
+  },
+  "acbs-retail": {
+   "title": "Cập nhật ngành Bán lẻ: Điểm sáng bán lẻ hiện đại trong bối cảnh tiêu dùng thận trọng",
+   "publisher": "ACBS",
+   "date": "2026-02-06",
+   "url": "https://acbs.com.vn/acbsmedia/2026/02/Cap-nhat-nganh-Ban-le_ACBS_06.02.2026-2.pdf"
+  },
+  "acbs-mwg": {
+   "title": "Cập nhật MWG – MUA",
+   "publisher": "ACBS",
+   "date": "2026-08-14",
+   "url": "https://acbs.com.vn/acbsmedia/2026/08/MWG_by_ACBS_Update-VN-_14.08.2026.pdf"
+  },
+  "acbs-pnj": {
+   "title": "Cập nhật nhanh PNJ – KHÔNG ĐÁNH GIÁ",
+   "publisher": "ACBS",
+   "date": "2026-10-23",
+   "url": "https://acbs.com.vn/acbsmedia/2026/10/PNJ-by-ACBS_Cap-nhat-nhanh_23.10.2026.pdf"
+  },
+  "acbs-fpt": {
+   "title": "Cập nhật FPT – MUA",
+   "publisher": "ACBS",
+   "date": "2026-08-07",
+   "url": "https://acbs.com.vn/acbsmedia/2026/08/FPT_by_ACBS_Update-VN-_07.08.2026.pdf"
+  }
+ },
+ "chains": [
+  {
+   "id": "bank",
+   "name": "Ngân hàng",
+   "icb": "Ngân hàng",
+   "status": "draft",
+   "symbols": [
+    "MBB",
+    "ACB",
+    "BID",
+    "CTG",
+    "SHB",
+    "STB",
+    "TCB",
+    "VCB",
+    "EIB"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Tiền gửi và vốn huy động",
+      "note": "Lãi suất huy động tăng mạnh làm NIM giảm",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-bank",
+        "page": 2
+       }
+      ]
+     },
+     {
+      "name": "Vốn trên thị trường liên ngân hàng",
+      "note": "Thanh khoản thu hẹp, lãi suất liên ngân hàng tăng cao",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-bank",
+        "page": 4
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Cho vay (tín dụng +19% svck, room tín dụng bị hạn chế)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-bank",
+        "page": 2
+       }
+      ]
+     },
+     {
+      "name": "Quản lý nợ xấu và chi phí tín dụng",
+      "note": "Nợ xấu 2%, chi phí tín dụng 0,27% trong Q1/26",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-bank",
+        "page": 2
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Thu nhập lãi thuần (NIM khoảng 3,0%)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-bank",
+        "page": 4
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "deposit_rate",
+     "label": "Lãi suất huy động",
+     "stage": "input",
+     "indicator": "deposit_12m",
+     "when_up": "bad",
+     "weight": "major",
+     "share": null,
+     "why": "Lãi suất huy động tăng làm chi phí vốn tăng nhanh hơn lợi suất cho vay, NIM giảm",
+     "refs": [
+      {
+       "source": "acbs-bank",
+       "page": 2
+      },
+      {
+       "source": "acbs-bank",
+       "page": 4
+      }
+     ]
+    },
+    {
+     "id": "interbank",
+     "label": "Lãi suất liên ngân hàng",
+     "stage": "input",
+     "indicator": "vn_interbank_on",
+     "when_up": "bad",
+     "weight": "minor",
+     "share": null,
+     "why": "Thanh khoản thu hẹp đẩy lãi suất liên ngân hàng lên",
+     "refs": [
+      {
+       "source": "acbs-bank",
+       "page": 4
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "securities",
+   "name": "Chứng khoán",
+   "icb": "Dịch vụ tài chính",
+   "status": "draft",
+   "symbols": [
+    "SSI",
+    "HCM",
+    "VND"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Vốn chủ sở hữu và vốn vay để cho vay ký quỹ",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-strategy-0926",
+        "page": 24
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Môi giới và cho vay ký quỹ (margin)",
+      "note": "Dư nợ margin lập kỷ lục mới trong Q2/26",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-strategy-0926",
+        "page": 22
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Phí môi giới theo thanh khoản thị trường",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-strategy-0926",
+        "page": 6
+       }
+      ]
+     },
+     {
+      "name": "Lãi cho vay ký quỹ",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-strategy-0926",
+        "page": 22
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "liquidity",
+     "label": "Thanh khoản thị trường",
+     "stage": "output",
+     "indicator": "vnindex_value",
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "Thanh khoản khớp lệnh quyết định phí môi giới; 2H26 thấp hơn đáng kể so với 1H26",
+     "refs": [
+      {
+       "source": "acbs-strategy-0926",
+       "page": 6
+      }
+     ]
+    },
+    {
+     "id": "funding",
+     "label": "Lãi suất vốn vay",
+     "stage": "input",
+     "indicator": "vn_interbank_on",
+     "when_up": "bad",
+     "weight": "minor",
+     "share": null,
+     "why": "Margin được tài trợ bằng vốn vay, trong khi tín dụng đang là nút thắt của hệ thống",
+     "refs": [
+      {
+       "source": "acbs-strategy-0926",
+       "page": 22
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "insurance",
+   "name": "Bảo hiểm",
+   "icb": "Bảo hiểm",
+   "status": "draft",
+   "symbols": [
+    "BVH"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Phí bảo hiểm nhân thọ và phi nhân thọ (GWP)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "vietcap-bvh",
+        "page": 2
+       }
+      ]
+     },
+     {
+      "name": "Mạng lưới đại lý phân phối",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "vietcap-bvh",
+        "page": 1
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Đầu tư quỹ bảo hiểm và trích lập dự phòng",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "vietcap-bvh",
+        "page": 1
+       },
+       {
+        "source": "vietcap-bvh",
+        "page": 2
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Lợi nhuận bảo hiểm và thu nhập đầu tư",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "vietcap-bvh",
+        "page": 1
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "rates",
+     "label": "Lãi suất thị trường",
+     "stage": "middle",
+     "indicator": "deposit_12m",
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "Lãi suất cao giảm nhu cầu trích lập dự phòng và nâng lợi suất đầu tư (trễ khoảng hai quý)",
+     "refs": [
+      {
+       "source": "vietcap-bvh",
+       "page": 1
+      },
+      {
+       "source": "vietcap-bvh",
+       "page": 2
+      }
+     ]
+    },
+    {
+     "id": "bond_yield",
+     "label": "Lợi suất trái phiếu",
+     "stage": "middle",
+     "indicator": "vn10y",
+     "when_up": "good",
+     "weight": "minor",
+     "share": null,
+     "why": "Lợi suất đầu tư đi theo lãi suất thị trường với độ trễ khoảng hai quý",
+     "refs": [
+      {
+       "source": "vietcap-bvh",
+       "page": 2
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "housing",
+   "name": "Bất động sản nhà ở",
+   "icb": "Bất động sản",
+   "status": "draft",
+   "symbols": [
+    "KDH",
+    "VHM",
+    "VIC",
+    "DXG",
+    "NLG",
+    "IJC"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Pháp lý dự án",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-kdh",
+        "page": 2
+       }
+      ]
+     },
+     {
+      "name": "Vốn vay và tín dụng",
+      "note": "Lãi suất cao và thắt chặt tín dụng",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-kdh",
+        "page": 2
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Phát triển dự án, hạ tầng giao thông kết nối",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-kdh",
+        "page": 2
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Bán và bàn giao nhà cho người mua",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-kdh",
+        "page": 2
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "mortgage",
+     "label": "Lãi suất",
+     "stage": "output",
+     "indicator": "deposit_12m",
+     "when_up": "bad",
+     "weight": "major",
+     "share": null,
+     "why": "Lãi suất cao và tín dụng thắt chặt ảnh hưởng tâm lý người mua",
+     "refs": [
+      {
+       "source": "acbs-kdh",
+       "page": 2
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "industrial-park",
+   "name": "Bất động sản khu công nghiệp",
+   "icb": "Bất động sản",
+   "status": "draft",
+   "symbols": [
+    "KBC"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Quỹ đất khu công nghiệp",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-kbc",
+        "page": 4
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Hạ tầng, cho thuê kho xưởng, cung cấp điện nước",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-kbc",
+        "page": 3
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Nhà đầu tư FDI thuê đất",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-kbc",
+        "page": 3
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "fdi",
+     "label": "Dòng vốn FDI",
+     "stage": "output",
+     "indicator": null,
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "KBC hưởng lợi khi thu hút dự án FDI quy mô lớn",
+     "refs": [
+      {
+       "source": "acbs-kbc",
+       "page": 3
+      }
+     ]
+    },
+    {
+     "id": "us_tariff",
+     "label": "Thuế quan Mỹ (Mục 301)",
+     "stage": "output",
+     "indicator": null,
+     "when_up": "bad",
+     "weight": "minor",
+     "share": null,
+     "why": "KCN nằm trong nhóm chịu tác động của thuế quan Mỹ",
+     "refs": [
+      {
+       "source": "acbs-s301",
+       "page": 3
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "construction",
+   "name": "Xây dựng hạ tầng",
+   "icb": "Xây dựng và Vật liệu",
+   "status": "draft",
+   "symbols": [
+    "CTD",
+    "VCG"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Vật liệu xây dựng",
+      "note": "Giá vật liệu tăng làm chậm giải ngân và ép biên lợi nhuận nhà thầu",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-infra",
+        "page": 2
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Thi công (nhà thầu)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-infra",
+        "page": 2
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Đầu tư công (giải ngân vốn ngân sách)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-infra",
+        "page": 2
+       }
+      ]
+     },
+     {
+      "name": "Công trình của khách hàng tư nhân",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-ctd",
+        "page": 3
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "materials",
+     "label": "Giá vật liệu xây dựng",
+     "stage": "input",
+     "indicator": null,
+     "when_up": "bad",
+     "weight": "major",
+     "share": null,
+     "why": "Giá nguyên vật liệu cao gây áp lực lên biên lợi nhuận nhà thầu",
+     "refs": [
+      {
+       "source": "acbs-infra",
+       "page": 2
+      }
+     ]
+    },
+    {
+     "id": "public_spend",
+     "label": "Giải ngân đầu tư công",
+     "stage": "output",
+     "indicator": null,
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "Giải ngân 5T2026 chỉ đạt 24% kế hoạch",
+     "refs": [
+      {
+       "source": "acbs-infra",
+       "page": 2
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "plastic-pipe",
+   "name": "Ống nhựa xây dựng",
+   "icb": "Xây dựng và Vật liệu",
+   "status": "draft",
+   "symbols": [
+    "BMP"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Hạt nhựa PVC",
+      "note": "Mua từ SCG Chemicals; giá PVC Trung Quốc tăng 13,6% từ tháng 6/2026",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-bmp",
+        "page": 1
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Sản xuất ống nhựa",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-bmp",
+        "page": 1
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Tiêu thụ ống nhựa (sản lượng Q3/2026 giảm khoảng 17% svck)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-bmp",
+        "page": 1
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "pvc",
+     "label": "Giá PVC",
+     "stage": "input",
+     "indicator": null,
+     "when_up": "bad",
+     "weight": "major",
+     "share": null,
+     "why": "Chi phí PVC tăng gây sức ép lên biên lợi nhuận gộp",
+     "refs": [
+      {
+       "source": "acbs-bmp",
+       "page": 1
+      }
+     ]
+    },
+    {
+     "id": "oil",
+     "label": "Giá dầu",
+     "stage": "input",
+     "indicator": "wti",
+     "when_up": "bad",
+     "weight": "minor",
+     "share": null,
+     "why": "Giá dầu hạ nhiệt được kỳ vọng hỗ trợ biên lợi nhuận",
+     "refs": [
+      {
+       "source": "acbs-bmp",
+       "page": 1
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "steel",
+   "name": "Thép",
+   "icb": "Tài nguyên Cơ bản",
+   "status": "draft",
+   "symbols": [
+    "HPG"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Quặng sắt",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-hpg",
+        "page": 3
+       }
+      ]
+     },
+     {
+      "name": "Than luyện thép",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-hpg",
+        "page": 3
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Luyện thép thô, cán thép cuộn nóng (HRC)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-hpg",
+        "page": 1
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Thép xây dựng và HRC bán trong nước và xuất khẩu",
+      "note": "Sản xuất thép đóng góp 96% doanh thu",
+      "share": "0.96",
+      "basis": "doanh thu",
+      "refs": [
+       {
+        "source": "acbs-hpg",
+        "page": 1
+       },
+       {
+        "source": "acbs-hpg",
+        "page": 2
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "iron_ore",
+     "label": "Giá quặng sắt",
+     "stage": "input",
+     "indicator": "com_iron_ore",
+     "when_up": "bad",
+     "weight": "major",
+     "share": null,
+     "why": "Nguyên liệu chính; giá bán tăng nhanh hơn chi phí nguyên liệu thì biên mở rộng",
+     "refs": [
+      {
+       "source": "acbs-hpg",
+       "page": 2
+      },
+      {
+       "source": "acbs-hpg",
+       "page": 3
+      }
+     ]
+    },
+    {
+     "id": "coking_coal",
+     "label": "Giá than luyện thép",
+     "stage": "input",
+     "indicator": null,
+     "when_up": "bad",
+     "weight": "major",
+     "share": null,
+     "why": "Nguyên liệu chính; FRED chỉ có giá than nhiệt Úc, không phải than luyện thép",
+     "refs": [
+      {
+       "source": "acbs-hpg",
+       "page": 3
+      }
+     ]
+    },
+    {
+     "id": "steel_price",
+     "label": "Giá bán thép",
+     "stage": "output",
+     "indicator": null,
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "Giá bán bình quân Q2/2026 khoảng 14,6 triệu đồng/tấn",
+     "refs": [
+      {
+       "source": "acbs-hpg",
+       "page": 2
+      }
+     ]
+    },
+    {
+     "id": "trade_defence",
+     "label": "Phòng vệ thương mại với HRC Trung Quốc",
+     "stage": "output",
+     "indicator": null,
+     "when_up": "good",
+     "weight": "minor",
+     "share": null,
+     "why": "Giúp duy trì mặt bằng giá trong nước",
+     "refs": [
+      {
+       "source": "acbs-hpg",
+       "page": 1
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "rubber",
+   "name": "Cao su tự nhiên",
+   "icb": "Hóa chất",
+   "status": "draft",
+   "symbols": [
+    "GVR",
+    "PHR",
+    "DPR"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Vườn cây và đất cao su",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-gvr",
+        "page": 2
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Khai thác và chế biến mủ cao su",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-gvr",
+        "page": 2
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Bán cao su",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-gvr",
+        "page": 2
+       }
+      ]
+     },
+     {
+      "name": "Chuyển đổi đất cao su sang khu công nghiệp",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-gvr",
+        "page": 2
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "rubber_price",
+     "label": "Giá cao su",
+     "stage": "output",
+     "indicator": "com_rubber",
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "Thiếu hụt nguồn cung đẩy giá cao su tăng",
+     "refs": [
+      {
+       "source": "acbs-gvr",
+       "page": 2
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "fertiliser",
+   "name": "Phân bón",
+   "icb": "Hóa chất",
+   "status": "draft",
+   "symbols": [
+    "DCM",
+    "DPM"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Khí thiên nhiên",
+      "note": "Nguyên liệu đầu vào chiếm 70–80% giá thành; với urê, giá khí là quan trọng nhất",
+      "share": "0.70-0.80",
+      "basis": "giá thành",
+      "refs": [
+       {
+        "source": "acbs-fert",
+        "page": 3
+       }
+      ]
+     },
+     {
+      "name": "Khí LNG khi khí nội địa hao hụt",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-dpm",
+        "page": 2
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Sản xuất phân urê",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-dcm",
+        "page": 2
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Nông dân trong nước",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-fert",
+        "page": 2
+       }
+      ]
+     },
+     {
+      "name": "Xuất khẩu (25–30% sản lượng của DPM, chủ yếu Campuchia)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-dpm",
+        "page": 2
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "gas_price",
+     "label": "Giá khí đầu vào",
+     "stage": "input",
+     "indicator": "com_lng",
+     "when_up": "bad",
+     "weight": "major",
+     "share": "0.70-0.80",
+     "why": "Giá khí là yếu tố quan trọng nhất của giá thành urê; DPM có thể huy động khí LNG",
+     "refs": [
+      {
+       "source": "acbs-fert",
+       "page": 3
+      },
+      {
+       "source": "acbs-dpm",
+       "page": 2
+      }
+     ]
+    },
+    {
+     "id": "urea_price",
+     "label": "Giá urê",
+     "stage": "output",
+     "indicator": null,
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "Giá urê tăng lên khoảng 19.000 đồng/kg so với 12.000 đồng/kg năm 2025",
+     "refs": [
+      {
+       "source": "acbs-dcm",
+       "page": 2
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "drilling",
+   "name": "Dịch vụ khoan dầu khí",
+   "icb": "Dầu khí",
+   "status": "draft",
+   "symbols": [
+    "PVD"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Giàn khoan tự nâng",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-pvd",
+        "page": 2
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Dịch vụ khoan và dịch vụ giếng khoan",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-pvd",
+        "page": 2
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Các chủ mỏ thuê giàn (95.000–110.000 USD/ngày trong khu vực)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-pvd",
+        "page": 2
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "oil",
+     "label": "Giá dầu",
+     "stage": "output",
+     "indicator": "wti",
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "Giá dầu cao là điểm tích cực cho doanh nghiệp thượng nguồn",
+     "refs": [
+      {
+       "source": "acbs-oilgas",
+       "page": 2
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "gas",
+   "name": "Khí",
+   "icb": "Điện, nước & xăng dầu khí đốt",
+   "status": "draft",
+   "symbols": [
+    "GAS"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Khí khô trong nước và LNG",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-gas",
+        "page": 1
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Vận chuyển và phân phối khí",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-oilgas",
+        "page": 2
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Nhà máy điện khí",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-gas",
+        "page": 1
+       }
+      ]
+     },
+     {
+      "name": "LPG trong nước và Campuchia",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-gas",
+        "page": 1
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "oil",
+     "label": "Giá dầu",
+     "stage": "output",
+     "indicator": "wti",
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "Giá dầu tăng giúp doanh nghiệp phân phối khí tăng doanh thu và lợi nhuận",
+     "refs": [
+      {
+       "source": "acbs-oilgas",
+       "page": 2
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "power",
+   "name": "Điện",
+   "icb": "Điện, nước & xăng dầu khí đốt",
+   "status": "draft",
+   "symbols": [
+    "REE",
+    "NT2",
+    "HDG"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Nguồn nước cho thủy điện",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-ree",
+        "page": 2
+       },
+       {
+        "source": "acbs-hdg",
+        "page": 3
+       }
+      ]
+     },
+     {
+      "name": "Gió và mặt trời",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-hdg",
+        "page": 3
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Phát điện (thủy điện, điện gió, điện mặt trời)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-hdg",
+        "page": 3
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Bán điện",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-hdg",
+        "page": 3
+       }
+      ]
+     },
+     {
+      "name": "Cho thuê văn phòng (REE, HDG)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-ree",
+        "page": 3
+       },
+       {
+        "source": "acbs-hdg",
+        "page": 3
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "hydrology",
+     "label": "Thủy văn (El Nino)",
+     "stage": "input",
+     "indicator": null,
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "El Nino quay lại làm giảm sản lượng thủy điện",
+     "refs": [
+      {
+       "source": "acbs-hdg",
+       "page": 3
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "port",
+   "name": "Cảng biển",
+   "icb": "Hàng & Dịch vụ Công nghiệp",
+   "status": "draft",
+   "symbols": [
+    "GMD",
+    "VSC"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Hạ tầng cảng nước sâu",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-gmd",
+        "page": 1
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Bốc dỡ, khai thác container",
+      "note": "Giá dịch vụ bốc dỡ tăng 10% từ tháng 02/2026",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-gmd",
+        "page": 1
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Hãng tàu và hàng xuất nhập khẩu",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-gmd",
+        "page": 1
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "throughput",
+     "label": "Sản lượng container qua cảng",
+     "stage": "output",
+     "indicator": null,
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "Sản lượng container tăng 8% svck",
+     "refs": [
+      {
+       "source": "acbs-gmd",
+       "page": 1
+      }
+     ]
+    },
+    {
+     "id": "us_tariff",
+     "label": "Thuế quan Mỹ (Mục 301)",
+     "stage": "output",
+     "indicator": null,
+     "when_up": "bad",
+     "weight": "minor",
+     "share": null,
+     "why": "Cảng & logistics nằm trong nhóm chịu tác động",
+     "refs": [
+      {
+       "source": "acbs-s301",
+       "page": 3
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "shipping",
+   "name": "Vận tải biển",
+   "icb": "Hàng & Dịch vụ Công nghiệp",
+   "status": "draft",
+   "symbols": [
+    "PVT",
+    "HAH"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Đội tàu",
+      "note": "Tổng trọng tải PVT hơn 2 triệu DWT",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-pvt",
+        "page": 1
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Cho thuê định hạn và vận chuyển",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-pvt",
+        "page": 1
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Chủ hàng dầu khí (PVT)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-pvt",
+        "page": 1
+       }
+      ]
+     },
+     {
+      "name": "Container nội địa và nội Á (HAH)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-hah",
+        "page": 2
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "freight",
+     "label": "Giá cước vận tải",
+     "stage": "output",
+     "indicator": null,
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "Giá cước container thế giới được dự báo giảm 15–20% trong 2026",
+     "refs": [
+      {
+       "source": "acbs-pvt",
+       "page": 1
+      },
+      {
+       "source": "acbs-hah",
+       "page": 2
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dairy",
+   "name": "Sữa",
+   "icb": "Thực phẩm và đồ uống",
+   "status": "draft",
+   "symbols": [
+    "VNM"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Nguyên liệu sữa (giá thế giới)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-vnm",
+        "page": 3
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Chế biến sữa",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-vnm",
+        "page": 3
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Người tiêu dùng trong nước và xuất khẩu",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-vnm",
+        "page": 3
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "milk_input",
+     "label": "Giá nguyên liệu sữa thế giới",
+     "stage": "input",
+     "indicator": null,
+     "when_up": "bad",
+     "weight": "major",
+     "share": null,
+     "why": "Biên lợi nhuận gộp mở rộng nhờ nguyên liệu mua trước khi giá thế giới đi lên",
+     "refs": [
+      {
+       "source": "acbs-vnm",
+       "page": 3
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "seafood",
+   "name": "Thủy sản",
+   "icb": "Thực phẩm và đồ uống",
+   "status": "draft",
+   "symbols": [
+    "VHC",
+    "ANV"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Nguyên liệu cá",
+      "note": "Lợi thế nguyên liệu khác nhau giữa các doanh nghiệp",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-strategy-0926",
+        "page": 36
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Chế biến (mức độ tích hợp cao)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-strategy-0926",
+        "page": 36
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Xuất khẩu, nhạy cảm với thị trường Hoa Kỳ",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-strategy-0926",
+        "page": 20
+       },
+       {
+        "source": "acbs-s301",
+        "page": 5
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "us_tariff",
+     "label": "Thuế quan và phòng vệ thương mại Mỹ",
+     "stage": "output",
+     "indicator": null,
+     "when_up": "bad",
+     "weight": "major",
+     "share": null,
+     "why": "Rủi ro chính nằm ở biện pháp phòng vệ thương mại theo từng mặt hàng",
+     "refs": [
+      {
+       "source": "acbs-strategy-0926",
+       "page": 20
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "sugar",
+   "name": "Mía đường",
+   "icb": "Thực phẩm và đồ uống",
+   "status": "draft",
+   "symbols": [
+    "SBT"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Vùng nguyên liệu 71.797 ha ở 4 quốc gia",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "tct-sbt",
+        "page": null
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Sản xuất đường, mật đường, điện",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "tct-sbt",
+        "page": null
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Đường",
+      "note": null,
+      "share": "0.91",
+      "basis": "doanh thu",
+      "refs": [
+       {
+        "source": "tct-sbt",
+        "page": null
+       }
+      ]
+     },
+     {
+      "name": "Xuất khẩu tới 69 quốc gia",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "tct-sbt",
+        "page": null
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "sugar_price",
+     "label": "Giá đường thế giới",
+     "stage": "output",
+     "indicator": "com_sugar",
+     "when_up": "good",
+     "weight": "major",
+     "share": "0.91",
+     "why": "Đường là sản phẩm chủ lực, chiếm 91% doanh thu",
+     "refs": [
+      {
+       "source": "tct-sbt",
+       "page": null
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "consumer",
+   "name": "Hàng tiêu dùng",
+   "icb": "Thực phẩm và đồ uống",
+   "status": "draft",
+   "symbols": [
+    "MSN",
+    "KDC",
+    "PAN"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Thịt heo và nông sản (Masan MEATLife)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-msn",
+        "page": 2
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Chế biến hàng tiêu dùng, thịt mát",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-msn",
+        "page": 2
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Kênh bán lẻ hiện đại (WinCommerce, 70% cửa hàng mới ở nông thôn)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-msn",
+        "page": 2
+       }
+      ]
+     },
+     {
+      "name": "Người tiêu dùng",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-retail",
+        "page": 2
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "demand",
+     "label": "Sức mua người tiêu dùng",
+     "stage": "output",
+     "indicator": null,
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "Sức mua được kỳ vọng cải thiện trong 2026 nhưng chậm",
+     "refs": [
+      {
+       "source": "acbs-retail",
+       "page": 2
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "ict-retail",
+   "name": "Bán lẻ điện thoại, điện máy",
+   "icb": "Bán lẻ",
+   "status": "draft",
+   "symbols": [
+    "MWG",
+    "DGW"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Điện thoại, điện máy từ nhà sản xuất",
+      "note": "Giá sản phẩm tăng do tính năng mới và thiếu chip nhớ",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-mwg",
+        "page": 1
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Chuỗi cửa hàng bán lẻ hiện đại",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-retail",
+        "page": 3
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Người tiêu dùng, có hỗ trợ tài chính tiêu dùng (+47% svck)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-mwg",
+        "page": 1
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "demand",
+     "label": "Sức mua người tiêu dùng",
+     "stage": "output",
+     "indicator": null,
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "Sức mua được kỳ vọng cải thiện trong 2026 nhưng chậm",
+     "refs": [
+      {
+       "source": "acbs-retail",
+       "page": 2
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "jewellery",
+   "name": "Trang sức",
+   "icb": "Hàng cá nhân & Gia dụng",
+   "status": "draft",
+   "symbols": [
+    "PNJ"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Vàng",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-pnj",
+        "page": 1
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Chế tác và bán lẻ trang sức",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-pnj",
+        "page": 1
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Người mua trang sức, vàng giá trị cao",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-pnj",
+        "page": 1
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "gold",
+     "label": "Giá vàng",
+     "stage": "input",
+     "indicator": null,
+     "when_up": "bad",
+     "weight": "major",
+     "share": null,
+     "why": "Vàng là nguyên liệu chính của trang sức",
+     "refs": [
+      {
+       "source": "acbs-pnj",
+       "page": 1
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "it-services",
+   "name": "Dịch vụ công nghệ thông tin",
+   "icb": "Công nghệ Thông tin",
+   "status": "draft",
+   "symbols": [
+    "FPT",
+    "CMG"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Hợp đồng ký mới (dài hạn hơn)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-fpt",
+        "page": 1
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Dịch vụ CNTT trong nước và nước ngoài",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-fpt",
+        "page": 1
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Khách hàng tại các thị trường chính ở nước ngoài",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-fpt",
+        "page": 1
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "overseas_demand",
+     "label": "Nhu cầu CNTT ở thị trường chính",
+     "stage": "output",
+     "indicator": null,
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "Động lực tăng trưởng chính là dịch vụ CNTT nước ngoài",
+     "refs": [
+      {
+       "source": "acbs-fpt",
+       "page": 1
+      }
+     ]
+    }
+   ]
+  }
+ ]
 }

@@ -6,7 +6,6 @@ switching its status from draft to approved.
 """
 
 import json
-from datetime import date
 from pathlib import Path
 from typing import Literal
 
@@ -31,7 +30,7 @@ COMMODITY_MAX_AGE_DAYS = 75  # monthly averages, published with about a month's 
 class Source(ContractModel):
     title: str = Field(min_length=1)
     publisher: str = Field(min_length=1)
-    date: date
+    date: str = Field(pattern=r"^\d{4}-\d{2}(-\d{2})?$")  # a month alone when the document gives no day
     url: str = Field(pattern=r"^https?://\S+$")
 
 

@@ -407,6 +407,32 @@ def fetch_factors(store: MacroStore, *, get: Callable[[str], str], today: date |
     return results
 
 
+# Monthly world prices (IMF Primary Commodity Prices on FRED, checked 2026-10-30) for Chuỗi giá trị's input and output costs;
+# kept under data/macro/ but outside macro-indicators.json, so they never show on Vĩ mô. FRED has no urea series.
+COMMODITIES = {"com_coal": "PCOALAUUSDM", "com_iron_ore": "PIORECRUSDM", "com_rubber": "PRUBBUSDM", "com_sugar": "PSUGAISAUSDM",
+               "com_shrimp": "PSHRIUSDM", "com_lng": "PNGASJPUSDM", "com_aluminium": "PALUMUSDM", "com_copper": "PCOPPUSDM",
+               "com_wheat": "PWHEAMTUSDM", "com_soybean": "PSOYBUSDM"}
+COMMODITY_YEARS = 3
+
+
+def fetch_commodities(store: MacroStore, *, get: Callable[[str], str], today: date | None = None,
+                      sleep: Callable[[float], None] = time.sleep) -> dict[str, str]:
+    """Three years of each monthly commodity price; a failing series is reported and the others still update."""
+    today = today or datetime.now(VN).date()
+    start = today.replace(year=today.year - COMMODITY_YEARS, day=min(today.day, 28) if today.month == 2 else today.day)
+    results = {}
+    for key, series in COMMODITIES.items():
+        try:
+            points = parse_fred_csv(_get_with_retry(get, FRED_CSV.format(series=series) + f"&cosd={start.isoformat()}", sleep))
+            if not points:
+                raise MacroError("no_observations")
+            store.upsert(key, points, entry="auto")
+            results[key] = "ok"
+        except Exception as exc:
+            results[key] = f"error:{type(exc).__name__}"
+    return results
+
+
 def macro_reminders(indicators: list[dict], store: MacroStore, *, today: date) -> list[str]:
     """Indicators the owner can enter by hand that have no value yet or are older than their update rhythm (max_age_days)."""
     out = []

@@ -201,7 +201,7 @@ def trend_run(data_dir: Path, calendar_path: Path, now=None, provider=None, get=
 
 def macro_sync(data_dir: Path, get=None) -> int:
     """Exit 0 when every automatic indicator updated, 1 when some failed (each is reported)."""
-    from investment_agent.market.leading import MacroStore, fetch_auto, fetch_factors, load_indicators
+    from investment_agent.market.leading import MacroStore, fetch_auto, fetch_commodities, fetch_factors, load_indicators
     if get is None:
         import httpx
 
@@ -211,6 +211,7 @@ def macro_sync(data_dir: Path, get=None) -> int:
             return response.text
     results = fetch_auto(load_indicators(), MacroStore(data_dir), get=get)
     results.update(fetch_factors(MacroStore(data_dir), get=get))  # long oil and US dollar history for the sensitivity reading
+    results.update(fetch_commodities(MacroStore(data_dir), get=get))  # monthly world prices for Chuỗi giá trị
     failed = {k: v for k, v in results.items() if v != "ok"}
     print(json.dumps({"status": "ok" if not failed else "partial", "results": results}))
     return 0 if not failed else 1

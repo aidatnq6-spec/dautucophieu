@@ -382,3 +382,22 @@ def test_factor_series_retry_a_server_error(tmp_path):
         return "observation_date,X\n2026-10-27,61.2\n"
     assert fetch_factors(MacroStore(tmp_path), get=get, today=date(2026, 10, 30), sleep=waits.append) == {"factor_oil": "ok", "factor_usd": "ok"}
     assert waits == [2, 2]
+
+
+def test_commodity_series_are_kept_under_their_own_keys_for_three_years(tmp_path):
+    """Chuỗi giá trị needs world prices of coal, iron ore, rubber and the like; they never show on Vĩ mô."""
+    from investment_agent.market.leading import COMMODITIES, fetch_commodities
+    asked = []
+
+    def get(url):
+        asked.append(url)
+        if "PRUBBUSDM" in url:
+            raise OSError("offline")
+        return "observation_date,X\n2026-08-01,150.5\n2026-09-01,153.84\n"
+    store = MacroStore(tmp_path)
+    result = fetch_commodities(store, get=get, today=date(2026, 10, 30), sleep=lambda s: None)
+    assert COMMODITIES["com_coal"] == "PCOALAUUSDM" and len(COMMODITIES) == 10
+    assert result["com_rubber"] == "error:OSError" and result["com_coal"] == "ok"
+    assert store.read("com_coal")[-1]["value"] == "153.84" and store.read("com_rubber") == []
+    assert all("cosd=2023-10-30" in u for u in asked)
+    assert not any(i["id"].startswith("com_") for i in load_indicators())

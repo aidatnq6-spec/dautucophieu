@@ -88,7 +88,7 @@ export function SettingsView() {
       </section>
       <section className="surface">
         <h2>Lịch sau phiên</h2>
-        <p>Chạy lúc 15:30, thử lại 17:30, 18:30 và 20:00 (giờ Việt Nam) chỉ khi giá của phiên chưa về đủ; 07:00 sáng và khi máy bật lại sẽ chạy bù phiên gần nhất chưa có bản tin.
+        <p>Chạy lúc 15:30, thử lại 20:00 (giờ Việt Nam) chỉ khi giá của phiên chưa về đủ; 08:30 sáng và khi máy bật lại sẽ chạy bù phiên gần nhất chưa có bản tin.
           Bản tin lịch sử bổ sung không được gửi hàng loạt.</p>
         <p className="notice">Máy tắt hoặc ngủ thì không bảo đảm chạy đúng giờ. Đăng ký lịch bằng <code>scripts\windows\register-tasks.ps1 -Register</code> sau khi cấu hình xong.</p>
       </section>

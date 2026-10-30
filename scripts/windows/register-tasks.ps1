@@ -5,7 +5,7 @@ param([switch]$Register, [switch]$Unregister)
 $name = 'InvestmentAgent-AfterClose'
 $script = Join-Path $PSScriptRoot 'run-after-close.ps1'
 $argument = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$script`""
-$times = @('07:00', '15:30', '17:30', '18:30', '20:00')
+$times = @('08:30', '15:30', '20:00')
 
 if ($Unregister) {
     if (Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue) { Unregister-ScheduledTask -TaskName $name -Confirm:$false }

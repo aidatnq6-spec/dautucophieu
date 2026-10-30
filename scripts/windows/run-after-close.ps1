@@ -1,4 +1,4 @@
-﻿# One scheduler wake-up. Task Scheduler calls this at 07:00, 15:30, 17:30, 18:30, 20:00 and at logon (catch-up).
+﻿# One scheduler wake-up. Task Scheduler calls this at 08:30, 15:30, 20:00 and at logon (catch-up).
 # Secrets come from .env.local; nothing secret is passed on the command line or written to the log.
 . (Join-Path $PSScriptRoot 'common.ps1')
 $log = Join-Path $script:RepoRoot 'logs\scheduler.log'

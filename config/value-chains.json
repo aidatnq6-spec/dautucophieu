@@ -174,6 +174,18 @@
    "publisher": "ACBS",
    "date": "2026-08-07",
    "url": "https://acbs.com.vn/acbsmedia/2026/08/FPT_by_ACBS_Update-VN-_07.08.2026.pdf"
+  },
+  "acbs-nt2": {
+   "title": "Cập nhật NT2 – MUA (Q2/2026)",
+   "publisher": "ACBS",
+   "date": "2026-07-27",
+   "url": "https://acbs.com.vn/acbsmedia/2026/07/NT2_VN_Update_Q2-26.pdf"
+  },
+  "acbs-vhm": {
+   "title": "VHM Update – NEUTRAL",
+   "publisher": "ACBS",
+   "date": "2026-03-18",
+   "url": "https://acbs.com.vn/acbsmedia/2026/03/VHM-by-ACBS_18.3.2026-EN.pdf"
   }
  },
  "chains": [
@@ -560,6 +572,22 @@
         "page": 2
        }
       ]
+     },
+     {
+      "name": "Vingroup (VIC) sở hữu 73,5% Vinhomes và đứng tên chủ đầu tư một số dự án Vinhomes",
+      "note": "Chuỗi chỉ phản ánh mảng bất động sản của VIC",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-vhm",
+        "page": 2
+       },
+       {
+        "source": "acbs-vhm",
+        "page": 3
+       }
+      ]
      }
     ],
     "output": [
@@ -735,14 +763,18 @@
       ]
      },
      {
-      "name": "Công trình của khách hàng tư nhân",
-      "note": null,
-      "share": null,
-      "basis": null,
+      "name": "Công trình dân dụng của chủ đầu tư bất động sản tư nhân (CTD)",
+      "note": "Dân dụng chiếm 72% doanh thu FY2026 và 72% backlog của CTD",
+      "share": "0.72",
+      "basis": "doanh thu FY2026 của CTD",
       "refs": [
        {
         "source": "acbs-ctd",
-        "page": 3
+        "page": 2
+       },
+       {
+        "source": "acbs-ctd",
+        "page": 4
        }
       ]
      }
@@ -780,6 +812,26 @@
        "page": 2
       }
      ]
+    },
+    {
+     "id": "rates",
+     "label": "Lãi suất",
+     "stage": "output",
+     "indicator": "deposit_12m",
+     "when_up": "bad",
+     "weight": "minor",
+     "share": null,
+     "why": "Lãi suất cao làm chậm tiến độ và thanh toán của chủ đầu tư bất động sản; với CTD, dân dụng chiếm 72% doanh thu",
+     "refs": [
+      {
+       "source": "acbs-ctd",
+       "page": 1
+      },
+      {
+       "source": "acbs-ctd",
+       "page": 2
+      }
+     ]
     }
    ]
   },
@@ -795,7 +847,7 @@
     "input": [
      {
       "name": "Hạt nhựa PVC",
-      "note": "Mua từ SCG Chemicals; giá PVC Trung Quốc tăng 13,6% từ tháng 6/2026",
+      "note": "Phần lớn mua từ đối tác chiến lược trong nước (tiết giảm thuế nhập khẩu 5%); giá PVC Trung Quốc tăng 13,6% từ tháng 6/2026",
       "share": null,
       "basis": null,
       "refs": [
@@ -867,6 +919,22 @@
        "page": 1
       }
      ]
+    },
+    {
+     "id": "rates",
+     "label": "Lãi suất",
+     "stage": "output",
+     "indicator": "deposit_12m",
+     "when_up": "bad",
+     "weight": "minor",
+     "share": null,
+     "why": "Nhu cầu xây dựng chưa phục hồi do chi phí xây dựng và lãi suất ở mức cao; sản lượng Q3/2026 giảm khoảng 17% svck",
+     "refs": [
+      {
+       "source": "acbs-bmp",
+       "page": 1
+      }
+     ]
     }
    ]
   },
@@ -882,9 +950,9 @@
     "input": [
      {
       "name": "Quặng sắt",
-      "note": null,
-      "share": null,
-      "basis": null,
+      "note": "Chiếm khoảng 35% giá vốn sản xuất thép",
+      "share": "0.35",
+      "basis": "giá vốn sản xuất thép",
       "refs": [
        {
         "source": "acbs-hpg",
@@ -894,9 +962,9 @@
      },
      {
       "name": "Than luyện thép",
-      "note": null,
-      "share": null,
-      "basis": null,
+      "note": "Chiếm gần 40% giá vốn sản xuất thép",
+      "share": "0.40",
+      "basis": "giá vốn sản xuất thép",
       "refs": [
        {
         "source": "acbs-hpg",
@@ -946,7 +1014,7 @@
      "indicator": "com_iron_ore",
      "when_up": "bad",
      "weight": "major",
-     "share": null,
+     "share": "0.35",
      "why": "Nguyên liệu chính; giá bán tăng nhanh hơn chi phí nguyên liệu thì biên mở rộng",
      "refs": [
       {
@@ -966,8 +1034,8 @@
      "indicator": null,
      "when_up": "bad",
      "weight": "major",
-     "share": null,
-     "why": "Nguyên liệu chính; FRED chỉ có giá than nhiệt Úc, không phải than luyện thép",
+     "share": "0.40",
+     "why": "Chiếm gần 40% giá vốn; FRED chỉ có giá than nhiệt Úc, không phải than luyện thép",
      "refs": [
       {
        "source": "acbs-hpg",
@@ -1371,7 +1439,6 @@
    "status": "draft",
    "symbols": [
     "REE",
-    "NT2",
     "HDG"
    ],
    "stages": {
@@ -1467,6 +1534,101 @@
       },
       {
        "source": "acbs-hdg",
+       "page": 3
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "gas-power",
+   "name": "Nhiệt điện khí",
+   "icb": "Điện, nước & xăng dầu khí đốt",
+   "status": "draft",
+   "symbols": [
+    "NT2"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Khí thiên nhiên",
+      "note": "Giá khí bình quân Q2/2026 đạt 10,3 USD/MMBTU, tăng hơn 7% svck",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-nt2",
+        "page": 2
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Phát điện khí (Nhơn Trạch 2)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-nt2",
+        "page": 2
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Bán điện theo sản lượng hợp đồng (Qc) và trên thị trường điện",
+      "note": "Giá bán bình quân Q2/2026 giảm 12% svck do tỷ trọng bán trên thị trường tăng",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-nt2",
+        "page": 2
+       },
+       {
+        "source": "acbs-nt2",
+        "page": 3
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "gas_price",
+     "label": "Giá khí đầu vào",
+     "stage": "input",
+     "indicator": null,
+     "when_up": "bad",
+     "weight": "major",
+     "share": null,
+     "why": "Chi phí nguyên liệu Q2/2026 là 2.280 tỷ đồng trên doanh thu 2.825 tỷ đồng; ứng dụng không có chuỗi giá khí trong nước",
+     "refs": [
+      {
+       "source": "acbs-nt2",
+       "page": 2
+      }
+     ]
+    },
+    {
+     "id": "hydrology",
+     "label": "Lượng nước về hồ thủy điện",
+     "stage": "output",
+     "indicator": null,
+     "when_up": "bad",
+     "weight": "major",
+     "share": null,
+     "why": "Ngược với thủy điện: El Niño làm giảm huy động thủy điện thì điện khí được huy động nhiều hơn; kết quả 6T2026 của NT2 tăng nhờ sản lượng Qc được giao",
+     "refs": [
+      {
+       "source": "acbs-gas",
+       "page": 1
+      },
+      {
+       "source": "acbs-nt2",
        "page": 3
       }
      ]
@@ -1628,19 +1790,31 @@
    },
    "factors": [
     {
-     "id": "freight",
-     "label": "Giá cước vận tải",
+     "id": "freight_tanker",
+     "label": "Giá cước vận tải dầu khí (PVT)",
      "stage": "output",
      "indicator": null,
      "when_up": "good",
      "weight": "major",
      "share": null,
-     "why": "Giá cước container thế giới được dự báo giảm 15–20% trong 2026",
+     "why": "Cước tàu dầu duy trì ở mức cao, hợp đồng định hạn tái ký ở mặt bằng giá cao",
      "refs": [
       {
        "source": "acbs-pvt",
        "page": 1
-      },
+      }
+     ]
+    },
+    {
+     "id": "freight_container",
+     "label": "Giá cước container (HAH)",
+     "stage": "output",
+     "indicator": null,
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "Cước container thế giới được dự báo giảm 20% trong 2026; ACBS dự phóng cước của HAH chỉ giảm nhẹ nhờ tuyến nội địa và nội Á",
+     "refs": [
       {
        "source": "acbs-hah",
        "page": 2
@@ -1733,7 +1907,7 @@
     "input": [
      {
       "name": "Nguyên liệu cá",
-      "note": "Lợi thế nguyên liệu khác nhau giữa các doanh nghiệp",
+      "note": "Lợi thế nguyên liệu khác nhau giữa các doanh nghiệp (ví dụ trong nguồn là FMC, doanh nghiệp tôm)",
       "share": null,
       "basis": null,
       "refs": [
@@ -1784,9 +1958,9 @@
      "stage": "output",
      "indicator": null,
      "when_up": "bad",
-     "weight": "major",
+     "weight": "minor",
      "share": null,
-     "why": "Rủi ro chính nằm ở biện pháp phòng vệ thương mại theo từng mặt hàng",
+     "why": "Nguồn xếp rủi ro trực tiếp từ thuế Mục 301 với thủy sản ở mức thấp–trung bình; rủi ro chính nằm ở biện pháp phòng vệ thương mại theo từng mặt hàng",
      "refs": [
       {
        "source": "acbs-strategy-0926",
@@ -1838,7 +2012,7 @@
       "name": "Đường",
       "note": null,
       "share": "0.91",
-      "basis": "doanh thu",
+      "basis": "doanh thu quý 3 niên độ 2024–2025",
       "refs": [
        {
         "source": "tct-sbt",
@@ -1869,7 +2043,7 @@
      "when_up": "good",
      "weight": "major",
      "share": "0.91",
-     "why": "Đường là sản phẩm chủ lực, chiếm 91% doanh thu",
+     "why": "Đường là sản phẩm chủ lực, chiếm 91% doanh thu quý 3 niên độ 2024–2025 (tương đương quý 1/2025)",
      "refs": [
       {
        "source": "tct-sbt",
@@ -1997,7 +2171,7 @@
       "refs": [
        {
         "source": "acbs-retail",
-        "page": 3
+        "page": 2
        }
       ]
      }
@@ -2062,7 +2236,7 @@
     "middle": [
      {
       "name": "Chế tác và bán lẻ trang sức",
-      "note": null,
+      "note": "Kế hoạch 2026 điều chỉnh sang lỗ 6.271 tỷ đồng, phần lớn do dự phòng 7.071 tỷ đồng liên quan hoạt động mua lại; đóng 25–30 cửa hàng không hiệu quả",
       "share": null,
       "basis": null,
       "refs": [
@@ -2090,18 +2264,18 @@
    },
    "factors": [
     {
-     "id": "gold",
-     "label": "Giá vàng",
-     "stage": "input",
+     "id": "demand",
+     "label": "Sức mua người tiêu dùng",
+     "stage": "output",
      "indicator": null,
-     "when_up": "bad",
+     "when_up": "good",
      "weight": "major",
      "share": null,
-     "why": "Vàng là nguyên liệu chính của trang sức",
+     "why": "PNJ nằm trong nhóm bán lẻ niêm yết; sức mua được kỳ vọng cải thiện trong 2026 nhưng chậm",
      "refs": [
       {
-       "source": "acbs-pnj",
-       "page": 1
+       "source": "acbs-retail",
+       "page": 2
       }
      ]
     }

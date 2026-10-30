@@ -37,3 +37,26 @@ def test_bad_entries_are_refused():
     assert add(c, clock, "b1", kind="yacht").status_code == 422
     assert add(c, clock, "b2", amount="abc").status_code == 422
     assert add(c, clock, "b3", title="").status_code == 422
+
+
+def test_an_entry_can_be_edited_in_place():
+    c, clock = client()
+    add(c, clock, "e1")
+    body = {"on": "2027-01-12", "kind": "book", "title": "Sách định giá", "amount": "450000", "skill": "Đọc báo cáo tài chính", "request_id": "u1"}
+    r = call(c, clock, "PUT", "/internal/intangibles/entries/e1", body)
+    assert r.status_code == 200
+    [entry] = r.json()["entries"]
+    assert entry == {"id": "e1", "on": "2027-01-12", "kind": "book", "title": "Sách định giá", "amount": "450000", "skill": "Đọc báo cáo tài chính"}
+    assert r.json()["year"]["spent"] == "450000"
+    assert call(c, clock, "PUT", "/internal/intangibles/entries/zz", body).status_code == 404
+    assert call(c, clock, "PUT", "/internal/intangibles/entries/e1", {**body, "amount": "0"}).status_code == 422
+
+
+def test_an_entry_can_be_deleted_and_a_retried_delete_is_harmless():
+    c, clock = client()
+    add(c, clock, "d1")
+    add(c, clock, "d2", title="Sách")
+    r = call(c, clock, "POST", "/internal/intangibles/entries/d1/delete", {"request_id": "x1"})
+    assert r.status_code == 200 and [e["id"] for e in r.json()["entries"]] == ["d2"]
+    r = call(c, clock, "POST", "/internal/intangibles/entries/d1/delete", {"request_id": "x1"})
+    assert r.status_code == 200 and [e["id"] for e in r.json()["entries"]] == ["d2"]

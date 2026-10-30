@@ -1,5 +1,5 @@
-"""Tài sản vô hình on Hồ sơ & rủi ro: an append-only log of money put into oneself (`settings/intangibles`), against a share of
-yearly income from Sức khỏe tài chính. Entries are never edited; a correction is a new line."""
+"""Tài sản vô hình on Hồ sơ & rủi ro: a log of money put into oneself (`settings/intangibles`), against a share of yearly
+income from Sức khỏe tài chính. A line can be edited or deleted; earlier versions stay in the record's version history."""
 
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -23,13 +23,24 @@ DEFAULT_RATE = "10"
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
 
 
-class EntryRequest(ContractModel):
+class EntryFields(ContractModel):
     on: date
     kind: Literal["course", "certificate", "book", "other"]
     title: str = Field(min_length=1, max_length=200)
     amount: str = Field(max_length=24)
     skill: str = Field(default="", max_length=300)
-    request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")
+
+
+class EntryRequest(EntryFields):
+    request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")  # also the new line's id
+
+
+class EditRequest(EntryFields):
+    request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
+
+
+class DeleteRequest(ContractModel):
+    request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
 
 
 class TargetRequest(ContractModel):
@@ -73,25 +84,65 @@ def _write(request: Request, repo, owner, change, request_id: str):
         return write_error(exc)
 
 
-@router.post("/entries")
-def add_entry(request: Request, body: EntryRequest):
-    owner, repo = require_owner(request), request.app.state.personal_repository
-    if repo is None:
-        return unavailable()
+def _entry(entry_id: str, body: EntryFields):
+    """The line to store, or an error response when the amount is not a whole, non-zero number of đồng."""
     try:
         amount = Decimal(body.amount)
     except InvalidOperation:
         return error(422, "invalid_amount", "Số tiền phải là số đồng.")
     if not amount.is_finite() or amount == 0 or amount != amount.to_integral_value():
         return error(422, "invalid_amount", "Số tiền phải là số đồng khác 0 (số âm để điều chỉnh).")
-    entry = {"id": body.request_id, "on": body.on.isoformat(), "kind": body.kind, "title": body.title.strip(), "amount": format(amount, "f"),
-             "skill": body.skill.strip()}
+    return {"id": entry_id, "on": body.on.isoformat(), "kind": body.kind, "title": body.title.strip(), "amount": format(amount, "f"),
+            "skill": body.skill.strip()}
+
+
+@router.post("/entries")
+def add_entry(request: Request, body: EntryRequest):
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None:
+        return unavailable()
+    entry = _entry(body.request_id, body)
+    if not isinstance(entry, dict):
+        return entry
 
     def append(data):
         if any(e["id"] == entry["id"] for e in data["entries"]):
             return None  # a retry: already recorded
         return {**data, "entries": [*data["entries"], entry]}
     return _write(request, repo, owner, append, body.request_id)
+
+
+@router.put("/entries/{entry_id}")
+def edit_entry(entry_id: str, request: Request, body: EditRequest):
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None:
+        return unavailable()
+    entry = _entry(entry_id, body)
+    if not isinstance(entry, dict):
+        return entry
+    try:
+        if not any(e["id"] == entry_id for e in _payload(read_version(repo, owner, *RECORD, None))["entries"]):
+            return error(404, "entry_not_found", "Không tìm thấy dòng này trong sổ.")
+    except RepositoryUnavailable:
+        return unavailable()
+
+    def replace(data):
+        entries = [entry if e["id"] == entry_id else e for e in data["entries"]]
+        return None if entries == data["entries"] else {**data, "entries": entries}  # a retry: already saved
+    return _write(request, repo, owner, replace, body.request_id)
+
+
+@router.post("/entries/{entry_id}/delete")
+def delete_entry(entry_id: str, request: Request, body: DeleteRequest):
+    """Deleting a line that is already gone (a retried request) changes nothing."""
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None:
+        return unavailable()
+
+    def remove(data):
+        entries = [e for e in data["entries"] if e["id"] != entry_id]
+        return None if len(entries) == len(data["entries"]) else {**data, "entries": entries}
+    return _write(request, repo, owner, remove, body.request_id)
 
 
 @router.put("/target")

@@ -316,3 +316,69 @@ def test_factor_series_keep_five_years_of_fred_history(tmp_path):
     assert len(oil) == 56 and oil[0]["date"] == "2019-01-02" and oil[-1] == {**oil[-1], "date": "2026-01-08", "value": "96.8"}
     assert fetch_factors(store, get=lambda url: (_ for _ in ()).throw(OSError("offline")), today=date(2026, 10, 27)) == {
         "factor_oil": "error:OSError", "factor_usd": "error:OSError"}
+
+
+def _status_error(url, code):
+    import httpx
+    request = httpx.Request("GET", url)
+    return httpx.HTTPStatusError(f"{code}", request=request, response=httpx.Response(code, request=request))
+
+
+def test_fetch_auto_retries_a_timeout_before_giving_up(tmp_path):
+    """Stockbiz timed out on 2026-10-29 and 2026-10-30 for one page at a time; a second try usually answers."""
+    import httpx
+    wanted = [i for i in load_indicators() if i["id"] == "vn10y"]
+    calls, waits = [], []
+
+    def get(url):
+        calls.append(url)
+        if len(calls) < 3:
+            raise httpx.ReadTimeout("timed out")
+        return "Recent readings 10/29/2026 | 3.10% 10/30/2026 | 3.12% Source: Hanoi Stock Exchange"
+    store = MacroStore(tmp_path)
+    assert fetch_auto(wanted, store, get=get, today=date(2026, 10, 30), sleep=waits.append) == {"vn10y": "ok"}
+    assert len(calls) == 3 and waits == [2, 5]
+    assert store.read("vn10y")[-1]["value"] == "3.12"
+
+
+def test_fetch_auto_does_not_retry_a_permanent_answer(tmp_path):
+    wanted = [i for i in load_indicators() if i["id"] == "wti"]
+    calls, waits = [], []
+
+    def get(url):
+        calls.append(url)
+        raise _status_error(url, 404)
+    assert fetch_auto(wanted, MacroStore(tmp_path), get=get, today=date(2026, 10, 30), sleep=waits.append) == {"wti": "error:HTTPStatusError"}
+    assert len(calls) == 1 and waits == []
+
+
+def test_fetch_auto_skips_the_rest_of_a_host_that_stays_down(tmp_path):
+    """Three stockbiz pages behind one unreachable host cost one round of tries, not three; other hosts still update."""
+    import httpx
+    stockbiz = {i["id"] for i in load_indicators() if i["source"]["kind"] == "stockbiz"}
+    calls, waits = [], []
+
+    def get(url):
+        calls.append(url)
+        if "stockbiz.vn" in url:
+            raise httpx.ReadTimeout("timed out")
+        if "DGS10" in url:
+            return FRED_10Y
+        raise _status_error(url, 404)
+    result = fetch_auto(load_indicators(), MacroStore(tmp_path), get=get, today=date(2026, 10, 30), sleep=waits.append)
+    assert {k: v for k, v in result.items() if k in stockbiz} == {k: "error:ReadTimeout" for k in stockbiz} and len(stockbiz) >= 2
+    assert sum("stockbiz.vn" in u for u in calls) == 3 and waits == [2, 5]
+    assert result["us10y"] == "ok"
+
+
+def test_factor_series_retry_a_server_error(tmp_path):
+    from investment_agent.market.leading import fetch_factors
+    failed, waits = set(), []
+
+    def get(url):
+        if url not in failed:
+            failed.add(url)
+            raise _status_error(url, 503)
+        return "observation_date,X\n2026-10-27,61.2\n"
+    assert fetch_factors(MacroStore(tmp_path), get=get, today=date(2026, 10, 30), sleep=waits.append) == {"factor_oil": "ok", "factor_usd": "ok"}
+    assert waits == [2, 2]

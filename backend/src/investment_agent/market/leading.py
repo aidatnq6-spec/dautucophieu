@@ -20,10 +20,12 @@ import os
 import re
 import xml.etree.ElementTree as ET
 import calendar
+import time
 from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Callable
+from urllib.parse import urlsplit
 
 from investment_agent.domain.pinned import CONFIG_DIR
 
@@ -45,6 +47,28 @@ _ID = re.compile(r"^[a-z0-9_]{1,40}$")
 
 class MacroError(ValueError):
     pass
+
+
+# Seconds before the second and third try of a timeout, dropped connection, 429 or 5xx (stockbiz timed out
+# one page at a time on 2026-10-29 and 2026-10-30); any other answer is final.
+RETRY_DELAYS = (2, 5)
+
+
+def _transient(exc: Exception) -> bool:
+    import httpx
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code == 429 or exc.response.status_code >= 500
+    return isinstance(exc, httpx.TransportError)
+
+
+def _get_with_retry(get: Callable[[str], str], url: str, sleep: Callable[[float], None]) -> str:
+    for delay in (*RETRY_DELAYS, None):
+        try:
+            return get(url)
+        except Exception as exc:
+            if delay is None or not _transient(exc):
+                raise
+            sleep(delay)
 
 
 def load_indicators(path: Path = INDICATORS_PATH) -> list[dict]:
@@ -291,15 +315,26 @@ class MacroStore:
         os.replace(tmp, self.root / "_status.json")
 
 
-def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str], str], today: date | None = None) -> dict[str, str]:
+def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str], str], today: date | None = None,
+               sleep: Callable[[float], None] = time.sleep) -> dict[str, str]:
     """Fetch every automatic indicator; one failing source never stops the others. Topi pages carry no
-    publication date, so their values are dated on the fetch day (Vietnam time)."""
+    publication date, so their values are dated on the fetch day (Vietnam time). A host still unreachable
+    after its retries is not asked again this run; its other indicators report the same error."""
     today = today or datetime.now(VN).date()
     pages: dict[str, str] = {}
+    down: dict[str, Exception] = {}
 
     def page(url):
+        host = urlsplit(url).hostname
+        if host in down:
+            raise down[host]
         if url not in pages:
-            pages[url] = get(url)
+            try:
+                pages[url] = _get_with_retry(get, url, sleep)
+            except Exception as exc:
+                if _transient(exc):
+                    down[host] = exc
+                raise
         return pages[url]
     results = {}
     for ind in indicators:
@@ -354,14 +389,15 @@ FACTORS = {"factor_oil": "DCOILWTICO", "factor_usd": "DTWEXBGS"}
 FACTOR_YEARS = 5
 
 
-def fetch_factors(store: MacroStore, *, get: Callable[[str], str], today: date | None = None) -> dict[str, str]:
+def fetch_factors(store: MacroStore, *, get: Callable[[str], str], today: date | None = None,
+                  sleep: Callable[[float], None] = time.sleep) -> dict[str, str]:
     """Five years of each factor from FRED's public CSV; a failing series is reported and the other still updates."""
     today = today or datetime.now(VN).date()
     start = today.replace(year=today.year - FACTOR_YEARS, day=min(today.day, 28) if today.month == 2 else today.day)
     results = {}
     for key, series in FACTORS.items():
         try:
-            points = parse_fred_csv(get(FRED_CSV.format(series=series) + f"&cosd={start.isoformat()}"))
+            points = parse_fred_csv(_get_with_retry(get, FRED_CSV.format(series=series) + f"&cosd={start.isoformat()}", sleep))
             if not points:
                 raise MacroError("no_observations")
             store.upsert(key, points, entry="auto")

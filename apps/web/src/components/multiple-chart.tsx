@@ -2,9 +2,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../lib/api";
 
-type Point = { month: string; value: string | null; year: string };
+type Point = { month: string; value: string | null; year: string | null };  // year: fiscal year behind a ticker's point; null for an index
 type Series = { points: Point[]; median: string | null; sd: string | null; latest: string | null };
-type History = { symbol: string; pe: Series; pb: Series; shares: number | null; from: string | null; to: string | null; reason: string | null };
+type History = { symbol: string; kind?: "index"; pe: Series; pb: Series; shares: number | null; from: string | null; to: string | null; reason: string | null };
 
 const H = 220, PAD = { top: 14, right: 58, bottom: 26, left: 36 };
 const num = (v: string | number) => Number(v).toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -81,13 +81,13 @@ function Chart({ title, symbol, series, unit }: { title: string; symbol: string;
         </svg>
         {h && <div className="mc-tip" style={{ left: `${Math.min(80, Math.max(20, (x(hover!) / W) * 100))}%` }} role="status">
           <strong>{monthLabel(h.month)}</strong>: {h.value ? `${num(h.value)}${unit}` : "không xác định (lỗ hoặc vốn âm)"}
-          <div className="caption">theo số liệu năm {h.year}</div></div>}
+          {h.year && <div className="caption">theo số liệu năm {h.year}</div>}</div>}
       </div>
       <details className="mc-table">
         <summary>Bảng số liệu</summary>
-        <table><thead><tr><th>Tháng</th><th className="num">{title.split(" ")[0]}</th><th>Năm tài chính</th></tr></thead>
+        <table><thead><tr><th>Tháng</th><th className="num">{title.split(" ")[0]}</th>{pts[0]?.year !== null && <th>Năm tài chính</th>}</tr></thead>
           <tbody>{[...pts].reverse().map((p) => <tr key={p.month}><td>{monthLabel(p.month)}</td>
-            <td className="num">{p.value ? num(p.value) : "—"}</td><td>{p.year}</td></tr>)}</tbody></table>
+            <td className="num">{p.value ? num(p.value) : "—"}</td>{p.year !== null && <td>{p.year}</td>}</tr>)}</tbody></table>
       </details>
     </figure>
   );
@@ -104,8 +104,11 @@ export function MultipleCharts({ symbol }: { symbol: string }) {
   if (data.reason) return <p className="muted">Chưa vẽ được biểu đồ P/E, P/B: {data.reason}.</p>;
   return (
     <section aria-label={`Biểu đồ P/E và P/B ${symbol}`}>
-      <p className="caption">Mỗi tháng một điểm, {monthLabel(data.from!)}–{monthLabel(data.to!)}: giá cuối tháng (đã điều chỉnh) × số cổ phiếu hiện tại,
-        chia lợi nhuận hoặc vốn chủ của năm tài chính đã công bố gần nhất (số liệu năm N dùng từ 1/4 năm N+1).</p>
+      {data.kind === "index"
+        ? <p className="caption">Mỗi tháng một điểm, {monthLabel(data.from!)}–{monthLabel(data.to!)}: P/E, P/B của chỉ số ngày cuối tháng (VNDirect).
+          Trung vị và dải ±1 độ lệch chuẩn tính trên số liệu theo ngày của cùng 5 năm, như bảng phía trên.</p>
+        : <p className="caption">Mỗi tháng một điểm, {monthLabel(data.from!)}–{monthLabel(data.to!)}: giá cuối tháng (đã điều chỉnh) × số cổ phiếu hiện tại,
+          chia lợi nhuận hoặc vốn chủ của năm tài chính đã công bố gần nhất (số liệu năm N dùng từ 1/4 năm N+1).</p>}
       <div className="mc-grid2">
         <Chart title="P/E lịch sử" symbol={symbol} series={data.pe} unit="x" />
         <Chart title="P/B lịch sử" symbol={symbol} series={data.pb} unit="x" />

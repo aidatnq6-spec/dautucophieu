@@ -67,3 +67,15 @@ def test_fairvalue_values_the_two_indices_from_their_stored_multiples(tmp_path):
     rows = {r["symbol"]: r for r in body["indices"]}
     assert rows["VNINDEX"]["fair"] == "2025.00" and rows["VNINDEX"]["close"] == "1800.00" and rows["VNINDEX"]["verdict"] == "fair"
     assert rows["VN30"]["verdict"] == "insufficient" and {m["reason"] for m in rows["VN30"]["methods"]} == {"Chưa có số liệu"}
+
+
+def test_history_of_an_index_charts_its_stored_daily_multiples(tmp_path):
+    (tmp_path / "market-symbols.txt").write_text("FPT\n", encoding="utf-8")
+    store = SeriesStore(tmp_path / "index-valuation")
+    store.upsert("VN30-pe-1d", [(datetime(2025, m, 28), "12") for m in range(1, 13)])
+    store.upsert("VN30-pb-1d", [(datetime(2025, m, 28), "2") for m in range(1, 13)])
+    clock = Clock()
+    app = create_app(InternalAuthSettings("owner-1", TOKEN, SECRET), clock=clock, personal_repository=PersonalRepository("owner-1", MemoryDocumentStore()),
+                     market=SyntheticMarket(prices={}), data_dir=tmp_path)
+    body = call(TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000)), clock, "GET", "/internal/fairvalue/history/VN30").json()
+    assert body["symbol"] == "VN30" and body["kind"] == "index" and len(body["pe"]["points"]) == 12 and body["pb"]["latest"] == "2.00"

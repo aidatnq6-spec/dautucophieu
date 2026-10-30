@@ -67,3 +67,16 @@ test("VNINDEX and VN30 are valued from their P/E and P/B against a five-year med
   await expect(table.getByRole("row", { name: /VN-Index/ })).toContainText("Chưa có số liệu");
   await expect(page.getByText(/lợi nhuận bốn quý gần nhất/)).toBeVisible();
 });
+
+test("the detail of an index charts its monthly P/E and P/B over five years", async ({ page }) => {
+  await openPage(page);
+  await page.getByRole("button", { name: "Chi tiết VN30" }).click();
+  const pe = page.getByRole("figure", { name: "P/E lịch sử VN30" });
+  await expect(pe).toBeVisible();
+  await expect(pe).toContainText("Hiện tại 12,0x");
+  await expect(pe).toContainText("Trung vị 15,0x");
+  await expect(page.getByRole("figure", { name: "P/B lịch sử VN30" })).toBeVisible();
+  await expect(page.getByText(/như bảng phía trên/)).toBeVisible();
+  await pe.getByText("Bảng số liệu").click();
+  await expect(pe.getByRole("table")).not.toContainText("Năm tài chính");
+});

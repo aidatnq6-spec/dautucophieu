@@ -17,10 +17,10 @@ export function formatRatio(value: string | null | undefined, digits = 1): strin
   const negative = value.startsWith("-");
   const [i, f = ""] = (negative ? value.slice(1) : value).split(".");
   const scaled = (i + (f + "0000").slice(0, 2 + digits)).replace(/^0+(?=\d)/, "");
-  const whole = (scaled.slice(0, -digits) || "0").replace(/^0+(?=\d)/, "");
-  const frac = scaled.slice(-digits).padStart(digits, "0");
+  const whole = ((digits ? scaled.slice(0, -digits) : scaled) || "0").replace(/^0+(?=\d)/, "");
+  const frac = digits ? scaled.slice(-digits).padStart(digits, "0") : "";
   const sign = negative && /[1-9]/.test(whole + frac) ? "−" : "";
-  return `${sign}${whole},${frac}%`;
+  return `${sign}${whole}${digits ? `,${frac}` : ""}%`;
 }
 
 /** A non-money decimal string (e.g. index points) with Vietnamese grouping, rounded half up to `digits` places on the string. */

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
 import { formatDecimal } from "../lib/format";
+import { ValueChains } from "./value-chains";
 import { Change } from "./watchlist-view";
 
 type Index = { entity_id: string; close: string; date: string; change_1d: string | null; change_20d: string | null; ma20: string | null; above_ma20: boolean | null };
@@ -51,6 +52,7 @@ export function MarketView() {
         </div>
         {data.sectors_as_of && <p className="caption">Phân ngành ICB cấp 2 theo nguồn ngày {data.sectors_as_of}.</p>}
       </section>
+      <ValueChains />
     </>
   );
 }

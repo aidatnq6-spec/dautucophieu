@@ -1,16 +1,17 @@
 "use client";
+import Link from "next/link";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { ApiError, api } from "../lib/api";
 import { formatRatio, formatVnd } from "../lib/format";
 import { MultipleCharts } from "./multiple-chart";
 
-type Method = { method: string; label: string; value: string | null; reason: string | null; inputs: Record<string, string | number> };
-type Row = { symbol: string; sector: string; price: string | null; fair: string | null; low: string | null; high: string | null; gap: string | null;
+export type Method = { method: string; label: string; value: string | null; reason: string | null; inputs: Record<string, string | number> };
+export type Row = { symbol: string; sector: string; price: string | null; fair: string | null; low: string | null; high: string | null; gap: string | null;
   verdict: "cheap" | "fair" | "expensive" | "insufficient"; reason: string | null; methods: Method[]; latest_year: string | null;
   latest_quarter: string | null; held: boolean };
 type Board = { as_of: string; rows: Row[]; settings: { required_return: string; long_term_growth: string; threshold: string } };
 
-const VERDICT: Record<Row["verdict"], { label: string; tone: string }> = {
+export const VERDICT: Record<Row["verdict"], { label: string; tone: string }> = {
   cheap: { label: "Rẻ", tone: "good" }, fair: { label: "Hợp lý", tone: "" }, expensive: { label: "Đắt", tone: "bad" },
   insufficient: { label: "Chưa đủ dữ liệu", tone: "warn" },
 };
@@ -23,6 +24,20 @@ function inputText(k: string, v: string | number) {
   if (typeof v === "number") return String(v);
   if (k === "roe" || k === "justified_pb" || k.endsWith("median")) return k === "roe" ? pct(v) : v.replace(".", ",").slice(0, 6);
   return formatVnd(v);
+}
+
+/** Each valuation method with its inputs, then the share-count caveat. */
+export function MethodList({ row }: { row: Row }) {
+  return (
+    <section aria-label={`Phương án định giá ${row.symbol}`}>
+      {row.methods.length === 0 && <p className="muted">{row.reason}</p>}
+      <ul>{row.methods.map((m) => (
+        <li key={m.method}><strong>{m.label}</strong>: {m.value ? formatVnd(m.value) : <span className="muted">Không áp dụng — {m.reason}</span>}
+          {m.value && <span className="caption"> ({Object.entries(m.inputs).map(([k, v]) => `${INPUT[k] ?? k} ${inputText(k, v)}`).join(" · ")})</span>}</li>))}
+      </ul>
+      <p className="caption">Số cổ phiếu ước tính từ lợi nhuận / EPS năm {row.latest_year ?? "—"} và các đợt phát hành sau đó; có thể lệch vài phần trăm.</p>
+    </section>
+  );
 }
 
 export function FairValueView() {
@@ -49,7 +64,7 @@ export function FairValueView() {
         <tbody>{rows.map((r) => (
           <Fragment key={r.symbol}>
             <tr>
-              <td data-label="Mã"><strong>{r.symbol}</strong>{r.held && <> <span className="pill good">Đang nắm</span></>}</td>
+              <td data-label="Mã"><Link href={`/research/${r.symbol}`}><strong>{r.symbol}</strong></Link>{r.held && <> <span className="pill good">Đang nắm</span></>}</td>
               <td data-label="Ngành">{r.sector}</td>
               <td data-label="Giá" className="num">{formatVnd(r.price)}</td>
               <td data-label="Giá hợp lý" className="num">{r.fair ? <>{formatVnd(r.fair)}<div className="caption">{formatVnd(r.low, { unit: false })} – {formatVnd(r.high, { unit: false })}</div></> : "—"}</td>
@@ -60,14 +75,7 @@ export function FairValueView() {
                 aria-label={`Chi tiết ${r.symbol}`}>Chi tiết</button></td>
             </tr>
             {open === r.symbol && <tr className="fv-detail"><td colSpan={8}>
-              <section aria-label={`Phương án định giá ${r.symbol}`}>
-                {r.methods.length === 0 && <p className="muted">{r.reason}</p>}
-                <ul>{r.methods.map((m) => (
-                  <li key={m.method}><strong>{m.label}</strong>: {m.value ? formatVnd(m.value) : <span className="muted">Không áp dụng — {m.reason}</span>}
-                    {m.value && <span className="caption"> ({Object.entries(m.inputs).map(([k, v]) => `${INPUT[k] ?? k} ${inputText(k, v)}`).join(" · ")})</span>}</li>))}
-                </ul>
-                <p className="caption">Số cổ phiếu ước tính từ lợi nhuận / EPS năm {r.latest_year ?? "—"} và các đợt phát hành sau đó; có thể lệch vài phần trăm.</p>
-              </section>
+              <MethodList row={r} />
               <MultipleCharts symbol={r.symbol} />
             </td></tr>}
           </Fragment>))}

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
 import { formatVnd } from "../lib/format";
 import { SourceEvidence, type Evidence } from "./source-evidence";
+import { StockProfile } from "./stock-profile";
 import { ValuationReview, type ValuationView } from "./valuation-review";
 
 type Research = { entity_id: string; provenance: string; industry: string | null; in_universe: boolean;
@@ -19,9 +20,11 @@ export function ResearchEntity({ entityId }: { entityId: string }) {
   return (
     <>
       <div className="pagehead"><h1>{data.entity_id}</h1>
-        <p className="muted">{data.industry ?? "Chưa phân ngành"} · {data.in_universe ? "Trong danh sách nghiên cứu" : "Ngoài danh sách nghiên cứu"} ·
+        <p className="muted">Hồ sơ doanh nghiệp · {data.industry ?? "Chưa phân ngành"} · {data.in_universe ? "Trong danh sách nghiên cứu" : "Ngoài danh sách nghiên cứu"} ·
           Giá: {data.price ? `${formatVnd(data.price.price)} (${data.price.session_date})` : "chưa có giá đã xác minh"}</p></div>
       {data.provenance === "synthetic" && <p className="notice">Dữ liệu thị trường tổng hợp để kiểm thử.</p>}
+      <StockProfile symbol={data.entity_id} />
+      <h2>Giả định định giá và nguồn</h2>
       {data.valuation ? <ValuationReview entityId={data.entity_id} view={data.valuation} onChanged={() => void load()} />
         : <p className="notice">Chưa có giả định định giá: chưa có vùng giá hay khuyến nghị mua cho mã này.</p>}
       <SourceEvidence items={data.evidence} />

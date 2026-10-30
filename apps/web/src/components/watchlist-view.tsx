@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ApiError, api } from "../lib/api";
 import { formatRatio, formatVnd } from "../lib/format";
@@ -46,7 +47,7 @@ export function WatchlistView() {
           <thead><tr><th>Mã</th><th>Nhóm</th><th className="num">Giá đóng cửa (đ/cp)</th><th className="num">Trong phiên</th><th className="num">20 phiên</th></tr></thead>
           <tbody>{rows.map((r) => (
             <tr key={r.ticker}>
-              <td><strong>{r.ticker}</strong>{r.held && <> <span className="pill good">Đang nắm</span></>}</td>
+              <td><Link href={`/research/${r.ticker}`}><strong>{r.ticker}</strong></Link>{r.held && <> <span className="pill good">Đang nắm</span></>}</td>
               <td>{r.groups.join(", ") || "—"}</td>
               <td className="num">{r.close ? <>{formatVnd(r.close, { unit: false })} <span className="caption">({r.date}{r.stale ? ", giá cũ" : ""})</span></> : "Chưa có giá"}</td>
               <td className="num"><Change value={r.change_1d} /></td>

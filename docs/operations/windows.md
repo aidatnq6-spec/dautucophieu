@@ -44,6 +44,14 @@ scripts\windows\register-tasks.ps1 -Unregister
 
 Nhật ký: `logs\scheduler.log` chỉ ghi thời điểm, mã thoát và tóm tắt JSON (không có bí mật hay số liệu cá nhân).
 
+### Tự cập nhật ứng dụng
+
+Tác vụ `InvestmentAgent-Update` (đăng ký cùng `register-tasks.ps1 -Register`) chạy `scripts\windows\update-app.ps1` 10 phút một lần và khi đăng nhập. Khi `main` trên GitHub có commit mới: kéo về (chỉ fast-forward), cài lại thư viện nếu `backend/requirements.lock`, `backend/pyproject.toml` hoặc `apps/web/package-lock.json` đổi, build giao diện, rồi khởi động lại API và web bằng `start-app.ps1`.
+
+- Chỉ chạy khi thư mục đang ở nhánh `main` và không có thay đổi chưa commit; đang làm trên nhánh khác thì bỏ qua.
+- Build lỗi thì quay về commit trước, build lại và khởi động bản đó.
+- Nhật ký: `logs\update.log`, một dòng mỗi lần có cập nhật, bỏ qua hoặc lỗi.
+
 ## Dừng
 
 - Dừng lịch: `register-tasks.ps1 -Unregister`.

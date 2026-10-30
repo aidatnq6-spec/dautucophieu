@@ -96,7 +96,7 @@ export function ValueChains() {
     <section className="surface" aria-label="Chuỗi giá trị">
       <h2>Chuỗi giá trị</h2>
       <p className="caption">Đầu vào, trung gian, đầu ra của từng ngành theo tài liệu công khai, và vĩ mô khoảng một tháng qua đang tốt hay xấu cho ngành
-        (yếu tố chính tính 3, phụ 2, nhỏ 1). Chỉ để mô tả, không phải khuyến nghị.</p>
+        (yếu tố chính tính 3, phụ 2, nhỏ 1). Đây là bức tranh mô tả, không đưa ra lời khuyên mua bán.</p>
       {data.chains.length === 0 && <p className="muted">Chưa có chuỗi giá trị nào.</p>}
       <div className="vc-cards">{data.chains.map((c) => (
         <button key={c.id} className="vc-card" aria-expanded={open === c.id} onClick={() => setOpen(open === c.id ? null : c.id)}>

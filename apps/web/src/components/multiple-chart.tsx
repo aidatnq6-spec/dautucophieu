@@ -60,7 +60,8 @@ function Chart({ title, symbol, series, unit }: { title: string; symbol: string;
     <figure className="mc" aria-label={`${title} ${symbol}`}>
       <figcaption><strong>{title}</strong>
         <span className="caption"> · Hiện tại {series.latest ? num(series.latest) : "—"}{unit}
-          {median !== null && <> · Trung vị {num(median)}{unit} · dải ±1 độ lệch chuẩn {num(Math.max(0, median - sd))}–{num(median + sd)}{unit}</>}</span>
+          {median !== null && <> · Trung vị {num(median)}{unit} · dải ±1 độ lệch chuẩn {num(Math.max(0, median - sd))}–{num(median + sd)}{unit}
+            {[2, 3].map((k) => ` · ±${k}: ${median - k * sd > 0 ? num(median - k * sd) : "—"}–${num(median + k * sd)}${unit}`).join("")}</>}</span>
       </figcaption>
       <div className="mc-plot" ref={box}>
         <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${title} ${symbol} theo tháng`}>
@@ -69,6 +70,9 @@ function Chart({ title, symbol, series, unit }: { title: string; symbol: string;
           {median !== null && <>
             <rect x={PAD.left} width={W - PAD.left - PAD.right} y={y(median + sd)} height={Math.max(0, y(Math.max(0, median - sd)) - y(median + sd))} className="mc-band" />
             <line x1={PAD.left} x2={W - PAD.right} y1={y(median)} y2={y(median)} className="mc-median" />
+            {/* ±2 and ±3 standard deviations: faint dashed lines, drawn only where they fall inside the plotted range */}
+            {[2, 3].flatMap((k) => [median + k * sd, median - k * sd]).filter((v) => v > 0 && v <= yMax).map((v) =>
+              <line key={v} x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)} className="mc-sd" data-testid="mc-sd" />)}
             <text x={W - PAD.right + 10} y={y(median) + 4} className="mc-axis">Trung vị</text>
           </>}
           {years.map(({ i, m }) => <text key={m} x={x(i)} y={H - 8} className="mc-axis" textAnchor="middle">{m.slice(0, 4)}</text>)}

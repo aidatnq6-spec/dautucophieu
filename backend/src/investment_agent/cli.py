@@ -38,6 +38,8 @@ def main() -> int:
     sync.add_argument("--index", action="store_true", help="the symbols are indices (e.g. VNINDEX), quoted in points")
     macro = commands.add_parser("macro-sync", help="fetch automatic macro indicators (FRED, Vietcombank) into data/macro")
     macro.add_argument("--data-dir", type=Path, required=True)
+    frs = commands.add_parser("financial-ratios-sync", help="quarterly bank, securities and insurance ratios (VNDirect) into data/financial-ratios")
+    frs.add_argument("--data-dir", type=Path, required=True)
     ivs = commands.add_parser("index-valuation-sync", help="fetch daily P/E and P/B of VNINDEX and VN30 (VNDirect) into data/index-valuation")
     ivs.add_argument("--data-dir", type=Path, required=True)
     fsync = commands.add_parser("fundamentals-sync", help="refresh statements for the Định giá page (paced for Vnstock's limit)")
@@ -82,6 +84,8 @@ def main() -> int:
         return macro_sync(args.data_dir)
     if args.command == "index-valuation-sync":
         return index_valuation_sync(args.data_dir)
+    if args.command == "financial-ratios-sync":
+        return financial_ratios_sync(args.data_dir)
     if args.command == "industries":
         return industries(_symbols(args.symbols), args.output)
     if args.command == "backup":
@@ -222,6 +226,29 @@ def macro_sync(data_dir: Path, get=None) -> int:
     results = fetch_auto(load_indicators(), MacroStore(data_dir), get=get)
     results.update(fetch_factors(MacroStore(data_dir), get=get))  # long oil and US dollar history for the sensitivity reading
     results.update(fetch_commodities(MacroStore(data_dir), get=get))  # monthly world prices for Chuỗi giá trị
+    failed = {k: v for k, v in results.items() if v != "ok"}
+    print(json.dumps({"status": "ok" if not failed else "partial", "results": results}))
+    return 0 if not failed else 1
+
+
+def financial_ratios_sync(data_dir: Path, get=None, today=None) -> int:
+    """Exit 0 when every watched financial ticker updated, 1 when some failed (each is reported)."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from investment_agent.market.financial_ratios import FinancialRatioStore, fetch_financial_ratios
+    from investment_agent.market.sectors import load_sectors
+    from investment_agent.market.watchlist import load_watchlist
+    if get is None:
+        import httpx
+
+        def get(url):
+            response = httpx.get(url, timeout=60, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+            response.raise_for_status()
+            return response.text
+    sectors = load_sectors(data_dir)[0]
+    watched = {s: sectors.get(s) for s in load_watchlist(data_dir).symbols}
+    results = fetch_financial_ratios(FinancialRatioStore(data_dir / "financial-ratios"), watched, get=get,
+                                     today=today or datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
     failed = {k: v for k, v in results.items() if v != "ok"}
     print(json.dumps({"status": "ok" if not failed else "partial", "results": results}))
     return 0 if not failed else 1

@@ -127,6 +127,11 @@ if __name__ == "__main__":
                                   _ev(2, "FPT", "insider", -2, "Nguyễn Văn A - Đăng kí Mua 10,000 FPT")], fetched_at="2026-10-26T15:40:00+07:00")
     EventStore(data).save("VCB", [_ev(1, "VCB", "meeting", 10, "VCB - Tổ chức ĐHĐCĐ bất thường 2026")], fetched_at="2026-10-26T15:40:00+07:00")
     MacroStore(data).upsert("us10y", [(date(2026, 10, 21), "4.91"), (date(2026, 10, 23), "4.96")], entry="auto")
+    # Bank health score: VCB sector ratios, Q3/2026 against Q3/2025 (bad loans down, everything else missing).
+    from investment_agent.market.financial_ratios import FinancialRatioStore
+    FinancialRatioStore(os.path.join(data, "financial-ratios")).save({"symbol": "VCB", "kind": "bank", "fetched_at": "2026-10-31T00:00:00+00:00",
+        "source": "synthetic", "quarters": {"2025-09-30": {"BAD_LOANS_RATIO_AQ": "0.0103", "ROAA_TR_AVG4Q": "0.0154"},
+                                            "2026-09-30": {"BAD_LOANS_RATIO_AQ": "0.0071", "ROAA_TR_AVG4Q": "0.0166"}}})
     # Định giá chỉ số: VN30 at P/E 15 and P/B 2 for six years, today P/E 12 at 1,800 points (fair 2,025, −11,1%); VNINDEX has no multiples.
     ix_days = [datetime.combine(date.today() - timedelta(days=i), datetime.min.time()) for i in range(6 * 365, 0, -1)
                if (date.today() - timedelta(days=i)).weekday() < 5]

@@ -48,3 +48,15 @@ Mỗi dấu hiệu hiện số thật của các năm liên quan. Không gộp t
 
 - Bảng Định giá: cột "F-Score" (ví dụ "7/9", nhãn mạnh/trung bình/yếu, hoặc "—" kèm lý do); nhãn "Quý mới".
 - Chi tiết mã (Định giá và hồ sơ mã): mục "Chất lượng báo cáo" liệt kê 9 tiêu chí với số liệu, và các dấu hiệu cần xem kỹ.
+
+## Ngân hàng, chứng khoán, bảo hiểm: Điểm sức khỏe (bổ sung 31/10/2026)
+
+F-Score không hợp với cấu trúc báo cáo của ba nhóm này, và báo cáo miễn phí của Vnstock thiếu nợ xấu, dự phòng, tỷ lệ kết hợp. Dùng chỉ số ngành theo quý từ API công khai của VNDirect (`v4/ratios`, robots.txt cho phép), một lượt gọi mỗi mã trong lịch chạy (`financial-ratios-sync`), lưu ở `data/financial-ratios/`.
+
+So quý gần nhất có đủ số liệu với cùng quý năm trước (quý mới công bố dở thì dùng quý đủ gần nhất):
+
+- Ngân hàng (7): ROAA dương; ROAA tăng; tỷ lệ nợ xấu giảm; tỷ lệ nợ quá hạn giảm; bao phủ nợ xấu tăng; NIM tăng; vốn chủ / tổng tài sản tăng.
+- Chứng khoán (6): ROAA dương; ROAA tăng; biên lợi nhuận ròng tăng; vốn chủ / tổng tài sản tăng; cho vay / vốn chủ giảm; không phát hành cổ phiếu huy động vốn trong 12 tháng.
+- Bảo hiểm (6): ROAA dương; ROAA tăng; tỷ lệ kết hợp giảm; biên lợi nhuận ròng tăng; vốn chủ / tổng tài sản tăng; không phát hành cổ phiếu huy động vốn trong 12 tháng.
+
+Gọi là "Điểm sức khỏe", không phải F-Score; là bộ tiêu chí của ứng dụng, không có mốc nghiên cứu nên không xếp mạnh/yếu. Thiếu số thì tiêu chí "không đánh giá được". Cột trên bảng Định giá đổi tên thành "Chất lượng".

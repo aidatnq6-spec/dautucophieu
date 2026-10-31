@@ -50,8 +50,8 @@ def test_missing_lines_leave_criteria_unevaluated_and_no_level_below_seven():
 
 
 def test_financial_sectors_and_tickers_without_annual_lines_are_not_scored():
-    q = report_quality(STRONG, "Ngân hàng")
-    assert q["applicable"] is False and q["reason"] == "Không áp dụng cho ngân hàng, chứng khoán, bảo hiểm (cấu trúc báo cáo khác)"
+    q = report_quality(STRONG, "Ngân hàng")  # financial sectors are scored from sector ratios instead (below)
+    assert q["applicable"] is True and q["f_score"] is None and q["reason"] == "Chưa có chỉ số ngành từ VNDirect (chờ lần cập nhật sau)"
     q = report_quality({"years": {}}, "Công nghệ Thông tin")
     assert q["applicable"] is True and q["f_score"] is None and q["reason"] == "Chưa có số liệu báo cáo chi tiết (chờ lần cập nhật sau)"
 
@@ -65,3 +65,44 @@ def test_equal_looking_values_get_one_more_decimal_and_real_estate_gets_a_note()
     assert next(c for c in q["f_score"]["criteria"] if c["id"] == "roa")["detail"] == "ROA 15,6% (lợi nhuận 15,6 tỷ / tài sản đầu kỳ 100 tỷ)"
     assert q["note"] == "Bất động sản: chủ đầu tư thường lãi nhưng dòng tiền kinh doanh âm khi đang đổ tiền vào quỹ đất, dự án (hàng tồn kho); đọc dấu hiệu cùng tiến độ bàn giao."
     assert report_quality(STRONG, "Công nghệ Thông tin")["note"] is None
+
+
+def _quarters(now: dict, before: dict) -> dict:
+    return {"2025-09-30": {k: str(v) for k, v in before.items()}, "2026-09-30": {k: str(v) for k, v in now.items()}}
+
+
+def test_banks_get_a_health_score_from_sector_ratios_without_a_level():
+    ratios = {"kind": "bank", "quarters": _quarters(
+        {"ROAA_TR_AVG4Q": 0.0166, "BAD_LOANS_RATIO_AQ": 0.0071, "OVERDUE_LOANS_RATIO_AQ": 0.0086, "PROVISION_BAD_LOANS_AQ": 2.79,
+         "NET_INTEREST_MARGIN_TR_AVG5Q": 0.0239, "EQUITY_TO_ASSET_AQ": 0.0935},
+        {"ROAA_TR_AVG4Q": 0.0154, "BAD_LOANS_RATIO_AQ": 0.0103, "OVERDUE_LOANS_RATIO_AQ": 0.0120, "PROVISION_BAD_LOANS_AQ": 2.10,
+         "NET_INTEREST_MARGIN_TR_AVG5Q": 0.0223, "EQUITY_TO_ASSET_AQ": 0.0950})}
+    q = report_quality({"years": {}}, "Ngân hàng", ratios=ratios)
+    f = q["f_score"]
+    assert q["applicable"] is True and f["kind"] == "health" and f["title"] == "Điểm sức khỏe ngân hàng"
+    assert f["year"] == "Q3/2026 so với Q3/2025" and f["score"] == 6 and f["evaluated"] == 7 and f["level"] is None
+    npl = next(c for c in f["criteria"] if c["id"] == "npl_down")
+    assert npl["passed"] is True and npl["detail"] == "Nợ xấu 0,71% so với 1,03% cùng kỳ"
+    assert next(c for c in f["criteria"] if c["id"] == "equity_up")["passed"] is False
+    assert q["signs"] == []
+
+
+def test_brokers_and_insurers_use_their_own_criteria_and_a_missing_ratio_set_says_so():
+    ratios = {"kind": "insurance", "quarters": _quarters({"ROAA_TR_AVG4Q": 0.0112, "COMBINED_RATIO_TR": 1.22, "NET_MARGIN_TR": 0.083,
+                                                           "EQUITY_TO_ASSET_AQ": 0.0847},
+                                                          {"ROAA_TR_AVG4Q": 0.0100, "COMBINED_RATIO_TR": 1.25, "NET_MARGIN_TR": 0.070,
+                                                           "EQUITY_TO_ASSET_AQ": 0.0900})}
+    f = report_quality({"share_issues": []}, "Bảo hiểm", ratios=ratios)["f_score"]
+    assert f["title"] == "Điểm sức khỏe bảo hiểm" and f["score"] == 5 and f["evaluated"] == 6
+    assert next(c for c in f["criteria"] if c["id"] == "combined_down")["detail"] == "Tỷ lệ kết hợp 122,0% so với 125,0% cùng kỳ"
+    q = report_quality({"years": {}}, "Dịch vụ tài chính", ratios=None)
+    assert q["applicable"] is True and q["f_score"] is None and q["reason"] == "Chưa có chỉ số ngành từ VNDirect (chờ lần cập nhật sau)"
+
+
+def test_a_partly_published_latest_quarter_falls_back_to_the_latest_complete_one():
+    full = {"ROAA_TR_AVG4Q": 0.019, "BAD_LOANS_RATIO_AQ": 0.012, "OVERDUE_LOANS_RATIO_AQ": 0.02, "PROVISION_BAD_LOANS_AQ": 1.0,
+            "NET_INTEREST_MARGIN_TR_AVG5Q": 0.037, "EQUITY_TO_ASSET_AQ": 0.09}
+    ratios = {"kind": "bank", "quarters": {"2025-06-30": {k: str(v) for k, v in full.items()}, "2026-06-30": {k: str(v) for k, v in full.items()},
+                                           "2026-09-30": {"ROAA_TR_AVG4Q": "0.0192", "NET_INTEREST_MARGIN_TR_AVG5Q": "0.0372"}}}
+    f = report_quality({}, "Ngân hàng", ratios=ratios)["f_score"]
+    assert f["year"] == "Q2/2026 so với Q2/2025" and f["evaluated"] == 7

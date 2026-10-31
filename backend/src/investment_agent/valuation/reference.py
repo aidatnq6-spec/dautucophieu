@@ -179,7 +179,8 @@ def value_ticker(symbol: str, sector: str | None, m: dict | None, price: Decimal
     return {**row, "gap": str(gap.quantize(Decimal("0.0001"), ROUND_HALF_UP)), "verdict": verdict}
 
 
-def reference_board(symbols, *, sectors, records, prices, year_end, settings: Settings, today: date, held: set[str]) -> dict:
+def reference_board(symbols, *, sectors, records, prices, year_end, settings: Settings, today: date, held: set[str],
+                    ratios: dict | None = None) -> dict:
     ms = {s: metrics(records[s], today=today, year_end_prices=year_end.get(s, {})) if records.get(s) else None for s in symbols}
     current = {}
     for s, m in ms.items():
@@ -195,7 +196,7 @@ def reference_board(symbols, *, sectors, records, prices, year_end, settings: Se
         seen = (records.get(s) or {}).get("latest_quarter_seen")
         fresh = seen["quarter"] if seen and (today - date.fromisoformat(seen["on"])).days <= NEW_QUARTER_DAYS else None
         rows.append({**value_ticker(s, sector, ms[s], prices.get(s), peers, settings), "held": s in held,
-                     "quality": report_quality(records.get(s), sector), "new_quarter": fresh})
+                     "quality": report_quality(records.get(s), sector, (ratios or {}).get(s)), "new_quarter": fresh})
     return {"as_of": today.isoformat(), "rows": rows,
             "settings": {"required_return": str(settings.required_return), "long_term_growth": str(settings.long_term_growth),
                          "threshold": str(settings.threshold.normalize())}}

@@ -14,6 +14,7 @@ import { SectorRatios } from "./sector-ratios";
 import { DividendHistory } from "./dividend-history";
 import { CapmTicker } from "./capm";
 import { CompanyPeople } from "./company-people";
+import { InsiderDeals } from "./insider-deals";
 
 type Facts = { price: string | null; price_date: string | null; change_pct: string | null; high_52w: string | null; low_52w: string | null;
   shares: number | null; market_cap: string | null; avg_volume: number | null; avg_volume_sessions: number };
@@ -81,6 +82,7 @@ export function StockProfile({ symbol }: { symbol: string }) {
       {p.watched && <DividendHistory symbol={p.symbol} />}
 
       {p.watched && <CompanyPeople symbol={p.symbol} />}
+      {p.watched && <InsiderDeals symbol={p.symbol} />}
 
       <section className="surface" aria-label="Sự kiện">
         <h2>Sự kiện</h2>

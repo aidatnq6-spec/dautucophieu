@@ -200,3 +200,16 @@ def test_people_route_reads_through_the_cache(tmp_path, monkeypatch):
     body = call(c, clock, "GET", "/internal/fairvalue/people/FPT").json()
     assert body["shareholders"][0]["name"] == "A" and body["stale"] is False
     assert call(c, clock, "GET", "/internal/fairvalue/people/ZZZ").status_code == 404
+
+
+def test_insider_route_reads_vndirect_notices_for_a_watched_ticker(tmp_path, monkeypatch):
+    import json
+    from investment_agent.api.routes import fairvalue
+    (tmp_path / "market-symbols.txt").write_text("FPT\n", encoding="utf-8")
+    monkeypatch.setattr(fairvalue, "_get_text", lambda url: json.dumps({"data": [
+        {"tagCodes": "FPT", "newsTitle": "FPT: Báo cáo kết quả giao dịch cổ phiếu của Người nội bộ Bùi Quang Ngọc", "newsDate": "2026-02-14",
+         "newsSource": "HOSE", "numberOfShares": 2000000.0, "transType": "Bán", "dstockUrl": "https://dstock.vndirect.com.vn/tin-tuc/tin-tu-so/9"}]}))
+    c, clock = _app(tmp_path)
+    body = call(c, clock, "GET", "/internal/fairvalue/insider/FPT").json()
+    assert body["deals"][0]["kind"] == "Bán" and body["deals"][0]["shares"] == 2000000 and body["reason"] is None
+    assert call(c, clock, "GET", "/internal/fairvalue/insider/ZZZ").status_code == 404

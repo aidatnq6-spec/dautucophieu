@@ -12,6 +12,7 @@ from investment_agent.market.beta import BetaStore
 from investment_agent.market.company_people import PeopleStore, company_people
 from investment_agent.market.financial_ratios import DISPLAY, FinancialRatioStore
 from investment_agent.market.fundamentals import FundamentalsStore
+from investment_agent.market.insider_deals import InsiderStore, insider_deals
 from investment_agent.market.index_valuation import INDICES, series_key
 from investment_agent.market.leading import MacroStore
 from investment_agent.market.series import SeriesStore
@@ -260,3 +261,22 @@ def people(symbol: str, request: Request):
     if sym is None:
         return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
     return company_people(PeopleStore(data_dir), sym, fetch=_fetch_people, now=now(request))
+
+
+def _get_text(url: str) -> str:
+    import httpx
+    response = httpx.get(url, timeout=30, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+    response.raise_for_status()
+    return response.text
+
+
+@router.get("/fairvalue/insider/{symbol}")
+def insider(symbol: str, request: Request):
+    """Insider and major-shareholder trade notices (HOSE, via VNDirect), cached a day; the saved copy when the source fails."""
+    require_owner(request)
+    data_dir, sym = _forward_symbol(request, symbol)
+    if data_dir is None:
+        return unavailable()
+    if sym is None:
+        return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
+    return insider_deals(InsiderStore(data_dir), sym, get=_get_text, now=now(request))

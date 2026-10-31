@@ -38,6 +38,8 @@ def main() -> int:
     sync.add_argument("--index", action="store_true", help="the symbols are indices (e.g. VNINDEX), quoted in points")
     macro = commands.add_parser("macro-sync", help="fetch automatic macro indicators (FRED, Vietcombank) into data/macro")
     macro.add_argument("--data-dir", type=Path, required=True)
+    qa = commands.add_parser("quarter-alerts", help="Telegram note when a watched ticker's new quarter first appears in the statements")
+    qa.add_argument("--data-dir", type=Path, required=True)
     frs = commands.add_parser("financial-ratios-sync", help="quarterly bank, securities and insurance ratios (VNDirect) into data/financial-ratios")
     frs.add_argument("--data-dir", type=Path, required=True)
     ivs = commands.add_parser("index-valuation-sync", help="fetch daily P/E and P/B of VNINDEX and VN30 (VNDirect) into data/index-valuation")
@@ -84,6 +86,8 @@ def main() -> int:
         return macro_sync(args.data_dir)
     if args.command == "index-valuation-sync":
         return index_valuation_sync(args.data_dir)
+    if args.command == "quarter-alerts":
+        return quarter_alerts_cli(args.data_dir)
     if args.command == "financial-ratios-sync":
         return financial_ratios_sync(args.data_dir)
     if args.command == "industries":
@@ -477,6 +481,33 @@ def drawdown_cli(data_dir: Path) -> int:
         sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
         return all(sender.send(chosen.chat_id, part).status == "sent" for part in split_message(text))
     out = drawdown_run(repo, owner, data_dir, fetch=fetch, send=send, request_id=f"drawdown-{uuid.uuid4().hex[:16]}")
+    print(json.dumps(out))
+    return 0
+
+
+def quarter_alerts_cli(data_dir: Path) -> int:
+    """Báo cáo quý mới over Telegram; skipped entirely while scheduled delivery is off, so turning it on starts from a baseline."""
+    import os
+
+    import httpx
+
+    from investment_agent.api.auth import OwnerContext
+    from investment_agent.notifications.render import split_message
+    from investment_agent.notifications.telegram import TelegramSender
+    from investment_agent.repositories.firestore import personal_repository_from_env
+    from investment_agent.services.quarter_alerts import quarter_alerts_run
+    from investment_agent.services.records import notification_settings
+    from investment_agent.settings import Settings
+
+    settings = Settings.from_env()
+    repo = personal_repository_from_env()
+    owner = OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
+    chosen, _ = notification_settings(repo, owner)
+    if not (settings.telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
+        return 0
+    sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
+    out = quarter_alerts_run(data_dir, send=lambda text: all(sender.send(chosen.chat_id, part).status == "sent" for part in split_message(text)))
     print(json.dumps(out))
     return 0
 

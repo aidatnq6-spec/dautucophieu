@@ -87,9 +87,16 @@ export function FairValueView() {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  const [sector, setSector] = useState("");
   useEffect(() => { api<Board>("fairvalue").then(setBoard, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
-  const rows = useMemo(() => (board?.rows ?? []).filter((r) => filter === "all" || (filter === "held" ? r.held : r.verdict === filter))
-    .sort((a, b) => (a.gap === null ? 1 : b.gap === null ? -1 : Number(a.gap) - Number(b.gap))), [board, filter]);
+  const sectors = useMemo(() => [...new Set((board?.rows ?? []).map((r) => r.sector))].sort((a, b) => a.localeCompare(b, "vi")), [board]);
+  const rows = useMemo(() => {
+    const q = query.trim().toUpperCase();
+    return (board?.rows ?? []).filter((r) => (filter === "all" || (filter === "held" ? r.held : r.verdict === filter))
+      && (!q || r.symbol.includes(q)) && (!sector || r.sector === sector))
+      .sort((a, b) => (a.gap === null ? 1 : b.gap === null ? -1 : Number(a.gap) - Number(b.gap)));
+  }, [board, filter, query, sector]);
   if (error) return <p className="errors" role="alert">{error}</p>;
   if (!board) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   const s = board.settings;
@@ -102,6 +109,16 @@ export function FairValueView() {
         {[["all", "Tất cả"], ["cheap", "Rẻ"], ["fair", "Hợp lý"], ["expensive", "Đắt"], ["insufficient", "Chưa đủ dữ liệu"], ["held", "Đang nắm"]].map(([id, label]) => (
           <label key={id} className="choice"><input type="radio" name="fv-filter" checked={filter === id} onChange={() => setFilter(id)} />{label}</label>))}
       </div>
+      <div className="fv-search">
+        <label className="field">Tìm mã<input type="search" value={query} placeholder="Ví dụ: FPT" maxLength={10} autoComplete="off"
+          onChange={(e) => setQuery(e.target.value)} /></label>
+        <label className="field">Ngành<select value={sector} onChange={(e) => setSector(e.target.value)}>
+          <option value="">Tất cả ngành</option>{sectors.map((s) => <option key={s} value={s}>{s}</option>)}</select></label>
+        <p className="caption" role="status">Đang hiện {rows.length}/{board.rows.length} mã
+          {(query || sector || filter !== "all") && <> · <button type="button" className="link-btn"
+            onClick={() => { setQuery(""); setSector(""); setFilter("all"); }}>Bỏ lọc</button></>}</p>
+      </div>
+      {rows.length === 0 && <p className="muted">Không có mã nào khớp bộ lọc.</p>}
       <table className="fv-table" aria-label="Định giá tham khảo">
         <thead><tr><th>Mã</th><th>Ngành</th><th className="num">Giá</th><th className="num">Giá hợp lý</th><th className="num">Chênh lệch</th><th>Kết luận</th><th>Chất lượng</th><th>Số liệu</th><th /></tr></thead>
         <tbody>{rows.map((r) => (

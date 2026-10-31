@@ -36,7 +36,7 @@ def test_report_pages_prefill_each_figure_with_its_page_in_billion_dong():
 
 
 def test_an_unknown_unit_or_an_image_only_file_fills_nothing_and_says_why():
-    no_unit = ["Nợ đủ tiêu chuẩn 447.734 356.373\nNợ cần chú ý 7.808 3.912"]
+    no_unit = ["9.1 Phân tích chất lượng nợ cho vay\nNợ đủ tiêu chuẩn 447.734 356.373\nNợ cần chú ý 7.808 3.912"]
     out = parse_report_pages(no_unit)
     assert "group1" not in out["fields"] and "group1" in out["missing"]
     assert any("đơn vị" in w for w in out["warnings"])
@@ -50,3 +50,60 @@ def test_only_public_https_addresses_are_fetched():
                     ("https://intranet.example/a.pdf", "192.168.1.5"), ("https://x.example/a.pdf", "169.254.169.254"), ("ftp://x/a.pdf", "1.1.1.1")):
         with pytest.raises(UnsafeUrl):
             check_public_https(url, resolve=lambda host, ip=ip: [ip])
+
+
+# Lines as pypdf reads Techcombank's consolidated statements for 9M/2026 (public "bản tra cứu" PDF, read 31/10/2026): the unit sits
+# in the column header, and deposits at other banks (note 17.1) share the page and the labels with customer deposits (note 18).
+TCB = [
+    "BÁO CÁO TÌNH HÌNH TÀI CHÍNH HỢP NHẤT (tiếp theo)\n Thuyết \nminh \n30/9/2026 31/12/2025 \n triệu đồng triệu đồng \n"
+    "Tiền gửi của khách hàng 18  661.390.195  618.911.535  ",
+    "9.1  Phân tích chất lượng nợ cho vay \n 30/9/2026 31/12/2025 \n triệu đồng % triệu đồng % \n"
+    "Nợ đủ tiêu chuẩn  795.044.933  97,70  711.706.750  98,34  \nNợ cần chú ý  7.640.722  0,94  3.852.272  0,53  \n"
+    "Nợ dưới tiêu chuẩn  3.235.156  0,40  918.063  0,13  \nNợ nghi ngờ  2.462.069  0,30  1.339.119  0,18  \n"
+    "Nợ có khả năng mất vốn  5.350.874  0,66  5.941.193  0,82  ",
+    "17.1 Tiền gửi của các tổ chức tài chính, các TCTD khác  \n 30/9/2026 31/12/2025 \n triệu đồng triệu đồng \n"
+    "Tiền gửi không kỳ hạn  1.081.527  1.199.178  \n \n18.  TIỀN GỬI CỦA KHÁCH HÀNG \n 30/9/2026 31/12/2025 \n triệu đồng triệu đồng \n"
+    "Tiền gửi không kỳ hạn  205.336.117  213.415.080  \nTiền gửi có kỳ hạn  446.227.026  396.881.095  \n"
+    "Tiền gửi ký quỹ  9.827.052  8.615.360  \n  661.390.195  618.911.535  \n19.  CÁC CÔNG CỤ TÀI CHÍNH PHÁI SINH",
+]
+
+
+def test_a_real_bank_layout_reads_units_from_column_headers_and_deposits_from_the_customer_note():
+    out = parse_report_pages(TCB)
+    f = out["fields"]
+    assert f["group1"] == {"value": "795044.933", "page": 2} and f["group2"] == {"value": "7640.722", "page": 2}
+    assert f["group5"] == {"value": "5350.874", "page": 2}
+    assert f["demand_deposits"] == {"value": "205336.117", "page": 3}  # note 18, not the 1.081.527 of note 17.1 above it
+    assert f["margin_deposits"] == {"value": "9827.052", "page": 3}
+    assert f["customer_deposits"] == {"value": "661390.195", "page": 1}
+    assert out["missing"] == ["car"]  # quarterly statements carry no CAR: left for the owner
+
+
+def test_loan_groups_come_from_the_loan_quality_section_not_an_interbank_table_on_the_same_page():
+    # Techcombank 1Q/2026, page 42: interbank deposit quality first, then the customer-loan quality note.
+    page = ("Phân tích chất lượng dư nợ tiền gửi (không bao gồm tiền gửi không kỳ hạn) và cấp tín dụng \n triệu đồng triệu đồng \n"
+            "Nợ đủ tiêu chuẩn  406.749  4.778.366 \n \n9.1  Phân tích chất lượng nợ cho vay \n 31/3/2026 31/12/2025 \n triệu đồng % triệu đồng % \n"
+            "Nợ đủ tiêu chuẩn             737.972.246                       98,12                  711.706.750                       98,34  \n"
+            "Nợ cần chú ý                 5.441.738                         0,72                      3.852.272                         0,53  \n"
+            "Nợ dưới tiêu chuẩn                 1.391.382                         0,18                         918.063                         0,13  \n"
+            "Nợ nghi ngờ                 1.395.138                         0,19                      1.339.119                         0,18  \n"
+            "Nợ có khả năng mất vốn                 5.909.007                         0,79                      5.941.193                         0,82  \n"
+            "             752.109.511  100,00                 723.757.397                     100,00  ")
+    f = parse_report_pages([page])["fields"]
+    assert f["group1"] == {"value": "737972.246", "page": 1} and f["group5"] == {"value": "5909.007", "page": 1}
+    out = parse_report_pages(["Đơn vị: triệu đồng\nNợ đủ tiêu chuẩn 1.000 1\nNợ cần chú ý 2.000 1"])  # groups without a loan-quality heading
+    assert "group1" not in out["fields"] and any("chất lượng nợ cho vay" in w for w in out["warnings"])
+
+
+def test_car_is_read_from_a_capital_adequacy_report_taking_the_consolidated_column():
+    # Techcombank "Công bố thông tin tỷ lệ an toàn vốn 30/06/2026", page 6: separate and consolidated columns, no % sign.
+    page = ("Bảng 2 - Tỷ lệ an toàn vốn, Tài sản tính theo rủi ro tín dụng, Vốn yêu cầu theo từng loại rủi ro (*)  \nĐơn vị: Tỷ VND, % \n"
+            " Chỉ tiêu 30/06/2026 31/12/2025 \nRiêng lẻ Hợp nhất Riêng lẻ Hợp nhất \n"
+            "F Tỷ lệ vốn cấp 1 13.28  14.06  12.74 13.67 \nG Tỷ lệ an toàn vốn 12.45  14.95  11.97 14.61 ")
+    assert parse_report_pages([page])["fields"]["car"] == {"value": "14.95", "page": 1}
+
+
+def test_decomposed_vietnamese_text_from_a_pdf_is_normalised_before_matching():
+    import unicodedata
+    page = "Riêng lẻ Hợp nhất Riêng lẻ Hợp nhất \nG Tỷ lệ an toàn vốn 12.45  14.95  11.97 14.61 "
+    assert parse_report_pages([unicodedata.normalize("NFD", page)])["fields"]["car"] == {"value": "14.95", "page": 1}

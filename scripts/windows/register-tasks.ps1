@@ -9,12 +9,14 @@ $argument = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Byp
 $times = @('08:30', '15:30', '20:00')
 $updateName = 'InvestmentAgent-Update'
 $updateArgument = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$(Join-Path $PSScriptRoot 'update-app.ps1')`""
+$alertsName = 'InvestmentAgent-Alerts'
+$alertsArgument = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$(Join-Path $PSScriptRoot 'run-alerts.ps1')`""
 
 if ($Unregister) {
-    foreach ($n in $name, $updateName) {
+    foreach ($n in $name, $updateName, $alertsName) {
         if (Get-ScheduledTask -TaskName $n -ErrorAction SilentlyContinue) { Unregister-ScheduledTask -TaskName $n -Confirm:$false }
     }
-    Write-Host "Đã gỡ $name và $updateName (nếu có)."
+    Write-Host "Đã gỡ $name, $updateName và $alertsName (nếu có)."
     return
 }
 
@@ -22,6 +24,7 @@ Write-Host "Tác vụ: $name"
 Write-Host "Lệnh: powershell.exe $argument"
 Write-Host "Kích hoạt: hằng ngày lúc $($times -join ', ') (giờ máy, cần đặt múi giờ Asia/Ho_Chi_Minh) và khi đăng nhập (chạy bù)."
 Write-Host "Tác vụ: $updateName — 10 phút một lần và khi đăng nhập: khi main trên GitHub có bản mới thì kéo về, build và khởi động lại ứng dụng (chỉ khi thư mục đang ở main, không có thay đổi chưa commit)."
+Write-Host "Tác vụ: $alertsName — 5 phút một lần từ 09:00 đến 15:05 mỗi ngày: kiểm tra cảnh báo giá trong phiên (ngoài phiên lệnh tự bỏ qua)."
 if (-not $Register) { Write-Host 'Chưa đăng ký. Chạy lại với -Register sau khi cấu hình xong.'; return }
 
 $calendars = @('data\trading-calendar.json', "config\trading-calendar-hose-$((Get-Date).Year).json")
@@ -46,3 +49,12 @@ $updateSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInst
 Register-ScheduledTask -TaskName $updateName -Action $updateAction -Trigger $updateTriggers -Settings $updateSettings `
     -Description 'Chạy bản mới nhất của main (kéo về, build, khởi động lại)' -Force -ErrorAction Stop | Out-Null
 Write-Host "Đã đăng ký $updateName. Nhật ký: logs\update.log."
+
+$alertsAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $alertsArgument -WorkingDirectory $script:RepoRoot
+$alertsTrigger = New-ScheduledTaskTrigger -Daily -At '09:00'
+# A daily trigger repeating every 5 minutes for the session (09:00-15:05); weekends and holidays are skipped by the command itself.
+$alertsTrigger.Repetition = (New-ScheduledTaskTrigger -Once -At '09:00' -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Hours 6 -Minutes 5)).Repetition
+$alertsSettings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 4)
+Register-ScheduledTask -TaskName $alertsName -Action $alertsAction -Trigger $alertsTrigger -Settings $alertsSettings `
+    -Description 'Cảnh báo giá trong phiên qua Telegram' -Force -ErrorAction Stop | Out-Null
+Write-Host "Đã đăng ký $alertsName. Nhật ký: logs\scheduler.log (dòng price-alerts)."

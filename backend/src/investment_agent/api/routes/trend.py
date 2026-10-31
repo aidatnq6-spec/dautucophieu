@@ -4,15 +4,22 @@ from datetime import timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Request
+from pydantic import Field
+
+from investment_agent.domain.models import ContractModel
 
 from investment_agent.market.live_board import INDICES, ChartStore, build_board, chart, in_session
 from investment_agent.market.macro_board import IDS as MACRO_IDS
 from investment_agent.market.macro_board import macro_chart, macro_rows
 from investment_agent.market.trend import SnapshotStore
 from investment_agent.market.watchlist import load_watchlist
+from investment_agent.repositories.personal import RepositoryUnavailable
+from investment_agent.services.price_alerts import AlertError, change_alerts, read_alerts
+from investment_agent.services.records import notification_settings
+from investment_agent.settings import Settings
 
 from ..auth import require_owner
-from .common import error, now, unavailable
+from .common import WRITE_ERRORS, error, now, unavailable, write_error
 
 # One board read serves every poll for a while: Vnstock's free tier allows 60 calls a minute.
 BOARD_TTL = {True: timedelta(seconds=15), False: timedelta(minutes=5)}
@@ -103,3 +110,49 @@ def live_chart(symbol: str, interval: str, request: Request):
     if sym not in INDICES and sym not in load_watchlist(Path(data_dir)).symbols:
         return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
     return chart(ChartStore(Path(data_dir)), sym, interval, fetch=_source().ohlcv, now=now(request), index=sym in INDICES)
+
+
+class AlertChange(ContractModel):
+    action: str = Field(pattern=r"^(add|remove|rearm)$")
+    id: str | None = Field(default=None, max_length=32)
+    symbol: str | None = Field(default=None, max_length=10)
+    op: str | None = Field(default=None, max_length=8)
+    price: str | None = Field(default=None, max_length=16)
+    expected_version: int = Field(ge=0)
+    request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
+
+
+def _alerts_view(request: Request, alerts: list[dict], version: int) -> dict:
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    chosen, _ = notification_settings(repo, owner)
+    ready = bool(Settings.from_env().telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id)
+    return {"version": version, "alerts": alerts, "telegram_ready": ready}
+
+
+@router.get("/trend/alerts")
+def price_alerts(request: Request):
+    """Cảnh báo giá: the owner's levels and whether scheduled Telegram delivery is on (they are sent only then)."""
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None:
+        return unavailable()
+    try:
+        return _alerts_view(request, *read_alerts(repo, owner))
+    except RepositoryUnavailable:
+        return unavailable()
+
+
+@router.put("/trend/alerts")
+def price_alerts_change(request: Request, body: AlertChange):
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    data_dir = request.app.state.data_dir
+    if repo is None or data_dir is None:
+        return unavailable()
+    allowed = set(load_watchlist(Path(data_dir)).symbols) | set(INDICES)
+    try:
+        alerts, version = change_alerts(repo, owner, body.model_dump(exclude={"expected_version", "request_id"}), expected_version=body.expected_version,
+                                        request_id=body.request_id, allowed=allowed, now=now(request))
+        return _alerts_view(request, alerts, version)
+    except AlertError as exc:
+        return error(422, exc.code, exc.message)
+    except WRITE_ERRORS as exc:
+        return write_error(exc)

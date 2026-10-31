@@ -85,3 +85,20 @@ def test_outside_the_session_coins_stay_live_while_stocks_wait_five_minutes(tmp_
     clock.now += 300
     call(c, clock, "GET", "/internal/trend/board")
     assert counts() == (2, 6)
+
+
+def test_price_alerts_are_listed_added_and_refused_for_unknown_tickers(tmp_path):
+    (tmp_path / "market-symbols.txt").write_text("FPT\n", encoding="utf-8")
+    clock = Clock()
+    c = client(tmp_path, clock)
+    empty = call(c, clock, "GET", "/internal/trend/alerts").json()
+    assert empty == {"version": 0, "alerts": [], "telegram_ready": False}
+    added = call(c, clock, "PUT", "/internal/trend/alerts", {"action": "add", "symbol": "VNINDEX", "op": "above", "price": "1800",
+                                                             "expected_version": 0, "request_id": "p1"}).json()
+    assert added["version"] == 1 and added["alerts"][0]["symbol"] == "VNINDEX"
+    refused = call(c, clock, "PUT", "/internal/trend/alerts", {"action": "add", "symbol": "ZZZ", "op": "above", "price": "1",
+                                                               "expected_version": 1, "request_id": "p2"})
+    assert refused.status_code == 422 and refused.json()["code"] == "symbol_not_watched"
+    stale = call(c, clock, "PUT", "/internal/trend/alerts", {"action": "remove", "id": added["alerts"][0]["id"], "expected_version": 0,
+                                                             "request_id": "p3"})
+    assert stale.status_code == 409

@@ -51,6 +51,24 @@ test("the price board lists the indices and watched tickers in exchange colours 
   await expect(dxy.getByTestId("tb-chart-caption")).toContainText("Giá đóng cửa theo ngày · 60 điểm · điểm");
 });
 
+test("a price level is set for the ticker picked, listed as waiting, and removed", async ({ page }) => {
+  await openTrend(page);
+  const box = page.getByRole("region", { name: "Bảng giá và biểu đồ" });
+  await box.getByRole("table", { name: "Bảng giá" }).getByRole("row", { name: /FPT/ }).click();
+  const alerts = box.getByRole("region", { name: "Cảnh báo giá" });
+  await alerts.getByLabel("Điều kiện").selectOption("below");
+  await alerts.getByLabel("Mức giá FPT").fill("50,5");
+  await expect(alerts.getByTestId("alert-preview")).toHaveText("Mức: 50,50");
+  await alerts.getByRole("button", { name: "Thêm" }).click();
+  const list = alerts.getByRole("list", { name: "Danh sách cảnh báo" });
+  await expect(list).toContainText("FPT ≤ 50,50");
+  await expect(list).toContainText("đang chờ");
+  await list.getByRole("button", { name: "Xóa cảnh báo FPT ≤ 50.5" }).click();
+  await expect(alerts.getByRole("list", { name: "Danh sách cảnh báo" })).toHaveCount(0);
+  await box.getByRole("table", { name: "Bảng giá" }).getByRole("row", { name: /Bitcoin/ }).click();
+  await expect(alerts).toContainText("chưa có cho các biến vĩ mô");
+});
+
 for (const width of [375, 1440]) {
   test(`the trend page has no horizontal scroll, on the page or inside any card, at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });

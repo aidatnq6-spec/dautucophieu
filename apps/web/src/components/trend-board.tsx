@@ -3,6 +3,7 @@ import { type RefObject, useEffect, useRef, useState } from "react";
 import type { IChartApi, ISeriesApi, SeriesType, Time } from "lightweight-charts";
 import { ApiError, api } from "../lib/api";
 import { formatDecimal, formatRatio, formatVnd } from "../lib/format";
+import { PriceAlerts } from "./price-alerts";
 
 type Row = { symbol: string; kind: "index" | "macro" | "stock"; price: string | null; ref: string | null; change: string | null; change_pct: string | null;
   ceiling?: string | null; floor?: string | null; high?: string | null; low?: string | null; volume?: number | null; time: string | null;
@@ -231,6 +232,7 @@ export function TrendBoard() {
             {row?.kind === "stock" && row.volume !== null && <p className="caption">KL {selected}: {formatVnd(String(row.volume), { unit: false })} ·
               cao {formatDecimal(row.high, 2)} · thấp {formatDecimal(row.low, 2)} · trần {formatDecimal(row.ceiling, 2)} · sàn {formatDecimal(row.floor, 2)}</p>}
           </>}
+          <PriceAlerts symbol={selected} canAlert={row?.kind !== "macro"} />
         </div>
       </div>
     </section>

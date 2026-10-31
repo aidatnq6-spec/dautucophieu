@@ -138,12 +138,16 @@ def delete_quarter(symbol: str, quarter: str, request: Request, body: DeleteRequ
 
 
 def _read_pdf(url: str) -> list[str]:
+    import ssl
+
     import httpx
 
     from investment_agent.insights.download import fetch_pdf
     from investment_agent.insights.pdf import extract_pages
-    # No redirects: a redirect could lead to an address check_public_https never saw.
-    with httpx.Client(timeout=30, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"}) as client:
+    # No redirects: a redirect could lead to an address check_public_https never saw. Certificates are still verified, against
+    # the operating system's stores, which hold the intermediate certificates some bank file servers do not send (Eximbank).
+    with httpx.Client(timeout=30, follow_redirects=False, verify=ssl.create_default_context(),
+                      headers={"User-Agent": "investment-agent/0.1 (personal use)"}) as client:
         return extract_pages(fetch_pdf(client, url, max_bytes=MAX_PDF_BYTES, max_seconds=MAX_PDF_SECONDS), max_pages=MAX_PDF_PAGES)
 
 

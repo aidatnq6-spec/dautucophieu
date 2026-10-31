@@ -289,9 +289,43 @@ def test_company_people_are_normalised_with_missing_values_as_none():
             return pd.DataFrame([{"symbol": "FPT", "officer_name": "Bùi Quang Ngọc", "officer_position": "Phó Chủ tịch Hội đồng Quản trị",
                                   "officer_own_percent": 0.0148, "officer_own_quantity": 25255715, "update_date": "2026-08-03"}])
 
-    p = VnstockProvider(market=FakeMarket(), fundamental=FakeFundamental(), company=lambda sym: FakeCompany(), clock=lambda: NOW)
+        def overview(self):
+            return pd.DataFrame([{"symbol": "FPT", "foreigner_percentage": 0.22219219, "maximum_foreign_percentage": 0.3,
+                                  "state_percentage": 0.0, "free_float_percentage": float("nan")}])
+
+    class FakeKbs:
+        def ownership(self):
+            return pd.DataFrame([{"owner_type": "Cá nhân trong nước", "ownership_percentage": 53.86, "shares_owned": 2766461154,
+                                  "update_date": "2025-12-31T00:00:00"},
+                                 {"owner_type": "Tổ chức nước ngoài", "ownership_percentage": 28.54, "shares_owned": 1466163575,
+                                  "update_date": "2025-12-31T00:00:00"}])
+
+    p = VnstockProvider(market=FakeMarket(), fundamental=FakeFundamental(), company=lambda sym: FakeCompany(), clock=lambda: NOW,
+                        ownership=lambda sym: FakeKbs())
     out = p.company_people("fpt")
     assert out["shareholders"] == [
         {"name": "Trương Gia Bình", "type": "Individual", "quantity": 117347966, "percent": 0.0689, "updated": "2026-08-03"},
         {"name": "Deutsche Bank", "type": "Organization", "quantity": None, "percent": 0.024161, "updated": None}]
     assert out["officers"] == [{"name": "Bùi Quang Ngọc", "position": "Phó Chủ tịch Hội đồng Quản trị", "percent": 0.0148, "quantity": 25255715}]
+    assert out["ownership"] == {"foreign": "0.22219219", "foreign_max": "0.3", "state": "0", "free_float": None}
+    assert out["structure"] == [{"type": "Cá nhân trong nước", "percent": "0.5386", "shares": 2766461154, "updated": "2025-12-31"},
+                                {"type": "Tổ chức nước ngoài", "percent": "0.2854", "shares": 1466163575, "updated": "2025-12-31"}]
+
+
+def test_a_failing_ownership_breakdown_leaves_the_shareholders_in_place():
+    class FakeCompany:
+        def shareholders(self):
+            return pd.DataFrame([])
+
+        def officers(self):
+            return pd.DataFrame([])
+
+        def overview(self):
+            raise RuntimeError("down")
+
+    def broken(sym):
+        raise RuntimeError("down")
+
+    p = VnstockProvider(market=FakeMarket(), fundamental=FakeFundamental(), company=lambda sym: FakeCompany(), clock=lambda: NOW, ownership=broken)
+    out = p.company_people("FPT")
+    assert out["ownership"] is None and out["structure"] is None and out["shareholders"] == []

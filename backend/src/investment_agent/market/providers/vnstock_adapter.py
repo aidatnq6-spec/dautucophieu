@@ -34,11 +34,21 @@ def _traded(row: dict) -> bool:
         return False
 
 
+def _ratio(value, *, scale: Decimal = Decimal(1)) -> str | None:
+    """A source number as a plain decimal ratio string; NaN, blanks and text are None, never zero."""
+    try:
+        d = Decimal(str(value)) / scale
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+    return None if not d.is_finite() else ("0" if d == 0 else format(d.normalize(), "f"))
+
+
 class VnstockProvider:
-    def __init__(self, *, market=None, fundamental=None, listing=None, company=None,
+    def __init__(self, *, market=None, fundamental=None, listing=None, company=None, ownership=None,
                  clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
         self._market, self._fundamental, self._listing, self._clock = market, fundamental, listing, clock
         self._company = company  # callable symbol -> object with .events(); vnstock Company(source="VCI") when None
+        self._ownership = ownership  # callable symbol -> object with .ownership(); Company(source="KBS") when None (VCI does not serve it)
 
     def _api(self):
         if self._market is None or self._fundamental is None:
@@ -132,7 +142,34 @@ class VnstockProvider:
                    for r in company.shareholders().to_dict("records")]
         officers = [{"name": str(r.get("officer_name") or ""), "position": r.get("officer_position"), "percent": num(r.get("officer_own_percent")),
                      "quantity": num(r.get("officer_own_quantity"))} for r in company.officers().to_dict("records")]
-        return {"shareholders": holders, "officers": officers}
+        return {"shareholders": holders, "officers": officers, "ownership": self._foreign_state(company), "structure": self._structure(symbol.upper())}
+
+    @staticmethod
+    def _foreign_state(company) -> dict | None:
+        """Foreign and state stakes, foreign room and free float as ratios (VCI overview, current); None when the source fails."""
+        try:
+            row = company.overview().to_dict("records")[0]
+        except Exception:
+            return None
+        return {key: _ratio(row.get(field)) for key, field in (("foreign", "foreigner_percentage"), ("foreign_max", "maximum_foreign_percentage"),
+                                                                ("state", "state_percentage"), ("free_float", "free_float_percentage"))}
+
+    def _structure(self, symbol: str) -> list[dict] | None:
+        """Holdings by owner type (domestic/foreign, individual/organisation) as ratios with their date (KBS); None when the source fails."""
+        try:
+            if self._ownership is None:
+                from vnstock import Company
+                self._ownership = lambda sym: Company(source="KBS", symbol=sym)
+            rows = self._ownership(symbol).ownership().to_dict("records")
+        except Exception:
+            return None
+        out = []
+        for r in rows:
+            shares = _ratio(r.get("shares_owned"))
+            out.append({"type": str(r.get("owner_type") or ""), "percent": _ratio(r.get("ownership_percentage"), scale=Decimal(100)),
+                        "shares": int(Decimal(shares)) if shares is not None else None,
+                        "updated": str(r["update_date"])[:10] if r.get("update_date") else None})
+        return out
 
     def fetch_prices(self, symbol: str, start: date, end: date) -> list[PriceBar]:
         market, _ = self._api()

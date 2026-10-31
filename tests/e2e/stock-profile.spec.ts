@@ -112,6 +112,11 @@ test("the CAPM hint takes the owner's risk premium in Cài đặt and prices eac
   await page.goto("/research/FPT");
   await expect(page.getByRole("group", { name: "CAPM FPT" })).toContainText("Chi phí vốn chủ theo CAPM: 10,18%");  // 4,49% + 0,73 × 7,8%
   const people = page.getByRole("region", { name: "Cổ đông lớn và ban lãnh đạo" });
-  await expect(people.getByRole("table", { name: "Cổ đông lớn FPT" })).toContainText("Trương Gia Bình");
+  const holders = people.getByRole("table", { name: "Cổ đông lớn FPT" });
+  await expect(holders.getByRole("row", { name: /Trương Gia Bình/ })).toContainText("Chủ tịch Hội đồng Quản trị");  // the officer's role beside the stake
+  await expect(holders.getByRole("row", { name: /Khác/ })).toContainText("93,11%");  // 100% − 6,89%
+  await expect(people).toContainText("Nước ngoài 22,22% (room tối đa 49,00%)");
+  await expect(people).toContainText("Tự do chuyển nhượng chưa có số");
+  await expect(people.getByRole("table", { name: "Cơ cấu sở hữu FPT" })).toContainText("Tổ chức nước ngoài");
   await expect(people.getByRole("table", { name: "Ban lãnh đạo FPT" })).toContainText("Phó Chủ tịch Hội đồng Quản trị");
 });

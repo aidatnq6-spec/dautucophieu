@@ -40,7 +40,7 @@ test("the owner enters PMI values and sees the trend", async ({ page }) => {
 test("the impact chain shows five links, says what is missing, and reads inflation once it is entered", async ({ page }) => {
   await openMacro(page);
   const chain = page.getByRole("region", { name: "Chuỗi tác động vĩ mô" });
-  const links = chain.getByRole("list", { name: "Các mắt xích, từ giá dầu đến VN-Index" }).getByRole("listitem");
+  const links = chain.getByRole("list", { name: "Các mắt xích, từ giá dầu đến VN-Index" }).locator(":scope > li");  // not the rate rows inside a link
   await expect(links).toHaveText([/Giá dầu/, /Lạm phát Việt Nam/, /Lãi suất Việt Nam/, /Khối ngoại/, /VN-Index/]);
   await expect(chain).toContainText("không phải khuyến nghị");
   // Months before the 03/2026 figure performance.spec enters, so either order leaves CPI rising: 2,0 → 2,9 (→ 3,2).

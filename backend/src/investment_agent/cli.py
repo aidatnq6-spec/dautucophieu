@@ -38,6 +38,8 @@ def main() -> int:
     sync.add_argument("--index", action="store_true", help="the symbols are indices (e.g. VNINDEX), quoted in points")
     macro = commands.add_parser("macro-sync", help="fetch automatic macro indicators (FRED, Vietcombank) into data/macro")
     macro.add_argument("--data-dir", type=Path, required=True)
+    bs = commands.add_parser("beta-sync", help="beta of every watched ticker (VNDirect, one call) into data/beta.json for the CAPM hint")
+    bs.add_argument("--data-dir", type=Path, required=True)
     qa = commands.add_parser("quarter-alerts", help="Telegram note when a watched ticker's new quarter first appears in the statements")
     qa.add_argument("--data-dir", type=Path, required=True)
     frs = commands.add_parser("financial-ratios-sync", help="quarterly bank, securities and insurance ratios (VNDirect) into data/financial-ratios")
@@ -86,6 +88,8 @@ def main() -> int:
         return macro_sync(args.data_dir)
     if args.command == "index-valuation-sync":
         return index_valuation_sync(args.data_dir)
+    if args.command == "beta-sync":
+        return beta_sync(args.data_dir)
     if args.command == "quarter-alerts":
         return quarter_alerts_cli(args.data_dir)
     if args.command == "financial-ratios-sync":
@@ -481,6 +485,26 @@ def drawdown_cli(data_dir: Path) -> int:
         sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
         return all(sender.send(chosen.chat_id, part).status == "sent" for part in split_message(text))
     out = drawdown_run(repo, owner, data_dir, fetch=fetch, send=send, request_id=f"drawdown-{uuid.uuid4().hex[:16]}")
+    print(json.dumps(out))
+    return 0
+
+
+def beta_sync(data_dir: Path, get=None) -> int:
+    """Exit 0 when the call succeeded (tickers without a beta are listed), 1 when it failed."""
+    from investment_agent.market.beta import BetaStore, fetch_betas
+    from investment_agent.market.watchlist import load_watchlist
+    if get is None:
+        import httpx
+
+        def get(url):
+            response = httpx.get(url, timeout=60, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+            response.raise_for_status()
+            return response.text
+    try:
+        out = fetch_betas(BetaStore(data_dir), list(load_watchlist(data_dir).symbols), get=get)
+    except Exception as exc:
+        print(json.dumps({"status": "error", "reason": type(exc).__name__}))
+        return 1
     print(json.dumps(out))
     return 0
 

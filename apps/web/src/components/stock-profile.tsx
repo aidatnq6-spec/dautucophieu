@@ -12,6 +12,8 @@ import { BankFigures } from "./bank-figures";
 import { ForwardValuation } from "./forward-valuation";
 import { SectorRatios } from "./sector-ratios";
 import { DividendHistory } from "./dividend-history";
+import { CapmTicker } from "./capm";
+import { CompanyPeople } from "./company-people";
 
 type Facts = { price: string | null; price_date: string | null; change_pct: string | null; high_52w: string | null; low_52w: string | null;
   shares: number | null; market_cap: string | null; avg_volume: number | null; avg_volume_sessions: number };
@@ -64,6 +66,7 @@ export function StockProfile({ symbol }: { symbol: string }) {
             {v.latest_quarter && <span className="caption"> · số liệu {v.latest_quarter}</span>}</p>
           <MethodList row={v} />
           <QualityList symbol={p.symbol} q={v.quality} />
+          <CapmTicker symbol={p.symbol} />
           <MultipleCharts symbol={p.symbol} />
           <p className="caption"><Link href="/fair-value">So sánh với các mã khác ở Định giá</Link></p>
         </>}
@@ -76,6 +79,8 @@ export function StockProfile({ symbol }: { symbol: string }) {
       {p.watched && <BankFigures symbol={p.symbol} />}
 
       {p.watched && <DividendHistory symbol={p.symbol} />}
+
+      {p.watched && <CompanyPeople symbol={p.symbol} />}
 
       <section className="surface" aria-label="Sự kiện">
         <h2>Sự kiện</h2>

@@ -21,6 +21,8 @@ MACRO = (("DXY", "DXY", "điểm", None, False), ("US10Y", "US10Y", "%", None, F
          ("GOLD", "Vàng", "USD/oz", "PAXG-USD", True), ("USOIL", "Dầu WTI", "USD/thùng", None, False),
          ("BTC", "Bitcoin", "USD", "BTC-USD", True))
 IDS = {m[0] for m in MACRO}
+# DXY is kept under its own key since it is computed from ECB rates; "DXY-1d" holds FRED's broad dollar index, a different level.
+SERIES = {"DXY": "DXY-ecb-1d"}
 
 
 def _dec(v) -> Decimal | None:
@@ -38,7 +40,7 @@ def _s(d: Decimal) -> str:
 def _daily(data_dir: Path, symbol: str) -> list[tuple[str, str]]:
     if symbol == "VN10Y":
         return [(o["date"], o["value"]) for o in sorted(MacroStore(data_dir).read("vn10y"), key=lambda o: o["date"])]
-    return [(t[:10], v) for t, v in SeriesStore(data_dir / "trend-sources").points(f"{symbol}-1d")]
+    return [(t[:10], v) for t, v in SeriesStore(data_dir / "trend-sources").points(SERIES.get(symbol, f"{symbol}-1d"))]
 
 
 def _row(symbol, label, unit, price, ref, when, basis, reason=None) -> dict:

@@ -190,7 +190,7 @@ if __name__ == "__main__":
             return [{"time": first + timedelta(days=i), "open": "50", "high": "55", "low": "49", "close": str(50 + i % 4), "volume": 1000 + i}
                     for i in range(60)]
     trend_routes._source = FixtureSource
-    SeriesStore(os.path.join(data, "trend-sources")).upsert("DXY-1d", [(datetime(2026, 8, 1) + timedelta(days=i), str(99 + (i % 3) / 10))
+    SeriesStore(os.path.join(data, "trend-sources")).upsert("DXY-ecb-1d", [(datetime(2026, 8, 1) + timedelta(days=i), str(99 + (i % 3) / 10))
                                                                        for i in range(60)])
     app = create_app(InternalAuthSettings.from_env(), personal_repository=repository, market=MARKET,
                      jobs=JobStore(os.path.join(data, "jobs.sqlite")), outbox=deliveries, deliveries=deliveries, data_dir=data)

@@ -186,7 +186,7 @@ if __name__ == "__main__":
             raise RuntimeError("offline")
 
         def ohlcv(self, symbol, interval, start, end, index):
-            first = datetime(2026, 8, 1, tzinfo=timezone(timedelta(hours=7)))
+            first = datetime.combine(date.today() - timedelta(days=59), datetime.min.time(), tzinfo=timezone(timedelta(hours=7)))  # ends today
             return [{"time": first + timedelta(days=i), "open": "50", "high": "55", "low": "49", "close": str(50 + i % 4), "volume": 1000 + i}
                     for i in range(60)]
     trend_routes._source = FixtureSource

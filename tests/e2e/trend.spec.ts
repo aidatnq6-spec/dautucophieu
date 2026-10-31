@@ -36,6 +36,7 @@ test("the price board lists the indices and watched tickers in exchange colours 
   const fpt = box.getByRole("group", { name: "Biểu đồ FPT" });
   await expect(fpt.getByTestId("tb-chart-caption")).toContainText("nghìn đồng");
   await expect(fpt.getByTestId("tb-canvas").locator("canvas").first()).toBeVisible();
+  await expect(fpt.getByTestId("tb-canvas")).toHaveAttribute("data-live-close", "56.3");  // today's candle follows the board
   await fpt.getByRole("radio", { name: "1 giờ" }).click();
   await expect(fpt.getByTestId("tb-chart-caption")).toContainText("Nến 1 giờ");
   await expect(box).toContainText("trần 56,30");

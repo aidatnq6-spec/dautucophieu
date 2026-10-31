@@ -16,6 +16,7 @@ from .common import error, now, unavailable
 
 # One board read serves every poll for a while: Vnstock's free tier allows 60 calls a minute.
 BOARD_TTL = {True: timedelta(seconds=15), False: timedelta(minutes=5)}
+MACRO_TTL = timedelta(seconds=15)
 _board_cache: dict[str, tuple] = {}
 
 router = APIRouter(prefix="/internal")
@@ -62,23 +63,29 @@ def _source():
 
 @router.get("/trend/board")
 def live_board(request: Request):
-    """Indices, Vĩ mô rows and watched tickers (Vnstock, Coinbase, stored closes); cached 15 s in the session, 5 min outside it."""
+    """Indices and watched tickers (Vnstock) cached 15 s in the session, 5 min outside it; Vĩ mô rows (Coinbase live, stored closes)
+    cached 15 s at any hour, since Bitcoin and gold trade around the clock."""
     require_owner(request)
     data_dir = request.app.state.data_dir
     if data_dir is None:
         return unavailable()
     symbols = list(load_watchlist(Path(data_dir)).symbols)
     moment = now(request)
+    source = _source()
     key = f"{data_dir}|{','.join(symbols)}"
     cached = _board_cache.get(key)
     if cached and moment - cached[0] < BOARD_TTL[in_session(moment)]:
-        return cached[1]
-    source = _source()
-    payload = build_board(symbols, board=source.board, index_minutes=source.index_minutes, now=moment)
-    indices = [r for r in payload["rows"] if r["kind"] == "index"]
-    payload["rows"] = indices + macro_rows(Path(data_dir), get=source.get, now=moment) + payload["rows"][len(indices):]
-    _board_cache[key] = (moment, payload)
-    return payload
+        board = cached[1]
+    else:
+        board = build_board(symbols, board=source.board, index_minutes=source.index_minutes, now=moment)
+        _board_cache[key] = (moment, board)
+    macro = _board_cache.get(f"{data_dir}|macro")
+    if not macro or moment - macro[0] >= MACRO_TTL:
+        macro = (moment, macro_rows(Path(data_dir), get=source.get, now=moment))
+        _board_cache[f"{data_dir}|macro"] = macro
+    indices = [r for r in board["rows"] if r["kind"] == "index"]
+    return {**board, "as_of": max(board["as_of"], macro[0].isoformat()), "stocks_as_of": board["as_of"],
+            "rows": indices + macro[1] + board["rows"][len(indices):]}
 
 
 @router.get("/trend/chart/{symbol}/{interval}")

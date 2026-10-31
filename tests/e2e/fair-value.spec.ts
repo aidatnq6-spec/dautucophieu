@@ -89,7 +89,8 @@ test("each ticker shows its F-Score, a new-quarter mark, and the criteria and wa
   await expect(fpt).toContainText("mạnh");
   await expect(fpt).toContainText("Quý mới");
   const vcb = table.getByRole("row", { name: /VCB/ });
-  await expect(vcb).toContainText("3/3");  // a bank: health score from sector ratios
+  await expect(vcb).toContainText("7/7");  // a bank: health score from sector ratios, with a level like the others
+  await expect(vcb).toContainText("mạnh");
   await expect(vcb).toContainText("sức khỏe ngành");
   await fpt.getByRole("button", { name: "Chi tiết FPT" }).click();
   const q = page.getByRole("region", { name: "Chất lượng báo cáo FPT" });
@@ -103,7 +104,7 @@ test("a bank is scored on sector ratios, latest quarter against the same quarter
   await openPage(page);
   await page.getByRole("button", { name: "Chi tiết VCB" }).click();
   const q = page.getByRole("region", { name: "Chất lượng báo cáo VCB" });
-  await expect(q).toContainText("Điểm sức khỏe ngân hàng Q3/2026 so với Q3/2025: 3/3 tiêu chí đánh giá được");
+  await expect(q).toContainText("Điểm sức khỏe ngân hàng Q3/2026 so với Q3/2025: 7/7 tiêu chí đánh giá được");
   await expect(q).toContainText("Nợ xấu 0,71% so với 1,03% cùng kỳ");
-  await expect(q).toContainText("không xếp mạnh/yếu");
+  await expect(q).toContainText("quy đổi mốc Piotroski theo số tiêu chí");
 });

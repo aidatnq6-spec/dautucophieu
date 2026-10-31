@@ -80,7 +80,7 @@ def test_banks_get_a_health_score_from_sector_ratios_without_a_level():
     q = report_quality({"years": {}}, "Ngân hàng", ratios=ratios)
     f = q["f_score"]
     assert q["applicable"] is True and f["kind"] == "health" and f["title"] == "Điểm sức khỏe ngân hàng"
-    assert f["year"] == "Q3/2026 so với Q3/2025" and f["score"] == 6 and f["evaluated"] == 7 and f["level"] is None
+    assert f["year"] == "Q3/2026 so với Q3/2025" and f["score"] == 6 and f["evaluated"] == 7 and f["level"] == "strong"  # one miss of 7
     npl = next(c for c in f["criteria"] if c["id"] == "npl_down")
     assert npl["passed"] is True and npl["detail"] == "Nợ xấu 0,71% so với 1,03% cùng kỳ"
     assert next(c for c in f["criteria"] if c["id"] == "equity_up")["passed"] is False
@@ -106,3 +106,13 @@ def test_a_partly_published_latest_quarter_falls_back_to_the_latest_complete_one
                                            "2026-09-30": {"ROAA_TR_AVG4Q": "0.0192", "NET_INTEREST_MARGIN_TR_AVG5Q": "0.0372"}}}
     f = report_quality({}, "Ngân hàng", ratios=ratios)["f_score"]
     assert f["year"] == "Q2/2026 so với Q2/2025" and f["evaluated"] == 7
+
+
+def test_health_levels_scale_piotroski_cut_offs_to_the_number_of_criteria():
+    from investment_agent.valuation.quality import _level
+    assert [_level(s, 7, 7) for s in (7, 6, 5, 2, 1, 0)] == ["strong", "strong", "medium", "medium", "weak", "weak"]
+    assert [_level(s, 6, 6) for s in (6, 5, 4, 2, 1)] == ["strong", "strong", "medium", "medium", "weak"]
+    assert _level(5, 5, 7) is None and _level(5, 5, 6) == "strong"  # 7 criteria need 6 evaluated, 6 need 5
+    assert [_level(s, 9, 9) for s in (9, 8, 7, 3, 2)] == ["strong", "strong", "medium", "medium", "weak"]  # F-Score unchanged
+    assert _level(6, 6, 9) is None
+

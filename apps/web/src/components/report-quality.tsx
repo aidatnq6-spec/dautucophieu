@@ -38,7 +38,7 @@ export function QualityList({ symbol, q }: { symbol: string; q: Quality | undefi
       {!f ? <p className="muted">{q.reason}</p> : <>
         <p><strong>{health ? `${f.title} ${f.year}` : `F-Score năm ${f.year}`}: {f.score}/{f.evaluated} tiêu chí đánh giá được</strong>
           {f.level ? <> · <span className={`pill ${LEVEL[f.level].tone}`}>{LEVEL[f.level].label}</span></>
-            : !health && <span className="caption"> · cần ít nhất 7 tiêu chí đánh giá được mới xếp mức</span>}</p>
+            : <span className="caption"> · cần ít nhất 7/9 số tiêu chí đánh giá được mới xếp mức</span>}</p>
         <ul className="quality-list">{f.criteria.map((c) => <li key={c.id}>{mark(c.passed, true)} <strong>{c.label}</strong>
           <span className="caption"> — {c.detail}</span></li>)}</ul>
         {q.signs.length > 0 && <>
@@ -50,7 +50,8 @@ export function QualityList({ symbol, q }: { symbol: string; q: Quality | undefi
         </>}
         {health
           ? <p className="caption">F-Score của Piotroski không dùng được cho ngân hàng, chứng khoán, bảo hiểm. Điểm sức khỏe là bộ tiêu chí của ứng dụng từ chỉ số ngành
-            VNDirect công bố, so quý gần nhất với cùng quý năm trước; không có mốc nghiên cứu nên không xếp mạnh/yếu. Không phải lời khuyên mua bán.</p>
+            VNDirect công bố, so quý gần nhất với cùng quý năm trước. Mức xếp theo quy tắc của ứng dụng, quy đổi mốc Piotroski theo số tiêu chí: mạnh khi trượt
+            nhiều nhất 1 tiêu chí, yếu khi đạt không quá 2/9 số tiêu chí. Không phải lời khuyên mua bán.</p>
           : <p className="caption">F-Score (Piotroski): 9 tiêu chí so năm gần nhất với năm trước; 8–9 mạnh, 0–2 yếu. Dấu hiệu là quy tắc của ứng dụng,
             chỉ cho thấy điểm bất thường cần đọc kỹ báo cáo, không kết luận gian lận và không phải lời khuyên mua bán. Nguồn: Vnstock (gói miễn phí), không có khấu
             hao nên chưa tính M-Score.</p>}

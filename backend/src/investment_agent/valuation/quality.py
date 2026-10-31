@@ -6,6 +6,7 @@ criteria (8–9 strong, 0–2 weak: Piotroski's cut-offs). The warning-sign thre
 stated on the page, not research cut-offs. Banks, securities firms and insurers report on another structure: not scored.
 """
 
+import math
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -55,6 +56,14 @@ def _lines(record: dict) -> dict[int, dict[str, Decimal]]:
     for y, figures in (record.get("annual") or {}).items():
         out[int(y)] = {k: Decimal(v) for k, v in figures.items() if v is not None}
     return out
+
+
+def _level(score: int, evaluated: int, total: int) -> str | None:
+    """Piotroski's cut-offs for 9 criteria (level from 7 evaluated; 8–9 strong; 0–2 weak) scaled to `total`: at least 7/9 of the
+    criteria evaluated, strong when at most one is missed, weak at no more than 2/9 of them passed."""
+    if evaluated < math.ceil(total * MIN_EVALUATED / 9):
+        return None
+    return "strong" if score >= total - 1 else "weak" if score <= total * 2 // 9 else "medium"
 
 
 def _criterion(id_: str, label: str, passed: bool | None, detail: str) -> dict:
@@ -115,7 +124,7 @@ def _f_score(a: dict[int, dict[str, Decimal]], share_issues: list[dict] | None, 
 
     evaluated = [c for c in out if c["passed"] is not None]
     score = sum(1 for c in evaluated if c["passed"])
-    level = None if len(evaluated) < MIN_EVALUATED else "strong" if score >= 8 else "weak" if score <= 2 else "medium"
+    level = _level(score, len(evaluated), len(out))
     return {"kind": "f_score", "title": "F-Score", "year": str(y), "score": score, "evaluated": len(evaluated), "level": level, "criteria": out}
 
 
@@ -151,7 +160,7 @@ def _signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:
 
 
 # Financial sectors: Piotroski's criteria do not fit their statements, so a health score of the app's own choosing from the
-# sector ratios VNDirect publishes, latest quarter against the same quarter a year before. No research cut-offs: no level.
+# sector ratios VNDirect publishes, latest quarter against the same quarter a year before; levels scale Piotroski's cut-offs.
 _PCT2, _PCT1, _PCT0 = (lambda x, p=2: _pct(x, p)), (lambda x, p=1: _pct(x, p)), (lambda x, p=0: _pct(x, p))
 _TIMES = lambda x, p=2: f"{_ratio(x, p)} lần"  # noqa: E731
 _ROAA = [("roaa", "ROAA dương", "ROAA_TR_AVG4Q", "positive", _PCT2, "ROAA"), ("roaa_up", "ROAA tăng", "ROAA_TR_AVG4Q", "up", _PCT2, "ROAA")]
@@ -209,8 +218,9 @@ def _health(ratios: dict, share_issues: list[dict] | None) -> dict:
                                   else "Có đợt phát hành không rõ loại trong 12 tháng" if "other" in kinds
                                   else "Không có đợt huy động vốn bằng cổ phiếu trong 12 tháng (cổ phiếu thưởng, cổ tức bằng cổ phiếu không tính)"))
     evaluated = [c for c in out if c["passed"] is not None]
+    score = sum(1 for c in evaluated if c["passed"])
     return {"kind": "health", "title": title, "year": f"{_quarter(latest)} so với {_quarter(before_key)}",
-            "score": sum(1 for c in evaluated if c["passed"]), "evaluated": len(evaluated), "level": None, "criteria": out}
+            "score": score, "evaluated": len(evaluated), "level": _level(score, len(evaluated), len(out)), "criteria": out}
 
 
 def report_quality(record: dict | None, sector: str | None, ratios: dict | None = None) -> dict:

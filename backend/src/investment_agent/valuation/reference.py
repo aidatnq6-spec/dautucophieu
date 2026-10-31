@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
+from .quality import report_quality
+
 UNCLASSIFIED = "Chưa phân ngành"
 SECTOR_METHODS = {
     "Ngân hàng": ("pb_history", "justified_pb", "pe_history", "pb_peers"),
@@ -25,6 +27,7 @@ DEFAULT_METHODS = ("pe_history", "pe_peers", "ddm")
 LABELS = {"pe_history": "P/E lịch sử", "pb_history": "P/B lịch sử", "pe_peers": "P/E cùng ngành", "pb_peers": "P/B cùng ngành",
           "justified_pb": "P/B hợp lý theo ROE", "ddm": "Chiết khấu cổ tức", "pe_normalized": "P/E trên lợi nhuận bình quân"}
 MIN_YEARS, MIN_PEERS, MIN_PAYING_YEARS = 4, 3, 4
+NEW_QUARTER_DAYS = 7  # "Quý mới" mark after a ticker's latest quarter first appears
 
 
 @dataclass(frozen=True)
@@ -189,7 +192,10 @@ def reference_board(symbols, *, sectors, records, prices, year_end, settings: Se
         sector = sectors.get(s)
         mates = [o for o in symbols if o != s and sector and sectors.get(o) == sector and o in current]
         peers = {k: [current[o][k] for o in mates if current[o][k] is not None] for k in ("pe", "pb")}
-        rows.append({**value_ticker(s, sector, ms[s], prices.get(s), peers, settings), "held": s in held})
+        seen = (records.get(s) or {}).get("latest_quarter_seen")
+        fresh = seen["quarter"] if seen and (today - date.fromisoformat(seen["on"])).days <= NEW_QUARTER_DAYS else None
+        rows.append({**value_ticker(s, sector, ms[s], prices.get(s), peers, settings), "held": s in held,
+                     "quality": report_quality(records.get(s), sector), "new_quarter": fresh})
     return {"as_of": today.isoformat(), "rows": rows,
             "settings": {"required_return": str(settings.required_return), "long_term_growth": str(settings.long_term_growth),
                          "threshold": str(settings.threshold.normalize())}}

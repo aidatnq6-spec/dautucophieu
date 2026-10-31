@@ -65,7 +65,14 @@ if __name__ == "__main__":
         "symbol": "FPT", "fetched_at": "2026-10-26T00:00:00+00:00", "source": "synthetic",
         "years": {str(y): {"npat": "1000000000", "eps": "1000", "equity": "10000000000"} for y in range(2020, 2026)},
         "quarters": {q: {"npat": "250000000", "equity": "10000000000"} for q in ("2025-Q2", "2025-Q3", "2025-Q4", "2026-Q1", "2026-Q2")},
-        "dividends": [{"date": f"{y}-07-01", "cash": "500"} for y in range(2021, 2026)] + [{"date": "2026-07-01", "cash": "500"}], "issues": []})
+        "dividends": [{"date": f"{y}-07-01", "cash": "500"} for y in range(2021, 2026)] + [{"date": "2026-07-01", "cash": "500"}], "issues": [],
+        # Chất lượng báo cáo: better on every line each year (F-Score 9/9), a bonus issue in 2025, a quarter first seen today.
+        "annual": {y: {k: str(v * 10**9) for k, v in dict(revenue=r, gross_profit=g, profit=p, total_assets=a, current_assets=ca, current_liabilities=cl,
+                                                             long_liabilities=ll, receivables=rc, cfo=c).items()}
+                   for y, (r, g, p, a, ca, cl, ll, rc, c) in {"2023": (80, 16, 4, 100, 50, 40, 30, 10, 5), "2024": (90, 19, 6, 100, 55, 40, 28, 11, 8),
+                                                              "2025": (110, 25, 9, 105, 60, 38, 25, 12, 12)}.items()},
+        "share_issues": [{"date": "2025-06-01", "kind": "bonus"}],
+        "latest_quarter_seen": {"quarter": "2026-Q2", "on": date.today().isoformat()}})
     SeriesStore(os.path.join(data, "trend-sources")).upsert("FPT-1d", [(datetime(y, 12, 31), "12") for y in range(2020, 2026)])
     # Month-end closes that move around (P/E chart); the 31 December closes above stay 12 for the valuation tests.
     SeriesStore(os.path.join(data, "trend-sources")).upsert("FPT-1d", [(datetime(y, m, 28), str(12 + ((y * 12 + m) % 9) - 4))

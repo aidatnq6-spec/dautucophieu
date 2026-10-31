@@ -170,6 +170,10 @@ def _same_bar(a, b) -> bool:
     return a.model_dump(exclude={"observed_at"}) == b.model_dump(exclude={"observed_at"})
 
 
+# Months with quarterly or annual report deadlines: 17 tickers older than 3 days a night covers the 50 watched in 3 days.
+REPORTING_MONTHS = (1, 2, 4, 5, 7, 8, 10, 11)
+
+
 def fundamentals_sync(data_dir: Path, *, limit: int | None, symbols: list[str] | None = None, provider=None, now=None, sleep=None) -> int:
     import time
     from datetime import datetime, timezone
@@ -177,10 +181,12 @@ def fundamentals_sync(data_dir: Path, *, limit: int | None, symbols: list[str] |
     from investment_agent.market.providers.vnstock_adapter import VnstockProvider
     from investment_agent.market.series import SeriesStore
     from investment_agent.market.watchlist import load_watchlist
-    # Named tickers are refreshed now (max age 0); otherwise the stalest watched tickers.
+    now = now or datetime.now(timezone.utc)
+    # Named tickers are refreshed now (max age 0); otherwise the stalest watched tickers, more often in the months reports are due.
+    max_age, limit = (0, limit) if symbols else (3, max(limit or 0, 17)) if now.month in REPORTING_MONTHS else (7, limit)
     out = sync_fundamentals(FundamentalsStore(data_dir / "fundamentals"), SeriesStore(data_dir / "trend-sources"),
                             symbols or list(load_watchlist(data_dir).symbols), provider=provider or VnstockProvider(),
-                            now=now or datetime.now(timezone.utc), limit=limit, max_age_days=0 if symbols else 7, sleep=sleep or time.sleep)
+                            now=now, limit=limit, max_age_days=max_age, sleep=sleep or time.sleep)
     print(json.dumps(out, ensure_ascii=False))
     return 1 if out["errors"] else 0
 

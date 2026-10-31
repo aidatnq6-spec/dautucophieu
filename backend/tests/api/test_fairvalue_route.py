@@ -79,3 +79,22 @@ def test_history_of_an_index_charts_its_stored_daily_multiples(tmp_path):
                      market=SyntheticMarket(prices={}), data_dir=tmp_path)
     body = call(TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000)), clock, "GET", "/internal/fairvalue/history/VN30").json()
     assert body["symbol"] == "VN30" and body["kind"] == "index" and len(body["pe"]["points"]) == 12 and body["pb"]["latest"] == "2.00"
+
+
+def test_fairvalue_rows_carry_report_quality_and_a_new_quarter_mark(tmp_path):
+    (tmp_path / "market-symbols.txt").write_text("FPT\nVCB\n", encoding="utf-8")
+    (tmp_path / "industries.json").write_text(json.dumps({"as_of": "2026-10-25", "source": "t", "level": 2,
+                                                         "sectors": {"FPT": "Công nghệ Thông tin", "VCB": "Ngân hàng"}}), encoding="utf-8")
+    annual = {str(y): {"revenue": "100", "gross_profit": "30", "profit": "10", "total_assets": "100", "cfo": "12"} for y in (2024, 2025)}
+    store = FundamentalsStore(tmp_path / "fundamentals")
+    store.save({"symbol": "FPT", "fetched_at": "2027-01-14T00:00:00+00:00", "source": "t", "years": {}, "quarters": {}, "dividends": [], "issues": [],
+                "annual": annual, "share_issues": [], "latest_quarter_seen": {"quarter": "2026-Q4", "on": "2027-01-12"}})
+    store.save({"symbol": "VCB", "fetched_at": "2027-01-14T00:00:00+00:00", "source": "t", "years": {}, "quarters": {}, "dividends": [], "issues": [],
+                "latest_quarter_seen": {"quarter": "2026-Q3", "on": "2026-10-20"}})
+    clock = Clock()
+    app = create_app(InternalAuthSettings("owner-1", TOKEN, SECRET), clock=clock, personal_repository=PersonalRepository("owner-1", MemoryDocumentStore()),
+                     market=SyntheticMarket(prices={}), data_dir=tmp_path)
+    rows = {r["symbol"]: r for r in call(TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000)), clock, "GET",
+                                          "/internal/fairvalue").json()["rows"]}
+    assert rows["FPT"]["quality"]["f_score"]["year"] == "2025" and rows["FPT"]["new_quarter"] == "2026-Q4"  # seen 3 days before the clock
+    assert rows["VCB"]["quality"]["applicable"] is False and rows["VCB"]["new_quarter"] is None

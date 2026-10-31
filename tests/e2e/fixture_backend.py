@@ -133,11 +133,15 @@ if __name__ == "__main__":
     from investment_agent.market.company_people import PeopleStore
     BetaStore(data).save({"values": {"FPT": {"beta": "0.73", "date": (date.today() - timedelta(days=1)).isoformat()}}})
     for sym, holder in (("FPT", "Trương Gia Bình"), ("VCB", "Ngân hàng Nhà nước Việt Nam")):
-        PeopleStore(data).save(sym, {"symbol": sym, "fetched_at": datetime.now(timezone.utc).isoformat(), "source": "synthetic",
+        PeopleStore(data).save(sym, {"schema": 2, "symbol": sym, "fetched_at": datetime.now(timezone.utc).isoformat(), "source": "synthetic",
+                                     "ownership": {"foreign": "0.2222", "foreign_max": "0.49", "state": "0", "free_float": None},
+                                     "structure": [{"type": "Tổ chức nước ngoài", "percent": "0.2854", "shares": 1466163575, "updated": "2025-12-31"}],
                                      "shareholders": [{"name": holder, "type": "Individual" if sym == "FPT" else "Organization", "quantity": 117347966,
                                                        "percent": 0.0689, "updated": "2026-08-03"}],
                                      "officers": [{"name": "Bùi Quang Ngọc", "position": "Phó Chủ tịch Hội đồng Quản trị", "percent": 0.0148,
-                                                   "quantity": 25255715}]})
+                                                   "quantity": 25255715},
+                                                  {"name": "Trương Gia Bình", "position": "Chủ tịch Hội đồng Quản trị", "percent": 0.0689,
+                                                   "quantity": 117347966}]})
     # Bank health score: VCB sector ratios, Q3/2026 against Q3/2025, better on all seven (7/7, mạnh).
     from investment_agent.market.financial_ratios import FinancialRatioStore
     FinancialRatioStore(os.path.join(data, "financial-ratios")).save({"symbol": "VCB", "kind": "bank", "fetched_at": "2026-10-31T00:00:00+00:00",

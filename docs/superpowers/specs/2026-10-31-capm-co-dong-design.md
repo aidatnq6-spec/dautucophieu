@@ -17,3 +17,18 @@ Hiện ở Cài đặt (cạnh "Lợi suất yêu cầu": Ke thị trường = R
 Nguồn: Vnstock gói Cộng đồng, `Company(source="VCI").shareholders()` và `.officers()` (kiểm tra 31/10/2026: FPT có 67 cổ đông, 9 người trong ban lãnh đạo, kèm tỷ lệ, số cổ phiếu, ngày cập nhật). Đọc khi mở trang mã, lưu đệm `data/company/<MÃ>.json`, đọc lại sau 30 ngày; nguồn lỗi thì hiện bản đã lưu kèm ngày, chưa có bản nào thì ghi lý do.
 
 Trang mã hiện 10 cổ đông lớn nhất (tên, loại, tỷ lệ, số cổ phiếu, ngày cập nhật) và ban lãnh đạo (tên, chức vụ, tỷ lệ sở hữu). Dữ liệu công bố công khai của doanh nghiệp; không gửi cho AI.
+
+## Bổ sung: cơ cấu sở hữu, dòng "Khác", chức vụ cạnh cổ đông (31/10/2026)
+
+Nguồn đã kiểm tra với ACB, gói Cộng đồng:
+- VCI `Company.overview()`: `foreigner_percentage`, `maximum_foreign_percentage`, `state_percentage`, `free_float_percentage` (số hiện tại, không có ngày).
+- KBS `Company.ownership()`: tỷ lệ và số cổ phiếu theo nhóm (cá nhân/tổ chức × trong nước/nước ngoài) kèm ngày.
+- Giao dịch nội bộ: VCI không phục vụ, KBS trả bảng rỗng với mọi mã thử (ACB, FPT, HPG, VCB) → chưa làm.
+
+Quy tắc:
+- Mỗi nguồn lỗi riêng thì chỉ phần đó ghi "chưa đọc được", danh sách cổ đông vẫn hiện.
+- Nguồn giữ nhiều lần công bố của cùng một cổ đông: mỗi tên giữ bản có ngày mới nhất.
+- "Khác" = 1 − tổng 10 cổ đông lớn nhất; một trong mười không có tỷ lệ, hoặc tổng vượt 100%, thì để trống.
+- Chức vụ cạnh cổ đông chỉ khi tên trùng khớp (bỏ khoảng trắng thừa, không phân biệt hoa thường) với ban lãnh đạo; không ghép gần đúng.
+- Không suy xuất xứ trong nước/nước ngoài của từng cổ đông từ tên.
+- Bản lưu cũ (trước bổ sung) được đọc lại từ nguồn ở lần mở trang kế tiếp.

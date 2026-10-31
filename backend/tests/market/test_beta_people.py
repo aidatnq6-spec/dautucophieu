@@ -54,3 +54,31 @@ def test_cli_beta_sync_reads_the_watchlist(tmp_path, capsys):
     (tmp_path / "market-symbols.txt").write_text("FPT\n", encoding="utf-8")
     assert beta_sync(tmp_path, get=lambda url: json.dumps({"data": [{"code": "FPT", "reportDate": "2026-10-30", "value": 0.73}]})) == 0
     assert json.loads(capsys.readouterr().out)["betas"] == 1 and BetaStore(tmp_path).read()["values"]["FPT"]["beta"] == "0.73"
+
+
+def test_others_is_what_the_ten_largest_holders_leave_and_old_cache_files_are_read_again(tmp_path):
+    holders = [{"name": f"H{i}", "type": None, "quantity": None, "percent": p, "updated": None}
+               for i, p in enumerate([0.0649, 0.0502, 0.0499, 0.0343, 0.0362, 0.0251, 0.018, 0.0184, 0.0172, 0.0156, 0.0125])]
+    store = PeopleStore(tmp_path)
+    now = datetime(2026, 10, 31, tzinfo=timezone.utc)
+    store.save("ACB", {"symbol": "ACB", "shareholders": [], "officers": [], "fetched_at": now.isoformat(), "source": "vnstock:vci"})  # before ownership
+    calls = []
+
+    def fetch(symbol):
+        calls.append(symbol)
+        return {"shareholders": holders, "officers": [], "ownership": None, "structure": None}
+    view = company_people(store, "ACB", fetch=fetch, now=now)
+    assert calls == ["ACB"] and view["others_percent"] == "0.6702"  # 1 − top ten; the eleventh (1,25%) is inside "others"
+    blank = [{**holders[0], "percent": None}] + holders[1:3]
+    assert company_people(PeopleStore(tmp_path / "b"), "ACB", fetch=lambda s: {"shareholders": blank, "officers": [], "ownership": None,
+                                                                              "structure": None}, now=now)["others_percent"] is None
+
+
+def test_a_holder_listed_twice_keeps_only_the_latest_disclosure(tmp_path):
+    rows = [{"name": "Nguyễn Thiên Hương Jenny", "type": "Individual", "quantity": 151421326, "percent": 0.0295, "updated": "2026-06-19"},
+            {"name": "Nguyễn Thiên Hương Jenny", "type": "Individual", "quantity": 60012110, "percent": 0.01344, "updated": "2024-09-13"},
+            {"name": "Sather Gate Investments Limited", "type": "Organization", "quantity": 1, "percent": 0.0499, "updated": None}]
+    view = company_people(PeopleStore(tmp_path), "ACB", fetch=lambda s: {"shareholders": rows, "officers": [], "ownership": None, "structure": None},
+                          now=datetime(2026, 10, 31, tzinfo=timezone.utc))
+    assert [(h["name"], h["percent"]) for h in view["shareholders"]] == [("Nguyễn Thiên Hương Jenny", 0.0295), ("Sather Gate Investments Limited", 0.0499)]
+    assert view["others_percent"] == "0.9206"

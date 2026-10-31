@@ -59,4 +59,4 @@ So quý gần nhất có đủ số liệu với cùng quý năm trước (quý 
 - Chứng khoán (6): ROAA dương; ROAA tăng; biên lợi nhuận ròng tăng; vốn chủ / tổng tài sản tăng; cho vay / vốn chủ giảm; không phát hành cổ phiếu huy động vốn trong 12 tháng.
 - Bảo hiểm (6): ROAA dương; ROAA tăng; tỷ lệ kết hợp giảm; biên lợi nhuận ròng tăng; vốn chủ / tổng tài sản tăng; không phát hành cổ phiếu huy động vốn trong 12 tháng.
 
-Gọi là "Điểm sức khỏe", không phải F-Score; là bộ tiêu chí của ứng dụng, không có mốc nghiên cứu nên không xếp mạnh/yếu. Thiếu số thì tiêu chí "không đánh giá được". Cột trên bảng Định giá đổi tên thành "Chất lượng".
+Gọi là "Điểm sức khỏe", không phải F-Score; là bộ tiêu chí của ứng dụng. Theo yêu cầu của chủ sở hữu (31/10/2026), xếp mức bằng cách quy đổi mốc Piotroski theo số tiêu chí: cần ít nhất 7/9 số tiêu chí đánh giá được; mạnh khi trượt nhiều nhất 1 tiêu chí (6/7, 5/6); yếu khi đạt không quá 2/9 số tiêu chí (1/7, 1/6). Thiếu số thì tiêu chí "không đánh giá được". Cột trên bảng Định giá đổi tên thành "Chất lượng".

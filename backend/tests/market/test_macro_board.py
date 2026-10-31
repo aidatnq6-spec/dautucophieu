@@ -10,7 +10,8 @@ NOW = datetime(2026, 10, 31, 8, 0, tzinfo=timezone.utc)
 
 def _seed(tmp_path):
     days = SeriesStore(tmp_path / "trend-sources")
-    days.upsert("DXY-1d", [(datetime(2026, 10, 29), "99.37"), (datetime(2026, 10, 30), "99.48")])
+    days.upsert("DXY-ecb-1d", [(datetime(2026, 10, 29), "99.37"), (datetime(2026, 10, 30), "99.48")])
+    days.upsert("DXY-1d", [(datetime(2026, 10, 16), "121.4048")])  # FRED's broad dollar index the row used before: a different measure
     days.upsert("US10Y-1d", [(datetime(2026, 10, 28), "4.10"), (datetime(2026, 10, 29), "4.07")])
     days.upsert("BTC-1d", [(datetime(2026, 10, 29), "77000"), (datetime(2026, 10, 30), "77873.27")])
     days.upsert("GOLD-1d", [(datetime(2026, 10, 30), "3996.96")])
@@ -48,7 +49,7 @@ def test_a_failing_coin_feed_falls_back_to_the_last_daily_close(tmp_path):
 
 def test_macro_chart_is_a_close_line_with_indicators_and_hourly_only_where_the_source_has_it(tmp_path):
     days = SeriesStore(tmp_path / "trend-sources")
-    days.upsert("DXY-1d", [(datetime(2026, 1, 1) + timedelta(days=i), str(100 + i % 3)) for i in range(40)])
+    days.upsert("DXY-ecb-1d", [(datetime(2026, 1, 1) + timedelta(days=i), str(100 + i % 3)) for i in range(40)])
     SeriesStore(tmp_path / "intraday").upsert("BTC-1h", [(datetime(2026, 10, 30, 9, tzinfo=timezone.utc), "77000")])
     out = macro_chart(tmp_path, "DXY", "1D")
     assert out["style"] == "line" and out["bars"][0] == {"t": "2026-01-01", "c": "100"} and len(out["macd"]) == 7 and out["rsi"]

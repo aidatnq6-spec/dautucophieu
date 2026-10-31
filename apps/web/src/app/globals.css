@@ -82,6 +82,14 @@ legend{font-weight:600;padding:0 6px}
 .tb-list tbody tr{cursor:pointer}.tb-list tbody tr:hover,.tb-list tbody tr.tb-selected{background:#eef3fb}
 .tb-list tbody tr:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
 .tb-up{color:var(--good)}.tb-down{color:var(--bad)}.tb-ref{color:#a87b00}.tb-ceil{color:#8b2fc9}.tb-floor{color:#0b8aa8}
+.tb-alerts{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.tb-alerts h3{margin:0 0 8px;font-size:14px}
+.tb-alert-form{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tb-alert-form select,.tb-alert-form input{padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);min-width:0}
+.tb-alert-form input{width:96px}.tb-alert-form .btn{padding:6px 10px}
+.tb-alert-list{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:6px;font-size:13px}
+.tb-alert-list li{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tb-alert-list .btn{padding:3px 8px;font-size:12px}
 @media(max-width:900px){.tb-layout{grid-template-columns:1fr}.tb-canvas{height:420px}}
 .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .fv-table{width:100%;border-collapse:collapse;font-size:14px}

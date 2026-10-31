@@ -18,7 +18,23 @@ Push-Location $script:RepoRoot
 try {
     foreach ($name in $checks.Keys) {
         $output = & $checks[$name] 2>&1 | Out-String
-        if ($LASTEXITCODE -eq 0) { Write-Host "PASS $name" } else { Write-Host "FAIL $name"; Write-Host ($output -split "`n" | Select-Object -Last 15 | Out-String); $failed += $name }
+        if ($LASTEXITCODE -eq 0) { Write-Host "PASS $name"; continue }
+        Write-Host "FAIL $name"
+        # The whole output goes to logs\verify-<check>.log: the last lines alone hide which test failed and why.
+        $logs = Join-Path $script:RepoRoot 'logs'
+        New-Item -ItemType Directory -Force -Path $logs | Out-Null
+        $file = Join-Path $logs "verify-$($name -replace '\W+', '-').log"
+        $output | Set-Content -LiteralPath $file -Encoding UTF8
+        $lines = $output -split "`n"
+        $errors = $lines | Select-String -Pattern '^\s+\d+\) |Error:|Expected|Received' | Select-Object -First 30 | ForEach-Object { $_.Line.TrimEnd() }
+        Write-Host ((@($errors) + @('') + @($lines | Select-Object -Last 15)) -join "`n")
+        Write-Host "Nhật ký đầy đủ: $file"
+        if ($name -eq 'browser e2e') {
+            # One line per failing test, kept across runs, to see which tests fail now and then.
+            $lines | Select-String -Pattern '^\s+\[\w+\] .+\.spec\.ts:\d+:\d+' | ForEach-Object { "$(Get-Date -Format o) $($_.Line.Trim())" } |
+                Add-Content -LiteralPath (Join-Path $logs 'e2e-failures.log') -Encoding UTF8
+        }
+        $failed += $name
     }
 } finally { Pop-Location }
 if ($failed) { Write-Host "Không đạt: $($failed -join ', ')"; exit 1 }

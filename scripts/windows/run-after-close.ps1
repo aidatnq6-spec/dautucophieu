@@ -45,6 +45,9 @@ $bs = & $python -W ignore -m investment_agent.cli beta-sync --data-dir $data 2>$
 # CAPM default ERP: Damodaran (NYU Stern) for Vietnam, read at most weekly.
 $es = & $python -W ignore -m investment_agent.cli erp-sync --data-dir $data 2>$null
 "$(Get-Date -Format o) erp-sync exit=$LASTEXITCODE $es" | Add-Content -LiteralPath $log -Encoding UTF8
+# Giao dich noi bo moi: Telegram note for held tickers' new insider notices (only when scheduled delivery is on).
+$ia = & $python -W ignore -m investment_agent.cli insider-alerts --data-dir $data 2>$null
+"$(Get-Date -Format o) insider-alerts exit=$LASTEXITCODE $ia" | Add-Content -LiteralPath $log -Encoding UTF8
 # Public research reports (ACBS, World Bank): AI reads public report text only; at most 3 new reports, once per 6 hours.
 $ins = & $python -W ignore -m investment_agent.cli insights-run --data-dir $data --calendar $calendar 2>$null
 "$(Get-Date -Format o) insights-run exit=$LASTEXITCODE $ins" | Add-Content -LiteralPath $log -Encoding UTF8

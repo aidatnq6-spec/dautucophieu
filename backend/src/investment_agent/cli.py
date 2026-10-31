@@ -42,6 +42,10 @@ def main() -> int:
     bs.add_argument("--data-dir", type=Path, required=True)
     es = commands.add_parser("erp-sync", help="Damodaran's equity risk premium for Vietnam into data/erp.json, at most weekly")
     es.add_argument("--data-dir", type=Path, required=True)
+    ia = commands.add_parser("insider-alerts", help="Telegram note for new insider or major-shareholder notices of held tickers")
+    ia.add_argument("--data-dir", type=Path, required=True)
+    pa = commands.add_parser("price-alerts", help="during the session, Telegram note for the owner's price levels crossed")
+    pa.add_argument("--data-dir", type=Path, required=True)
     qa = commands.add_parser("quarter-alerts", help="Telegram note when a watched ticker's new quarter first appears in the statements")
     qa.add_argument("--data-dir", type=Path, required=True)
     frs = commands.add_parser("financial-ratios-sync", help="quarterly bank, securities and insurance ratios (VNDirect) into data/financial-ratios")
@@ -96,6 +100,10 @@ def main() -> int:
         return erp_sync_cli(args.data_dir)
     if args.command == "quarter-alerts":
         return quarter_alerts_cli(args.data_dir)
+    if args.command == "insider-alerts":
+        return insider_alerts_cli(args.data_dir)
+    if args.command == "price-alerts":
+        return price_alerts_cli(args.data_dir)
     if args.command == "financial-ratios-sync":
         return financial_ratios_sync(args.data_dir)
     if args.command == "industries":
@@ -554,6 +562,87 @@ def quarter_alerts_cli(data_dir: Path) -> int:
     sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
     out = quarter_alerts_run(data_dir, send=lambda text: all(sender.send(chosen.chat_id, part).status == "sent" for part in split_message(text)))
     print(json.dumps(out))
+    return 0
+
+
+def _scheduled_telegram():
+    """(send, repo, owner) when scheduled Telegram delivery is on, else None (nothing is read or sent)."""
+    import os
+
+    import httpx
+
+    from investment_agent.api.auth import OwnerContext
+    from investment_agent.notifications.render import split_message
+    from investment_agent.notifications.telegram import TelegramSender
+    from investment_agent.repositories.firestore import personal_repository_from_env
+    from investment_agent.services.records import notification_settings
+    from investment_agent.settings import Settings
+
+    settings = Settings.from_env()
+    repo = personal_repository_from_env()
+    owner = OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
+    chosen, _ = notification_settings(repo, owner)
+    if not (settings.telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):
+        return None
+    sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
+    return (lambda text: all(sender.send(chosen.chat_id, part).status == "sent" for part in split_message(text))), repo, owner
+
+
+def _http_text(url: str) -> str:
+    import httpx
+    response = httpx.get(url, timeout=30, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+    response.raise_for_status()
+    return response.text
+
+
+def insider_alerts_cli(data_dir: Path) -> int:
+    """Giao dịch nội bộ mới for held tickers over Telegram; skipped while scheduled delivery is off."""
+    from datetime import datetime, timezone
+
+    from investment_agent.services.holdings_view import held_from_repo
+    from investment_agent.services.insider_alerts import insider_alerts_run
+
+    telegram = _scheduled_telegram()
+    if telegram is None:
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
+        return 0
+    send, repo, owner = telegram
+    out = insider_alerts_run(data_dir, held=held_from_repo(repo, owner), get=_http_text, send=send, now=datetime.now(timezone.utc))
+    print(json.dumps(out))
+    return 0
+
+
+def price_alerts_cli(data_dir: Path, now=None) -> int:
+    """Cảnh báo giá during the session (every few minutes from the Windows schedule): one board read for the symbols with an armed
+    alert, then one Telegram note for the levels crossed. Outside the session, or with nothing armed, no source is called."""
+    import uuid
+    from datetime import datetime, timezone
+    from decimal import Decimal
+
+    from investment_agent.market.live_board import INDICES, build_board, in_session
+    from investment_agent.services.price_alerts import check_alerts, read_alerts
+
+    now = now or datetime.now(timezone.utc)
+    if not in_session(now):
+        print(json.dumps({"status": "skipped", "reason": "outside_session"}))
+        return 0
+    telegram = _scheduled_telegram()
+    if telegram is None:
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
+        return 0
+    send, repo, owner = telegram
+    wanted = {a["symbol"] for a in read_alerts(repo, owner)[0] if a["triggered_at"] is None}
+    if not wanted:
+        print(json.dumps({"status": "ok", "triggered": 0, "sent": False, "armed": 0}))
+        return 0
+    from investment_agent.api.routes.trend import _source
+    source = _source()
+    stocks = sorted(wanted - set(INDICES))
+    board = build_board(stocks, board=source.board if stocks else (lambda s: []),
+                        index_minutes=lambda i: source.index_minutes(i) if i in wanted else [], now=now)
+    prices = {r["symbol"]: Decimal(r["price"]) for r in board["rows"] if r["price"] is not None}
+    out = check_alerts(repo, owner, prices=prices, send=send, now=now, request_id=f"price-alerts-{uuid.uuid4().hex[:16]}")
+    print(json.dumps({**out, "armed": len(wanted), "errors": board["errors"]}, ensure_ascii=False))
     return 0
 
 

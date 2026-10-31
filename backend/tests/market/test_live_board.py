@@ -74,3 +74,10 @@ def test_chart_keeps_the_saved_bars_when_the_source_fails(tmp_path):
     later = chart(store, "FPT", "1D", fetch=broken, now=NOW + timedelta(days=1), index=False)
     assert later["stale"] is True and len(later["bars"]) == 5
     assert chart(ChartStore(tmp_path / "e"), "FPT", "1D", fetch=broken, now=NOW, index=False)["reason"] == "Không đọc được dữ liệu nến (nguồn lỗi)"
+
+
+def test_price_alert_check_does_nothing_outside_the_session(tmp_path, capsys):
+    import json
+    from investment_agent.cli import price_alerts_cli
+    assert price_alerts_cli(tmp_path, now=datetime(2026, 10, 31, 3, 30, tzinfo=UTC)) == 0  # Saturday
+    assert json.loads(capsys.readouterr().out) == {"status": "skipped", "reason": "outside_session"}

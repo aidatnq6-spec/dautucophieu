@@ -27,7 +27,8 @@ export default defineConfig({
   testDir: "../../tests/e2e",
   timeout: 60_000,
   workers: 1,
-  use: { baseURL: env.APP_ORIGIN },
+  // Failing tests keep a trace (test-results/, not in Git) so an occasional failure can be replayed.
+  use: { baseURL: env.APP_ORIGIN, trace: "retain-on-failure", screenshot: "only-on-failure" },
   // The backend keeps state for the whole run: onboarding starts from an empty store, the rest seed idempotently.
   projects: [
     { name: "onboarding", testMatch: /onboarding\.spec\.ts/ },

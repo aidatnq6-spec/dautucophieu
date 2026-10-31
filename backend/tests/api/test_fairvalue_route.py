@@ -97,4 +97,19 @@ def test_fairvalue_rows_carry_report_quality_and_a_new_quarter_mark(tmp_path):
     rows = {r["symbol"]: r for r in call(TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000)), clock, "GET",
                                           "/internal/fairvalue").json()["rows"]}
     assert rows["FPT"]["quality"]["f_score"]["year"] == "2025" and rows["FPT"]["new_quarter"] == "2026-Q4"  # seen 3 days before the clock
-    assert rows["VCB"]["quality"]["applicable"] is False and rows["VCB"]["new_quarter"] is None
+    assert rows["VCB"]["quality"]["f_score"] is None and rows["VCB"]["new_quarter"] is None  # a bank without sector ratios yet
+
+
+def test_fairvalue_scores_a_bank_from_its_stored_sector_ratios(tmp_path):
+    from investment_agent.market.financial_ratios import FinancialRatioStore
+    (tmp_path / "market-symbols.txt").write_text("VCB\n", encoding="utf-8")
+    (tmp_path / "industries.json").write_text(json.dumps({"as_of": "2026-10-25", "source": "t", "level": 2, "sectors": {"VCB": "Ngân hàng"}}),
+                                              encoding="utf-8")
+    FinancialRatioStore(tmp_path / "financial-ratios").save({"symbol": "VCB", "kind": "bank", "fetched_at": "2026-10-31T00:00:00+00:00", "source": "t",
+                                                             "quarters": {"2025-09-30": {"BAD_LOANS_RATIO_AQ": "0.0103"},
+                                                                          "2026-09-30": {"BAD_LOANS_RATIO_AQ": "0.0071"}}})
+    clock = Clock()
+    app = create_app(InternalAuthSettings("owner-1", TOKEN, SECRET), clock=clock, personal_repository=PersonalRepository("owner-1", MemoryDocumentStore()),
+                     market=SyntheticMarket(prices={}), data_dir=tmp_path)
+    [row] = call(TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000)), clock, "GET", "/internal/fairvalue").json()["rows"]
+    assert row["quality"]["f_score"]["kind"] == "health" and row["quality"]["f_score"]["score"] == 1

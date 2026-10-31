@@ -103,7 +103,7 @@ export function FairValueView() {
           <label key={id} className="choice"><input type="radio" name="fv-filter" checked={filter === id} onChange={() => setFilter(id)} />{label}</label>))}
       </div>
       <table className="fv-table" aria-label="Định giá tham khảo">
-        <thead><tr><th>Mã</th><th>Ngành</th><th className="num">Giá</th><th className="num">Giá hợp lý</th><th className="num">Chênh lệch</th><th>Kết luận</th><th>F-Score</th><th>Số liệu</th><th /></tr></thead>
+        <thead><tr><th>Mã</th><th>Ngành</th><th className="num">Giá</th><th className="num">Giá hợp lý</th><th className="num">Chênh lệch</th><th>Kết luận</th><th>Chất lượng</th><th>Số liệu</th><th /></tr></thead>
         <tbody>{rows.map((r) => (
           <Fragment key={r.symbol}>
             <tr>
@@ -113,7 +113,7 @@ export function FairValueView() {
               <td data-label="Giá hợp lý" className="num">{r.fair ? <>{formatVnd(r.fair)}<div className="caption">{formatVnd(r.low, { unit: false })} – {formatVnd(r.high, { unit: false })}</div></> : "—"}</td>
               <td data-label="Chênh lệch" className="num">{r.gap ? signedPct(r.gap) : "—"}</td>
               <td data-label="Kết luận"><span className={`pill ${VERDICT[r.verdict].tone}`}>{VERDICT[r.verdict].label}</span>{r.reason && <div className="caption">{r.reason}</div>}</td>
-              <td data-label="F-Score"><FScoreCell q={r.quality} /></td>
+              <td data-label="Chất lượng"><FScoreCell q={r.quality} /></td>
               <td data-label="Số liệu">{r.latest_quarter ?? "—"}{r.new_quarter && <> <span className="pill warn">Quý mới</span></>}</td>
               <td><button className="btn" aria-expanded={open === r.symbol} onClick={() => setOpen(open === r.symbol ? null : r.symbol)}
                 aria-label={`Chi tiết ${r.symbol}`}>Chi tiết</button></td>

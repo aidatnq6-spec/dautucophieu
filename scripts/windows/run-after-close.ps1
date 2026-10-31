@@ -36,6 +36,9 @@ $macro = & $python -W ignore -m investment_agent.cli macro-sync --data-dir $data
 # Dinh gia chi so: daily P/E and P/B of VNINDEX and VN30 from VNDirect's public API (whole history once, then the last 14 days).
 $ivs = & $python -W ignore -m investment_agent.cli index-valuation-sync --data-dir $data 2>$null
 "$(Get-Date -Format o) index-valuation-sync exit=$LASTEXITCODE $ivs" | Add-Content -LiteralPath $log -Encoding UTF8
+# Chat luong bao cao: quarterly ratios of watched banks, securities firms and insurers (VNDirect public API), one call each.
+$frs = & $python -W ignore -m investment_agent.cli financial-ratios-sync --data-dir $data 2>$null
+"$(Get-Date -Format o) financial-ratios-sync exit=$LASTEXITCODE $frs" | Add-Content -LiteralPath $log -Encoding UTF8
 # Public research reports (ACBS, World Bank): AI reads public report text only; at most 3 new reports, once per 6 hours.
 $ins = & $python -W ignore -m investment_agent.cli insights-run --data-dir $data --calendar $calendar 2>$null
 "$(Get-Date -Format o) insights-run exit=$LASTEXITCODE $ins" | Add-Content -LiteralPath $log -Encoding UTF8

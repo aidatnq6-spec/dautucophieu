@@ -88,11 +88,22 @@ test("each ticker shows its F-Score, a new-quarter mark, and the criteria and wa
   await expect(fpt).toContainText("9/9");
   await expect(fpt).toContainText("mạnh");
   await expect(fpt).toContainText("Quý mới");
-  await expect(table.getByRole("row", { name: /VCB/ })).toContainText("Không áp dụng");  // a bank
+  const vcb = table.getByRole("row", { name: /VCB/ });
+  await expect(vcb).toContainText("3/3");  // a bank: health score from sector ratios
+  await expect(vcb).toContainText("sức khỏe ngành");
   await fpt.getByRole("button", { name: "Chi tiết FPT" }).click();
   const q = page.getByRole("region", { name: "Chất lượng báo cáo FPT" });
   await expect(q).toContainText("F-Score năm 2025: 9/9 tiêu chí đánh giá được");
   await expect(q).toContainText("ROA 9,0% (lợi nhuận 9 tỷ / tài sản đầu kỳ 100 tỷ)");
   await expect(q).toContainText("Lãi nhưng dòng tiền kinh doanh âm");
   await expect(q).toContainText("không kết luận gian lận");
+});
+
+test("a bank is scored on sector ratios, latest quarter against the same quarter a year before", async ({ page }) => {
+  await openPage(page);
+  await page.getByRole("button", { name: "Chi tiết VCB" }).click();
+  const q = page.getByRole("region", { name: "Chất lượng báo cáo VCB" });
+  await expect(q).toContainText("Điểm sức khỏe ngân hàng Q3/2026 so với Q3/2025: 3/3 tiêu chí đánh giá được");
+  await expect(q).toContainText("Nợ xấu 0,71% so với 1,03% cùng kỳ");
+  await expect(q).toContainText("không xếp mạnh/yếu");
 });

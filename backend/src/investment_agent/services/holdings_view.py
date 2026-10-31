@@ -7,6 +7,7 @@ from datetime import date
 from pathlib import Path
 
 from investment_agent.domain.ledger import replay
+from investment_agent.market.financial_ratios import FinancialRatioStore
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.index_valuation import INDICES, series_key
 from investment_agent.market.sectors import load_sectors
@@ -32,8 +33,10 @@ def fair_value_board(data_dir: Path, market, repo, owner, *, held: set[str], tod
     records = {s: store.read(s) for s in symbols}
     prices = {s: p.price for s in symbols if (p := market.price(s)) is not None}
     s = Settings(settings.required_return, settings.long_term_growth, settings.threshold)
+    ratio_store = FinancialRatioStore(data_dir / "financial-ratios")
     board = reference_board(symbols, sectors=load_sectors(data_dir)[0], records=records, prices=prices,
-                            year_end={t: year_end_prices(series.read(f"{t}-1d"), today=today) for t in symbols}, settings=s, today=today, held=held)
+                            year_end={t: year_end_prices(series.read(f"{t}-1d"), today=today) for t in symbols}, settings=s, today=today, held=held,
+                            ratios={t: ratio_store.read(t) for t in symbols})
     multiples = SeriesStore(data_dir / "index-valuation")
     board["indices"] = [value_index(i, pe=multiples.read(series_key(i, "pe")), pb=multiples.read(series_key(i, "pb")),
                                     closes=series.read(f"{i}-1d"), settings=s, today=today) for i in INDICES]

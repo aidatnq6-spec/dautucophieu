@@ -6,6 +6,7 @@ criteria (8–9 strong, 0–2 weak: Piotroski's cut-offs). The warning-sign thre
 stated on the page, not research cut-offs. Banks, securities firms and insurers report on another structure: not scored.
 """
 
+from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 FINANCIAL = {"Ngân hàng", "Dịch vụ tài chính", "Bảo hiểm"}
@@ -115,7 +116,7 @@ def _f_score(a: dict[int, dict[str, Decimal]], share_issues: list[dict] | None, 
     evaluated = [c for c in out if c["passed"] is not None]
     score = sum(1 for c in evaluated if c["passed"])
     level = None if len(evaluated) < MIN_EVALUATED else "strong" if score >= 8 else "weak" if score <= 2 else "medium"
-    return {"year": str(y), "score": score, "evaluated": len(evaluated), "level": level, "criteria": out}
+    return {"kind": "f_score", "title": "F-Score", "year": str(y), "score": score, "evaluated": len(evaluated), "level": level, "criteria": out}
 
 
 def _signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:
@@ -149,10 +150,74 @@ def _signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:
     return signs
 
 
-def report_quality(record: dict | None, sector: str | None) -> dict:
+# Financial sectors: Piotroski's criteria do not fit their statements, so a health score of the app's own choosing from the
+# sector ratios VNDirect publishes, latest quarter against the same quarter a year before. No research cut-offs: no level.
+_PCT2, _PCT1, _PCT0 = (lambda x, p=2: _pct(x, p)), (lambda x, p=1: _pct(x, p)), (lambda x, p=0: _pct(x, p))
+_TIMES = lambda x, p=2: f"{_ratio(x, p)} lần"  # noqa: E731
+_ROAA = [("roaa", "ROAA dương", "ROAA_TR_AVG4Q", "positive", _PCT2, "ROAA"), ("roaa_up", "ROAA tăng", "ROAA_TR_AVG4Q", "up", _PCT2, "ROAA")]
+_EQUITY = ("equity_up", "Vốn chủ / tổng tài sản tăng", "EQUITY_TO_ASSET_AQ", "up", _PCT1, "Vốn chủ / tổng tài sản")
+_MARGIN = ("margin_up", "Biên lợi nhuận ròng tăng", "NET_MARGIN_TR", "up", _PCT1, "Biên lợi nhuận ròng")
+HEALTH = {
+    "bank": ("Điểm sức khỏe ngân hàng", _ROAA + [
+        ("npl_down", "Tỷ lệ nợ xấu giảm", "BAD_LOANS_RATIO_AQ", "down", _PCT2, "Nợ xấu"),
+        ("overdue_down", "Tỷ lệ nợ quá hạn giảm", "OVERDUE_LOANS_RATIO_AQ", "down", _PCT2, "Nợ quá hạn"),
+        ("coverage_up", "Bao phủ nợ xấu tăng", "PROVISION_BAD_LOANS_AQ", "up", _PCT0, "Bao phủ nợ xấu"),
+        ("nim_up", "NIM tăng", "NET_INTEREST_MARGIN_TR_AVG5Q", "up", _PCT2, "NIM"), _EQUITY], False),
+    "securities": ("Điểm sức khỏe công ty chứng khoán", _ROAA + [
+        _MARGIN, _EQUITY, ("loans_down", "Cho vay / vốn chủ giảm", "LOANS_TO_EQUITY_AQ", "down", _TIMES, "Cho vay / vốn chủ")], True),
+    "insurance": ("Điểm sức khỏe bảo hiểm", _ROAA + [
+        ("combined_down", "Tỷ lệ kết hợp giảm", "COMBINED_RATIO_TR", "down", _PCT1, "Tỷ lệ kết hợp"), _MARGIN, _EQUITY], True),
+}
+
+
+def _quarter(iso: str) -> str:
+    return f"Q{(int(iso[5:7]) + 2) // 3}/{iso[:4]}"
+
+
+def _health(ratios: dict, share_issues: list[dict] | None) -> dict:
+    title, criteria, with_issues = HEALTH[ratios["kind"]]
+    quarters = ratios["quarters"]
+    codes = {c[2] for c in criteria}
+
+    def complete(q: str) -> bool:
+        return codes <= set(quarters[q]) and codes <= set(quarters.get(f"{int(q[:4]) - 1}{q[4:]}", {}))
+    # A quarter VNDirect has only partly published yet would leave criteria unevaluated: use the latest complete pair instead.
+    latest = max((q for q in quarters if complete(q)), default=max(quarters))
+    before_key = f"{int(latest[:4]) - 1}{latest[4:]}"
+    now, before = quarters[latest], quarters.get(before_key, {})
+    out = []
+    for id_, label, code, rule, fmt, name in criteria:
+        if code not in now or (rule != "positive" and code not in before):
+            out.append(_criterion(id_, label, None, f"Thiếu {name} {_quarter(latest if code not in now else before_key)}"))
+            continue
+        a = Decimal(now[code])
+        if rule == "positive":
+            out.append(_criterion(id_, label, a > 0, f"{name} {fmt(a)}"))
+            continue
+        b = Decimal(before[code])
+        x, y = (fmt(a), fmt(b)) if fmt(a) != fmt(b) or a == b else (fmt(a, 3), fmt(b, 3))
+        out.append(_criterion(id_, label, a > b if rule == "up" else a < b, f"{name} {x} so với {y} cùng kỳ"))
+    if with_issues:
+        label = "Không phát hành cổ phiếu huy động vốn"
+        since = (date.fromisoformat(latest) - timedelta(days=365)).isoformat()
+        if share_issues is None:
+            out.append(_criterion("no_issue", label, None, "Chưa có số liệu phát hành cổ phiếu (chờ lần cập nhật báo cáo sau)"))
+        else:
+            kinds = {i["kind"] for i in share_issues if since < i["date"] <= latest}
+            out.append(_criterion("no_issue", label, False if "raise" in kinds else None if "other" in kinds else True,
+                                  "Có đợt huy động vốn bằng cổ phiếu trong 12 tháng (quyền mua, riêng lẻ hoặc ESOP)" if "raise" in kinds
+                                  else "Có đợt phát hành không rõ loại trong 12 tháng" if "other" in kinds
+                                  else "Không có đợt huy động vốn bằng cổ phiếu trong 12 tháng (cổ phiếu thưởng, cổ tức bằng cổ phiếu không tính)"))
+    evaluated = [c for c in out if c["passed"] is not None]
+    return {"kind": "health", "title": title, "year": f"{_quarter(latest)} so với {_quarter(before_key)}",
+            "score": sum(1 for c in evaluated if c["passed"]), "evaluated": len(evaluated), "level": None, "criteria": out}
+
+
+def report_quality(record: dict | None, sector: str | None, ratios: dict | None = None) -> dict:
     if sector in FINANCIAL:
-        return {"applicable": False, "reason": "Không áp dụng cho ngân hàng, chứng khoán, bảo hiểm (cấu trúc báo cáo khác)", "f_score": None, "signs": [],
-                "note": None}
+        if not ratios or not ratios.get("quarters") or ratios.get("kind") not in HEALTH:
+            return {"applicable": True, "reason": "Chưa có chỉ số ngành từ VNDirect (chờ lần cập nhật sau)", "f_score": None, "signs": [], "note": None}
+        return {"applicable": True, "reason": None, "f_score": _health(ratios, (record or {}).get("share_issues")), "signs": [], "note": None}
     a = _lines(record or {})
     years = [y for y, row in a.items() if "profit" in row]
     if not years:

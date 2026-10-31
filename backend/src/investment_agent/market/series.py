@@ -28,6 +28,11 @@ class SeriesStore:
             return []
         return [(datetime.fromisoformat(t), float(v)) for t, v in json.loads(path.read_text(encoding="utf-8"))["points"]]
 
+    def points(self, key: str) -> list[tuple[str, str]]:
+        """The stored (timestamp, decimal string) pairs as written, oldest first."""
+        path = self._path(key)
+        return [tuple(p) for p in json.loads(path.read_text(encoding="utf-8"))["points"]] if path.is_file() else []
+
     def upsert(self, key: str, points: list[tuple[datetime, str]], *, keep: int = 9000) -> None:  # ~36 years of sessions (full history for drawdowns)
         path = self._path(key)
         merged = {t: v for t, v in (json.loads(path.read_text(encoding="utf-8"))["points"] if path.is_file() else [])}

@@ -39,6 +39,15 @@ test("the price board lists the indices and watched tickers in exchange colours 
   await fpt.getByRole("radio", { name: "1 giờ" }).click();
   await expect(fpt.getByTestId("tb-chart-caption")).toContainText("Nến 1 giờ");
   await expect(box).toContainText("trần 56,30");
+  // Vĩ mô rows: closes with their date, Bitcoin live against 24 hours before, missing series without a number.
+  await expect(list.getByRole("row", { name: /Bitcoin/ })).toContainText("so với 24 giờ trước77.220,00−780,00−1,00%");
+  await expect(list.getByRole("row", { name: /DXY/ })).toContainText("đóng cửa 29/09");
+  await expect(list.getByRole("row", { name: /Dầu WTI/ })).toContainText("Dầu WTI———");
+  await list.getByRole("row", { name: /DXY/ }).click();
+  const dxy = box.getByRole("group", { name: "Biểu đồ DXY" });
+  await expect(dxy).toContainText("Nguồn chỉ có giá ngày");  // still on the hourly frame
+  await dxy.getByRole("radio", { name: "Ngày" }).click();
+  await expect(dxy.getByTestId("tb-chart-caption")).toContainText("Giá đóng cửa theo ngày · 60 điểm · điểm");
 });
 
 for (const width of [375, 1440]) {

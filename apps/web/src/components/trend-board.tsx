@@ -4,12 +4,16 @@ import type { IChartApi, Time } from "lightweight-charts";
 import { ApiError, api } from "../lib/api";
 import { formatDecimal, formatRatio, formatVnd } from "../lib/format";
 
-type Row = { symbol: string; kind: "index" | "stock"; price: string | null; ref: string | null; change: string | null; change_pct: string | null;
-  ceiling: string | null; floor: string | null; high: string | null; low: string | null; volume: number | null; time: string | null };
+type Row = { symbol: string; kind: "index" | "macro" | "stock"; price: string | null; ref: string | null; change: string | null; change_pct: string | null;
+  ceiling?: string | null; floor?: string | null; high?: string | null; low?: string | null; volume?: number | null; time: string | null;
+  label?: string; basis?: "close" | "24h"; unit?: string; reason?: string | null };
 type Board = { as_of: string; session_open: boolean; rows: Row[]; missing: string[]; errors: string[] };
-type Bar = { t: string | number; o: string; h: string; l: string; c: string; v: number };
+type Bar = { t: string | number; o?: string; h?: string; l?: string; c: string; v?: number };
 type Chart = { symbol: string; interval: "1D" | "1H"; bars: Bar[]; macd: { t: string | number; macd: number; signal: number; hist: number }[];
-  rsi: { t: string | number; v: number }[]; fetched_at: string | null; stale: boolean; reason: string | null; unit?: string };
+  rsi: { t: string | number; v: number }[]; fetched_at: string | null; stale: boolean; reason: string | null; unit?: string;
+  style?: "line"; as_of?: string | null };
+const GROUPS: [Row["kind"], string][] = [["index", "Chỉ số"], ["macro", "Vĩ mô"], ["stock", "Cổ phiếu"]];
+const day = (iso: string) => iso.slice(0, 10).split("-").reverse().slice(0, 2).join("/");
 
 const POLL = { open: 20_000, closed: 300_000 };
 const C = { up: "#137556", down: "#b14249", ink: "#183247", line: "#dce4eb", muted: "#576777", macd: "#245edb", signal: "#d97706", rsi: "#7c3aed" };
@@ -18,8 +22,8 @@ const C = { up: "#137556", down: "#b14249", ink: "#183247", line: "#dce4eb", mut
 function tone(r: Row): string {
   if (r.price === null || r.ref === null) return "";
   const p = Number(r.price);
-  if (r.ceiling !== null && p >= Number(r.ceiling)) return "tb-ceil";
-  if (r.floor !== null && p <= Number(r.floor)) return "tb-floor";
+  if (r.ceiling != null && p >= Number(r.ceiling)) return "tb-ceil";
+  if (r.floor != null && p <= Number(r.floor)) return "tb-floor";
   return p > Number(r.ref) ? "tb-up" : p < Number(r.ref) ? "tb-down" : "tb-ref";
 }
 const signed = (v: string) => (v.startsWith("-") || Number(v) === 0 ? formatDecimal(v, 2) : `+${formatDecimal(v, 2)}`);
@@ -29,18 +33,26 @@ function PriceList({ board, selected, onSelect }: { board: Board; selected: stri
   return (
     <table className="tb-list" aria-label="Bảng giá">
       <thead><tr><th>Mã</th><th className="num">Giá</th><th className="num">+/−</th><th className="num">%</th></tr></thead>
-      <tbody>{board.rows.map((r) => {
-        const t = tone(r);
-        return (
-          <tr key={r.symbol} className={r.symbol === selected ? "tb-selected" : undefined} aria-selected={r.symbol === selected}
-            tabIndex={0} onClick={() => onSelect(r.symbol)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(r.symbol); } }}>
-            <th scope="row" className={t}>{r.symbol}</th>
-            <td className={`num ${t}`}>{r.price === null ? <span title="Chưa khớp lệnh trong phiên">—</span> : formatDecimal(r.price, 2)}</td>
-            <td className={`num ${t}`}>{r.change === null ? "—" : signed(r.change)}</td>
-            <td className={`num ${t}`}>{r.change_pct === null ? "—" : pct(r.change_pct)}</td>
-          </tr>
-        );
-      })}</tbody>
+      {GROUPS.map(([kind, title]) => {
+        const rows = board.rows.filter((r) => r.kind === kind);
+        return rows.length > 0 && <tbody key={kind}>
+          <tr className="tb-group"><th colSpan={4} scope="colgroup">{title}</th></tr>
+          {rows.map((r) => {
+            const t = tone(r);
+            const when = r.kind === "macro" && r.time ? (r.basis === "24h" ? "so với 24 giờ trước" : `đóng cửa ${day(r.time)}`) : null;
+            return (
+              <tr key={r.symbol} className={r.symbol === selected ? "tb-selected" : undefined} aria-selected={r.symbol === selected}
+                tabIndex={0} onClick={() => onSelect(r.symbol)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(r.symbol); } }}>
+                <th scope="row" className={t}>{r.label ?? r.symbol}{when && <span className="tb-when">{when}</span>}</th>
+                <td className={`num ${t}`}>{r.price === null
+                  ? <span title={r.reason ?? "Chưa khớp lệnh trong phiên"}>—</span> : formatDecimal(r.price, 2)}</td>
+                <td className={`num ${t}`}>{r.change === null ? "—" : signed(r.change)}</td>
+                <td className={`num ${t}`}>{r.change_pct === null ? "—" : pct(r.change_pct)}</td>
+              </tr>
+            );
+          })}
+        </tbody>;
+      })}
     </table>
   );
 }
@@ -58,11 +70,15 @@ function CandleChart({ data }: { data: Chart }) {
         timeScale: { timeVisible: data.interval === "1H", secondsVisible: false, borderColor: C.line }, rightPriceScale: { borderColor: C.line },
       });
       const t = (v: string | number) => v as Time;
-      const candles = chart.addSeries(CandlestickSeries, { upColor: C.up, downColor: C.down, borderVisible: false, wickUpColor: C.up, wickDownColor: C.down });
-      candles.setData(data.bars.map((b) => ({ time: t(b.t), open: Number(b.o), high: Number(b.h), low: Number(b.l), close: Number(b.c) })));
-      const volume = chart.addSeries(HistogramSeries, { priceFormat: { type: "volume" }, priceScaleId: "vol", lastValueVisible: false, priceLineVisible: false });
-      chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
-      volume.setData(data.bars.map((b) => ({ time: t(b.t), value: b.v, color: Number(b.c) >= Number(b.o) ? "rgba(19,117,86,.35)" : "rgba(177,66,73,.35)" })));
+      if (data.style === "line") {  // closes only (Vĩ mô feeds): a line, no candles or volume
+        chart.addSeries(LineSeries, { color: C.macd, lineWidth: 2 }).setData(data.bars.map((b) => ({ time: t(b.t), value: Number(b.c) })));
+      } else {
+        const candles = chart.addSeries(CandlestickSeries, { upColor: C.up, downColor: C.down, borderVisible: false, wickUpColor: C.up, wickDownColor: C.down });
+        candles.setData(data.bars.map((b) => ({ time: t(b.t), open: Number(b.o), high: Number(b.h), low: Number(b.l), close: Number(b.c) })));
+        const volume = chart.addSeries(HistogramSeries, { priceFormat: { type: "volume" }, priceScaleId: "vol", lastValueVisible: false, priceLineVisible: false });
+        chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+        volume.setData(data.bars.map((b) => ({ time: t(b.t), value: b.v ?? 0, color: Number(b.c) >= Number(b.o) ? "rgba(19,117,86,.35)" : "rgba(177,66,73,.35)" })));
+      }
       const hist = chart.addSeries(HistogramSeries, { lastValueVisible: false, priceLineVisible: false }, 1);
       hist.setData(data.macd.map((m) => ({ time: t(m.t), value: m.hist, color: m.hist >= 0 ? "rgba(19,117,86,.5)" : "rgba(177,66,73,.5)" })));
       chart.addSeries(LineSeries, { color: C.macd, lineWidth: 1, priceLineVisible: false }, 1).setData(data.macd.map((m) => ({ time: t(m.t), value: m.macd })));
@@ -116,7 +132,7 @@ export function TrendBoard() {
       <div className="tb-layout">
         <div className="tb-chart" role="group" aria-label={`Biểu đồ ${selected}`}>
           <div className="tb-head">
-            <strong>{selected}</strong>
+            <strong>{row?.label ?? selected}</strong>
             {row?.price && <span className={tone(row)}>{formatDecimal(row.price, 2)} {row.change && signed(row.change)} {row.change_pct && `(${pct(row.change_pct)})`}</span>}
             <span className="tb-intervals" role="radiogroup" aria-label="Khung nến">
               {(["1D", "1H"] as const).map((iv) => <button key={iv} type="button" role="radio" aria-checked={interval === iv}
@@ -127,8 +143,12 @@ export function TrendBoard() {
           {current?.reason && <p className="muted">{current.reason}.</p>}
           {current && !current.reason && <>
             <CandleChart data={current} />
-            <p className="caption" data-testid="tb-chart-caption">{current.interval === "1D" ? "Nến ngày" : "Nến 1 giờ"} · {current.bars.length} nến ·
-              {" "}{current.unit ?? ""} · dưới: MACD (12, 26, 9) và RSI (14), đường 70/30 · Vnstock, đọc {current.fetched_at ? new Date(current.fetched_at).toLocaleString("vi-VN") : "—"}
+            <p className="caption" data-testid="tb-chart-caption">{current.style === "line"
+              ? `Giá đóng cửa ${current.interval === "1D" ? "theo ngày" : "theo giờ"} · ${current.bars.length} điểm · ${current.unit ?? ""} · số mới nhất ${current.as_of ?? "—"}`
+              : `${current.interval === "1D" ? "Nến ngày" : "Nến 1 giờ"} · ${current.bars.length} nến · ${current.unit ?? ""}`}
+              {" "}· dưới: MACD (12, 26, 9) và RSI (14), đường 70/30
+              {current.style === "line" ? " · dữ liệu phần mềm đã lưu cho bảng Xu hướng"
+                : ` · Vnstock, đọc ${current.fetched_at ? new Date(current.fetched_at).toLocaleString("vi-VN") : "—"}`}
               {current.stale ? " — nguồn đang lỗi, đây là bản đã lưu" : ""}. Biểu đồ dùng thư viện mã nguồn mở Lightweight Charts của TradingView.</p>
           </>}
         </div>
@@ -141,6 +161,8 @@ export function TrendBoard() {
               ? `Trong phiên · cập nhật ${new Date(board.as_of).toLocaleTimeString("vi-VN")}, tự làm mới mỗi 20 giây`
               : `Ngoài giờ giao dịch · giá phiên gần nhất, đọc lúc ${new Date(board.as_of).toLocaleString("vi-VN")}`}.
               Cổ phiếu tính bằng nghìn đồng, chỉ số bằng điểm; tím là giá trần, xanh lơ là giá sàn, vàng là tham chiếu.
+              Vĩ mô: Bitcoin và vàng (PAXG, token bám giá vàng) theo Coinbase, so với 24 giờ trước; DXY, US10Y, VN10Y, dầu WTI là giá đóng cửa gần
+              nhất so với phiên trước, vì nguồn miễn phí chỉ có giá ngày; lợi suất tính bằng %, thay đổi bằng điểm phần trăm.
               {board.missing.length > 0 && ` Chưa có giá: ${board.missing.join(", ")}.`}</p>
             {board.errors.map((e) => <p key={e} className="errors">{e}.</p>)}
             {row?.kind === "stock" && row.volume !== null && <p className="caption">KL {selected}: {formatVnd(String(row.volume), { unit: false })} ·

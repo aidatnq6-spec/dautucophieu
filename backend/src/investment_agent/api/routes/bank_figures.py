@@ -28,6 +28,7 @@ class Source(ContractModel):
     kind: Literal["manual", "pdf"]
     url: str | None = Field(default=None, max_length=500)
     pages: dict[str, int] = Field(default_factory=dict)
+    urls: dict[str, str] = Field(default_factory=dict)  # field → the PDF it was read from (statements and CAR report differ)
 
 
 class SaveRequest(ContractModel):
@@ -121,7 +122,8 @@ def save_quarter(symbol: str, quarter: str, request: Request, body: SaveRequest)
     values, problem = _clean(body.values)
     if problem:
         return error(422, "invalid_value", problem)
-    source = {"kind": body.source.kind, "url": body.source.url, "pages": {k: v for k, v in body.source.pages.items() if k in FIELDS}} \
+    source = {"kind": body.source.kind, "url": body.source.url, "pages": {k: v for k, v in body.source.pages.items() if k in FIELDS},
+              "urls": {k: v[:500] for k, v in body.source.urls.items() if k in FIELDS and v.startswith("https://")}} \
         if body.source.kind == "pdf" else {"kind": "manual"}
     return _change(request, sym, body.expected_version, body.request_id,
                    lambda data: {**data, "quarters": {**data["quarters"], quarter: {"values": values, "source": source}}})

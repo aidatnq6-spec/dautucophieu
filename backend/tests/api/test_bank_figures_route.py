@@ -33,7 +33,7 @@ def test_a_quarter_is_saved_with_its_ratios_and_listed_newest_first(tmp_path):
     assert [q["quarter"] for q in body["quarters"]] == ["2025-Q4", "2024-Q4"] and body["version"] == 2
     latest = body["quarters"][0]
     assert latest["values"]["car"] is None and latest["derived"]["casa"] == "0.3300" and latest["derived"]["npl"] == "0.0109"
-    assert latest["source"] == {"kind": "pdf", "url": "https://acb.com.vn/bctc.pdf", "pages": {"group1": 12}}
+    assert latest["source"] == {"kind": "pdf", "url": "https://acb.com.vn/bctc.pdf", "pages": {"group1": 12}, "urls": {}}
 
 
 def test_edit_delete_and_bad_input(tmp_path):
@@ -78,3 +78,11 @@ def test_saved_figures_reach_the_bank_health_score_on_the_valuation_board(tmp_pa
     rows = {r["symbol"]: r for r in call(c, clock, "GET", "/internal/fairvalue").json()["rows"]}
     ids = {cr["id"]: cr for cr in rows["ACB"]["quality"]["f_score"]["criteria"]}
     assert ids["group2_down"]["passed"] is True and "casa_up" in ids
+
+
+def test_each_figure_keeps_the_file_it_was_read_from(tmp_path):
+    c, clock = client(tmp_path)
+    src = {"kind": "pdf", "url": "https://bank.example/car.pdf", "pages": {"group1": 45, "car": 6},
+           "urls": {"group1": "https://bank.example/bctc.pdf", "car": "https://bank.example/car.pdf", "nonsense": "https://x"}}
+    r = call(c, clock, "PUT", "/internal/bank-figures/ACB/2026-Q3", {"values": ACB, "source": src, "expected_version": 0, "request_id": "u1"})
+    assert r.json()["quarters"][0]["source"]["urls"] == {"group1": "https://bank.example/bctc.pdf", "car": "https://bank.example/car.pdf"}

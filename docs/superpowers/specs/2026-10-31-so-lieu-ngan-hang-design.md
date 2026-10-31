@@ -29,3 +29,13 @@ Khi một ngân hàng đã có số nhập tay, Điểm sức khỏe thêm hai t
 ## Giao diện
 
 Trang hồ sơ mã ngân hàng: mục "Số liệu ngân hàng (nhập tay)" — bảng theo quý (nhóm nợ, NPL, nợ nhóm 2, CASA, CAR, nguồn), form nhập/sửa một quý, ô dán đường dẫn PDF để điền sẵn, nút xóa một quý.
+
+## Thử trên báo cáo thật (31/10/2026)
+
+Đã đọc thử báo cáo tài chính hợp nhất quý 1, 2, 3/2026 ("bản tra cứu") và báo cáo công bố tỷ lệ an toàn vốn bán niên 2026, năm 2025 của Techcombank (trang nhà đầu tư `techcombank.com`, robots.txt cho phép): đủ 8 ô từ báo cáo tài chính, CAR hợp nhất từ báo cáo an toàn vốn; NPL, nợ nhóm 2 tính ra khớp cột % trong báo cáo. Ba điều chỉnh từ lần thử:
+
+- đơn vị đọc được từ dòng tiêu đề cột ("triệu đồng triệu đồng"), không chỉ "Đơn vị: …";
+- nợ nhóm 1–5 chỉ lấy trong mục "chất lượng nợ cho vay" (cùng trang có thể có bảng chất lượng tiền gửi, cấp tín dụng cho TCTD khác với cùng nhãn); tiền gửi chỉ lấy trong mục thuyết minh "Tiền gửi của khách hàng" có đánh số;
+- chữ trong PDF được chuẩn hóa NFC (có file lưu chữ Việt dạng tổ hợp); CAR đọc được từ bảng "Riêng lẻ | Hợp nhất" (lấy hợp nhất).
+
+CAR không có trong báo cáo tài chính quý; một quý có thể điền từ hai file, mỗi ô giữ file và trang nguồn của nó.

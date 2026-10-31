@@ -329,3 +329,31 @@ def test_a_failing_ownership_breakdown_leaves_the_shareholders_in_place():
     p = VnstockProvider(market=FakeMarket(), fundamental=FakeFundamental(), company=lambda sym: FakeCompany(), clock=lambda: NOW, ownership=broken)
     out = p.company_people("FPT")
     assert out["ownership"] is None and out["structure"] is None and out["shareholders"] == []
+
+
+def test_candles_and_minute_closes_for_the_trend_board():
+    class Handle:
+        def __init__(self, calls, sym):
+            self.calls, self.sym = calls, sym
+
+        def ohlcv(self, **kw):
+            self.calls.append((self.sym, kw["interval"]))
+            return pd.DataFrame([{"time": pd.Timestamp("2026-10-30 09:00:00+07:00"), "open": 53.0, "high": 53.3, "low": 52.9, "close": 53.2, "volume": 100},
+                                 {"time": pd.Timestamp("2026-10-30 10:00:00+07:00"), "open": 53.2, "high": 53.2, "low": 53.2, "close": 53.2, "volume": 0}])
+
+    class Market:
+        calls = []
+
+        def equity(self, sym):
+            return Handle(self.calls, sym)
+
+        def index(self, sym):
+            return Handle(self.calls, "idx:" + sym)
+
+    m = Market()
+    p = VnstockProvider(market=m, fundamental=FakeFundamental(), clock=lambda: NOW)
+    rows = p.ohlcv_rows("fpt", "1H", date(2026, 10, 1), date(2026, 10, 30), index=False)
+    assert rows == [{"time": datetime(2026, 10, 30, 9, tzinfo=ZoneInfo("Asia/Ho_Chi_Minh")), "open": "53", "high": "53.3", "low": "52.9",
+                     "close": "53.2", "volume": 100}]  # the no-trade placeholder row is dropped
+    assert p.index_minutes("VNINDEX", date(2026, 10, 24), date(2026, 10, 30))[0][1] == "53.2"
+    assert m.calls == [("FPT", "1H"), ("idx:VNINDEX", "1m")]

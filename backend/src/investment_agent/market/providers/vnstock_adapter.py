@@ -171,6 +171,27 @@ class VnstockProvider:
                         "updated": str(r["update_date"])[:10] if r.get("update_date") else None})
         return out
 
+    def ohlcv_rows(self, symbol: str, interval: str, start: date, end: date, *, index: bool) -> list[dict]:
+        """Candles for the trend chart ("1D" or "1H") as the source sends them (thousand đồng for stocks, points for indices);
+        no-trade placeholder rows dropped."""
+        market, _ = self._api()
+        handle = market.index(symbol.upper()) if index else market.equity(symbol.upper())
+        frame = handle.ohlcv(start=start.isoformat(), end=end.isoformat(), interval=interval)
+        out = []
+        for row in frame.to_dict("records"):
+            if not _traded(row):
+                continue
+            out.append({"time": row["time"].to_pydatetime(), "volume": int(row["volume"]),
+                        **{k: _ratio(row.get(k)) for k in ("open", "high", "low", "close")}})
+        return out
+
+    def index_minutes(self, symbol: str, start: date, end: date) -> list[tuple[datetime, str]]:
+        """Minute closes of an index; the price board does not serve indices."""
+        market, _ = self._api()
+        frame = market.index(symbol.upper()).ohlcv(start=start.isoformat(), end=end.isoformat(), interval="1m")
+        rows = [(r["time"].to_pydatetime(), _ratio(r.get("close"))) for r in frame.to_dict("records") if _traded(r)]
+        return [(t, c) for t, c in rows if c is not None]
+
     def fetch_prices(self, symbol: str, start: date, end: date) -> list[PriceBar]:
         market, _ = self._api()
         symbol = symbol.upper()
@@ -229,9 +250,14 @@ def _plain(value):
     return value.item() if hasattr(value, "item") else value
 
 
-def flatten_board(frame) -> list[dict]:
-    """Vnstock's price board has (group, field) columns; keep the fields the brief uses as one flat dict per symbol."""
-    wanted = [(g, f) for g, fields in BOARD_FIELDS.items() for f in fields if (g, f) in frame.columns]
+# The trend board also shows the day's band and range.
+LIVE_FIELDS = {"listing": BOARD_FIELDS["listing"] + ("ceiling", "floor"),
+               "match": ("match_price", "accumulated_volume", "highest", "lowest")}
+
+
+def flatten_board(frame, fields: dict = BOARD_FIELDS) -> list[dict]:
+    """Vnstock's price board has (group, field) columns; keep the wanted fields (the brief's by default) as one flat dict per symbol."""
+    wanted = [(g, f) for g, names in fields.items() for f in names if (g, f) in frame.columns]
     return [{f: _plain(row[(g, f)]) for g, f in wanted} for _, row in frame.iterrows()]
 
 
@@ -251,10 +277,10 @@ def hose_listing() -> dict:
     return {"symbols": symbols, "icb_names": names, "icb_codes": codes}
 
 
-def price_board(symbols: list[str]) -> list[dict]:
+def price_board(symbols: list[str], fields: dict = BOARD_FIELDS) -> list[dict]:
     """Whole-board snapshot in one call (Vnstock accepts up to 500 symbols); Community tier allows it."""
     try:
         from vnstock import Trading
     except ImportError as exc:
         raise ProviderUnavailable("vnstock is not installed; install it from vnstocks.com with your own key") from exc
-    return flatten_board(Trading(source="VCI").price_board(list(symbols)[:500]))
+    return flatten_board(Trading(source="VCI").price_board(list(symbols)[:500]), fields)

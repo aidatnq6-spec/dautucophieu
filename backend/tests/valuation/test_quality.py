@@ -116,3 +116,22 @@ def test_health_levels_scale_piotroski_cut_offs_to_the_number_of_criteria():
     assert [_level(s, 9, 9) for s in (9, 8, 7, 3, 2)] == ["strong", "strong", "medium", "medium", "weak"]  # F-Score unchanged
     assert _level(6, 6, 9) is None
 
+
+
+def test_owner_entered_bank_figures_add_casa_and_group_two_criteria_only_when_present():
+    full = {"ROAA_TR_AVG4Q": 0.019, "BAD_LOANS_RATIO_AQ": 0.012, "OVERDUE_LOANS_RATIO_AQ": 0.02, "PROVISION_BAD_LOANS_AQ": 1.0,
+            "NET_INTEREST_MARGIN_TR_AVG5Q": 0.037, "EQUITY_TO_ASSET_AQ": 0.09}
+    better = {**full, "ROAA_TR_AVG4Q": 0.02, "BAD_LOANS_RATIO_AQ": 0.011, "OVERDUE_LOANS_RATIO_AQ": 0.019, "PROVISION_BAD_LOANS_AQ": 1.1,
+              "NET_INTEREST_MARGIN_TR_AVG5Q": 0.038, "EQUITY_TO_ASSET_AQ": 0.095}
+    ratios = {"kind": "bank", "quarters": {"2025-09-30": {k: str(v) for k, v in full.items()}, "2026-09-30": {k: str(v) for k, v in better.items()}}}
+    assert report_quality({}, "Ngân hàng", ratios=ratios)["f_score"]["evaluated"] == 7  # nothing entered: seven criteria as before
+    groups = {"group1": "450", "group3": "2", "group4": "1", "group5": "2"}
+    bank = {"2025-Q3": {**groups, "group2": "8", "demand_deposits": "160", "margin_deposits": "10", "customer_deposits": "500"},
+            "2026-Q3": {**groups, "group2": "5", "demand_deposits": "150", "margin_deposits": "10", "customer_deposits": "500"}}
+    f = report_quality({}, "Ngân hàng", ratios=ratios, bank=bank)["f_score"]
+    by_id = {c["id"]: c for c in f["criteria"]}
+    assert by_id["casa_up"]["passed"] is False and by_id["casa_up"]["detail"] == "CASA 32,0% so với 34,0% Q3/2025 (số nhập tay)"
+    assert by_id["group2_down"]["passed"] is True and f["evaluated"] == 9 and f["score"] == 8 and f["level"] == "strong"
+    only_now = {"2026-Q3": bank["2026-Q3"]}
+    f = report_quality({}, "Ngân hàng", ratios=ratios, bank=only_now)["f_score"]
+    assert {c["id"]: c for c in f["criteria"]}["casa_up"]["detail"] == "Cần số nhập tay của cùng quý năm trước (Q3/2025)"

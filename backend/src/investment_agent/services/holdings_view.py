@@ -24,6 +24,15 @@ def held_from_repo(repo, owner) -> set[str]:
     return {p.security_id for p in replay(list(book.effective().events)).positions if p.quantity + p.pending_quantity > 0}
 
 
+def _bank_figures(repo, owner, symbols, sectors) -> dict[str, dict]:
+    """Owner-entered quarterly bank figures (Số liệu ngân hàng), values only, for the banks' health score."""
+    out = {}
+    for s in symbols:
+        if sectors.get(s) == "Ngân hàng" and (record := read_version(repo, owner, "settings", f"bank_figures_{s}", None)):
+            out[s] = {q: v["values"] for q, v in record.payload.get("quarters", {}).items()}
+    return out
+
+
 def fair_value_board(data_dir: Path, market, repo, owner, *, held: set[str], today: date) -> dict:
     """Reference valuation of the watched tickers; raises RepositoryUnavailable."""
     settings, _ = valuation_settings(repo, owner)
@@ -34,9 +43,10 @@ def fair_value_board(data_dir: Path, market, repo, owner, *, held: set[str], tod
     prices = {s: p.price for s in symbols if (p := market.price(s)) is not None}
     s = Settings(settings.required_return, settings.long_term_growth, settings.threshold)
     ratio_store = FinancialRatioStore(data_dir / "financial-ratios")
-    board = reference_board(symbols, sectors=load_sectors(data_dir)[0], records=records, prices=prices,
+    sectors = load_sectors(data_dir)[0]
+    board = reference_board(symbols, sectors=sectors, records=records, prices=prices,
                             year_end={t: year_end_prices(series.read(f"{t}-1d"), today=today) for t in symbols}, settings=s, today=today, held=held,
-                            ratios={t: ratio_store.read(t) for t in symbols})
+                            ratios={t: ratio_store.read(t) for t in symbols}, bank=_bank_figures(repo, owner, symbols, sectors))
     multiples = SeriesStore(data_dir / "index-valuation")
     board["indices"] = [value_index(i, pe=multiples.read(series_key(i, "pe")), pb=multiples.read(series_key(i, "pb")),
                                     closes=series.read(f"{i}-1d"), settings=s, today=today) for i in INDICES]

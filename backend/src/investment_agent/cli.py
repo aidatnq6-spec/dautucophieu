@@ -42,6 +42,9 @@ def main() -> int:
     bs.add_argument("--data-dir", type=Path, required=True)
     es = commands.add_parser("erp-sync", help="Damodaran's equity risk premium for Vietnam into data/erp.json, at most weekly")
     es.add_argument("--data-dir", type=Path, required=True)
+    wb = commands.add_parser("weekly-brief", help="Bản tin tuần over Telegram on the weekend, once per week")
+    wb.add_argument("--data-dir", type=Path, required=True)
+    wb.add_argument("--calendar", type=Path, required=True)
     ia = commands.add_parser("insider-alerts", help="Telegram note for new insider or major-shareholder notices of held tickers")
     ia.add_argument("--data-dir", type=Path, required=True)
     pa = commands.add_parser("price-alerts", help="during the session, Telegram note for the owner's price levels crossed")
@@ -100,6 +103,8 @@ def main() -> int:
         return erp_sync_cli(args.data_dir)
     if args.command == "quarter-alerts":
         return quarter_alerts_cli(args.data_dir)
+    if args.command == "weekly-brief":
+        return weekly_brief_cli(args.data_dir, args.calendar)
     if args.command == "insider-alerts":
         return insider_alerts_cli(args.data_dir)
     if args.command == "price-alerts":
@@ -609,6 +614,72 @@ def insider_alerts_cli(data_dir: Path) -> int:
     send, repo, owner = telegram
     out = insider_alerts_run(data_dir, held=held_from_repo(repo, owner), get=_http_text, send=send, now=datetime.now(timezone.utc))
     print(json.dumps(out))
+    return 0
+
+
+def weekly_inputs(data_dir: Path, *, ledger_events: list, held: set[str], alerts: list[dict], insider, today) -> dict:
+    """What Bản tin tuần reads: stored session snapshots, closes, corporate events and the owner's records; insider(symbol) lists
+    a held ticker's notices (VNDirect, cached a day)."""
+    from datetime import timedelta
+
+    from investment_agent.domain.time_weighted import performance
+    from investment_agent.market.corporate_events import EventStore
+    from investment_agent.market.series import SeriesStore
+    from investment_agent.market.watchlist import load_watchlist
+
+    store = SeriesStore(Path(data_dir) / "trend-sources")
+    briefs = {}
+    for path in sorted((Path(data_dir) / "brief").glob("*.json")):
+        if (today - timedelta(days=21)).isoformat() <= path.stem <= today.isoformat():
+            try:
+                briefs[path.stem] = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+    closes = {s: [(t.date(), v) for t, v in store.read(f"{s}-1d")] for s in held}
+    symbols = {e.security_id for e in ledger_events if getattr(e, "security_id", None)}
+    priced = {s: {t.date(): v * 1000 for t, v in store.read(f"{s}-1d")} for s in symbols}  # thousand đồng to đồng, as Hiệu quả does
+    series = performance(ledger_events, closes=priced, index={t.date(): v for t, v in store.read("VNINDEX-1d")}, today=today)["series"]
+    watched = set(load_watchlist(Path(data_dir)).symbols) | held
+    return {"series": series, "index": [(t.date(), v) for t, v in store.read("VNINDEX-1d")], "briefs": briefs, "closes": closes, "insider": {s: insider(s) for s in sorted(held)},
+            "events": EventStore(Path(data_dir)).events(sorted(watched)), "alerts": alerts, "held": held, "watched": watched}
+
+
+def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
+    """Bản tin tuần on Saturday (or the first weekend run after), once per week; skipped while scheduled delivery is off."""
+    from datetime import datetime, timezone
+
+    from investment_agent.market.insider_deals import InsiderStore, insider_deals
+    from investment_agent.services.holdings_view import held_from_repo
+    from investment_agent.services.price_alerts import read_alerts
+    from investment_agent.services.records import LedgerBook, read_version
+    from investment_agent.services.weekly_brief import VN, week_of, weekly_brief_run
+
+    now = datetime.now(timezone.utc)
+    if now.astimezone(VN).weekday() < 5:
+        print(json.dumps({"status": "skipped", "reason": "weekday"}))
+        return 0
+    telegram = _scheduled_telegram()
+    if telegram is None:
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
+        return 0
+    send, repo, owner = telegram
+    today = now.astimezone(VN).date()
+    start, end = week_of(today)
+    try:
+        sessions = list(load_calendar(calendar_path).sessions(start, end))
+    except Exception:
+        sessions = None  # no calendar for these dates: every weekday counts
+
+    def inputs():
+        events = list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)
+        store = InsiderStore(Path(data_dir))
+
+        def insider(symbol):
+            return insider_deals(store, symbol, get=_http_text, now=now)["deals"]
+        got = weekly_inputs(data_dir, ledger_events=events, held=held_from_repo(repo, owner), alerts=read_alerts(repo, owner)[0],
+                            insider=insider, today=today)
+        return {**got, "sessions": sessions}
+    print(json.dumps(weekly_brief_run(data_dir, inputs=inputs, send=send, now=now)))
     return 0
 
 

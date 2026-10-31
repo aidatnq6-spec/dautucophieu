@@ -20,3 +20,11 @@ trong Cài đặt. Không dữ liệu nào gửi cho AI.
 ## Ổn định kiểm thử
 - `verify.ps1`: bước nào trượt thì lưu toàn bộ đầu ra vào `logs/verify-<bước>.log`, in các dòng lỗi; test e2e trượt ghi thêm một dòng
   vào `logs/e2e-failures.log` để theo dõi test nào trượt thất thường. Playwright giữ trace và ảnh của test trượt.
+
+## Bản tin tuần (31/10/2026)
+- Một tin Telegram vào lượt chạy đầu tiên của thứ Bảy (hoặc Chủ nhật nếu thứ Bảy máy tắt), một lần mỗi tuần (`data/alerts/weekly.json`);
+  gửi lỗi thì lượt sau gửi lại. Chỉ khi "gửi theo lịch" đang bật. Không gửi gì cho AI.
+- Tuần thứ Hai–thứ Sáu vừa qua: hiệu quả danh mục theo thời gian (như Hiệu quả danh mục) và VN-Index (chuỗi giá ngày; phiên thiếu lấy từ
+  ảnh chụp phiên), khối ngoại HOSE cộng theo ảnh chụp từng phiên (ghi phiên thiếu theo lịch giao dịch), thay đổi tuần của từng mã đang nắm,
+  thông báo giao dịch nội bộ trong tuần của mã đang nắm, sự kiện cổ tức/phát hành/đại hội 7 ngày tới của mã theo dõi, cảnh báo giá đã báo.
+- Thiếu số thì ghi thiếu, không ước lượng.

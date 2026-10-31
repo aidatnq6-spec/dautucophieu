@@ -142,6 +142,14 @@ if __name__ == "__main__":
                                                    "quantity": 25255715},
                                                   {"name": "Trương Gia Bình", "position": "Chủ tịch Hội đồng Quản trị", "percent": 0.0689,
                                                    "quantity": 117347966}]})
+    from investment_agent.market.insider_deals import InsiderStore
+    InsiderStore(data).save("FPT", {"symbol": "FPT", "fetched_at": datetime.now(timezone.utc).isoformat(), "source": "synthetic", "deals": [
+        {"date": (date.today() - timedelta(days=30)).isoformat(), "kind": "Bán", "shares": 2000000, "source": "HOSE",
+         "title": "Báo cáo kết quả giao dịch cổ phiếu của Người nội bộ Bùi Quang Ngọc", "url": "https://dstock.vndirect.com.vn/tin-tuc/tin-tu-so/1"},
+        {"date": (date.today() - timedelta(days=45)).isoformat(), "kind": "Đăng kí bán", "shares": 2000000, "source": "HOSE",
+         "title": "Thông báo giao dịch cổ phiếu của Người nội bộ Bùi Quang Ngọc", "url": None},
+        {"date": (date.today() - timedelta(days=60)).isoformat(), "kind": None, "shares": None, "source": "HOSE",
+         "title": "Báo cáo kết quả giao dịch cổ phiếu ESOP của người nội bộ", "url": None}]})
     # Bank health score: VCB sector ratios, Q3/2026 against Q3/2025, better on all seven (7/7, mạnh).
     from investment_agent.market.financial_ratios import FinancialRatioStore
     FinancialRatioStore(os.path.join(data, "financial-ratios")).save({"symbol": "VCB", "kind": "bank", "fetched_at": "2026-10-31T00:00:00+00:00",

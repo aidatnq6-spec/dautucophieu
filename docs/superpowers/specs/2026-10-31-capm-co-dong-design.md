@@ -32,3 +32,15 @@ Quy tắc:
 - Chức vụ cạnh cổ đông chỉ khi tên trùng khớp (bỏ khoảng trắng thừa, không phân biệt hoa thường) với ban lãnh đạo; không ghép gần đúng.
 - Không suy xuất xứ trong nước/nước ngoài của từng cổ đông từ tên.
 - Bản lưu cũ (trước bổ sung) được đọc lại từ nguồn ở lần mở trang kế tiếp.
+
+## Bổ sung: Giao dịch nội bộ và cổ đông lớn (31/10/2026)
+
+Nguồn: API công khai VNDirect `v4/insider_trans?q=tagCodes:<MÃ>` (robots.txt cho phép mọi user agent, use=reference) — thông báo HOSE
+của người nội bộ, người có liên quan và cổ đông lớn từ 2024, kèm loại (Mua, Bán, Đăng kí mua, Đăng kí bán), khối lượng và link thông báo gốc.
+Đã thử Vnstock (VCI không phục vụ, KBS rỗng) và Ủy ban Chứng khoán (503) trước.
+
+Quy tắc:
+- Đọc khi mở trang mã, lưu `data/insider/<MÃ>.json` 1 ngày; nguồn lỗi thì hiện bản đã lưu kèm ngày, không có bản lưu thì ghi lý do.
+- Loại và khối lượng giữ theo nguồn; thông báo thiếu thì để trống, không suy từ tiêu đề.
+- Tổng 12 tháng chỉ cộng báo cáo kết quả Mua/Bán có khối lượng; "Đăng ký" là ý định nên không cộng; báo cáo thiếu loại hoặc khối lượng được đếm riêng.
+- Link chỉ nhận trang thông báo của dstock.vndirect.com.vn.

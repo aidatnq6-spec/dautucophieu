@@ -118,5 +118,10 @@ test("the CAPM hint takes the owner's risk premium in Cài đặt and prices eac
   await expect(people).toContainText("Nước ngoài 22,22% (room tối đa 49,00%)");
   await expect(people).toContainText("Tự do chuyển nhượng chưa có số");
   await expect(people.getByRole("table", { name: "Cơ cấu sở hữu FPT" })).toContainText("Tổ chức nước ngoài");
+  const insider = page.getByRole("region", { name: "Giao dịch nội bộ và cổ đông lớn" });
+  await expect(insider.getByRole("table", { name: "Giao dịch nội bộ FPT" }).getByRole("row")).toHaveCount(4);
+  await expect(insider.getByTestId("insider-year")).toContainText("đã bán 2.000.000 cổ phiếu (1 báo cáo)");  // the registration is not a trade
+  await expect(insider.getByTestId("insider-year")).toContainText("1 báo cáo kết quả không ghi loại hoặc khối lượng");
+  await expect(insider.getByRole("link", { name: /Bùi Quang Ngọc/ })).toHaveAttribute("href", /^https:\/\/dstock\.vndirect\.com\.vn\//);
   await expect(people.getByRole("table", { name: "Ban lãnh đạo FPT" })).toContainText("Phó Chủ tịch Hội đồng Quản trị");
 });

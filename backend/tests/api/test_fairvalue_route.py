@@ -113,3 +113,26 @@ def test_fairvalue_scores_a_bank_from_its_stored_sector_ratios(tmp_path):
                      market=SyntheticMarket(prices={}), data_dir=tmp_path)
     [row] = call(TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000)), clock, "GET", "/internal/fairvalue").json()["rows"]
     assert row["quality"]["f_score"]["kind"] == "health" and row["quality"]["f_score"]["score"] == 1
+
+
+def test_forward_scenario_is_saved_per_ticker_and_priced_on_its_own_monthly_bands(tmp_path):
+    (tmp_path / "market-symbols.txt").write_text("FPT\n", encoding="utf-8")
+    years = {str(y): {"npat": "1000000000", "eps": "1000", "equity": "10000000000"} for y in range(2018, 2026)}
+    FundamentalsStore(tmp_path / "fundamentals").save({"symbol": "FPT", "fetched_at": "2026-10-26T00:00:00+00:00", "source": "t",
+                                                      "years": years, "quarters": {}, "dividends": [], "issues": []})
+    SeriesStore(tmp_path / "trend-sources").upsert("FPT-1d", [(datetime(2025, m, 28), str(10 + m % 3)) for m in range(1, 13)])
+    clock = Clock()
+    app = create_app(InternalAuthSettings("owner-1", TOKEN, SECRET), clock=clock, personal_repository=PersonalRepository("owner-1", MemoryDocumentStore()),
+                     market=SyntheticMarket(prices={"FPT": PricePoint(Decimal(12000), date(2027, 1, 14))}), data_dir=tmp_path)
+    c = TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000))
+    empty = call(c, clock, "GET", "/internal/fairvalue/forward/FPT").json()
+    assert empty["version"] == 0 and empty["assumptions"] is None and empty["base"]["eps"] == "1000.00" and empty["years"] == []
+    body = {"assumptions": {"profit_growth": ["0.1", "0.1"], "equity_growth": ["0.1", "0.1"], "dilution": ["0", "0"]}, "custom": {"pe": "10", "pb": None},
+            "expected_version": 0, "request_id": "f1"}
+    out = call(c, clock, "PUT", "/internal/fairvalue/forward/FPT", body).json()
+    assert out["version"] == 1 and [y["year"] for y in out["years"]] == ["2026", "2027"] and out["years"][0]["eps"] == "1100.00"
+    assert out["years"][0]["custom"]["pe"] == "11000.00" and len(out["years"][0]["pe"]) == 7
+    assert call(c, clock, "GET", "/internal/fairvalue/forward/FPT").json()["assumptions"]["profit_growth"] == ["0.1", "0.1"]
+    bad = {**body, "assumptions": {**body["assumptions"], "profit_growth": ["9", "0.1"]}, "expected_version": 1, "request_id": "f2"}
+    assert call(c, clock, "PUT", "/internal/fairvalue/forward/FPT", bad).status_code == 422
+    assert call(c, clock, "GET", "/internal/fairvalue/forward/ZZZ").status_code == 404

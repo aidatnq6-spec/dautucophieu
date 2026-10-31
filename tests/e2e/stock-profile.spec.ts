@@ -65,3 +65,25 @@ test("a ticker that is not a bank has no bank figures section", async ({ page })
   await expect(page.getByRole("region", { name: "Định giá tham khảo" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Số liệu ngân hàng" })).toHaveCount(0);
 });
+
+test("a growth scenario prices forward EPS on the ticker's own P/E and P/B bands, with ±2 and ±3 SD on the charts", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Định giá dự phóng" });
+  await expect(box).toContainText("Năm gốc 2025: EPS 1.000 đ");  // fixture: profit 1 tỷ, EPS 1.000 every year
+  await box.getByLabel("Tăng trưởng lợi nhuận năm 1").fill("10");
+  await box.getByLabel("Tăng trưởng vốn chủ năm 1").fill("10");
+  for (const i of [2, 3]) {
+    await box.getByLabel(`Tăng trưởng lợi nhuận năm ${i}`).fill("");
+    await box.getByLabel(`Tăng trưởng vốn chủ năm ${i}`).fill("");
+    await box.getByLabel(`Pha loãng cổ phiếu năm ${i}`).fill("");
+  }
+  await box.getByLabel("Giả sử P/E =").fill("10");
+  await box.getByRole("button", { name: "Tính và lưu kịch bản" }).click();
+  await expect(box).toContainText("Năm 2026: EPS 1.100 đ");
+  await expect(box).toContainText("Với P/E 10: 11.000 đ");
+  const table = box.getByRole("table", { name: "Giá dự phóng năm 2026" });
+  await expect(table.getByRole("row")).toHaveCount(8);  // header and seven levels, −3 to +3 SD
+  await expect(table).toContainText("Trung vị");
+  await expect(page.getByRole("figure", { name: "P/E lịch sử FPT" })).toContainText("±2:");
+  await expect(page.getByRole("figure", { name: "P/E lịch sử FPT" }).getByTestId("mc-sd").first()).toBeAttached();
+});

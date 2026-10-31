@@ -103,14 +103,20 @@ test("a bank's page shows its sector ratios by quarter, and every watched ticker
   await expect(div).toContainText(/12 tháng gần nhất: cổ tức tiền [\d.]+ đ\/cp/);
 });
 
-test("the CAPM hint takes the owner's risk premium in Cài đặt and prices each ticker on its beta; the page lists shareholders and officers", async ({ page }) => {
+test("the CAPM hint starts from Damodaran's premium for Vietnam, takes the owner's in Cài đặt, prices each ticker on its beta; the page lists shareholders and officers", async ({ page }) => {
   await page.goto("/settings");
   const box = page.getByRole("region", { name: "Gợi ý CAPM" });
+  await expect(box).toContainText("Chi phí vốn chủ theo CAPM: 12,62%");  // 4,49% + 1 × 8,13% before anything is entered
+  await expect(box.getByTestId("erp-damodaran")).toContainText("ERP 8,13% (theo xếp hạng Moody's Ba2)");
   await box.getByLabel("Phần bù rủi ro vốn cổ phần, ERP (%)").fill("7,8");
   await box.getByRole("button", { name: "Lưu ERP" }).click();
   await expect(box).toContainText("Chi phí vốn chủ theo CAPM: 12,29%");  // 4,49% + 1 × 7,8%
   await page.goto("/research/FPT");
   await expect(page.getByRole("group", { name: "CAPM FPT" })).toContainText("Chi phí vốn chủ theo CAPM: 10,18%");  // 4,49% + 0,73 × 7,8%
+  await page.goto("/settings");
+  await box.getByRole("button", { name: "Dùng số Damodaran" }).click();
+  await expect(box).toContainText("Chi phí vốn chủ theo CAPM: 12,62%");
+  await page.goto("/research/FPT");
   const people = page.getByRole("region", { name: "Cổ đông lớn và ban lãnh đạo" });
   const holders = people.getByRole("table", { name: "Cổ đông lớn FPT" });
   await expect(holders.getByRole("row", { name: /Trương Gia Bình/ })).toContainText("Chủ tịch Hội đồng Quản trị");  // the officer's role beside the stake

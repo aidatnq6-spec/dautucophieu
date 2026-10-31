@@ -1,5 +1,5 @@
 """CAPM hint for the required return: cost of equity Ke = Rf + β × ERP, with Rf (the 10-year Vietnamese government bond
-yield) and ERP (the owner's equity risk premium) in percent and β as a plain number. A hint shown next to the owner's
+yield) and ERP (the owner's equity risk premium, else Damodaran's for Vietnam) in percent and β as a plain number. A hint shown next to the owner's
 required return, never applied to it. A missing input gives a reason instead of a number.
 """
 
@@ -17,7 +17,7 @@ def _d(v) -> Decimal | None:
 def capm(*, rf, beta, erp) -> dict:
     """Ke as a decimal ratio string (0.1018 for 10,18%)."""
     for value, reason in ((rf, "Chưa có lợi suất trái phiếu 10 năm"), (beta, "Chưa có beta của mã"),
-                          (erp, "Chưa nhập phần bù rủi ro (ERP) trong Cài đặt")):
+                          (erp, "Chưa có ERP: chưa nhập trong Cài đặt và chưa tải được bảng Damodaran")):
         if _d(value) is None:
             return {"ke": None, "reason": reason}
     ke = (_d(rf) + _d(beta) * _d(erp)) / 100

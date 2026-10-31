@@ -76,6 +76,8 @@ legend{font-weight:600;padding:0 6px}
 .tb-list{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
 .tb-list th,.tb-list td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left}
 .tb-list .num{text-align:right}
+.tb-list .tb-group th{background:#f6f8fa;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:5px 6px;cursor:default}
+.tb-when{display:block;font-size:10px;font-weight:400;color:var(--muted)}
 .tb-list thead th{color:var(--muted);font-weight:600;font-size:12px}
 .tb-list tbody tr{cursor:pointer}.tb-list tbody tr:hover,.tb-list tbody tr.tb-selected{background:#eef3fb}
 .tb-list tbody tr:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}

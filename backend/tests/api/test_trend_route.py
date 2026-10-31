@@ -38,6 +38,9 @@ class FakeSource:
         self.calls.append(("minutes", index))
         return []
 
+    def get(self, url):
+        raise RuntimeError("offline")
+
     def ohlcv(self, symbol, interval, start, end, index):
         self.calls.append(("ohlcv", symbol, interval, index))
         from datetime import datetime, timedelta, timezone
@@ -52,11 +55,12 @@ def test_board_and_chart_cover_the_watchlist_and_the_two_indices_only(tmp_path, 
     clock = Clock()
     c = client(tmp_path, clock)
     board = call(c, clock, "GET", "/internal/trend/board").json()
-    assert [r["symbol"] for r in board["rows"]] == ["FPT"] and board["missing"] == ["VNINDEX", "VN30"]
+    assert [r["symbol"] for r in board["rows"]] == ["DXY", "US10Y", "VN10Y", "GOLD", "USOIL", "BTC", "FPT"] and board["missing"] == ["VNINDEX", "VN30"]
     call(c, clock, "GET", "/internal/trend/board")
     assert [x for x in source.calls if x[0] == "board"] == [("board", ("FPT",))]  # cached between polls
     assert call(c, clock, "GET", "/internal/trend/chart/VNINDEX/1H").json()["bars"][0]["c"] == "2"
     assert ("ohlcv", "VNINDEX", "1H", True) in source.calls
     assert call(c, clock, "GET", "/internal/trend/chart/FPT/1D").json()["interval"] == "1D"
+    assert call(c, clock, "GET", "/internal/trend/chart/DXY/1H").json()["reason"] == "Nguồn chỉ có giá ngày"
     assert call(c, clock, "GET", "/internal/trend/chart/ZZZ/1D").status_code == 404
     assert call(c, clock, "GET", "/internal/trend/chart/FPT/5m").status_code == 422

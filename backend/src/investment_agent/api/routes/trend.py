@@ -6,6 +6,8 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 
 from investment_agent.market.live_board import INDICES, ChartStore, build_board, chart, in_session
+from investment_agent.market.macro_board import IDS as MACRO_IDS
+from investment_agent.market.macro_board import macro_chart, macro_rows
 from investment_agent.market.trend import SnapshotStore
 from investment_agent.market.watchlist import load_watchlist
 
@@ -29,7 +31,7 @@ def trend(request: Request):
 
 
 class _Vnstock:
-    """Vnstock's free tier behind the three reads the board and chart need."""
+    """Vnstock's free tier behind the three reads the board and chart need, and a plain GET for Coinbase's public stats."""
 
     def __init__(self):
         from investment_agent.market.providers.vnstock_adapter import VnstockProvider
@@ -44,6 +46,12 @@ class _Vnstock:
         today = date.today()
         return self.provider.index_minutes(index, today - timedelta(days=7), today)
 
+    def get(self, url):
+        import httpx
+        response = httpx.get(url, timeout=10, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+        response.raise_for_status()
+        return response.text
+
     def ohlcv(self, symbol, interval, start, end, index):
         return self.provider.ohlcv_rows(symbol, interval, start, end, index=index)
 
@@ -54,7 +62,7 @@ def _source():
 
 @router.get("/trend/board")
 def live_board(request: Request):
-    """Indices and watched tickers during the session (Vnstock); cached 15 s in the session, 5 min outside it."""
+    """Indices, Vĩ mô rows and watched tickers (Vnstock, Coinbase, stored closes); cached 15 s in the session, 5 min outside it."""
     require_owner(request)
     data_dir = request.app.state.data_dir
     if data_dir is None:
@@ -67,6 +75,8 @@ def live_board(request: Request):
         return cached[1]
     source = _source()
     payload = build_board(symbols, board=source.board, index_minutes=source.index_minutes, now=moment)
+    indices = [r for r in payload["rows"] if r["kind"] == "index"]
+    payload["rows"] = indices + macro_rows(Path(data_dir), get=source.get, now=moment) + payload["rows"][len(indices):]
     _board_cache[key] = (moment, payload)
     return payload
 
@@ -81,6 +91,8 @@ def live_chart(symbol: str, interval: str, request: Request):
     if interval not in ("1D", "1H"):
         return error(422, "invalid_interval", "Khung chỉ có 1D hoặc 1H.")
     sym = symbol.upper()
+    if sym in MACRO_IDS:
+        return macro_chart(Path(data_dir), sym, interval)
     if sym not in INDICES and sym not in load_watchlist(Path(data_dir)).symbols:
         return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
     return chart(ChartStore(Path(data_dir)), sym, interval, fetch=_source().ohlcv, now=now(request), index=sym in INDICES)

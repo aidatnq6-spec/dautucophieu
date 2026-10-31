@@ -180,11 +180,18 @@ if __name__ == "__main__":
             vn = timezone(timedelta(hours=7))
             return [(datetime(2026, 10, 29, 14, 45, tzinfo=vn), "1755.61"), (datetime(2026, 10, 30, 14, 45, tzinfo=vn), "1741.62")] if index == "VNINDEX" else []
 
+        def get(self, url):  # Coinbase stats: Bitcoin down 1% over 24 hours; gold left to its stored close
+            if "BTC-USD" in url:
+                return '{"open": "78000", "last": "77220"}'
+            raise RuntimeError("offline")
+
         def ohlcv(self, symbol, interval, start, end, index):
             first = datetime(2026, 8, 1, tzinfo=timezone(timedelta(hours=7)))
             return [{"time": first + timedelta(days=i), "open": "50", "high": "55", "low": "49", "close": str(50 + i % 4), "volume": 1000 + i}
                     for i in range(60)]
     trend_routes._source = FixtureSource
+    SeriesStore(os.path.join(data, "trend-sources")).upsert("DXY-1d", [(datetime(2026, 8, 1) + timedelta(days=i), str(99 + (i % 3) / 10))
+                                                                       for i in range(60)])
     app = create_app(InternalAuthSettings.from_env(), personal_repository=repository, market=MARKET,
                      jobs=JobStore(os.path.join(data, "jobs.sqlite")), outbox=deliveries, deliveries=deliveries, data_dir=data)
     uvicorn.run(app, host="127.0.0.1", port=int(os.environ["E2E_PYTHON_PORT"]), workers=1, access_log=False)

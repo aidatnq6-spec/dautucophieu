@@ -20,3 +20,10 @@ trong phiên bên phải, bấm một dòng mở biểu đồ nến ngày hoặc
 - Màu theo quy ước sàn: tím trần, xanh lơ sàn, vàng tham chiếu, xanh lá tăng, đỏ giảm.
 - Biểu đồ dùng Lightweight Charts 5.2.1 (TradingView, Apache-2.0); giữ logo ghi công mặc định của thư viện.
 - Proxy web không chuyển chuỗi truy vấn, nên khung nằm trong đường dẫn: `/internal/trend/chart/<MÃ>/<1D|1H>`.
+
+## Bổ sung: Vĩ mô trên bảng giá (31/10/2026)
+- Nhóm "Vĩ mô" giữa Chỉ số và Cổ phiếu: DXY, US10Y, VN10Y, Vàng, Dầu WTI, Bitcoin.
+- Bitcoin và Vàng (PAXG) đọc tức thời từ thống kê công khai của Coinbase (`/products/<cặp>/stats`), so với giá 24 giờ trước; nguồn lỗi thì
+  dùng giá đóng cửa đã lưu. Các biến khác: giá đóng cửa gần nhất đã lưu (trend-sources; VN10Y từ kho vĩ mô) so với phiên trước, ghi ngày.
+- Một điểm duy nhất thì không có thay đổi; không có chuỗi thì "Chưa có số". Lợi suất: thay đổi bằng điểm phần trăm.
+- Biểu đồ của biến vĩ mô là đường giá đóng cửa (nguồn không có mở/cao/thấp) kèm MACD/RSI; khung 1 giờ chỉ cho Bitcoin và Vàng.

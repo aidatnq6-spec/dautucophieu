@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request
 from pydantic import Field
 
 from investment_agent.domain.models import ContractModel
+from investment_agent.market.financial_ratios import DISPLAY, FinancialRatioStore
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.index_valuation import INDICES, series_key
 from investment_agent.market.series import SeriesStore
@@ -14,6 +15,7 @@ from investment_agent.market.watchlist import load_watchlist
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.holdings_view import fair_value_board
 from investment_agent.services.records import read_version
+from investment_agent.valuation.dividend_history import dividend_history
 from investment_agent.valuation.forward import Assumptions, forward_valuation
 from investment_agent.valuation.history import monthly_multiples
 from investment_agent.valuation.index_reference import index_monthly_multiples
@@ -25,6 +27,7 @@ from .watchlist import held_tickers
 
 router = APIRouter(prefix="/internal")
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
+QUARTERS_SHOWN = 8
 
 
 @router.get("/fairvalue")
@@ -138,3 +141,34 @@ def forward_put(symbol: str, request: Request, body: ForwardRequest):
         return _forward_view(request, data_dir, sym, read_version(repo, owner, "settings", _forward_id(sym), None))
     except WRITE_ERRORS as exc:
         return write_error(exc)
+
+
+@router.get("/fairvalue/ratios/{symbol}")
+def sector_ratios(symbol: str, request: Request):
+    """Quarterly sector ratios of a watched bank, securities firm or insurer (VNDirect public data), oldest quarter first."""
+    require_owner(request)
+    data_dir, sym = _forward_symbol(request, symbol)
+    if data_dir is None:
+        return unavailable()
+    record = FinancialRatioStore(data_dir / "financial-ratios").read(sym) if sym else None
+    if not record or record.get("kind") not in DISPLAY:
+        return error(404, "not_a_financial", "Chỉ có cho ngân hàng, chứng khoán, bảo hiểm trong danh sách theo dõi.")
+    quarters = sorted(record["quarters"])[-QUARTERS_SHOWN:]
+    return {"symbol": sym, "kind": record["kind"], "fetched_at": record.get("fetched_at"),
+            "quarters": [{"date": q, "label": f"Q{(int(q[5:7]) + 2) // 3}/{q[:4]}"} for q in quarters],
+            "metrics": [{"code": code, "label": label, "format": fmt, "values": [record["quarters"][q].get(code) for q in quarters]}
+                        for code, label, fmt in DISPLAY[record["kind"]]]}
+
+
+@router.get("/fairvalue/dividends/{symbol}")
+def dividends(symbol: str, request: Request):
+    """Cash and stock dividends by year, payout against the previous year's EPS, and the trailing yield on today's price."""
+    require_owner(request)
+    data_dir, sym = _forward_symbol(request, symbol)
+    if data_dir is None:
+        return unavailable()
+    if sym is None:
+        return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
+    point = request.app.state.market.price(sym) if request.app.state.market else None
+    return {"symbol": sym, **dividend_history(FundamentalsStore(data_dir / "fundamentals").read(sym), price=point.price if point else None,
+                                              today=now(request).astimezone(VN).date())}

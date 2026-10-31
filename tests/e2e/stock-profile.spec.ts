@@ -87,3 +87,18 @@ test("a growth scenario prices forward EPS on the ticker's own P/E and P/B bands
   await expect(page.getByRole("figure", { name: "P/E lịch sử FPT" })).toContainText("±2:");
   await expect(page.getByRole("figure", { name: "P/E lịch sử FPT" }).getByTestId("mc-sd").first()).toBeAttached();
 });
+
+test("a bank's page shows its sector ratios by quarter, and every watched ticker its dividend history", async ({ page }) => {
+  await page.goto("/research/VCB");
+  const ratios = page.getByRole("region", { name: "Chỉ số ngành theo quý" });
+  await expect(ratios).toContainText("Chỉ số ngân hàng theo quý");
+  const table = ratios.getByRole("table", { name: "Chỉ số theo quý VCB" });
+  await expect(table).toContainText("Q3/2026");
+  await expect(table.getByRole("row", { name: /Tỷ lệ nợ xấu/ })).toContainText("0,71%");
+  await page.goto("/research/FPT");
+  await expect(page.getByRole("region", { name: "Chỉ số ngành theo quý" })).toHaveCount(0);
+  const div = page.getByRole("region", { name: "Lịch sử cổ tức" });
+  await expect(div).toContainText("Cổ tức tiền (đ/cp)");
+  await expect(div.getByRole("table", { name: "Lịch sử cổ tức FPT" }).getByRole("row", { name: /^2025/ })).toContainText("500");
+  await expect(div).toContainText(/12 tháng gần nhất: cổ tức tiền [\d.]+ đ\/cp/);
+});

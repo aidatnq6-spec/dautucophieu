@@ -66,9 +66,10 @@ def _events(rows: list[dict]) -> tuple[list[dict], list[dict], list[dict]]:
         if r.get("event_code") == "DIV" and (m := _CASH.search(title)):
             dividends.append({"date": day, "cash": _num(m.group(1).replace(",", "").replace(".", ""))})
         elif r.get("event_code") == "ISS":
-            if m := _RATIO.search(title):
-                issues.append({"date": day, "ratio": _num(Decimal(m.group(1).replace(",", ".")) / 100)})
-            kinds.append({"date": day, "kind": next((k for k, p in _ISSUE_KINDS if p.search(title)), "other")})
+            ratio = _num(Decimal(m.group(1).replace(",", ".")) / 100) if (m := _RATIO.search(title)) else None
+            if ratio is not None:
+                issues.append({"date": day, "ratio": ratio})
+            kinds.append({"date": day, "kind": next((k for k, p in _ISSUE_KINDS if p.search(title)), "other"), "ratio": ratio})
     return (sorted(dividends, key=lambda d: d["date"]), sorted(issues, key=lambda d: d["date"]),
             sorted(kinds, key=lambda d: (d["date"], d["kind"])))
 

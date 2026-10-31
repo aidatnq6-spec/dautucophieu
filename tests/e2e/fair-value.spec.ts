@@ -108,3 +108,20 @@ test("a bank is scored on sector ratios, latest quarter against the same quarter
   await expect(q).toContainText("Nợ xấu 0,71% so với 1,03% cùng kỳ");
   await expect(q).toContainText("quy đổi mốc Piotroski theo số tiêu chí");
 });
+
+test("the ticker table can be narrowed by symbol and by sector, and the filters cleared", async ({ page }) => {
+  await openPage(page);
+  const table = page.getByRole("table", { name: "Định giá tham khảo" });
+  const status = page.getByText(/^Đang hiện \d+\/\d+ mã/);
+  await expect(status).toContainText("Đang hiện 2/2 mã");
+  await page.getByLabel("Tìm mã").fill("fp");
+  await expect(table.getByRole("row", { name: /FPT/ }).first()).toBeVisible();
+  await expect(table.getByRole("row", { name: /VCB/ })).toHaveCount(0);
+  await expect(status).toContainText("Đang hiện 1/2 mã");
+  await page.getByRole("button", { name: "Bỏ lọc" }).click();
+  await page.getByLabel("Ngành").selectOption("Ngân hàng");
+  await expect(table.getByRole("row", { name: /VCB/ })).toBeVisible();
+  await expect(table.getByRole("row", { name: /FPT/ })).toHaveCount(0);
+  await page.getByLabel("Tìm mã").fill("ZZZ");
+  await expect(page.getByText("Không có mã nào khớp bộ lọc.")).toBeVisible();
+});

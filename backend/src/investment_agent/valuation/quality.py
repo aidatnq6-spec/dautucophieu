@@ -10,6 +10,8 @@ import math
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
+from investment_agent.domain.bank_figures import derive
+
 FINANCIAL = {"Ngân hàng", "Dịch vụ tài chính", "Bảo hiểm"}
 MIN_EVALUATED = 7
 RECEIVABLES_GAP = Decimal("0.20")  # receivables growth above revenue growth, in share points
@@ -183,7 +185,24 @@ def _quarter(iso: str) -> str:
     return f"Q{(int(iso[5:7]) + 2) // 3}/{iso[:4]}"
 
 
-def _health(ratios: dict, share_issues: list[dict] | None) -> dict:
+def _manual_bank_criteria(bank: dict[str, dict]) -> list[dict]:
+    """CASA up and group-2 share down, latest owner-entered quarter against the same quarter a year before."""
+    derived = {q: derive(v) for q, v in bank.items()}
+    out = []
+    for id_, label, key, rule, name in (("casa_up", "CASA tăng", "casa", "up", "CASA"), ("group2_down", "Tỷ lệ nợ nhóm 2 giảm", "group2_ratio", "down", "Nợ nhóm 2")):
+        pairs = [q for q in sorted(derived, reverse=True) if derived[q][key] and derived.get(f"{int(q[:4]) - 1}{q[4:]}", {}).get(key)]
+        if not pairs:
+            latest = max((q for q in derived if derived[q][key]), default=max(derived))
+            out.append(_criterion(id_, label, None, f"Cần số nhập tay của cùng quý năm trước (Q{latest[-1]}/{int(latest[:4]) - 1})"))
+            continue
+        q = pairs[0]
+        a, b = Decimal(derived[q][key]), Decimal(derived[f"{int(q[:4]) - 1}{q[4:]}"][key])
+        x, y = (_pct(a), _pct(b)) if _pct(a) != _pct(b) or a == b else (_pct(a, 2), _pct(b, 2))
+        out.append(_criterion(id_, label, a > b if rule == "up" else a < b, f"{name} {x} so với {y} Q{q[-1]}/{int(q[:4]) - 1} (số nhập tay)"))
+    return out
+
+
+def _health(ratios: dict, share_issues: list[dict] | None, bank: dict | None = None) -> dict:
     title, criteria, with_issues = HEALTH[ratios["kind"]]
     quarters = ratios["quarters"]
     codes = {c[2] for c in criteria}
@@ -217,17 +236,19 @@ def _health(ratios: dict, share_issues: list[dict] | None) -> dict:
                                   "Có đợt huy động vốn bằng cổ phiếu trong 12 tháng (quyền mua, riêng lẻ hoặc ESOP)" if "raise" in kinds
                                   else "Có đợt phát hành không rõ loại trong 12 tháng" if "other" in kinds
                                   else "Không có đợt huy động vốn bằng cổ phiếu trong 12 tháng (cổ phiếu thưởng, cổ tức bằng cổ phiếu không tính)"))
+    if bank:
+        out.extend(_manual_bank_criteria(bank))
     evaluated = [c for c in out if c["passed"] is not None]
     score = sum(1 for c in evaluated if c["passed"])
     return {"kind": "health", "title": title, "year": f"{_quarter(latest)} so với {_quarter(before_key)}",
             "score": score, "evaluated": len(evaluated), "level": _level(score, len(evaluated), len(out)), "criteria": out}
 
 
-def report_quality(record: dict | None, sector: str | None, ratios: dict | None = None) -> dict:
+def report_quality(record: dict | None, sector: str | None, ratios: dict | None = None, bank: dict | None = None) -> dict:
     if sector in FINANCIAL:
         if not ratios or not ratios.get("quarters") or ratios.get("kind") not in HEALTH:
             return {"applicable": True, "reason": "Chưa có chỉ số ngành từ VNDirect (chờ lần cập nhật sau)", "f_score": None, "signs": [], "note": None}
-        return {"applicable": True, "reason": None, "f_score": _health(ratios, (record or {}).get("share_issues")), "signs": [], "note": None}
+        return {"applicable": True, "reason": None, "f_score": _health(ratios, (record or {}).get("share_issues"), bank), "signs": [], "note": None}
     a = _lines(record or {})
     years = [y for y, row in a.items() if "profit" in row]
     if not years:

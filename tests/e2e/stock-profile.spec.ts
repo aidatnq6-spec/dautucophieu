@@ -38,3 +38,30 @@ test("no horizontal scroll on a profile at 375px", async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test("a watched bank's page takes quarterly loan groups, deposits and CAR, and shows NPL and CASA", async ({ page }) => {
+  await page.goto("/research/VCB");
+  const box = page.getByRole("region", { name: "Số liệu ngân hàng" });
+  await expect(box.getByLabel("Quý")).toBeEnabled();
+  const quarter = `20${10 + (Date.now() % 15)}-Q${1 + (Date.now() % 4)}`;  // the e2e store persists between runs: a fresh quarter each time
+  await box.getByLabel("Quý").fill(quarter);
+  for (const [label, value] of [["Nợ nhóm 1 (đủ tiêu chuẩn) (tỷ đồng)", "447734"], ["Nợ nhóm 2 (cần chú ý) (tỷ đồng)", "7808"],
+    ["Nợ nhóm 3 (dưới tiêu chuẩn) (tỷ đồng)", "1517"], ["Nợ nhóm 4 (nghi ngờ) (tỷ đồng)", "1220"], ["Nợ nhóm 5 (có khả năng mất vốn) (tỷ đồng)", "2293"],
+    ["Tiền gửi không kỳ hạn (tỷ đồng)", "166971"], ["Tiền gửi ký quỹ (tỷ đồng)", "10354"], ["Tiền gửi của khách hàng (tỷ đồng)", "537304,578"], ["CAR (%)", "11,5"]]) {
+    await box.getByLabel(label).fill(value);
+  }
+  await box.getByRole("button", { name: "Lưu quý này" }).click();
+  const row = box.getByRole("table", { name: "Số liệu ngân hàng VCB" }).getByRole("row", { name: new RegExp(quarter) });
+  await expect(row).toContainText("1,09%");  // NPL
+  await expect(row).toContainText("33,00%");  // CASA
+  await expect(row).toContainText("11,50%");  // CAR
+  page.once("dialog", (d) => d.accept());
+  await row.getByRole("button", { name: `Xóa ${quarter}` }).click();
+  await expect(box.getByRole("row", { name: new RegExp(quarter) })).toHaveCount(0);
+});
+
+test("a ticker that is not a bank has no bank figures section", async ({ page }) => {
+  await page.goto("/research/FPT");
+  await expect(page.getByRole("region", { name: "Định giá tham khảo" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Số liệu ngân hàng" })).toHaveCount(0);
+});

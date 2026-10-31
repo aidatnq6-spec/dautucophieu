@@ -8,6 +8,7 @@ import { MethodList, VERDICT, type Row } from "./fair-value-view";
 import { SOURCE } from "./insights-view";
 import { MultipleCharts } from "./multiple-chart";
 import { QualityList } from "./report-quality";
+import { BankFigures } from "./bank-figures";
 
 type Facts = { price: string | null; price_date: string | null; change_pct: string | null; high_52w: string | null; low_52w: string | null;
   shares: number | null; market_cap: string | null; avg_volume: number | null; avg_volume_sessions: number };
@@ -64,6 +65,8 @@ export function StockProfile({ symbol }: { symbol: string }) {
           <p className="caption"><Link href="/fair-value">So sánh với các mã khác ở Định giá</Link></p>
         </>}
       </section>
+
+      {p.watched && <BankFigures symbol={p.symbol} />}
 
       <section className="surface" aria-label="Sự kiện">
         <h2>Sự kiện</h2>

@@ -10,6 +10,7 @@ from pydantic import Field
 from investment_agent.domain.models import ContractModel
 from investment_agent.market.beta import BetaStore
 from investment_agent.market.company_people import PeopleStore, company_people
+from investment_agent.market.erp import ErpStore
 from investment_agent.market.financial_ratios import DISPLAY, FinancialRatioStore
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.insider_deals import InsiderStore, insider_deals
@@ -184,9 +185,13 @@ CAPM_RECORD = ("settings", "capm")
 
 
 class CapmRequest(ContractModel):
-    erp: str = Field(max_length=8)
+    erp: str | None = Field(max_length=8)  # None goes back to Damodaran's premium for Vietnam
     expected_version: int = Field(ge=0)
     request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
+
+
+def _percent(ratio: str | None) -> str | None:
+    return format((Decimal(ratio) * 100).normalize(), "f") if ratio else None
 
 
 def _capm_view(request: Request, data_dir: Path, record, beta: dict | None) -> dict:
@@ -194,10 +199,15 @@ def _capm_view(request: Request, data_dir: Path, record, beta: dict | None) -> d
     owner, repo = require_owner(request), request.app.state.personal_repository
     points = MacroStore(data_dir).read("vn10y")
     rf = {"value": points[-1]["value"], "date": points[-1]["date"]} if points else None
-    erp = record.payload.get("erp") if record else None
+    owner_erp = record.payload.get("erp") if record else None
+    stored = ErpStore(data_dir).read()
+    damodaran = {"erp": _percent(stored["erp"]), "erp_cds": _percent(stored.get("erp_cds")), "rating": stored.get("rating"),
+                 "published": stored.get("published")} if stored else None
+    erp = owner_erp if owner_erp is not None else damodaran["erp"] if damodaran else None
+    source = "owner" if owner_erp is not None else "damodaran" if erp is not None else None
     settings, _ = valuation_settings(repo, owner)
-    return {"version": record.version if record else 0, "rf": rf, "beta": beta, "erp": erp,
-            "required_return": str(settings.required_return),
+    return {"version": record.version if record else 0, "rf": rf, "beta": beta, "erp": erp, "erp_source": source, "owner_erp": owner_erp,
+            "damodaran": damodaran, "required_return": str(settings.required_return),
             **capm(rf=rf["value"] if rf else None, beta=beta["value"] if beta else None, erp=erp)}
 
 
@@ -233,14 +243,17 @@ def capm_save(request: Request, body: CapmRequest):
     owner, repo = require_owner(request), request.app.state.personal_repository
     if repo is None or request.app.state.data_dir is None:
         return unavailable()
+    erp = None
+    if body.erp is not None:
+        try:
+            erp = Decimal(body.erp.strip().replace(",", "."))
+        except InvalidOperation:
+            erp = None
+        if erp is None or not erp.is_finite() or not Decimal(0) < erp <= Decimal(30):
+            return error(422, "invalid_erp", "Phần bù rủi ro (ERP) là số phần trăm từ 0 đến 30, ví dụ 7,8.")
     try:
-        erp = Decimal(body.erp.strip().replace(",", "."))
-    except InvalidOperation:
-        erp = None
-    if erp is None or not erp.is_finite() or not Decimal(0) < erp <= Decimal(30):
-        return error(422, "invalid_erp", "Phần bù rủi ro (ERP) là số phần trăm từ 0 đến 30, ví dụ 7,8.")
-    try:
-        repo.write(owner, *CAPM_RECORD, {"erp": format(erp.normalize(), "f")}, expected_version=body.expected_version, request_id=body.request_id)
+        repo.write(owner, *CAPM_RECORD, {"erp": format(erp.normalize(), "f") if erp is not None else None},
+                   expected_version=body.expected_version, request_id=body.request_id)
         return _capm_view(request, Path(request.app.state.data_dir), read_version(repo, owner, *CAPM_RECORD, None), {"value": "1", "date": None})
     except WRITE_ERRORS as exc:
         return write_error(exc)

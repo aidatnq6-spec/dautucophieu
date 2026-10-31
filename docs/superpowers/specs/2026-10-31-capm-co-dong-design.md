@@ -44,3 +44,13 @@ Quy tắc:
 - Loại và khối lượng giữ theo nguồn; thông báo thiếu thì để trống, không suy từ tiêu đề.
 - Tổng 12 tháng chỉ cộng báo cáo kết quả Mua/Bán có khối lượng; "Đăng ký" là ý định nên không cộng; báo cáo thiếu loại hoặc khối lượng được đếm riêng.
 - Link chỉ nhận trang thông báo của dstock.vndirect.com.vn.
+
+## Thay đổi theo yêu cầu chủ sở hữu: ERP mặc định từ Damodaran (31/10/2026)
+
+Chủ sở hữu yêu cầu tự điền ERP từ nguồn miễn phí cho Việt Nam (thay quy tắc "ERP do bạn nhập").
+- Nguồn: bảng quốc gia của Aswath Damodaran, NYU Stern, `pc/datasets/ctryprem.xlsx` (robots.txt cho phép), trang "ERPs by country",
+  dòng Vietnam: Total Equity Risk Premium (theo xếp hạng Moody's) và bản theo CDS để tham khảo. Ngày bảng = Last-Modified của file
+  (ô ngày trong file không được cập nhật). Đọc bằng thư viện chuẩn, tìm cột theo tên tiêu đề.
+- `erp-sync` chạy trong lịch sau giờ đóng cửa, đọc lại tối đa mỗi tuần; đọc lỗi hoặc không thấy dòng Vietnam thì giữ số cũ.
+- ERP dùng cho CAPM: số chủ sở hữu nhập nếu có, không thì số Damodaran; giao diện ghi rõ nguồn và ngày; nút "Dùng số Damodaran" xóa số tự nhập.
+- Lưu làm tròn 0,01 điểm phần trăm (8,13%).

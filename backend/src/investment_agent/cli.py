@@ -40,6 +40,8 @@ def main() -> int:
     macro.add_argument("--data-dir", type=Path, required=True)
     bs = commands.add_parser("beta-sync", help="beta of every watched ticker (VNDirect, one call) into data/beta.json for the CAPM hint")
     bs.add_argument("--data-dir", type=Path, required=True)
+    es = commands.add_parser("erp-sync", help="Damodaran's equity risk premium for Vietnam into data/erp.json, at most weekly")
+    es.add_argument("--data-dir", type=Path, required=True)
     qa = commands.add_parser("quarter-alerts", help="Telegram note when a watched ticker's new quarter first appears in the statements")
     qa.add_argument("--data-dir", type=Path, required=True)
     frs = commands.add_parser("financial-ratios-sync", help="quarterly bank, securities and insurance ratios (VNDirect) into data/financial-ratios")
@@ -90,6 +92,8 @@ def main() -> int:
         return index_valuation_sync(args.data_dir)
     if args.command == "beta-sync":
         return beta_sync(args.data_dir)
+    if args.command == "erp-sync":
+        return erp_sync_cli(args.data_dir)
     if args.command == "quarter-alerts":
         return quarter_alerts_cli(args.data_dir)
     if args.command == "financial-ratios-sync":
@@ -507,6 +511,23 @@ def beta_sync(data_dir: Path, get=None) -> int:
         return 1
     print(json.dumps(out))
     return 0
+
+
+def erp_sync_cli(data_dir: Path, get=None) -> int:
+    """Exit 0 when the premium is stored or still fresh, 1 when the book could not be read (the old value stays)."""
+    from datetime import datetime, timezone
+
+    from investment_agent.market.erp import ErpStore, erp_sync
+    if get is None:
+        import httpx
+
+        def get(url):
+            response = httpx.get(url, timeout=60, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+            response.raise_for_status()
+            return response.content, response.headers.get("last-modified")
+    out = erp_sync(ErpStore(data_dir), get=get, now=datetime.now(timezone.utc))
+    print(json.dumps(out))
+    return 1 if out["status"] == "error" else 0
 
 
 def quarter_alerts_cli(data_dir: Path) -> int:

@@ -181,7 +181,8 @@ def test_capm_hint_uses_stored_bond_yield_and_beta_and_the_owner_premium(tmp_pat
     BetaStore(tmp_path).save({"values": {"FPT": {"beta": "0.73", "date": "2026-10-30"}}})
     c, clock = _app(tmp_path)
     market = call(c, clock, "GET", "/internal/fairvalue/capm").json()
-    assert market["ke"] is None and market["reason"] == "Chưa nhập phần bù rủi ro (ERP) trong Cài đặt" and market["rf"] == {"value": "4.49", "date": "2026-10-30"}
+    assert market["ke"] is None and market["reason"] == "Chưa có ERP: chưa nhập trong Cài đặt và chưa tải được bảng Damodaran"
+    assert market["rf"] == {"value": "4.49", "date": "2026-10-30"}
     saved = call(c, clock, "PUT", "/internal/fairvalue/capm", {"erp": "7.8", "expected_version": 0, "request_id": "k1"}).json()
     assert saved["erp"] == "7.8" and saved["ke"] == "0.1229" and saved["version"] == 1  # 4,49% + 1 × 7,8%
     fpt = call(c, clock, "GET", "/internal/fairvalue/capm/FPT").json()
@@ -189,6 +190,22 @@ def test_capm_hint_uses_stored_bond_yield_and_beta_and_the_owner_premium(tmp_pat
     assert call(c, clock, "PUT", "/internal/fairvalue/capm", {"erp": "40", "expected_version": 1, "request_id": "k2"}).status_code == 422
     for bad in ("", "abc"):
         assert call(c, clock, "PUT", "/internal/fairvalue/capm", {"erp": bad, "expected_version": 1, "request_id": "k3"}).json()["code"] == "invalid_erp"
+
+
+
+def test_capm_falls_back_to_damodaran_for_vietnam_until_the_owner_enters_a_premium(tmp_path):
+    from investment_agent.market.erp import ErpStore
+    from investment_agent.market.leading import MacroStore
+    MacroStore(tmp_path).upsert("vn10y", [(date(2026, 10, 30), "4.49")], entry="auto")
+    ErpStore(tmp_path).save({"erp": "0.0813", "erp_cds": "0.0632", "rating": "Ba2", "published": "2026-02-16", "fetched_at": "2026-10-31T00:00:00+00:00"})
+    c, clock = _app(tmp_path)
+    auto = call(c, clock, "GET", "/internal/fairvalue/capm").json()
+    assert auto["erp"] == "8.13" and auto["erp_source"] == "damodaran" and auto["owner_erp"] is None and auto["ke"] == "0.1262"
+    assert auto["damodaran"] == {"erp": "8.13", "erp_cds": "6.32", "rating": "Ba2", "published": "2026-02-16"}
+    own = call(c, clock, "PUT", "/internal/fairvalue/capm", {"erp": "7,8", "expected_version": 0, "request_id": "o1"}).json()
+    assert own["erp"] == "7.8" and own["erp_source"] == "owner" and own["ke"] == "0.1229"
+    back = call(c, clock, "PUT", "/internal/fairvalue/capm", {"erp": None, "expected_version": 1, "request_id": "o2"}).json()
+    assert back["erp_source"] == "damodaran" and back["owner_erp"] is None and back["ke"] == "0.1262"
 
 
 def test_people_route_reads_through_the_cache(tmp_path, monkeypatch):

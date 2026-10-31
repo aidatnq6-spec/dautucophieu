@@ -142,6 +142,8 @@ if __name__ == "__main__":
                                                    "quantity": 25255715},
                                                   {"name": "Trương Gia Bình", "position": "Chủ tịch Hội đồng Quản trị", "percent": 0.0689,
                                                    "quantity": 117347966}]})
+    from investment_agent.market.erp import ErpStore
+    ErpStore(data).save({"erp": "0.0813", "erp_cds": "0.0632", "rating": "Ba2", "published": "2026-02-16", "fetched_at": datetime.now(timezone.utc).isoformat()})
     from investment_agent.market.insider_deals import InsiderStore
     InsiderStore(data).save("FPT", {"symbol": "FPT", "fetched_at": datetime.now(timezone.utc).isoformat(), "source": "synthetic", "deals": [
         {"date": (date.today() - timedelta(days=30)).isoformat(), "kind": "Bán", "shares": 2000000, "source": "HOSE",

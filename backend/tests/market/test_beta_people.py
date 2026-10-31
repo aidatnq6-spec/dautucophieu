@@ -24,7 +24,7 @@ def test_capm_adds_beta_times_premium_to_the_risk_free_rate_or_says_what_is_miss
     assert capm(rf="4.49", beta="0.73", erp="7.8") == {"ke": "0.1018", "reason": None}  # 4,49% + 0,73 × 7,8%
     assert capm(rf="4.49", beta=None, erp="7.8")["reason"] == "Chưa có beta của mã"
     assert capm(rf=None, beta="1", erp="7.8")["reason"] == "Chưa có lợi suất trái phiếu 10 năm"
-    assert capm(rf="4.49", beta="1", erp=None)["reason"] == "Chưa nhập phần bù rủi ro (ERP) trong Cài đặt"
+    assert capm(rf="4.49", beta="1", erp=None)["reason"] == "Chưa có ERP: chưa nhập trong Cài đặt và chưa tải được bảng Damodaran"
 
 
 def test_people_are_read_once_a_month_and_the_saved_copy_survives_a_failing_source(tmp_path):

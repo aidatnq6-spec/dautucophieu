@@ -1,13 +1,13 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import type { IChartApi, Time } from "lightweight-charts";
+import { type RefObject, useEffect, useRef, useState } from "react";
+import type { IChartApi, ISeriesApi, SeriesType, Time } from "lightweight-charts";
 import { ApiError, api } from "../lib/api";
 import { formatDecimal, formatRatio, formatVnd } from "../lib/format";
 
 type Row = { symbol: string; kind: "index" | "macro" | "stock"; price: string | null; ref: string | null; change: string | null; change_pct: string | null;
   ceiling?: string | null; floor?: string | null; high?: string | null; low?: string | null; volume?: number | null; time: string | null;
   label?: string; basis?: "close" | "24h"; unit?: string; reason?: string | null };
-type Board = { as_of: string; session_open: boolean; rows: Row[]; missing: string[]; errors: string[] };
+type Board = { as_of: string; stocks_as_of?: string; session_open: boolean; rows: Row[]; missing: string[]; errors: string[] };
 type Bar = { t: string | number; o?: string; h?: string; l?: string; c: string; v?: number };
 type Chart = { symbol: string; interval: "1D" | "1H"; bars: Bar[]; macd: { t: string | number; macd: number; signal: number; hist: number }[];
   rsi: { t: string | number; v: number }[]; fetched_at: string | null; stale: boolean; reason: string | null; unit?: string;
@@ -15,7 +15,23 @@ type Chart = { symbol: string; interval: "1D" | "1H"; bars: Bar[]; macd: { t: st
 const GROUPS: [Row["kind"], string][] = [["index", "Chỉ số"], ["macro", "Vĩ mô"], ["stock", "Cổ phiếu"]];
 const day = (iso: string) => iso.slice(0, 10).split("-").reverse().slice(0, 2).join("/");
 
-const POLL = { open: 20_000, closed: 300_000 };
+/** Which candle the row's latest price belongs to, keyed like the chart's bars: a date for daily bars (the trading date for stocks,
+ * Hà Nội date for indices, UTC date for Coinbase's daily candles), Hà Nội wall-clock seconds at the hour's start for hourly bars.
+ * Rows read from a daily close have no live price. */
+function liveKey(row: Row, board: Board, interval: "1D" | "1H"): string | number | null {
+  if (row.price === null || (row.kind === "macro" && row.basis !== "24h")) return null;
+  const at = Date.parse(row.kind === "stock" ? board.stocks_as_of ?? board.as_of : row.time ?? board.as_of);
+  if (Number.isNaN(at)) return null;
+  const wall = Math.floor(at / 1000) + 7 * HOUR;
+  if (interval === "1H") return wall - (wall % HOUR);
+  if (row.kind === "stock") return row.time;
+  return new Date((row.kind === "macro" ? Math.floor(at / 1000) : wall) * 1000).toISOString().slice(0, 10);
+}
+
+// Every 20 s at any hour: Bitcoin and gold trade around the clock; the server keeps stocks for 5 min outside the session.
+const POLL = 20_000;
+const RELOAD_GAP = 120_000;
+const HOUR = 3600;
 const C = { up: "#137556", down: "#b14249", ink: "#183247", line: "#dce4eb", muted: "#576777", macd: "#245edb", signal: "#d97706", rsi: "#7c3aed" };
 
 /** Exchange colours: ceiling purple, floor cyan, reference yellow, then up green and down red. */
@@ -57,8 +73,33 @@ function PriceList({ board, selected, onSelect }: { board: Board; selected: stri
   );
 }
 
-function CandleChart({ data }: { data: Chart }) {
+type ChartRefs = { box: RefObject<HTMLDivElement | null>; price: RefObject<ISeriesApi<SeriesType> | null>; last: RefObject<Bar | null>;
+  latest: RefObject<{ t: string | number | null; p: number | null }> };
+
+/** The open candle follows the board's price; a new candle waits for the source, so no open, high or low is made up.
+ * Called when the price changes and again once the (asynchronously built) chart exists. */
+function applyLive({ box, price, last, latest }: ChartRefs, style: Chart["style"]) {
+  const series = price.current;
+  const bar = last.current;
+  const { t: at, p } = latest.current;
+  if (!series || !bar || at === null || p === null || at !== bar.t) return;
+  const time = bar.t as Time;
+  if (style === "line") {
+    series.update({ time, value: p });
+  } else {
+    const high = Math.max(Number(bar.h), p);
+    const low = Math.min(Number(bar.l), p);
+    series.update({ time, open: Number(bar.o), high, low, close: p });
+    last.current = { ...bar, h: String(high), l: String(low), c: String(p) };
+  }
+  if (box.current) box.current.dataset.liveClose = String(p);
+}
+
+function CandleChart({ data, liveT, livePrice }: { data: Chart; liveT: string | number | null; livePrice: number | null }) {
   const box = useRef<HTMLDivElement>(null);
+  const price = useRef<ISeriesApi<SeriesType> | null>(null);
+  const last = useRef<Bar | null>(null);
+  const latest = useRef<{ t: string | number | null; p: number | null }>({ t: null, p: null });
   useEffect(() => {
     let chart: IChartApi | null = null;
     let cancelled = false;
@@ -71,10 +112,13 @@ function CandleChart({ data }: { data: Chart }) {
       });
       const t = (v: string | number) => v as Time;
       if (data.style === "line") {  // closes only (Vĩ mô feeds): a line, no candles or volume
-        chart.addSeries(LineSeries, { color: C.macd, lineWidth: 2 }).setData(data.bars.map((b) => ({ time: t(b.t), value: Number(b.c) })));
+        const line = chart.addSeries(LineSeries, { color: C.macd, lineWidth: 2 });
+        line.setData(data.bars.map((b) => ({ time: t(b.t), value: Number(b.c) })));
+        price.current = line;
       } else {
         const candles = chart.addSeries(CandlestickSeries, { upColor: C.up, downColor: C.down, borderVisible: false, wickUpColor: C.up, wickDownColor: C.down });
         candles.setData(data.bars.map((b) => ({ time: t(b.t), open: Number(b.o), high: Number(b.h), low: Number(b.l), close: Number(b.c) })));
+        price.current = candles;
         const volume = chart.addSeries(HistogramSeries, { priceFormat: { type: "volume" }, priceScaleId: "vol", lastValueVisible: false, priceLineVisible: false });
         chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
         volume.setData(data.bars.map((b) => ({ time: t(b.t), value: b.v ?? 0, color: Number(b.c) >= Number(b.o) ? "rgba(19,117,86,.35)" : "rgba(177,66,73,.35)" })));
@@ -89,11 +133,17 @@ function CandleChart({ data }: { data: Chart }) {
       const panes = chart.panes();
       panes[1]?.setHeight(110);
       panes[2]?.setHeight(90);
+      last.current = data.bars.at(-1) ?? null;
+      applyLive({ box, price, last, latest }, data.style);
       const shown = data.interval === "1D" ? 180 : 120;
       chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, data.bars.length - shown), to: data.bars.length + 3 });
     });
-    return () => { cancelled = true; chart?.remove(); };
+    return () => { cancelled = true; price.current = null; last.current = null; chart?.remove(); };
   }, [data]);
+  useEffect(() => {
+    latest.current = { t: liveT, p: livePrice };
+    applyLive({ box, price, last, latest }, data.style);
+  });
   return <div ref={box} className="tb-canvas" data-testid="tb-canvas" />;
 }
 
@@ -104,14 +154,16 @@ export function TrendBoard() {
   const [interval, setInterval_] = useState<"1D" | "1H">("1D");
   const [chart, setChart] = useState<Chart | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
+  const reloadedAt = useRef(0);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let alive = true;
     const load = () => {
-      if (document.hidden) { timer = setTimeout(load, POLL.open); return; }
-      api<Board>("trend/board").then((b) => { if (!alive) return; setBoard(b); setMessage(null); timer = setTimeout(load, b.session_open ? POLL.open : POLL.closed); },
-        (e) => { if (!alive) return; setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải bảng giá."); timer = setTimeout(load, POLL.closed); });
+      if (document.hidden) { timer = setTimeout(load, POLL); return; }
+      api<Board>("trend/board").then((b) => { if (!alive) return; setBoard(b); setMessage(null); timer = setTimeout(load, POLL); },
+        (e) => { if (!alive) return; setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải bảng giá."); timer = setTimeout(load, POLL); });
     };
     load();
     return () => { alive = false; clearTimeout(timer); };
@@ -122,10 +174,20 @@ export function TrendBoard() {
     api<Chart>(`trend/chart/${encodeURIComponent(selected)}/${interval}`).then((c) => { if (alive) setChart(c); },
       () => { if (alive) setChart({ symbol: selected, interval, bars: [], macd: [], rsi: [], fetched_at: null, stale: false, reason: "Lỗi tải biểu đồ" }); });
     return () => { alive = false; };
-  }, [selected, interval]);
+  }, [selected, interval, reload]);
 
   const row = board?.rows.find((r) => r.symbol === selected);
   const current = chart && chart.symbol === selected && chart.interval === interval ? chart : null;
+  const liveT = row && board ? liveKey(row, board, interval) : null;
+  const livePrice = liveT !== null && row?.price ? Number(row.price) : null;
+  const lastT = current?.bars.at(-1)?.t;
+  const behind = liveT !== null && livePrice !== null && lastT !== undefined && liveT > lastT;  // a newer candle has started: read the source again
+  useEffect(() => {
+    if (!behind) return;
+    const wait = Math.max(0, reloadedAt.current + RELOAD_GAP - Date.now());
+    const timer = setTimeout(() => { reloadedAt.current = Date.now(); setReload((n) => n + 1); }, wait);
+    return () => clearTimeout(timer);
+  }, [behind, current]);  // each read that still lacks the new candle waits RELOAD_GAP before the next
   return (
     <section className="surface" aria-label="Bảng giá và biểu đồ">
       <h2>Bảng giá và biểu đồ</h2>
@@ -142,7 +204,7 @@ export function TrendBoard() {
           {!current && <p className="muted fx-loading" role="status">Đang tải biểu đồ…</p>}
           {current?.reason && <p className="muted">{current.reason}.</p>}
           {current && !current.reason && <>
-            <CandleChart data={current} />
+            <CandleChart data={current} liveT={liveT} livePrice={livePrice} />
             <p className="caption" data-testid="tb-chart-caption">{current.style === "line"
               ? `Giá đóng cửa ${current.interval === "1D" ? "theo ngày" : "theo giờ"} · ${current.bars.length} điểm · ${current.unit ?? ""} · số mới nhất ${current.as_of ?? "—"}`
               : `${current.interval === "1D" ? "Nến ngày" : "Nến 1 giờ"} · ${current.bars.length} nến · ${current.unit ?? ""}`}
@@ -159,7 +221,8 @@ export function TrendBoard() {
             <PriceList board={board} selected={selected} onSelect={setSelected} />
             <p className="caption" data-testid="tb-status">{board.session_open
               ? `Trong phiên · cập nhật ${new Date(board.as_of).toLocaleTimeString("vi-VN")}, tự làm mới mỗi 20 giây`
-              : `Ngoài giờ giao dịch · giá phiên gần nhất, đọc lúc ${new Date(board.as_of).toLocaleString("vi-VN")}`}.
+              : `Ngoài giờ giao dịch · cổ phiếu và chỉ số là giá phiên gần nhất, đọc lúc ${new Date(board.stocks_as_of ?? board.as_of).toLocaleString("vi-VN")}; Bitcoin và vàng vẫn cập nhật mỗi 20 giây`}.
+              Nến đang mở trên biểu đồ chạy theo giá này; MACD, RSI và nến mới cập nhật khi đọc lại nguồn.
               Cổ phiếu tính bằng nghìn đồng, chỉ số bằng điểm; tím là giá trần, xanh lơ là giá sàn, vàng là tham chiếu.
               Vĩ mô: Bitcoin và vàng (PAXG, token bám giá vàng) theo Coinbase, so với 24 giờ trước; DXY, US10Y, VN10Y, dầu WTI là giá đóng cửa gần
               nhất so với phiên trước, vì nguồn miễn phí chỉ có giá ngày; lợi suất tính bằng %, thay đổi bằng điểm phần trăm.

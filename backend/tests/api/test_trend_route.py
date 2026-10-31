@@ -39,6 +39,7 @@ class FakeSource:
         return []
 
     def get(self, url):
+        self.calls.append(("get", url))
         raise RuntimeError("offline")
 
     def ohlcv(self, symbol, interval, start, end, index):
@@ -64,3 +65,23 @@ def test_board_and_chart_cover_the_watchlist_and_the_two_indices_only(tmp_path, 
     assert call(c, clock, "GET", "/internal/trend/chart/DXY/1H").json()["reason"] == "Nguồn chỉ có giá ngày"
     assert call(c, clock, "GET", "/internal/trend/chart/ZZZ/1D").status_code == 404
     assert call(c, clock, "GET", "/internal/trend/chart/FPT/5m").status_code == 422
+
+
+def test_outside_the_session_coins_stay_live_while_stocks_wait_five_minutes(tmp_path, monkeypatch):
+    from investment_agent.api.routes import trend
+    source = FakeSource()
+    monkeypatch.setattr(trend, "_source", lambda: source)
+    (tmp_path / "market-symbols.txt").write_text("FPT\n", encoding="utf-8")
+    clock = Clock(1_800_000_000 + 86_400)  # Saturday afternoon in Hà Nội
+    c = client(tmp_path, clock)
+
+    def counts():
+        return sum(x[0] == "board" for x in source.calls), sum(x[0] == "get" for x in source.calls)
+    call(c, clock, "GET", "/internal/trend/board")
+    assert counts() == (1, 2)  # Bitcoin and gold
+    clock.now += 20
+    call(c, clock, "GET", "/internal/trend/board")
+    assert counts() == (1, 4)
+    clock.now += 300
+    call(c, clock, "GET", "/internal/trend/board")
+    assert counts() == (2, 6)

@@ -27,3 +27,10 @@ trong phiên bên phải, bấm một dòng mở biểu đồ nến ngày hoặc
   dùng giá đóng cửa đã lưu. Các biến khác: giá đóng cửa gần nhất đã lưu (trend-sources; VN10Y từ kho vĩ mô) so với phiên trước, ghi ngày.
 - Một điểm duy nhất thì không có thay đổi; không có chuỗi thì "Chưa có số". Lợi suất: thay đổi bằng điểm phần trăm.
 - Biểu đồ của biến vĩ mô là đường giá đóng cửa (nguồn không có mở/cao/thấp) kèm MACD/RSI; khung 1 giờ chỉ cho Bitcoin và Vàng.
+
+## Bổ sung: giá chạy ngoài giờ và nến đang mở (31/10/2026)
+- Trình duyệt hỏi bảng giá mỗi 20 giây ở mọi giờ (dừng khi tab ẩn). Máy chủ giữ cổ phiếu/chỉ số 15 giây trong phiên, 5 phút ngoài phiên;
+  dòng Vĩ mô có bộ đệm riêng 15 giây ở mọi giờ, nên Bitcoin và vàng chạy cả cuối tuần (Coinbase: 2 lượt mỗi 15 giây).
+- Nến đang mở trên biểu đồ (cùng ngày/cùng giờ với giá mới) nhận giá của bảng giá: giá đóng cửa mới, cao/thấp nới theo giá đó, giá mở giữ nguyên.
+  Khi giá thuộc nến mới chưa có trong dữ liệu, không tự tạo nến (không đoán giá mở/cao/thấp); biểu đồ đọc lại nguồn, tối đa mỗi 2 phút.
+- MACD và RSI cập nhật khi đọc lại nguồn, không tính lại theo từng giá.

@@ -4,6 +4,7 @@ import { Save } from "lucide-react";
 import { ApiError, api, requestId, type ApiFailure } from "../lib/api";
 import { formatRatio, percentToRatio } from "../lib/format";
 import { AiStatusSection } from "./ai-status";
+import { CapmSettings } from "./capm";
 import { FormErrors } from "./form-errors";
 import { PortfolioSettingsSection } from "./portfolio-settings";
 
@@ -73,6 +74,7 @@ export function SettingsView() {
         </div>
         <div className="actions"><button className="btn primary" onClick={() => void save("valuation")}><Save size={16} aria-hidden="true" />Lưu định giá</button></div>
       </section>
+      <CapmSettings />
       <PortfolioSettingsSection />
       <section className="surface">
         <h2>Telegram</h2>

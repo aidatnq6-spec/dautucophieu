@@ -1,5 +1,6 @@
 """Reference valuation of the watched tickers (Định giá page): computed on request from stored statements."""
 
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -7,14 +8,18 @@ from fastapi import APIRouter, Request
 from pydantic import Field
 
 from investment_agent.domain.models import ContractModel
+from investment_agent.market.beta import BetaStore
+from investment_agent.market.company_people import PeopleStore, company_people
 from investment_agent.market.financial_ratios import DISPLAY, FinancialRatioStore
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.index_valuation import INDICES, series_key
+from investment_agent.market.leading import MacroStore
 from investment_agent.market.series import SeriesStore
 from investment_agent.market.watchlist import load_watchlist
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.holdings_view import fair_value_board
-from investment_agent.services.records import read_version
+from investment_agent.services.records import read_version, valuation_settings
+from investment_agent.valuation.capm import capm
 from investment_agent.valuation.dividend_history import dividend_history
 from investment_agent.valuation.forward import Assumptions, forward_valuation
 from investment_agent.valuation.history import monthly_multiples
@@ -172,3 +177,86 @@ def dividends(symbol: str, request: Request):
     point = request.app.state.market.price(sym) if request.app.state.market else None
     return {"symbol": sym, **dividend_history(FundamentalsStore(data_dir / "fundamentals").read(sym), price=point.price if point else None,
                                               today=now(request).astimezone(VN).date())}
+
+
+CAPM_RECORD = ("settings", "capm")
+
+
+class CapmRequest(ContractModel):
+    erp: str = Field(max_length=8)
+    expected_version: int = Field(ge=0)
+    request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
+
+
+def _capm_view(request: Request, data_dir: Path, record, beta: dict | None) -> dict:
+    """Ke = Rf + β × ERP with each input and its date, next to the owner's required return (a hint, never applied)."""
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    points = MacroStore(data_dir).read("vn10y")
+    rf = {"value": points[-1]["value"], "date": points[-1]["date"]} if points else None
+    erp = record.payload.get("erp") if record else None
+    settings, _ = valuation_settings(repo, owner)
+    return {"version": record.version if record else 0, "rf": rf, "beta": beta, "erp": erp,
+            "required_return": str(settings.required_return),
+            **capm(rf=rf["value"] if rf else None, beta=beta["value"] if beta else None, erp=erp)}
+
+
+@router.get("/fairvalue/capm")
+def capm_market(request: Request):
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None or request.app.state.data_dir is None:
+        return unavailable()
+    try:
+        return _capm_view(request, Path(request.app.state.data_dir), read_version(repo, owner, *CAPM_RECORD, None), {"value": "1", "date": None})
+    except RepositoryUnavailable:
+        return unavailable()
+
+
+@router.get("/fairvalue/capm/{symbol}")
+def capm_ticker(symbol: str, request: Request):
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    data_dir, sym = _forward_symbol(request, symbol)
+    if data_dir is None or repo is None:
+        return unavailable()
+    if sym is None:
+        return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
+    stored = BetaStore(data_dir).read()["values"].get(sym)
+    try:
+        return _capm_view(request, data_dir, read_version(repo, owner, *CAPM_RECORD, None),
+                          {"value": stored["beta"], "date": stored["date"]} if stored else None)
+    except RepositoryUnavailable:
+        return unavailable()
+
+
+@router.put("/fairvalue/capm")
+def capm_save(request: Request, body: CapmRequest):
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None or request.app.state.data_dir is None:
+        return unavailable()
+    try:
+        erp = Decimal(body.erp.strip().replace(",", "."))
+    except InvalidOperation:
+        erp = None
+    if erp is None or not erp.is_finite() or not Decimal(0) < erp <= Decimal(30):
+        return error(422, "invalid_erp", "Phần bù rủi ro (ERP) là số phần trăm từ 0 đến 30, ví dụ 7,8.")
+    try:
+        repo.write(owner, *CAPM_RECORD, {"erp": format(erp.normalize(), "f")}, expected_version=body.expected_version, request_id=body.request_id)
+        return _capm_view(request, Path(request.app.state.data_dir), read_version(repo, owner, *CAPM_RECORD, None), {"value": "1", "date": None})
+    except WRITE_ERRORS as exc:
+        return write_error(exc)
+
+
+def _fetch_people(symbol: str) -> dict:
+    from investment_agent.market.providers.vnstock_adapter import VnstockProvider
+    return VnstockProvider().company_people(symbol)
+
+
+@router.get("/fairvalue/people/{symbol}")
+def people(symbol: str, request: Request):
+    """Major shareholders and officers (Vnstock, VCI), cached 30 days; the saved copy when the source fails."""
+    require_owner(request)
+    data_dir, sym = _forward_symbol(request, symbol)
+    if data_dir is None:
+        return unavailable()
+    if sym is None:
+        return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
+    return company_people(PeopleStore(data_dir), sym, fetch=_fetch_people, now=now(request))

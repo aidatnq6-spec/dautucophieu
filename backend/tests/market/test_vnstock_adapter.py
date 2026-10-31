@@ -275,3 +275,23 @@ def test_market_sync_survives_a_repeated_session_from_the_source(tmp_path):
     p = VnstockProvider(market=PreOpenMarket(), fundamental=FakeFundamental(), clock=lambda: NOW)
     assert market_sync(["VNINDEX"], tmp_path, cal_path, 7, provider=p, today=date(2026, 10, 26), index=True) == 0
     assert sorted(PriceStore(tmp_path).latest("VNINDEX")) == [date(2026, 10, 23)]
+
+
+def test_company_people_are_normalised_with_missing_values_as_none():
+    class FakeCompany:
+        def shareholders(self):
+            return pd.DataFrame([{"symbol": "FPT", "share_holder": "Trương Gia Bình", "shareholder_type": "Individual", "quantity": 117347966,
+                                  "share_own_percent": 0.0689, "update_date": "2026-08-03T10:25:12.523"},
+                                 {"symbol": "FPT", "share_holder": "Deutsche Bank", "shareholder_type": "Organization", "quantity": float("nan"),
+                                  "share_own_percent": 0.024161, "update_date": None}])
+
+        def officers(self):
+            return pd.DataFrame([{"symbol": "FPT", "officer_name": "Bùi Quang Ngọc", "officer_position": "Phó Chủ tịch Hội đồng Quản trị",
+                                  "officer_own_percent": 0.0148, "officer_own_quantity": 25255715, "update_date": "2026-08-03"}])
+
+    p = VnstockProvider(market=FakeMarket(), fundamental=FakeFundamental(), company=lambda sym: FakeCompany(), clock=lambda: NOW)
+    out = p.company_people("fpt")
+    assert out["shareholders"] == [
+        {"name": "Trương Gia Bình", "type": "Individual", "quantity": 117347966, "percent": 0.0689, "updated": "2026-08-03"},
+        {"name": "Deutsche Bank", "type": "Organization", "quantity": None, "percent": 0.024161, "updated": None}]
+    assert out["officers"] == [{"name": "Bùi Quang Ngọc", "position": "Phó Chủ tịch Hội đồng Quản trị", "percent": 0.0148, "quantity": 25255715}]

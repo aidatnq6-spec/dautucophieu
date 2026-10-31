@@ -102,3 +102,16 @@ test("a bank's page shows its sector ratios by quarter, and every watched ticker
   await expect(div.getByRole("table", { name: "Lịch sử cổ tức FPT" }).getByRole("row", { name: /^2025/ })).toContainText("500");
   await expect(div).toContainText(/12 tháng gần nhất: cổ tức tiền [\d.]+ đ\/cp/);
 });
+
+test("the CAPM hint takes the owner's risk premium in Cài đặt and prices each ticker on its beta; the page lists shareholders and officers", async ({ page }) => {
+  await page.goto("/settings");
+  const box = page.getByRole("region", { name: "Gợi ý CAPM" });
+  await box.getByLabel("Phần bù rủi ro vốn cổ phần, ERP (%)").fill("7,8");
+  await box.getByRole("button", { name: "Lưu ERP" }).click();
+  await expect(box).toContainText("Chi phí vốn chủ theo CAPM: 12,29%");  // 4,49% + 1 × 7,8%
+  await page.goto("/research/FPT");
+  await expect(page.getByRole("group", { name: "CAPM FPT" })).toContainText("Chi phí vốn chủ theo CAPM: 10,18%");  // 4,49% + 0,73 × 7,8%
+  const people = page.getByRole("region", { name: "Cổ đông lớn và ban lãnh đạo" });
+  await expect(people.getByRole("table", { name: "Cổ đông lớn FPT" })).toContainText("Trương Gia Bình");
+  await expect(people.getByRole("table", { name: "Ban lãnh đạo FPT" })).toContainText("Phó Chủ tịch Hội đồng Quản trị");
+});

@@ -97,19 +97,42 @@ class VnstockProvider:
         """Annual and quarterly income statement and balance sheet rows, annual cash flow totals (long format), plus company events."""
         _, fundamental = self._api()
         eq = fundamental.equity(symbol.upper())
+        frames = {"income_year": eq.income_statement(period="year", format="long"), "balance_year": eq.balance_sheet(period="year", format="long"),
+                  "income_quarter": eq.income_statement(period="quarter", format="long"),
+                  "balance_quarter": eq.balance_sheet(period="quarter", format="long"),
+                  "cash_year": eq.cash_flow(period="year", format="long")}
+        company = self._company_api()(symbol.upper())
+        frames.update(events=company.events(), overview=company.overview())
+        return {k: v.to_dict("records") for k, v in frames.items()}
+
+    def _company_api(self):
         if self._company is None:
             try:
                 from vnstock import Company
             except ImportError as exc:
                 raise ProviderUnavailable("vnstock is not installed; install it from vnstocks.com with your own key") from exc
             self._company = lambda sym: Company(source="VCI", symbol=sym)
-        frames = {"income_year": eq.income_statement(period="year", format="long"), "balance_year": eq.balance_sheet(period="year", format="long"),
-                  "income_quarter": eq.income_statement(period="quarter", format="long"),
-                  "balance_quarter": eq.balance_sheet(period="quarter", format="long"),
-                  "cash_year": eq.cash_flow(period="year", format="long")}
-        company = self._company(symbol.upper())
-        frames.update(events=company.events(), overview=company.overview())
-        return {k: v.to_dict("records") for k, v in frames.items()}
+        return self._company
+
+    def company_people(self, symbol: str) -> dict:
+        """Major shareholders and officers (VCI); a missing number is None, never zero."""
+        company = self._company_api()(symbol.upper())
+
+        def num(v):
+            try:
+                f = float(v)
+            except (TypeError, ValueError):
+                return None
+            return None if f != f else (int(f) if f.is_integer() else f)
+
+        def day(v):
+            return str(v)[:10] if v not in (None, "") and str(v) not in ("nan", "NaT", "None") else None
+        holders = [{"name": str(r.get("share_holder") or ""), "type": r.get("shareholder_type"), "quantity": num(r.get("quantity")),
+                    "percent": num(r.get("share_own_percent")), "updated": day(r.get("update_date"))}
+                   for r in company.shareholders().to_dict("records")]
+        officers = [{"name": str(r.get("officer_name") or ""), "position": r.get("officer_position"), "percent": num(r.get("officer_own_percent")),
+                     "quantity": num(r.get("officer_own_quantity"))} for r in company.officers().to_dict("records")]
+        return {"shareholders": holders, "officers": officers}
 
     def fetch_prices(self, symbol: str, start: date, end: date) -> list[PriceBar]:
         market, _ = self._api()

@@ -39,6 +39,9 @@ $ivs = & $python -W ignore -m investment_agent.cli index-valuation-sync --data-d
 # Chat luong bao cao: quarterly ratios of watched banks, securities firms and insurers (VNDirect public API), one call each.
 $frs = & $python -W ignore -m investment_agent.cli financial-ratios-sync --data-dir $data 2>$null
 "$(Get-Date -Format o) financial-ratios-sync exit=$LASTEXITCODE $frs" | Add-Content -LiteralPath $log -Encoding UTF8
+# CAPM hint: beta of every watched ticker (VNDirect public API), one call.
+$bs = & $python -W ignore -m investment_agent.cli beta-sync --data-dir $data 2>$null
+"$(Get-Date -Format o) beta-sync exit=$LASTEXITCODE $bs" | Add-Content -LiteralPath $log -Encoding UTF8
 # Public research reports (ACBS, World Bank): AI reads public report text only; at most 3 new reports, once per 6 hours.
 $ins = & $python -W ignore -m investment_agent.cli insights-run --data-dir $data --calendar $calendar 2>$null
 "$(Get-Date -Format o) insights-run exit=$LASTEXITCODE $ins" | Add-Content -LiteralPath $log -Encoding UTF8

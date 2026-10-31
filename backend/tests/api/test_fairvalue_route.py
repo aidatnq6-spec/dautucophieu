@@ -171,3 +171,32 @@ def test_dividend_history_route_uses_the_stored_record_and_the_current_price(tmp
     assert body["years"][0] == {"year": "2026", "cash": "700", "stock": "0.13", "eps_prev": "5000", "payout": "0.1400", "stock_note": None}
     assert body["ttm"]["cash"] == "700" and body["ttm"]["yield"] == "0.0333"
     assert call(c, clock, "GET", "/internal/fairvalue/dividends/ZZZ").status_code == 404
+
+
+def test_capm_hint_uses_stored_bond_yield_and_beta_and_the_owner_premium(tmp_path):
+    from investment_agent.market.beta import BetaStore
+    from investment_agent.market.leading import MacroStore
+    (tmp_path / "market-symbols.txt").write_text("FPT\n", encoding="utf-8")
+    MacroStore(tmp_path).upsert("vn10y", [(date(2026, 10, 30), "4.49")], entry="auto")
+    BetaStore(tmp_path).save({"values": {"FPT": {"beta": "0.73", "date": "2026-10-30"}}})
+    c, clock = _app(tmp_path)
+    market = call(c, clock, "GET", "/internal/fairvalue/capm").json()
+    assert market["ke"] is None and market["reason"] == "Chưa nhập phần bù rủi ro (ERP) trong Cài đặt" and market["rf"] == {"value": "4.49", "date": "2026-10-30"}
+    saved = call(c, clock, "PUT", "/internal/fairvalue/capm", {"erp": "7.8", "expected_version": 0, "request_id": "k1"}).json()
+    assert saved["erp"] == "7.8" and saved["ke"] == "0.1229" and saved["version"] == 1  # 4,49% + 1 × 7,8%
+    fpt = call(c, clock, "GET", "/internal/fairvalue/capm/FPT").json()
+    assert fpt["beta"] == {"value": "0.73", "date": "2026-10-30"} and fpt["ke"] == "0.1018" and fpt["required_return"] is not None
+    assert call(c, clock, "PUT", "/internal/fairvalue/capm", {"erp": "40", "expected_version": 1, "request_id": "k2"}).status_code == 422
+    for bad in ("", "abc"):
+        assert call(c, clock, "PUT", "/internal/fairvalue/capm", {"erp": bad, "expected_version": 1, "request_id": "k3"}).json()["code"] == "invalid_erp"
+
+
+def test_people_route_reads_through_the_cache(tmp_path, monkeypatch):
+    from investment_agent.api.routes import fairvalue
+    (tmp_path / "market-symbols.txt").write_text("FPT\n", encoding="utf-8")
+    monkeypatch.setattr(fairvalue, "_fetch_people", lambda s: {"shareholders": [{"name": "A", "type": "Individual", "quantity": 1, "percent": 0.1,
+                                                                                  "updated": "2026-08-03"}], "officers": []})
+    c, clock = _app(tmp_path)
+    body = call(c, clock, "GET", "/internal/fairvalue/people/FPT").json()
+    assert body["shareholders"][0]["name"] == "A" and body["stale"] is False
+    assert call(c, clock, "GET", "/internal/fairvalue/people/ZZZ").status_code == 404

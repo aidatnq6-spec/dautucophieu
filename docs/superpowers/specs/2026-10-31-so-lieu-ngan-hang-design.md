@@ -39,3 +39,13 @@ Trang hồ sơ mã ngân hàng: mục "Số liệu ngân hàng (nhập tay)" —
 - chữ trong PDF được chuẩn hóa NFC (có file lưu chữ Việt dạng tổ hợp); CAR đọc được từ bảng "Riêng lẻ | Hợp nhất" (lấy hợp nhất).
 
 CAR không có trong báo cáo tài chính quý; một quý có thể điền từ hai file, mỗi ô giữ file và trang nguồn của nó.
+
+## Thử với 9 ngân hàng theo dõi (31/10/2026)
+
+| Mã | Nguồn | Kết quả |
+|---|---|---|
+| TCB | `techcombank.com` (robots cho phép) | Đọc đủ 8 ô từ báo cáo quý 1–3/2026 "bản tra cứu", CAR từ báo cáo an toàn vốn |
+| EIB | `eximbank.com.vn` → `media.eximbank.com.vn` | Báo cáo quý là bản scan dạng ảnh: không có chữ, nhập tay. Máy chủ file thiếu chứng chỉ trung gian: tải bằng kho chứng chỉ của hệ điều hành (vẫn xác minh) |
+| MBB | `mbbank.com.vn` | robots.txt trả 403 — không lấy |
+| BID | `bidv.com.vn` | Có lớp kiểm tra chống bot bằng JavaScript — không vượt, không lấy |
+| ACB, VCB, CTG, STB, SHB | trang nhà đầu tư (robots cho phép, SHB trả 403 cho trang danh sách) | Chưa tìm được đường dẫn PDF 2026 tự động (danh sách tải bằng JavaScript/API riêng). Chủ sở hữu dán đường dẫn từ trình duyệt; nếu là PDF có chữ, bộ đọc dùng được, nếu lệch định dạng thì để trống ô và báo |

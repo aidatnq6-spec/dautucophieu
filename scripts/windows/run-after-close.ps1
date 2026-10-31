@@ -64,6 +64,9 @@ $contrib = & $python -W ignore -m investment_agent.cli contribution-remind --dat
 if ((Get-Date).Hour -ge 20) {
     $fund = & $python -W ignore -m investment_agent.cli fundamentals-sync --data-dir $data --limit 8 2>$null
     "$(Get-Date -Format o) fundamentals-sync exit=$LASTEXITCODE $fund" | Add-Content -LiteralPath $log -Encoding UTF8
+    # Bao cao quy moi: Telegram note for tickers whose new quarter the sync just found (only when scheduled delivery is on).
+    $qa = & $python -W ignore -m investment_agent.cli quarter-alerts --data-dir $data 2>$null
+    "$(Get-Date -Format o) quarter-alerts exit=$LASTEXITCODE $qa" | Add-Content -LiteralPath $log -Encoding UTF8
 }
 $summary = & $python -W ignore -m investment_agent.cli scheduled-run --calendar $calendar --data-dir $data 2>$null
 $runExit = $LASTEXITCODE

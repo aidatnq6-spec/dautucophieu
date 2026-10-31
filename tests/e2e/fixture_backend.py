@@ -168,6 +168,23 @@ if __name__ == "__main__":
     # Chuỗi giá trị: oil up 10% over a month (bad for plastic pipe, good for drilling and gas) and world rubber up (good for rubber).
     MacroStore(data).upsert("wti", [(date.today() - timedelta(days=35), "60"), (date.today() - timedelta(days=1), "66")], entry="auto")
     MacroStore(data).upsert("com_rubber", [(date.today() - timedelta(days=60), "120"), (date.today() - timedelta(days=30), "130")], entry="auto")
+    # Bảng giá và biểu đồ: a fixed board (FPT up to its ceiling, VNINDEX down) and 60 daily candles; no network.
+    from investment_agent.api.routes import trend as trend_routes
+
+    class FixtureSource:
+        def board(self, symbols):
+            return [{"symbol": "FPT", "trading_date": date.today().isoformat(), "ref_price": 52700, "match_price": 56300, "ceiling": 56300,
+                     "floor": 49100, "highest": 56300, "lowest": 52600, "accumulated_volume": 5661600}]
+
+        def index_minutes(self, index):
+            vn = timezone(timedelta(hours=7))
+            return [(datetime(2026, 10, 29, 14, 45, tzinfo=vn), "1755.61"), (datetime(2026, 10, 30, 14, 45, tzinfo=vn), "1741.62")] if index == "VNINDEX" else []
+
+        def ohlcv(self, symbol, interval, start, end, index):
+            first = datetime(2026, 8, 1, tzinfo=timezone(timedelta(hours=7)))
+            return [{"time": first + timedelta(days=i), "open": "50", "high": "55", "low": "49", "close": str(50 + i % 4), "volume": 1000 + i}
+                    for i in range(60)]
+    trend_routes._source = FixtureSource
     app = create_app(InternalAuthSettings.from_env(), personal_repository=repository, market=MARKET,
                      jobs=JobStore(os.path.join(data, "jobs.sqlite")), outbox=deliveries, deliveries=deliveries, data_dir=data)
     uvicorn.run(app, host="127.0.0.1", port=int(os.environ["E2E_PYTHON_PORT"]), workers=1, access_log=False)

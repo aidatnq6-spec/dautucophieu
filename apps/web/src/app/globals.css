@@ -67,6 +67,20 @@ legend{font-weight:600;padding:0 6px}
 .trend-note{margin:6px 0 0;font-size:12px;color:var(--muted)}
 .trend-legend{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12px;color:var(--muted);margin:0 0 12px}
 .trend-legend .trend-macd,.trend-legend .trend-rsi{padding:2px 6px}
+.tb-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px}
+.tb-chart{min-width:0}.tb-side{min-width:0}
+.tb-head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-bottom:8px}
+.tb-head strong{font-size:18px}
+.tb-intervals{margin-left:auto;display:flex;gap:6px}.tb-intervals .btn{padding:5px 10px}
+.tb-canvas{height:520px;width:100%;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.tb-list{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.tb-list th,.tb-list td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left}
+.tb-list .num{text-align:right}
+.tb-list thead th{color:var(--muted);font-weight:600;font-size:12px}
+.tb-list tbody tr{cursor:pointer}.tb-list tbody tr:hover,.tb-list tbody tr.tb-selected{background:#eef3fb}
+.tb-list tbody tr:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.tb-up{color:var(--good)}.tb-down{color:var(--bad)}.tb-ref{color:#a87b00}.tb-ceil{color:#8b2fc9}.tb-floor{color:#0b8aa8}
+@media(max-width:900px){.tb-layout{grid-template-columns:1fr}.tb-canvas{height:420px}}
 .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .fv-table{width:100%;border-collapse:collapse;font-size:14px}
 .fv-table th,.fv-table td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}

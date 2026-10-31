@@ -23,6 +23,24 @@ test("the board shows MACD and RSI by frame and highlights what changed", async 
   await expect(page.getByText(/không phải khuyến nghị/)).toBeVisible();
 });
 
+test("the price board lists the indices and watched tickers in exchange colours and opens a candle chart with MACD and RSI", async ({ page }) => {
+  await openTrend(page);
+  const box = page.getByRole("region", { name: "Bảng giá và biểu đồ" });
+  const list = box.getByRole("table", { name: "Bảng giá" });
+  await expect(list.getByRole("row", { name: /VNINDEX/ })).toContainText("1.741,62−13,99−0,80%");
+  await expect(list.getByRole("row", { name: /FPT/ })).toContainText("56,30+3,60+6,83%");
+  await expect(list.getByRole("row", { name: /FPT/ }).locator("td").first()).toHaveClass(/tb-ceil/);  // at the ceiling: purple
+  await expect(box.getByTestId("tb-status")).toContainText("Chưa có giá: VN30");
+  await expect(box.getByRole("group", { name: "Biểu đồ VNINDEX" }).getByTestId("tb-chart-caption")).toContainText("Nến ngày · 60 nến · điểm");
+  await list.getByRole("row", { name: /FPT/ }).click();
+  const fpt = box.getByRole("group", { name: "Biểu đồ FPT" });
+  await expect(fpt.getByTestId("tb-chart-caption")).toContainText("nghìn đồng");
+  await expect(fpt.getByTestId("tb-canvas").locator("canvas").first()).toBeVisible();
+  await fpt.getByRole("radio", { name: "1 giờ" }).click();
+  await expect(fpt.getByTestId("tb-chart-caption")).toContainText("Nến 1 giờ");
+  await expect(box).toContainText("trần 56,30");
+});
+
 for (const width of [375, 1440]) {
   test(`the trend page has no horizontal scroll, on the page or inside any card, at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });

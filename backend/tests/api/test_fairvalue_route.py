@@ -136,3 +136,38 @@ def test_forward_scenario_is_saved_per_ticker_and_priced_on_its_own_monthly_band
     bad = {**body, "assumptions": {**body["assumptions"], "profit_growth": ["9", "0.1"]}, "expected_version": 1, "request_id": "f2"}
     assert call(c, clock, "PUT", "/internal/fairvalue/forward/FPT", bad).status_code == 422
     assert call(c, clock, "GET", "/internal/fairvalue/forward/ZZZ").status_code == 404
+
+
+def _app(tmp_path, prices=None):
+    clock = Clock()
+    app = create_app(InternalAuthSettings("owner-1", TOKEN, SECRET), clock=clock, personal_repository=PersonalRepository("owner-1", MemoryDocumentStore()),
+                     market=SyntheticMarket(prices=prices or {}), data_dir=tmp_path)
+    return TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000)), clock
+
+
+def test_sector_ratios_list_a_financial_ticker_quarters_oldest_first_with_labels(tmp_path):
+    from investment_agent.market.financial_ratios import FinancialRatioStore
+    (tmp_path / "market-symbols.txt").write_text("VCB\nFPT\n", encoding="utf-8")
+    (tmp_path / "industries.json").write_text(json.dumps({"as_of": "2026-10-25", "source": "t", "level": 2,
+                                                         "sectors": {"VCB": "Ngân hàng", "FPT": "Công nghệ Thông tin"}}), encoding="utf-8")
+    FinancialRatioStore(tmp_path / "financial-ratios").save({"symbol": "VCB", "kind": "bank", "fetched_at": "2026-10-31T00:00:00+00:00", "source": "t",
+                                                             "quarters": {"2026-09-30": {"BAD_LOANS_RATIO_AQ": "0.0071"}, "2026-06-30": {"BAD_LOANS_RATIO_AQ": "0.0061"}}})
+    c, clock = _app(tmp_path)
+    body = call(c, clock, "GET", "/internal/fairvalue/ratios/VCB").json()
+    assert body["kind"] == "bank" and [q["label"] for q in body["quarters"]] == ["Q2/2026", "Q3/2026"]
+    npl = next(m for m in body["metrics"] if m["code"] == "BAD_LOANS_RATIO_AQ")
+    assert npl["label"] == "Tỷ lệ nợ xấu (NPL)" and npl["format"] == "pct2" and npl["values"] == ["0.0061", "0.0071"]
+    assert call(c, clock, "GET", "/internal/fairvalue/ratios/FPT").status_code == 404
+
+
+def test_dividend_history_route_uses_the_stored_record_and_the_current_price(tmp_path):
+    (tmp_path / "market-symbols.txt").write_text("ACB\n", encoding="utf-8")
+    FundamentalsStore(tmp_path / "fundamentals").save({"symbol": "ACB", "fetched_at": "2027-01-14T00:00:00+00:00", "source": "t",
+                                                      "years": {"2025": {"eps": "5000"}}, "quarters": {}, "issues": [],
+                                                      "dividends": [{"date": "2026-06-15", "cash": "700"}],
+                                                      "share_issues": [{"date": "2026-06-15", "kind": "bonus", "ratio": "0.13"}]})
+    c, clock = _app(tmp_path, {"ACB": PricePoint(Decimal(21000), date(2027, 1, 14))})
+    body = call(c, clock, "GET", "/internal/fairvalue/dividends/ACB").json()
+    assert body["years"][0] == {"year": "2026", "cash": "700", "stock": "0.13", "eps_prev": "5000", "payout": "0.1400", "stock_note": None}
+    assert body["ttm"]["cash"] == "700" and body["ttm"]["yield"] == "0.0333"
+    assert call(c, clock, "GET", "/internal/fairvalue/dividends/ZZZ").status_code == 404

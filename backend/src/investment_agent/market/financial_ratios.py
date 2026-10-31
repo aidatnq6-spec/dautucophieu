@@ -16,12 +16,19 @@ from typing import Callable
 from .leading import _get_with_retry
 
 KINDS = {"Ngân hàng": "bank", "Dịch vụ tài chính": "securities", "Bảo hiểm": "insurance"}
-CODES = {
-    "bank": ("ROAA_TR_AVG4Q", "BAD_LOANS_RATIO_AQ", "OVERDUE_LOANS_RATIO_AQ", "PROVISION_BAD_LOANS_AQ", "NET_INTEREST_MARGIN_TR_AVG5Q",
-             "EQUITY_TO_ASSET_AQ"),
-    "securities": ("ROAA_TR_AVG4Q", "NET_MARGIN_TR", "EQUITY_TO_ASSET_AQ", "LOANS_TO_EQUITY_AQ"),
-    "insurance": ("ROAA_TR_AVG4Q", "COMBINED_RATIO_TR", "NET_MARGIN_TR", "EQUITY_TO_ASSET_AQ"),
+# Shown on the ticker page (Chỉ số ngành theo quý), in this order: code, label, format (pct1/pct2/times). The health score
+# (valuation/quality.py) uses a subset.
+DISPLAY = {
+    "bank": (("BAD_LOANS_RATIO_AQ", "Tỷ lệ nợ xấu (NPL)", "pct2"), ("OVERDUE_LOANS_RATIO_AQ", "Tỷ lệ nợ quá hạn", "pct2"),
+             ("PROVISION_BAD_LOANS_AQ", "Bao phủ nợ xấu", "pct0"), ("NET_INTEREST_MARGIN_TR_AVG5Q", "NIM", "pct2"),
+             ("LOANS_TO_DEPOSIT_AQ", "Cho vay / tiền gửi (LDR)", "pct1"), ("CUSTOMER_LOANS_AQ_GRYOY", "Tăng trưởng cho vay (so cùng kỳ)", "pct1"),
+             ("EQUITY_TO_ASSET_AQ", "Vốn chủ / tổng tài sản", "pct1"), ("ROAA_TR_AVG4Q", "ROAA", "pct2"), ("ROAE_TR_AVG4Q", "ROAE", "pct1")),
+    "securities": (("ROAA_TR_AVG4Q", "ROAA", "pct2"), ("ROAE_TR_AVG4Q", "ROAE", "pct1"), ("NET_MARGIN_TR", "Biên lợi nhuận ròng", "pct1"),
+                   ("LOANS_TO_EQUITY_AQ", "Cho vay / vốn chủ", "times"), ("EQUITY_TO_ASSET_AQ", "Vốn chủ / tổng tài sản", "pct1")),
+    "insurance": (("COMBINED_RATIO_TR", "Tỷ lệ kết hợp", "pct1"), ("NET_MARGIN_TR", "Biên lợi nhuận ròng", "pct1"), ("ROAA_TR_AVG4Q", "ROAA", "pct2"),
+                  ("ROAE_TR_AVG4Q", "ROAE", "pct1"), ("EQUITY_TO_ASSET_AQ", "Vốn chủ / tổng tài sản", "pct1")),
 }
+CODES = {kind: tuple(code for code, _, _ in rows) for kind, rows in DISPLAY.items()}
 URL = "https://api-finfo.vndirect.com.vn/v4/ratios?q=code:{symbol}~ratioCode:{codes}~reportDate:gte:{start}&sort=reportDate:desc&size=500"
 HISTORY_DAYS = 800  # the latest quarter and the same quarter a year before, with room for a late report
 _SYMBOL = re.compile(r"^[A-Z0-9]{1,10}$")

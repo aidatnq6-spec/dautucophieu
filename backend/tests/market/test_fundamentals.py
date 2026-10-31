@@ -129,9 +129,8 @@ def test_record_keeps_the_annual_lines_for_report_quality_and_share_issue_kinds(
                                    "profit": "2200000000", "total_assets": "40000000000", "current_assets": "20000000000",
                                    "current_liabilities": "10000000000", "long_liabilities": "5000000000", "receivables": "6000000000",
                                    "cfo": "-1000000000"}
-    assert r["share_issues"] == [{"date": "2024-02-01", "kind": "other"}, {"date": "2024-05-25", "kind": "bonus"},
-                                 {"date": "2025-06-05", "kind": "raise"}, {"date": "2025-12-08", "kind": "raise"},
-                                 {"date": "2026-09-21", "kind": "bonus"}]
+    assert [(i["date"], i["kind"]) for i in r["share_issues"]] == [("2024-02-01", "other"), ("2024-05-25", "bonus"), ("2025-06-05", "raise"),
+                                                                   ("2025-12-08", "raise"), ("2026-09-21", "bonus")]
 
 
 def test_sync_notes_the_day_a_new_latest_quarter_first_appears(tmp_path):
@@ -156,3 +155,11 @@ def test_cli_refreshes_more_often_in_the_months_reports_are_due(tmp_path, capsys
         store.save(build_record(s, FRAMES, datetime(2026, 12, 1, tzinfo=timezone.utc)))
     fundamentals_sync(tmp_path, limit=8, provider=FakeProvider(), now=datetime(2026, 12, 5, tzinfo=timezone.utc), sleep=lambda s: None)
     assert json.loads(capsys.readouterr().out)["updated"] == []  # December: 7 days
+
+
+def test_share_issues_keep_their_ratio_so_stock_dividends_can_be_summed():
+    frames = {**FRAMES, "events": [
+        {"event_code": "ISS", "event_title_vi": "Phát hành cổ phiếu - Trả Cổ tức bằng Cổ phiếu tỉ lệ 15.0%", "exright_date": pd.Timestamp("2025-05-23")},
+        {"event_code": "ISS", "event_title_vi": "Phát hành cổ phiếu - Phát hành cho CBCNV", "exright_date": pd.Timestamp("2025-06-05")}]}
+    assert build_record("ACB", frames, NOW)["share_issues"] == [{"date": "2025-05-23", "kind": "bonus", "ratio": "0.15"},
+                                                                {"date": "2025-06-05", "kind": "raise", "ratio": None}]

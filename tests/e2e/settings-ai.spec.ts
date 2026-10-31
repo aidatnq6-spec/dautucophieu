@@ -6,7 +6,7 @@ test.beforeEach(async ({ context }) => signIn(context));
 
 test("the AI section shows the real status, not a fixed sentence", async ({ page }) => {
   await page.goto("/settings");
-  const ai = page.getByRole("region", { name: "AI" });
+  const ai = page.getByRole("region", { name: "AI", exact: true });  // a bare "AI" also matches any label containing "ai"
   await expect(ai).toContainText("Key OpenRouter: chưa cấu hình");
   await expect(ai).toContainText("Chính sách: đã duyệt");
   await expect(ai).toContainText("openai/gpt-6-luna");

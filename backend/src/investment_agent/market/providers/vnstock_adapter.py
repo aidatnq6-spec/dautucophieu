@@ -94,7 +94,7 @@ class VnstockProvider:
         return sorted(out.items())
 
     def fundamentals_frames(self, symbol: str) -> dict:
-        """Annual and quarterly income statement and balance sheet rows (long format) plus company events."""
+        """Annual and quarterly income statement and balance sheet rows, annual cash flow totals (long format), plus company events."""
         _, fundamental = self._api()
         eq = fundamental.equity(symbol.upper())
         if self._company is None:
@@ -105,7 +105,8 @@ class VnstockProvider:
             self._company = lambda sym: Company(source="VCI", symbol=sym)
         frames = {"income_year": eq.income_statement(period="year", format="long"), "balance_year": eq.balance_sheet(period="year", format="long"),
                   "income_quarter": eq.income_statement(period="quarter", format="long"),
-                  "balance_quarter": eq.balance_sheet(period="quarter", format="long")}
+                  "balance_quarter": eq.balance_sheet(period="quarter", format="long"),
+                  "cash_year": eq.cash_flow(period="year", format="long")}
         company = self._company(symbol.upper())
         frames.update(events=company.events(), overview=company.overview())
         return {k: v.to_dict("records") for k, v in frames.items()}

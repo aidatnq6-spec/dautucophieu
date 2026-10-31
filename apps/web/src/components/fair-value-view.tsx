@@ -4,11 +4,12 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { ApiError, api } from "../lib/api";
 import { formatDecimal, formatRatio, formatVnd } from "../lib/format";
 import { MultipleCharts } from "./multiple-chart";
+import { FScoreCell, QualityList, type Quality } from "./report-quality";
 
 export type Method = { method: string; label: string; value: string | null; reason: string | null; inputs: Record<string, string | number> };
 export type Row = { symbol: string; sector: string; price: string | null; fair: string | null; low: string | null; high: string | null; gap: string | null;
   verdict: "cheap" | "fair" | "expensive" | "insufficient"; reason: string | null; methods: Method[]; latest_year: string | null;
-  latest_quarter: string | null; held: boolean };
+  latest_quarter: string | null; held: boolean; quality?: Quality; new_quarter?: string | null };
 export type IndexRow = { symbol: string; name: string; as_of: string | null; close: string | null; fair: string | null; low: string | null; high: string | null;
   gap: string | null; verdict: Row["verdict"]; reason: string | null; methods: Method[] };
 type Board = { as_of: string; rows: Row[]; indices?: IndexRow[]; settings: { required_return: string; long_term_growth: string; threshold: string } };
@@ -102,7 +103,7 @@ export function FairValueView() {
           <label key={id} className="choice"><input type="radio" name="fv-filter" checked={filter === id} onChange={() => setFilter(id)} />{label}</label>))}
       </div>
       <table className="fv-table" aria-label="Định giá tham khảo">
-        <thead><tr><th>Mã</th><th>Ngành</th><th className="num">Giá</th><th className="num">Giá hợp lý</th><th className="num">Chênh lệch</th><th>Kết luận</th><th>Số liệu</th><th /></tr></thead>
+        <thead><tr><th>Mã</th><th>Ngành</th><th className="num">Giá</th><th className="num">Giá hợp lý</th><th className="num">Chênh lệch</th><th>Kết luận</th><th>F-Score</th><th>Số liệu</th><th /></tr></thead>
         <tbody>{rows.map((r) => (
           <Fragment key={r.symbol}>
             <tr>
@@ -112,12 +113,14 @@ export function FairValueView() {
               <td data-label="Giá hợp lý" className="num">{r.fair ? <>{formatVnd(r.fair)}<div className="caption">{formatVnd(r.low, { unit: false })} – {formatVnd(r.high, { unit: false })}</div></> : "—"}</td>
               <td data-label="Chênh lệch" className="num">{r.gap ? signedPct(r.gap) : "—"}</td>
               <td data-label="Kết luận"><span className={`pill ${VERDICT[r.verdict].tone}`}>{VERDICT[r.verdict].label}</span>{r.reason && <div className="caption">{r.reason}</div>}</td>
-              <td data-label="Số liệu">{r.latest_quarter ?? "—"}</td>
+              <td data-label="F-Score"><FScoreCell q={r.quality} /></td>
+              <td data-label="Số liệu">{r.latest_quarter ?? "—"}{r.new_quarter && <> <span className="pill warn">Quý mới</span></>}</td>
               <td><button className="btn" aria-expanded={open === r.symbol} onClick={() => setOpen(open === r.symbol ? null : r.symbol)}
                 aria-label={`Chi tiết ${r.symbol}`}>Chi tiết</button></td>
             </tr>
-            {open === r.symbol && <tr className="fv-detail"><td colSpan={8}>
+            {open === r.symbol && <tr className="fv-detail"><td colSpan={9}>
               <MethodList row={r} />
+              <QualityList symbol={r.symbol} q={r.quality} />
               <MultipleCharts symbol={r.symbol} />
             </td></tr>}
           </Fragment>))}

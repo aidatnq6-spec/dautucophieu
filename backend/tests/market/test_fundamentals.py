@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -107,3 +108,51 @@ def test_cli_can_refresh_named_tickers_now_even_when_recent(tmp_path, capsys):
     FundamentalsStore(tmp_path / "fundamentals").save(build_record("SSI", FRAMES, NOW))  # fresh, so not stale
     assert fundamentals_sync(tmp_path, limit=8, symbols=["SSI"], provider=FakeProvider(), now=NOW, sleep=lambda s: None) == 0
     assert '"updated": ["SSI"]' in capsys.readouterr().out
+
+
+def test_record_keeps_the_annual_lines_for_report_quality_and_share_issue_kinds():
+    frames = {**FRAMES,
+              "income_year": FRAMES["income_year"] + rows("2025", IS_GROSS_PROFIT=3e9, IS_SELLING_EXPENSES=4e8, IS_GENERAL_AND_ADMINISTRATIVE_EXPENSES=5e8,
+                                                          IS_NET_PROFIT_AFTER_TAX=2.2e9),
+              "balance_year": FRAMES["balance_year"] + rows("2025", BS_TOTAL_ASSETS=40e9, BS_SHORT_TERM_ASSETS=20e9, BS_SHORT_TERM_LIABILITIES=10e9,
+                                                            BS_LONG_TERM_LIABILITIES=5e9, BS_SHORT_TERM_RECEIVABLES=6e9),
+              "cash_year": rows("2025", CF_NET_CASH_FLOWS_FROM_OPERATING_ACTIVITIES=-1e9, CF_NET_CASH_FLOWS_DURING_THE_PERIOD=2e8),
+              "events": FRAMES["events"] + [
+                  {"event_code": "ISS", "event_title_vi": "Phát hành cổ phiếu - Phát hành cho CBCNV tỉ lệ 0.5%", "exright_date": pd.Timestamp("2025-06-05")},
+                  {"event_code": "ISS", "event_title_vi": "Phát hành cổ phiếu - Quyền mua CP cho Cổ đông hiện hữu tỉ lệ 20.0%",
+                   "exright_date": pd.Timestamp("2025-12-08")},
+                  {"event_code": "ISS", "event_title_vi": "Phát hành cổ phiếu - Trả Cổ tức bằng Cổ phiếu tỉ lệ 10.0%", "exright_date": pd.Timestamp("2024-05-25")},
+                  {"event_code": "ISS", "event_title_vi": "Phát hành cổ phiếu - Hoán đổi", "exright_date": pd.Timestamp("2024-02-01")}]}
+    r = build_record("FPT", frames, NOW)
+    assert r["years"]["2025"] == {"npat": "2000000000", "eps": "2000", "equity": "15000000000"}  # valuation lines unchanged
+    assert r["annual"]["2025"] == {"revenue": "9000000000", "gross_profit": "3000000000", "selling": "400000000", "admin": "500000000",
+                                   "profit": "2200000000", "total_assets": "40000000000", "current_assets": "20000000000",
+                                   "current_liabilities": "10000000000", "long_liabilities": "5000000000", "receivables": "6000000000",
+                                   "cfo": "-1000000000"}
+    assert r["share_issues"] == [{"date": "2024-02-01", "kind": "other"}, {"date": "2024-05-25", "kind": "bonus"},
+                                 {"date": "2025-06-05", "kind": "raise"}, {"date": "2025-12-08", "kind": "raise"},
+                                 {"date": "2026-09-21", "kind": "bonus"}]
+
+
+def test_sync_notes_the_day_a_new_latest_quarter_first_appears(tmp_path):
+    store, series = FundamentalsStore(tmp_path / "f"), SeriesStore(tmp_path / "s")
+    sync_fundamentals(store, series, ["FPT"], provider=FakeProvider(), now=NOW, limit=None, max_age_days=0, sleep=lambda s: None)
+    assert store.read("FPT")["latest_quarter_seen"] == {"quarter": "2026-Q1", "on": "2026-10-26"}
+    later = datetime(2026, 11, 2, tzinfo=timezone.utc)
+    sync_fundamentals(store, series, ["FPT"], provider=FakeProvider(), now=later, limit=None, max_age_days=0, sleep=lambda s: None)
+    assert store.read("FPT")["latest_quarter_seen"] == {"quarter": "2026-Q1", "on": "2026-10-26"}  # same quarter: first day kept
+
+
+def test_cli_refreshes_more_often_in_the_months_reports_are_due(tmp_path, capsys):
+    from investment_agent.cli import fundamentals_sync
+    names = [f"A{i:02d}" for i in range(20)]
+    (tmp_path / "market-symbols.txt").write_text("\n".join(names) + "\n", encoding="utf-8")
+    store = FundamentalsStore(tmp_path / "fundamentals")
+    for s in names:  # all fetched four days before: stale only in a reporting month (3 days), not otherwise (7 days)
+        store.save(build_record(s, FRAMES, datetime(2026, 10, 22, tzinfo=timezone.utc)))
+    fundamentals_sync(tmp_path, limit=8, provider=FakeProvider(), now=NOW, sleep=lambda s: None)  # October: reports due
+    assert len(json.loads(capsys.readouterr().out)["updated"]) == 17
+    for s in names:
+        store.save(build_record(s, FRAMES, datetime(2026, 12, 1, tzinfo=timezone.utc)))
+    fundamentals_sync(tmp_path, limit=8, provider=FakeProvider(), now=datetime(2026, 12, 5, tzinfo=timezone.utc), sleep=lambda s: None)
+    assert json.loads(capsys.readouterr().out)["updated"] == []  # December: 7 days

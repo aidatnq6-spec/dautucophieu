@@ -80,3 +80,19 @@ test("the detail of an index charts its monthly P/E and P/B over five years", as
   await pe.getByText("Bảng số liệu").click();
   await expect(pe.getByRole("table")).not.toContainText("Năm tài chính");
 });
+
+test("each ticker shows its F-Score, a new-quarter mark, and the criteria and warning signs behind it", async ({ page }) => {
+  await openPage(page);
+  const table = page.getByRole("table", { name: "Định giá tham khảo" });
+  const fpt = table.getByRole("row", { name: /FPT/ }).first();
+  await expect(fpt).toContainText("9/9");
+  await expect(fpt).toContainText("mạnh");
+  await expect(fpt).toContainText("Quý mới");
+  await expect(table.getByRole("row", { name: /VCB/ })).toContainText("Không áp dụng");  // a bank
+  await fpt.getByRole("button", { name: "Chi tiết FPT" }).click();
+  const q = page.getByRole("region", { name: "Chất lượng báo cáo FPT" });
+  await expect(q).toContainText("F-Score năm 2025: 9/9 tiêu chí đánh giá được");
+  await expect(q).toContainText("ROA 9,0% (lợi nhuận 9 tỷ / tài sản đầu kỳ 100 tỷ)");
+  await expect(q).toContainText("Lãi nhưng dòng tiền kinh doanh âm");
+  await expect(q).toContainText("không kết luận gian lận");
+});

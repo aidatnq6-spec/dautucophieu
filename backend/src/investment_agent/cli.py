@@ -49,6 +49,10 @@ def main() -> int:
     ia.add_argument("--data-dir", type=Path, required=True)
     pa = commands.add_parser("price-alerts", help="during the session, Telegram note for the owner's price levels crossed")
     pa.add_argument("--data-dir", type=Path, required=True)
+    tc = commands.add_parser("thesis-check", help="Luận điểm đầu tư: check the owner's conditions and send a Telegram note for those broken")
+    tc.add_argument("--data-dir", type=Path, required=True)
+    tc.add_argument("--calendar", type=Path, required=True)
+    tc.add_argument("--scope", choices=("price", "data"), required=True)
     qa = commands.add_parser("quarter-alerts", help="Telegram note when a watched ticker's new quarter first appears in the statements")
     qa.add_argument("--data-dir", type=Path, required=True)
     frs = commands.add_parser("financial-ratios-sync", help="quarterly bank, securities and insurance ratios (VNDirect) into data/financial-ratios")
@@ -109,6 +113,8 @@ def main() -> int:
         return insider_alerts_cli(args.data_dir)
     if args.command == "price-alerts":
         return price_alerts_cli(args.data_dir)
+    if args.command == "thesis-check":
+        return thesis_check_cli(args.data_dir, args.calendar, args.scope)
     if args.command == "financial-ratios-sync":
         return financial_ratios_sync(args.data_dir)
     if args.command == "industries":
@@ -652,6 +658,8 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
     from investment_agent.services.holdings_view import held_from_repo
     from investment_agent.services.price_alerts import read_alerts
     from investment_agent.services.records import LedgerBook, read_version
+    from investment_agent.services.drawdown import held_costs
+    from investment_agent.services.theses import position_shares, read_theses
     from investment_agent.services.weekly_brief import VN, week_of, weekly_brief_run
 
     now = datetime.now(timezone.utc)
@@ -678,7 +686,8 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
             return insider_deals(store, symbol, get=_http_text, now=now)["deals"]
         got = weekly_inputs(data_dir, ledger_events=events, held=held_from_repo(repo, owner), alerts=read_alerts(repo, owner)[0],
                             insider=insider, today=today)
-        return {**got, "sessions": sessions}
+        return {**got, "sessions": sessions, "theses": read_theses(repo, owner)[0], "costs": held_costs(repo, owner),
+                "shares": position_shares(repo, owner)}
     print(json.dumps(weekly_brief_run(data_dir, inputs=inputs, send=send, now=now)))
     return 0
 
@@ -714,6 +723,58 @@ def price_alerts_cli(data_dir: Path, now=None) -> int:
     prices = {r["symbol"]: Decimal(r["price"]) for r in board["rows"] if r["price"] is not None}
     out = check_alerts(repo, owner, prices=prices, send=send, now=now, request_id=f"price-alerts-{uuid.uuid4().hex[:16]}")
     print(json.dumps({**out, "armed": len(wanted), "errors": board["errors"]}, ensure_ascii=False))
+    return 0
+
+
+def thesis_check_cli(data_dir: Path, calendar_path: Path, scope: str, now=None) -> int:
+    """Luận điểm đầu tư: "price" every few minutes in the session (loss against cost, one board read for those tickers), "data" after
+    the close (every condition, on stored data). With scheduled Telegram delivery off it records states and closes theses without
+    sending."""
+    import uuid
+    from datetime import datetime, timezone
+    from decimal import Decimal
+
+    from investment_agent.domain.thesis import KINDS
+    from investment_agent.market.live_board import build_board, in_session
+    from investment_agent.services.holdings_view import held_from_repo
+    from investment_agent.services.theses import gather, position_shares, read_theses, thesis_check_run
+    from investment_agent.services.weekly_brief import VN
+
+    now = now or datetime.now(timezone.utc)
+    if scope == "price" and not in_session(now):
+        print(json.dumps({"status": "skipped", "reason": "outside_session"}))
+        return 0
+    telegram = _scheduled_telegram()
+    if telegram is None:  # still record states and close sold tickers' theses; nothing is sent, so notes stay due for later
+        import os
+
+        from investment_agent.api.auth import OwnerContext
+        from investment_agent.repositories.firestore import personal_repository_from_env
+        send, repo, owner = None, personal_repository_from_env(), OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
+    else:
+        send, repo, owner = telegram
+    today = now.astimezone(VN).date()
+    held = held_from_repo(repo, owner)
+    open_ = [t for t in read_theses(repo, owner)[0] if t["closed_on"] is None]
+    symbols = sorted({t["symbol"] for t in open_ if t["symbol"] in held and (scope == "data" or any(KINDS[c["kind"]][2] == "price" for c in t["conditions"]))})
+    live, errors, market, insider = {}, [], None, None
+    if symbols and scope == "price":
+        from investment_agent.api.routes.trend import _source
+        board = build_board(symbols, board=_source().board, index_minutes=lambda i: [], now=now)
+        live = {r["symbol"]: Decimal(r["price"]) * 1000 for r in board["rows"] if r["price"] is not None and r["kind"] == "stock"}
+        errors = board["errors"]
+    if symbols and scope == "data":
+        from investment_agent.market.insider_deals import InsiderStore, insider_deals
+        from investment_agent.market.prices import PriceStore
+        from investment_agent.market.view import EmptyMarket, StoreMarket
+        market = StoreMarket(PriceStore(data_dir), load_calendar(calendar_path), today=lambda: today) if (data_dir / "prices").exists() else EmptyMarket()
+        wanted = {t["symbol"] for t in open_ if any(c["kind"] == "insider_sell" for c in t["conditions"])}
+        store = InsiderStore(Path(data_dir))
+        insider = lambda s: insider_deals(store, s, get=_http_text, now=now) if s in wanted else None  # noqa: E731
+    facts = gather(data_dir, repo, owner, symbols, scope=scope, today=today, market=market, live=live, insider=insider)
+    out = thesis_check_run(repo, owner, data_dir, scope=scope, facts=facts, shares=position_shares(repo, owner), held=held, send=send, now=now,
+                           today=today, request_id=f"thesis-check-{uuid.uuid4().hex[:16]}")
+    print(json.dumps({**out, "errors": errors}, ensure_ascii=False))
     return 0
 
 

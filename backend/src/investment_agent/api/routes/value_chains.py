@@ -34,6 +34,15 @@ def value_chains(request: Request):
         held = set()
     data_dir, today = Path(data_dir), now(request).astimezone(VN).date()
     config = load_value_chains(getattr(request.app.state, "value_chains_path", VALUE_CHAINS_PATH))
+    chains = scored_chains(data_dir, config, today=today, held=held)
+    chains.sort(key=lambda c: (ORDER[c["label"]], -(Decimal(c["score"]["good"]) - Decimal(c["score"]["bad"]))))
+    covered = {s for c in config.chains for s in c.symbols}
+    return {"as_of": today.isoformat(), "chains": chains, "sources": {k: v.model_dump(mode="json") for k, v in config.sources.items()},
+            "uncovered": [s for s in load_watchlist(data_dir).symbols if s not in covered]}
+
+
+def scored_chains(data_dir: Path, config, *, today: date, held: set[str]) -> list[dict]:
+    """Each chain with its factors read from the stored macro series, its score and label (None when not approved)."""
     indicators = {i["id"]: i for i in load_indicators()}
     store, readings = MacroStore(data_dir), {}
 
@@ -57,7 +66,13 @@ def value_chains(request: Request):
         chains.append({**chain.model_dump(mode="json", exclude={"symbols", "factors"}), "factors": factors, "score": shares,
                        "label": label(shares, approved=chain.status == "approved"),
                        "symbols": [{"symbol": s, "held": s in held} for s in chain.symbols]})
-    chains.sort(key=lambda c: (ORDER[c["label"]], -(Decimal(c["score"]["good"]) - Decimal(c["score"]["bad"]))))
-    covered = {s for c in config.chains for s in c.symbols}
-    return {"as_of": today.isoformat(), "chains": chains, "sources": {k: v.model_dump(mode="json") for k, v in config.sources.items()},
-            "uncovered": [s for s in load_watchlist(data_dir).symbols if s not in covered]}
+    return chains
+
+
+def chain_labels(data_dir: Path, *, today: date, config_path: Path = VALUE_CHAINS_PATH) -> dict[str, list[str | None]]:
+    """Labels of the chains each ticker belongs to (tailwind, neutral, headwind, insufficient, or None when not approved)."""
+    out: dict[str, list[str | None]] = {}
+    for chain in scored_chains(Path(data_dir), load_value_chains(config_path), today=today, held=set()):
+        for s in chain["symbols"]:
+            out.setdefault(s["symbol"], []).append(chain["label"])
+    return out

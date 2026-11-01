@@ -80,6 +80,9 @@ if ((Get-Date).Hour -ge 20) {
     $qa = & $python -W ignore -m investment_agent.cli quarter-alerts --data-dir $data 2>$null
     "$(Get-Date -Format o) quarter-alerts exit=$LASTEXITCODE $qa" | Add-Content -LiteralPath $log -Encoding UTF8
 }
+# Luan diem dau tu: every condition of open theses on stored data, after the statements refresh when it ran.
+$tc = & $python -W ignore -m investment_agent.cli thesis-check --scope data --data-dir $data --calendar $calendar 2>$null
+"$(Get-Date -Format o) thesis-check-data exit=$LASTEXITCODE $tc" | Add-Content -LiteralPath $log -Encoding UTF8
 $summary = & $python -W ignore -m investment_agent.cli scheduled-run --calendar $calendar --data-dir $data 2>$null
 $runExit = $LASTEXITCODE
 "$(Get-Date -Format o) exit=$runExit $summary" | Add-Content -LiteralPath $log -Encoding UTF8

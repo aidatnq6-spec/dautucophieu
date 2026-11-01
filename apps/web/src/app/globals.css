@@ -215,3 +215,8 @@ main h2{scroll-margin-top:16px}
 .vc-good{border-left-color:var(--good);background:#eef7f2}.vc-bad{border-left-color:var(--bad);background:#fbf1f2}.vc-neutral{border-left-color:#9aa8b5}
 .vc-status{font-weight:600}
 @media (max-width:900px){.vc-flow{grid-template-columns:1fr;gap:20px}.vc-stage:not(:last-child)::after{content:"↓";right:auto;left:50%;top:auto;bottom:-19px;transform:translateX(-50%)}}
+.th-card{border-top:1px solid var(--line);padding:12px 0;display:grid;gap:8px}.th-card .row{gap:8px 12px;flex-wrap:wrap;justify-content:flex-start}
+.th-note{margin:0;font-style:italic;color:var(--muted);overflow-wrap:anywhere}
+.th-conds{list-style:none;padding:0;margin:0;display:grid;gap:8px}.th-conds li{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.th-conds .caption{overflow-wrap:anywhere}.th-form{display:grid;gap:10px;max-width:640px}.th-form fieldset{border:1px solid var(--line);border-radius:8px;padding:8px 12px;display:flex;flex-wrap:wrap;gap:6px 14px}
+.th-check{display:inline-flex;gap:6px;align-items:center;font-size:14px}.th-cond{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}

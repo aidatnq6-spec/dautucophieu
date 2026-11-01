@@ -7,7 +7,7 @@ import { TransactionForm, type LedgerEvent } from "./transaction-form";
 
 type Suggestion = { id: string; symbol: string; kind: "cash" | "stock" | "rights"; title: string; exright: string; record: string | null;
   payout: string | null; value_per_share: number | null; ratio: number | null; eligible: number;
-  status: "to_record" | "to_receive" | "waiting" | "to_credit" | "rights" | "upcoming"; draft: Record<string, unknown> | null };
+  status: "to_record" | "to_receive" | "waiting" | "to_credit" | "rights" | "upcoming" | "under_one_share"; draft: Record<string, unknown> | null };
 type Costs = { year: number; sell_value: string; fees: string; sell_tax: string; dividends: string; dividend_tax: string; total: string };
 type Data = { version: number; suggestions: Suggestion[]; costs: Costs[]; dismissed: { id: string; symbol: string; title: string; exright: string }[] };
 
@@ -25,6 +25,7 @@ export function describeSuggestion(s: Omit<Suggestion, "draft"> & { draft: unkno
     case "to_receive": return `${what} · trả ${s.payout ? day(s.payout) : "—"} → ghi tiền đã nhận`;
     case "waiting": return `${what} · đã ghi quyền, chờ trả ${s.payout ? day(s.payout) : "(nguồn chưa có ngày)"}`;
     case "to_credit": return `${what} · đã ghi quyền → ghi khi cổ phiếu về tài khoản`;
+    case "under_one_share": return `${what} · ${ex} · ${shares(s.eligible)} cp được dưới 1 cổ phiếu: không có gì để ghi`;
     case "rights": return `${what} · ${ex} · sổ chưa hỗ trợ quyền mua: nếu bạn thực hiện, ghi “Sự kiện chưa hỗ trợ”`;
     default: return `${what} · ${ex} · sắp tới, bạn đang có ${shares(s.eligible)} cp`;
   }
@@ -86,7 +87,8 @@ export function CorporateView({ ledgerVersion, events, onSaved }: { ledgerVersio
             <td className="num">{formatVnd(c.sell_tax)}</td><td className="num">{formatVnd(c.dividends)}</td><td className="num">{formatVnd(c.dividend_tax)}</td>
             <td className="num"><strong>{formatVnd(c.total)}</strong></td></tr>)}</tbody>
         </table></div>)}
-      <p className="caption">Chỉ những gì đã ghi trong sổ (phí và thuế theo chứng từ; cổ tức tiền gồm thực nhận và thuế khấu trừ). Không phải tư vấn thuế.</p>
+      <p className="caption">Chỉ những gì đã ghi trong sổ (phí và thuế theo chứng từ; cổ tức tiền gồm thực nhận và thuế khấu trừ). Chưa gồm tiền trả thay
+        cổ phiếu lẻ và thuế 5% của cổ phiếu thưởng (nộp khi bán số cổ phiếu đó). Không phải tư vấn thuế.</p>
     </section>
   </>);
 }

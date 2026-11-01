@@ -14,5 +14,7 @@ it("says what each suggestion is about and what is left to do", () => {
   expect(describeSuggestion({ ...base, kind: "stock", status: "to_credit", ratio: 0.15 })).toBe("Cổ phiếu thưởng 15% · đã ghi quyền → ghi khi cổ phiếu về tài khoản");
   expect(describeSuggestion({ ...base, kind: "rights", status: "rights", ratio: 0.2 }))
     .toBe("Quyền mua 20% · GDKHQ 10/06/2026 · sổ chưa hỗ trợ quyền mua: nếu bạn thực hiện, ghi “Sự kiện chưa hỗ trợ”");
+  expect(describeSuggestion({ ...base, kind: "stock", status: "under_one_share", ratio: 0.0005, eligible: 100 }))
+    .toBe("Cổ phiếu thưởng 0,05% · GDKHQ 10/06/2026 · 100 cp được dưới 1 cổ phiếu: không có gì để ghi");
   expect(describeSuggestion({ ...base, kind: "cash", status: "upcoming" })).toBe("Cổ tức tiền 700 đ/cp · GDKHQ 10/06/2026 · sắp tới, bạn đang có 1.000 cp");
 });

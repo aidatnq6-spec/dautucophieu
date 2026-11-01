@@ -20,7 +20,17 @@ export const LEDGER_ERRORS: Record<string, string> = {
   ledger_oversell: "Số lượng bán vượt số cổ phiếu đang có.", ledger_cash_negative: "Tiền trong sổ sẽ âm: cần ghi nộp tiền trước.",
   ledger_ambiguous_order: "Đã có giao dịch cùng ngày và cùng thứ tự: đổi thứ tự trong ngày.", ledger_duplicate_event: "Mã giao dịch đã tồn tại.",
   version_conflict: "Sổ đã thay đổi ở nơi khác: tải lại trang rồi nhập lại.",
+  ledger_eligible_exceeds_holding: "Số cổ phiếu hưởng quyền lớn hơn số đang có trong sổ vào ngày này: kiểm tra ngày và thứ tự so với lệnh bán cùng ngày.",
+  ledger_duplicate_action: "Sự kiện này đã được ghi quyền trong sổ.", ledger_action_already_settled: "Sự kiện này đã được ghi nhận tiền/cổ phiếu về.",
+  ledger_unknown_action: "Chưa có dòng quyền với mã sự kiện này: ghi quyền trước.",
+  ledger_action_type_mismatch: "Mã sự kiện này thuộc loại khác (cổ tức tiền hay cổ phiếu thưởng).",
 };
+
+/** The order number for a new line on `day`: after the highest already used that day (a cancelled line can leave a gap). */
+export function nextSequence(events: { effective_at: string; sequence: number }[], day: string): number {
+  const used = events.filter((e) => e.effective_at === day).map((e) => e.sequence);
+  return used.length ? Math.max(...used) + 1 : 0;
+}
 
 /** A new or corrected ledger line. `draft` pre-fills a new line (a dividend drafted from the Lịch sự kiện) that the owner checks against
  * the broker's papers before saving; `editing` corrects an existing one. */
@@ -30,7 +40,7 @@ export function TransactionForm({ ledgerVersion, events, editing, draft = null, 
   const today = hanoiDate();
   const [type, setType] = useState(seed?.type ?? "deposit");
   const [day, setDay] = useState(seed?.effective_at ?? today);
-  const [sequence, setSequence] = useState(String(editing?.sequence ?? events.filter((e) => e.effective_at === (seed?.effective_at ?? today)).length));
+  const [sequence, setSequence] = useState(String(editing?.sequence ?? nextSequence(events, seed?.effective_at || today)));
   const [ticker, setTicker] = useState(seed?.security_id ?? "");
   const [quantity, setQuantity] = useState(seed?.quantity ? String(seed.quantity) : "");
   const [price, setPrice] = useState(seed?.price ?? "");
@@ -69,6 +79,7 @@ export function TransactionForm({ ledgerVersion, events, editing, draft = null, 
     const problems: string[] = [];
     const money = (label: string, raw: string) => { const v = parseMoneyInput(raw); if (v === null) problems.push(`${label} không hợp lệ`); return v ?? "0"; };
     const seq = Number(sequence);
+    if (!day) problems.push("Cần ngày giao dịch (theo chứng từ)");
     if (!Number.isInteger(seq) || seq < 0) problems.push("Thứ tự trong ngày phải là số nguyên không âm");
     const base: LedgerEvent = { event_id: editing?.event_id ?? `ev-${requestId().slice(0, 20)}`, type, effective_at: day, sequence: seq,
       settlement_date: settlement || null };

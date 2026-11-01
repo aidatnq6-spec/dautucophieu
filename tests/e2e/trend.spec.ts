@@ -37,6 +37,12 @@ test("the price board lists the indices and watched tickers in exchange colours 
   await expect(fpt.getByTestId("tb-chart-caption")).toContainText("nghìn đồng");
   await expect(fpt.getByTestId("tb-canvas").locator("canvas").first()).toBeVisible();
   await expect(fpt.getByTestId("tb-canvas")).toHaveAttribute("data-live-close", "56.3");  // today's candle follows the board
+  await fpt.getByRole("radio", { name: "Tuần" }).click();
+  await expect(fpt.getByTestId("tb-chart-caption")).toContainText("Nến tuần");
+  await expect(fpt.getByTestId("tb-chart-caption")).toContainText("gộp từ nến ngày");
+  await fpt.getByRole("radio", { name: "Tháng" }).click();
+  await expect(fpt.getByTestId("tb-chart-caption")).toContainText("Nến tháng");
+  await expect(fpt.getByTestId("tb-canvas").locator("canvas").first()).toBeVisible();
   await fpt.getByRole("radio", { name: "1 giờ" }).click();
   await expect(fpt.getByTestId("tb-chart-caption")).toContainText("Nến 1 giờ");
   await expect(box).toContainText("trần 56,30");
@@ -86,12 +92,21 @@ test("a level and a trend line are drawn on the price pane, kept per frame, and 
   await fpt.getByRole("radio", { name: "1 giờ" }).click();
   await expect(fpt.getByTestId("tb-chart-caption")).toContainText("Nến 1 giờ");
   await expect(list).toContainText("Đường ngang");  // a level shows on both frames
+  await expect(tools.getByRole("button", { name: "Con trỏ" })).toHaveAttribute("aria-pressed", "true");  // back to the pointer once drawn
   await tools.getByRole("button", { name: "Đường xu hướng" }).click();
-  await canvas.click({ position: { x: size.width * 0.4, y: 150 } });
-  await expect(tools).toContainText("bấm điểm thứ hai");
-  await canvas.click({ position: { x: size.width * 0.7, y: 100 } });
+  // Press on one candle, drag to another, let go.
+  await page.mouse.move(size.x + size.width * 0.4, size.y + 150);
+  await page.mouse.down();
+  await page.mouse.move(size.x + size.width * 0.55, size.y + 125, { steps: 5 });
+  await page.mouse.move(size.x + size.width * 0.7, size.y + 100, { steps: 5 });
+  await page.mouse.up();
   await expect(list).toContainText("Đường xu hướng");
   await expect(canvas).toHaveAttribute("data-drawings", "2");
+  // A press let go on the same candle draws nothing.
+  await tools.getByRole("button", { name: "Đường xu hướng" }).click();
+  await canvas.click({ position: { x: size.width * 0.3, y: 140 } });
+  await expect(canvas).toHaveAttribute("data-drawings", "2");
+  await page.keyboard.press("Escape");
   await fpt.getByRole("radio", { name: "Ngày" }).click();
   await expect(fpt.getByTestId("tb-chart-caption")).toContainText("Nến ngày");
   await expect(list).not.toContainText("Đường xu hướng");  // the hourly trend line stays on the hourly frame

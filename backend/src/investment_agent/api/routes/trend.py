@@ -8,7 +8,7 @@ from pydantic import Field
 
 from investment_agent.domain.models import ContractModel
 
-from investment_agent.market.live_board import INDICES, ChartStore, build_board, chart, in_session
+from investment_agent.market.live_board import INDICES, ChartStore, build_board, chart, in_session, regroup
 from investment_agent.market.macro_board import IDS as MACRO_IDS
 from investment_agent.market.macro_board import macro_chart, macro_rows
 from investment_agent.market.trend import SnapshotStore
@@ -98,19 +98,22 @@ def live_board(request: Request):
 
 @router.get("/trend/chart/{symbol}/{interval}")
 def live_chart(symbol: str, interval: str, request: Request):
-    """Daily (10 years) or hourly (1 year) candles with MACD and RSI for an index or a watched ticker."""
+    """Daily (10 years), weekly or monthly (from the daily ones) or hourly (1 year) candles with MACD and RSI for an index or a watched ticker."""
     require_owner(request)
     data_dir = request.app.state.data_dir
     if data_dir is None:
         return unavailable()
-    if interval not in ("1D", "1H"):
-        return error(422, "invalid_interval", "Khung chỉ có 1D hoặc 1H.")
+    if interval not in ("1D", "1H", "1W", "1M"):
+        return error(422, "invalid_interval", "Khung chỉ có 1D, 1H, 1W hoặc 1M.")
     sym = symbol.upper()
+    base = "1D" if interval in ("1W", "1M") else interval  # weeks and months are built from the saved daily candles
     if sym in MACRO_IDS:
-        return macro_chart(Path(data_dir), sym, interval)
-    if sym not in INDICES and sym not in load_watchlist(Path(data_dir)).symbols:
+        out = macro_chart(Path(data_dir), sym, base)
+    elif sym not in INDICES and sym not in load_watchlist(Path(data_dir)).symbols:
         return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
-    return chart(ChartStore(Path(data_dir)), sym, interval, fetch=_source().ohlcv, now=now(request), index=sym in INDICES)
+    else:
+        out = chart(ChartStore(Path(data_dir)), sym, base, fetch=_source().ohlcv, now=now(request), index=sym in INDICES)
+    return regroup(out, interval) if base != interval else out
 
 
 class AlertChange(ContractModel):

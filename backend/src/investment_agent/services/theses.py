@@ -12,7 +12,7 @@ from pathlib import Path
 from investment_agent.api.routes.value_chains import chain_labels
 from investment_agent.domain.journal import JournalEntry
 from investment_agent.domain.ledger import replay
-from investment_agent.domain.thesis import (KINDS, REASON_VI, ThesisError, advance, edit_thesis, evaluate, hold_condition, mark_sent, new_thesis,
+from investment_agent.domain.thesis import (KINDS, REASON_VI, ThesisError, advance, describe, edit_thesis, evaluate, hold_condition, mark_sent, new_thesis,
                                             scenario, similar, validate_thesis)
 from investment_agent.market.financial_ratios import kind_of
 from investment_agent.market.fundamentals import FundamentalsStore
@@ -155,20 +155,8 @@ def hold(repo, owner, *, thesis_id: str, cond_id: str, reason: str, emotion: str
     return theses, version
 
 
-def _params(cond: dict) -> str:
-    p = cond.get("params", {})
-    if "pct" in p:
-        return f"{_num(Decimal(p['pct']), 0) if Decimal(p['pct']) == Decimal(p['pct']).to_integral() else _num(Decimal(p['pct']), 1)}%"
-    if "level" in p:
-        return f"mức {_num(Decimal(p['level']), 2)}"
-    if "n" in p:
-        return f"ngưỡng {p['n']}"
-    return ""
-
-
 def _title(symbol: str, cond: dict) -> str:
-    params = _params(cond)
-    return f"{symbol} — {KINDS[cond['kind']][0]}{f' ({params})' if params else ''}"
+    return f"{symbol} — {describe(cond)}"
 
 
 def _dm(iso: str) -> str:

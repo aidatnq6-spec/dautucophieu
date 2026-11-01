@@ -249,6 +249,26 @@ def new_thesis(symbol: str, validated: dict, *, today: date, snapshot: dict) -> 
             "conditions": [_fresh(c, today, snapshot.get("fair")) for c in validated["conditions"]]}
 
 
+def describe(cond: dict) -> str:
+    """The condition as the owner set it, e.g. "Lỗ so với giá vốn (10%)"."""
+    p = cond.get("params", {})
+    if "pct" in p:
+        pct = Decimal(p["pct"])
+        extra = f"{_num(pct, 0 if pct == pct.to_integral() else 1)}%"
+    elif "level" in p:
+        extra = f"mức {_num(Decimal(p['level']), 2)}"
+    elif "n" in p:
+        extra = f"ngưỡng {p['n']}"
+    else:
+        extra = ""
+    return f"{KINDS[cond['kind']][0]}{f' ({extra})' if extra else ''}"
+
+
+def holding(cond: dict, today: date) -> bool:
+    """A Giữ tiếp, có lý do in force (until its review date)."""
+    return _holding(cond, today)
+
+
 def _holding(cond: dict, today: date) -> bool:
     hold = cond.get("hold")
     return bool(hold) and (hold.get("until") is None or today <= date.fromisoformat(hold["until"]))

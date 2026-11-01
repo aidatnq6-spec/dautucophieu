@@ -11,7 +11,10 @@ from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Callable
 
+from investment_agent.domain.thesis import describe as describe_condition
+from investment_agent.domain.thesis import holding
 from investment_agent.market.corporate_events import REMINDED_KINDS, describe
+from investment_agent.notifications.render import vnd
 
 VN = timezone(timedelta(hours=7))
 OPS = {"above": "≥", "below": "≤"}
@@ -103,8 +106,38 @@ def _holdings(closes: dict[str, list[tuple[date, float]]], held: set[str], start
     return out
 
 
+def _theses(theses: list[dict], closes: dict, costs: dict[str, str], shares: dict[str, int], held: set[str], today: date) -> list[str]:
+    """Broken conditions of open theses not under a Giữ tiếp: the first report, what the price did since, and where the position
+    stands against its cost — all figures that already happened. Held tickers without a thesis are named."""
+    out = []
+    for t in theses:
+        if t.get("closed_on") is not None or t["symbol"] not in held:
+            continue
+        last = closes.get(t["symbol"], [])
+        price = Decimal(str(last[-1][1])) * 1000 if last else None
+        for c in t["conditions"]:
+            if c.get("status") != "broken" or holding(c, today):
+                continue
+            line = f"- {t['symbol']} · {describe_condition(c)}: báo từ {_dm(c['broken_on'])}"
+            if c.get("broken_price"):
+                line += f" ở {_num(Decimal(c['broken_price']) / 1000)}"
+                if price is not None:
+                    line += f"; từ đó {_pct(price / Decimal(c['broken_price']) - 1)}"
+            cost, n = costs.get(t["symbol"]), shares.get(t["symbol"])
+            if price is not None and cost and n:
+                line += f"; vị thế hiện tại {vnd(format(((price - Decimal(cost)) * n).quantize(Decimal(1)), 'f'))} so với giá vốn"
+            out.append(line)
+    if not out:
+        out.append("Không có điều kiện nào đang bị phá (ngoài các lần đã giữ tiếp có lý do).")
+    missing = sorted(held - {t["symbol"] for t in theses if t.get("closed_on") is None})
+    if missing:
+        out.append("Chưa có luận điểm: " + ", ".join(missing))
+    return out
+
+
 def compose(*, series, index, briefs, closes, insider, events, alerts, held: set[str], watched: set[str], today: date,
-            sessions: list[date] | None = None) -> str:
+            sessions: list[date] | None = None, theses: list[dict] | None = None, costs: dict[str, str] | None = None,
+            shares: dict[str, int] | None = None) -> str:
     start, end = week_of(today)
     sessions = sessions if sessions is not None else [start + timedelta(days=i) for i in range(5)]
     lines = [f"BẢN TIN TUẦN {_dm(start)}–{_dm(end)}/{end.year}", "",
@@ -127,6 +160,8 @@ def compose(*, series, index, briefs, closes, insider, events, alerts, held: set
         lines.append(f"- {e['symbol']}{' (đang nắm)' if e['symbol'] in held else ''}: {describe(e)}")
     if not upcoming:
         lines.append("Không có sự kiện đã biết.")
+    if held and theses is not None:
+        lines += ["", "LUẬN ĐIỂM ĐẦU TƯ (đã bị phá mà vẫn đang giữ)", *_theses(theses, closes, costs or {}, shares or {}, held, today)]
     lines += ["", "CẢNH BÁO GIÁ"]
     fired = [a for a in alerts if a.get("triggered_at") and start <= datetime.fromisoformat(a["triggered_at"]).astimezone(VN).date() <= end]
     for a in fired:

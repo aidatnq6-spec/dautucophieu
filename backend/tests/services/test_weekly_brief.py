@@ -49,6 +49,23 @@ def test_brief_puts_the_portfolio_against_vnindex_then_foreign_flows_insiders_ne
     assert text.rstrip().endswith("Không phải khuyến nghị.")
 
 
+def _broken(kind, params, on, price, hold=None):
+    return {"id": kind, "kind": kind, "params": params, "status": "broken", "broken_on": on, "broken_price": price, "hold": hold}
+
+
+def test_broken_theses_still_held_show_what_happened_since_the_first_report_and_missing_theses_are_named():
+    theses = [{"symbol": "HPG", "closed_on": None, "conditions": [
+                   _broken("loss_vs_cost", {"pct": "10"}, "2026-10-23", "21500"),
+                   _broken("f_score", {"n": 3}, "2026-10-20", "22000", hold={"until": "2026-11-20", "reason": "Chờ"}),  # held on: not listed
+                   {"id": "ok", "kind": "macd_weekly", "params": {}, "status": "ok", "broken_on": None, "broken_price": None, "hold": None}]},
+              {"symbol": "FPT", "closed_on": "2026-10-01", "conditions": [_broken("loss_vs_cost", {"pct": "10"}, "2026-09-01", "90000")]}]
+    text = compose(**INPUTS, held={"HPG", "SSI"}, watched={"HPG", "SSI"}, today=SAT, theses=theses, costs={"HPG": "25000"}, shares={"HPG": 1000})
+    part = text.split("LUẬN ĐIỂM ĐẦU TƯ")[1].split("CẢNH BÁO GIÁ")[0]
+    assert "- HPG · Lỗ so với giá vốn (10%): báo từ 23/10 ở 21,50; từ đó −2,33%; vị thế hiện tại −4.000.000 đ so với giá vốn" in part
+    assert "F-Score" not in part and "FPT" not in part and "MACD" not in part
+    assert "Chưa có luận điểm: SSI" in part
+
+
 def test_missing_inputs_are_named_not_filled():
     text = compose(series=[], index=[], briefs={}, closes={}, insider={}, events=[], alerts=[], held=set(), watched=set(), today=SAT)
     assert "Danh mục: chưa đủ dữ liệu hiệu quả cho tuần này" in text

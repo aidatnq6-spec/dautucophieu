@@ -10,6 +10,7 @@ import { ConcentrationView } from "./concentration-view";
 import { DrawdownView } from "./drawdown-view";
 import { PerformanceView } from "./performance-view";
 import { ThesisView } from "./thesis-view";
+import { CorporateView } from "./corporate-view";
 
 type Holding = { security_id: string; quantity: number; pending_quantity: number; total_cost: string; average_cost: string; blocked_by: string[] };
 type LedgerView = { version: number; events: LedgerEvent[]; original_events: LedgerEvent[]; audit: { amendment_id: string; action: string; target_event_id: string }[];
@@ -98,6 +99,7 @@ export function PortfolioView() {
       </section>
 
       <ThesisView />
+      <CorporateView ledgerVersion={ledger.version} events={ledger.events} onSaved={() => void load()} />
 
       <section className="surface">
         <div className="row"><h2>Sổ giao dịch</h2>

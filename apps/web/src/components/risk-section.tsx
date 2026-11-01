@@ -16,13 +16,19 @@ export function RiskSection({ onChanged }: { onChanged: () => void }) {
   const [r, setR] = useState<RiskView | null | undefined>(undefined);
   const [choice, setChoice] = useState("");
   const [message, setMessage] = useState<string | null>(null);
-  const load = useCallback(() => {
-    api<RiskView>("risk").then((v) => { setR(v); setChoice(v.effective.group); }).catch((e) => {
+  // A read that is no longer wanted (the section unmounted) must not reset the group the owner has picked since.
+  const load = useCallback((alive: () => boolean = () => true) => {
+    api<RiskView>("risk").then((v) => { if (alive()) { setR(v); setChoice(v.effective.group); } }).catch((e) => {
+      if (!alive()) return;
       if (e instanceof ApiError && e.failure.status === 404) setR(null);
       else setMessage(e instanceof ApiError ? e.failure.message : "Không tải được dữ liệu.");
     });
   }, []);
-  useEffect(load, [load]);
+  useEffect(() => {
+    let alive = true;
+    load(() => alive);
+    return () => { alive = false; };
+  }, [load]);
   async function apply(group: string | null) {
     if (!r) return;
     try {

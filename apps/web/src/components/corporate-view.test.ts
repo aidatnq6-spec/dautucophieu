@@ -18,3 +18,8 @@ it("says what each suggestion is about and what is left to do", () => {
     .toBe("Cổ phiếu thưởng 0,05% · GDKHQ 10/06/2026 · 100 cp được dưới 1 cổ phiếu: không có gì để ghi");
   expect(describeSuggestion({ ...base, kind: "cash", status: "upcoming" })).toBe("Cổ tức tiền 700 đ/cp · GDKHQ 10/06/2026 · sắp tới, bạn đang có 1.000 cp");
 });
+
+it("names a reminder kept from the ledger without the source's amount", () => {
+  expect(describeSuggestion({ ...base, kind: "cash", status: "waiting", value_per_share: null, payout: null }))
+    .toBe("Cổ tức tiền · đã ghi quyền, chờ trả (nguồn chưa có ngày)");
+});

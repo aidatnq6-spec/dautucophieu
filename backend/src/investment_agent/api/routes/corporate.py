@@ -33,7 +33,8 @@ def _view(request: Request, repo, owner, dismissed: list[str], version: int) -> 
     today = now(request).astimezone(VN).date()
     by_id = {e["id"]: e for e in corporate}
     return {"version": version, "suggestions": suggestions(events, corporate, today=today, dismissed=set(dismissed)), "costs": yearly_costs(events),
-            "dismissed": [{"id": i, "symbol": by_id[i]["symbol"], "title": by_id[i]["title"], "exright": by_id[i]["exright"]} for i in dismissed if i in by_id]}
+            "dismissed": [{"id": i, "symbol": by_id[i]["symbol"], "title": by_id[i]["title"], "exright": by_id[i]["exright"]} if i in by_id
+                          else {"id": i, "symbol": None, "title": "Sự kiện không còn trong Lịch sự kiện", "exright": None} for i in dismissed]}
 
 
 @router.get("/corporate")

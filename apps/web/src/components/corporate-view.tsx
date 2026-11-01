@@ -9,7 +9,7 @@ type Suggestion = { id: string; symbol: string; kind: "cash" | "stock" | "rights
   payout: string | null; value_per_share: number | null; ratio: number | null; eligible: number;
   status: "to_record" | "to_receive" | "waiting" | "to_credit" | "rights" | "upcoming" | "under_one_share"; draft: Record<string, unknown> | null };
 type Costs = { year: number; sell_value: string; fees: string; sell_tax: string; dividends: string; dividend_tax: string; total: string };
-type Data = { version: number; suggestions: Suggestion[]; costs: Costs[]; dismissed: { id: string; symbol: string; title: string; exright: string }[] };
+type Data = { version: number; suggestions: Suggestion[]; costs: Costs[]; dismissed: { id: string; symbol: string | null; title: string; exright: string | null }[] };
 
 const day = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 const shares = (n: number) => n.toLocaleString("vi-VN");
@@ -17,8 +17,8 @@ const pct = (r: number | null) => (r === null ? "" : `${Number((r * 100).toFixed
 const NEEDS_ACTION = new Set(["to_record", "to_receive", "to_credit"]);
 
 export function describeSuggestion(s: Omit<Suggestion, "draft"> & { draft: unknown }): string {
-  const what = s.kind === "cash" ? `Cổ tức tiền ${(s.value_per_share ?? 0).toLocaleString("vi-VN")} đ/cp` : s.kind === "stock" ? `Cổ phiếu thưởng ${pct(s.ratio)}`
-    : `Quyền mua ${pct(s.ratio)}`;
+  const rate = s.kind === "cash" ? (s.value_per_share ? ` ${s.value_per_share.toLocaleString("vi-VN")} đ/cp` : "") : s.ratio ? ` ${pct(s.ratio)}` : "";
+  const what = `${s.kind === "cash" ? "Cổ tức tiền" : s.kind === "stock" ? "Cổ phiếu thưởng" : "Quyền mua"}${rate}`;
   const ex = `GDKHQ ${day(s.exright)}`;
   switch (s.status) {
     case "to_record": return `${what} · ${ex} · bạn có ${shares(s.eligible)} cp trước ngày này → ghi quyền vào sổ`;
@@ -72,7 +72,7 @@ export function CorporateView({ ledgerVersion, events, onSaved }: { ledgerVersio
           </li>)}
         </ul>
         {data.dismissed.length > 0 && <details><summary className="caption">Đã bỏ qua ({data.dismissed.length})</summary>
-          <ul className="co-list">{data.dismissed.map((d) => <li key={d.id}><span>{d.symbol} · {d.title} · GDKHQ {day(d.exright)}</span>
+          <ul className="co-list">{data.dismissed.map((d) => <li key={d.id}><span>{[d.symbol, d.title, d.exright && `GDKHQ ${day(d.exright)}`].filter(Boolean).join(" · ")}</span>
             <button type="button" className="btn" onClick={() => void dismiss("restore", d.id)}><RotateCcw size={15} aria-hidden="true" />Khôi phục</button></li>)}</ul>
         </details>}
       </>}
@@ -87,8 +87,8 @@ export function CorporateView({ ledgerVersion, events, onSaved }: { ledgerVersio
             <td className="num">{formatVnd(c.sell_tax)}</td><td className="num">{formatVnd(c.dividends)}</td><td className="num">{formatVnd(c.dividend_tax)}</td>
             <td className="num"><strong>{formatVnd(c.total)}</strong></td></tr>)}</tbody>
         </table></div>)}
-      <p className="caption">Chỉ những gì đã ghi trong sổ (phí và thuế theo chứng từ; cổ tức tiền gồm thực nhận và thuế khấu trừ). Chưa gồm tiền trả thay
-        cổ phiếu lẻ và thuế 5% của cổ phiếu thưởng (nộp khi bán số cổ phiếu đó). Không phải tư vấn thuế.</p>
+      <p className="caption">Chỉ những gì đã ghi trong sổ (phí và thuế theo chứng từ; cổ tức tiền gồm thực nhận và thuế khấu trừ). Cổ tức đã nhận gồm cả tiền
+        trả thay cổ phiếu lẻ. Thuế 5% của cổ phiếu thưởng nộp khi bán số cổ phiếu đó, nằm trong thuế bán theo chứng từ. Không phải tư vấn thuế.</p>
     </section>
   </>);
 }

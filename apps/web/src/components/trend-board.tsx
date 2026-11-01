@@ -1,8 +1,9 @@
 "use client";
 import { type RefObject, useEffect, useRef, useState } from "react";
-import type { IChartApi, ISeriesApi, SeriesType, Time } from "lightweight-charts";
+import type { IChartApi, IPriceLine, ISeriesApi, SeriesType, Time } from "lightweight-charts";
 import { ApiError, api } from "../lib/api";
 import { formatDecimal, formatRatio, formatVnd } from "../lib/format";
+import { type Drawing, DrawingList, DrawingToolbar, useChartDrawings } from "./chart-drawings";
 import { PriceAlerts } from "./price-alerts";
 
 type Row = { symbol: string; kind: "index" | "macro" | "stock"; price: string | null; ref: string | null; change: string | null; change_pct: string | null;
@@ -33,7 +34,7 @@ function liveKey(row: Row, board: Board, interval: "1D" | "1H"): string | number
 const POLL = 20_000;
 const RELOAD_GAP = 120_000;
 const HOUR = 3600;
-const C = { up: "#137556", down: "#b14249", ink: "#183247", line: "#dce4eb", muted: "#576777", macd: "#245edb", signal: "#d97706", rsi: "#7c3aed" };
+const C = { up: "#137556", down: "#b14249", ink: "#183247", line: "#dce4eb", muted: "#576777", macd: "#245edb", signal: "#d97706", rsi: "#7c3aed", draw: "#c2410c" };
 
 /** Exchange colours: ceiling purple, floor cyan, reference yellow, then up green and down red. */
 function tone(r: Row): string {
@@ -96,14 +97,23 @@ function applyLive({ box, price, last, latest }: ChartRefs, style: Chart["style"
   if (box.current) box.current.dataset.liveClose = String(p);
 }
 
-function CandleChart({ data, liveT, livePrice }: { data: Chart; liveT: string | number | null; livePrice: number | null }) {
+type ChartProps = { data: Chart; liveT: string | number | null; livePrice: number | null; drawings: Drawing[];
+  onPoint: (at: { t: string | number; p: number }) => void; drawing: boolean };
+
+function CandleChart({ data, liveT, livePrice, drawings, onPoint, drawing }: ChartProps) {
   const box = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const LineRef = useRef<typeof import("lightweight-charts").LineSeries | null>(null);
+  const [built, setBuilt] = useState(0);
+  const pointRef = useRef(onPoint);
+  useEffect(() => { pointRef.current = onPoint; });
   const price = useRef<ISeriesApi<SeriesType> | null>(null);
   const last = useRef<Bar | null>(null);
   const latest = useRef<{ t: string | number | null; p: number | null }>({ t: null, p: null });
   useEffect(() => {
     let chart: IChartApi | null = null;
     let cancelled = false;
+    let unlisten = () => {};
     void import("lightweight-charts").then(({ createChart, CandlestickSeries, HistogramSeries, LineSeries }) => {
       if (cancelled || !box.current) return;
       chart = createChart(box.current, {
@@ -138,14 +148,56 @@ function CandleChart({ data, liveT, livePrice }: { data: Chart; liveT: string | 
       applyLive({ box, price, last, latest }, data.style);
       const shown = data.interval === "1D" ? 180 : 120;
       chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, data.bars.length - shown), to: data.bars.length + 3 });
+      // Drawing happens on the price pane only, snapped to the nearest candle. Read from the page's own clicks: the library drops a
+      // second click that comes within its double-click wait at another spot, which is how a trend line's two points are placed.
+      const el = box.current;
+      const onDown = (e: PointerEvent) => { downAt = { x: e.clientX, y: e.clientY }; };
+      const onClick = (e: MouseEvent) => {
+        const drag = downAt ? Math.abs(e.clientX - downAt.x) + Math.abs(e.clientY - downAt.y) : Infinity;
+        const at = el.getBoundingClientRect();
+        const x = e.clientX - at.left, y = e.clientY - at.top;
+        const bar = data.bars[Math.round(chart?.timeScale().coordinateToLogical(x) ?? -1)];
+        if (!chart || drag > 4 || !bar || x > chart.timeScale().width() || y > (chart.panes()[0]?.getHeight() ?? 0)) return;
+        const p = price.current?.coordinateToPrice(y);
+        if (p != null) pointRef.current({ t: bar.t, p });
+      };
+      let downAt: { x: number; y: number } | null = null;
+      el.addEventListener("pointerdown", onDown);
+      el.addEventListener("click", onClick);
+      unlisten = () => { el.removeEventListener("pointerdown", onDown); el.removeEventListener("click", onClick); };
+      chartRef.current = chart;
+      LineRef.current = LineSeries;
+      setBuilt((n) => n + 1);
     });
-    return () => { cancelled = true; price.current = null; last.current = null; chart?.remove(); };
+    return () => { cancelled = true; unlisten(); price.current = null; last.current = null; chartRef.current = null; chart?.remove(); };
   }, [data]);
+  useEffect(() => {
+    const chart = chartRef.current, series = price.current, Line = LineRef.current;
+    if (!chart || !series || !Line) return;
+    const lines: IPriceLine[] = [];
+    const trends: ISeriesApi<"Line">[] = [];
+    for (const d of drawings) {
+      if (d.kind === "hline" && d.price) {
+        lines.push(series.createPriceLine({ price: Number(d.price), color: C.draw, lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "" }));
+      } else if (d.kind === "trend" && d.points) {
+        const trend = chart.addSeries(Line, { color: C.draw, lineWidth: 2, lastValueVisible: false, priceLineVisible: false,
+          crosshairMarkerVisible: false, autoscaleInfoProvider: () => null });
+        trend.setData([...d.points].sort((a, b) => (a.t < b.t ? -1 : 1)).map((pt) => ({ time: pt.t as Time, value: Number(pt.p) })));
+        trends.push(trend);
+      }
+    }
+    if (box.current) box.current.dataset.drawings = String(drawings.length);
+    return () => {
+      if (chartRef.current !== chart) return;  // the chart was rebuilt: its lines went with it
+      for (const l of lines) series.removePriceLine(l);
+      for (const t of trends) chart.removeSeries(t);
+    };
+  }, [drawings, built]);
   useEffect(() => {
     latest.current = { t: liveT, p: livePrice };
     applyLive({ box, price, last, latest }, data.style);
   });
-  return <div ref={box} className="tb-canvas" data-testid="tb-canvas" />;
+  return <div ref={box} className={`tb-canvas${drawing ? " tb-drawing" : ""}`} data-testid="tb-canvas" />;
 }
 
 /** Bảng giá và biểu đồ: indices and watched tickers during the session, and candles with MACD and RSI for the one picked. */
@@ -157,6 +209,7 @@ export function TrendBoard() {
   const [message, setMessage] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const reloadedAt = useRef(0);
+  const tools = useChartDrawings(selected, interval);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -205,14 +258,17 @@ export function TrendBoard() {
           {!current && <p className="muted fx-loading" role="status">Đang tải biểu đồ…</p>}
           {current?.reason && <p className="muted">{current.reason}.</p>}
           {current && !current.reason && <>
-            <CandleChart data={current} liveT={liveT} livePrice={livePrice} />
+            <DrawingToolbar tools={tools} symbol={row?.label ?? selected} />
+            <CandleChart data={current} liveT={liveT} livePrice={livePrice} drawings={tools.shown} onPoint={tools.onPoint} drawing={tools.tool !== "pointer"} />
             <p className="caption" data-testid="tb-chart-caption">{current.style === "line"
               ? `Giá đóng cửa ${current.interval === "1D" ? "theo ngày" : "theo giờ"} · ${current.bars.length} điểm · ${current.unit ?? ""} · số mới nhất ${current.as_of ?? "—"}`
               : `${current.interval === "1D" ? "Nến ngày" : "Nến 1 giờ"} · ${current.bars.length} nến · ${current.unit ?? ""}`}
               {" "}· dưới: MACD (12, 26, 9) và RSI (14), đường 70/30
               {current.style === "line" ? " · dữ liệu phần mềm đã lưu cho bảng Xu hướng"
                 : ` · Vnstock, đọc ${current.fetched_at ? new Date(current.fetched_at).toLocaleString("vi-VN") : "—"}`}
-              {current.stale ? " — nguồn đang lỗi, đây là bản đã lưu" : ""}. Biểu đồ dùng thư viện mã nguồn mở Lightweight Charts của TradingView.</p>
+              {current.stale ? " — nguồn đang lỗi, đây là bản đã lưu" : ""}. Biểu đồ dùng thư viện mã nguồn mở Lightweight Charts của TradingView.
+              Hình vẽ (màu cam) là ghi chú của bạn: đường ngang hiện ở cả hai khung, đường xu hướng chỉ ở khung đã vẽ.</p>
+            <DrawingList tools={tools} />
           </>}
         </div>
         <div className="tb-side">

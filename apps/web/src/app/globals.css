@@ -73,6 +73,8 @@ legend{font-weight:600;padding:0 6px}
 .tb-head strong{font-size:18px}
 .tb-intervals{margin-left:auto;display:flex;gap:6px}.tb-intervals .btn{padding:5px 10px}
 .tb-canvas{height:520px;width:100%;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.tb-canvas.tb-drawing{cursor:crosshair}
+.tb-draw{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}.tb-draw .btn{padding:5px 10px}
 .tb-list{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
 .tb-list th,.tb-list td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left}
 .tb-list .num{text-align:right}

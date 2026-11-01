@@ -14,6 +14,7 @@ from investment_agent.market.macro_board import macro_chart, macro_rows
 from investment_agent.market.trend import SnapshotStore
 from investment_agent.market.watchlist import load_watchlist
 from investment_agent.repositories.personal import RepositoryUnavailable
+from investment_agent.services.chart_drawings import DrawingError, change_drawings, read_drawings
 from investment_agent.services.price_alerts import AlertError, change_alerts, read_alerts
 from investment_agent.services.records import notification_settings
 from investment_agent.settings import Settings
@@ -153,6 +154,53 @@ def price_alerts_change(request: Request, body: AlertChange):
                                         request_id=body.request_id, allowed=allowed, now=now(request))
         return _alerts_view(request, alerts, version)
     except AlertError as exc:
+        return error(422, exc.code, exc.message)
+    except WRITE_ERRORS as exc:
+        return write_error(exc)
+
+
+class DrawingPoint(ContractModel):
+    t: str | int
+    p: str = Field(max_length=16)
+
+
+class DrawingChange(ContractModel):
+    action: str = Field(pattern=r"^(add|remove|clear)$")
+    id: str | None = Field(default=None, max_length=32)
+    symbol: str | None = Field(default=None, max_length=10)
+    kind: str | None = Field(default=None, max_length=8)
+    interval: str | None = Field(default=None, max_length=4)
+    price: str | None = Field(default=None, max_length=16)
+    points: list[DrawingPoint] | None = Field(default=None, max_length=2)
+    expected_version: int = Field(ge=0)
+    request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
+
+
+@router.get("/trend/drawings")
+def chart_drawings(request: Request):
+    """Hình vẽ trên biểu đồ: the owner's levels and trend lines."""
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None:
+        return unavailable()
+    try:
+        drawings, version = read_drawings(repo, owner)
+        return {"version": version, "drawings": drawings}
+    except RepositoryUnavailable:
+        return unavailable()
+
+
+@router.put("/trend/drawings")
+def chart_drawings_change(request: Request, body: DrawingChange):
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    data_dir = request.app.state.data_dir
+    if repo is None or data_dir is None:
+        return unavailable()
+    allowed = set(load_watchlist(Path(data_dir)).symbols) | set(INDICES) | set(MACRO_IDS)
+    try:
+        drawings, version = change_drawings(repo, owner, body.model_dump(exclude={"expected_version", "request_id"}),
+                                            expected_version=body.expected_version, request_id=body.request_id, allowed=allowed, now=now(request))
+        return {"version": version, "drawings": drawings}
+    except DrawingError as exc:
         return error(422, exc.code, exc.message)
     except WRITE_ERRORS as exc:
         return write_error(exc)

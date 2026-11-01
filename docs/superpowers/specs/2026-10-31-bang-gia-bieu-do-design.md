@@ -47,3 +47,13 @@ Chủ sở hữu chọn "làm luôn", không qua hỏi đáp; các lựa chọn 
 - Lưu ở kho cá nhân (`settings/chart_drawings`), như Cảnh báo giá: có phiên bản chống ghi đè, tối đa 200 hình. Chỉ mã trong danh sách
   theo dõi, VNINDEX, VN30 và các biến Vĩ mô của bảng giá. Hình vẽ không gửi đi đâu, không vào bản tin, không phải cảnh báo.
 - Đây là công cụ ghi chú của chủ sở hữu; phần mềm không tự vẽ hỗ trợ/kháng cự hay đường xu hướng nào.
+
+## Bổ sung: vẽ bằng cách kéo; khung tuần và tháng (01/11/2026)
+Chủ sở hữu thấy thao tác vẽ khó, muốn kéo để vẽ, và muốn thêm khung 1 tuần, 1 tháng.
+- Vẽ bằng cách kéo, thay cho bấm hai lần: đang cầm công cụ thì nhấn giữ trên khung giá, kéo, thả. Đường xu hướng nối điểm nhấn và điểm thả
+  (thả trên cùng nến thì không vẽ); đường ngang đặt ở mức giá lúc thả (bấm một lần cũng được). Trong lúc kéo có đường nháp nét đứt chạy theo
+  con trỏ; Esc hủy. Khi đang cầm công cụ, biểu đồ tạm không cuộn/thu phóng. Vẽ xong tự trở về Con trỏ.
+- Khung Tuần và Tháng gộp từ nến ngày đã lưu (không gọi thêm nguồn): giá mở của ngày đầu kỳ, cao nhất, thấp nhất, giá đóng của ngày cuối kỳ,
+  khối lượng cộng dồn; tuần tính từ thứ Hai, tháng từ ngày 1. Biến Vĩ mô lấy giá đóng cửa cuối kỳ. MACD và RSI tính lại trên giá đóng của
+  khung đó. Kỳ cuối là kỳ đang chạy và nhận giá của bảng giá như nến ngày. Nến ngày chỉ có từ khoảng 2018 nên khung tháng có khoảng 100 nến.
+- Đường ngang hiện ở mọi khung; đường xu hướng chỉ ở khung đã vẽ (bốn khung: 1 giờ, Ngày, Tuần, Tháng).

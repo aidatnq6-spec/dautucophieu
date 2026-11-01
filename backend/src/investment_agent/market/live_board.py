@@ -141,6 +141,28 @@ def _indicators(bars: list[dict]) -> tuple[list[dict], list[dict]]:
     return m, r
 
 
+def _period(day: str, interval: str) -> str:
+    d = date.fromisoformat(day)
+    return (d - timedelta(days=d.weekday())).isoformat() if interval == "1W" else d.replace(day=1).isoformat()
+
+
+def regroup(daily: dict, interval: str) -> dict:
+    """Weekly (keyed by the week's Monday) or monthly (by its first day) bars built from the daily ones: first open, highest high,
+    lowest low, last close, summed volume; a close line keeps each period's last close. MACD and RSI on the new closes."""
+    groups: dict[str, list[dict]] = {}
+    for b in daily["bars"]:
+        groups.setdefault(_period(b["t"], interval), []).append(b)
+    bars = []
+    for t, rows in groups.items():
+        if "o" in rows[0]:
+            bars.append({"t": t, "o": rows[0]["o"], "h": _s(max(Decimal(r["h"]) for r in rows)), "l": _s(min(Decimal(r["l"]) for r in rows)),
+                         "c": rows[-1]["c"], "v": sum(r.get("v") or 0 for r in rows)})
+        else:
+            bars.append({"t": t, "c": rows[-1]["c"]})
+    m, r = _indicators(bars) if bars else ([], [])
+    return {**daily, "interval": interval, "bars": bars, "macd": m, "rsi": r}
+
+
 def chart(store: ChartStore, symbol: str, interval: str, *, fetch: Callable, now: datetime, index: bool) -> dict:
     saved = store.read(symbol, interval)
     fresh_for = FRESH[(interval, in_session(now))]

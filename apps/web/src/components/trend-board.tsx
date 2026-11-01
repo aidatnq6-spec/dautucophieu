@@ -3,7 +3,7 @@ import { type RefObject, useEffect, useRef, useState } from "react";
 import type { IChartApi, IPriceLine, ISeriesApi, SeriesType, Time } from "lightweight-charts";
 import { ApiError, api } from "../lib/api";
 import { formatDecimal, formatRatio, formatVnd } from "../lib/format";
-import { type Drawing, DrawingList, DrawingToolbar, useChartDrawings } from "./chart-drawings";
+import { type Add, type At, type Drawing, DrawingList, DrawingToolbar, type Interval, type Tool, dragResult, useChartDrawings } from "./chart-drawings";
 import { PriceAlerts } from "./price-alerts";
 
 type Row = { symbol: string; kind: "index" | "macro" | "stock"; price: string | null; ref: string | null; change: string | null; change_pct: string | null;
@@ -11,24 +11,36 @@ type Row = { symbol: string; kind: "index" | "macro" | "stock"; price: string | 
   label?: string; basis?: "close" | "24h"; unit?: string; reason?: string | null };
 type Board = { as_of: string; stocks_as_of?: string; session_open: boolean; rows: Row[]; missing: string[]; errors: string[] };
 type Bar = { t: string | number; o?: string; h?: string; l?: string; c: string; v?: number };
-type Chart = { symbol: string; interval: "1D" | "1H"; bars: Bar[]; macd: { t: string | number; macd: number; signal: number; hist: number }[];
+type Chart = { symbol: string; interval: Interval; bars: Bar[]; macd: { t: string | number; macd: number; signal: number; hist: number }[];
   rsi: { t: string | number; v: number }[]; fetched_at: string | null; stale: boolean; reason: string | null; unit?: string;
   style?: "line"; as_of?: string | null };
 const GROUPS: [Row["kind"], string][] = [["index", "Chỉ số"], ["macro", "Vĩ mô"], ["stock", "Cổ phiếu"]];
 const day = (iso: string) => iso.slice(0, 10).split("-").reverse().slice(0, 2).join("/");
 
+/** The bar a day falls in: the week's Monday for weekly bars, the month's first day for monthly ones, as the server groups them. */
+export function periodStart(day: string, interval: Interval): string {
+  if (interval === "1M") return `${day.slice(0, 7)}-01`;
+  if (interval !== "1W") return day;
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
 /** Which candle the row's latest price belongs to, keyed like the chart's bars: a date for daily bars (the trading date for stocks,
- * Hà Nội date for indices, UTC date for Coinbase's daily candles), Hà Nội wall-clock seconds at the hour's start for hourly bars.
- * Rows read from a daily close have no live price. */
-function liveKey(row: Row, board: Board, interval: "1D" | "1H"): string | number | null {
+ * Hà Nội date for indices, UTC date for Coinbase's daily candles) and the week's or month's start for longer ones, Hà Nội
+ * wall-clock seconds at the hour's start for hourly bars. Rows read from a daily close have no live price. */
+function liveKey(row: Row, board: Board, interval: Interval): string | number | null {
   if (row.price === null || (row.kind === "macro" && row.basis !== "24h")) return null;
   const at = Date.parse(row.kind === "stock" ? board.stocks_as_of ?? board.as_of : row.time ?? board.as_of);
   if (Number.isNaN(at)) return null;
   const wall = Math.floor(at / 1000) + 7 * HOUR;
   if (interval === "1H") return wall - (wall % HOUR);
-  if (row.kind === "stock") return row.time;
-  return new Date((row.kind === "macro" ? Math.floor(at / 1000) : wall) * 1000).toISOString().slice(0, 10);
+  const day = row.kind === "stock" ? row.time : new Date((row.kind === "macro" ? Math.floor(at / 1000) : wall) * 1000).toISOString().slice(0, 10);
+  return day === null ? null : periodStart(day, interval);
 }
+
+const FRAMES: [Interval, string, string][] = [["1H", "1 giờ", "giờ"], ["1D", "Ngày", "ngày"], ["1W", "Tuần", "tuần"], ["1M", "Tháng", "tháng"]];
+const SHOWN: Record<Interval, number> = { "1H": 120, "1D": 180, "1W": 104, "1M": 120 };
 
 // Every 20 s at any hour: Bitcoin and gold trade around the clock; the server keeps stocks for 5 min outside the session.
 const POLL = 20_000;
@@ -97,16 +109,17 @@ function applyLive({ box, price, last, latest }: ChartRefs, style: Chart["style"
   if (box.current) box.current.dataset.liveClose = String(p);
 }
 
-type ChartProps = { data: Chart; liveT: string | number | null; livePrice: number | null; drawings: Drawing[];
-  onPoint: (at: { t: string | number; p: number }) => void; drawing: boolean };
+type ChartProps = { data: Chart; liveT: string | number | null; livePrice: number | null; drawings: Drawing[]; tool: Tool;
+  onDrawn: (add: Add) => void };
 
-function CandleChart({ data, liveT, livePrice, drawings, onPoint, drawing }: ChartProps) {
+function CandleChart({ data, liveT, livePrice, drawings, tool, onDrawn }: ChartProps) {
   const box = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const LineRef = useRef<typeof import("lightweight-charts").LineSeries | null>(null);
   const [built, setBuilt] = useState(0);
-  const pointRef = useRef(onPoint);
-  useEffect(() => { pointRef.current = onPoint; });
+  const toolRef = useRef(tool);
+  const drawnRef = useRef(onDrawn);
+  useEffect(() => { toolRef.current = tool; drawnRef.current = onDrawn; });
   const price = useRef<ISeriesApi<SeriesType> | null>(null);
   const last = useRef<Bar | null>(null);
   const latest = useRef<{ t: string | number | null; p: number | null }>({ t: null, p: null });
@@ -146,25 +159,64 @@ function CandleChart({ data, liveT, livePrice, drawings, onPoint, drawing }: Cha
       chart.panes().forEach((pane, i) => pane.setStretchFactor([320, 110, 90][i] ?? 1));
       last.current = data.bars.at(-1) ?? null;
       applyLive({ box, price, last, latest }, data.style);
-      const shown = data.interval === "1D" ? 180 : 120;
+      const shown = SHOWN[data.interval];
       chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, data.bars.length - shown), to: data.bars.length + 3 });
-      // Drawing happens on the price pane only, snapped to the nearest candle. Read from the page's own clicks: the library drops a
-      // second click that comes within its double-click wait at another spot, which is how a trend line's two points are placed.
+      // Drawing: press on the price pane, drag, let go. A dashed draft follows the pointer; the points snap to the nearest candle.
+      // Read from the page's own pointer events, with the chart's scrolling off while a tool is held (see the effect below).
       const el = box.current;
-      const onDown = (e: PointerEvent) => { downAt = { x: e.clientX, y: e.clientY }; };
-      const onClick = (e: MouseEvent) => {
-        const drag = downAt ? Math.abs(e.clientX - downAt.x) + Math.abs(e.clientY - downAt.y) : Infinity;
+      const c = chart;
+      const pointAt = (e: PointerEvent): At | null => {
         const at = el.getBoundingClientRect();
         const x = e.clientX - at.left, y = e.clientY - at.top;
-        const bar = data.bars[Math.round(chart?.timeScale().coordinateToLogical(x) ?? -1)];
-        if (!chart || drag > 4 || !bar || x > chart.timeScale().width() || y > (chart.panes()[0]?.getHeight() ?? 0)) return;
+        const bar = data.bars[Math.round(c.timeScale().coordinateToLogical(x) ?? -1)];
         const p = price.current?.coordinateToPrice(y);
-        if (p != null) pointRef.current({ t: bar.t, p });
+        return bar && p != null && x <= c.timeScale().width() && y >= 0 && y <= (c.panes()[0]?.getHeight() ?? 0) ? { t: bar.t, p } : null;
       };
-      let downAt: { x: number; y: number } | null = null;
+      let from: At | null = null, to: At | null = null;
+      let draft: ISeriesApi<"Line"> | null = null, draftLevel: IPriceLine | null = null;
+      const show = (at: At) => {
+        to = at;
+        if (toolRef.current === "hline") {
+          draftLevel ??= price.current?.createPriceLine({ price: at.p, color: C.draw, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "" }) ?? null;
+          draftLevel?.applyOptions({ price: at.p });
+        } else if (from) {
+          draft ??= c.addSeries(LineSeries, { color: C.draw, lineWidth: 2, lineStyle: 2, lastValueVisible: false, priceLineVisible: false,
+            crosshairMarkerVisible: false, autoscaleInfoProvider: () => null });
+          const ends = from.t === at.t ? [at] : [from, at].sort((a, b) => (a.t < b.t ? -1 : 1));
+          draft.setData(ends.map((pt) => ({ time: pt.t as Time, value: pt.p })));
+        }
+      };
+      const stop = () => {
+        from = to = null;
+        if (draft) { c.removeSeries(draft); draft = null; }
+        if (draftLevel) { price.current?.removePriceLine(draftLevel); draftLevel = null; }
+      };
+      const onDown = (e: PointerEvent) => {
+        const at = toolRef.current === "pointer" || e.button !== 0 ? null : pointAt(e);
+        if (!at) return;
+        e.preventDefault();
+        el.setPointerCapture?.(e.pointerId);
+        from = at;
+        show(at);
+      };
+      const onMove = (e: PointerEvent) => { const at = from && pointAt(e); if (at) show(at); };
+      const onUp = (e: PointerEvent) => {
+        if (!from) return;
+        const start = from, end = pointAt(e) ?? to ?? from;
+        stop();
+        const add = dragResult(toolRef.current, start, end);
+        if (add) drawnRef.current(add);
+      };
+      const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") stop(); };
       el.addEventListener("pointerdown", onDown);
-      el.addEventListener("click", onClick);
-      unlisten = () => { el.removeEventListener("pointerdown", onDown); el.removeEventListener("click", onClick); };
+      el.addEventListener("pointermove", onMove);
+      el.addEventListener("pointerup", onUp);
+      el.addEventListener("pointercancel", stop);
+      window.addEventListener("keydown", onKey);
+      unlisten = () => {
+        el.removeEventListener("pointerdown", onDown); el.removeEventListener("pointermove", onMove); el.removeEventListener("pointerup", onUp);
+        el.removeEventListener("pointercancel", stop); window.removeEventListener("keydown", onKey);
+      };
       chartRef.current = chart;
       LineRef.current = LineSeries;
       setBuilt((n) => n + 1);
@@ -193,23 +245,26 @@ function CandleChart({ data, liveT, livePrice, drawings, onPoint, drawing }: Cha
       for (const t of trends) chart.removeSeries(t);
     };
   }, [drawings, built]);
+  // While a drawing tool is held, a drag draws instead of scrolling or zooming the chart.
+  useEffect(() => { chartRef.current?.applyOptions({ handleScroll: tool === "pointer", handleScale: tool === "pointer" }); }, [tool, built]);
   useEffect(() => {
     latest.current = { t: liveT, p: livePrice };
     applyLive({ box, price, last, latest }, data.style);
   });
-  return <div ref={box} className={`tb-canvas${drawing ? " tb-drawing" : ""}`} data-testid="tb-canvas" />;
+  return <div ref={box} className={`tb-canvas${tool !== "pointer" ? " tb-drawing" : ""}`} data-testid="tb-canvas" />;
 }
 
 /** Bảng giá và biểu đồ: indices and watched tickers during the session, and candles with MACD and RSI for the one picked. */
 export function TrendBoard() {
   const [board, setBoard] = useState<Board | null>(null);
   const [selected, setSelected] = useState("VNINDEX");
-  const [interval, setInterval_] = useState<"1D" | "1H">("1D");
+  const [interval, setInterval_] = useState<Interval>("1D");
   const [chart, setChart] = useState<Chart | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const reloadedAt = useRef(0);
   const tools = useChartDrawings(selected, interval);
+  const frameWord = FRAMES.find(([iv]) => iv === interval)?.[2] ?? "";
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -251,23 +306,24 @@ export function TrendBoard() {
             <strong>{row?.label ?? selected}</strong>
             {row?.price && <span className={tone(row)}>{formatDecimal(row.price, 2)} {row.change && signed(row.change)} {row.change_pct && `(${pct(row.change_pct)})`}</span>}
             <span className="tb-intervals" role="radiogroup" aria-label="Khung nến">
-              {(["1D", "1H"] as const).map((iv) => <button key={iv} type="button" role="radio" aria-checked={interval === iv}
-                className={`btn ${interval === iv ? "primary" : ""}`} onClick={() => setInterval_(iv)}>{iv === "1D" ? "Ngày" : "1 giờ"}</button>)}
+              {FRAMES.map(([iv, label]) => <button key={iv} type="button" role="radio" aria-checked={interval === iv}
+                className={`btn ${interval === iv ? "primary" : ""}`} onClick={() => setInterval_(iv)}>{label}</button>)}
             </span>
           </div>
           {!current && <p className="muted fx-loading" role="status">Đang tải biểu đồ…</p>}
           {current?.reason && <p className="muted">{current.reason}.</p>}
           {current && !current.reason && <>
             <DrawingToolbar tools={tools} symbol={row?.label ?? selected} />
-            <CandleChart data={current} liveT={liveT} livePrice={livePrice} drawings={tools.shown} onPoint={tools.onPoint} drawing={tools.tool !== "pointer"} />
+            <CandleChart data={current} liveT={liveT} livePrice={livePrice} drawings={tools.shown} tool={tools.tool} onDrawn={tools.onDrawn} />
             <p className="caption" data-testid="tb-chart-caption">{current.style === "line"
-              ? `Giá đóng cửa ${current.interval === "1D" ? "theo ngày" : "theo giờ"} · ${current.bars.length} điểm · ${current.unit ?? ""} · số mới nhất ${current.as_of ?? "—"}`
-              : `${current.interval === "1D" ? "Nến ngày" : "Nến 1 giờ"} · ${current.bars.length} nến · ${current.unit ?? ""}`}
+              ? `Giá đóng cửa theo ${frameWord} · ${current.bars.length} điểm · ${current.unit ?? ""} · số mới nhất ${current.as_of ?? "—"}`
+              : `${current.interval === "1H" ? "Nến 1 giờ" : `Nến ${frameWord}`} · ${current.bars.length} nến · ${current.unit ?? ""}`}
+              {current.interval === "1W" || current.interval === "1M" ? ` · gộp từ nến ngày (mở đầu kỳ, cao nhất, thấp nhất, đóng cuối kỳ), ${frameWord} cuối đang chạy` : ""}
               {" "}· dưới: MACD (12, 26, 9) và RSI (14), đường 70/30
               {current.style === "line" ? " · dữ liệu phần mềm đã lưu cho bảng Xu hướng"
                 : ` · Vnstock, đọc ${current.fetched_at ? new Date(current.fetched_at).toLocaleString("vi-VN") : "—"}`}
               {current.stale ? " — nguồn đang lỗi, đây là bản đã lưu" : ""}. Biểu đồ dùng thư viện mã nguồn mở Lightweight Charts của TradingView.
-              Hình vẽ (màu cam) là ghi chú của bạn: đường ngang hiện ở cả hai khung, đường xu hướng chỉ ở khung đã vẽ.</p>
+              Hình vẽ (màu cam) là ghi chú của bạn: đường ngang hiện ở mọi khung, đường xu hướng chỉ ở khung đã vẽ.</p>
             <DrawingList tools={tools} />
           </>}
         </div>

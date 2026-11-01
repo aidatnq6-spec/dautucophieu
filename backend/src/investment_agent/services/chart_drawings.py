@@ -1,6 +1,6 @@
 """Hình vẽ trên biểu đồ: the owner's horizontal levels and two-point trend lines on the Xu hướng chart, kept in the personal store
 (settings/chart_drawings). A level shows on both frames; a trend line belongs to the frame it was drawn on, its points keyed like the
-chart's bars (a date for daily bars, Hà Nội wall-clock seconds for hourly ones). Notes only: nothing is sent or drawn by the software.
+chart's bars (a date for daily, weekly and monthly bars, Hà Nội wall-clock seconds for hourly ones). Notes only: nothing is sent or drawn by the software.
 """
 
 import uuid
@@ -35,7 +35,7 @@ def _price(raw) -> str | None:
 
 
 def _time(raw, interval: str):
-    if interval == "1D":
+    if interval != "1H":
         try:
             return date.fromisoformat(raw).isoformat() if isinstance(raw, str) and len(raw) == 10 else None
         except ValueError:
@@ -59,8 +59,8 @@ def _new(change: dict, allowed: set[str], now: datetime) -> dict:
             raise _invalid("Đường ngang cần một mức giá dương.")
     elif drawing["kind"] == "trend":
         interval, points = change.get("interval"), change.get("points")
-        if interval not in ("1D", "1H") or not isinstance(points, list) or len(points) != 2:
-            raise _invalid("Đường xu hướng cần khung 1D hoặc 1H và đúng hai điểm.")
+        if interval not in ("1D", "1H", "1W", "1M") or not isinstance(points, list) or len(points) != 2:
+            raise _invalid("Đường xu hướng cần khung 1D, 1H, 1W hoặc 1M và đúng hai điểm.")
         kept = [{"t": _time(p.get("t"), interval), "p": _price(p.get("p"))} if isinstance(p, dict) else {"t": None, "p": None} for p in points]
         if any(p["t"] is None or p["p"] is None for p in kept) or kept[0]["t"] == kept[1]["t"]:
             raise _invalid("Hai điểm của đường xu hướng cần thời gian của nến (khác nhau) và giá dương.")

@@ -62,6 +62,10 @@ def test_board_and_chart_cover_the_watchlist_and_the_two_indices_only(tmp_path, 
     assert call(c, clock, "GET", "/internal/trend/chart/VNINDEX/1H").json()["bars"][0]["c"] == "2"
     assert ("ohlcv", "VNINDEX", "1H", True) in source.calls
     assert call(c, clock, "GET", "/internal/trend/chart/FPT/1D").json()["interval"] == "1D"
+    weekly = call(c, clock, "GET", "/internal/trend/chart/FPT/1W").json()
+    assert weekly["interval"] == "1W" and ("ohlcv", "FPT", "1W", False) not in source.calls  # built from the daily candles
+    assert call(c, clock, "GET", "/internal/trend/chart/DXY/1M").json()["interval"] == "1M"
+    assert call(c, clock, "GET", "/internal/trend/chart/FPT/1Y").status_code == 422
     assert call(c, clock, "GET", "/internal/trend/chart/DXY/1H").json()["reason"] == "Nguồn chỉ có giá ngày"
     assert call(c, clock, "GET", "/internal/trend/chart/ZZZ/1D").status_code == 404
     assert call(c, clock, "GET", "/internal/trend/chart/FPT/5m").status_code == 422

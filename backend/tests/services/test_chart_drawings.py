@@ -31,8 +31,11 @@ def test_a_level_and_a_trend_line_are_kept_per_ticker_and_removed():
     hourly = {"action": "add", "symbol": "BTC", "kind": "trend", "interval": "1H", "points": [{"t": 1761900000, "p": "70000"}, {"t": 1761990000, "p": "71000.5"}]}
     drawings, version = _change(repo, hourly, 2, "d3")
     assert drawings[2]["points"][0] == {"t": 1761900000, "p": "70000"}
-    drawings, version = _change(repo, {"action": "remove", "id": drawings[0]["id"]}, 3, "d4")
-    assert [d["symbol"] for d in drawings] == ["HPG", "BTC"] and read_drawings(repo, OWNER) == (drawings, 4)
+    weekly = {"action": "add", "symbol": "HPG", "kind": "trend", "interval": "1W", "points": [{"t": "2026-08-31", "p": "25"}, {"t": "2026-10-26", "p": "28"}]}
+    drawings, version = _change(repo, weekly, 3, "d3w")
+    assert drawings[3]["interval"] == "1W"
+    drawings, version = _change(repo, {"action": "remove", "id": drawings[0]["id"]}, 4, "d4")
+    assert [d["symbol"] for d in drawings] == ["HPG", "BTC", "HPG"] and read_drawings(repo, OWNER) == (drawings, 5)
 
 
 def test_clearing_a_ticker_leaves_the_others():
@@ -50,7 +53,7 @@ def test_clearing_a_ticker_leaves_the_others():
     ({"action": "add", "symbol": "FPT", "kind": "hline", "price": "-1"}, "invalid_drawing"),
     ({"action": "add", "symbol": "FPT", "kind": "hline", "price": "56,3"}, "invalid_drawing"),
     ({"action": "add", "symbol": "FPT", "kind": "hline", "price": "1.23456789012345678"}, "invalid_drawing"),
-    ({"action": "add", "symbol": "FPT", "kind": "trend", "interval": "1W", "points": [{"t": "2026-09-01", "p": "1"}, {"t": "2026-09-02", "p": "2"}]},
+    ({"action": "add", "symbol": "FPT", "kind": "trend", "interval": "1Y", "points": [{"t": "2026-09-01", "p": "1"}, {"t": "2026-09-02", "p": "2"}]},
      "invalid_drawing"),
     ({"action": "add", "symbol": "FPT", "kind": "trend", "interval": "1D", "points": [{"t": "2026-09-01", "p": "1"}]}, "invalid_drawing"),
     ({"action": "add", "symbol": "FPT", "kind": "trend", "interval": "1D", "points": [{"t": "2026-09-01", "p": "1"}, {"t": "2026-09-01", "p": "2"}]},

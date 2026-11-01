@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from investment_agent.market.live_board import ChartStore, build_board, chart, in_session
+from investment_agent.market.live_board import ChartStore, build_board, chart, in_session, regroup
 
 UTC = timezone.utc
 VN = timezone(timedelta(hours=7))
@@ -81,3 +81,27 @@ def test_price_alert_check_does_nothing_outside_the_session(tmp_path, capsys):
     from investment_agent.cli import price_alerts_cli
     assert price_alerts_cli(tmp_path, now=datetime(2026, 10, 31, 3, 30, tzinfo=UTC)) == 0  # Saturday
     assert json.loads(capsys.readouterr().out) == {"status": "skipped", "reason": "outside_session"}
+
+
+def test_weekly_and_monthly_candles_are_built_from_the_daily_ones():
+    days = [("2026-09-29", "10", "12", "9", "11", 100), ("2026-09-30", "11", "15", "10", "14", 200),  # Tue, Wed
+            ("2026-10-01", "14", "14", "8", "9", 300), ("2026-10-05", "9", "10", "7", "10", 400)]  # Thu; next Monday
+    daily = {"symbol": "FPT", "interval": "1D", "bars": [{"t": t, "o": o, "h": h, "l": lo, "c": c, "v": v} for t, o, h, lo, c, v in days],
+             "macd": [], "rsi": [], "fetched_at": "x", "stale": False, "reason": None, "unit": "nghìn đồng"}
+    weekly = regroup(daily, "1W")
+    assert weekly["interval"] == "1W" and weekly["fetched_at"] == "x" and weekly["unit"] == "nghìn đồng"
+    assert weekly["bars"] == [{"t": "2026-09-28", "o": "10", "h": "15", "l": "8", "c": "9", "v": 600},  # keyed by the week's Monday
+                              {"t": "2026-10-05", "o": "9", "h": "10", "l": "7", "c": "10", "v": 400}]
+    assert regroup(daily, "1M")["bars"] == [{"t": "2026-09-01", "o": "10", "h": "15", "l": "9", "c": "14", "v": 300},
+                                            {"t": "2026-10-01", "o": "14", "h": "14", "l": "7", "c": "10", "v": 700}]
+    many = {**daily, "bars": [{"t": (datetime(2025, 1, 6) + timedelta(days=7 * i)).date().isoformat(), "o": "10", "h": "20", "l": "9",
+                               "c": str(10 + i % 5), "v": 1} for i in range(40)]}
+    assert len(regroup(many, "1W")["macd"]) == 40 - 33 and regroup(many, "1W")["rsi"]  # indicators on the weekly closes
+
+
+def test_regrouping_a_close_line_keeps_the_last_close_and_a_reason_passes_through():
+    line = {"symbol": "DXY", "interval": "1D", "style": "line", "bars": [{"t": "2026-09-29", "c": "99.1"}, {"t": "2026-09-30", "c": "99.4"}],
+            "macd": [], "rsi": [], "reason": None, "as_of": "2026-09-30"}
+    assert regroup(line, "1M")["bars"] == [{"t": "2026-09-01", "c": "99.4"}] and regroup(line, "1M")["style"] == "line"
+    missing = {**line, "bars": [], "reason": "Chưa có số"}
+    assert regroup(missing, "1W") == {**missing, "interval": "1W"}

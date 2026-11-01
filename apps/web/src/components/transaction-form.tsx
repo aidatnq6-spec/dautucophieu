@@ -11,7 +11,8 @@ export type LedgerEvent = { event_id: string; type: string; effective_at: string
   price?: string; fee?: string; tax?: string; amount?: string; settlement_date?: string | null; note?: string; [k: string]: unknown };
 
 const TYPES: [string, string][] = [["deposit", "Nộp tiền"], ["withdrawal", "Rút tiền"], ["buy", "Mua"], ["sell", "Bán"],
-  ["opening_balance", "Số dư đầu kỳ"], ["cash_dividend_entitlement", "Quyền cổ tức tiền"], ["cash_dividend_payment", "Nhận cổ tức tiền"]];
+  ["opening_balance", "Số dư đầu kỳ"], ["cash_dividend_entitlement", "Quyền cổ tức tiền"], ["cash_dividend_payment", "Nhận cổ tức tiền"],
+  ["stock_dividend_entitlement", "Quyền cổ phiếu thưởng"], ["stock_dividend_credit", "Cổ phiếu thưởng về"]];
 export const TYPE_LABEL: Record<string, string> = Object.fromEntries([...TYPES, ["opening_balance", "Số dư đầu kỳ"],
   ["cash_dividend_entitlement", "Quyền cổ tức tiền"], ["cash_dividend_payment", "Nhận cổ tức tiền"], ["stock_dividend_entitlement", "Quyền cổ phiếu thưởng"],
   ["stock_dividend_credit", "Cổ phiếu thưởng về"], ["share_split", "Tách/gộp"], ["unsupported_action", "Sự kiện chưa hỗ trợ"]]);
@@ -19,31 +20,47 @@ export const LEDGER_ERRORS: Record<string, string> = {
   ledger_oversell: "Số lượng bán vượt số cổ phiếu đang có.", ledger_cash_negative: "Tiền trong sổ sẽ âm: cần ghi nộp tiền trước.",
   ledger_ambiguous_order: "Đã có giao dịch cùng ngày và cùng thứ tự: đổi thứ tự trong ngày.", ledger_duplicate_event: "Mã giao dịch đã tồn tại.",
   version_conflict: "Sổ đã thay đổi ở nơi khác: tải lại trang rồi nhập lại.",
+  ledger_eligible_exceeds_holding: "Số cổ phiếu hưởng quyền lớn hơn số đang có trong sổ vào ngày này: kiểm tra ngày và thứ tự so với lệnh bán cùng ngày.",
+  ledger_duplicate_action: "Sự kiện này đã được ghi quyền trong sổ.", ledger_action_already_settled: "Sự kiện này đã được ghi nhận tiền/cổ phiếu về.",
+  ledger_unknown_action: "Chưa có dòng quyền với mã sự kiện này: ghi quyền trước.",
+  ledger_action_type_mismatch: "Mã sự kiện này thuộc loại khác (cổ tức tiền hay cổ phiếu thưởng).",
 };
 
-export function TransactionForm({ ledgerVersion, events, editing, onSaved, onCancel }:
-  { ledgerVersion: number; events: LedgerEvent[]; editing: LedgerEvent | null; onSaved: () => void; onCancel?: () => void }) {
+/** The order number for a new line on `day`: after the highest already used that day (a cancelled line can leave a gap). */
+export function nextSequence(events: { effective_at: string; sequence: number }[], day: string): number {
+  const used = events.filter((e) => e.effective_at === day).map((e) => e.sequence);
+  return used.length ? Math.max(...used) + 1 : 0;
+}
+
+/** A new or corrected ledger line. `draft` pre-fills a new line (a dividend drafted from the Lịch sự kiện) that the owner checks against
+ * the broker's papers before saving; `editing` corrects an existing one. */
+export function TransactionForm({ ledgerVersion, events, editing, draft = null, onSaved, onCancel }:
+  { ledgerVersion: number; events: LedgerEvent[]; editing: LedgerEvent | null; draft?: LedgerEvent | null; onSaved: () => void; onCancel?: () => void }) {
+  const seed = editing ?? draft;
   const today = hanoiDate();
-  const [type, setType] = useState(editing?.type ?? "deposit");
-  const [day, setDay] = useState(editing?.effective_at ?? today);
-  const [sequence, setSequence] = useState(String(editing?.sequence ?? events.filter((e) => e.effective_at === today).length));
-  const [ticker, setTicker] = useState(editing?.security_id ?? "");
-  const [quantity, setQuantity] = useState(editing?.quantity ? String(editing.quantity) : "");
-  const [price, setPrice] = useState(editing?.price ?? "");
-  const [fee, setFee] = useState(editing?.fee ?? "0");
-  const [tax, setTax] = useState(editing?.tax ?? "0");
-  const [amount, setAmount] = useState(editing?.amount ?? "");
-  const [actionId, setActionId] = useState(String(editing?.action_id ?? ""));
-  const [recordDate, setRecordDate] = useState(String(editing?.record_date ?? ""));
-  const [paymentDate, setPaymentDate] = useState(String(editing?.payment_date ?? ""));
-  const [eligibleQuantity, setEligibleQuantity] = useState(String(editing?.eligible_quantity ?? ""));
-  const [expectedGross, setExpectedGross] = useState(String(editing?.expected_gross ?? ""));
-  const [expectedTax, setExpectedTax] = useState(String(editing?.expected_tax ?? "0"));
-  const [receivedNet, setReceivedNet] = useState(String(editing?.received_net ?? ""));
-  const [taxWithheld, setTaxWithheld] = useState(String(editing?.tax_withheld ?? "0"));
-  const [openingPositions, setOpeningPositions] = useState(() => Array.isArray(editing?.positions)
-    ? (editing.positions as { security_id: string; quantity: number; total_cost: string }[]).map((p) => `${p.security_id},${p.quantity},${p.total_cost}`).join("\n") : "");
-  const [settlement, setSettlement] = useState(editing?.settlement_date ?? "");
+  const [type, setType] = useState(seed?.type ?? "deposit");
+  const [day, setDay] = useState(seed?.effective_at ?? today);
+  const [sequence, setSequence] = useState(String(editing?.sequence ?? nextSequence(events, seed?.effective_at || today)));
+  const [ticker, setTicker] = useState(seed?.security_id ?? "");
+  const [quantity, setQuantity] = useState(seed?.quantity ? String(seed.quantity) : "");
+  const [price, setPrice] = useState(seed?.price ?? "");
+  const [fee, setFee] = useState(seed?.fee ?? "0");
+  const [tax, setTax] = useState(seed?.tax ?? "0");
+  const [amount, setAmount] = useState(seed?.amount ?? "");
+  const [actionId, setActionId] = useState(String(seed?.action_id ?? ""));
+  const [recordDate, setRecordDate] = useState(String(seed?.record_date ?? ""));
+  const [paymentDate, setPaymentDate] = useState(String(seed?.payment_date ?? ""));
+  const [eligibleQuantity, setEligibleQuantity] = useState(String(seed?.eligible_quantity ?? ""));
+  const [expectedGross, setExpectedGross] = useState(String(seed?.expected_gross ?? ""));
+  const [expectedTax, setExpectedTax] = useState(String(seed?.expected_tax ?? "0"));
+  const [receivedNet, setReceivedNet] = useState(String(seed?.received_net ?? ""));
+  const [taxWithheld, setTaxWithheld] = useState(String(seed?.tax_withheld ?? "0"));
+  const [openingPositions, setOpeningPositions] = useState(() => Array.isArray(seed?.positions)
+    ? (seed.positions as { security_id: string; quantity: number; total_cost: string }[]).map((p) => `${p.security_id},${p.quantity},${p.total_cost}`).join("\n") : "");
+  const [sharesEntitled, setSharesEntitled] = useState(String(seed?.shares_entitled ?? ""));
+  const [sharesCredited, setSharesCredited] = useState(String(seed?.shares_credited ?? ""));
+  const [cashInLieu, setCashInLieu] = useState(String(seed?.cash_in_lieu ?? "0"));
+  const [settlement, setSettlement] = useState(seed?.settlement_date ?? "");
   const [reason, setReason] = useState("");
   const [why, setWhy] = useState("");
   const [emotion, setEmotion] = useState("");
@@ -62,6 +79,7 @@ export function TransactionForm({ ledgerVersion, events, editing, onSaved, onCan
     const problems: string[] = [];
     const money = (label: string, raw: string) => { const v = parseMoneyInput(raw); if (v === null) problems.push(`${label} không hợp lệ`); return v ?? "0"; };
     const seq = Number(sequence);
+    if (!day) problems.push("Cần ngày giao dịch (theo chứng từ)");
     if (!Number.isInteger(seq) || seq < 0) problems.push("Thứ tự trong ngày phải là số nguyên không âm");
     const base: LedgerEvent = { event_id: editing?.event_id ?? `ev-${requestId().slice(0, 20)}`, type, effective_at: day, sequence: seq,
       settlement_date: settlement || null };
@@ -90,6 +108,20 @@ export function TransactionForm({ ledgerVersion, events, editing, onSaved, onCan
       Object.assign(base, { action_id: actionId.trim(), security_id: ticker.trim().toUpperCase(), record_date: recordDate,
         payment_date: paymentDate || null, eligible_quantity: q, expected_gross: money("Cổ tức gộp dự kiến", expectedGross),
         expected_tax: money("Thuế dự kiến", expectedTax) });
+    } else if (type === "stock_dividend_entitlement") {
+      const q = Number(eligibleQuantity), n = Number(sharesEntitled);
+      if (!actionId.trim()) problems.push("Cần mã sự kiện");
+      if (!recordDate) problems.push("Cần ngày chốt quyền");
+      if (!Number.isInteger(q) || q <= 0) problems.push("Số cổ phiếu hưởng quyền phải là số nguyên dương");
+      if (!Number.isInteger(n) || n <= 0) problems.push("Số cổ phiếu được nhận phải là số nguyên dương");
+      if (!/^[A-Z0-9]{3,10}$/.test(ticker.trim().toUpperCase())) problems.push("Mã cổ phiếu không hợp lệ");
+      Object.assign(base, { action_id: actionId.trim(), security_id: ticker.trim().toUpperCase(), record_date: recordDate, eligible_quantity: q,
+        shares_entitled: n });
+    } else if (type === "stock_dividend_credit") {
+      const n = Number(sharesCredited);
+      if (!actionId.trim()) problems.push("Cần mã sự kiện quyền đã ghi");
+      if (!Number.isInteger(n) || n < 0) problems.push("Số cổ phiếu về tài khoản phải là số nguyên không âm");
+      Object.assign(base, { action_id: actionId.trim(), shares_credited: n, cash_in_lieu: money("Tiền trả thay cổ phiếu lẻ", cashInLieu) });
     } else if (type === "cash_dividend_payment") {
       if (!actionId.trim()) problems.push("Cần mã sự kiện cổ tức đã ghi nhận quyền");
       Object.assign(base, { action_id: actionId.trim(), received_net: money("Tiền thực nhận", receivedNet), tax_withheld: money("Thuế đã khấu trừ", taxWithheld) });
@@ -157,6 +189,16 @@ export function TransactionForm({ ledgerVersion, events, editing, onSaved, onCan
           <label className="field">Số cổ phiếu hưởng quyền<input inputMode="numeric" value={eligibleQuantity} onChange={(e) => setEligibleQuantity(e.target.value)} /></label>
           <label className="field">Cổ tức gộp dự kiến (đ)<input inputMode="numeric" value={expectedGross} onChange={(e) => setExpectedGross(e.target.value)} /></label>
           <label className="field">Thuế dự kiến (đ)<input inputMode="numeric" value={expectedTax} onChange={(e) => setExpectedTax(e.target.value)} /></label>
+        </>) : type === "stock_dividend_entitlement" ? (<>
+          <label className="field">Mã sự kiện<input value={actionId} onChange={(e) => setActionId(e.target.value)} /></label>
+          <label className="field">Mã cổ phiếu<input value={ticker} onChange={(e) => setTicker(e.target.value)} /></label>
+          <label className="field">Ngày chốt quyền<input type="date" value={recordDate} onChange={(e) => setRecordDate(e.target.value)} /></label>
+          <label className="field">Số cổ phiếu hưởng quyền<input inputMode="numeric" value={eligibleQuantity} onChange={(e) => setEligibleQuantity(e.target.value)} /></label>
+          <label className="field">Số cổ phiếu được nhận<input inputMode="numeric" value={sharesEntitled} onChange={(e) => setSharesEntitled(e.target.value)} /></label>
+        </>) : type === "stock_dividend_credit" ? (<>
+          <label className="field">Mã sự kiện quyền đã ghi<input value={actionId} onChange={(e) => setActionId(e.target.value)} /></label>
+          <label className="field">Số cổ phiếu về tài khoản<input inputMode="numeric" value={sharesCredited} onChange={(e) => setSharesCredited(e.target.value)} /></label>
+          <label className="field">Tiền trả thay cổ phiếu lẻ (đ)<input inputMode="numeric" value={cashInLieu} onChange={(e) => setCashInLieu(e.target.value)} /></label>
         </>) : type === "cash_dividend_payment" ? (<>
           <label className="field">Mã sự kiện quyền đã ghi<input value={actionId} onChange={(e) => setActionId(e.target.value)} /></label>
           <label className="field">Tiền thực nhận (đ)<input inputMode="numeric" value={receivedNet} onChange={(e) => setReceivedNet(e.target.value)} /></label>
@@ -166,7 +208,8 @@ export function TransactionForm({ ledgerVersion, events, editing, onSaved, onCan
         )}
         {editing && <label className="field">Lý do sửa<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Sửa theo sao kê" /></label>}
       </div>
-      <p className="caption">Phí và thuế nhập theo chứng từ; ứng dụng không tự áp tỷ lệ. Chưa bấm lưu thì chưa ghi vào sổ.</p>
+      <p className="caption">{draft && !editing ? "Số đã điền là ước tính soạn từ Lịch sự kiện (thuế cổ tức 5%); sửa theo chứng từ trước khi ghi."
+        : "Phí và thuế nhập theo chứng từ; ứng dụng không tự áp tỷ lệ."} Chưa bấm lưu thì chưa ghi vào sổ.</p>
       <div className="actions">
         <button type="submit" className="btn primary" disabled={busy}><Save size={16} aria-hidden="true" />{editing ? "Lưu bản sửa" : "Ghi vào sổ"}</button>
         {onCancel && <button type="button" className="btn" onClick={onCancel}>Hủy bỏ</button>}

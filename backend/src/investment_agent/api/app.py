@@ -13,6 +13,7 @@ from .auth import InternalAuthSettings, InternalAuthenticator, Unauthorized, req
 from .routes.buy_check import router as buy_check_router
 from .routes.concentration import router as concentration_router
 from .routes.contributions import router as contributions_router
+from .routes.corporate import router as corporate_router
 from .routes.drawdown import router as drawdown_router
 from .routes.equity_budget import router as equity_budget_router
 from .routes.events import router as events_router
@@ -90,6 +91,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(reports_router)
     app.include_router(theses_router)
     app.include_router(hindsight_router)
+    app.include_router(corporate_router)
     app.include_router(notifications_router)
     app.include_router(settings_router)
     app.include_router(watchlist_router)

@@ -8,6 +8,7 @@ import { FormErrors } from "./form-errors";
 import { LEDGER_ERRORS, TYPE_LABEL, TransactionForm, type LedgerEvent } from "./transaction-form";
 import { ConcentrationView } from "./concentration-view";
 import { DrawdownView } from "./drawdown-view";
+import { StressView } from "./stress-view";
 import { PerformanceView } from "./performance-view";
 import { ThesisView } from "./thesis-view";
 import { CorporateView } from "./corporate-view";
@@ -80,6 +81,7 @@ export function PortfolioView() {
       <ConcentrationView />
       <PerformanceView />
       <DrawdownView />
+      <StressView ledgerVersion={ledger.version} />
 
       <section className="surface">
         <h2>Cổ phiếu đang nắm giữ</h2>

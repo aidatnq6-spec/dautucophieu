@@ -39,6 +39,7 @@ from .routes.risk import router as risk_router
 from .routes.screener import router as screener_router
 from .routes.settings import router as settings_router
 from .routes.stock import router as stock_router
+from .routes.stress import router as stress_router
 from .routes.theses import router as theses_router
 from .routes.value_chains import router as value_chains_router
 from .routes.universe import router as universe_router
@@ -94,6 +95,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(hindsight_router)
     app.include_router(corporate_router)
     app.include_router(screener_router)
+    app.include_router(stress_router)
     app.include_router(notifications_router)
     app.include_router(settings_router)
     app.include_router(watchlist_router)

@@ -49,6 +49,9 @@ def main() -> int:
     ia.add_argument("--data-dir", type=Path, required=True)
     pa = commands.add_parser("price-alerts", help="during the session, Telegram note for the owner's price levels crossed")
     pa.add_argument("--data-dir", type=Path, required=True)
+    sc = commands.add_parser("screen-check", help="Bộ lọc tín hiệu: Telegram note for tickers new to a saved screen, after the close")
+    sc.add_argument("--data-dir", type=Path, required=True)
+    sc.add_argument("--calendar", type=Path, required=True)
     tc = commands.add_parser("thesis-check", help="Luận điểm đầu tư: check the owner's conditions and send a Telegram note for those broken")
     tc.add_argument("--data-dir", type=Path, required=True)
     tc.add_argument("--calendar", type=Path, required=True)
@@ -113,6 +116,8 @@ def main() -> int:
         return insider_alerts_cli(args.data_dir)
     if args.command == "price-alerts":
         return price_alerts_cli(args.data_dir)
+    if args.command == "screen-check":
+        return screen_check_cli(args.data_dir, args.calendar)
     if args.command == "thesis-check":
         return thesis_check_cli(args.data_dir, args.calendar, args.scope)
     if args.command == "financial-ratios-sync":
@@ -723,6 +728,33 @@ def price_alerts_cli(data_dir: Path, now=None) -> int:
     prices = {r["symbol"]: Decimal(r["price"]) for r in board["rows"] if r["price"] is not None}
     out = check_alerts(repo, owner, prices=prices, send=send, now=now, request_id=f"price-alerts-{uuid.uuid4().hex[:16]}")
     print(json.dumps({**out, "armed": len(wanted), "errors": board["errors"]}, ensure_ascii=False))
+    return 0
+
+
+def screen_check_cli(data_dir: Path, calendar_path: Path, now=None) -> int:
+    """Bộ lọc tín hiệu after the close: one Telegram note for tickers new to the owner's notifying screens; skipped while scheduled
+    delivery is off (the next check after it is turned on starts from a baseline)."""
+    from datetime import datetime, timezone
+
+    from investment_agent.market.prices import PriceStore
+    from investment_agent.market.view import EmptyMarket, StoreMarket
+    from investment_agent.services.holdings_view import held_from_repo
+    from investment_agent.services.screener import gather_rows, read_screens, screen_check_run
+    from investment_agent.services.weekly_brief import VN
+
+    now = now or datetime.now(timezone.utc)
+    telegram = _scheduled_telegram()
+    if telegram is None:
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
+        return 0
+    send, repo, owner = telegram
+    if not any(s.get("notify") for s in read_screens(repo, owner)[0]):
+        print(json.dumps({"status": "ok", "screens": 0, "entered": 0, "sent": False}))
+        return 0
+    today = now.astimezone(VN).date()
+    market = StoreMarket(PriceStore(data_dir), load_calendar(calendar_path), today=lambda: today) if (data_dir / "prices").exists() else EmptyMarket()
+    rows = gather_rows(data_dir, repo, owner, held=held_from_repo(repo, owner), today=today, market=market)
+    print(json.dumps(screen_check_run(repo, owner, data_dir, rows=rows, send=send, now=now)))
     return 0
 
 

@@ -204,3 +204,15 @@ def hindsight(events, *, closes: dict, index: list, journal: list[dict], theses:
     return {"trades": rows, "opening_skipped": opening, "loss_holds": loss_holds, "breaks": breaks,
             "biases": {"disposition": disposition, "by_emotion": by_emotion, "by_reason": _group(reason_rows),
                        "chasing": {"chasing": (_group(chase) or [empty])[0], "other": (_group(other) or [empty])[0]}}}
+
+
+def lesson(breaks: list[dict]) -> str | None:
+    """The owner's own record of holding on after a broken condition, for the thesis note; None under five times."""
+    held = [Decimal(b["change"]) for b in breaks if b.get("held_on") and b.get("change") is not None]
+    if len(held) < MIN_OBSERVATIONS:
+        return None
+    mean = sum(held) / len(held) * 100
+    sign = "−" if mean < 0 else "+" if mean > 0 else ""
+    text = f"{abs(mean).quantize(Decimal('0.1'), ROUND_HALF_UP)}".replace(".", ",")
+    return (f"{len(held)} lần trước bạn giữ tiếp sau khi điều kiện bị phá; so với bán ngay lúc báo đầu, trung bình {sign}{text}% "
+            "(đã xảy ra, không phải dự báo).")

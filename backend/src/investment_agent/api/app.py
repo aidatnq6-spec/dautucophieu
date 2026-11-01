@@ -25,6 +25,7 @@ from .routes.passive_income import router as passive_income_router
 from .routes.performance import router as performance_router
 from .routes.insights import router as insights_router
 from .routes.health import router as health_router
+from .routes.hindsight import router as hindsight_router
 from .routes.profile import router as profile_router
 from .routes.ledger import router as ledger_router
 from .routes.macro import router as macro_router
@@ -88,6 +89,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(jobs_router)
     app.include_router(reports_router)
     app.include_router(theses_router)
+    app.include_router(hindsight_router)
     app.include_router(notifications_router)
     app.include_router(settings_router)
     app.include_router(watchlist_router)

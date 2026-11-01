@@ -14,7 +14,7 @@ def hindsight_for(repo, owner, data_dir: Path, *, today: date) -> dict:
     """Raises RepositoryUnavailable."""
     events = list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)
     store = SeriesStore(Path(data_dir) / "trend-sources")
-    symbols = {e.security_id for e in events if getattr(e, "security_id", None)}
+    symbols = {e.security_id for e in events if getattr(e, "security_id", None)} | {p.security_id for e in events for p in getattr(e, "positions", ())}
     closes = {s: [(t.date(), v) for t, v in store.read(f"{s}-1d")] for s in symbols}
     journal = [{"ledger_event_id": e.ledger_event_id, "emotion": e.emotion} for e in read_journal(repo, owner)[0]]
     threshold = portfolio_settings(repo, owner)[0].drawdown_threshold

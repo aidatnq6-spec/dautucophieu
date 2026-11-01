@@ -161,3 +161,32 @@ def test_a_break_is_not_credited_with_a_sale_after_its_thesis_closed():
                         ("buy", "2025-04-01", "FPT", 100, "50000"), ("sell", "2025-06-01", "FPT", 100, "60000")), closes=closes,
                     index=_flat_index(), journal=[], theses=[thesis], threshold=Decimal("0.3"), today=TODAY)
     assert out["breaks"][0]["then"] == "44000" and out["breaks"][0]["label"] == "Lỗ so với giá vốn"
+
+
+def test_a_horizon_dated_today_waits_for_todays_close():
+    closes = {"FPT": _days(date(2026, 7, 1), [50] * 124)}  # up to 01/11, the day before today
+    out = hindsight(_ev(("buy", "2026-08-02", "FPT", 100, "50000")), closes=closes, index=_flat_index(), journal=[], theses=[],
+                    threshold=Decimal("0.3"), today=TODAY)
+    assert out["trades"][0]["horizons"]["3"]["status"] == "not_yet"
+
+
+def test_breaks_without_a_condition_id_are_kept_apart_by_kind():
+    closes = {"FPT": _days(date(2025, 1, 1), [50] * 700)}
+    thesis = {"symbol": "FPT", "closed_on": None, "conditions": [], "history": [
+        {"type": "hold", "kind": "f_score", "broken_on": "2025-02-01", "broken_price": "50000"},
+        {"type": "hold", "kind": "loss_vs_cost", "broken_on": "2025-02-01", "broken_price": "50000"}]}
+    out = hindsight(_ev(("buy", "2025-01-01", "FPT", 100, "50000")), closes=closes, index=_flat_index(), journal=[], theses=[thesis],
+                    threshold=Decimal("0.3"), today=TODAY)
+    assert [b["kind"] for b in out["breaks"]] == ["f_score", "loss_vs_cost"]
+
+
+def test_hindsight_replays_the_ledger_once(monkeypatch):
+    import investment_agent.domain.hindsight as hs
+    calls = []
+    real = hs.snapshots
+    monkeypatch.setattr(hs, "snapshots", lambda events: calls.append(1) or real(events))
+    monkeypatch.setattr(hs, "replay", lambda *a, **k: (_ for _ in ()).throw(AssertionError("replay per prefix")), raising=False)
+    closes = {"AAA": _days(date(2025, 1, 1), [10] * 700)}
+    rows = [("buy", (date(2025, 1, 2) + timedelta(days=i)).isoformat(), "AAA", 10, "10000") for i in range(30)]
+    hindsight(_ev(*rows), closes=closes, index=_flat_index(), journal=[], theses=[], threshold=Decimal("0.3"), today=TODAY)
+    assert calls == [1]

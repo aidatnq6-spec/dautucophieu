@@ -192,3 +192,17 @@ def test_the_owners_lesson_is_added_to_the_first_note_when_there_is_one(tmp_path
     thesis_check_run(repo, OWNER, data, scope="data", facts={"FPT": _facts(data)}, shares={"FPT": 1000}, held={"FPT"}, send=send, now=NOW,
                      today=TODAY, request_id="c1", lesson=lambda t, c: "5 lần trước bạn giữ tiếp")
     assert "• Bài học của chính bạn: 5 lần trước bạn giữ tiếp" in box[0]
+
+
+def test_a_long_check_goes_out_as_several_notes_each_marked_on_its_own(tmp_path):
+    repo, data = _repo(), _data(tmp_path)
+    raw = {"reasons": ["cheap"], "note": "x" * 1900, "conditions": [{"kind": "loss_vs_cost", "params": {"pct": "10"}},
+                                                                   {"kind": "close_below", "params": {"level": "45"}}]}
+    save(repo, OWNER, symbol="FPT", raw=raw, company="other", facts=_facts(data), today=TODAY, expected_version=0, request_id="t1", held={"FPT"})
+    sent = []
+    send = lambda text: (sent.append(text) or True) if len(sent) == 0 else False  # noqa: E731  the second note fails
+    thesis_check_run(repo, OWNER, data, scope="data", facts={"FPT": _facts(data)}, shares={"FPT": 1000}, held={"FPT"}, send=send, now=NOW,
+                     today=TODAY, request_id="c1")
+    assert len(sent) == 1 and all(len(t) < 4096 for t in sent)
+    flags = [c["sent_first"] for c in read_theses(repo, OWNER)[0][0]["conditions"]]
+    assert flags == [True, False]  # the note that went out is not sent again; the other is offered next time

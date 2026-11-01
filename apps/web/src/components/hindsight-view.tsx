@@ -95,7 +95,8 @@ export function HindsightView() {
             <td className="num">{formatDecimal(String(Number(t.price) / 1000), 2)}</td>
             {["3", "6", "12"].map((m) => <td key={m}>{horizonText(t.horizons[m])}</td>)}</tr>)}</tbody>
         </table></div>}
-        <p className="caption">Lệnh bán: số sau đó là giá đi tiếp sau khi bán (dương là bán non, âm là thoát đúng lúc). Giá tính bằng nghìn đồng.</p>
+        <p className="caption">Lệnh bán: số sau đó là giá đi tiếp sau khi bán (dương là bán non, âm là thoát đúng lúc). Giá tính bằng nghìn đồng.
+          Một mã chỉ tính là đã thoát hết khi không còn cả cổ phiếu thưởng chờ về.</p>
       </>}
     </section>
   );

@@ -44,3 +44,16 @@ def test_the_owners_own_lesson_needs_five_past_holds():
     assert lesson(four) is None
     five = four + [{"held_on": True, "change": "0.0500"}, {"held_on": False, "change": "-0.5"}]
     assert lesson(five) == "5 lần trước bạn giữ tiếp sau khi điều kiện bị phá; so với bán ngay lúc báo đầu, trung bình −7,0% (đã xảy ra, không phải dự báo)."
+
+
+def test_tickers_only_in_the_opening_balance_get_their_closes(tmp_path):
+    store = SeriesStore(tmp_path / "trend-sources")
+    store.upsert("HPG-1d", [(datetime(2026, 1, 1) + timedelta(days=i), "30" if i < 10 else "18") for i in range(380)])
+    clock = Clock()
+    c = client(tmp_path, clock)
+    call(c, clock, "POST", "/internal/ledger/events", {"event": {"event_id": "o1", "type": "opening_balance", "effective_at": "2026-01-02",
+                                                                 "sequence": 0, "cash": "10000000",
+                                                                 "positions": [{"security_id": "HPG", "quantity": 100, "total_cost": "3000000"}]},
+                                                       "expected_version": 0, "request_id": "l1"})
+    out = call(c, clock, "GET", "/internal/hindsight").json()
+    assert [h["symbol"] for h in out["loss_holds"]] == ["HPG"]  # 18 against the close of 30 on the opening day: down 40%

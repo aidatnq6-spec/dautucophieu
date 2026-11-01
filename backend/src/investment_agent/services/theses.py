@@ -221,6 +221,7 @@ def render(blocks: list[list[str]], now: datetime) -> str:
 
 
 READINGS = ("reading", "current", "reason")
+NOTE_LIMIT = 3800  # Telegram allows 4096 characters
 
 
 def _state(theses: list[dict]) -> list[dict]:
@@ -232,7 +233,8 @@ def thesis_check_run(repo, owner, data_dir: Path, *, scope: str, facts: dict[str
     """One check: close theses of tickers no longer held, evaluate the conditions of `scope` ("price": during the session; "data":
     all of them, after the close), send one note for what is due, and record it as sent only when the note went out."""
     theses, version = read_theses(repo, owner)
-    closed, events_all, blocks, out = 0, [], [], []
+    closed, out = 0, []
+    pieces: list[tuple[int, dict, list[str]]] = []  # (thesis position, event, lines)
     for t in theses:
         if t["closed_on"] is None and t["symbol"] not in held:
             t = {**t, "closed_on": today.isoformat()}
@@ -245,14 +247,23 @@ def thesis_check_run(repo, owner, data_dir: Path, *, scope: str, facts: dict[str
         t, events = advance(t, results, today=today, price=f.get("price"))
         for e in events:
             c = e["condition"]
-            blocks.append(_first(t, c, f, shares.get(t["symbol"]), lesson(t, c) if lesson else None) if e["type"] == "first"
-                          else _step(t, c, f, e["level"]) if e["type"] == "step" else _review(t, c))
-        events_all.append((len(out), events))
+            pieces.append((len(out), e, _first(t, c, f, shares.get(t["symbol"]), lesson(t, c) if lesson else None) if e["type"] == "first"
+                           else _step(t, c, f, e["level"]) if e["type"] == "step" else _review(t, c)))
         out.append(t)
-    sent = bool(blocks) and send is not None and send(render(blocks, now))
-    if sent:
-        for i, events in events_all:
-            out[i] = mark_sent(out[i], events)
+    # Notes kept under Telegram's size so each goes out whole; each is marked as sent on its own, so a failure resends only itself.
+    notes: list[list[tuple[int, dict, list[str]]]] = []
+    for piece in pieces:
+        if notes and len(render([b for _, _, b in notes[-1]] + [piece[2]], now)) <= NOTE_LIMIT:
+            notes[-1].append(piece)
+        else:
+            notes.append([piece])
+    sent = 0
+    for note in notes:
+        if send is None or not send(render([b for _, _, b in note], now)):
+            continue
+        sent += 1
+        for i, e, _ in note:
+            out[i] = mark_sent(out[i], [e])
     if _state(out) != _state(theses):  # readings alone do not rewrite the record (the page reads them live)
         _write(repo, owner, out, version, request_id)
-    return {"status": "ok", "open": sum(t["closed_on"] is None for t in out), "closed": closed, "events": len(blocks), "sent": sent}
+    return {"status": "ok", "open": sum(t["closed_on"] is None for t in out), "closed": closed, "events": len(pieces), "sent": bool(notes) and sent == len(notes)}

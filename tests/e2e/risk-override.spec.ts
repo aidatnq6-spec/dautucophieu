@@ -9,7 +9,9 @@ test("a risk group chosen by hand shows its score range and equity share, and ca
   await seedOwner(page);
   await page.goto("/profile");
   const risk = page.getByRole("region", { name: "Khảo sát rủi ro" });
+  await expect(risk.getByTestId("risk-effective")).toHaveText("Cân bằng · 39 điểm · cổ phiếu 35%");
   await risk.getByLabel("Chọn nhóm thủ công").selectOption("strong_growth");
+  await expect(risk.getByLabel("Chọn nhóm thủ công")).toHaveValue("strong_growth");
   await risk.getByRole("button", { name: "Áp dụng" }).click();
   await expect(risk.getByTestId("risk-effective")).toHaveText("Tăng trưởng mạnh · 47–52 điểm · cổ phiếu 60%");
   await expect(risk.getByText("Tự chọn", { exact: true })).toBeVisible();

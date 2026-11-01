@@ -141,9 +141,9 @@ function CandleChart({ data, liveT, livePrice, drawings, onPoint, drawing }: Cha
       const rsi = chart.addSeries(LineSeries, { color: C.rsi, lineWidth: 1, priceLineVisible: false }, 2);
       rsi.setData(data.rsi.map((r) => ({ time: t(r.t), value: r.v })));
       for (const level of [70, 30]) rsi.createPriceLine({ price: level, color: C.muted, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "" });
-      const panes = chart.panes();
-      panes[1]?.setHeight(110);
-      panes[2]?.setHeight(90);
+      // Shares, not pixels: the chart is still unsized here (autoSize), so pixel heights came out as a sliver for MACD.
+      // 320/110/90 of the 520 px box, kept in proportion on the 420 px phone layout.
+      chart.panes().forEach((pane, i) => pane.setStretchFactor([320, 110, 90][i] ?? 1));
       last.current = data.bars.at(-1) ?? null;
       applyLive({ box, price, last, latest }, data.style);
       const shown = data.interval === "1D" ? 180 : 120;

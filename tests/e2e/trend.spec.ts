@@ -100,6 +100,20 @@ test("a level and a trend line are drawn on the price pane, kept per frame, and 
   await expect(fpt.getByRole("list", { name: "Hình vẽ" })).toHaveCount(0);
 });
 
+test("the MACD and RSI panes keep a readable height under the candles", async ({ page }) => {
+  await openTrend(page);
+  const canvas = page.getByRole("region", { name: "Bảng giá và biểu đồ" }).getByTestId("tb-canvas");
+  await expect(canvas.locator("canvas").first()).toBeVisible();
+  // One table row per pane, with a thin separator row between them.
+  const panes = async () => (await canvas.locator("table > tr, table > tbody > tr").evaluateAll((rows) => rows.map((r) => r.getBoundingClientRect().height)))
+    .filter((h) => h > 5);
+  await expect.poll(async () => (await panes()).length).toBe(4);  // price, MACD, RSI, time axis
+  const [price, macd, rsi] = await panes();
+  expect(price).toBeGreaterThan(250);
+  expect(macd).toBeGreaterThan(80);
+  expect(rsi).toBeGreaterThan(70);
+});
+
 for (const width of [375, 1440]) {
   test(`the trend page has no horizontal scroll, on the page or inside any card, at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });

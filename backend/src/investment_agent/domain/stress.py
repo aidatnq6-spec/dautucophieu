@@ -29,14 +29,17 @@ def _dmy(iso: str) -> str:
 
 
 def stress_inputs(*, shares: dict[str, int], costs: dict[str, Decimal], prices: dict[str, Decimal | None], betas: dict[str, dict],
-                  sensitivity: dict[str, dict], index: list, answer10: str | None, threshold: Decimal) -> dict:
+                  sensitivity: dict[str, dict], index: list, answer10: str | None, threshold: Decimal, watched: set[str] | None = None) -> dict:
     rows = []
     for symbol in sorted(shares, key=lambda s: -(shares[s] * (prices.get(s) or 0))):
         price = prices.get(symbol)
         oil, oil_note = _factor(sensitivity.get(symbol), "oil")
         usd, usd_note = _factor(sensitivity.get(symbol), "usd")
+        beta = (betas.get(symbol) or {}).get("beta")
+        beta_note = None if beta else "Mã ngoài danh sách theo dõi nên chưa lấy beta" if watched is not None and symbol not in watched \
+            else "VNDirect chưa có beta"
         rows.append({"symbol": symbol, "shares": shares[symbol], "price": _s(price), "value": _s(None if price is None else price * shares[symbol]),
-                     "cost": _s(costs.get(symbol)), "beta": (betas.get(symbol) or {}).get("beta"), "oil": oil, "usd": usd,
+                     "cost": _s(costs.get(symbol)), "beta": beta, "beta_note": beta_note, "oil": oil, "usd": usd,
                      "oil_note": oil_note, "usd_note": usd_note})
     deepest = max_drawdown(index)
     worst = None if deepest is None or Decimal(deepest["depth"]) >= 0 else {"depth": deepest["depth"], "peak": deepest["peak"], "trough": deepest["trough"]}

@@ -33,7 +33,7 @@ def test_holdings_values_betas_and_the_owners_answer_ten(tmp_path):
     call(c, clock, "PUT", "/internal/risk", {"answers": answers, "confirmed_conflicts": [], "expected_version": 0, "request_id": "r1"})
     out = call(c, clock, "GET", "/internal/stress").json()
     assert out["rows"][0] | {"oil_note": None, "usd_note": None} == {
-        "symbol": "FPT", "shares": 100, "price": "60000", "value": "6000000", "cost": "50000", "beta": "1.2", "oil": None, "usd": None,
+        "symbol": "FPT", "shares": 100, "price": "60000", "value": "6000000", "cost": "50000", "beta": "1.2", "beta_note": None, "oil": None, "usd": None,
         "oil_note": None, "usd_note": None}
     assert out["tolerance"]["answer"] == "B" and out["worst"]["depth"] == "-0.2500" and out["threshold"] == "0.30"
 

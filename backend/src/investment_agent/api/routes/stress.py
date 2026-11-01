@@ -11,6 +11,7 @@ from investment_agent.domain.stress import stress_inputs
 from investment_agent.market.beta import BetaStore
 from investment_agent.market.leading import MacroStore
 from investment_agent.market.series import SeriesStore
+from investment_agent.market.watchlist import load_watchlist
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.drawdown import held_costs, last_close
 from investment_agent.services.records import StoredRisk, portfolio_settings, read_version
@@ -50,4 +51,5 @@ def stress(request: Request):
     index = closes("VNINDEX-1d")
     sens = {s: sensitivity(closes(f"{s}-1d"), index=index, oil=factor["oil"], usd=factor["usd"], weeks=SPANS["3y"]) for s in shares}
     return stress_inputs(shares=shares, costs=costs, prices=prices, betas=BetaStore(data_dir).read()["values"], sensitivity=sens,
-                         index=series.read("VNINDEX-1d"), answer10=answer, threshold=threshold)
+                         index=series.read("VNINDEX-1d"), answer10=answer, threshold=threshold,
+                         watched=set(load_watchlist(Path(data_dir)).symbols))

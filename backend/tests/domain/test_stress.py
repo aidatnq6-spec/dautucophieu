@@ -13,7 +13,7 @@ def test_each_holding_gets_its_value_beta_and_only_clear_factor_relations():
                         prices={"FPT": D("60000"), "HPG": D("20000"), "VCB": None}, betas={"FPT": {"beta": "1.2", "date": "2026-10-30"}},
                         sensitivity=sens, index=[], answer10=None, threshold=D("0.3"))
     fpt, hpg, vcb = out["rows"]
-    assert fpt == {"symbol": "FPT", "shares": 100, "price": "60000", "value": "6000000", "cost": "50000", "beta": "1.2",
+    assert fpt == {"symbol": "FPT", "shares": 100, "price": "60000", "value": "6000000", "cost": "50000", "beta": "1.2", "beta_note": None,
                    "oil": "-0.150", "usd": None, "oil_note": None, "usd_note": "Quan hệ không rõ (|t| < 2)"}
     assert hpg["beta"] is None and hpg["oil"] is None and hpg["oil_note"] == "Chưa đủ dữ liệu để đo"
     assert vcb["value"] is None and vcb["price"] is None
@@ -35,3 +35,10 @@ def test_no_deepest_fall_preset_when_the_stored_index_never_fell():
     rising = [(datetime(2020, 1, 1) + timedelta(days=i), 1000 + i) for i in range(5)]
     out = stress_inputs(shares={}, costs={}, prices={}, betas={}, sensitivity={}, index=rising, answer10=None, threshold=D("0.3"))
     assert out["worst"] is None and "worst" not in [p["id"] for p in out["presets"]]
+
+
+def test_a_missing_beta_says_whether_the_ticker_is_watched():
+    out = stress_inputs(shares={"FPT": 1, "ABC": 1}, costs={}, prices={"FPT": D("1"), "ABC": D("1")}, betas={}, sensitivity={}, index=[],
+                        answer10=None, threshold=D("0.3"), watched={"FPT"})
+    notes = {r["symbol"]: r["beta_note"] for r in out["rows"]}
+    assert notes == {"FPT": "VNDirect chưa có beta", "ABC": "Mã ngoài danh sách theo dõi nên chưa lấy beta"}

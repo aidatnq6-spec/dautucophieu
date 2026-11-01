@@ -81,7 +81,7 @@ export function PortfolioView() {
       <ConcentrationView />
       <PerformanceView />
       <DrawdownView />
-      <StressView />
+      <StressView ledgerVersion={ledger.version} />
 
       <section className="surface">
         <h2>Cổ phiếu đang nắm giữ</h2>

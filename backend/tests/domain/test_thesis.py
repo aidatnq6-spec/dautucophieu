@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from investment_agent.domain.thesis import ThesisError, evaluate, validate_thesis
+from investment_agent.domain.thesis import ThesisError, advance, edit_thesis, evaluate, hold_condition, mark_sent, new_thesis, validate_thesis
 
 D = Decimal
 
@@ -106,3 +106,115 @@ def test_a_thesis_needs_reasons_valid_conditions_and_a_loss_limit_when_bought_ou
         with pytest.raises(ThesisError) as err:
             validate_thesis(raw, company=company)
         assert err.value.code == code
+
+
+TODAY = date(2026, 11, 2)
+BROKEN = {"state": "broken", "reading": "x", "reason": None}
+
+
+def _thesis(*conds, fair=None):
+    raw = {"reasons": ["cheap"], "note": "Rẻ", "conditions": [{"kind": k, "params": p} for k, p in conds]}
+    return new_thesis("FPT", validate_thesis(raw, company="other"), today=TODAY, snapshot={"price": "50000", "fair": fair})
+
+
+def _ids(t):
+    return [c["id"] for c in t["conditions"]]
+
+
+def test_a_broken_condition_stays_broken_when_the_price_recovers_and_is_reported_once():
+    t = _thesis(("loss_vs_cost", {"pct": "10"}))
+    cid = _ids(t)[0]
+    t, events = advance(t, {cid: {"state": "broken", "reading": "giá 44", "reason": None}}, today=TODAY, price=D("44000"))
+    c = t["conditions"][0]
+    assert c["status"] == "broken" and c["broken_on"] == "2026-11-02" and c["broken_price"] == "44000"
+    assert [e["type"] for e in events] == ["first"]
+    t, events = advance(t, {cid: {"state": "broken", "reading": "giá 44", "reason": None}}, today=TODAY, price=D("44000"))
+    assert [e["type"] for e in events] == ["first"]  # not sent yet: offered again
+    t = mark_sent(t, events)
+    t, events = advance(t, {cid: {"state": "ok", "reading": "giá 49", "reason": None}}, today=TODAY + timedelta(days=3), price=D("49000"))
+    assert events == [] and t["conditions"][0]["status"] == "broken" and t["conditions"][0]["current"] == "giá 49"
+
+
+def test_each_further_five_percent_fall_since_the_first_report_is_reported_once():
+    t = _thesis(("loss_vs_cost", {"pct": "10"}))
+    cid = _ids(t)[0]
+    t, ev = advance(t, {cid: BROKEN}, today=TODAY, price=D("40000"))
+    t = mark_sent(t, ev)
+    t, ev = advance(t, {cid: BROKEN}, today=TODAY, price=D("37900"))  # −5.25%
+    assert [(e["type"], e["level"]) for e in ev] == [("step", 1)]
+    t = mark_sent(t, ev)
+    t, ev = advance(t, {cid: BROKEN}, today=TODAY, price=D("37800"))
+    assert ev == []
+    t, ev = advance(t, {cid: BROKEN}, today=TODAY, price=D("33000"))  # −17.5%
+    assert [(e["type"], e["level"]) for e in ev] == [("step", 3)]
+
+
+def test_unknown_keeps_the_last_known_state_and_says_why():
+    t = _thesis(("f_score", {"n": 3}))
+    cid = _ids(t)[0]
+    t, ev = advance(t, {cid: {"state": "unknown", "reading": None, "reason": "Chưa có F-Score"}}, today=TODAY, price=None)
+    assert ev == [] and t["conditions"][0]["status"] == "unknown" and t["conditions"][0]["reason"] == "Chưa có F-Score"
+
+
+def test_holding_on_with_a_reason_silences_only_that_condition_until_the_review_date():
+    t = _thesis(("loss_vs_cost", {"pct": "10"}), ("f_score", {"n": 3}))
+    loss, fs = _ids(t)
+    t, ev = advance(t, {loss: BROKEN}, today=TODAY, price=D("40000"))
+    t = mark_sent(t, ev)
+    in30 = TODAY + timedelta(days=30)
+    for kwargs, code in (({"cond_id": loss, "reason": "", "until": in30}, "reason_required"),
+                         ({"cond_id": loss, "reason": "Chờ KQKD quý 4", "until": None}, "hold_needs_condition_or_date"),
+                         ({"cond_id": loss, "reason": "Chờ", "until": TODAY + timedelta(days=91)}, "invalid_review_date"),
+                         ({"cond_id": fs, "reason": "Chờ", "until": in30}, "not_broken")):
+        with pytest.raises(ThesisError) as err:
+            hold_condition(t, kwargs["cond_id"], reason=kwargs["reason"], until=kwargs["until"], new_condition=None, today=TODAY, entry_id="j1")
+        assert err.value.code == code
+    t = hold_condition(t, loss, reason="Chờ KQKD quý 4", until=in30, new_condition=None, today=TODAY, entry_id="j1")
+    assert t["history"][-1] == {"type": "hold", "condition": loss, "kind": "loss_vs_cost", "on": "2026-11-02", "reason": "Chờ KQKD quý 4",
+                                "broken_on": "2026-11-02", "broken_price": "40000", "until": "2026-12-02", "entry_id": "j1"}
+    t, ev = advance(t, {loss: BROKEN, fs: BROKEN}, today=TODAY + timedelta(days=5), price=D("30000"))
+    assert [(e["type"], e["condition"]["kind"]) for e in ev] == [("first", "f_score")]  # the other condition still reports
+    t = mark_sent(t, ev)
+    t, ev = advance(t, {loss: BROKEN, fs: BROKEN}, today=TODAY + timedelta(days=31), price=D("30000"))
+    assert [(e["type"], e["condition"]["kind"]) for e in ev] == [("review", "loss_vs_cost")]
+    t = mark_sent(t, ev)
+    t, ev = advance(t, {loss: BROKEN, fs: BROKEN}, today=TODAY + timedelta(days=32), price=D("30000"))
+    assert [e["type"] for e in ev] == ["step"] and ev[0]["condition"]["kind"] == "loss_vs_cost"  # reminders resume after the date
+
+
+def test_holding_on_with_a_new_condition_replaces_the_broken_one_and_keeps_it_in_history():
+    t = _thesis(("loss_vs_cost", {"pct": "10"}))
+    loss = _ids(t)[0]
+    t, ev = advance(t, {loss: BROKEN}, today=TODAY, price=D("40000"))
+    t = mark_sent(t, ev)
+    t = hold_condition(t, loss, reason="Nới ngưỡng vì đã mua thêm", until=None, today=TODAY, entry_id="j2",
+                       new_condition={"kind": "loss_vs_cost", "params": {"pct": "25"}}, company="other")
+    assert len(t["conditions"]) == 1 and t["conditions"][0]["id"] != loss and t["conditions"][0]["params"] == {"pct": "25"}
+    assert t["conditions"][0]["status"] is None and t["conditions"][0]["set_on"] == "2026-11-02"
+    assert t["history"][0]["id"] == loss and t["history"][0]["ended_by"] == "hold" and t["history"][1]["type"] == "hold"
+
+
+def test_editing_keeps_broken_conditions_and_versions_the_rest():
+    t = _thesis(("loss_vs_cost", {"pct": "10"}), ("f_score", {"n": 3}), fair="60000")
+    loss, fs = _ids(t)
+    t, ev = advance(t, {loss: BROKEN}, today=TODAY, price=D("40000"))
+    base = {"reasons": ["cheap"], "note": "Rẻ"}
+    for conds in ([{"id": fs, "kind": "f_score", "params": {"n": 3}}],  # dropping the broken one
+                  [{"id": loss, "kind": "loss_vs_cost", "params": {"pct": "30"}}, {"id": fs, "kind": "f_score", "params": {"n": 3}}]):
+        with pytest.raises(ThesisError) as err:
+            edit_thesis(t, {**base, "conditions": conds}, company="other", today=TODAY, fair="60000")
+        assert err.value.code == "broken_locked"
+    t = edit_thesis(t, {**base, "note": "Rẻ, thêm điều kiện", "conditions": [
+        {"id": loss, "kind": "loss_vs_cost", "params": {"pct": "10"}}, {"id": fs, "kind": "f_score", "params": {"n": 4}},
+        {"kind": "fair_cut", "params": {"pct": "15"}}]}, company="other", today=TODAY, fair="58000")
+    assert t["version"] == 2 and t["note"] == "Rẻ, thêm điều kiện"
+    assert t["conditions"][0]["status"] == "broken" and t["conditions"][0]["id"] == loss  # untouched
+    assert t["conditions"][1]["params"] == {"n": 4} and t["conditions"][1]["id"] != fs and t["history"][-1]["id"] == fs
+    assert t["conditions"][2]["fair_at_set"] == "58000"
+
+
+def test_a_thesis_saved_while_a_condition_is_already_broken_reports_it_at_once():
+    t = _thesis(("loss_vs_cost", {"pct": "10"}), fair="60000")
+    assert t["conditions"][0]["set_on"] == "2026-11-02" and t["snapshot"]["price"] == "50000" and t["version"] == 1
+    t, ev = advance(t, {_ids(t)[0]: BROKEN}, today=TODAY, price=D("40000"))
+    assert ev[0]["type"] == "first" and t["conditions"][0]["broken_on"] == TODAY.isoformat()

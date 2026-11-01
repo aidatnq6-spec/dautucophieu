@@ -181,6 +181,136 @@ def validate_condition(raw: dict, *, company: str | None) -> dict:
     return {"id": uuid.uuid4().hex[:12], "kind": kind, "params": {n: _param(kind, n, params.get(n)) for n in names}}
 
 
+STEP = Decimal("0.05")  # a further fall of 5% from the price at the first report is reported again, once per step
+MAX_HOLD_DAYS = 90
+
+
+def _fresh(cond: dict, today: date, fair: str | None) -> dict:
+    out = {**cond, "set_on": today.isoformat(), "status": None, "reading": None, "reason": None, "current": None, "broken_on": None,
+           "broken_price": None, "broken_reading": None, "sent_first": False, "steps_sent": [], "hold": None}
+    if cond["kind"] == "fair_cut":
+        out["fair_at_set"] = fair
+    return out
+
+
+def new_thesis(symbol: str, validated: dict, *, today: date, snapshot: dict) -> dict:
+    """A new thesis from validate_thesis(); snapshot holds the figures at that moment (each may be None)."""
+    return {"id": uuid.uuid4().hex[:12], "symbol": symbol, "reasons": validated["reasons"], "note": validated["note"],
+            "created_on": today.isoformat(), "snapshot": snapshot, "version": 1, "closed_on": None, "history": [],
+            "conditions": [_fresh(c, today, snapshot.get("fair")) for c in validated["conditions"]]}
+
+
+def _holding(cond: dict, today: date) -> bool:
+    hold = cond.get("hold")
+    return bool(hold) and (hold.get("until") is None or today <= date.fromisoformat(hold["until"]))
+
+
+def advance(thesis: dict, results: dict[str, dict], *, today: date, price: Decimal | None) -> tuple[dict, list[dict]]:
+    """Apply one check. A broken condition stays broken (only its current reading changes) until the thesis closes or the owner
+    holds on with a reason. Returns the events to report: first (newly broken, offered until sent), step (a further 5% fall
+    from the price at the first report), review (a hold-on date has passed)."""
+    t = {**thesis, "conditions": [dict(c) for c in thesis["conditions"]]}
+    events = []
+    for c in t["conditions"]:
+        r = results.get(c["id"])
+        if r is None:
+            continue
+        if c["status"] == "broken":
+            c["current"] = r["reading"] or r["reason"]
+        else:
+            c.update(status=r["state"], reading=r["reading"], reason=r["reason"], current=r["reading"])
+            if r["state"] == "broken":
+                c.update(broken_on=today.isoformat(), broken_price=None if price is None else format(price.normalize(), "f"),
+                         broken_reading=r["reading"])
+        if c["status"] != "broken":
+            continue
+        hold = c.get("hold")
+        if _holding(c, today):
+            continue
+        if hold and not hold.get("review_sent"):
+            events.append({"type": "review", "condition": c})
+        elif not c["sent_first"]:
+            events.append({"type": "first", "condition": c})
+        elif price is not None and c["broken_price"]:
+            level = int((1 - price / Decimal(c["broken_price"])) / STEP)
+            if level >= 1 and level not in c["steps_sent"] and level > max(c["steps_sent"], default=0):
+                events.append({"type": "step", "condition": c, "level": level})
+    return t, events
+
+
+def mark_sent(thesis: dict, events: list[dict]) -> dict:
+    """Record the events as delivered (call only after the message went out)."""
+    t = {**thesis, "conditions": [dict(c) for c in thesis["conditions"]]}
+    by_id = {c["id"]: c for c in t["conditions"]}
+    for e in events:
+        c = by_id.get(e["condition"]["id"])
+        if c is None:
+            continue
+        if e["type"] == "first":
+            c["sent_first"] = True
+        elif e["type"] == "step":
+            c["steps_sent"] = sorted({*c["steps_sent"], e["level"]})
+        elif e["type"] == "review":
+            c["hold"] = {**c["hold"], "review_sent": True}
+            c["sent_first"] = True
+    return t
+
+
+def hold_condition(thesis: dict, cond_id: str, *, reason: str, until: date | None, new_condition: dict | None, today: date, entry_id: str,
+                   company: str | None = None, fair: str | None = None) -> dict:
+    """Giữ tiếp, có lý do: a written reason and either a replacement condition or a review date within 90 days."""
+    c = next((c for c in thesis["conditions"] if c["id"] == cond_id), None)
+    if c is None:
+        raise ThesisError("condition_not_found", "Không tìm thấy điều kiện này; hãy tải lại.")
+    if c["status"] != "broken":
+        raise ThesisError("not_broken", "Chỉ điều kiện đã bị phá mới cần quyết định giữ tiếp.")
+    if not reason.strip():
+        raise ThesisError("reason_required", "Viết lý do giữ tiếp.")
+    if new_condition is None and until is None:
+        raise ThesisError("hold_needs_condition_or_date", "Đặt điều kiện mới hoặc ngày xem lại.")
+    if until is not None and not today < until <= today + timedelta(days=MAX_HOLD_DAYS):
+        raise ThesisError("invalid_review_date", f"Ngày xem lại trong vòng {MAX_HOLD_DAYS} ngày tới.")
+    record = {"type": "hold", "condition": c["id"], "kind": c["kind"], "on": today.isoformat(), "reason": reason.strip(),
+              "broken_on": c["broken_on"], "broken_price": c["broken_price"], "until": None if until is None else until.isoformat(),
+              "entry_id": entry_id}
+    t = {**thesis, "history": [*thesis["history"]]}
+    if new_condition is not None:
+        fresh = _fresh(validate_condition(new_condition, company=company), today, fair)
+        t["history"].append({**c, "ended_on": today.isoformat(), "ended_by": "hold"})
+        t["conditions"] = [fresh if x["id"] == cond_id else x for x in thesis["conditions"]]
+    else:
+        t["conditions"] = [{**x, "hold": {"since": today.isoformat(), "until": until.isoformat(), "reason": reason.strip(), "entry_id": entry_id,
+                                          "review_sent": False}} if x["id"] == cond_id else x for x in thesis["conditions"]]
+    t["history"].append(record)
+    return t
+
+
+def edit_thesis(thesis: dict, raw: dict, *, company: str | None, today: date, fair: str | None) -> dict:
+    """Change reasons, note and conditions. A broken condition can be neither changed nor removed (only held on with a reason);
+    a changed condition starts afresh under a new id and the old one goes to history."""
+    validated = validate_thesis(raw, company=company)
+    current = {c["id"]: c for c in thesis["conditions"]}
+    kept_ids = [c.get("id") for c in raw["conditions"]]
+    history = [*thesis["history"]]
+    for c in thesis["conditions"]:
+        if c["status"] == "broken" and c["id"] not in kept_ids:
+            raise ThesisError("broken_locked", "Điều kiện đã bị phá chỉ thay đổi qua “Giữ tiếp, có lý do”.")
+    conditions = []
+    for asked, checked in zip(raw["conditions"], validated["conditions"]):
+        old = current.get(asked.get("id"))
+        if old is not None and old["kind"] == checked["kind"] and old["params"] == checked["params"]:
+            conditions.append(old)
+            continue
+        if old is not None:
+            if old["status"] == "broken":
+                raise ThesisError("broken_locked", "Điều kiện đã bị phá chỉ thay đổi qua “Giữ tiếp, có lý do”.")
+            history.append({**old, "ended_on": today.isoformat(), "ended_by": "edit"})
+        conditions.append(_fresh(checked, today, fair))
+    history += [{**c, "ended_on": today.isoformat(), "ended_by": "edit"} for c in thesis["conditions"] if c["id"] not in kept_ids]
+    return {**thesis, "reasons": validated["reasons"], "note": validated["note"], "conditions": conditions, "history": history,
+            "version": thesis["version"] + 1}
+
+
 def validate_thesis(raw: dict, *, company: str | None) -> dict:
     reasons = raw.get("reasons") or []
     if not reasons:

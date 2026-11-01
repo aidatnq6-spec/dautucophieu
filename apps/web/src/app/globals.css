@@ -221,3 +221,6 @@ main h2{scroll-margin-top:16px}
 .th-conds .caption{overflow-wrap:anywhere}.th-form{display:grid;gap:10px;max-width:640px}.th-form fieldset{border:1px solid var(--line);border-radius:8px;padding:8px 12px;display:flex;flex-wrap:wrap;gap:6px 14px}
 .th-check{display:inline-flex;gap:6px;align-items:center;font-size:14px}.th-cond{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
 .co-list{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:10px}.co-list li{display:grid;gap:8px}.co-list .row{gap:8px 12px;flex-wrap:wrap;justify-content:flex-start}.co-list .pill{white-space:normal;overflow-wrap:anywhere}
+.sc-saved{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.sc-criteria{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;margin-bottom:10px}
+.sc-criteria fieldset{border:1px solid var(--line);border-radius:8px;padding:6px 10px;display:flex;flex-wrap:wrap;gap:4px 12px;min-width:0}
+.sc-save{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;margin-top:12px}.sc-missing{font-size:13px;padding-left:18px;overflow-wrap:anywhere}

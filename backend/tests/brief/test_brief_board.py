@@ -34,10 +34,19 @@ def test_breadth_totals_foreign_and_sectors():
     assert [x["symbol"] for x in f["top_sell"]] == ["MBB", "FPT"] and f["top_sell"][0]["net_value_bn"] == "-90.00"
     assert [x["symbol"] for x in f["top_buy"]] == ["VCB"]  # zero-net ACB skipped
     assert [(s["sector"], s["pct"], s["count"]) for s in out["sectors"]] == [("Ngân hàng", "0.0000", 3), ("Công nghệ Thông tin", "-0.0175", 1)]
-    assert out["symbols"]["FPT"] == {"price": 56000, "ref": 57000, "change": -1000, "pct": "-0.0175", "sector": "Công nghệ Thông tin"}
+    assert out["symbols"]["FPT"] == {"price": 56000, "ref": 57000, "change": -1000, "pct": "-0.0175", "sector": "Công nghệ Thông tin",
+                                     "foreign_net_bn": "-78.14"}  # per ticker, for the 20-session screen
+    assert out["symbols"]["ACB"]["foreign_net_bn"] == "0.00"
     assert out["symbols"]["XYZ"]["pct"] is None and out["symbols"]["XYZ"]["sector"] == "Khác"
 
 
 def test_board_of_another_day_is_not_used():
     out = summarise_board([rec("VCB", 1, 2, day="2026-10-23")], session_date=D, icb_names=ICB)
     assert out == {"status": "missing", "reason": "Bảng giá chưa phải phiên này"}
+
+
+def test_a_board_row_without_foreign_figures_stores_no_foreign_value():
+    row = {"symbol": "AAA", "trading_date": "2026-10-26", "ref_price": 10000, "match_price": 10100, "accumulated_value": 1.0,
+           "accumulated_volume": 100, "icb_code2": "8300"}
+    out = summarise_board([row], session_date=D, icb_names=ICB)
+    assert out["symbols"]["AAA"]["foreign_net_bn"] is None

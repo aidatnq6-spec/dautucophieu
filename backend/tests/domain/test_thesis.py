@@ -83,10 +83,12 @@ def test_chain_and_insider_conditions():
     assert evaluate(c, {"chains": []})["reason"] == "Mã không thuộc chuỗi giá trị nào"
     assert evaluate(c, {"chains": [None, "insufficient"]})["state"] == "unknown"
     i = cond("insider_sell")
-    sale = {"date": "2026-10-20", "name": "Ông A", "kind": "sell", "volume": 100000}
-    assert evaluate(i, {"insider_sells": [sale]})["state"] == "broken"
-    assert evaluate(i, {"insider_sells": []})["state"] == "ok"
-    assert evaluate(i, {"insider_sells": None})["state"] == "unknown"
+    sale = {"date": "2026-10-20", "kind": "Bán", "shares": 100000, "title": "Ông A bán cổ phiếu"}
+    out = evaluate(i, {"insider_deals": [sale]})
+    assert out["state"] == "broken" and out["reading"] == "1 thông báo bán sau ngày đặt, gần nhất 2026-10-20: Ông A bán cổ phiếu"
+    assert evaluate(i, {"insider_deals": [{**sale, "date": "2026-09-30"}]})["state"] == "ok"  # before the condition was set
+    assert evaluate(i, {"insider_deals": [{**sale, "kind": "Đăng kí bán"}]})["state"] == "ok"  # an intention, not a trade
+    assert evaluate(i, {"insider_deals": None})["state"] == "unknown"
 
 
 def test_a_thesis_needs_reasons_valid_conditions_and_a_loss_limit_when_bought_out_of_fear_of_missing_out():

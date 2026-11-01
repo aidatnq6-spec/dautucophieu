@@ -144,13 +144,13 @@ def evaluate(cond: dict, facts: dict) -> dict:
             return _unknown("Chuỗi giá trị chưa duyệt hoặc thiếu dữ liệu")
         return _result("ok", "không chuỗi nào bất lợi")
     if kind == "insider_sell":
-        sells = facts.get("insider_sells")
-        if sells is None:
+        deals = facts.get("insider_deals")
+        if deals is None:
             return _unknown("Chưa đọc được thông báo giao dịch nội bộ")
+        sells = sorted((d for d in deals if d.get("kind") == "Bán" and d.get("date", "") > cond["set_on"]), key=lambda d: d["date"], reverse=True)
         if not sells:
-            return _result("ok", "không có thông báo bán mới")
-        first = sells[0]
-        return _result("broken", f"{len(sells)} thông báo bán, gần nhất {first.get('date')}: {first.get('name')}")
+            return _result("ok", "không có thông báo bán mới sau ngày đặt")
+        return _result("broken", f"{len(sells)} thông báo bán sau ngày đặt, gần nhất {sells[0]['date']}: {sells[0].get('title') or ''}".rstrip(": "))
     raise ThesisError("invalid_condition", "Loại điều kiện không hợp lệ.")
 
 

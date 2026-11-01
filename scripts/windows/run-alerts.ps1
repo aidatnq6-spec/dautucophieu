@@ -8,3 +8,8 @@ $python = Get-RepoPython
 $data = Join-Path $script:RepoRoot 'data'
 $out = & $python -W ignore -m investment_agent.cli price-alerts --data-dir $data 2>$null
 "$(Get-Date -Format o) price-alerts exit=$LASTEXITCODE $out" | Add-Content -LiteralPath $log -Encoding UTF8
+# Luan diem dau tu: loss against cost for open theses, on the same wake-up (nothing is read outside the session).
+$calendar = Join-Path $data 'trading-calendar.json'
+if (-not (Test-Path -LiteralPath $calendar)) { $calendar = Join-Path $script:RepoRoot "config\trading-calendar-hose-$((Get-Date).Year).json" }
+$tc = & $python -W ignore -m investment_agent.cli thesis-check --scope price --data-dir $data --calendar $calendar 2>$null
+"$(Get-Date -Format o) thesis-check-price exit=$LASTEXITCODE $tc" | Add-Content -LiteralPath $log -Encoding UTF8

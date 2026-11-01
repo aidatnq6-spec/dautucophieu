@@ -212,7 +212,7 @@ def test_editing_keeps_broken_conditions_and_versions_the_rest():
         {"kind": "fair_cut", "params": {"pct": "15"}}]}, company="other", today=TODAY, fair="58000")
     assert t["version"] == 2 and t["note"] == "Rẻ, thêm điều kiện"
     assert t["conditions"][0]["status"] == "broken" and t["conditions"][0]["id"] == loss  # untouched
-    assert t["conditions"][1]["params"] == {"n": 4} and t["conditions"][1]["id"] != fs and t["history"][-1]["id"] == fs
+    assert t["conditions"][1]["params"] == {"n": 4} and t["conditions"][1]["id"] != fs and any(h.get("id") == fs for h in t["history"])
     assert t["conditions"][2]["fair_at_set"] == "58000"
 
 
@@ -244,3 +244,16 @@ def test_a_thesis_saved_while_a_condition_is_already_broken_reports_it_at_once()
     assert t["conditions"][0]["set_on"] == "2026-11-02" and t["snapshot"]["price"] == "50000" and t["version"] == 1
     t, ev = advance(t, {_ids(t)[0]: BROKEN}, today=TODAY, price=D("40000"))
     assert ev[0]["type"] == "first" and t["conditions"][0]["broken_on"] == TODAY.isoformat()
+
+
+def test_an_edit_keeps_the_old_reasons_and_words():
+    t = _thesis(("loss_vs_cost", {"pct": "10"}))
+    cid = _ids(t)[0]
+    t = edit_thesis(t, {"reasons": ["earnings"], "note": "Lãi tăng", "conditions": [{"id": cid, "kind": "loss_vs_cost", "params": {"pct": "10"}}]},
+                    company="other", today=TODAY, fair=None)
+    assert t["history"][-1] == {"type": "edit", "on": "2026-11-02", "version": 1, "reasons": ["cheap"], "note": "Rẻ"}
+
+
+def test_health_levels_read_in_vietnamese():
+    out = evaluate(cond("health_weak"), {"quality": {"kind": "health", "score": 1, "level": "weak", "year": "Q3/2026"}})
+    assert "yếu" in out["reading"] and "weak" not in out["reading"]

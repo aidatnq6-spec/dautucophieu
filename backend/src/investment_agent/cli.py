@@ -728,7 +728,8 @@ def price_alerts_cli(data_dir: Path, now=None) -> int:
 
 def thesis_check_cli(data_dir: Path, calendar_path: Path, scope: str, now=None) -> int:
     """Luận điểm đầu tư: "price" every few minutes in the session (loss against cost, one board read for those tickers), "data" after
-    the close (every condition, on stored data). Skipped while scheduled Telegram delivery is off, like the other alerts."""
+    the close (every condition, on stored data). With scheduled Telegram delivery off it records states and closes theses without
+    sending."""
     import uuid
     from datetime import datetime, timezone
     from decimal import Decimal
@@ -744,10 +745,14 @@ def thesis_check_cli(data_dir: Path, calendar_path: Path, scope: str, now=None) 
         print(json.dumps({"status": "skipped", "reason": "outside_session"}))
         return 0
     telegram = _scheduled_telegram()
-    if telegram is None:
-        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
-        return 0
-    send, repo, owner = telegram
+    if telegram is None:  # still record states and close sold tickers' theses; nothing is sent, so notes stay due for later
+        import os
+
+        from investment_agent.api.auth import OwnerContext
+        from investment_agent.repositories.firestore import personal_repository_from_env
+        send, repo, owner = None, personal_repository_from_env(), OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
+    else:
+        send, repo, owner = telegram
     today = now.astimezone(VN).date()
     held = held_from_repo(repo, owner)
     open_ = [t for t in read_theses(repo, owner)[0] if t["closed_on"] is None]

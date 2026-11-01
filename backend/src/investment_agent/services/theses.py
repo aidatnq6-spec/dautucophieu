@@ -4,7 +4,6 @@ Nhật ký), the facts each check reads from stored data, and the Telegram note 
 Personal data: stays on the owner's machine and in their Firestore; nothing here is ever sent to a model. The note gives the
 owner's own condition and words, a scenario from the ticker's stored history (never a forecast), and never says to sell."""
 
-import uuid
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -46,15 +45,16 @@ def company_of(data_dir: Path, symbol: str) -> str | None:
 
 
 def facts_for(data_dir: Path, symbol: str, *, cost: Decimal | None, row: dict | None, chains: list | None, deals: list | None,
-              live: Decimal | None = None) -> dict:
+              live: Decimal | None = None, live_only: bool = False) -> dict:
     """What the conditions read for one ticker, from stored data: closes (thousand đồng, given here in đồng), the reference valuation
-    row, quarterly profit, chain labels and insider notices. `live` is the board's price during the session."""
+    row, quarterly profit, chain labels and insider notices. `live` is the board's price during the session; with `live_only`
+    (the in-session check) a ticker without a matched price has no price, never the last close."""
     daily = SeriesStore(Path(data_dir) / "trend-sources").read(f"{symbol}-1d")
     close = Decimal(str(daily[-1][1])) * 1000 if daily else None
     quality = (row or {}).get("quality") or {}
     record = FundamentalsStore(Path(data_dir) / "fundamentals").read(symbol) or {}
     quarters = {q: Decimal(f["npat"]) for q, f in record.get("quarters", {}).items() if f.get("npat") is not None and "-Q" in q}
-    return {"price": live if live is not None else close, "close": close, "cost": cost, "fair": Decimal(row["fair"]) if row and row.get("fair") else None,
+    return {"price": live if live is not None or live_only else close, "close": close, "cost": cost, "fair": Decimal(row["fair"]) if row and row.get("fair") else None,
             "quality": quality.get("f_score"), "quality_reason": quality.get("reason"), "quarters": quarters,
             "daily": [(t.date(), v) for t, v in daily], "points": daily, "chains": chains, "insider_deals": deals}
 
@@ -88,7 +88,7 @@ def gather(data_dir: Path, repo, owner, symbols: list[str], *, scope: str, today
             got = insider(s)
             deals = None if got is None or got.get("reason") else got.get("deals")
         out[s] = facts_for(data_dir, s, cost=costs.get(s), row=rows.get(s), chains=None if chains is None else chains.get(s, []), deals=deals,
-                           live=(live or {}).get(s))
+                           live=(live or {}).get(s), live_only=scope == "price")
     return out
 
 
@@ -104,6 +104,10 @@ def _open(theses: list[dict], **match) -> dict | None:
 
 def _reasons(reasons: list[str]) -> str:
     return ", ".join(REASON_VI[r] for r in reasons)
+
+
+def _entry_id(prefix: str, request_id: str) -> str:
+    return f"{prefix}-{request_id}"[:64]
 
 
 def _refresh(thesis: dict, facts: dict, today: date) -> dict:
@@ -122,11 +126,12 @@ def save(repo, owner, *, symbol: str, raw: dict, company: str | None, facts: dic
         raise ThesisError("thesis_exists", "Mã này đã có luận điểm; hãy sửa luận điểm đó.")
     thesis = new_thesis(symbol, validate_thesis(raw, company=company), today=today, snapshot=_snapshot(facts))
     thesis = _refresh(thesis, facts, today)  # a condition already broken is recorded at once; the next check sends the note
-    version = _write(repo, owner, [*theses, thesis], expected_version, request_id)
-    append_entry(repo, owner, JournalEntry(entry_id=f"thesis-{thesis['id']}", symbol=symbol, kind="buy", created_on=today,
+    # The Nhật ký entry goes first under an id from the request: a retry after any failure finds it instead of losing or doubling it.
+    append_entry(repo, owner, JournalEntry(entry_id=_entry_id("thesis", request_id), symbol=symbol, kind="buy", created_on=today,
                                            reason=f"Luận điểm — lý do mua: {_reasons(thesis['reasons'])}. {thesis['note']}".strip(),
                                            emotion="fomo" if "fomo" in thesis["reasons"] else None,
-                                           context={"price": thesis["snapshot"]["price"]}), request_id=f"{request_id}-journal")
+                                           context={"price": thesis["snapshot"]["price"]}), request_id=f"{request_id}-journal"[:128])
+    version = _write(repo, owner, [*theses, thesis], expected_version, request_id)
     return [*theses, thesis], version
 
 
@@ -150,18 +155,17 @@ def hold(repo, owner, *, thesis_id: str, cond_id: str, reason: str, emotion: str
         raise ThesisError("thesis_not_found", "Không tìm thấy luận điểm này; hãy tải lại.")
     if emotion is not None and emotion not in EMOTIONS:
         raise ThesisError("invalid_emotion", "Cảm xúc không hợp lệ.")
-    entry_id = f"hold-{uuid.uuid4().hex[:12]}"
+    entry_id = _entry_id("hold", request_id)
     if facts is not None:
         found = _refresh(found, facts, today)
     changed = hold_condition(found, cond_id, reason=reason, until=until, new_condition=new_condition, today=today, entry_id=entry_id,
                              company=company, fair=fair)
     cond = next(c for c in found["conditions"] if c["id"] == cond_id)
-    theses = [changed if t["id"] == thesis_id and t["closed_on"] is None else t for t in theses]
-    version = _write(repo, owner, theses, expected_version, request_id)
     append_entry(repo, owner, JournalEntry(entry_id=entry_id, symbol=found["symbol"], kind="hold", created_on=today, emotion=emotion,
                                            reason=f"Giữ tiếp khi “{KINDS[cond['kind']][0]}” bị phá: {reason.strip()}",
-                                           context={"price": cond["broken_price"]}), request_id=f"{request_id}-journal")
-    return theses, version
+                                           context={"price": cond["broken_price"]}), request_id=f"{request_id}-journal"[:128])
+    theses = [changed if t["id"] == thesis_id and t["closed_on"] is None else t for t in theses]
+    return theses, _write(repo, owner, theses, expected_version, request_id)
 
 
 def _title(symbol: str, cond: dict) -> str:
@@ -216,6 +220,13 @@ def render(blocks: list[list[str]], now: datetime) -> str:
             "Không phải khuyến nghị. Phần mềm không đặt lệnh.")
 
 
+READINGS = ("reading", "current", "reason")
+
+
+def _state(theses: list[dict]) -> list[dict]:
+    return [{**t, "conditions": [{k: v for k, v in c.items() if k not in READINGS} for c in t["conditions"]]} for t in theses]
+
+
 def thesis_check_run(repo, owner, data_dir: Path, *, scope: str, facts: dict[str, dict], shares: dict[str, int], held: set[str], send,
                      now: datetime, today: date, request_id: str, lesson=None) -> dict:
     """One check: close theses of tickers no longer held, evaluate the conditions of `scope` ("price": during the session; "data":
@@ -238,10 +249,10 @@ def thesis_check_run(repo, owner, data_dir: Path, *, scope: str, facts: dict[str
                           else _step(t, c, f, e["level"]) if e["type"] == "step" else _review(t, c))
         events_all.append((len(out), events))
         out.append(t)
-    sent = bool(blocks) and send(render(blocks, now))
+    sent = bool(blocks) and send is not None and send(render(blocks, now))
     if sent:
         for i, events in events_all:
             out[i] = mark_sent(out[i], events)
-    if out != theses:
+    if _state(out) != _state(theses):  # readings alone do not rewrite the record (the page reads them live)
         _write(repo, owner, out, version, request_id)
     return {"status": "ok", "open": sum(t["closed_on"] is None for t in out), "closed": closed, "events": len(blocks), "sent": sent}

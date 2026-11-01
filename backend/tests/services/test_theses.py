@@ -129,3 +129,57 @@ def test_the_in_session_check_reads_nothing_outside_the_session(tmp_path, capsys
     from investment_agent.cli import thesis_check_cli
     assert thesis_check_cli(tmp_path, tmp_path / "calendar.json", "price", now=datetime(2026, 10, 31, 3, 30, tzinfo=timezone.utc)) == 0  # Saturday
     assert json.loads(capsys.readouterr().out) == {"status": "skipped", "reason": "outside_session"}
+
+
+def test_a_check_that_only_moves_readings_does_not_rewrite_the_record(tmp_path):
+    repo, data = _repo(), _data(tmp_path)
+    raw = {"reasons": ["cheap"], "note": "", "conditions": [{"kind": "loss_vs_cost", "params": {"pct": "50"}}]}
+    _, version = save(repo, OWNER, symbol="FPT", raw=raw, company="other", facts=_facts(data), today=TODAY, expected_version=0, request_id="t1",
+                      held={"FPT"})
+    for i, price in enumerate(("41000", "42000")):
+        live = facts_for(data, "FPT", cost=D("50000"), row=None, chains=None, deals=None, live=D(price))
+        thesis_check_run(repo, OWNER, data, scope="price", facts={"FPT": live}, shares={"FPT": 1000}, held={"FPT"}, send=lambda t: True,
+                         now=NOW, today=TODAY, request_id=f"c{i}")
+    assert read_theses(repo, OWNER)[1] == version  # the page's version stays valid while only the price moves
+
+
+def test_without_a_matched_price_the_in_session_check_does_not_use_the_last_close(tmp_path):
+    f = facts_for(_data(tmp_path), "FPT", cost=D("50000"), row=None, chains=None, deals=None, live=None, live_only=True)
+    assert f["price"] is None and f["close"] == D("40000")
+
+
+def test_journal_entries_are_written_first_under_ids_from_the_request_so_a_retry_does_not_lose_or_double_them(tmp_path, monkeypatch):
+    import investment_agent.services.theses as svc
+    from investment_agent.repositories.personal import RepositoryUnavailable
+    repo, data = _repo(), _data(tmp_path)
+    real, calls = svc.append_entry, []
+
+    def flaky(*a, **k):  # the journal write fails once, as when Firestore drops a request
+        calls.append(1)
+        if len(calls) == 1:
+            raise RepositoryUnavailable("down")
+        return real(*a, **k)
+    monkeypatch.setattr(svc, "append_entry", flaky)
+    with pytest.raises(RepositoryUnavailable):
+        save(repo, OWNER, symbol="FPT", raw=FOMO, company="other", facts=_facts(data), today=TODAY, expected_version=0, request_id="t1", held={"FPT"})
+    save(repo, OWNER, symbol="FPT", raw=FOMO, company="other", facts=_facts(data), today=TODAY, expected_version=0, request_id="t1", held={"FPT"})
+    assert [e.kind for e in read_journal(repo, OWNER)[0]] == ["buy"]
+    theses, v = read_theses(repo, OWNER)
+    calls.clear()
+    args = dict(thesis_id=theses[0]["id"], cond_id=theses[0]["conditions"][0]["id"], reason="Chờ", emotion=None, until=TODAY + timedelta(days=10),
+                new_condition=None, company="other", fair=None, today=TODAY, expected_version=v, request_id="h1")
+    with pytest.raises(RepositoryUnavailable):
+        hold(repo, OWNER, **args)
+    theses, _ = hold(repo, OWNER, **args)
+    holds = [e for e in read_journal(repo, OWNER)[0] if e.kind == "hold"]
+    assert len(holds) == 1 and theses[0]["history"][-1]["entry_id"] == holds[0].entry_id
+
+
+def test_with_delivery_off_the_check_still_records_and_closes_but_marks_nothing_sent(tmp_path):
+    repo, data = _repo(), _data(tmp_path)
+    save(repo, OWNER, symbol="FPT", raw=FOMO, company="other", facts=_facts(data), today=TODAY, expected_version=0, request_id="t1", held={"FPT"})
+    out = thesis_check_run(repo, OWNER, data, scope="data", facts={"FPT": _facts(data)}, shares={"FPT": 1000}, held={"FPT"}, send=None, now=NOW,
+                           today=TODAY, request_id="c1")
+    assert out["sent"] is False and read_theses(repo, OWNER)[0][0]["conditions"][0]["sent_first"] is False
+    out = thesis_check_run(repo, OWNER, data, scope="price", facts={}, shares={}, held=set(), send=None, now=NOW, today=TODAY, request_id="c2")
+    assert out["closed"] == 1

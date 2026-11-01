@@ -11,7 +11,8 @@ type Cond = { id: string; kind: string; params: Record<string, string | number>;
   broken_on: string | null; broken_price: string | null; set_on: string; hold: { until: string; reason: string } | null };
 type Thesis = { id: string; symbol: string; reasons: string[]; note: string; created_on: string; conditions: Cond[]; company: string | null };
 type Kind = { label: string; params: string[]; applies: string | null };
-type Data = { version: number; theses: Thesis[]; missing: string[]; kinds: Record<string, Kind>; reasons: Record<string, string> };
+type Data = { version: number; theses: Thesis[]; missing: string[]; companies: Record<string, string | null>; kinds: Record<string, Kind>;
+  reasons: Record<string, string> };
 type Draft = { id?: string; kind: string; values: Record<string, string> };
 
 const PARAM: Record<string, string> = { pct: "%", level: "mức giá (nghìn đồng)", n: "ngưỡng" };
@@ -34,6 +35,14 @@ export function conditionParams(names: string[], values: Record<string, string>)
   }
   return out;
 }
+
+/** Giữ tiếp is offered for a condition shown broken (recorded, or read so from stored data) unless a hold is in force through its date. */
+export function canHold(c: { status: string | null; view: View; hold: { until: string; reason: string } | null }, today: string): boolean {
+  return (c.status === "broken" || c.view.state === "broken") && (!c.hold || c.hold.until < today);
+}
+
+/** Today in Hà Nội as YYYY-MM-DD, as the server dates holds. */
+const todayVN = () => new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
 
 export function stateText(view: View, brokenOn: string | null): { text: string; tone: "good" | "bad" | "warn" } {
   if (view.state === "ok") return { text: "Đạt", tone: "good" };
@@ -58,7 +67,7 @@ function ConditionFields({ draft, kinds, company, onChange, onRemove }: { draft:
 
 function ThesisForm({ data, symbol, thesis, onSave, onCancel }: { data: Data; symbol: string; thesis?: Thesis;
   onSave: (body: Record<string, unknown>) => Promise<boolean>; onCancel: () => void }) {
-  const company = thesis?.company ?? null;
+  const company = thesis?.company ?? data.companies[symbol] ?? null;
   const [reasons, setReasons] = useState<string[]>(thesis?.reasons ?? []);
   const [note, setNote] = useState(thesis?.note ?? "");
   const [drafts, setDrafts] = useState<Draft[]>(thesis?.conditions.map((c) => ({ id: c.id, kind: c.kind,
@@ -81,7 +90,7 @@ function ThesisForm({ data, symbol, thesis, onSave, onCancel }: { data: Data; sy
         ? <p key={d.id} className="caption">Điều kiện đã bị phá — {thesis?.conditions.find((c) => c.id === d.id)?.label}: chỉ thay đổi qua “Giữ tiếp, có lý do”.</p>
         : <ConditionFields key={d.id ?? `new-${i}`} draft={d} kinds={data.kinds} company={company}
           onChange={(next) => setDrafts(drafts.map((x, j) => (j === i ? next : x)))} onRemove={() => setDrafts(drafts.filter((_, j) => j !== i))} />)}
-      <button type="button" className="btn" onClick={() => setDrafts([...drafts, { kind: "f_score", values: {} }])}><Plus size={15} aria-hidden="true" />Thêm điều kiện</button>
+      <button type="button" className="btn" onClick={() => setDrafts([...drafts, { kind: "loss_vs_cost", values: {} }])}><Plus size={15} aria-hidden="true" />Thêm điều kiện</button>
       {fomoWithoutLimit && <p className="notice" role="alert">Mua vì sợ bỏ lỡ thì cần đặt điều kiện “Lỗ so với giá vốn”.</p>}
       <div className="row"><button className="btn primary" type="submit" disabled={!ready}>Lưu luận điểm</button>
         <button className="btn" type="button" onClick={onCancel}>Hủy</button></div>
@@ -127,6 +136,7 @@ export function ThesisView() {
   const [open, setOpen] = useState<{ symbol: string; thesis?: Thesis } | null>(null);
   const [holding, setHolding] = useState<{ thesis: Thesis; cond: Cond } | null>(null);
   const load = useCallback(() => api<Data>("theses").then(setData, (e) => setMessage(failure(e, "Lỗi tải luận điểm."))), []);
+  const today = todayVN();
   useEffect(() => { void load(); }, [load]);
 
   async function change(body: Record<string, unknown>) {
@@ -136,6 +146,11 @@ export function ThesisView() {
       setMessage(null); setOpen(null); setHolding(null);
       return true;
     } catch (e) {
+      if (e instanceof ApiError && e.failure.code === "version_conflict") {  // a scheduled check wrote meanwhile: reload, keep what was typed
+        await load();
+        setMessage("Dữ liệu vừa được cập nhật nên đã tải lại; nội dung bạn nhập vẫn còn, hãy bấm lưu lần nữa.");
+        return false;
+      }
       setMessage(failure(e, "Lỗi lưu luận điểm."));
       return false;
     }
@@ -166,8 +181,9 @@ export function ThesisView() {
                 <span>{c.label}</span><span className={`pill ${s.tone}`}>{s.text}</span>
                 <span className="caption">{c.view.reading ?? c.view.reason ?? ""}{c.broken_price && c.view.state === "broken"
                   ? ` · lúc báo đầu ${formatDecimal(String(Number(c.broken_price) / 1000), 2)}` : ""}</span>
-                {c.hold && <span className="caption">Giữ tiếp đến {day(c.hold.until)}: “{c.hold.reason}”</span>}
-                {c.status === "broken" && !c.hold && <button className="btn" type="button" onClick={() => setHolding({ thesis: t, cond: c })}>
+                {c.hold && <span className="caption">{c.hold.until < today ? `Giữ tiếp đã hết hạn ${day(c.hold.until)}` : `Giữ tiếp đến ${day(c.hold.until)}`}:
+                  {" "}“{c.hold.reason}”</span>}
+                {canHold(c, today) && <button className="btn" type="button" onClick={() => setHolding({ thesis: t, cond: c })}>
                   <PauseCircle size={15} aria-hidden="true" />Giữ tiếp, có lý do</button>}
                 {holding?.cond.id === c.id && <HoldForm data={data} thesis={t} cond={c} onSave={change} onCancel={() => setHolding(null)} />}
               </li>;

@@ -41,7 +41,9 @@ def _view(request: Request, theses: list[dict], version: int, held: set[str], to
             conds.append({**c, "label": describe(c), "view": view})
         shown.append({**t, "conditions": conds, "company": company_of(Path(request.app.state.data_dir), t["symbol"])
                       if request.app.state.data_dir is not None else None})
-    return {"version": version, "theses": shown, "missing": sorted(held - {t["symbol"] for t in open_}),
+    missing = sorted(held - {t["symbol"] for t in open_})
+    companies = {s: company_of(Path(request.app.state.data_dir), s) if request.app.state.data_dir is not None else None for s in missing}
+    return {"version": version, "theses": shown, "missing": missing, "companies": companies,
             "kinds": {k: {"label": v[0], "params": list(v[1]), "applies": v[3]} for k, v in KINDS.items()}, "reasons": REASON_VI}
 
 

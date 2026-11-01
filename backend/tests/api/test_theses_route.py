@@ -33,6 +33,7 @@ def test_theses_are_listed_with_held_tickers_missing_one_and_the_condition_catal
     _held(c, clock)
     view = call(c, clock, "GET", "/internal/theses").json()
     assert view["version"] == 0 and view["theses"] == [] and view["missing"] == ["FPT"]
+    assert view["companies"] == {"FPT": None}  # sector unknown here: the form offers every condition, the server checks
     assert view["kinds"]["loss_vs_cost"] == {"label": "Lỗ so với giá vốn", "params": ["pct"], "applies": None}
     assert view["reasons"]["fomo"] == "Sợ bỏ lỡ"
 

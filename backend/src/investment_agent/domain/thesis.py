@@ -29,6 +29,7 @@ KINDS = {
     "chain_headwind": ("Chuỗi giá trị chuyển sang bất lợi", (), "data", None),
     "insider_sell": ("Người nội bộ hoặc cổ đông lớn bán", (), "data", None),
 }
+LEVEL_VI = {"strong": "mạnh", "medium": "trung bình", "weak": "yếu"}
 LIMITS = {"pct": (Decimal(1), Decimal(90)), "n": {"f_score": (0, 8), "profit_drop": (1, 4)}}
 MAX_CONDITIONS = 10
 
@@ -110,7 +111,7 @@ def evaluate(cond: dict, facts: dict) -> dict:
             return _result("broken" if q["score"] <= int(p["n"]) else "ok", f"F-Score {q['score']} (năm {q['year']}), ngưỡng {p['n']}")
         if q.get("level") is None:
             return _unknown("Điểm sức khỏe chưa đủ tiêu chí để xếp mức")
-        return _result("broken" if q["level"] == "weak" else "ok", f"Điểm sức khỏe {q['score']} ({q['year']}), mức {q['level']}")
+        return _result("broken" if q["level"] == "weak" else "ok", f"Điểm sức khỏe {q['score']} ({q['year']}), mức {LEVEL_VI.get(q['level'], q['level'])}")
     if kind == "profit_drop":
         quarters = facts.get("quarters") or {}
         latest = sorted(quarters)[-int(p["n"]):] if quarters else []
@@ -376,6 +377,7 @@ def edit_thesis(thesis: dict, raw: dict, *, company: str | None, today: date, fa
             history.append({**old, "ended_on": today.isoformat(), "ended_by": "edit"})
         conditions.append(_fresh(checked, today, fair))
     history += [{**c, "ended_on": today.isoformat(), "ended_by": "edit"} for c in thesis["conditions"] if c["id"] not in kept_ids]
+    history.append({"type": "edit", "on": today.isoformat(), "version": thesis["version"], "reasons": thesis["reasons"], "note": thesis["note"]})
     return {**thesis, "reasons": validated["reasons"], "note": validated["note"], "conditions": conditions, "history": history,
             "version": thesis["version"] + 1}
 

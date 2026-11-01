@@ -41,3 +41,12 @@ def test_drafts_costs_and_dismissing(tmp_path):
 def test_without_personal_store_it_is_unavailable(tmp_path):
     clock = Clock()
     assert call(client(tmp_path, clock, repo=False), clock, "GET", "/internal/ledger/corporate").status_code == 503
+
+
+def test_a_set_aside_suggestion_whose_event_left_the_calendar_can_still_be_brought_back(tmp_path):
+    clock = Clock()
+    c = client(tmp_path, clock)
+    gone = call(c, clock, "PUT", "/internal/ledger/corporate", {"action": "dismiss", "id": "OLD-9", "expected_version": 0, "request_id": "x1"}).json()
+    assert gone["dismissed"] == [{"id": "OLD-9", "symbol": None, "title": "Sự kiện không còn trong Lịch sự kiện", "exright": None}]
+    back = call(c, clock, "PUT", "/internal/ledger/corporate", {"action": "restore", "id": "OLD-9", "expected_version": 1, "request_id": "x2"}).json()
+    assert back["dismissed"] == []

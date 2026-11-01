@@ -139,3 +139,26 @@ def test_pending_bonus_shares_count_toward_entitlement_as_the_ledger_does():
     bonus = {"event_id": "q2", "type": "stock_dividend_entitlement", "effective_at": "2026-03-01", "sequence": 0, "action_id": "B-1",
              "security_id": "FPT", "record_date": "2026-03-02", "eligible_quantity": 1000, "shares_entitled": 100}
     assert suggestions(_ledger(bonus), [_event()], today=TODAY, dismissed=set())[0]["eligible"] == 1100
+
+
+def test_open_entitlements_are_reminded_from_the_ledger_even_without_the_source_event():
+    cash = {"event_id": "q1", "type": "cash_dividend_entitlement", "effective_at": "2025-06-09", "sequence": 0, "action_id": "OLD-1",
+            "security_id": "FPT", "record_date": "2025-06-11", "payment_date": "2025-07-01", "eligible_quantity": 1000,
+            "expected_gross": "700000", "expected_tax": "35000"}
+    bonus = {"event_id": "q2", "type": "stock_dividend_entitlement", "effective_at": "2026-03-01", "sequence": 0, "action_id": "OLD-2",
+             "security_id": "FPT", "record_date": "2026-03-02", "eligible_quantity": 1000, "shares_entitled": 100}
+    rows = [{"event_id": "d0", "type": "deposit", "effective_at": "2025-01-02", "sequence": 0, "amount": "100000000"},
+            {"event_id": "b1", "type": "buy", "effective_at": "2025-01-05", "sequence": 0, "security_id": "FPT", "quantity": 1000,
+             "price": "50000", "fee": "0", "tax": "0"}, cash, bonus]
+    out = {s["id"]: s for s in suggestions(parse_events(rows), [], today=TODAY, dismissed=set())}
+    assert out["ledger-OLD-1"]["status"] == "to_receive" and out["ledger-OLD-1"]["draft"]["received_net"] == "665000"
+    assert out["ledger-OLD-1"]["title"] == "Quyền đã ghi trong sổ (sự kiện không còn trong Lịch sự kiện)"
+    assert out["ledger-OLD-2"]["status"] == "to_credit" and out["ledger-OLD-2"]["draft"]["shares_credited"] == 100
+
+
+def test_cash_in_lieu_of_fractional_bonus_shares_counts_as_dividends_received():
+    rows = [{"event_id": "q2", "type": "stock_dividend_entitlement", "effective_at": "2026-03-01", "sequence": 0, "action_id": "B-1",
+             "security_id": "FPT", "record_date": "2026-03-02", "eligible_quantity": 1000, "shares_entitled": 100},
+            {"event_id": "c2", "type": "stock_dividend_credit", "effective_at": "2026-04-01", "sequence": 0, "action_id": "B-1",
+             "shares_credited": 100, "cash_in_lieu": "12000"}]
+    assert yearly_costs(_ledger(*rows))[0]["dividends"] == "12000"

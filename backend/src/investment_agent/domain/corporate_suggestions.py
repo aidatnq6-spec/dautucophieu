@@ -61,7 +61,7 @@ def suggestions(events, corporate: list[dict], *, today: date, dismissed: set[st
     entitlements = [e for e in events if isinstance(e, (CashDividendEntitlement, StockDividendEntitlement))]
     paid = {e.action_id for e in events if isinstance(e, CashDividendPayment)}
     credited = {e.action_id for e in events if isinstance(e, StockDividendCredit)}
-    out = []
+    out, handled = [], set()
     for ev in sorted(corporate, key=lambda e: (e.get("exright") or "", e["symbol"])):
         kind = classify(ev)
         if kind is None or not ev.get("exright") or ev["id"] in dismissed:
@@ -84,6 +84,8 @@ def suggestions(events, corporate: list[dict], *, today: date, dismissed: set[st
             out.append({**base, "status": "rights", "eligible": eligible, "draft": None})
             continue
         recorded = _recorded(entitlements, kind, symbol, action, exright)
+        if recorded is not None:
+            handled.add(recorded.action_id)
         # Dated the day before the ex-date: the shares held then are the ones entitled, whatever is traded on the ex-date itself.
         # A record date the source lacks is left empty for the owner to fill from the papers.
         on, record = (exright - timedelta(days=1)).isoformat(), ev.get("record") or ""
@@ -113,6 +115,24 @@ def suggestions(events, corporate: list[dict], *, today: date, dismissed: set[st
             out.append({**base, "status": "to_credit", "eligible": recorded.eligible_quantity, "draft": {
                 "type": "stock_dividend_credit", "effective_at": "", "action_id": recorded.action_id,  # the day they arrive, from the papers
                 "shares_credited": recorded.shares_entitled, "cash_in_lieu": "0"}})
+    # Entitlements in the ledger still waiting for cash or shares are reminded from the ledger itself, even once their event has
+    # left the Lịch sự kiện or the window above.
+    for e in entitlements:
+        key = f"ledger-{e.action_id}"
+        if e.action_id in handled or key in dismissed:
+            continue
+        base = {"id": key, "symbol": e.security_id, "title": "Quyền đã ghi trong sổ (sự kiện không còn trong Lịch sự kiện)",
+                "exright": (e.effective_at + timedelta(days=1)).isoformat(), "record": e.record_date.isoformat(), "value_per_share": None, "ratio": None,
+                "eligible": e.eligible_quantity}
+        if isinstance(e, CashDividendEntitlement) and e.action_id not in paid:
+            due = e.payment_date
+            out.append({**base, "kind": "cash", "payout": None if due is None else due.isoformat(), "status": "waiting" if due is None or due > today
+                        else "to_receive", "draft": None if due is None or due > today else {
+                            "type": "cash_dividend_payment", "effective_at": due.isoformat(), "action_id": e.action_id,
+                            "received_net": _s(e.expected_gross - e.expected_tax), "tax_withheld": _s(e.expected_tax)}})
+        elif isinstance(e, StockDividendEntitlement) and e.action_id not in credited:
+            out.append({**base, "kind": "stock", "payout": None, "status": "to_credit", "draft": {
+                "type": "stock_dividend_credit", "effective_at": "", "action_id": e.action_id, "shares_credited": e.shares_entitled, "cash_in_lieu": "0"}})
     return out
 
 
@@ -130,5 +150,7 @@ def yearly_costs(events) -> list[dict]:
         elif isinstance(e, CashDividendPayment):
             y["dividends"] += e.received_net + e.tax_withheld
             y["dividend_tax"] += e.tax_withheld
+        elif isinstance(e, StockDividendCredit):
+            y["dividends"] += e.cash_in_lieu  # cash paid for fractional bonus shares
     return [{"year": year, **{k: _s(v) for k, v in y.items()}, "total": _s(y["fees"] + y["sell_tax"] + y["dividend_tax"])}
             for year, y in sorted(years.items()) if any(y.values())]

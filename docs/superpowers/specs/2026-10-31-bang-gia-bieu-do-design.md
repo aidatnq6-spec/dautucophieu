@@ -34,3 +34,16 @@ trong phiên bên phải, bấm một dòng mở biểu đồ nến ngày hoặc
 - Nến đang mở trên biểu đồ (cùng ngày/cùng giờ với giá mới) nhận giá của bảng giá: giá đóng cửa mới, cao/thấp nới theo giá đó, giá mở giữ nguyên.
   Khi giá thuộc nến mới chưa có trong dữ liệu, không tự tạo nến (không đoán giá mở/cao/thấp); biểu đồ đọc lại nguồn, tối đa mỗi 2 phút.
 - MACD và RSI cập nhật khi đọc lại nguồn, không tính lại theo từng giá.
+
+## Bổ sung: công cụ vẽ trên biểu đồ (01/11/2026)
+Chủ sở hữu chọn "làm luôn", không qua hỏi đáp; các lựa chọn dưới đây là quyết định của người làm, chủ sở hữu duyệt khi xem PR.
+- Thanh công cụ trên biểu đồ: **Con trỏ** (mặc định, không vẽ), **Đường ngang** (một lần bấm), **Đường xu hướng** (bấm hai điểm),
+  **Xóa hết** cho mã đang xem. Esc hoặc bấm lại công cụ thì hủy điểm đầu đang chờ.
+- Chỉ vẽ trên khung giá (khung trên cùng), không vẽ trên MACD/RSI. Điểm bấm bám theo nến (thời gian của nến gần nhất), giá lấy đúng
+  vị trí con trỏ trên trục giá, làm tròn 2 chữ số. Không bám tự động vào giá mở/cao/thấp/đóng.
+- Đường ngang là một mức giá: hiện ở cả hai khung (Ngày và 1 giờ), có nhãn trên trục giá. Đường xu hướng nối hai điểm (thời gian, giá)
+  và chỉ hiện ở khung đã vẽ, vì thời gian nến ngày và nến giờ khác nhau; không kéo dài quá hai điểm.
+- Danh sách hình vẽ dưới biểu đồ, mỗi dòng có Xóa (sửa = xóa rồi vẽ lại). Mã vĩ mô (đường giá đóng cửa) cũng vẽ được.
+- Lưu ở kho cá nhân (`settings/chart_drawings`), như Cảnh báo giá: có phiên bản chống ghi đè, tối đa 200 hình. Chỉ mã trong danh sách
+  theo dõi, VNINDEX, VN30 và các biến Vĩ mô của bảng giá. Hình vẽ không gửi đi đâu, không vào bản tin, không phải cảnh báo.
+- Đây là công cụ ghi chú của chủ sở hữu; phần mềm không tự vẽ hỗ trợ/kháng cự hay đường xu hướng nào.

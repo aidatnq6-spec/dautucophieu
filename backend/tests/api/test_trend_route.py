@@ -102,3 +102,27 @@ def test_price_alerts_are_listed_added_and_refused_for_unknown_tickers(tmp_path)
     stale = call(c, clock, "PUT", "/internal/trend/alerts", {"action": "remove", "id": added["alerts"][0]["id"], "expected_version": 0,
                                                              "request_id": "p3"})
     assert stale.status_code == 409
+
+
+def test_chart_drawings_are_listed_added_and_refused_for_unknown_tickers(tmp_path):
+    (tmp_path / "market-symbols.txt").write_text("FPT\n", encoding="utf-8")
+    clock = Clock()
+    c = client(tmp_path, clock)
+    assert call(c, clock, "GET", "/internal/trend/drawings").json() == {"version": 0, "drawings": []}
+    added = call(c, clock, "PUT", "/internal/trend/drawings", {"action": "add", "symbol": "FPT", "kind": "trend", "interval": "1D",
+                                                               "points": [{"t": "2026-09-01", "p": "50"}, {"t": "2026-10-30", "p": "55.5"}],
+                                                               "expected_version": 0, "request_id": "g1"}).json()
+    assert added["version"] == 1 and added["drawings"][0]["points"][1] == {"t": "2026-10-30", "p": "55.5"}
+    macro = call(c, clock, "PUT", "/internal/trend/drawings", {"action": "add", "symbol": "BTC", "kind": "hline", "price": "70000",
+                                                               "expected_version": 1, "request_id": "g2"})
+    assert macro.status_code == 200
+    refused = call(c, clock, "PUT", "/internal/trend/drawings", {"action": "add", "symbol": "ZZZ", "kind": "hline", "price": "1",
+                                                                 "expected_version": 2, "request_id": "g3"})
+    assert refused.status_code == 422 and refused.json()["code"] == "symbol_not_watched"
+    stale = call(c, clock, "PUT", "/internal/trend/drawings", {"action": "clear", "symbol": "FPT", "expected_version": 0, "request_id": "g4"})
+    assert stale.status_code == 409
+
+
+def test_chart_drawings_without_personal_store_are_unavailable(tmp_path):
+    clock = Clock()
+    assert call(client(tmp_path, clock, repo=False), clock, "GET", "/internal/trend/drawings").status_code == 503

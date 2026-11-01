@@ -69,6 +69,37 @@ test("a price level is set for the ticker picked, listed as waiting, and removed
   await expect(alerts).toContainText("chưa có cho các biến vĩ mô");
 });
 
+test("a level and a trend line are drawn on the price pane, kept per frame, and cleared", async ({ page }) => {
+  await openTrend(page);
+  const box = page.getByRole("region", { name: "Bảng giá và biểu đồ" });
+  await box.getByRole("table", { name: "Bảng giá" }).getByRole("row", { name: /FPT/ }).click();
+  const fpt = box.getByRole("group", { name: "Biểu đồ FPT" });
+  const canvas = fpt.getByTestId("tb-canvas");
+  await expect(canvas.locator("canvas").first()).toBeVisible();
+  const tools = fpt.getByRole("toolbar", { name: "Công cụ vẽ" });
+  const size = (await canvas.boundingBox())!;
+  await tools.getByRole("button", { name: "Đường ngang" }).click();
+  await canvas.click({ position: { x: size.width * 0.5, y: 120 } });
+  const list = fpt.getByRole("list", { name: "Hình vẽ" });
+  await expect(list).toContainText("Đường ngang");
+  await expect(canvas).toHaveAttribute("data-drawings", "1");
+  await fpt.getByRole("radio", { name: "1 giờ" }).click();
+  await expect(fpt.getByTestId("tb-chart-caption")).toContainText("Nến 1 giờ");
+  await expect(list).toContainText("Đường ngang");  // a level shows on both frames
+  await tools.getByRole("button", { name: "Đường xu hướng" }).click();
+  await canvas.click({ position: { x: size.width * 0.4, y: 150 } });
+  await expect(tools).toContainText("bấm điểm thứ hai");
+  await canvas.click({ position: { x: size.width * 0.7, y: 100 } });
+  await expect(list).toContainText("Đường xu hướng");
+  await expect(canvas).toHaveAttribute("data-drawings", "2");
+  await fpt.getByRole("radio", { name: "Ngày" }).click();
+  await expect(fpt.getByTestId("tb-chart-caption")).toContainText("Nến ngày");
+  await expect(list).not.toContainText("Đường xu hướng");  // the hourly trend line stays on the hourly frame
+  page.once("dialog", (d) => void d.accept());
+  await tools.getByRole("button", { name: "Xóa hết" }).click();
+  await expect(fpt.getByRole("list", { name: "Hình vẽ" })).toHaveCount(0);
+});
+
 for (const width of [375, 1440]) {
   test(`the trend page has no horizontal scroll, on the page or inside any card, at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });

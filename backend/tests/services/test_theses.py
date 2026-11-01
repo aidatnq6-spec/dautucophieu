@@ -98,13 +98,13 @@ def test_a_failed_delivery_is_offered_again_and_a_sold_ticker_closes_its_thesis(
 def test_the_price_scope_checks_only_price_conditions(tmp_path):
     repo, data = _repo(), _data(tmp_path)
     raw = {"reasons": ["cheap"], "note": "", "conditions": [{"kind": "loss_vs_cost", "params": {"pct": "10"}},
-                                                            {"kind": "f_score", "params": {"n": 6}}]}
+                                                            {"kind": "f_score", "params": {"n": 3}}]}
     save(repo, OWNER, symbol="FPT", raw=raw, company="other", facts=_facts(data), today=TODAY, expected_version=0, request_id="t1", held={"FPT"})
     box, send = _sent()
     thesis_check_run(repo, OWNER, data, scope="price", facts={"FPT": _facts(data)}, shares={"FPT": 1000}, held={"FPT"}, send=send, now=NOW,
                      today=TODAY, request_id="c1")
     statuses = [c["status"] for c in read_theses(repo, OWNER)[0][0]["conditions"]]
-    assert statuses == ["broken", None] and "F-Score" not in box[0]
+    assert statuses == ["broken", "ok"] and "F-Score" not in box[0]  # both recorded on save; only the price one is due a note
 
 
 def test_holding_on_writes_the_reason_to_the_journal(tmp_path):

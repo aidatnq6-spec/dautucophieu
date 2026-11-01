@@ -106,6 +106,12 @@ def _reasons(reasons: list[str]) -> str:
     return ", ".join(REASON_VI[r] for r in reasons)
 
 
+def _refresh(thesis: dict, facts: dict, today: date) -> dict:
+    """Record what stored data says now (no message): lets the owner act on a condition the page shows as broken."""
+    results = {c["id"]: evaluate(c, facts) for c in thesis["conditions"] if c["kind"] != "insider_sell"}
+    return advance(thesis, results, today=today, price=facts.get("price"))[0]
+
+
 def save(repo, owner, *, symbol: str, raw: dict, company: str | None, facts: dict, today: date, expected_version: int, request_id: str,
          held: set[str]) -> tuple[list[dict], int]:
     """A new thesis for a held ticker without an open one; the reasons and words also go to the Nhật ký as a buy entry."""
@@ -115,6 +121,7 @@ def save(repo, owner, *, symbol: str, raw: dict, company: str | None, facts: dic
     if _open(theses, symbol=symbol):
         raise ThesisError("thesis_exists", "Mã này đã có luận điểm; hãy sửa luận điểm đó.")
     thesis = new_thesis(symbol, validate_thesis(raw, company=company), today=today, snapshot=_snapshot(facts))
+    thesis = _refresh(thesis, facts, today)  # a condition already broken is recorded at once; the next check sends the note
     version = _write(repo, owner, [*theses, thesis], expected_version, request_id)
     append_entry(repo, owner, JournalEntry(entry_id=f"thesis-{thesis['id']}", symbol=symbol, kind="buy", created_on=today,
                                            reason=f"Luận điểm — lý do mua: {_reasons(thesis['reasons'])}. {thesis['note']}".strip(),
@@ -135,7 +142,7 @@ def edit(repo, owner, *, thesis_id: str, raw: dict, company: str | None, fair: s
 
 
 def hold(repo, owner, *, thesis_id: str, cond_id: str, reason: str, emotion: str | None, until: date | None, new_condition: dict | None,
-         company: str | None, fair: str | None, today: date, expected_version: int, request_id: str) -> tuple[list[dict], int]:
+         company: str | None, fair: str | None, today: date, expected_version: int, request_id: str, facts: dict | None = None) -> tuple[list[dict], int]:
     """Giữ tiếp, có lý do: the reason goes to the Nhật ký as a hold entry, linked from the thesis history."""
     theses, _ = read_theses(repo, owner)
     found = _open(theses, id=thesis_id)
@@ -144,10 +151,12 @@ def hold(repo, owner, *, thesis_id: str, cond_id: str, reason: str, emotion: str
     if emotion is not None and emotion not in EMOTIONS:
         raise ThesisError("invalid_emotion", "Cảm xúc không hợp lệ.")
     entry_id = f"hold-{uuid.uuid4().hex[:12]}"
+    if facts is not None:
+        found = _refresh(found, facts, today)
     changed = hold_condition(found, cond_id, reason=reason, until=until, new_condition=new_condition, today=today, entry_id=entry_id,
                              company=company, fair=fair)
     cond = next(c for c in found["conditions"] if c["id"] == cond_id)
-    theses = [changed if t is found else t for t in theses]
+    theses = [changed if t["id"] == thesis_id and t["closed_on"] is None else t for t in theses]
     version = _write(repo, owner, theses, expected_version, request_id)
     append_entry(repo, owner, JournalEntry(entry_id=entry_id, symbol=found["symbol"], kind="hold", created_on=today, emotion=emotion,
                                            reason=f"Giữ tiếp khi “{KINDS[cond['kind']][0]}” bị phá: {reason.strip()}",

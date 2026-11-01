@@ -129,7 +129,7 @@ def main() -> int:
     if args.command == "scheduled-run":
         return scheduled_run(args.calendar, args.data_dir)
     if args.command == "contribution-remind":
-        return contribution_cli()
+        return contribution_cli(args.data_dir)
     if args.command == "drawdown-check":
         return drawdown_cli(args.data_dir)
     if args.command == "journal-review":
@@ -443,7 +443,7 @@ def scheduled_run(calendar_path: Path, data_dir: Path) -> int:
     return 0
 
 
-def contribution_cli() -> int:
+def contribution_cli(data_dir: Path) -> int:
     """Remind once a month, from the plan's day, while this month's deposits are below the planned contribution."""
     import os
     import uuid
@@ -453,7 +453,6 @@ def contribution_cli() -> int:
     import httpx
 
     from investment_agent.api.auth import OwnerContext
-    from investment_agent.notifications.render import split_message
     from investment_agent.notifications.telegram import TelegramSender
     from investment_agent.repositories.firestore import personal_repository_from_env
     from investment_agent.services.contributions import remind_run
@@ -469,7 +468,7 @@ def contribution_cli() -> int:
         if not (settings.telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):
             return False
         sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
-        return all(sender.send(chosen.chat_id, part).status == "sent" for part in split_message(text))
+        return _part_sender(sender, chosen.chat_id, data_dir)(text)
     out = remind_run(repo, owner, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date(), send=send,
                      request_id=f"contribution-{uuid.uuid4().hex[:16]}")
     print(json.dumps(out))
@@ -485,7 +484,6 @@ def drawdown_cli(data_dir: Path) -> int:
     import httpx
 
     from investment_agent.api.auth import OwnerContext
-    from investment_agent.notifications.render import split_message
     from investment_agent.notifications.telegram import TelegramSender
     from investment_agent.repositories.firestore import personal_repository_from_env
     from investment_agent.services.drawdown import drawdown_run
@@ -511,7 +509,7 @@ def drawdown_cli(data_dir: Path) -> int:
         if not (settings.telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):
             return False
         sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
-        return all(sender.send(chosen.chat_id, part).status == "sent" for part in split_message(text))
+        return _part_sender(sender, chosen.chat_id, data_dir)(text)
     out = drawdown_run(repo, owner, data_dir, fetch=fetch, send=send, request_id=f"drawdown-{uuid.uuid4().hex[:16]}")
     print(json.dumps(out))
     return 0
@@ -561,7 +559,6 @@ def quarter_alerts_cli(data_dir: Path) -> int:
     import httpx
 
     from investment_agent.api.auth import OwnerContext
-    from investment_agent.notifications.render import split_message
     from investment_agent.notifications.telegram import TelegramSender
     from investment_agent.repositories.firestore import personal_repository_from_env
     from investment_agent.services.quarter_alerts import quarter_alerts_run
@@ -576,19 +573,24 @@ def quarter_alerts_cli(data_dir: Path) -> int:
         print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
         return 0
     sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
-    out = quarter_alerts_run(data_dir, send=lambda text: all(sender.send(chosen.chat_id, part).status == "sent" for part in split_message(text)))
+    out = quarter_alerts_run(data_dir, send=_part_sender(sender, chosen.chat_id, data_dir))
     print(json.dumps(out))
     return 0
 
 
-def _scheduled_telegram():
+def _part_sender(sender, chat_id: str, data_dir: Path):
+    """Send a note in parts that are never sent twice: parts left after a failure go out first next time (see PartSender)."""
+    from investment_agent.notifications.part_sender import PartSender
+    return PartSender(lambda part: sender.send(chat_id, part).status == "sent", Path(data_dir) / "alerts" / "telegram_pending.json")
+
+
+def _scheduled_telegram(data_dir: Path):
     """(send, repo, owner) when scheduled Telegram delivery is on, else None (nothing is read or sent)."""
     import os
 
     import httpx
 
     from investment_agent.api.auth import OwnerContext
-    from investment_agent.notifications.render import split_message
     from investment_agent.notifications.telegram import TelegramSender
     from investment_agent.repositories.firestore import personal_repository_from_env
     from investment_agent.services.records import notification_settings
@@ -601,7 +603,7 @@ def _scheduled_telegram():
     if not (settings.telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):
         return None
     sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
-    return (lambda text: all(sender.send(chosen.chat_id, part).status == "sent" for part in split_message(text))), repo, owner
+    return _part_sender(sender, chosen.chat_id, data_dir), repo, owner
 
 
 def _http_text(url: str) -> str:
@@ -618,7 +620,7 @@ def insider_alerts_cli(data_dir: Path) -> int:
     from investment_agent.services.holdings_view import held_from_repo
     from investment_agent.services.insider_alerts import insider_alerts_run
 
-    telegram = _scheduled_telegram()
+    telegram = _scheduled_telegram(data_dir)
     if telegram is None:
         print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
         return 0
@@ -671,7 +673,7 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
     if now.astimezone(VN).weekday() < 5:
         print(json.dumps({"status": "skipped", "reason": "weekday"}))
         return 0
-    telegram = _scheduled_telegram()
+    telegram = _scheduled_telegram(data_dir)
     if telegram is None:
         print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
         return 0
@@ -711,7 +713,7 @@ def price_alerts_cli(data_dir: Path, now=None) -> int:
     if not in_session(now):
         print(json.dumps({"status": "skipped", "reason": "outside_session"}))
         return 0
-    telegram = _scheduled_telegram()
+    telegram = _scheduled_telegram(data_dir)
     if telegram is None:
         print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
         return 0
@@ -743,7 +745,7 @@ def screen_check_cli(data_dir: Path, calendar_path: Path, now=None) -> int:
     from investment_agent.services.weekly_brief import VN
 
     now = now or datetime.now(timezone.utc)
-    telegram = _scheduled_telegram()
+    telegram = _scheduled_telegram(data_dir)
     if telegram is None:
         import os
 
@@ -780,7 +782,7 @@ def thesis_check_cli(data_dir: Path, calendar_path: Path, scope: str, now=None) 
     if scope == "price" and not in_session(now):
         print(json.dumps({"status": "skipped", "reason": "outside_session"}))
         return 0
-    telegram = _scheduled_telegram()
+    telegram = _scheduled_telegram(data_dir)
     if telegram is None:  # still record states and close sold tickers' theses; nothing is sent, so notes stay due for later
         import os
 
@@ -832,7 +834,6 @@ def journal_cli(data_dir: Path) -> int:
 
     from investment_agent.api.auth import OwnerContext
     from investment_agent.market.series import SeriesStore
-    from investment_agent.notifications.render import split_message
     from investment_agent.notifications.telegram import TelegramSender
     from investment_agent.repositories.firestore import personal_repository_from_env
     from investment_agent.services.journal import read_journal, review_run
@@ -853,7 +854,7 @@ def journal_cli(data_dir: Path) -> int:
             prices[symbol] = Decimal(str(closes[-1][1])) * 1000
     sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
     out = review_run(repo, owner, prices=prices, threshold=portfolio_settings(repo, owner)[0].journal_review_threshold,
-                     send=lambda text: all(sender.send(chosen.chat_id, part).status == "sent" for part in split_message(text)),
+                     send=_part_sender(sender, chosen.chat_id, data_dir),
                      request_id=f"journal-review-{uuid.uuid4().hex[:16]}")
     print(json.dumps(out))
     return 0
@@ -868,7 +869,6 @@ def events_cli(data_dir: Path) -> int:
     import httpx
 
     from investment_agent.market.corporate_events import events_run, render_reminders
-    from investment_agent.notifications.render import split_message
     from investment_agent.notifications.telegram import TelegramSender
     from investment_agent.settings import Settings
 
@@ -898,7 +898,7 @@ def events_cli(data_dir: Path) -> int:
             held = set()
         sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
         text = render_reminders(due, held=held, today=now.date())
-        return all(sender.send(chosen.chat_id, part).status == "sent" for part in split_message(text))
+        return _part_sender(sender, chosen.chat_id, data_dir)(text)
 
     out = events_run(data_dir, fetch=lambda symbol: Company(source="VCI", symbol=symbol).events().to_dict("records"), notify=notify, now=now)
     print(json.dumps(out, ensure_ascii=False))

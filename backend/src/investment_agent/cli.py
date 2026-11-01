@@ -772,8 +772,16 @@ def thesis_check_cli(data_dir: Path, calendar_path: Path, scope: str, now=None) 
         store = InsiderStore(Path(data_dir))
         insider = lambda s: insider_deals(store, s, get=_http_text, now=now) if s in wanted else None  # noqa: E731
     facts = gather(data_dir, repo, owner, symbols, scope=scope, today=today, market=market, live=live, insider=insider)
+    own = None
+    if symbols and send is not None:  # the owner's own record of holding on, shown only from five past times
+        from investment_agent.domain.hindsight import lesson
+        from investment_agent.services.hindsight import hindsight_for
+        try:
+            own = lesson(hindsight_for(repo, owner, data_dir, today=today)["breaks"])
+        except Exception:  # an optional line: whatever fails here must not stop the check or its notes
+            own = None
     out = thesis_check_run(repo, owner, data_dir, scope=scope, facts=facts, shares=position_shares(repo, owner), held=held, send=send, now=now,
-                           today=today, request_id=f"thesis-check-{uuid.uuid4().hex[:16]}")
+                           today=today, request_id=f"thesis-check-{uuid.uuid4().hex[:16]}", lesson=(lambda t, c: own) if own else None)
     print(json.dumps({**out, "errors": errors}, ensure_ascii=False))
     return 0
 

@@ -183,3 +183,12 @@ def test_with_delivery_off_the_check_still_records_and_closes_but_marks_nothing_
     assert out["sent"] is False and read_theses(repo, OWNER)[0][0]["conditions"][0]["sent_first"] is False
     out = thesis_check_run(repo, OWNER, data, scope="price", facts={}, shares={}, held=set(), send=None, now=NOW, today=TODAY, request_id="c2")
     assert out["closed"] == 1
+
+
+def test_the_owners_lesson_is_added_to_the_first_note_when_there_is_one(tmp_path):
+    repo, data = _repo(), _data(tmp_path)
+    save(repo, OWNER, symbol="FPT", raw=FOMO, company="other", facts=_facts(data), today=TODAY, expected_version=0, request_id="t1", held={"FPT"})
+    box, send = _sent()
+    thesis_check_run(repo, OWNER, data, scope="data", facts={"FPT": _facts(data)}, shares={"FPT": 1000}, held={"FPT"}, send=send, now=NOW,
+                     today=TODAY, request_id="c1", lesson=lambda t, c: "5 lần trước bạn giữ tiếp")
+    assert "• Bài học của chính bạn: 5 lần trước bạn giữ tiếp" in box[0]

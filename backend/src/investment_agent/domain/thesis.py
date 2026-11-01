@@ -5,9 +5,11 @@ broken. Prices in the facts are in đồng; a close_below level is typed in thou
 says to sell: the owner decides."""
 
 import uuid
-from datetime import date, timedelta
-from decimal import Decimal, InvalidOperation
+from datetime import date, datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from statistics import median
 
+from investment_agent.domain.drawdown import max_drawdown
 from investment_agent.market.indicators import macd
 from investment_agent.notifications.render import _num
 
@@ -179,6 +181,53 @@ def validate_condition(raw: dict, *, company: str | None) -> dict:
         raise ThesisError("not_applicable", f"“{label}” không áp dụng cho loại doanh nghiệp này.")
     params = raw.get("params") or {}
     return {"id": uuid.uuid4().hex[:12], "kind": kind, "params": {n: _param(kind, n, params.get(n)) for n in names}}
+
+
+HORIZON = 126  # sessions, about six months
+MIN_OCCURRENCES = 5
+
+
+def scenario(points: list, *, price: Decimal | None, shares: int) -> dict | None:
+    """The deepest fall in the stored history and what it would cost the position now if it happened again — a scenario."""
+    deepest = max_drawdown(points)
+    if deepest is None:
+        return None
+    loss = None if price is None else format((price * shares * -Decimal(deepest["depth"])).quantize(Decimal(1)), "f")
+    return {"depth": deepest["depth"], "peak": deepest["peak"], "trough": deepest["trough"], "loss": loss}
+
+
+def _occurrences(points: list, kind: str, params: dict) -> list[int] | None:
+    closes = [c for _, c in points]
+    if kind == "close_below":
+        level = float(params["level"])
+        return [i for i in range(1, len(closes)) if closes[i] < level <= closes[i - 1]]
+    if kind == "macd_weekly":
+        days = [d.date() if isinstance(d, datetime) else d for d, _ in points]
+        weekly = _weekly_macd(list(zip(days, closes)))
+        crosses = {k for (_, pa, ps), (k, a, s) in zip(weekly, weekly[1:]) if a < s and pa >= ps}
+        last_of_week: dict[date, int] = {}
+        for i, d in enumerate(days):
+            last_of_week[d - timedelta(days=d.weekday())] = i
+        return sorted(last_of_week[k] for k in crosses)
+    return None
+
+
+def similar(points: list, kind: str, params: dict, horizon: int = HORIZON) -> dict | None:
+    """Past times this ticker first met the condition (at least `horizon` sessions apart) and the median change `horizon`
+    sessions later; under five times the median is withheld. None when the condition has no price history to look at."""
+    found = _occurrences([p for p in points if p[1] > 0], kind, params)
+    if found is None:
+        return None
+    closes = [c for _, c in points if c > 0]
+    changes, last = [], None
+    for i in found:
+        if (last is None or i - last >= horizon) and i + horizon < len(closes):
+            changes.append(closes[i + horizon] / closes[i] - 1)
+            last = i
+    if len(changes) < MIN_OCCURRENCES:
+        return {"count": len(changes), "median": None, "horizon": horizon}
+    return {"count": len(changes), "median": format(Decimal(str(median(changes))).quantize(Decimal("0.0001"), ROUND_HALF_UP), "f"),
+            "horizon": horizon}
 
 
 STEP = Decimal("0.05")  # a further fall of 5% from the price at the first report is reported again, once per step

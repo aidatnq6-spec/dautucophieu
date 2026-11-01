@@ -1,9 +1,10 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
 
-from investment_agent.domain.thesis import ThesisError, advance, edit_thesis, evaluate, hold_condition, mark_sent, new_thesis, validate_thesis
+from investment_agent.domain.thesis import (ThesisError, advance, edit_thesis, evaluate, hold_condition, mark_sent, new_thesis, scenario, similar,
+                                            validate_thesis)
 
 D = Decimal
 
@@ -211,6 +212,29 @@ def test_editing_keeps_broken_conditions_and_versions_the_rest():
     assert t["conditions"][0]["status"] == "broken" and t["conditions"][0]["id"] == loss  # untouched
     assert t["conditions"][1]["params"] == {"n": 4} and t["conditions"][1]["id"] != fs and t["history"][-1]["id"] == fs
     assert t["conditions"][2]["fair_at_set"] == "58000"
+
+
+def _points(values, start=datetime(2018, 1, 2)):
+    return [(start + timedelta(days=i), v) for i, v in enumerate(values)]
+
+
+def test_the_deepest_past_fall_priced_on_the_current_position_is_a_scenario_not_a_forecast():
+    out = scenario(_points([10, 12, 6, 9, 11]), price=D("40000"), shares=1000)
+    assert out == {"depth": "-0.5000", "peak": "2018-01-03", "trough": "2018-01-04", "loss": "20000000"}
+    assert scenario([], price=D("40000"), shares=1000) is None
+    assert scenario(_points([10, 12]), price=None, shares=1000)["loss"] is None
+
+
+def test_similar_past_situations_need_five_occurrences_six_months_apart():
+    one_cycle = [20.0] * 5 + [17.0] * 5 + [15.0] * 130  # a close below 18, then six months later
+    out = similar(_points(one_cycle * 5), "close_below", {"level": "18"})
+    assert out == {"count": 5, "median": "-0.1176", "horizon": 126}  # 15 / 17 − 1
+    assert similar(_points(one_cycle * 2), "close_below", {"level": "18"}) == {"count": 2, "median": None, "horizon": 126}
+    assert similar(_points(one_cycle), "loss_vs_cost", {"pct": "10"}) is None  # no history for the owner's own cost
+    wave = [10 + (i / 40) ** 2 for i in range(400)]
+    wave = wave + [wave[-1] - i * 0.2 for i in range(1, 200)]  # stays above zero
+    weekly = similar(_points(wave), "macd_weekly", {})
+    assert weekly["count"] == 1 and weekly["median"] is None  # one weekly cross down, six months of data after it
 
 
 def test_a_thesis_saved_while_a_condition_is_already_broken_reports_it_at_once():

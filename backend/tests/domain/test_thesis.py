@@ -257,3 +257,25 @@ def test_an_edit_keeps_the_old_reasons_and_words():
 def test_health_levels_read_in_vietnamese():
     out = evaluate(cond("health_weak"), {"quality": {"kind": "health", "score": 1, "level": "weak", "year": "Q3/2026"}})
     assert "yếu" in out["reading"] and "weak" not in out["reading"]
+
+
+def test_the_review_note_comes_on_the_review_date_itself():
+    t = _thesis(("loss_vs_cost", {"pct": "10"}))
+    loss = _ids(t)[0]
+    t, ev = advance(t, {loss: BROKEN}, today=TODAY, price=D("40000"))
+    t = mark_sent(t, ev)
+    t = hold_condition(t, loss, reason="Chờ", until=TODAY + timedelta(days=30), new_condition=None, today=TODAY, entry_id="j1")
+    t, ev = advance(t, {loss: BROKEN}, today=TODAY + timedelta(days=29), price=D("40000"))
+    assert ev == []
+    t, ev = advance(t, {loss: BROKEN}, today=TODAY + timedelta(days=30), price=D("40000"))
+    assert [e["type"] for e in ev] == ["review"]
+
+
+def test_holding_on_takes_a_date_or_a_new_condition_not_both():
+    t = _thesis(("loss_vs_cost", {"pct": "10"}))
+    loss = _ids(t)[0]
+    t, ev = advance(t, {loss: BROKEN}, today=TODAY, price=D("40000"))
+    with pytest.raises(ThesisError) as err:
+        hold_condition(t, loss, reason="Chờ", until=TODAY + timedelta(days=30), new_condition={"kind": "loss_vs_cost", "params": {"pct": "20"}},
+                       today=TODAY, entry_id="j1", company="other")
+    assert err.value.code == "hold_one_way"

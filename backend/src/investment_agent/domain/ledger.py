@@ -161,27 +161,39 @@ def ordered_events(events: list) -> list:
     return ordered
 
 
+def _apply(book: _Book, event) -> None:
+    if event.type == "opening_balance":
+        book.cash = event.cash
+        for p in event.positions:
+            book.quantity[p.security_id] = book.quantity.get(p.security_id, 0) + p.quantity
+            book.cost[p.security_id] = book.cost.get(p.security_id, Decimal(0)) + p.total_cost
+    elif event.type == "deposit":
+        book.cash += event.amount
+        book.deposits += event.amount
+    elif event.type == "withdrawal":
+        book.cash -= event.amount
+        book.withdrawals += event.amount
+    elif event.type in {"buy", "sell"}:
+        book.trade(event)
+    elif isinstance(event, ACTION_EVENTS):
+        apply_action(book, event)
+    if book.cash < 0:
+        raise LedgerError("cash_negative", event.event_id)
+
+
+def snapshots(events: list):
+    """(event, {security: (shares, pending shares, average cost)}) after each event in ledger order, from a single replay."""
+    book = _Book()
+    for event in ordered_events(events):
+        _apply(book, event)
+        yield event, {s: (book.quantity.get(s, 0), book.pending.get(s, 0), Decimal(_s(book.cost[s] / book.shares(s)))) for s in book.cost}
+
+
 def replay(events: list) -> LedgerState:
     ordered = ordered_events(events)
     book = _Book()
     for event in ordered:
-        if event.type == "opening_balance":
-            book.cash = event.cash
-            for p in event.positions:
-                book.quantity[p.security_id] = book.quantity.get(p.security_id, 0) + p.quantity
-                book.cost[p.security_id] = book.cost.get(p.security_id, Decimal(0)) + p.total_cost
-        elif event.type == "deposit":
-            book.cash += event.amount
-            book.deposits += event.amount
-        elif event.type == "withdrawal":
-            book.cash -= event.amount
-            book.withdrawals += event.amount
-        elif event.type in {"buy", "sell"}:
-            book.trade(event)
-        elif isinstance(event, ACTION_EVENTS):
-            apply_action(book, event)
-        if book.cash < 0:
-            raise LedgerError("cash_negative", event.event_id)
+        _apply(book, event)
 
     holdings = tuple(Holding(security_id=s, quantity=book.quantity.get(s, 0), pending_quantity=book.pending.get(s, 0),
                              total_cost=_s(book.cost[s]), average_cost=_s(book.cost[s] / book.shares(s)),

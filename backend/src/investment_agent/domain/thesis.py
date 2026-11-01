@@ -272,7 +272,7 @@ def holding(cond: dict, today: date) -> bool:
 
 def _holding(cond: dict, today: date) -> bool:
     hold = cond.get("hold")
-    return bool(hold) and (hold.get("until") is None or today <= date.fromisoformat(hold["until"]))
+    return bool(hold) and (hold.get("until") is None or today < date.fromisoformat(hold["until"]))  # the review is due on its date
 
 
 def advance(thesis: dict, results: dict[str, dict], *, today: date, price: Decimal | None) -> tuple[dict, list[dict]]:
@@ -338,6 +338,8 @@ def hold_condition(thesis: dict, cond_id: str, *, reason: str, until: date | Non
         raise ThesisError("reason_required", "Viết lý do giữ tiếp.")
     if new_condition is None and until is None:
         raise ThesisError("hold_needs_condition_or_date", "Đặt điều kiện mới hoặc ngày xem lại.")
+    if new_condition is not None and until is not None:
+        raise ThesisError("hold_one_way", "Chọn một trong hai: ngày xem lại hoặc điều kiện mới.")
     if until is not None and not today < until <= today + timedelta(days=MAX_HOLD_DAYS):
         raise ThesisError("invalid_review_date", f"Ngày xem lại trong vòng {MAX_HOLD_DAYS} ngày tới.")
     record = {"type": "hold", "condition": c["id"], "kind": c["kind"], "on": today.isoformat(), "reason": reason.strip(),

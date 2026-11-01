@@ -11,7 +11,7 @@ from bisect import bisect_right
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
-from investment_agent.domain.ledger import OpeningBalance, Trade, ordered_events, replay
+from investment_agent.domain.ledger import OpeningBalance, Trade, ordered_events, snapshots
 from investment_agent.domain.thesis import KINDS
 
 HORIZONS = (3, 6, 12)
@@ -73,20 +73,21 @@ class _Book:
         self.events = ordered_events(list(events))
         self.days, self.states, self.adjusted = [], [], []
         adj: dict[str, Decimal | None] = {}
-        for i, e in enumerate(self.events):
+        previous: dict = {}
+        for i, (e, snap) in enumerate(snapshots(self.events)):
             if isinstance(e, Trade) and e.type == "buy":
                 close = series.get(e.security_id, EMPTY).on(e.effective_at)
-                before = replay(self.events[:i]).positions if i else ()
-                q0 = next((p.quantity + p.pending_quantity for p in before if p.security_id == e.security_id), 0)
+                q0 = sum(previous.get(e.security_id, (0, 0, 0))[:2])
                 old = adj.get(e.security_id)
                 adj[e.security_id] = None if close is None or (q0 and old is None) else (old * q0 + close[1] * e.quantity) / (q0 + e.quantity) if q0 else close[1]
             elif isinstance(e, OpeningBalance):
                 for p in e.positions:
                     close = series.get(p.security_id, EMPTY).on(e.effective_at)
                     adj[p.security_id] = close[1] if close else None
+            previous = snap
             if i + 1 < len(self.events) and self.events[i + 1].effective_at == e.effective_at:
                 continue
-            state = {p.security_id: (p.quantity + p.pending_quantity, p.average_cost) for p in replay(self.events[:i + 1]).positions}
+            state = {s: (q + pending, cost) for s, (q, pending, cost) in snap.items()}
             for s in list(adj):
                 if state.get(s, (0, 0))[0] <= 0:
                     adj.pop(s)
@@ -110,7 +111,7 @@ class _Book:
 def _horizon(series: _Series, index: _Series, start: date, months: int, today: date) -> dict:
     on = _add_months(start, months)
     empty = {"on": on.isoformat(), "change": None, "index": None, "diff": None, "reason": None}
-    if on > today:
+    if on > today or (on == today and (not series.days or series.days[-1] < today)):  # today's close comes with the 20:00 run
         return {"status": "not_yet", **empty}
     base, got = series.on(start), series.on(on)
     if base is None or got is None:
@@ -197,7 +198,7 @@ def hindsight(events, *, closes: dict, index: list, journal: list[dict], theses:
             for e in trades]
 
     loss_holds = []
-    for symbol in sorted({e.security_id for e in trades}):
+    for symbol in sorted({e.security_id for e in trades} | {p.security_id for e in book.events if isinstance(e, OpeningBalance) for p in e.positions}):
         if symbol in series:
             loss_holds += _loss_holds(symbol, book, series[symbol], sells, buys, threshold)
 
@@ -208,9 +209,9 @@ def hindsight(events, *, closes: dict, index: list, journal: list[dict], theses:
                   if c.get("status") == "broken"]
         closed = date.fromisoformat(t["closed_on"]) if t.get("closed_on") else None
         for cid, kind, on, price, held in found:
-            if not on or not price or Decimal(price) <= 0 or (cid, on) in seen:
+            if not on or not price or Decimal(price) <= 0 or (cid, kind, on) in seen:
                 continue
-            seen.add((cid, on))
+            seen.add((cid, kind, on))
             start = date.fromisoformat(on)
             exits = sorted((d, _weighted(p)) for (d, s), p in sells.items() if s == t["symbol"] and d >= start and (closed is None or d <= closed)
                            and book.at(d).get(t["symbol"], (0, 0))[0] == 0)

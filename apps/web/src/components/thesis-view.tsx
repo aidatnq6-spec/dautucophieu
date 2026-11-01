@@ -36,9 +36,9 @@ export function conditionParams(names: string[], values: Record<string, string>)
   return out;
 }
 
-/** Giữ tiếp is offered for a condition shown broken (recorded, or read so from stored data) unless a hold is in force through its date. */
+/** Giữ tiếp is offered for a condition shown broken (recorded, or read so from stored data) unless a hold is in force (before its review date). */
 export function canHold(c: { status: string | null; view: View; hold: { until: string; reason: string } | null }, today: string): boolean {
-  return (c.status === "broken" || c.view.state === "broken") && (!c.hold || c.hold.until < today);
+  return (c.status === "broken" || c.view.state === "broken") && (!c.hold || c.hold.until <= today);
 }
 
 /** Today in Hà Nội as YYYY-MM-DD, as the server dates holds. */
@@ -181,7 +181,7 @@ export function ThesisView() {
                 <span>{c.label}</span><span className={`pill ${s.tone}`}>{s.text}</span>
                 <span className="caption">{c.view.reading ?? c.view.reason ?? ""}{c.broken_price && c.view.state === "broken"
                   ? ` · lúc báo đầu ${formatDecimal(String(Number(c.broken_price) / 1000), 2)}` : ""}</span>
-                {c.hold && <span className="caption">{c.hold.until < today ? `Giữ tiếp đã hết hạn ${day(c.hold.until)}` : `Giữ tiếp đến ${day(c.hold.until)}`}:
+                {c.hold && <span className="caption">{c.hold.until <= today ? `Đến ngày xem lại ${day(c.hold.until)}` : `Giữ tiếp đến ${day(c.hold.until)}`}:
                   {" "}“{c.hold.reason}”</span>}
                 {canHold(c, today) && <button className="btn" type="button" onClick={() => setHolding({ thesis: t, cond: c })}>
                   <PauseCircle size={15} aria-hidden="true" />Giữ tiếp, có lý do</button>}

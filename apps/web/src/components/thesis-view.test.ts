@@ -5,7 +5,8 @@ it("offers Giữ tiếp for a condition shown broken unless a hold is still in f
   const broken = { status: "broken", view: { state: "broken" as const, reading: null, reason: null }, hold: null };
   expect(canHold(broken, "2026-11-02")).toBe(true);
   expect(canHold({ ...broken, status: null }, "2026-11-02")).toBe(true);  // shown broken from stored data, not yet recorded
-  expect(canHold({ ...broken, hold: { until: "2026-11-02", reason: "x" } }, "2026-11-02")).toBe(false);  // in force through its date
+  expect(canHold({ ...broken, hold: { until: "2026-11-03", reason: "x" } }, "2026-11-02")).toBe(false);  // in force before its date
+  expect(canHold({ ...broken, hold: { until: "2026-11-02", reason: "x" } }, "2026-11-02")).toBe(true);  // due on the review date
   expect(canHold({ ...broken, hold: { until: "2026-11-01", reason: "x" } }, "2026-11-02")).toBe(true);  // expired
   expect(canHold({ ...broken, status: "ok", view: { state: "ok" as const, reading: null, reason: null } }, "2026-11-02")).toBe(false);
 });

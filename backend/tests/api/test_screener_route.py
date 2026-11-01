@@ -21,6 +21,7 @@ def test_rows_criteria_and_saved_screens(tmp_path):
     assert [r["symbol"] for r in view["rows"]] == ["FPT", "HPG"] and view["screens"] == [] and view["version"] == 0
     assert view["criteria"]["verdict"] == {"label": "Định giá", "values": {"cheap": "Rẻ", "fair": "Hợp lý", "expensive": "Đắt"}}
     assert view["rows"][0]["missing"]["foreign20"] == "Chưa đủ 20 phiên khối ngoại (0)"
+    assert view["as_of"] == {"trend": None, "foreign": None}
     saved = call(c, clock, "PUT", "/internal/screener", {"action": "save", "screen": {"name": "Rẻ", "criteria": {"verdict": ["cheap"]}, "notify": True},
                                                          "expected_version": 0, "request_id": "s1"}).json()
     assert saved["version"] == 1 and saved["screens"][0]["name"] == "Rẻ"

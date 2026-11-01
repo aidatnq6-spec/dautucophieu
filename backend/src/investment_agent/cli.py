@@ -732,8 +732,8 @@ def price_alerts_cli(data_dir: Path, now=None) -> int:
 
 
 def screen_check_cli(data_dir: Path, calendar_path: Path, now=None) -> int:
-    """Bộ lọc tín hiệu after the close: one Telegram note for tickers new to the owner's notifying screens; skipped while scheduled
-    delivery is off (the next check after it is turned on starts from a baseline)."""
+    """Bộ lọc tín hiệu after the close: one Telegram note for tickers new to the owner's notifying screens. With scheduled delivery
+    off, or no screen set to notify, the matches are still recorded (no note), so turning either on later starts from them."""
     from datetime import datetime, timezone
 
     from investment_agent.market.prices import PriceStore
@@ -745,11 +745,15 @@ def screen_check_cli(data_dir: Path, calendar_path: Path, now=None) -> int:
     now = now or datetime.now(timezone.utc)
     telegram = _scheduled_telegram()
     if telegram is None:
-        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
-        return 0
-    send, repo, owner = telegram
-    if not any(s.get("notify") for s in read_screens(repo, owner)[0]):
-        print(json.dumps({"status": "ok", "screens": 0, "entered": 0, "sent": False}))
+        import os
+
+        from investment_agent.api.auth import OwnerContext
+        from investment_agent.repositories.firestore import personal_repository_from_env
+        send, repo, owner = None, personal_repository_from_env(), OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
+    else:
+        send, repo, owner = telegram
+    if not any(s.get("notify") for s in read_screens(repo, owner)[0]):  # nothing to read: clear the record so a later switch-on is a baseline
+        print(json.dumps(screen_check_run(repo, owner, data_dir, rows=[], send=None, now=now)))
         return 0
     today = now.astimezone(VN).date()
     market = StoreMarket(PriceStore(data_dir), load_calendar(calendar_path), today=lambda: today) if (data_dir / "prices").exists() else EmptyMarket()

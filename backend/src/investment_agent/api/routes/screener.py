@@ -8,7 +8,7 @@ from pydantic import Field
 from investment_agent.domain.models import ContractModel
 from investment_agent.domain.screener import CRITERIA, ScreenError
 from investment_agent.repositories.personal import RepositoryUnavailable
-from investment_agent.services.screener import change_screens, gather_rows, read_screens
+from investment_agent.services.screener import change_screens, gather_rows, read_screens, signal_dates
 from investment_agent.services.weekly_brief import VN
 
 from ..auth import require_owner
@@ -23,6 +23,7 @@ def _view(request: Request, screens: list[dict], version: int) -> dict:
     rows = gather_rows(Path(data_dir), repo, owner, held=held_tickers(request), today=now(request).astimezone(VN).date(),
                        market=request.app.state.market) if data_dir is not None else []
     return {"version": version, "screens": screens, "rows": rows,
+            "as_of": signal_dates(Path(data_dir)) if data_dir is not None else {"trend": None, "foreign": None},
             "criteria": {k: {"label": label, "values": values} for k, (label, values) in CRITERIA.items()}}
 
 

@@ -52,7 +52,8 @@ def summarise_board(records: list[dict], *, session_date: date, icb_names: dict[
             nets.append((r["symbol"], buy - sell))
         symbols[r["symbol"]] = {"price": int(price) if traded else None, "ref": int(ref) if ref else None,
                                 "change": int(price - ref) if traded else None, "pct": _s(pct, _Q4) if traded else None,
-                                "sector": sector, "foreign_net_bn": _s((buy - sell) / Decimal(1_000_000_000), _Q2)}
+                                "sector": sector, "foreign_net_bn": None if r.get("foreign_buy_value") is None and r.get("foreign_sell_value") is None
+                                else _s((buy - sell) / Decimal(1_000_000_000), _Q2)}
     bn = Decimal(1_000_000_000)
     top = lambda items: [{"symbol": s, "net_value_bn": _s(n / bn, _Q2)} for s, n in items[:3]]
     sectors = [{"sector": name, "pct": _s(sum(p) / len(p), _Q4), "count": len(p)} for name, p in groups.items()]

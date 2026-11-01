@@ -24,7 +24,8 @@ def test_foreign_flows_come_from_the_session_snapshots_in_date_order(tmp_path):
         board = {"status": "ok", "symbols": {"FPT": {"foreign_net_bn": str(i)}, "HPG": {"price": 1}}}  # HPG from before the field existed
         (brief / f"{day}.json").write_text(json.dumps({"session_date": day, "board": board}), encoding="utf-8")
     (brief / "2026-10-30.json").write_text(json.dumps({"session_date": "2026-10-30", "board": {"status": "missing"}}), encoding="utf-8")
-    assert foreign_by_symbol(tmp_path) == {"FPT": ["0", "1", "2"]}
+    assert foreign_by_symbol(tmp_path) == {"sessions": ["2026-10-27", "2026-10-28", "2026-10-29"],
+                                           "values": {"FPT": {"2026-10-27": "0", "2026-10-28": "1", "2026-10-29": "2"}}}
 
 
 def test_screens_are_saved_and_deleted_with_versions():
@@ -78,3 +79,50 @@ def test_changing_a_screens_criteria_starts_a_new_baseline(tmp_path):
                                                               "notify": True}}, expected_version=v, request_id="s2")
     out = screen_check_run(repo, OWNER, tmp_path, rows=[_row("FPT", "cheap"), _row("HPG", "fair")], send=send, now=NOW)
     assert out["entered"] == 0 and box == []
+
+
+def _lacking(symbol):
+    return {"symbol": symbol, "values": {"verdict": None}, "missing": {"verdict": "x"}, "foreign20_bn": None}
+
+
+def test_a_ticker_lacking_data_keeps_its_place_instead_of_leaving_and_reentering(tmp_path):
+    repo = _repo()
+    change_screens(repo, OWNER, {"action": "save", "screen": {"name": "Rẻ", "criteria": {"verdict": ["cheap"]}, "notify": True}},
+                   expected_version=0, request_id="s1")
+    box = []
+    send = lambda t: box.append(t) or True  # noqa: E731
+    screen_check_run(repo, OWNER, tmp_path, rows=[_row("FPT", "cheap")], send=send, now=NOW)
+    screen_check_run(repo, OWNER, tmp_path, rows=[_lacking("FPT")], send=send, now=NOW)  # a day without valuation
+    assert screen_check_run(repo, OWNER, tmp_path, rows=[_row("FPT", "cheap")], send=send, now=NOW)["entered"] == 0 and box == []
+
+
+def test_with_delivery_off_or_no_notifying_screen_the_matches_are_still_recorded(tmp_path):
+    repo = _repo()
+    screens, v = change_screens(repo, OWNER, {"action": "save", "screen": {"name": "Rẻ", "criteria": {"verdict": ["cheap"]}, "notify": True}},
+                                expected_version=0, request_id="s1")
+    box = []
+    send = lambda t: box.append(t) or True  # noqa: E731
+    screen_check_run(repo, OWNER, tmp_path, rows=[_row("FPT", "cheap")], send=send, now=NOW)
+    out = screen_check_run(repo, OWNER, tmp_path, rows=[_row("FPT", "cheap"), _row("HPG", "cheap")], send=None, now=NOW)  # delivery off
+    assert out["sent"] is False and out["entered"] == 1
+    assert screen_check_run(repo, OWNER, tmp_path, rows=[_row("FPT", "cheap"), _row("HPG", "cheap")], send=send, now=NOW)["entered"] == 0
+    change_screens(repo, OWNER, {"action": "save", "screen": {**screens[0], "notify": False}}, expected_version=v, request_id="s2")
+    screen_check_run(repo, OWNER, tmp_path, rows=[_row("FPT", "cheap")], send=send, now=NOW)
+    change_screens(repo, OWNER, {"action": "save", "screen": {**screens[0], "notify": True}}, expected_version=v + 1, request_id="s3")
+    assert screen_check_run(repo, OWNER, tmp_path, rows=[_row("FPT", "cheap"), _row("SSI", "cheap")], send=send, now=NOW)["entered"] == 0  # baseline
+    assert box == []
+
+
+def test_a_corrupt_state_file_starts_a_baseline_and_the_note_shows_hanoi_time(tmp_path):
+    from datetime import timezone
+    repo = _repo()
+    change_screens(repo, OWNER, {"action": "save", "screen": {"name": "Rẻ", "criteria": {"verdict": ["cheap"]}, "notify": True}},
+                   expected_version=0, request_id="s1")
+    (tmp_path / "alerts").mkdir()
+    (tmp_path / "alerts" / "screens.json").write_text("{oops", encoding="utf-8")
+    box = []
+    send = lambda t: box.append(t) or True  # noqa: E731
+    assert screen_check_run(repo, OWNER, tmp_path, rows=[_row("FPT", "cheap")], send=send, now=NOW)["entered"] == 0
+    utc = datetime(2026, 11, 2, 8, 30, tzinfo=timezone.utc)  # 15:30 in Hà Nội
+    screen_check_run(repo, OWNER, tmp_path, rows=[_row("FPT", "cheap"), _row("HPG", "cheap")], send=send, now=utc)
+    assert "15:30 02/11" in box[0]

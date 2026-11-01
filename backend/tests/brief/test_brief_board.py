@@ -43,3 +43,10 @@ def test_breadth_totals_foreign_and_sectors():
 def test_board_of_another_day_is_not_used():
     out = summarise_board([rec("VCB", 1, 2, day="2026-10-23")], session_date=D, icb_names=ICB)
     assert out == {"status": "missing", "reason": "Bảng giá chưa phải phiên này"}
+
+
+def test_a_board_row_without_foreign_figures_stores_no_foreign_value():
+    row = {"symbol": "AAA", "trading_date": "2026-10-26", "ref_price": 10000, "match_price": 10100, "accumulated_value": 1.0,
+           "accumulated_volume": 100, "icb_code2": "8300"}
+    out = summarise_board([row], session_date=D, icb_names=ICB)
+    assert out["symbols"]["AAA"]["foreign_net_bn"] is None

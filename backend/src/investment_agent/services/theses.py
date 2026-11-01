@@ -4,7 +4,7 @@ Nhật ký), the facts each check reads from stored data, and the Telegram note 
 Personal data: stays on the owner's machine and in their Firestore; nothing here is ever sent to a model. The note gives the
 owner's own condition and words, a scenario from the ticker's stored history (never a forecast), and never says to sell."""
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -215,7 +215,8 @@ def _review(thesis: dict, cond: dict) -> list[str]:
 
 def render(blocks: list[list[str]], now: datetime) -> str:
     body = "\n\n".join("\n".join(b) for b in blocks)
-    return (f"Luận điểm đầu tư · {now.strftime('%H:%M %d/%m')}\n{body}\n\n"
+    local = now.astimezone(timezone(timedelta(hours=7))) if now.tzinfo else now  # the scheduler passes UTC
+    return (f"Luận điểm đầu tư · {local.strftime('%H:%M %d/%m')}\n{body}\n\n"
             "Quyết định giữ hay bán là của bạn; trang Danh mục có nút “Giữ tiếp, có lý do”. Giá cổ phiếu tính bằng nghìn đồng.\n"
             "Không phải khuyến nghị. Phần mềm không đặt lệnh.")
 

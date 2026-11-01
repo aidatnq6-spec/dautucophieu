@@ -15,6 +15,7 @@ from investment_agent.market.view import EmptyMarket
 from investment_agent.market.watchlist import load_watchlist
 from investment_agent.services.holdings_view import fair_value_board
 from investment_agent.services.records import read_version
+from investment_agent.services.weekly_brief import VN
 
 RECORD = ("settings", "screens")
 
@@ -44,19 +45,30 @@ def change_screens(repo, owner, change: dict, *, expected_version: int, request_
     return screens, record.version
 
 
-def foreign_by_symbol(data_dir: Path) -> dict[str, list[str]]:
-    """Each ticker's net foreign value (billion đồng) per stored session snapshot, oldest first; sessions from before the
-    per-ticker value was kept are left out."""
-    out: dict[str, list[str]] = {}
+def foreign_by_symbol(data_dir: Path) -> dict:
+    """The stored sessions whose board carries per-ticker foreign values (oldest first; one file per session) and each ticker's net
+    foreign value (billion đồng) by session. A ticker absent from a session has no value there, never a zero."""
+    sessions, values = [], {}
     for path in sorted((Path(data_dir) / "brief").glob("*.json")):
         try:
-            board = json.loads(path.read_text(encoding="utf-8")).get("board") or {}
+            snap = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        for symbol, row in (board.get("symbols") or {}).items():
+        rows = (snap.get("board") or {}).get("symbols") or {}
+        if not any("foreign_net_bn" in r for r in rows.values()):
+            continue  # a failed board, or a session from before the per-ticker value was kept
+        day = snap.get("session_date") or path.stem
+        sessions.append(day)
+        for symbol, row in rows.items():
             if row.get("foreign_net_bn") is not None:
-                out.setdefault(symbol, []).append(row["foreign_net_bn"])
-    return out
+                values.setdefault(symbol, {})[day] = row["foreign_net_bn"]
+    return {"sessions": sessions, "values": values}
+
+
+def signal_dates(data_dir: Path) -> dict:
+    """The sessions the stored signals are from: the Xu hướng board and the last session with per-ticker foreign values."""
+    sessions = foreign_by_symbol(data_dir)["sessions"]
+    return {"trend": (SnapshotStore(Path(data_dir) / "trend").latest() or {}).get("session_date"), "foreign": sessions[-1] if sessions else None}
 
 
 def gather_rows(data_dir: Path, repo, owner, *, held: set[str], today: date, market=None) -> list[dict]:
@@ -69,12 +81,15 @@ def gather_rows(data_dir: Path, repo, owner, *, held: set[str], today: date, mar
         valuation = {}
     snapshot = SnapshotStore(data_dir / "trend").latest() or {}
     trend = {r["id"]: r["cells"] for g in snapshot.get("groups", []) for r in g.get("rows", [])}
+    store = EventStore(data_dir)
     try:
         chains = chain_labels(data_dir, today=today)
     except (OSError, ValueError):
         chains = None
-    return build_rows(symbols=symbols, valuation=valuation, trend=trend, chains=chains, foreign=foreign_by_symbol(data_dir),
-                      events=EventStore(data_dir).events(symbols), held=held, today=today)
+    return build_rows(symbols=symbols, valuation=valuation, trend=trend,
+                      trend_meta={"session_date": snapshot.get("session_date"), "previous_date": snapshot.get("previous_date")},
+                      chains=chains, foreign=foreign_by_symbol(data_dir), events=store.events(symbols),
+                      events_known={s for s in symbols if store.read(s) is not None}, held=held, today=today)
 
 
 def _describe(row: dict, criteria: dict) -> str:
@@ -87,19 +102,36 @@ def _describe(row: dict, criteria: dict) -> str:
     return "; ".join(parts)
 
 
+def _local(now: datetime) -> datetime:
+    return now.astimezone(VN) if now.tzinfo else now
+
+
 def _state(data_dir: Path) -> Path:
     return Path(data_dir) / "alerts" / "screens.json"
 
 
 def screen_check_run(repo, owner, data_dir: Path, *, rows: list[dict], send, now: datetime) -> dict:
     """For screens set to notify: tickers that entered since the last check go out in one note; the first check of a screen is
-    a baseline. The matches are recorded only when the note went out (or nothing was due)."""
+    a baseline. The matches are recorded only when the note went out or nothing was due; with `send` None (delivery off) they
+    are recorded without a note, so turning delivery on later starts from what was already there."""
     screens = [s for s in read_screens(repo, owner)[0] if s.get("notify")]
     path = _state(data_dir)
-    previous = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    try:
+        previous = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    except (OSError, ValueError):
+        previous = {}  # unreadable: start from a baseline
     # Keyed by the screen and its criteria: changing the criteria starts a new baseline instead of announcing every ticker it now finds.
     key = {s["id"]: f"{s['id']}:{json.dumps(s['criteria'], sort_keys=True)}" for s in screens}
-    current = {key[s["id"]]: [r["symbol"] for r in rows if match(s["criteria"], r)[0]] for s in screens}
+    current = {}
+    for s in screens:
+        kept = set(previous.get(key[s["id"]], []))
+        # A ticker lacking data today keeps yesterday's place: an outage must not make it leave and then "enter" again.
+        found = []
+        for r in rows:
+            ok, lacking = match(s["criteria"], r)
+            if ok or (lacking and r["symbol"] in kept):
+                found.append(r["symbol"])
+        current[key[s["id"]]] = found
     new = entered(previous, current)
     by_symbol = {r["symbol"]: r for r in rows}
     sent = False
@@ -111,10 +143,10 @@ def screen_check_run(repo, owner, data_dir: Path, *, rows: list[dict], send, now
                 lines = [f"Bộ lọc “{s['name']}”: {', '.join(found)}"]
                 lines += [f"• {sym} — {_describe(by_symbol[sym], s['criteria'])}" for sym in found]
                 blocks.append("\n".join(lines))
-        text = (f"Bộ lọc tín hiệu · {now.strftime('%H:%M %d/%m')}\nMã mới lọt vào bộ lọc của bạn:\n\n" + "\n\n".join(blocks)
+        text = (f"Bộ lọc tín hiệu · {_local(now).strftime('%H:%M %d/%m')}\nMã mới lọt vào bộ lọc của bạn:\n\n" + "\n\n".join(blocks)
                 + "\n\nChỉ để thu hẹp danh sách. Không phải khuyến nghị.")
-        sent = bool(send(text))
-        if not sent:
+        sent = send is not None and bool(send(text))
+        if send is not None and not sent:
             return {"status": "ok", "screens": len(screens), "entered": sum(map(len, new.values())), "sent": False}
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")

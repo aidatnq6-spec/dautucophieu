@@ -58,3 +58,10 @@ def test_a_failed_delivery_leaves_the_alert_armed_and_a_missing_price_never_trig
     assert check_alerts(repo, OWNER, prices={}, send=lambda t: True, now=NOW, request_id="c1")["triggered"] == 0
     assert check_alerts(repo, OWNER, prices={"FPT": Decimal("52.7")}, send=lambda t: False, now=NOW, request_id="c2")["sent"] is False
     assert read_alerts(repo, OWNER)[0][0]["triggered_at"] is None
+
+
+
+def test_the_note_shows_hanoi_time():
+    from investment_agent.services.price_alerts import render
+    text = render([({"symbol": "FPT", "op": "above", "price": "50"}, Decimal("51"))], NOW)  # 03:30 UTC
+    assert text.startswith("Cảnh báo giá · 10:30 02/11")

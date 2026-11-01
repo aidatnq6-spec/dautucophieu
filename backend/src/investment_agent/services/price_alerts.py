@@ -5,7 +5,7 @@ stays listed as triggered with the time and price, until the owner arms it again
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 
 from investment_agent.services.records import read_version
@@ -70,7 +70,8 @@ def _num(d: Decimal) -> str:
 
 def render(hits: list[tuple[dict, Decimal]], now: datetime) -> str:
     lines = [f"• {a['symbol']} {_num(p)} {OPS[a['op']]} {_num(Decimal(a['price']))} (mức bạn đặt)" for a, p in hits]
-    return (f"Cảnh báo giá · {now.strftime('%H:%M %d/%m')}\n" + "\n".join(lines)
+    local = now.astimezone(timezone(timedelta(hours=7))) if now.tzinfo else now  # the scheduler passes UTC
+    return (f"Cảnh báo giá · {local.strftime('%H:%M %d/%m')}\n" + "\n".join(lines)
             + "\nGiá cổ phiếu tính bằng nghìn đồng, chỉ số bằng điểm. Mỗi cảnh báo báo một lần; bật lại ở tab Xu hướng. Không phải khuyến nghị.")
 
 

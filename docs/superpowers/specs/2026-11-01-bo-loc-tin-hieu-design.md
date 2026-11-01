@@ -26,8 +26,11 @@ Telegram khi có mã mới lọt vào. Chỉ thu hẹp danh sách để xem, kh�
 ## Bộ lọc đã lưu và Telegram
 - Lưu tối đa 20 bộ lọc ở kho cá nhân (`settings/screens`): tên, tiêu chí, có nhắn Telegram hay không.
 - Sau mỗi lượt sau giờ đóng cửa (sau Xu hướng và ảnh chụp phiên), với bộ lọc bật nhắn: mã **mới lọt vào** so với lần trước thì nhắn một tin
-  (chỉ khi "gửi theo lịch" đang bật). Lần đầu chỉ ghi mốc. Mã rời bộ lọc không nhắn. Danh sách mã khớp lần trước lưu ở
-  `data/alerts/screens.json` (chỉ mã cổ phiếu công khai).
+  (chỉ khi "gửi theo lịch" đang bật). Lần đầu chỉ ghi mốc; sửa tiêu chí, tắt rồi bật nhắn cũng ghi mốc lại. Khi "gửi theo lịch" tắt,
+  danh sách khớp vẫn được ghi (không nhắn). Mã thiếu dữ liệu trong ngày giữ chỗ cũ, không tính là rời rồi vào lại. Mã rời bộ lọc
+  không nhắn. Danh sách mã khớp lần trước lưu ở `data/alerts/screens.json` (trên máy này, không vào Git).
+- "MACD tuần vừa cắt lên" = bảng trước dưới đường tín hiệu, bảng này trên (đường MACD chỉ đổi dấu thì không tính). Bảng Xu hướng hay
+  khối ngoại cũ quá 7 ngày, hay thiếu một phiên trong 20 phiên, thì tiêu chí đó "thiếu dữ liệu" kèm lý do.
 - Tin nhắn liệt kê mã mới và giá trị các tiêu chí của mã; kết bằng "Chỉ để thu hẹp danh sách. Không phải khuyến nghị."
 
 ## Giao diện

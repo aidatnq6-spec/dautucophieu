@@ -3,12 +3,13 @@ import { useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
 import { formatDecimal } from "../lib/format";
 
-type Horizon = { status: "ok" | "not_yet" | "missing"; on: string; change: string | null; index: string | null; diff: string | null };
+type Horizon = { status: "ok" | "not_yet" | "missing"; on: string; change: string | null; index: string | null; diff: string | null;
+  reason: string | null };
 type Trade = { event_id: string; symbol: string; type: "buy" | "sell"; date: string; price: string; quantity: number; horizons: Record<string, Horizon> };
-type LossHold = { symbol: string; start: string; end: string | null; days: number | null; deepest: string; outcome: "recovered" | "sold_at_loss" | "holding" };
-type Break = { symbol: string; kind: string; broken_on: string; broken_price: string; held_on: boolean; then: string | null; then_on: string | null;
+type LossHold = { symbol: string; start: string; end: string | null; days: number | null; deepest: string; outcome: "recovered" | "sold_at_loss" | "holding" | "averaged_down" };
+type Break = { symbol: string; kind: string; label: string; broken_on: string; broken_price: string; held_on: boolean; then: string | null; then_on: string | null;
   how: string; change: string | null };
-type Group = { key: string; count: number; enough: boolean; mean: string | null; mean_diff: string | null };
+type Group = { key: string; count: number; matured: number; enough: boolean; mean: string | null; mean_diff: string | null };
 type Data = { trades: Trade[]; opening_skipped: number; loss_holds: LossHold[]; breaks: Break[]; threshold: string;
   biases: { disposition: { days: number; pgr: string | null; plr: string | null; enough: boolean }; by_emotion: Group[]; by_reason: Group[];
     chasing: { chasing: Group; other: Group } } };
@@ -21,17 +22,21 @@ const pct = (ratio: string) => {
 const EMOTION: Record<string, string> = { calm: "Bình tĩnh", excited: "Hào hứng", fomo: "Sợ bỏ lỡ (FOMO)", anxious: "Lo lắng", panic: "Hoảng sợ", regret: "Tiếc nuối" };
 const REASON: Record<string, string> = { cheap: "Giá rẻ so với định giá", earnings: "Kết quả kinh doanh tốt", trend: "Xu hướng giá đẹp",
   industry: "Câu chuyện ngành", fomo: "Sợ bỏ lỡ" };
-const OUTCOME = { recovered: "hồi về giá vốn", sold_at_loss: "bán lỗ", holding: "vẫn đang giữ" };
+const OUTCOME = { recovered: "hồi về giá vốn", sold_at_loss: "bán lỗ", holding: "vẫn đang giữ", averaged_down: "mua thêm khi đang lỗ" };
 const NOT_ENOUGH = "chưa đủ dữ liệu để kết luận";
 
 export function horizonText(h: Horizon): string {
   if (h.status === "not_yet") return `chưa tới (${day(h.on)})`;
-  if (h.status === "missing" || h.change === null) return "thiếu giá";
+  if (h.status === "missing" || h.change === null) return h.reason ? `thiếu giá: ${h.reason}` : "thiếu giá";
   return `${pct(h.change)} (VN-Index${h.index === null ? ": thiếu số" : ` ${pct(h.index)}`})`;
 }
 
+export function groupCount(g: { count: number; matured: number }): string {
+  return g.matured === g.count ? `${g.count} lần` : `${g.count} lần, ${g.matured} đủ 6 tháng`;
+}
+
 function GroupRows({ title, rows, label }: { title: string; rows: Group[]; label: (k: string) => string }) {
-  return <>{rows.map((g) => <tr key={`${title}-${g.key}`}><td>{title}: {label(g.key)}</td><td className="num">{g.count}</td>
+  return <>{rows.map((g) => <tr key={`${title}-${g.key}`}><td>{title}: {label(g.key)}</td><td className="num">{groupCount(g)}</td>
     <td>{g.enough && g.mean ? `${pct(g.mean)} sau 6 tháng${g.mean_diff ? `, so với VN-Index ${pct(g.mean_diff)}` : ""}` : NOT_ENOUGH}</td></tr>)}</>;
 }
 
@@ -67,14 +72,15 @@ export function HindsightView() {
         <h3>Luận điểm bị phá</h3>
         {data.breaks.length === 0 ? <p className="muted">Chưa có điều kiện nào bị phá.</p> : <div className="tablewrap"><table aria-label="Luận điểm bị phá">
           <thead><tr><th>Mã</th><th>Bị phá</th><th>Đã giữ tiếp</th><th>Sau đó</th><th className="num">So với bán ngay</th></tr></thead>
-          <tbody>{data.breaks.map((b, i) => <tr key={`${b.symbol}-${b.broken_on}-${i}`}><td>{b.symbol}</td>
-            <td>{day(b.broken_on)} ở {formatDecimal(String(Number(b.broken_price) / 1000), 2)}</td><td>{b.held_on ? "có lý do" : "không"}</td>
+          <tbody>{data.breaks.map((b, i) => <tr key={`${b.symbol}-${b.broken_on}-${i}`}><td>{b.symbol} · {b.label}</td>
+            <td>{day(b.broken_on)} ở {formatDecimal(String(Number(b.broken_price) / 1000), 2)}</td><td>{b.held_on ? "có, có lý do" : "chưa quyết định"}</td>
             <td>{b.then === null ? "thiếu giá" : `${b.how === "sold" ? "bán" : "giá"} ${formatDecimal(String(Number(b.then) / 1000), 2)} (${day(b.then_on ?? "")})`}</td>
             <td className="num">{b.change === null ? "—" : pct(b.change)}</td></tr>)}</tbody>
         </table></div>}
 
-        <h3>Giữ khi đang lỗ quá {pct(String(-Number(data.threshold)))} so với giá vốn</h3>
-        <p className="caption">Dùng ngưỡng Kế hoạch sụt giảm hiện tại cho mọi khoảng trong quá khứ.</p>
+        <h3>Giữ khi đang lỗ quá {pct(data.threshold).replace("+", "")} so với giá vốn</h3>
+        <p className="caption">Dùng ngưỡng Kế hoạch sụt giảm hiện tại cho mọi khoảng trong quá khứ. Giá đã lưu được điều chỉnh theo cổ tức và phát hành,
+          nên giá vốn ở đây là bình quân giá đóng cửa (đã điều chỉnh) của các ngày mua, không phải giá khớp.</p>
         {data.loss_holds.length === 0 ? <p className="muted">Chưa có lần nào.</p> : <div className="tablewrap"><table aria-label="Giữ khi đang lỗ">
           <thead><tr><th>Mã</th><th>Từ</th><th>Đến</th><th className="num">Sâu nhất</th><th>Kết thúc</th></tr></thead>
           <tbody>{data.loss_holds.map((h) => <tr key={`${h.symbol}-${h.start}`}><td>{h.symbol}</td><td>{day(h.start)}</td>

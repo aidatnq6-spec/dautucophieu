@@ -778,7 +778,7 @@ def thesis_check_cli(data_dir: Path, calendar_path: Path, scope: str, now=None) 
         from investment_agent.services.hindsight import hindsight_for
         try:
             own = lesson(hindsight_for(repo, owner, data_dir, today=today)["breaks"])
-        except (OSError, ValueError, KeyError):
+        except Exception:  # an optional line: whatever fails here must not stop the check or its notes
             own = None
     out = thesis_check_run(repo, owner, data_dir, scope=scope, facts=facts, shares=position_shares(repo, owner), held=held, send=send, now=now,
                            today=today, request_id=f"thesis-check-{uuid.uuid4().hex[:16]}", lesson=(lambda t, c: own) if own else None)

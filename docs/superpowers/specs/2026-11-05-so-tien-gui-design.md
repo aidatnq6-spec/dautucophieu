@@ -11,6 +11,9 @@ Thay con số "Tiền gửi" nhập tay của Tháp tài sản bằng danh sách
 - **Tài khoản tiền mặt** ngoài tài khoản chứng khoán (tối đa 30): tên (≤ 60 ký tự), số tiền (đồng, ≥ 0), rút ngay được hay không.
 - **Sổ tiền gửi** (tối đa 100): ngân hàng (≤ 40 ký tự), ngày đáo hạn, tiền gốc (đồng, > 0), lãi suất %/năm (tùy chọn, 0–30),
   lãi dự kiến khi đáo hạn (đồng, tùy chọn), cách trả lãi: **cuối kỳ** hoặc **đầu kỳ** (đã nhận khi mở sổ), phong tỏa đến hạn hay không.
+- Lựa chọn **cộng tiền mặt sổ giao dịch** (mặc định có). Chủ sở hữu bỏ chọn khi các tài khoản đã là toàn bộ tiền mặt (05/11/2026: tiền
+  trong tài khoản chứng khoán là iPower), để không đếm hai lần: lớp Tiền mặt và Rút ngay chỉ lấy các tài khoản; số của sổ giao dịch vẫn
+  hiện, ghi "không cộng".
 - Mỗi dòng có mã do trình duyệt tạo; lưu cả danh sách một lần, có `expected_version` như các bản ghi khác.
 - Ô bỏ trống là **chưa nhập**, không phải 0; không suy lãi từ lãi suất hay ngược lại.
 

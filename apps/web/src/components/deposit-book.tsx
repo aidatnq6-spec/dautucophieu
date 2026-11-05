@@ -8,9 +8,9 @@ type Account = { id: string; name: string; amount: string; liquid: boolean };
 type Deposit = { id: string; bank: string; matures: string; principal: string; rate: string | null; interest: string | null;
   payout: "end" | "upfront"; locked: boolean };
 type Month = { month: string; count: number; principal: string; interest: string; missing_interest: number };
-type Liquidity = { now: string; ledger_cash: string; accounts_liquid: string; reserve: string; status: "enough" | "short"; short: string | null;
+type Liquidity = { now: string; ledger_cash: string; ledger_cash_counted: boolean; accounts_liquid: string; reserve: string; status: "enough" | "short"; short: string | null;
   maturing_90d: string; not_now: { accounts: string; locked: string; unlocked: string; overdue: string } };
-type View = { version: number; book: { accounts: Account[]; deposits: Deposit[] };
+type View = { version: number; book: { accounts: Account[]; deposits: Deposit[]; count_ledger_cash: boolean };
   calendar: { months: Month[]; due_soon: string[]; overdue: string[] }; liquidity: Liquidity };
 
 /** Rows as typed: money grouped with dots, rate with a comma, blanks kept blank. */
@@ -56,9 +56,11 @@ export function DepositBook({ onSaved }: { onSaved?: () => void }) {
   const [view, setView] = useState<View | null>(null);
   const [accounts, setAccounts] = useState<AccountDraft[]>([]);
   const [deposits, setDeposits] = useState<DepositDraft[]>([]);
+  const [countLedger, setCountLedger] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   function show(v: View) {
     setView(v);
+    setCountLedger(v.book.count_ledger_cash);
     setAccounts(v.book.accounts.map(toAccountDraft));
     setDeposits(v.book.deposits.map(toDepositDraft));
   }
@@ -68,7 +70,7 @@ export function DepositBook({ onSaved }: { onSaved?: () => void }) {
     const r = bookPayload(accounts, deposits);
     if ("error" in r) { setMessage(r.error); return; }
     try {
-      show(await api<View>("deposit-book", { method: "PUT", body: { ...r.ok, expected_version: view.version, request_id: requestId() } }));
+      show(await api<View>("deposit-book", { method: "PUT", body: { ...r.ok, count_ledger_cash: countLedger, expected_version: view.version, request_id: requestId() } }));
       setMessage(null);
       onSaved?.();
     } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); }
@@ -99,6 +101,10 @@ export function DepositBook({ onSaved }: { onSaved?: () => void }) {
               <Trash2 size={14} aria-hidden="true" />Xóa</button></td>
           </tr>))}</tbody>
       </table>}
+      <label className="db-check"><input type="checkbox" checked={countLedger} disabled={!view} onChange={(e) => setCountLedger(e.target.checked)} />
+        Cộng thêm tiền mặt trong tài khoản chứng khoán tính từ sổ giao dịch</label>
+      <p className="caption wrap">Bỏ chọn khi các tài khoản ở trên đã là toàn bộ tiền mặt của bạn (ví dụ tiền trong tài khoản chứng khoán chính là iPower):
+        lớp Tiền mặt và ô Thanh khoản chỉ lấy các tài khoản này, không đếm hai lần. Lưu để áp dụng.</p>
       <button type="button" className="btn" disabled={!view || accounts.length >= 30}
         onClick={() => setAccounts([...accounts, { id: requestId(), name: "", amount: "", liquid: true }])}><Plus size={14} aria-hidden="true" />Thêm tài khoản</button>
 
@@ -152,7 +158,8 @@ export function DepositBook({ onSaved }: { onSaved?: () => void }) {
       {l && <>
         <h3>Thanh khoản so với quỹ dự phòng</h3>
         <dl className="eb-result" aria-label="Thanh khoản">
-          <div><dt>Tiền mặt trong tài khoản chứng khoán <span className="caption">(sổ giao dịch)</span></dt><dd>{formatVnd(l.ledger_cash)}</dd></div>
+          <div><dt>Tiền mặt trong tài khoản chứng khoán <span className="caption">(sổ giao dịch)</span></dt>
+            <dd>{l.ledger_cash_counted ? formatVnd(l.ledger_cash) : <span className="muted">không cộng ({formatVnd(l.ledger_cash)} theo sổ giao dịch)</span>}</dd></div>
           <div><dt>Tài khoản tiền mặt rút ngay</dt><dd>{formatVnd(l.accounts_liquid)}</dd></div>
           <div className="eb-main"><dt>Rút ngay được</dt><dd data-testid="liquid-now">{formatVnd(l.now)}</dd></div>
           <div><dt>Quỹ dự phòng và khoản chi 12 tháng <span className="caption">(như Tháp tài sản)</span></dt><dd>{formatVnd(l.reserve)}</dd></div>

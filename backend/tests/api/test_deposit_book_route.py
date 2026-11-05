@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
@@ -41,7 +42,7 @@ def save_layers(c, clock, version=0):
 def test_an_empty_book_has_no_rows_and_liquidity_from_the_ledger_cash(tmp_path):
     c, clock = client(tmp_path)
     body = call(c, clock, "GET", "/internal/deposit-book").json()
-    assert body["version"] == 0 and body["book"] == {"accounts": [], "deposits": []}
+    assert body["version"] == 0 and body["book"] == {"accounts": [], "deposits": [], "count_ledger_cash": True}
     assert body["liquidity"]["now"] == "95000000" and body["calendar"]["months"] == []
 
 
@@ -95,3 +96,16 @@ def test_invalid_books_and_stale_versions_are_refused(tmp_path):
     assert save_book(c, clock, deposits=[DEPOSITS[0], DEPOSITS[0]]).status_code == 422
     assert save_book(c, clock).status_code == 200
     assert save_book(c, clock, version=0, rid="db2").status_code == 409
+
+
+def test_cash_from_the_book_only_leaves_the_ledger_cash_out_of_the_pyramid_and_cash_now(tmp_path):
+    c, clock = client(tmp_path)
+    save_layers(c, clock)
+    ok = call(c, clock, "PUT", "/internal/deposit-book", {"deposits": DEPOSITS, "accounts": ACCOUNTS, "count_ledger_cash": False,
+                                                         "expected_version": 0, "request_id": "db1"})
+    assert ok.status_code == 200 and ok.json()["book"]["count_ledger_cash"] is False
+    assert ok.json()["liquidity"]["now"] == "10000000"
+    b = call(c, clock, "GET", "/internal/equity-budget").json()["budget"]
+    amounts = {l["id"]: l["amount"] for l in b["pyramid"]["layers"]}
+    assert amounts["cash"] == "15000000" and b["cash_source"] == "book"  # the two accounts only; the ledger's 95 tr left out
+    assert Decimal(b["pyramid"]["funding"]["from_cash"]) <= Decimal("15000000")  # never more cash than the book holds

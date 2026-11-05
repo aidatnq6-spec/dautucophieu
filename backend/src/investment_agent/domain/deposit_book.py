@@ -52,6 +52,7 @@ class Deposit(ContractModel):
 class DepositBook(ContractModel):
     accounts: tuple[CashAccount, ...] = Field(default=(), max_length=30)
     deposits: tuple[Deposit, ...] = Field(default=(), max_length=100)
+    count_ledger_cash: bool = True  # False: the owner's cash is the accounts here only; the ledger's cash is shown, not counted
 
     @model_validator(mode="after")
     def _unique_ids(self):
@@ -85,14 +86,15 @@ def maturity_calendar(book: DepositBook, *, today: date) -> dict:
 
 
 def liquidity(book: DepositBook, *, ledger_cash: Decimal, reserve: Decimal, today: date) -> dict:
-    """Cash now (ledger cash + accounts marked liquid) against the reserve; everything else is named apart, and not counted."""
+    """Cash now (ledger cash unless the owner keeps cash to the book, + accounts marked liquid) against the reserve; everything else
+    is named apart, and not counted."""
     def total(rows) -> Decimal:
         return sum(rows, Decimal(0))
     liquid = total(a.amount for a in book.accounts if a.liquid)
-    now = ledger_cash + liquid
+    now = (ledger_cash if book.count_ledger_cash else Decimal(0)) + liquid
     ahead = [d for d in book.deposits if d.matures >= today]
     short = reserve - now
-    return {"now": _s(now), "ledger_cash": _s(ledger_cash), "accounts_liquid": _s(liquid),
+    return {"now": _s(now), "ledger_cash": _s(ledger_cash), "ledger_cash_counted": book.count_ledger_cash, "accounts_liquid": _s(liquid),
             "not_now": {"accounts": _s(total(a.amount for a in book.accounts if not a.liquid)),
                         "locked": _s(total(d.principal for d in ahead if d.locked)),
                         "unlocked": _s(total(d.principal for d in ahead if not d.locked)),

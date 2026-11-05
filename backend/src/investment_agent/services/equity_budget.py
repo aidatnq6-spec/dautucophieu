@@ -40,12 +40,13 @@ def budget_view(repo, owner) -> tuple[dict, int]:
     held_cost = sum((p.total_cost for p in state.positions if p.quantity + p.pending_quantity > 0), Decimal(0))
     ratios = dict(load_allocation_policy().baseline_equity)
     layers = stored.payload.get("layers")
-    amounts, deposit_source = None, "manual"
+    amounts, deposit_source, cash_source = None, "manual", "ledger"
     if layers:  # Tháp tài sản: the total is the sum of the layers, with the reserve as the bottom layer
         book, _ = read_book(repo, owner)
         from_book = totals(book) if book else {"deposits": Decimal(0), "accounts": Decimal(0)}
         deposit_source = "book" if book and book.deposits else "manual"  # the sổ replace the hand-entered figure once there is one
-        amounts = {"reserve": deductions, "cash": state.cash + from_book["accounts"],
+        cash_source = "book" if book and not book.count_ledger_cash else "ledger"  # the owner keeps cash to the book's accounts
+        amounts = {"reserve": deductions, "cash": (state.cash if cash_source == "ledger" else Decimal(0)) + from_book["accounts"],
                    "deposit": from_book["deposits"] if deposit_source == "book" else Decimal(layers["deposit"]), "bond": Decimal(layers["bond"]),
                    "gold": Decimal(layers["gold"]), "stocks": held_cost, "crypto": Decimal(layers["crypto"])}
     total = sum(amounts.values(), Decimal(0)) if amounts else Decimal(stored.payload["total"])
@@ -53,5 +54,6 @@ def budget_view(repo, owner) -> tuple[dict, int]:
     if budget["status"] == "ok":
         pyramid = asset_pyramid(amounts, deductions=deductions, stock_ratio=ratios[group]) if amounts else None
         budget = {**budget, "deductions_source": "manual" if manual is not None else "profile", "profile_deductions": format(from_profile, "f"),
-                  "reserve": manual, "layers": layers, "pyramid": pyramid, "deposit_source": deposit_source}
+                  "reserve": manual, "layers": layers, "pyramid": pyramid, "deposit_source": deposit_source,
+                  "cash_source": cash_source}
     return budget, stored.version

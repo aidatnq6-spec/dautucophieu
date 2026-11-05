@@ -15,7 +15,7 @@ type Layers = { deposit: string; bond: string; gold: string; crypto: string };
 type Budget = { status: "no_total" | "no_risk" | "ok"; total?: string; deductions?: string; base?: string; group?: string; ratio?: string;
   budget?: string; held_cost?: string; held_weight?: string | null; room?: string | null; over?: string | null;
   deductions_source?: "manual" | "profile"; profile_deductions?: string; reserve?: string | null; layers?: Layers | null; pyramid?: Pyramid | null;
-  deposit_source?: "book" | "manual" };
+  deposit_source?: "book" | "manual"; cash_source?: "book" | "ledger" };
 type View = { version: number; budget: Budget };
 
 const pct = (r: string) => formatRatio(r, 1).replace(",0%", "%");
@@ -36,7 +36,8 @@ function target(l: Layer) {
 }
 
 /** Tháp tài sản: layers from the bottom up against their targets, the total they add up to, and the money for stocks it gives. */
-function PyramidView({ p, intangibles, fromBook }: { p: Pyramid; intangibles: IntangiblesView["year"] | null; fromBook: boolean }) {
+function PyramidView({ p, intangibles, fromBook, cashFromBook }: { p: Pyramid; intangibles: IntangiblesView["year"] | null; fromBook: boolean;
+  cashFromBook: boolean }) {
   return (
     <>
       <ol className="pyr" aria-label="Các lớp tài sản, từ dưới lên">
@@ -44,7 +45,9 @@ function PyramidView({ p, intangibles, fromBook }: { p: Pyramid; intangibles: In
           const [word, tone] = STATUS[l.status];
           return (
             <li key={l.id} data-testid={`layer-${l.id}`} className={`pyr-layer pyr-${l.status}`} style={{ ["--step" as string]: i }}>
-              <div className="pyr-name"><strong>{NAME[l.id]}</strong>{NOTE[l.id] && <span className="caption"> · {NOTE[l.id]}</span>}
+              <div className="pyr-name"><strong>{NAME[l.id]}</strong>{l.id === "cash" && cashFromBook
+                  ? <span className="caption"> · chỉ các tài khoản tiền mặt ở Sổ tiền gửi</span>
+                  : NOTE[l.id] && <span className="caption"> · {NOTE[l.id]}</span>}
                 {l.id === "deposit" && fromBook && <span className="caption"> · tổng gốc từ Sổ tiền gửi</span>}</div>
               <div className="pyr-figs">
                 <span>{formatVnd(l.amount)}</span>
@@ -144,7 +147,7 @@ export function EquityBudget() {
       {message && <p className="errors" role="alert">{message}</p>}
       {b?.status === "ok" && !b.pyramid && <p className="notice">Đang dùng tổng tài sản nhập một con số ({formatVnd(b.total)}). Nhập số tiền từng lớp ở trên để xem tháp tài sản.</p>}
       {b?.status === "no_risk" && <p className="notice">Chưa có kết quả khảo sát rủi ro nên chưa biết tỷ trọng cổ phiếu.</p>}
-      {b?.status === "ok" && b.pyramid && <PyramidView p={b.pyramid} intangibles={intangibles} fromBook={fromBook} />}
+      {b?.status === "ok" && b.pyramid && <PyramidView p={b.pyramid} intangibles={intangibles} fromBook={fromBook} cashFromBook={b.cash_source === "book"} />}
       {b?.status === "ok" && <dl className="eb-result">
         <div><dt>Tổng tài sản tài chính</dt><dd data-testid="equity-total">{formatVnd(b.total)}</dd></div>
         <div><dt>Trừ quỹ dự phòng và khoản chi 12 tháng <span className="caption">({b.deductions_source === "manual" ? "nhập tay" : "theo hồ sơ"})</span></dt>

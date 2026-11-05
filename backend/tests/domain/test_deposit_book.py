@@ -72,3 +72,12 @@ def test_income_uses_each_rate_and_the_market_rate_only_for_deposits_without_one
 def test_invalid_books_are_refused(bad):
     with pytest.raises(ValidationError):
         DepositBook.model_validate({"accounts": [], "deposits": [], **bad})
+
+
+def test_when_the_owner_keeps_cash_to_the_book_the_ledger_cash_is_shown_but_not_counted():
+    b = DepositBook.model_validate({"accounts": [{"id": "x", "name": "TK", "amount": "10000000", "liquid": True}], "deposits": [],
+                                    "count_ledger_cash": False})
+    l = liquidity(b, ledger_cash=Decimal("95000000"), reserve=Decimal("20000000"), today=TODAY)
+    assert l["now"] == "10000000" and l["ledger_cash"] == "95000000" and l["ledger_cash_counted"] is False
+    assert l["status"] == "short" and l["short"] == "10000000"
+    assert book().count_ledger_cash is True  # the default keeps the ledger cash

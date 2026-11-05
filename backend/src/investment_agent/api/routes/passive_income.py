@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Request
 from pydantic import Field
 
+from investment_agent.domain.deposit_book import deposit_income
 from investment_agent.domain.models import ContractModel
 from investment_agent.domain.ledger import replay
 from investment_agent.domain.passive_income import income_by_layer, passive_income
@@ -16,6 +17,7 @@ from investment_agent.market.corporate_events import EventStore
 from investment_agent.market.leading import MacroStore
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.contributions import PLAN as CONTRIBUTION_PLAN
+from investment_agent.services.deposit_book import read_book
 from investment_agent.services.equity_budget import budget_view
 from investment_agent.services.records import LedgerBook, read_version
 
@@ -65,11 +67,17 @@ def _view(request: Request, repo, owner) -> dict:
     pyramid = budget.get("pyramid") if budget.get("status") == "ok" else None
     if pyramid and default_rate is not None:
         layers = {l["id"]: Decimal(l["amount"]) for l in pyramid["layers"]}
+        from_book = None
+        if budget.get("deposit_source") == "book":  # each sổ at its own rate; the market rate only for a sổ without one, counted
+            from_book = deposit_income(read_book(repo, owner)[0], market_rate=Decimal(default_rate))
         bond_rate = (record.payload.get("bond_rate") if record else None) or BOND_RATE
         income = income_by_layer(deposit=layers.get("deposit", Decimal(0)), deposit_rate=Decimal(default_rate), bond=layers.get("bond", Decimal(0)),
                                  bond_rate=Decimal(bond_rate), dividends_12m=dividends_last_year(data_dir, repo, owner, today),
                                  stocks=layers.get("stocks", Decimal(0)),
-                                 stock_rate=Decimal(record.payload["stock_rate"]) if record and record.payload.get("stock_rate") else None)
+                                 stock_rate=Decimal(record.payload["stock_rate"]) if record and record.payload.get("stock_rate") else None,
+                                 deposit_monthly=from_book["monthly"] if from_book else None)
+        if from_book:
+            income["deposit_market_rate_count"] = from_book["market_rate_count"]
     result = None
     if record is not None:
         rate = record.payload.get("rate") or default_rate

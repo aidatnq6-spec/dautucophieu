@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
+import { DepositBook } from "./deposit-book";
 import { EquityBudget } from "./equity-budget";
 import { WealthCheck } from "./wealth-check";
 import { LifestyleInflation } from "./lifestyle";
@@ -32,6 +33,7 @@ export function ProfileSummary() {
   const [riskChanges, setRiskChanges] = useState(0);
   const [wealthSaves, setWealthSaves] = useState(0);
   const [intangibleChanges, setIntangibleChanges] = useState(0);
+  const [bookSaves, setBookSaves] = useState(0);
   if (profile.error) return <p className="errors" role="alert">{profile.error}</p>;
   if (profile.value === undefined) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   const p = profile.value;
@@ -48,9 +50,10 @@ export function ProfileSummary() {
       <WealthCheck onSaved={() => setWealthSaves((n) => n + 1)} />
       <LifestyleInflation refresh={wealthSaves} />
       <Contributions />
-      <PassiveIncome />
+      <PassiveIncome key={bookSaves} />
       <Intangibles onChanged={() => setIntangibleChanges((n) => n + 1)} />
-      <EquityBudget key={`${riskChanges}-${intangibleChanges}`} />
+      <DepositBook onSaved={() => setBookSaves((n) => n + 1)} />
+      <EquityBudget key={`${riskChanges}-${intangibleChanges}-${bookSaves}`} />
     </>
   );
 }

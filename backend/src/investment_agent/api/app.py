@@ -14,6 +14,7 @@ from .routes.buy_check import router as buy_check_router
 from .routes.concentration import router as concentration_router
 from .routes.contributions import router as contributions_router
 from .routes.corporate import router as corporate_router
+from .routes.deposit_book import router as deposit_book_router
 from .routes.drawdown import router as drawdown_router
 from .routes.equity_budget import router as equity_budget_router
 from .routes.events import router as events_router
@@ -107,6 +108,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(events_router)
     app.include_router(journal_router)
     app.include_router(equity_budget_router)
+    app.include_router(deposit_book_router)
     app.include_router(glance_router)
     app.include_router(drawdown_router)
     app.include_router(buy_check_router)

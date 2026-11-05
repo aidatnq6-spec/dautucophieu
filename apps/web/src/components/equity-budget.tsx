@@ -14,13 +14,15 @@ type Pyramid = { total: string; base: string; layers: Layer[]; warnings: { short
 type Layers = { deposit: string; bond: string; gold: string; crypto: string };
 type Budget = { status: "no_total" | "no_risk" | "ok"; total?: string; deductions?: string; base?: string; group?: string; ratio?: string;
   budget?: string; held_cost?: string; held_weight?: string | null; room?: string | null; over?: string | null;
-  deductions_source?: "manual" | "profile"; profile_deductions?: string; reserve?: string | null; layers?: Layers | null; pyramid?: Pyramid | null };
+  deductions_source?: "manual" | "profile"; profile_deductions?: string; reserve?: string | null; layers?: Layers | null; pyramid?: Pyramid | null;
+  deposit_source?: "book" | "manual" };
 type View = { version: number; budget: Budget };
 
 const pct = (r: string) => formatRatio(r, 1).replace(",0%", "%");
 const whole = (r: string) => formatRatio(r, 1).replace(",0%", "").replace("%", "");
 const NAME: Record<string, string> = { reserve: "Dự phòng", cash: "Tiền mặt", deposit: "Tiền gửi", bond: "Trái phiếu", gold: "Vàng", stocks: "Cổ phiếu", crypto: "Tiền số" };
-const NOTE: Record<string, string> = { reserve: "quỹ dự phòng và khoản chi 12 tháng", cash: "trong tài khoản chứng khoán, lấy từ sổ giao dịch",
+const NOTE: Record<string, string> = { reserve: "quỹ dự phòng và khoản chi 12 tháng",
+  cash: "trong tài khoản chứng khoán (sổ giao dịch) và các tài khoản tiền mặt ở Sổ tiền gửi",
   deposit: "% và mục tiêu tính cùng tiền mặt",
   stocks: "theo giá mua, từ sổ giao dịch" };
 const STATUS: Record<string, [string, string]> = { short: ["thiếu", "warn"], ok: ["đủ", "good"], over: ["vượt", "bad"], fixed: ["cố định", ""],
@@ -34,7 +36,7 @@ function target(l: Layer) {
 }
 
 /** Tháp tài sản: layers from the bottom up against their targets, the total they add up to, and the money for stocks it gives. */
-function PyramidView({ p, intangibles }: { p: Pyramid; intangibles: IntangiblesView["year"] | null }) {
+function PyramidView({ p, intangibles, fromBook }: { p: Pyramid; intangibles: IntangiblesView["year"] | null; fromBook: boolean }) {
   return (
     <>
       <ol className="pyr" aria-label="Các lớp tài sản, từ dưới lên">
@@ -42,7 +44,8 @@ function PyramidView({ p, intangibles }: { p: Pyramid; intangibles: IntangiblesV
           const [word, tone] = STATUS[l.status];
           return (
             <li key={l.id} data-testid={`layer-${l.id}`} className={`pyr-layer pyr-${l.status}`} style={{ ["--step" as string]: i }}>
-              <div className="pyr-name"><strong>{NAME[l.id]}</strong>{NOTE[l.id] && <span className="caption"> · {NOTE[l.id]}</span>}</div>
+              <div className="pyr-name"><strong>{NAME[l.id]}</strong>{NOTE[l.id] && <span className="caption"> · {NOTE[l.id]}</span>}
+                {l.id === "deposit" && fromBook && <span className="caption"> · tổng gốc từ Sổ tiền gửi</span>}</div>
               <div className="pyr-figs">
                 <span>{formatVnd(l.amount)}</span>
                 {l.share !== null && <span>{pct(l.share)}</span>}
@@ -121,6 +124,7 @@ export function EquityBudget() {
     } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); }
   }
   const b = view?.budget;
+  const fromBook = b?.deposit_source === "book";  // the sổ replace the hand-entered deposits
   return (
     <section className="surface" aria-label="Tháp tài sản">
       <h2>Tháp tài sản</h2>
@@ -129,7 +133,8 @@ export function EquityBudget() {
         Tổng tài sản là tổng các lớp. Mục tiêu tính trên phần còn lại sau quỹ dự phòng: vàng 10–15%, trái phiếu tối đa 10%, cổ phiếu theo khẩu vị,
         tiền số tối đa 5%, tiền gửi là phần còn lại. Xây từ dưới lên. Trang Danh mục tính tỷ trọng từng mã trên vốn dành cho cổ phiếu.</p>
       <form className="eb-form" onSubmit={(e) => { e.preventDefault(); void save(); }}>
-        {INPUTS.map(([k, label]) => <label key={k} className="field">{label}<input inputMode="numeric" value={values[k]} disabled={!view}
+        {INPUTS.map(([k, label]) => <label key={k} className="field">{label}<input inputMode="numeric" value={values[k]} disabled={!view || (k === "deposit" && fromBook)}
+          title={k === "deposit" && fromBook ? "Lấy tổng gốc từ Sổ tiền gửi" : undefined}
           onChange={(e) => setValues({ ...values, [k]: groupDigitsInput(e.target.value) })} /></label>)}
         <label className="field">Quỹ dự phòng và khoản chi 12 tháng (đ)<input inputMode="numeric" value={reserve} disabled={!view}
           onChange={(e) => setReserve(groupDigitsInput(e.target.value))}
@@ -139,7 +144,7 @@ export function EquityBudget() {
       {message && <p className="errors" role="alert">{message}</p>}
       {b?.status === "ok" && !b.pyramid && <p className="notice">Đang dùng tổng tài sản nhập một con số ({formatVnd(b.total)}). Nhập số tiền từng lớp ở trên để xem tháp tài sản.</p>}
       {b?.status === "no_risk" && <p className="notice">Chưa có kết quả khảo sát rủi ro nên chưa biết tỷ trọng cổ phiếu.</p>}
-      {b?.status === "ok" && b.pyramid && <PyramidView p={b.pyramid} intangibles={intangibles} />}
+      {b?.status === "ok" && b.pyramid && <PyramidView p={b.pyramid} intangibles={intangibles} fromBook={fromBook} />}
       {b?.status === "ok" && <dl className="eb-result">
         <div><dt>Tổng tài sản tài chính</dt><dd data-testid="equity-total">{formatVnd(b.total)}</dd></div>
         <div><dt>Trừ quỹ dự phòng và khoản chi 12 tháng <span className="caption">({b.deductions_source === "manual" ? "nhập tay" : "theo hồ sơ"})</span></dt>

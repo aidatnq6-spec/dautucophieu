@@ -7,24 +7,36 @@ import { formatVnd, groupDigitsInput, parseMoneyInput } from "../lib/format";
 type Account = { id: string; name: string; amount: string; liquid: boolean };
 type Deposit = { id: string; bank: string; matures: string; principal: string; rate: string | null; interest: string | null;
   payout: "end" | "upfront"; locked: boolean };
+type Holding = { id: string; name: string; amount: string };
+type Bond = Holding & { rate: string | null };
+type Holdings = { bonds: Bond[]; gold: Holding[]; crypto: Holding[] };
 type Month = { month: string; count: number; principal: string; interest: string; missing_interest: number };
 type Liquidity = { now: string; ledger_cash: string; ledger_cash_counted: boolean; accounts_liquid: string; reserve: string; status: "enough" | "short"; short: string | null;
   maturing_90d: string; not_now: { accounts: string; locked: string; unlocked: string; overdue: string } };
-type View = { version: number; book: { accounts: Account[]; deposits: Deposit[]; count_ledger_cash: boolean };
+type View = { version: number; book: { accounts: Account[]; deposits: Deposit[]; count_ledger_cash: boolean } & Holdings;
   calendar: { months: Month[]; due_soon: string[]; overdue: string[] }; liquidity: Liquidity };
 
 /** Rows as typed: money grouped with dots, rate with a comma, blanks kept blank. */
 export type AccountDraft = Account;
 export type DepositDraft = Omit<Deposit, "rate" | "interest"> & { rate: string; interest: string };
+export type HoldingDraft = Holding;
+export type BondDraft = Holding & { rate: string };
+type HoldingDrafts = { bonds: BondDraft[]; gold: HoldingDraft[]; crypto: HoldingDraft[] };
+const NO_HOLDINGS: HoldingDrafts = { bonds: [], gold: [], crypto: [] };
 
 const money = (v: string) => formatVnd(v, { unit: false });
 const toAccountDraft = (a: Account): AccountDraft => ({ ...a, amount: money(a.amount) });
 const toDepositDraft = (d: Deposit): DepositDraft => ({ ...d, principal: money(d.principal), interest: d.interest === null ? "" : money(d.interest),
   rate: d.rate === null ? "" : d.rate.replace(".", ",") });
 const whole = (raw: string) => { const v = parseMoneyInput(raw); return v !== null && !v.includes(".") ? v : null; };
+const toHoldingDrafts = (b: Holdings): HoldingDrafts => ({
+  bonds: b.bonds.map((x) => ({ ...x, amount: money(x.amount), rate: x.rate === null ? "" : x.rate.replace(".", ",") })),
+  gold: b.gold.map((x) => ({ ...x, amount: money(x.amount) })), crypto: b.crypto.map((x) => ({ ...x, amount: money(x.amount) })) });
+const LIST_NAME = { bonds: "Trái phiếu", gold: "Vàng", crypto: "Tiền số" } as const;
 
 /** The book the API takes, or the first row that cannot be saved, named by its place in the table. Blank rate or interest = unknown (null). */
-export function bookPayload(accounts: AccountDraft[], deposits: DepositDraft[]): { ok: { accounts: Account[]; deposits: Deposit[] } } | { error: string } {
+export function bookPayload(accounts: AccountDraft[], deposits: DepositDraft[], holdings: HoldingDrafts = NO_HOLDINGS):
+  { ok: { accounts: Account[]; deposits: Deposit[] } & Holdings } | { error: string } {
   const outAccounts: Account[] = [];
   for (const [i, a] of accounts.entries()) {
     if (!a.name.trim()) return { error: `Tài khoản ${i + 1}: nhập tên.` };
@@ -45,17 +57,59 @@ export function bookPayload(accounts: AccountDraft[], deposits: DepositDraft[]):
     if (d.interest.trim() && interest === null) return { error: `${n}: lãi dự kiến là số đồng, hoặc để trống.` };
     outDeposits.push({ id: d.id, bank: d.bank.trim(), matures: d.matures, principal, rate, interest, payout: d.payout, locked: d.locked });
   }
-  return { ok: { accounts: outAccounts, deposits: outDeposits } };
+  const out: Holdings = { bonds: [], gold: [], crypto: [] };
+  for (const list of ["bonds", "gold", "crypto"] as const) {
+    for (const [i, h] of holdings[list].entries()) {
+      const n = `${LIST_NAME[list]} ${i + 1}`;
+      if (!h.name.trim()) return { error: `${n}: nhập tên.` };
+      const amount = whole(h.amount);
+      if (amount === null) return { error: `${n}: nhập số tiền (đồng).` };
+      if (list !== "bonds") { out[list].push({ id: h.id, name: h.name.trim(), amount }); continue; }
+      const raw = (h as BondDraft).rate.trim();
+      const rate = raw ? parseMoneyInput(raw) : null;
+      if (raw && (rate === null || Number(rate) > 30)) return { error: `${n}: lợi suất từ 0 đến 30%/năm, hoặc để trống.` };
+      out.bonds.push({ id: h.id, name: h.name.trim(), amount, rate });
+    }
+  }
+  return { ok: { accounts: outAccounts, deposits: outDeposits, ...out } };
+}
+
+/** One list of Trái phiếu, Vàng or Tiền số: name and amount per row (bonds also an expected yield), added and removed before Lưu. */
+function HoldingList({ list, rows, onChange, disabled }: { list: keyof HoldingDrafts; rows: (HoldingDraft | BondDraft)[];
+  onChange: (rows: (HoldingDraft | BondDraft)[]) => void; disabled: boolean }) {
+  const label = LIST_NAME[list];
+  const set = (i: number, patch: Partial<BondDraft>) => onChange(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  return (
+    <>
+      {rows.length > 0 && <table className="fv-table db-table" aria-label={label}>
+        <thead><tr><th>Tên</th><th>Số tiền (đ)</th>{list === "bonds" && <th>Lợi suất %/năm</th>}<th /></tr></thead>
+        <tbody>{rows.map((r, i) => (
+          <tr key={r.id}>
+            <td data-label="Tên"><input aria-label={`Tên ${label.toLowerCase()} ${i + 1}`} maxLength={80} value={r.name} onChange={(e) => set(i, { name: e.target.value })} /></td>
+            <td data-label="Số tiền"><input aria-label={`Số tiền ${label.toLowerCase()} ${i + 1}`} inputMode="numeric" value={r.amount}
+              onChange={(e) => set(i, { amount: groupDigitsInput(e.target.value) })} /></td>
+            {list === "bonds" && <td data-label="Lợi suất"><input aria-label={`Lợi suất trái phiếu ${i + 1}`} inputMode="decimal" placeholder="chưa nhập"
+              value={(r as BondDraft).rate} onChange={(e) => set(i, { rate: e.target.value })} /></td>}
+            <td><button type="button" className="btn" aria-label={`Xóa ${label.toLowerCase()} ${i + 1}`} onClick={() => onChange(rows.filter((_, j) => j !== i))}>
+              <Trash2 size={14} aria-hidden="true" />Xóa</button></td>
+          </tr>))}</tbody>
+      </table>}
+      <button type="button" className="btn" disabled={disabled || rows.length >= 30}
+        onClick={() => onChange([...rows, list === "bonds" ? { id: requestId(), name: "", amount: "", rate: "" } : { id: requestId(), name: "", amount: "" }])}>
+        <Plus size={14} aria-hidden="true" />Thêm dòng {label.toLowerCase()}</button>
+    </>
+  );
 }
 
 const monthLabel = (m: string) => `${m.slice(5)}/${m.slice(0, 4)}`;
 
-/** Sổ tiền gửi và tiền mặt: cash accounts and term deposits, the months their money comes back, and cash now against the reserve.
+/** Sổ tài sản: cash accounts, term deposits, bonds, gold and crypto; the months deposits come back, and cash now against the reserve.
  * A sổ not yet due is never cash now; one past its date is overdue, not guessed as rolled over or closed. */
 export function DepositBook({ onSaved }: { onSaved?: () => void }) {
   const [view, setView] = useState<View | null>(null);
   const [accounts, setAccounts] = useState<AccountDraft[]>([]);
   const [deposits, setDeposits] = useState<DepositDraft[]>([]);
+  const [holdings, setHoldings] = useState<HoldingDrafts>(NO_HOLDINGS);
   const [countLedger, setCountLedger] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   function show(v: View) {
@@ -63,11 +117,12 @@ export function DepositBook({ onSaved }: { onSaved?: () => void }) {
     setCountLedger(v.book.count_ledger_cash);
     setAccounts(v.book.accounts.map(toAccountDraft));
     setDeposits(v.book.deposits.map(toDepositDraft));
+    setHoldings(toHoldingDrafts(v.book));
   }
   useEffect(() => { api<View>("deposit-book").then(show, (e) => setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
   async function save() {
     if (!view) return;
-    const r = bookPayload(accounts, deposits);
+    const r = bookPayload(accounts, deposits, holdings);
     if ("error" in r) { setMessage(r.error); return; }
     try {
       show(await api<View>("deposit-book", { method: "PUT", body: { ...r.ok, count_ledger_cash: countLedger, expected_version: view.version, request_id: requestId() } }));
@@ -81,11 +136,11 @@ export function DepositBook({ onSaved }: { onSaved?: () => void }) {
     : view?.calendar.due_soon.includes(id) ? <span className="pill warn">sắp đến hạn</span> : null;
   const l = view?.liquidity;
   return (
-    <section className="surface db" aria-label="Sổ tiền gửi và tiền mặt">
-      <h2>Sổ tiền gửi và tiền mặt</h2>
-      <p className="caption wrap">Ghi từng sổ tiết kiệm và tài khoản tiền mặt ngoài tài khoản chứng khoán. Có ít nhất một sổ thì lớp Tiền gửi của Tháp tài
-        sản lấy tổng gốc các sổ; tài khoản tiền mặt cộng vào lớp Tiền mặt. Ô lãi để trống là chưa nhập, không phải 0. Sổ chưa đến hạn không bao giờ
-        được tính là tiền rút ngay.</p>
+    <section className="surface db" aria-label="Sổ tài sản">
+      <h2>Sổ tài sản</h2>
+      <p className="caption wrap">Ghi chi tiết tài khoản tiền mặt ngoài tài khoản chứng khoán, sổ tiết kiệm, trái phiếu và chứng chỉ quỹ, vàng, tiền số.
+        Danh sách nào có ít nhất một dòng thì lớp tương ứng của Tháp tài sản lấy tổng danh sách đó (ô nhập tay bị khóa); tài khoản tiền mặt cộng vào
+        lớp Tiền mặt. Ô lãi hay lợi suất để trống là chưa nhập, không phải 0. Sổ chưa đến hạn không bao giờ được tính là tiền rút ngay.</p>
 
       <h3>Tài khoản tiền mặt</h3>
       {accounts.length > 0 && <table className="fv-table db-table" aria-label="Tài khoản tiền mặt">
@@ -130,11 +185,21 @@ export function DepositBook({ onSaved }: { onSaved?: () => void }) {
               <Trash2 size={14} aria-hidden="true" />Xóa</button></td>
           </tr>))}</tbody>
       </table>}
+      <button type="button" className="btn" disabled={!view || deposits.length >= 100}
+        onClick={() => setDeposits([...deposits, { id: requestId(), bank: "", matures: "", principal: "", rate: "", interest: "", payout: "end", locked: true }])}>
+        <Plus size={14} aria-hidden="true" />Thêm sổ</button>
+
+      <h3>Trái phiếu và chứng chỉ quỹ</h3>
+      <p className="caption wrap">Lợi suất là mức bạn kỳ vọng mỗi năm, dùng cho Dòng tiền thụ động; để trống thì dùng lãi suất trái phiếu ở mục đó.
+        Hiệu suất năm trước không phải lợi suất bảo đảm.</p>
+      <HoldingList list="bonds" rows={holdings.bonds} disabled={!view} onChange={(rows) => setHoldings({ ...holdings, bonds: rows as BondDraft[] })} />
+      <h3>Vàng</h3>
+      <HoldingList list="gold" rows={holdings.gold} disabled={!view} onChange={(rows) => setHoldings({ ...holdings, gold: rows })} />
+      <h3>Tiền số</h3>
+      <HoldingList list="crypto" rows={holdings.crypto} disabled={!view} onChange={(rows) => setHoldings({ ...holdings, crypto: rows })} />
+
       <div className="actions">
-        <button type="button" className="btn" disabled={!view || deposits.length >= 100}
-          onClick={() => setDeposits([...deposits, { id: requestId(), bank: "", matures: "", principal: "", rate: "", interest: "", payout: "end", locked: true }])}>
-          <Plus size={14} aria-hidden="true" />Thêm sổ</button>
-        <button type="button" className="btn primary" disabled={!view} onClick={() => void save()}><Save size={16} aria-hidden="true" />Lưu sổ tiền gửi</button>
+        <button type="button" className="btn primary" disabled={!view} onClick={() => void save()}><Save size={16} aria-hidden="true" />Lưu sổ tài sản</button>
       </div>
       {message && <p className="errors" role="alert">{message}</p>}
 

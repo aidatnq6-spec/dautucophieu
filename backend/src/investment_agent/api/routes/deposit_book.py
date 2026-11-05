@@ -1,4 +1,5 @@
-"""Sổ tiền gửi on Hồ sơ & rủi ro: cash accounts and term deposits, saved as one list, with the maturity calendar and cash now."""
+"""Sổ tài sản on Hồ sơ & rủi ro: cash accounts, term deposits, bonds, gold and crypto, saved as one book, with the maturity calendar
+and cash now."""
 
 from zoneinfo import ZoneInfo
 
@@ -43,7 +44,7 @@ def put_book(request: Request, body: BookRequest):
     owner, repo = require_owner(request), request.app.state.personal_repository
     if repo is None:
         return unavailable()
-    payload = DepositBook(accounts=body.accounts, deposits=body.deposits, count_ledger_cash=body.count_ledger_cash).model_dump(mode="json")
+    payload = DepositBook.model_validate(body.model_dump(exclude={"expected_version", "request_id"})).model_dump(mode="json")
     try:
         repo.write(owner, *RECORD, payload, expected_version=body.expected_version, request_id=body.request_id)
         return _view(request, repo, owner)

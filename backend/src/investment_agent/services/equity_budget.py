@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from investment_agent.domain.allocation import load_allocation_policy
 from investment_agent.domain.asset_pyramid import asset_pyramid
-from investment_agent.domain.deposit_book import totals
+from investment_agent.domain.deposit_book import DepositBook, totals
 from investment_agent.domain.equity_budget import equity_budget
 from investment_agent.domain.ledger import replay
 from investment_agent.domain.profile import ConfirmedProfile
@@ -15,6 +15,7 @@ from investment_agent.services.records import LedgerBook, StoredRisk, effective_
 RECORD = ("settings", "equity_budget")
 LAYERS = ("deposit", "bond", "gold", "crypto")  # entered by hand; stocks (at cost) and ledger cash come from the ledger
 PROTECTED = {"emergency_reserve", "due_within_12_months"}
+BOOK_LISTS = {"deposit": "deposits", "bond": "bonds", "gold": "gold", "crypto": "crypto"}  # layer → list in Sổ tài sản (totals key = field)
 
 
 def protected_deductions(repo, owner) -> tuple[Decimal, Decimal, str | None]:
@@ -40,20 +41,21 @@ def budget_view(repo, owner) -> tuple[dict, int]:
     held_cost = sum((p.total_cost for p in state.positions if p.quantity + p.pending_quantity > 0), Decimal(0))
     ratios = dict(load_allocation_policy().baseline_equity)
     layers = stored.payload.get("layers")
-    amounts, deposit_source, cash_source = None, "manual", "ledger"
+    amounts, sources, cash_source = None, dict.fromkeys(LAYERS, "manual"), "ledger"
     if layers:  # Tháp tài sản: the total is the sum of the layers, with the reserve as the bottom layer
         book, _ = read_book(repo, owner)
-        from_book = totals(book) if book else {"deposits": Decimal(0), "accounts": Decimal(0)}
-        deposit_source = "book" if book and book.deposits else "manual"  # the sổ replace the hand-entered figure once there is one
+        from_book = totals(book or DepositBook())
+        rows = {layer: getattr(book, name) if book else () for layer, name in BOOK_LISTS.items()}
+        sources = {layer: "book" if rows[layer] else "manual" for layer in LAYERS}  # a list replaces the hand-entered figure once it has a row
         cash_source = "book" if book and not book.count_ledger_cash else "ledger"  # the owner keeps cash to the book's accounts
         amounts = {"reserve": deductions, "cash": (state.cash if cash_source == "ledger" else Decimal(0)) + from_book["accounts"],
-                   "deposit": from_book["deposits"] if deposit_source == "book" else Decimal(layers["deposit"]), "bond": Decimal(layers["bond"]),
-                   "gold": Decimal(layers["gold"]), "stocks": held_cost, "crypto": Decimal(layers["crypto"])}
+                   **{layer: from_book[BOOK_LISTS[layer]] if sources[layer] == "book" else Decimal(layers[layer]) for layer in LAYERS},
+                   "stocks": held_cost}
     total = sum(amounts.values(), Decimal(0)) if amounts else Decimal(stored.payload["total"])
     budget = equity_budget(total=total, deductions=deductions, group=group, ratios=ratios, held_cost=held_cost)
     if budget["status"] == "ok":
         pyramid = asset_pyramid(amounts, deductions=deductions, stock_ratio=ratios[group]) if amounts else None
         budget = {**budget, "deductions_source": "manual" if manual is not None else "profile", "profile_deductions": format(from_profile, "f"),
-                  "reserve": manual, "layers": layers, "pyramid": pyramid, "deposit_source": deposit_source,
-                  "cash_source": cash_source}
+                  "reserve": manual, "layers": layers, "pyramid": pyramid, "deposit_source": sources["deposit"],
+                  "layer_sources": sources, "cash_source": cash_source}
     return budget, stored.version

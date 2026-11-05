@@ -42,7 +42,7 @@ def save_layers(c, clock, version=0):
 def test_an_empty_book_has_no_rows_and_liquidity_from_the_ledger_cash(tmp_path):
     c, clock = client(tmp_path)
     body = call(c, clock, "GET", "/internal/deposit-book").json()
-    assert body["version"] == 0 and body["book"] == {"accounts": [], "deposits": [], "count_ledger_cash": True}
+    assert body["version"] == 0 and body["book"] == {"accounts": [], "deposits": [], "bonds": [], "gold": [], "crypto": [], "count_ledger_cash": True}
     assert body["liquidity"]["now"] == "95000000" and body["calendar"]["months"] == []
 
 
@@ -109,3 +109,19 @@ def test_cash_from_the_book_only_leaves_the_ledger_cash_out_of_the_pyramid_and_c
     amounts = {l["id"]: l["amount"] for l in b["pyramid"]["layers"]}
     assert amounts["cash"] == "15000000" and b["cash_source"] == "book"  # the two accounts only; the ledger's 95 tr left out
     assert Decimal(b["pyramid"]["funding"]["from_cash"]) <= Decimal("15000000")  # never more cash than the book holds
+
+
+def test_bond_gold_and_crypto_lists_replace_their_hand_entered_layers_and_bond_income_uses_each_rate(tmp_path):
+    c, clock = client(tmp_path)
+    save_layers(c, clock)  # by hand: bond 0, gold 100 tr, crypto 0
+    ok = call(c, clock, "PUT", "/internal/deposit-book", {"deposits": [], "accounts": [], "expected_version": 0, "request_id": "db1",
+                                                         "bonds": [{"id": "a", "name": "Quỹ A", "amount": "120000000", "rate": "8"},
+                                                                   {"id": "b", "name": "Quỹ B", "amount": "60000000", "rate": None}],
+                                                         "gold": [{"id": "g", "name": "Vàng nhẫn", "amount": "40000000"}]})
+    assert ok.status_code == 200 and len(ok.json()["book"]["bonds"]) == 2
+    b = call(c, clock, "GET", "/internal/equity-budget").json()["budget"]
+    amounts = {l["id"]: l["amount"] for l in b["pyramid"]["layers"]}
+    assert amounts["bond"] == "180000000" and amounts["gold"] == "40000000" and amounts["crypto"] == "0"
+    assert b["layer_sources"] == {"deposit": "manual", "bond": "book", "gold": "book", "crypto": "manual"}
+    income = call(c, clock, "GET", "/internal/passive-income").json()["income"]
+    assert income["bond"] == "1150000" and income["bond_default_rate_count"] == 1  # 120 tr × 8% / 12 + 60 tr × 7% (default) / 12

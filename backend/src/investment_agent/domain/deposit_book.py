@@ -1,4 +1,4 @@
-"""Sổ tiền gửi: the owner's term deposits and cash accounts outside the securities account, the months their money comes back, and how much
+"""Sổ tài sản: the owner's term deposits, cash accounts outside the securities account, bonds and funds, gold and crypto, row by row; the months their money comes back, and how much
 can be withdrawn now against the protected reserve. A deposit not yet due, locked or not, is never cash now; one past its date is overdue
 (rolled over or closed is unknown, so it is not guessed). Blank fields stay unknown, never 0. Personal data; never sent to a model."""
 
@@ -49,14 +49,32 @@ class Deposit(ContractModel):
         return value
 
 
+class Holding(ContractModel):
+    """A line of gold or crypto: what the owner holds, at the value they enter."""
+    id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")
+    name: str = Field(min_length=1, max_length=80, pattern=r"\S")
+    amount: UnsignedAmount
+
+    _amount_whole = field_validator("amount")(_whole)
+
+
+class Bond(Holding):
+    """A bond or fund certificate; rate: the yearly yield the owner expects, for Dòng tiền thụ động (blank = their bond rate)."""
+    rate: Decimal | None = Field(default=None, ge=0, le=30, allow_inf_nan=False)
+
+
 class DepositBook(ContractModel):
     accounts: tuple[CashAccount, ...] = Field(default=(), max_length=30)
     deposits: tuple[Deposit, ...] = Field(default=(), max_length=100)
+    bonds: tuple[Bond, ...] = Field(default=(), max_length=30)
+    gold: tuple[Holding, ...] = Field(default=(), max_length=30)
+    crypto: tuple[Holding, ...] = Field(default=(), max_length=30)
     count_ledger_cash: bool = True  # False: the owner's cash is the accounts here only; the ledger's cash is shown, not counted
 
     @model_validator(mode="after")
     def _unique_ids(self):
-        if any(n > 1 for n in Counter(x.id for x in (*self.accounts, *self.deposits)).values()):
+        rows = (*self.accounts, *self.deposits, *self.bonds, *self.gold, *self.crypto)
+        if any(n > 1 for n in Counter(x.id for x in rows).values()):
             raise ValueError("row ids must be unique")
         return self
 
@@ -104,11 +122,20 @@ def liquidity(book: DepositBook, *, ledger_cash: Decimal, reserve: Decimal, toda
 
 
 def totals(book: DepositBook) -> dict[str, Decimal]:
-    """Principal of every deposit (overdue ones are still in the bank) and every cash account, for Tháp tài sản."""
-    return {"deposits": sum((d.principal for d in book.deposits), Decimal(0)), "accounts": sum((a.amount for a in book.accounts), Decimal(0))}
+    """Per list, for Tháp tài sản: principal of every deposit (overdue ones are still in the bank), and the amount of every other row."""
+    def total(rows) -> Decimal:
+        return sum((r.amount for r in rows), Decimal(0))
+    return {"deposits": sum((d.principal for d in book.deposits), Decimal(0)), "accounts": total(book.accounts), "bonds": total(book.bonds),
+            "gold": total(book.gold), "crypto": total(book.crypto)}
 
 
 def deposit_income(book: DepositBook, *, market_rate: Decimal) -> dict:
     """Monthly interest, unrounded: principal × the sổ's own rate / 12, or the market 12-month rate for a sổ without one (counted)."""
     monthly = sum((d.principal * (d.rate if d.rate is not None else market_rate) / 100 / 12 for d in book.deposits), Decimal(0))
     return {"monthly": monthly, "market_rate_count": sum(1 for d in book.deposits if d.rate is None)}
+
+
+def bond_income(book: DepositBook, *, default_rate: Decimal) -> dict:
+    """Monthly yield, unrounded: amount × the row's own rate / 12, or the owner's bond rate for a row without one (counted)."""
+    monthly = sum((b.amount * (b.rate if b.rate is not None else default_rate) / 100 / 12 for b in book.bonds), Decimal(0))
+    return {"monthly": monthly, "default_rate_count": sum(1 for b in book.bonds if b.rate is None)}

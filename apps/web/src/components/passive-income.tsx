@@ -5,7 +5,8 @@ import { ApiError, api, requestId } from "../lib/api";
 import { formatRatio, formatVnd, groupDigitsInput, parseMoneyInput } from "../lib/format";
 
 type Result = { required: string; income_now: string | null; progress: string | null; months: number | null; reached_on: string | null; rate: string };
-type Income = { deposit: string; bond: string; dividends: string; stocks?: string; total: string; deposit_market_rate_count?: number };
+type Income = { deposit: string; bond: string; dividends: string; stocks?: string; total: string; deposit_market_rate_count?: number;
+  bond_default_rate_count?: number };
 type View = { version: number; goal: { target: string; rate: string | null; bond_rate: string; stock_rate?: string | null } | null; default_rate: string | null; default_bond_rate: string;
   income: Income | null; result: Result | null; capital: string | null; contribution: string };
 
@@ -74,7 +75,10 @@ export function PassiveIncome() {
             ? <li>Tiền gửi ({rate(view!.default_rate!)}%/năm): {formatVnd(view!.income.deposit)}/tháng</li>
             : <li>Tiền gửi (lãi suất từng sổ): {formatVnd(view!.income.deposit)}/tháng{view!.income.deposit_market_rate_count > 0
               && <span className="caption"> ({view!.income.deposit_market_rate_count} sổ chưa nhập lãi suất, tính theo {rate(view!.default_rate!)}%/năm thị trường)</span>}</li>}
-          <li>Trái phiếu ({rate(view!.goal?.bond_rate ?? view!.default_bond_rate)}%/năm): {formatVnd(view!.income.bond)}/tháng</li>
+          {view!.income.bond_default_rate_count === undefined
+            ? <li>Trái phiếu ({rate(view!.goal?.bond_rate ?? view!.default_bond_rate)}%/năm): {formatVnd(view!.income.bond)}/tháng</li>
+            : <li>Trái phiếu (lợi suất từng dòng): {formatVnd(view!.income.bond)}/tháng{view!.income.bond_default_rate_count > 0
+              && <span className="caption"> ({view!.income.bond_default_rate_count} dòng chưa nhập lợi suất, tính theo {rate(view!.goal?.bond_rate ?? view!.default_bond_rate)}%/năm)</span>}</li>}
           {view!.income.stocks !== undefined
             ? <li>Cổ phiếu ({rate(view!.goal!.stock_rate!)}%/năm, bạn nhập): {formatVnd(view!.income.stocks)}/tháng <span className="caption">(theo giá mua)</span></li>
             : <li>Cổ tức tiền mặt 12 tháng: {formatVnd(view!.income.dividends)}/tháng <span className="caption">(theo lịch sự kiện, số cổ phiếu đang nắm)</span></li>}

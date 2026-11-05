@@ -14,6 +14,9 @@ Thay con số "Tiền gửi" nhập tay của Tháp tài sản bằng danh sách
 - Lựa chọn **cộng tiền mặt sổ giao dịch** (mặc định có). Chủ sở hữu bỏ chọn khi các tài khoản đã là toàn bộ tiền mặt (05/11/2026: tiền
   trong tài khoản chứng khoán là iPower), để không đếm hai lần: lớp Tiền mặt và Rút ngay chỉ lấy các tài khoản; số của sổ giao dịch vẫn
   hiện, ghi "không cộng".
+- **Trái phiếu và chứng chỉ quỹ, Vàng, Tiền số** (05/11/2026, chủ sở hữu yêu cầu; tối đa 30 dòng mỗi loại): tên (≤ 80 ký tự), số tiền
+  (đồng, ≥ 0); trái phiếu thêm lợi suất kỳ vọng %/năm (tùy chọn, 0–30). Hiệu suất năm trước không tự điền thành lợi suất.
+- Mục đổi tên thành **Sổ tài sản**.
 - Mỗi dòng có mã do trình duyệt tạo; lưu cả danh sách một lần, có `expected_version` như các bản ghi khác.
 - Ô bỏ trống là **chưa nhập**, không phải 0; không suy lãi từ lãi suất hay ngược lại.
 
@@ -37,11 +40,14 @@ Thay con số "Tiền gửi" nhập tay của Tháp tài sản bằng danh sách
   cách tính tháp không đổi.
 - **Dòng tiền thụ động**: khi có sổ, thu nhập tiền gửi mỗi tháng = Σ gốc × lãi suất của sổ / 12 cho sổ có lãi suất; sổ chưa nhập lãi suất
   dùng lãi suất 12 tháng thị trường như trước, và trang nêu số sổ dùng lãi suất thị trường.
-- Không có sổ và không có tài khoản: mọi trang giữ nguyên hành vi cũ.
+- Trái phiếu, Vàng, Tiền số: danh sách có ít nhất một dòng thì lớp tương ứng = tổng danh sách, ô nhập tay bị khóa. Dòng tiền thụ động tính
+  trái phiếu theo lợi suất từng dòng; dòng chưa nhập dùng lãi suất trái phiếu của mục đó (mặc định 7%) và được đếm.
+- Không có dòng nào: mọi trang giữ nguyên hành vi cũ.
 
 ## Giao diện
 Hồ sơ & rủi ro, mục "Sổ tiền gửi và tiền mặt", ngay trước Tháp tài sản: bảng tài khoản tiền mặt, bảng sổ (thêm, sửa, xóa, rồi Lưu),
 lịch đáo hạn theo tháng, ô thanh khoản. Lưu xong, Tháp tài sản và Dòng tiền thụ động tải lại.
 
 ## Ngoài phạm vi (việc sau)
-Nhắc sổ sắp đáo hạn qua Telegram; nhập file JSON xuất từ VI-TECH; chứng chỉ quỹ có NAV; vàng theo khối lượng.
+Nhắc sổ sắp đáo hạn qua Telegram; nhập file JSON xuất từ VI-TECH; chứng chỉ quỹ theo số đơn vị và NAV công khai; vàng theo khối lượng
+và giá công khai; tiền số theo số lượng và giá.

@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Request
 from pydantic import Field
 
-from investment_agent.domain.deposit_book import deposit_income
+from investment_agent.domain.deposit_book import bond_income, deposit_income
 from investment_agent.domain.models import ContractModel
 from investment_agent.domain.ledger import replay
 from investment_agent.domain.passive_income import income_by_layer, passive_income
@@ -71,13 +71,18 @@ def _view(request: Request, repo, owner) -> dict:
         if budget.get("deposit_source") == "book":  # each sổ at its own rate; the market rate only for a sổ without one, counted
             from_book = deposit_income(read_book(repo, owner)[0], market_rate=Decimal(default_rate))
         bond_rate = (record.payload.get("bond_rate") if record else None) or BOND_RATE
+        bonds = None
+        if (budget.get("layer_sources") or {}).get("bond") == "book":  # each row at its own rate; the owner's bond rate for the rest, counted
+            bonds = bond_income(read_book(repo, owner)[0], default_rate=Decimal(bond_rate))
         income = income_by_layer(deposit=layers.get("deposit", Decimal(0)), deposit_rate=Decimal(default_rate), bond=layers.get("bond", Decimal(0)),
                                  bond_rate=Decimal(bond_rate), dividends_12m=dividends_last_year(data_dir, repo, owner, today),
                                  stocks=layers.get("stocks", Decimal(0)),
                                  stock_rate=Decimal(record.payload["stock_rate"]) if record and record.payload.get("stock_rate") else None,
-                                 deposit_monthly=from_book["monthly"] if from_book else None)
+                                 deposit_monthly=from_book["monthly"] if from_book else None, bond_monthly=bonds["monthly"] if bonds else None)
         if from_book:
             income["deposit_market_rate_count"] = from_book["market_rate_count"]
+        if bonds:
+            income["bond_default_rate_count"] = bonds["default_rate_count"]
     result = None
     if record is not None:
         rate = record.payload.get("rate") or default_rate

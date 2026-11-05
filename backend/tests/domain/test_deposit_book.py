@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from investment_agent.domain.deposit_book import DepositBook, deposit_income, liquidity, maturity_calendar, totals
+from investment_agent.domain.deposit_book import DepositBook, bond_income, deposit_income, liquidity, maturity_calendar, totals
 
 TODAY = date(2027, 1, 15)
 
@@ -52,7 +52,8 @@ def test_a_reserve_exactly_covered_is_enough():
 def test_totals_are_the_principal_of_every_deposit_and_every_account():
     b = book([deposit("a", "2027-03-01"), deposit("old", "2027-01-01", principal="20000000")],
              [{"id": "x", "name": "TK", "amount": "10000000", "liquid": False}])
-    assert totals(b) == {"deposits": Decimal("70000000"), "accounts": Decimal("10000000")}
+    t = totals(b)
+    assert t["deposits"] == Decimal("70000000") and t["accounts"] == Decimal("10000000")
 
 
 def test_income_uses_each_rate_and_the_market_rate_only_for_deposits_without_one():
@@ -81,3 +82,30 @@ def test_when_the_owner_keeps_cash_to_the_book_the_ledger_cash_is_shown_but_not_
     assert l["now"] == "10000000" and l["ledger_cash"] == "95000000" and l["ledger_cash_counted"] is False
     assert l["status"] == "short" and l["short"] == "10000000"
     assert book().count_ledger_cash is True  # the default keeps the ledger cash
+
+
+def test_bonds_gold_and_crypto_are_listed_and_add_up_per_layer():
+    b = DepositBook.model_validate({"bonds": [{"id": "vff", "name": "Quỹ trái phiếu A", "amount": "50000000", "rate": "7"},
+                                              {"id": "dcbf", "name": "Quỹ trái phiếu B", "amount": "50200000", "rate": None}],
+                                    "gold": [{"id": "pnj", "name": "Vàng nhẫn", "amount": "39364000"}],
+                                    "crypto": [{"id": "btc", "name": "BTC", "amount": "1000000"}]})
+    t = totals(b)
+    assert t["bonds"] == Decimal("100200000") and t["gold"] == Decimal("39364000") and t["crypto"] == Decimal("1000000")
+
+
+def test_bond_income_uses_each_rate_and_the_owner_bond_rate_for_rows_without_one():
+    b = DepositBook.model_validate({"bonds": [{"id": "a", "name": "A", "amount": "120000000", "rate": "8"},
+                                              {"id": "b", "name": "B", "amount": "60000000", "rate": None}]})
+    assert bond_income(b, default_rate=Decimal("7")) == {"monthly": Decimal("1150000"), "default_rate_count": 1}  # 800.000 + 350.000
+
+
+@pytest.mark.parametrize("bad", [
+    {"bonds": [{"id": "a", "name": "A", "amount": "-1", "rate": None}]},
+    {"bonds": [{"id": "a", "name": "A", "amount": "1", "rate": "31"}]},
+    {"gold": [{"id": "a", "name": "", "amount": "1"}]},
+    {"crypto": [{"id": "a", "name": "BTC", "amount": "1.5"}]},
+    {"gold": [{"id": "a", "name": "A", "amount": "1"}], "crypto": [{"id": "a", "name": "B", "amount": "1"}]},
+])
+def test_invalid_holdings_are_refused(bad):
+    with pytest.raises(ValidationError):
+        DepositBook.model_validate(bad)

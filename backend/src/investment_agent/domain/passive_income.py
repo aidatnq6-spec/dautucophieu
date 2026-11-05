@@ -18,11 +18,12 @@ def _month_after(today: date, months: int) -> str:
 
 
 def income_by_layer(*, deposit: Decimal, deposit_rate: Decimal, bond: Decimal, bond_rate: Decimal, dividends_12m: Decimal,
-                    stocks: Decimal = Decimal(0), stock_rate: Decimal | None = None, deposit_monthly: Decimal | None = None) -> dict:
+                    stocks: Decimal = Decimal(0), stock_rate: Decimal | None = None, deposit_monthly: Decimal | None = None,
+                    bond_monthly: Decimal | None = None) -> dict:
     """What today's assets actually pay per month: deposits at the deposit rate, bonds at their coupon, stocks their cash dividends of
     the last 12 months, or, when the owner sets a stock rate (gains taken by selling count too), stocks at cost × that rate.
-    Gold, cash and crypto pay nothing. deposit_monthly: interest per month from Sổ tiền gửi, replacing deposit × the deposit rate."""
-    lines = {"deposit": deposit_monthly if deposit_monthly is not None else deposit * deposit_rate / 100 / 12, "bond": bond * bond_rate / 100 / 12}
+    Gold, cash and crypto pay nothing. deposit_monthly, bond_monthly: per month from Sổ tài sản, replacing the layer × its single rate."""
+    lines = {"deposit": deposit_monthly if deposit_monthly is not None else deposit * deposit_rate / 100 / 12, "bond": bond_monthly if bond_monthly is not None else bond * bond_rate / 100 / 12}
     if stock_rate is not None:
         lines.update(stocks=stocks * stock_rate / 100 / 12, dividends=Decimal(0))
     else:

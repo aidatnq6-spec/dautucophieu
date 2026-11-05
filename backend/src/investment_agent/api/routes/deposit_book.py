@@ -43,7 +43,7 @@ def put_book(request: Request, body: BookRequest):
     owner, repo = require_owner(request), request.app.state.personal_repository
     if repo is None:
         return unavailable()
-    payload = DepositBook(accounts=body.accounts, deposits=body.deposits).model_dump(mode="json")
+    payload = DepositBook(accounts=body.accounts, deposits=body.deposits, count_ledger_cash=body.count_ledger_cash).model_dump(mode="json")
     try:
         repo.write(owner, *RECORD, payload, expected_version=body.expected_version, request_id=body.request_id)
         return _view(request, repo, owner)

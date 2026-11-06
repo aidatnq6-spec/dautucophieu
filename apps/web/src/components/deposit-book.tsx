@@ -13,8 +13,8 @@ type Holdings = { bonds: Bond[]; gold: Holding[]; crypto: Holding[] };
 type Month = { month: string; count: number; principal: string; interest: string; missing_interest: number };
 type Liquidity = { now: string; ledger_cash: string; ledger_cash_counted: boolean; accounts_liquid: string; reserve: string; status: "enough" | "short"; short: string | null;
   maturing_90d: string; not_now: { accounts: string; locked: string; unlocked: string; overdue: string } };
-type View = { version: number; book: { accounts: Account[]; deposits: Deposit[]; count_ledger_cash: boolean } & Holdings;
-  calendar: { months: Month[]; due_soon: string[]; overdue: string[] }; liquidity: Liquidity };
+type View = { version: number; book: { accounts: Account[]; deposits: Deposit[]; count_ledger_cash: boolean; reserve: string | null } & Holdings;
+  calendar: { months: Month[]; due_soon: string[]; overdue: string[] }; liquidity: Liquidity; profile_reserve: string };
 
 /** Rows as typed: money grouped with dots, rate with a comma, blanks kept blank. */
 export type AccountDraft = Account;
@@ -74,6 +74,13 @@ export function bookPayload(accounts: AccountDraft[], deposits: DepositDraft[], 
   return { ok: { accounts: outAccounts, deposits: outDeposits, ...out } };
 }
 
+/** Quỹ dự phòng as typed: whole đồng, or blank = the confirmed profile's figure (null). */
+export function reservePayload(raw: string): { ok: string | null } | { error: string } {
+  if (!raw.trim()) return { ok: null };
+  const v = whole(raw.trim());
+  return v === null ? { error: "Quỹ dự phòng: nhập số đồng, hoặc để trống để theo hồ sơ." } : { ok: v };
+}
+
 /** One list of Trái phiếu, Vàng or Tiền số: name and amount per row (bonds also an expected yield), added and removed before Lưu. */
 function HoldingList({ list, rows, onChange, disabled }: { list: keyof HoldingDrafts; rows: (HoldingDraft | BondDraft)[];
   onChange: (rows: (HoldingDraft | BondDraft)[]) => void; disabled: boolean }) {
@@ -111,10 +118,12 @@ export function DepositBook({ onSaved }: { onSaved?: () => void }) {
   const [deposits, setDeposits] = useState<DepositDraft[]>([]);
   const [holdings, setHoldings] = useState<HoldingDrafts>(NO_HOLDINGS);
   const [countLedger, setCountLedger] = useState(true);
+  const [reserve, setReserve] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   function show(v: View) {
     setView(v);
     setCountLedger(v.book.count_ledger_cash);
+    setReserve(v.book.reserve === null ? "" : money(v.book.reserve));
     setAccounts(v.book.accounts.map(toAccountDraft));
     setDeposits(v.book.deposits.map(toDepositDraft));
     setHoldings(toHoldingDrafts(v.book));
@@ -124,8 +133,10 @@ export function DepositBook({ onSaved }: { onSaved?: () => void }) {
     if (!view) return;
     const r = bookPayload(accounts, deposits, holdings);
     if ("error" in r) { setMessage(r.error); return; }
+    const res = reservePayload(reserve);
+    if ("error" in res) { setMessage(res.error); return; }
     try {
-      show(await api<View>("deposit-book", { method: "PUT", body: { ...r.ok, count_ledger_cash: countLedger, expected_version: view.version, request_id: requestId() } }));
+      show(await api<View>("deposit-book", { method: "PUT", body: { ...r.ok, count_ledger_cash: countLedger, reserve: res.ok, expected_version: view.version, request_id: requestId() } }));
       setMessage(null);
       onSaved?.();
     } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); }
@@ -139,8 +150,16 @@ export function DepositBook({ onSaved }: { onSaved?: () => void }) {
     <section className="surface db" aria-label="Sổ tài sản">
       <h2>Sổ tài sản</h2>
       <p className="caption wrap">Ghi chi tiết tài khoản tiền mặt ngoài tài khoản chứng khoán, sổ tiết kiệm, trái phiếu và chứng chỉ quỹ, vàng, tiền số.
-        Danh sách nào có ít nhất một dòng thì lớp tương ứng của Tháp tài sản lấy tổng danh sách đó (ô nhập tay bị khóa); tài khoản tiền mặt cộng vào
-        lớp Tiền mặt. Ô lãi hay lợi suất để trống là chưa nhập, không phải 0. Sổ chưa đến hạn không bao giờ được tính là tiền rút ngay.</p>
+        Đã lưu sổ thì Tháp tài sản lấy mọi lớp từ đây: mỗi lớp là tổng danh sách của nó, danh sách trống là 0; các số nhập tay trước đó không còn được
+        tính. Tài khoản tiền mặt cộng vào lớp Tiền mặt. Ô lãi hay lợi suất để trống là chưa nhập, không phải 0. Sổ chưa đến hạn không bao giờ được
+        tính là tiền rút ngay.</p>
+
+      <h3>Quỹ dự phòng</h3>
+      <label className="field">Quỹ dự phòng và khoản chi 12 tháng (đ)<input inputMode="numeric" value={reserve} disabled={!view}
+        onChange={(e) => setReserve(groupDigitsInput(e.target.value))}
+        placeholder={view ? `để trống = theo hồ sơ (${formatVnd(view.profile_reserve)})` : "để trống = theo hồ sơ"} /></label>
+      <p className="caption wrap">Lớp dưới cùng của Tháp tài sản, và mốc để so thanh khoản bên dưới. Để trống thì lấy quỹ dự phòng và khoản chi
+        trong 12 tháng ở hồ sơ đã xác nhận.</p>
 
       <h3>Tài khoản tiền mặt</h3>
       {accounts.length > 0 && <table className="fv-table db-table" aria-label="Tài khoản tiền mặt">
@@ -227,7 +246,7 @@ export function DepositBook({ onSaved }: { onSaved?: () => void }) {
             <dd>{l.ledger_cash_counted ? formatVnd(l.ledger_cash) : <span className="muted">không cộng ({formatVnd(l.ledger_cash)} theo sổ giao dịch)</span>}</dd></div>
           <div><dt>Tài khoản tiền mặt rút ngay</dt><dd>{formatVnd(l.accounts_liquid)}</dd></div>
           <div className="eb-main"><dt>Rút ngay được</dt><dd data-testid="liquid-now">{formatVnd(l.now)}</dd></div>
-          <div><dt>Quỹ dự phòng và khoản chi 12 tháng <span className="caption">(như Tháp tài sản)</span></dt><dd>{formatVnd(l.reserve)}</dd></div>
+          <div><dt>Quỹ dự phòng và khoản chi 12 tháng <span className="caption">({view?.book.reserve === null ? "theo hồ sơ" : "nhập ở trên"})</span></dt><dd>{formatVnd(l.reserve)}</dd></div>
           <div><dt>So với quỹ dự phòng</dt><dd data-testid="liquid-status">{l.status === "short"
             ? <span className="negative">Thiếu {formatVnd(l.short)}</span> : <span className="positive">Đủ</span>}</dd></div>
           <div><dt>Gốc sẽ đáo hạn trong 90 ngày <span className="caption">(tham khảo)</span></dt><dd>{formatVnd(l.maturing_90d)}</dd></div>

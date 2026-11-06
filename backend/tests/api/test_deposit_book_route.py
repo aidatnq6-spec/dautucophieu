@@ -30,8 +30,9 @@ def client(tmp_path):
     return c, clock
 
 
-def save_book(c, clock, deposits=DEPOSITS, accounts=ACCOUNTS, version=0, rid="db1"):
-    return call(c, clock, "PUT", "/internal/deposit-book", {"deposits": deposits, "accounts": accounts, "expected_version": version, "request_id": rid})
+def save_book(c, clock, deposits=DEPOSITS, accounts=ACCOUNTS, version=0, rid="db1", **more):
+    return call(c, clock, "PUT", "/internal/deposit-book", {"deposits": deposits, "accounts": accounts, "expected_version": version, "request_id": rid,
+                                                           **more})
 
 
 def save_layers(c, clock, version=0):
@@ -42,14 +43,14 @@ def save_layers(c, clock, version=0):
 def test_an_empty_book_has_no_rows_and_liquidity_from_the_ledger_cash(tmp_path):
     c, clock = client(tmp_path)
     body = call(c, clock, "GET", "/internal/deposit-book").json()
-    assert body["version"] == 0 and body["book"] == {"accounts": [], "deposits": [], "bonds": [], "gold": [], "crypto": [], "count_ledger_cash": True}
+    assert body["version"] == 0 and body["book"] == {"accounts": [], "deposits": [], "bonds": [], "gold": [], "crypto": [], "count_ledger_cash": True,
+                                                     "reserve": None}
     assert body["liquidity"]["now"] == "95000000" and body["calendar"]["months"] == []
 
 
 def test_saved_book_gives_the_calendar_and_liquidity_against_the_reserve_of_the_pyramid(tmp_path):
     c, clock = client(tmp_path)
-    save_layers(c, clock)
-    ok = save_book(c, clock)
+    ok = save_book(c, clock, reserve="120000000")
     assert ok.status_code == 200
     body = call(c, clock, "GET", "/internal/deposit-book").json()
     assert body["version"] == 1 and [d["id"] for d in body["book"]["deposits"]] == ["a", "b"]
@@ -69,16 +70,35 @@ def test_the_pyramid_takes_deposits_and_cash_accounts_from_the_book(tmp_path):
     b = call(c, clock, "GET", "/internal/equity-budget").json()["budget"]
     amounts = {l["id"]: l["amount"] for l in b["pyramid"]["layers"]}
     assert amounts["deposit"] == "300000000" and amounts["cash"] == "110000000"  # 200 + 100 tr in sổ; 95 ledger + 15 accounts
-    assert b["deposit_source"] == "book" and b["total"] == "635000000"  # 120 + 110 + 300 + 100 gold + 5 stocks
+    assert amounts["gold"] == "0" and amounts["reserve"] == "0"  # the hand-entered gold and reserve no longer count once there is a book
+    assert b["deposit_source"] == "book" and b["total"] == "415000000"  # 110 + 300 + 5 stocks
 
 
-def test_only_cash_accounts_keep_the_hand_entered_deposits(tmp_path):
+def test_the_book_alone_builds_the_pyramid_with_every_layer_from_its_lists(tmp_path):
     c, clock = client(tmp_path)
-    save_layers(c, clock)
+    assert call(c, clock, "GET", "/internal/equity-budget").json()["budget"] == {"status": "no_total"}
     save_book(c, clock, deposits=[])
+    body = call(c, clock, "GET", "/internal/equity-budget").json()
+    amounts = {l["id"]: l["amount"] for l in body["budget"]["pyramid"]["layers"]}
+    assert body["budget"]["status"] == "ok" and body["budget"]["layer_sources"] == dict.fromkeys(("deposit", "bond", "gold", "crypto"), "book")
+    assert amounts == {"reserve": "0", "cash": "110000000", "deposit": "0", "bond": "0", "gold": "0", "stocks": "5000000", "crypto": "0"}
+
+
+def test_the_reserve_is_entered_in_the_book_and_blank_uses_the_profile(tmp_path):
+    c, clock = client(tmp_path)
+    save_layers(c, clock)  # the old hand-entered reserve, 120 tr, no longer counts once there is a book
+    ok = call(c, clock, "PUT", "/internal/deposit-book", {"deposits": [], "accounts": ACCOUNTS, "reserve": "50000000",
+                                                         "expected_version": 0, "request_id": "db1"})
+    assert ok.json()["book"]["reserve"] == "50000000" and ok.json()["liquidity"]["reserve"] == "50000000"
+    assert ok.json()["profile_reserve"] == "0"  # the figure a blank reserve falls back to
     b = call(c, clock, "GET", "/internal/equity-budget").json()["budget"]
-    amounts = {l["id"]: l["amount"] for l in b["pyramid"]["layers"]}
-    assert b["deposit_source"] == "manual" and amounts["deposit"] == "300000000" and amounts["cash"] == "110000000"
+    assert b["deductions"] == "50000000" and b["deductions_source"] == "manual" and b["reserve"] == "50000000"
+    save_book(c, clock, deposits=[], version=1, rid="db2")  # reserve left out = blank
+    b = call(c, clock, "GET", "/internal/equity-budget").json()["budget"]
+    assert b["deductions"] == "0" and b["deductions_source"] == "profile"
+    assert save_book(c, clock, deposits=[], version=2, rid="db3").status_code == 200
+    bad = call(c, clock, "PUT", "/internal/deposit-book", {"deposits": [], "accounts": [], "reserve": "-1", "expected_version": 3, "request_id": "db4"})
+    assert bad.status_code == 422
 
 
 def test_passive_income_uses_each_deposit_rate_and_counts_those_on_the_market_rate(tmp_path):
@@ -122,6 +142,6 @@ def test_bond_gold_and_crypto_lists_replace_their_hand_entered_layers_and_bond_i
     b = call(c, clock, "GET", "/internal/equity-budget").json()["budget"]
     amounts = {l["id"]: l["amount"] for l in b["pyramid"]["layers"]}
     assert amounts["bond"] == "180000000" and amounts["gold"] == "40000000" and amounts["crypto"] == "0"
-    assert b["layer_sources"] == {"deposit": "manual", "bond": "book", "gold": "book", "crypto": "manual"}
+    assert b["layer_sources"] == {"deposit": "book", "bond": "book", "gold": "book", "crypto": "book"}
     income = call(c, clock, "GET", "/internal/passive-income").json()["income"]
     assert income["bond"] == "1150000" and income["bond_default_rate_count"] == 1  # 120 tr × 8% / 12 + 60 tr × 7% (default) / 12

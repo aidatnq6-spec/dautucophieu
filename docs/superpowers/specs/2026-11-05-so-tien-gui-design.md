@@ -31,18 +31,19 @@ Thay con số "Tiền gửi" nhập tay của Tháp tài sản bằng danh sách
 - **Rút ngay** = tiền mặt trong tài khoản chứng khoán (từ sổ giao dịch) + tài khoản tiền mặt đánh dấu rút ngay.
 - **Chưa rút ngay** (nêu riêng): tài khoản đánh dấu chưa rút được, sổ chưa đến hạn (phong tỏa hay không), sổ quá hạn chưa cập nhật.
   Sổ không phong tỏa ghi thêm "rút trước hạn được, thường mất lãi" nhưng vẫn không cộng vào rút ngay.
-- So với **quỹ dự phòng và khoản chi 12 tháng** đang dùng ở Tháp tài sản (nhập tay hoặc theo hồ sơ): đủ, hoặc thiếu bao nhiêu đồng; kèm
+- So với **quỹ dự phòng và khoản chi 12 tháng** đang dùng ở Tháp tài sản (nhập ở Sổ tài sản, hoặc theo hồ sơ khi để trống): đủ, hoặc thiếu bao nhiêu đồng; kèm
   tổng gốc sẽ đáo hạn trong 90 ngày để tham khảo. Không chuyển tiền, không khuyên rút sổ.
 
 ## Ảnh hưởng tới phần đã có
-- **Tháp tài sản**: khi sổ có ít nhất một sổ tiền gửi, lớp Tiền gửi = tổng gốc các sổ (kể cả sổ quá hạn), ô nhập tay bị khóa và ghi
-  "từ sổ tiền gửi"; chưa có sổ thì giữ số nhập tay như trước. Lớp Tiền mặt = tiền mặt sổ giao dịch + mọi tài khoản tiền mặt. Mục tiêu và
-  cách tính tháp không đổi.
+- **Tháp tài sản** (cập nhật 2026-11-06): khi Sổ tài sản đã được lưu, tháp lấy mọi lớp từ sổ: Tiền gửi = tổng gốc các sổ (kể cả sổ quá
+  hạn), Trái phiếu, Vàng, Tiền số = tổng danh sách tương ứng, danh sách trống là 0. Các số nhập tay của Tháp tài sản (từng lớp và quỹ dự
+  phòng) không còn được tính và form nhập tay được ẩn; tháp tính được cả khi chưa từng nhập tay. **Quỹ dự phòng và khoản chi 12 tháng**
+  nhập ở Sổ tài sản; để trống thì theo hồ sơ đã xác nhận. Lớp Tiền mặt = tiền mặt sổ giao dịch (trừ khi bỏ chọn) + mọi tài khoản tiền mặt.
+  Mục tiêu và cách tính tháp không đổi.
 - **Dòng tiền thụ động**: khi có sổ, thu nhập tiền gửi mỗi tháng = Σ gốc × lãi suất của sổ / 12 cho sổ có lãi suất; sổ chưa nhập lãi suất
   dùng lãi suất 12 tháng thị trường như trước, và trang nêu số sổ dùng lãi suất thị trường.
-- Trái phiếu, Vàng, Tiền số: danh sách có ít nhất một dòng thì lớp tương ứng = tổng danh sách, ô nhập tay bị khóa. Dòng tiền thụ động tính
-  trái phiếu theo lợi suất từng dòng; dòng chưa nhập dùng lãi suất trái phiếu của mục đó (mặc định 7%) và được đếm.
-- Không có dòng nào: mọi trang giữ nguyên hành vi cũ.
+- Dòng tiền thụ động tính trái phiếu theo lợi suất từng dòng; dòng chưa nhập dùng lãi suất trái phiếu của mục đó (mặc định 7%) và được đếm.
+- Chưa lưu Sổ tài sản lần nào: mọi trang giữ nguyên hành vi cũ (số nhập tay).
 
 ## Giao diện
 Hồ sơ & rủi ro, mục "Sổ tiền gửi và tiền mặt", ngay trước Tháp tài sản: bảng tài khoản tiền mặt, bảng sổ (thêm, sửa, xóa, rồi Lưu),

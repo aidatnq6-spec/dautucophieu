@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { bookPayload, type AccountDraft, type BondDraft, type DepositDraft, type HoldingDraft } from "./deposit-book";
+import { bookPayload, reservePayload, type AccountDraft, type BondDraft, type DepositDraft, type HoldingDraft } from "./deposit-book";
 
 const depo = (d: Partial<DepositDraft> = {}): DepositDraft => ({ id: "a", bank: "Ngân hàng A", matures: "2027-03-05", principal: "50.000.000", rate: "",
   interest: "", payout: "end", locked: true, ...d });
@@ -37,4 +37,11 @@ it("names the bond, gold or crypto row that cannot be saved", () => {
   expect(bookPayload([], [], { bonds: [bond({ rate: "40" })], gold: [], crypto: [] })).toEqual({ error: "Trái phiếu 1: lợi suất từ 0 đến 30%/năm, hoặc để trống." });
   expect(bookPayload([], [], { bonds: [], gold: [item({ name: "" })], crypto: [] })).toEqual({ error: "Vàng 1: nhập tên." });
   expect(bookPayload([], [], { bonds: [], gold: [], crypto: [item(), item({ id: "d", amount: "x" })] })).toEqual({ error: "Tiền số 2: nhập số tiền (đồng)." });
+});
+
+it("takes the reserve in whole đồng, a blank one meaning the profile's figure", () => {
+  expect(reservePayload("")).toEqual({ ok: null });
+  expect(reservePayload(" 120.000.000 ")).toEqual({ ok: "120000000" });
+  expect(reservePayload("12,5")).toEqual({ error: "Quỹ dự phòng: nhập số đồng, hoặc để trống để theo hồ sơ." });
+  expect(reservePayload("abc")).toEqual({ error: "Quỹ dự phòng: nhập số đồng, hoặc để trống để theo hồ sơ." });
 });

@@ -24,8 +24,8 @@ class BookRequest(DepositBook):
 
 
 def _view(request: Request, repo, owner) -> dict:
-    reserve, _, _ = protected_deductions(repo, owner)
-    return book_view(repo, owner, reserve=reserve, today=now(request).astimezone(VN).date())
+    reserve, from_profile, _ = protected_deductions(repo, owner)
+    return book_view(repo, owner, reserve=reserve, profile_reserve=from_profile, today=now(request).astimezone(VN).date())
 
 
 @router.get("/deposit-book")

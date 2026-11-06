@@ -44,6 +44,8 @@ def main() -> int:
     es.add_argument("--data-dir", type=Path, required=True)
     fn = commands.add_parser("fund-nav-sync", help="NAV/đơn vị of every open-ended fund from Fmarket into data/fund-nav.json, one call")
     fn.add_argument("--data-dir", type=Path, required=True)
+    gp = commands.add_parser("gold-price-sync", help="Phú Quý's gold buying and selling prices per chỉ into data/gold-price.json, one page")
+    gp.add_argument("--data-dir", type=Path, required=True)
     wb = commands.add_parser("weekly-brief", help="Bản tin tuần over Telegram on the weekend, once per week")
     wb.add_argument("--data-dir", type=Path, required=True)
     wb.add_argument("--calendar", type=Path, required=True)
@@ -114,6 +116,8 @@ def main() -> int:
         return erp_sync_cli(args.data_dir)
     if args.command == "fund-nav-sync":
         return fund_nav_sync_cli(args.data_dir)
+    if args.command == "gold-price-sync":
+        return gold_price_sync_cli(args.data_dir)
     if args.command == "quarter-alerts":
         return quarter_alerts_cli(args.data_dir)
     if args.command == "weekly-brief":
@@ -573,6 +577,23 @@ def fund_nav_sync_cli(data_dir: Path, *, post=None) -> int:
             response.raise_for_status()
             return response.json()
     out = fund_nav_sync(FundNavStore(data_dir), post=post, now=datetime.now(timezone.utc))
+    print(json.dumps(out))
+    return 1 if out["status"] == "error" else 0
+
+
+def gold_price_sync_cli(data_dir: Path, *, get=None) -> int:
+    """Phú Quý's public gold price table for Sổ tài sản's gold rows; the request names nothing about the owner."""
+    from datetime import datetime, timezone
+
+    from investment_agent.market.gold_price import GoldPriceStore, gold_price_sync
+    if get is None:
+        import httpx
+
+        def get(url):
+            response = httpx.get(url, timeout=30, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+            response.raise_for_status()
+            return response.text
+    out = gold_price_sync(GoldPriceStore(data_dir), get=get, now=datetime.now(timezone.utc))
     print(json.dumps(out))
     return 1 if out["status"] == "error" else 0
 

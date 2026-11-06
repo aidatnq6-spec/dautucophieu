@@ -11,20 +11,25 @@ type Holding = { id: string; name: string; amount: string };
 type Bond = Holding & { rate: string | null; fund: string | null; units: string | null };
 type BondValue = { id: string; cost: string; value: string; source: "nav" | "no_nav" | "amount"; fund?: string; nav?: string; nav_date?: string;
   stale?: boolean; change?: string };
-type Holdings = { bonds: Bond[]; gold: Holding[]; crypto: Holding[] };
+type Gold = Holding & { kind: string | null; chi: string | null };
+type GoldValue = { id: string; cost: string; value: string; source: "price" | "no_price" | "amount"; kind?: string; buy_per_chi?: string;
+  as_of?: string; stale?: boolean; change?: string };
+type Holdings = { bonds: Bond[]; gold: Gold[]; crypto: Holding[] };
 type Month = { month: string; count: number; principal: string; interest: string; missing_interest: number };
 type Liquidity = { now: string; ledger_cash: string; ledger_cash_counted: boolean; accounts_liquid: string; reserve: string; status: "enough" | "short"; short: string | null;
   maturing_90d: string; not_now: { accounts: string; locked: string; unlocked: string; overdue: string } };
 type View = { version: number; book: { accounts: Account[]; deposits: Deposit[]; count_ledger_cash: boolean; reserve: string | null } & Holdings;
   calendar: { months: Month[]; due_soon: string[]; overdue: string[] }; liquidity: Liquidity; profile_reserve: string;
-  bond_values: BondValue[]; nav_source: string | null };
+  bond_values: BondValue[]; nav_source: string | null; gold_values: GoldValue[]; gold_kinds: string[]; gold_source: string | null;
+  gold_as_of: string | null };
 
 /** Rows as typed: money grouped with dots, rate with a comma, blanks kept blank. */
 export type AccountDraft = Account;
 export type DepositDraft = Omit<Deposit, "rate" | "interest"> & { rate: string; interest: string };
 export type HoldingDraft = Holding;
 export type BondDraft = Holding & { rate: string; fund: string; units: string };
-type HoldingDrafts = { bonds: BondDraft[]; gold: HoldingDraft[]; crypto: HoldingDraft[] };
+export type GoldDraft = Holding & { kind: string; chi: string };
+type HoldingDrafts = { bonds: BondDraft[]; gold: GoldDraft[]; crypto: HoldingDraft[] };
 const NO_HOLDINGS: HoldingDrafts = { bonds: [], gold: [], crypto: [] };
 
 const money = (v: string) => formatVnd(v, { unit: false });
@@ -37,7 +42,7 @@ const whole = (raw: string) => { const v = parseMoneyInput(raw); return v !== nu
 const toHoldingDrafts = (b: Holdings): HoldingDrafts => ({
   bonds: b.bonds.map((x) => ({ ...x, amount: money(x.amount), rate: x.rate === null ? "" : x.rate.replace(".", ","), fund: x.fund ?? "",
     units: x.units === null ? "" : decimalText(x.units) })),
-  gold: b.gold.map((x) => ({ ...x, amount: money(x.amount) })), crypto: b.crypto.map((x) => ({ ...x, amount: money(x.amount) })) });
+  gold: b.gold.map((x) => ({ ...x, amount: money(x.amount), kind: x.kind ?? "", chi: x.chi === null ? "" : decimalText(x.chi) })), crypto: b.crypto.map((x) => ({ ...x, amount: money(x.amount) })) });
 const LIST_NAME = { bonds: "Trái phiếu", gold: "Vàng", crypto: "Tiền số" } as const;
 
 /** The book the API takes, or the first row that cannot be saved, named by its place in the table. Blank rate or interest = unknown (null). */
@@ -70,7 +75,17 @@ export function bookPayload(accounts: AccountDraft[], deposits: DepositDraft[], 
       if (!h.name.trim()) return { error: `${n}: nhập tên.` };
       const amount = whole(h.amount);
       if (amount === null) return { error: `${n}: nhập số tiền (đồng).` };
-      if (list !== "bonds") { out[list].push({ id: h.id, name: h.name.trim(), amount }); continue; }
+      if (list === "crypto") { out.crypto.push({ id: h.id, name: h.name.trim(), amount }); continue; }
+      if (list === "gold") {
+        const g = h as GoldDraft;
+        if (!g.kind !== !g.chi.trim()) return { error: `${n}: chọn cả loại giá và số chỉ, hoặc để trống cả hai.` };
+        const chi = g.kind ? parseMoneyInput(g.chi) : null;
+        if (g.kind && (chi === null || Number(chi) <= 0 || (chi.split(".")[1] ?? "").length > 2)) {
+          return { error: `${n}: số chỉ lớn hơn 0, tối đa 2 chữ số thập phân.` };
+        }
+        out.gold.push({ id: h.id, name: h.name.trim(), amount, kind: g.kind || null, chi });
+        continue;
+      }
       const raw = (h as BondDraft).rate.trim();
       const rate = raw ? parseMoneyInput(raw) : null;
       if (raw && (rate === null || Number(rate) > 30)) return { error: `${n}: lợi suất từ 0 đến 30%/năm, hoặc để trống.` };
@@ -108,7 +123,7 @@ type Drafts = { accounts: AccountDraft[]; deposits: DepositDraft[] } & HoldingDr
 type ListKey = keyof Drafts;
 type AnyDraft = AccountDraft | DepositDraft | HoldingDraft | BondDraft;
 type Editing = { list: ListKey; draft: AnyDraft; isNew: boolean } | null;
-type Field = { key: string; label: string; aria: string; kind: "text" | "money" | "rate" | "units" | "date" | "check" | "payout"; max?: number; dash?: boolean;
+type Field = { key: string; label: string; aria: string; kind: "text" | "money" | "rate" | "units" | "choice" | "date" | "check" | "payout"; max?: number; dash?: boolean; hint?: string;
   optional?: boolean; yes?: string; no?: string };
 
 const NAME_FIELD = (max: number): Field => ({ key: "name", label: "Tên", aria: "Tên", kind: "text", max });
@@ -123,9 +138,11 @@ const FIELDS: Record<ListKey, Field[]> = {
     { key: "payout", label: "Trả lãi", aria: "Cách trả lãi", kind: "payout" },
     { key: "locked", label: "Phong tỏa", aria: "Phong tỏa đến hạn", kind: "check", yes: "phong tỏa", no: "không" }],
   bonds: [NAME_FIELD(80), { key: "amount", label: "Vốn đã mua (đ)", aria: "Vốn đã mua", kind: "money" },
-    { key: "fund", label: "Mã quỹ", aria: "Mã quỹ", kind: "text", max: 16, dash: true }, { key: "units", label: "Số đơn vị", aria: "Số đơn vị", kind: "units", dash: true },
+    { key: "fund", label: "Mã quỹ", aria: "Mã quỹ", kind: "text", max: 16, dash: true, hint: "nếu là chứng chỉ quỹ" }, { key: "units", label: "Số đơn vị", aria: "Số đơn vị", kind: "units", dash: true, hint: "nếu là chứng chỉ quỹ" },
     { key: "rate", label: "Lợi suất %/năm", aria: "Lợi suất", kind: "rate", optional: true }],
-  gold: [NAME_FIELD(80), AMOUNT],
+  gold: [NAME_FIELD(80), { key: "amount", label: "Vốn đã mua (đ)", aria: "Vốn đã mua", kind: "money" },
+    { key: "kind", label: "Loại giá", aria: "Loại giá", kind: "choice", dash: true },
+    { key: "chi", label: "Số chỉ", aria: "Số chỉ", kind: "units", dash: true, hint: "nếu tính theo giá" }],
   crypto: [NAME_FIELD(80), AMOUNT],
 };
 const TABLE_NAME: Record<ListKey, string> = { accounts: "Tài khoản tiền mặt", deposits: "Sổ tiền gửi", ...LIST_NAME };
@@ -137,7 +154,7 @@ const EMPTY: Record<ListKey, () => AnyDraft> = {
   accounts: () => ({ id: requestId(), name: "", amount: "", liquid: true }),
   deposits: () => ({ id: requestId(), bank: "", matures: "", principal: "", rate: "", interest: "", payout: "end", locked: true }),
   bonds: () => ({ id: requestId(), name: "", amount: "", rate: "", fund: "", units: "" }),
-  gold: () => ({ id: requestId(), name: "", amount: "" }),
+  gold: () => ({ id: requestId(), name: "", amount: "", kind: "", chi: "" }),
   crypto: () => ({ id: requestId(), name: "", amount: "" }),
 };
 const toDrafts = (b: View["book"]): Drafts => ({ accounts: b.accounts.map(toAccountDraft), deposits: b.deposits.map(toDepositDraft), ...toHoldingDrafts(b) });
@@ -155,24 +172,32 @@ function shown(f: Field, v: string | boolean) {
   return text;
 }
 
-function FieldInput({ f, value, label, onChange }: { f: Field; value: string | boolean; label: string; onChange: (v: string | boolean) => void }) {
+function FieldInput({ f, value, label, options, onChange }: { f: Field; value: string | boolean; label: string; options?: string[];
+  onChange: (v: string | boolean) => void }) {
   const aria = `${f.aria} ${label}`;
+  if (f.kind === "choice") {
+    const list = options ?? [];
+    return <select aria-label={aria} value={String(value)} onChange={(e) => onChange(e.target.value)}>
+      <option value="">— không theo giá —</option>
+      {value && !list.includes(String(value)) && <option value={String(value)}>{String(value)} (không còn trong bảng giá)</option>}
+      {list.map((o) => <option key={o} value={o}>{o}</option>)}</select>;
+  }
   if (f.kind === "check") return <input type="checkbox" aria-label={aria} checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />;
   if (f.kind === "payout") return <select aria-label={aria} value={String(value)} onChange={(e) => onChange(e.target.value)}>
     <option value="end">Cuối kỳ</option><option value="upfront">Đầu kỳ (đã nhận)</option></select>;
   if (f.kind === "date") return <input type="date" aria-label={aria} value={String(value)} onChange={(e) => onChange(e.target.value)} />;
   if (f.kind === "money") return <input aria-label={aria} inputMode="numeric" placeholder={f.optional ? "chưa nhập" : undefined} value={String(value)}
     onChange={(e) => onChange(groupDigitsInput(e.target.value))} />;
-  if (f.kind === "units") return <input aria-label={aria} inputMode="decimal" placeholder="nếu là chứng chỉ quỹ" value={String(value)}
+  if (f.kind === "units") return <input aria-label={aria} inputMode="decimal" placeholder={f.hint} value={String(value)}
     onChange={(e) => onChange(e.target.value)} />;
   if (f.kind === "rate") return <input aria-label={aria} inputMode="decimal" placeholder="chưa nhập" value={String(value)} onChange={(e) => onChange(e.target.value)} />;
-  return <input aria-label={aria} maxLength={f.max} placeholder={f.dash ? "nếu là chứng chỉ quỹ" : undefined} value={String(value)}
+  return <input aria-label={aria} maxLength={f.max} placeholder={f.hint} value={String(value)}
     onChange={(e) => onChange(f.dash ? e.target.value.toUpperCase() : e.target.value)} />;
 }
 
 /** One list of Sổ tài sản: each saved row read-only with Sửa and Xóa; the row being edited (or added) as inputs with Lưu and Hủy. */
-function RowTable({ list, rows, editing, locked, status, extra, onEdit, onDraft, onSave, onCancel, onDelete }: {
-  list: ListKey; rows: AnyDraft[]; editing: Editing; locked: boolean; status: (id: string) => ReactNode;
+function RowTable({ list, rows, editing, locked, status, extra, choices, onEdit, onDraft, onSave, onCancel, onDelete }: {
+  list: ListKey; rows: AnyDraft[]; editing: Editing; locked: boolean; status: (id: string) => ReactNode; choices?: string[];
   extra?: { label: string; cell: (id: string) => ReactNode };
   onEdit: (row: AnyDraft) => void; onDraft: (row: AnyDraft) => void; onSave: () => void; onCancel: () => void; onDelete: (row: AnyDraft, n: number) => void }) {
   const fields = FIELDS[list];
@@ -188,7 +213,7 @@ function RowTable({ list, rows, editing, locked, status, extra, onEdit, onDraft,
         return (
           <tr key={r.id} className={draft ? "db-editing" : undefined}>
             {fields.map((f) => <td key={f.key} data-label={f.aria}>
-              {draft ? <FieldInput f={f} label={label} value={field(draft, f.key)} onChange={(v) => onDraft({ ...draft, [f.key]: v } as AnyDraft)} />
+              {draft ? <FieldInput f={f} label={label} options={choices} value={field(draft, f.key)} onChange={(v) => onDraft({ ...draft, [f.key]: v } as AnyDraft)} />
                 : <>{shown(f, field(r, f.key))}{f.kind === "date" && status(r.id)}</>}</td>)}
             {extra && <td data-label={extra.label}>{draft ? null : extra.cell(r.id)}</td>}
             <td className="db-actions">{draft ? <>
@@ -207,17 +232,35 @@ function RowTable({ list, rows, editing, locked, status, extra, onEdit, onDraft,
   );
 }
 
+/** The change from what it cost, in đồng and %, as a plain subtraction of the two figures shown. */
+function ChangeFromCost({ value, cost, change }: { value: string; cost: string; change: string }) {
+  const c = Number(change);
+  const pct = Number(cost) > 0 ? ` (${c >= 0 ? "+" : "−"}${(Math.abs(c) / Number(cost) * 100).toFixed(1).replace(".", ",")}%)` : "";
+  return <><strong>{formatVnd(value)}</strong>{" "}
+    <span className={c >= 0 ? "positive" : "negative"}>{c >= 0 ? "+" : "−"}{formatVnd(String(Math.abs(c)))}{pct}</span></>;
+}
+
+/** A gold row's value: chi × the buying price per chỉ with the time the table gave it, or why it is still at cost. Never a guessed price. */
+function GoldValueCell({ v, source }: { v: GoldValue | undefined; source: string | null }) {
+  if (!v) return null;
+  if (v.source === "no_price") return <span className="muted">{v.kind} không còn trong bảng giá{source ? ` ${source}` : ""}, đang tính bằng vốn đã mua</span>;
+  if (v.source === "amount") return <span className="muted">bằng vốn đã mua</span>;
+  const at = v.as_of!;
+  return <>
+    <ChangeFromCost value={v.value} cost={v.cost} change={v.change!} />
+    <div className="caption">giá {source ?? ""} mua vào {formatVnd(v.buy_per_chi!)}/chỉ lúc {at.slice(11, 16)} {at.slice(8, 10)}/{at.slice(5, 7)}/{at.slice(0, 4)}
+      {v.stale && <span className="pill warn">giá đã cũ</span>}</div>
+  </>;
+}
+
 /** A bond row's value: units × NAV with the NAV's date and the change from cost, or why it is still at cost. Never a guessed NAV. */
 function BondValueCell({ v, source }: { v: BondValue | undefined; source: string | null }) {
   if (!v) return null;
   if (v.source === "no_nav") return <span className="muted">chưa có NAV cho {v.fund}, đang tính bằng vốn đã mua</span>;
   if (v.source === "amount") return <span className="muted">bằng vốn đã mua</span>;
-  const change = Number(v.change);
-  const pct = Number(v.cost) > 0 ? ` (${change >= 0 ? "+" : "−"}${(Math.abs(change) / Number(v.cost) * 100).toFixed(1).replace(".", ",")}%)` : "";
   const date = v.nav_date!;
   return <>
-    <strong>{formatVnd(v.value)}</strong>{" "}
-    <span className={change >= 0 ? "positive" : "negative"}>{change >= 0 ? "+" : "−"}{formatVnd(String(Math.abs(change)))}{pct}</span>
+    <ChangeFromCost value={v.value} cost={v.cost} change={v.change!} />
     <div className="caption">NAV {v.fund} {decimalText(v.nav!)} đ kỳ {date.slice(8)}/{date.slice(5, 7)}/{date.slice(0, 4)}{source ? ` (${source})` : ""}
       {v.stale && <span className="pill warn">NAV đã cũ</span>}</div>
   </>;
@@ -271,8 +314,8 @@ export function DepositBook({ onSaved }: { onSaved?: () => void }) {
   const status = (id: string) => view?.calendar.overdue.includes(id) ? <span className="pill bad">quá hạn, cần cập nhật</span>
     : view?.calendar.due_soon.includes(id) ? <span className="pill warn">sắp đến hạn</span> : null;
   const alert = message && <p className="errors" role="alert">{message}</p>;
-  const table = (list: ListKey, extra?: { label: string; cell: (id: string) => ReactNode }) => saved && <>
-    <RowTable list={list} rows={saved[list] as AnyDraft[]} editing={editing} locked={locked} status={status} extra={extra}
+  const table = (list: ListKey, extra?: { label: string; cell: (id: string) => ReactNode }, choices?: string[]) => saved && <>
+    <RowTable list={list} rows={saved[list] as AnyDraft[]} editing={editing} locked={locked} status={status} extra={extra} choices={choices}
       onEdit={(row) => { setReserveDraft(null); setMessage(null); setEditing({ list, draft: row, isNew: false }); }}
       onDraft={(draft) => setEditing({ list, draft, isNew: editing?.isNew ?? false })}
       onSave={() => void saveRow()} onCancel={cancel} onDelete={(row, n) => void deleteRow(list, row, n)} />
@@ -333,7 +376,12 @@ export function DepositBook({ onSaved }: { onSaved?: () => void }) {
         Hiệu suất năm trước không phải lợi suất bảo đảm.</p>
       {table("bonds", { label: "Giá trị hiện tại", cell: (id) => <BondValueCell v={view?.bond_values.find((x) => x.id === id)} source={view?.nav_source ?? null} /> })}
       <h3>Vàng</h3>
-      {table("gold")}
+      <p className="caption wrap">Chọn loại giá và nhập số chỉ đang có: giá trị hiện tại = số chỉ × giá mua vào/chỉ
+        {view?.gold_source ? ` của ${view.gold_source}` : ""} (số tiền thực nhận nếu bán lại), cập nhật mỗi lượt chạy theo lịch; Tháp tài sản dùng giá trị
+        này. Vàng hãng khác (ví dụ nhẫn PNJ) chỉ là giá tham chiếu theo loại gần nhất bạn chọn. Vốn đã mua là số tiền đã bỏ ra.
+        {view && !view.gold_kinds.length && " Chưa có bảng giá: lượt chạy theo lịch sẽ tải."}</p>
+      {table("gold", { label: "Giá trị hiện tại", cell: (id) => <GoldValueCell v={view?.gold_values.find((x) => x.id === id)} source={view?.gold_source ?? null} /> },
+        view?.gold_kinds)}
       <h3>Tiền số</h3>
       {table("crypto")}
       {!editing && reserveDraft === null && alert}

@@ -5,9 +5,9 @@ from decimal import Decimal, InvalidOperation
 from fastapi import APIRouter, Request
 
 from investment_agent.domain.concentration import concentration, simulate
-from investment_agent.market.fund_nav import fund_navs
 from investment_agent.market.sectors import load_sectors
 from investment_agent.repositories.personal import RepositoryUnavailable
+from investment_agent.services.deposit_book import book_quotes
 from investment_agent.services.equity_budget import budget_view
 from investment_agent.services.overview import compose_overview
 from investment_agent.services.records import portfolio_settings
@@ -37,7 +37,7 @@ def concentration_view(request: Request, symbol: str | None = None, amount: str 
     try:
         view = compose_overview(repo, owner, request.app.state.market, request_now(request))
         settings, _ = portfolio_settings(repo, owner)
-        budget, _ = budget_view(repo, owner, navs=fund_navs(request.app.state.data_dir))
+        budget, _ = budget_view(repo, owner, quotes=book_quotes(request.app.state.data_dir))
     except RepositoryUnavailable:
         return unavailable()
     capital = view["capital"]

@@ -167,3 +167,22 @@ def test_a_fund_row_is_valued_at_units_times_the_stored_nav_in_the_book_the_pyra
     bad = call(c, clock, "PUT", "/internal/deposit-book", {"deposits": [], "accounts": [], "expected_version": 1, "request_id": "db2",
                                                           "bonds": [{"id": "a", "name": "Quỹ A", "amount": "1", "rate": None, "fund": "VFF"}]})
     assert bad.status_code == 422
+
+
+def test_a_gold_row_is_valued_at_chi_times_the_buying_price_in_the_book_and_the_pyramid(tmp_path):
+    from investment_agent.market.gold_price import GoldPriceStore
+    ring = "Nhẫn tròn Phú Quý 999.9"
+    GoldPriceStore(tmp_path).save({"source": "Phú Quý", "unit": "chỉ", "as_of": "2027-01-15T08:30:00+07:00",
+                                   "kinds": {ring: {"buy": "13650000", "sell": "14050000"}, "Vàng trang sức 99": {"buy": "1", "sell": None}}})
+    c, clock = client(tmp_path)
+    ok = call(c, clock, "PUT", "/internal/deposit-book", {"deposits": [], "accounts": [], "expected_version": 0, "request_id": "db1",
+                                                         "gold": [{"id": "g", "name": "Vàng nhẫn", "amount": "39364000", "kind": ring, "chi": "3"}]})
+    assert ok.status_code == 200
+    body = ok.json()
+    assert body["gold_values"][0]["value"] == "40950000" and body["gold_values"][0]["source"] == "price"
+    assert body["gold_kinds"] == [ring, "Vàng trang sức 99"] and body["gold_source"] == "Phú Quý"
+    b = call(c, clock, "GET", "/internal/equity-budget").json()["budget"]
+    assert {l["id"]: l["amount"] for l in b["pyramid"]["layers"]}["gold"] == "40950000"
+    bad = call(c, clock, "PUT", "/internal/deposit-book", {"deposits": [], "accounts": [], "expected_version": 1, "request_id": "db2",
+                                                          "gold": [{"id": "g", "name": "Vàng", "amount": "1", "kind": ring}]})
+    assert bad.status_code == 422

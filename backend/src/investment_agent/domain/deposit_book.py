@@ -12,7 +12,7 @@ from pydantic import Field, field_validator, model_validator
 from .models import ContractModel, UnsignedAmount
 
 DUE_SOON_DAYS, MATURING_DAYS = 30, 90
-NAV_STALE_DAYS = 14
+NAV_STALE_DAYS, GOLD_STALE_DAYS = 14, 3
 
 
 def _whole(value: Decimal | None) -> Decimal | None:
@@ -73,11 +73,24 @@ class Bond(Holding):
         return self
 
 
+class GoldRow(Holding):
+    """A line of gold; amount: what it cost (vốn đã mua). kind and chi, both or neither: valued at chi × the public buying price per
+    chỉ for that kind (market.gold_price)."""
+    kind: str | None = Field(default=None, min_length=1, max_length=80)
+    chi: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def _kind_with_chi(self):
+        if (self.kind is None) != (self.chi is None):
+            raise ValueError("a gold kind needs its chi, and chi need a kind")
+        return self
+
+
 class DepositBook(ContractModel):
     accounts: tuple[CashAccount, ...] = Field(default=(), max_length=30)
     deposits: tuple[Deposit, ...] = Field(default=(), max_length=100)
     bonds: tuple[Bond, ...] = Field(default=(), max_length=30)
-    gold: tuple[Holding, ...] = Field(default=(), max_length=30)
+    gold: tuple[GoldRow, ...] = Field(default=(), max_length=30)
     crypto: tuple[Holding, ...] = Field(default=(), max_length=30)
     count_ledger_cash: bool = True  # False: the owner's cash is the accounts here only; the ledger's cash is shown, not counted
     reserve: UnsignedAmount | None = None  # quỹ dự phòng và khoản chi 12 tháng for Tháp tài sản; None = the confirmed profile's figure
@@ -158,13 +171,43 @@ def bond_values(book: DepositBook, navs: dict[str, dict], *, today: date) -> lis
     return out
 
 
-def totals(book: DepositBook, navs: dict[str, dict]) -> dict[str, Decimal]:
+def _gold_value(row: GoldRow, gold: dict) -> Decimal:
+    """chi × the buying price per chỉ, rounded to the đồng, when the price table lists the kind; otherwise what it cost (never a
+    guessed price)."""
+    price = (gold.get("kinds") or {}).get(row.kind) if row.kind is not None else None
+    return (row.chi * Decimal(price["buy"])).quantize(Decimal(1), ROUND_HALF_UP) if price else row.amount
+
+
+def gold_values(book: DepositBook, gold: dict, *, today: date) -> list[dict]:
+    """Per gold row: cost, value and where it comes from — "price" (the buying price per chỉ, the time the table gave it, whether it
+    is more than 3 days old, and the change from cost), "no_price" (a kind the table no longer lists: at cost) or "amount" (no kind)."""
+    out = []
+    for g in book.gold:
+        row = {"id": g.id, "cost": _s(g.amount), "value": _s(g.amount), "source": "amount"}
+        if g.kind is not None:
+            price = (gold.get("kinds") or {}).get(g.kind)
+            if price is None:
+                row |= {"source": "no_price", "kind": g.kind}
+            else:
+                value = _gold_value(g, gold)
+                as_of = gold["as_of"]
+                row |= {"value": _s(value), "source": "price", "kind": g.kind,
+                        "buy_per_chi": price["buy"], "as_of": as_of,
+                        "stale": (today - date.fromisoformat(as_of[:10])).days > GOLD_STALE_DAYS, "change": _s(value - g.amount)}
+        out.append(row)
+    return out
+
+
+def totals(book: DepositBook, quotes: dict) -> dict[str, Decimal]:
     """Per list, for Tháp tài sản: principal of every deposit (overdue ones are still in the bank), each bond at its value (units ×
-    NAV for a fund with one), and the amount of every other row."""
+    NAV for a fund with one), each gold row at its value (chi × the buying price for its kind), and the amount of every other row.
+    quotes: {"funds": fund NAVs, "gold": gold prices}, either may be missing."""
     def total(rows) -> Decimal:
         return sum((r.amount for r in rows), Decimal(0))
+    navs, gold = quotes.get("funds") or {}, quotes.get("gold") or {}
     return {"deposits": sum((d.principal for d in book.deposits), Decimal(0)), "accounts": total(book.accounts),
-            "bonds": sum((_bond_value(b, navs) for b in book.bonds), Decimal(0)), "gold": total(book.gold), "crypto": total(book.crypto)}
+            "bonds": sum((_bond_value(b, navs) for b in book.bonds), Decimal(0)),
+            "gold": sum((_gold_value(g, gold) for g in book.gold), Decimal(0)), "crypto": total(book.crypto)}
 
 
 def deposit_income(book: DepositBook, *, market_rate: Decimal) -> dict:

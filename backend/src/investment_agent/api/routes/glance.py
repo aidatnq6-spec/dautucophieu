@@ -16,9 +16,9 @@ from investment_agent.domain.ledger import replay
 from investment_agent.domain.time_weighted import performance
 from investment_agent.jobs.publication import latest_report
 from investment_agent.market.corporate_events import REMINDED_KINDS, EventStore
-from investment_agent.market.fund_nav import fund_navs
 from investment_agent.market.series import SeriesStore
 from investment_agent.repositories.personal import RepositoryUnavailable, prefetch
+from investment_agent.services.deposit_book import book_quotes
 from investment_agent.services.equity_budget import budget_view
 from investment_agent.services.journal import read_journal
 from investment_agent.services.overview import OVERVIEW_RECORDS, compose_overview
@@ -51,7 +51,7 @@ def glance(request: Request):
     try:
         view = compose_overview(repo, owner, market, now(request))
         events = list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)
-        budget, _ = budget_view(repo, owner, navs=fund_navs(request.app.state.data_dir))
+        budget, _ = budget_view(repo, owner, quotes=book_quotes(request.app.state.data_dir))
         entries, _ = read_journal(repo, owner)
         threshold = portfolio_settings(repo, owner)[0].journal_review_threshold
         latest = latest_report(repo, owner)

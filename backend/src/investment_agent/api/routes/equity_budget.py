@@ -6,8 +6,8 @@ from fastapi import APIRouter, Request
 from pydantic import Field
 
 from investment_agent.domain.models import ContractModel
-from investment_agent.market.fund_nav import fund_navs
 from investment_agent.repositories.personal import RepositoryUnavailable
+from investment_agent.services.deposit_book import book_quotes
 from investment_agent.services.equity_budget import RECORD, budget_view
 
 from ..auth import require_owner
@@ -37,7 +37,7 @@ def get_budget(request: Request):
     if repo is None:
         return unavailable()
     try:
-        budget, version = budget_view(repo, owner, navs=fund_navs(request.app.state.data_dir))
+        budget, version = budget_view(repo, owner, quotes=book_quotes(request.app.state.data_dir))
     except RepositoryUnavailable:
         return unavailable()
     return {"version": version, "budget": budget}
@@ -76,7 +76,7 @@ def put_budget(request: Request, body: BudgetRequest):
                "layers": {k: format(v, "f") for k, v in layers.items()} if layers else None}
     try:
         repo.write(owner, *RECORD, payload, expected_version=body.expected_version, request_id=body.request_id)
-        budget, version = budget_view(repo, owner, navs=fund_navs(request.app.state.data_dir))
+        budget, version = budget_view(repo, owner, quotes=book_quotes(request.app.state.data_dir))
     except WRITE_ERRORS as exc:
         return write_error(exc)
     return {"version": version, "budget": budget}

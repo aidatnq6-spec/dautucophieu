@@ -50,5 +50,5 @@ Hồ sơ & rủi ro, mục "Sổ tiền gửi và tiền mặt", ngay trước T
 lịch đáo hạn theo tháng, ô thanh khoản. Lưu xong, Tháp tài sản và Dòng tiền thụ động tải lại.
 
 ## Ngoài phạm vi (việc sau)
-Nhắc sổ sắp đáo hạn qua Telegram (đã làm: [nhắc trước 1 ngày](2026-11-06-nhac-so-dao-han-design.md)); nhập file JSON xuất từ VI-TECH; chứng chỉ quỹ theo số đơn vị và NAV công khai; vàng theo khối lượng
+Nhắc sổ sắp đáo hạn qua Telegram (đã làm: [nhắc trước 1 ngày](2026-11-06-nhac-so-dao-han-design.md)); nhập file JSON xuất từ VI-TECH; chứng chỉ quỹ theo số đơn vị và NAV công khai (đã làm: [theo NAV Fmarket](2026-11-06-ccq-theo-nav-design.md)); vàng theo khối lượng
 và giá công khai; tiền số theo số lượng và giá.

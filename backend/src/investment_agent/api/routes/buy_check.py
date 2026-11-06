@@ -8,6 +8,7 @@ from fastapi import APIRouter, Request
 
 from investment_agent.domain.asset_pyramid import asset_pyramid
 from investment_agent.domain.buy_check import buy_flags, three_month_change
+from investment_agent.market.fund_nav import fund_navs
 from investment_agent.market.series import SeriesStore
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.equity_budget import budget_view
@@ -43,7 +44,7 @@ def buy_check(request: Request, symbol: str, amount: str):
         name = ticker["sector"] if ticker else None
         sector = next((s for s in after["sectors"] if s["sector"] == name and len(s["symbols"]) > 1), None)
     try:
-        budget, _ = budget_view(repo, owner)
+        budget, _ = budget_view(repo, owner, navs=fund_navs(request.app.state.data_dir))
     except RepositoryUnavailable:
         return unavailable()
     warnings, stocks_over = [], False

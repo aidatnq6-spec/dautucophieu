@@ -145,3 +145,25 @@ def test_bond_gold_and_crypto_lists_replace_their_hand_entered_layers_and_bond_i
     assert b["layer_sources"] == {"deposit": "book", "bond": "book", "gold": "book", "crypto": "book"}
     income = call(c, clock, "GET", "/internal/passive-income").json()["income"]
     assert income["bond"] == "1150000" and income["bond_default_rate_count"] == 1  # 120 tr × 8% / 12 + 60 tr × 7% (default) / 12
+
+
+def test_a_fund_row_is_valued_at_units_times_the_stored_nav_in_the_book_the_pyramid_and_passive_income(tmp_path):
+    from investment_agent.market.fund_nav import FundNavStore
+    FundNavStore(tmp_path).save({"source": "Fmarket", "funds": {"VFF": {"name": "Quỹ A", "nav": "20000", "date": "2027-01-14"}}})
+    c, clock = client(tmp_path)
+    ok = call(c, clock, "PUT", "/internal/deposit-book", {"deposits": [], "accounts": [], "expected_version": 0, "request_id": "db1",
+                                                         "bonds": [{"id": "a", "name": "Quỹ A", "amount": "50000000", "rate": "8", "fund": "VFF", "units": "3000"},
+                                                                   {"id": "b", "name": "Quỹ B", "amount": "10000000", "rate": None, "fund": "ZZZ", "units": "5"}]})
+    assert ok.status_code == 200
+    rows = ok.json()["bond_values"]
+    assert rows[0] == {"id": "a", "cost": "50000000", "value": "60000000", "source": "nav", "fund": "VFF", "nav": "20000", "nav_date": "2027-01-14",
+                       "stale": False, "change": "10000000"}
+    assert rows[1]["source"] == "no_nav" and rows[1]["value"] == "10000000"
+    assert ok.json()["nav_source"] == "Fmarket"
+    b = call(c, clock, "GET", "/internal/equity-budget").json()["budget"]
+    assert {l["id"]: l["amount"] for l in b["pyramid"]["layers"]}["bond"] == "70000000"
+    income = call(c, clock, "GET", "/internal/passive-income").json()["income"]
+    assert income["bond"] == "458333"  # 60 tr × 8% / 12 + 10 tr × 7% (default) / 12
+    bad = call(c, clock, "PUT", "/internal/deposit-book", {"deposits": [], "accounts": [], "expected_version": 1, "request_id": "db2",
+                                                          "bonds": [{"id": "a", "name": "Quỹ A", "amount": "1", "rate": None, "fund": "VFF"}]})
+    assert bad.status_code == 422

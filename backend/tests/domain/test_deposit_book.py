@@ -52,7 +52,7 @@ def test_a_reserve_exactly_covered_is_enough():
 def test_totals_are_the_principal_of_every_deposit_and_every_account():
     b = book([deposit("a", "2027-03-01"), deposit("old", "2027-01-01", principal="20000000")],
              [{"id": "x", "name": "TK", "amount": "10000000", "liquid": False}])
-    t = totals(b)
+    t = totals(b, {})
     assert t["deposits"] == Decimal("70000000") and t["accounts"] == Decimal("10000000")
 
 
@@ -89,14 +89,14 @@ def test_bonds_gold_and_crypto_are_listed_and_add_up_per_layer():
                                               {"id": "dcbf", "name": "Quỹ trái phiếu B", "amount": "50200000", "rate": None}],
                                     "gold": [{"id": "pnj", "name": "Vàng nhẫn", "amount": "39364000"}],
                                     "crypto": [{"id": "btc", "name": "BTC", "amount": "1000000"}]})
-    t = totals(b)
+    t = totals(b, {})
     assert t["bonds"] == Decimal("100200000") and t["gold"] == Decimal("39364000") and t["crypto"] == Decimal("1000000")
 
 
 def test_bond_income_uses_each_rate_and_the_owner_bond_rate_for_rows_without_one():
     b = DepositBook.model_validate({"bonds": [{"id": "a", "name": "A", "amount": "120000000", "rate": "8"},
                                               {"id": "b", "name": "B", "amount": "60000000", "rate": None}]})
-    assert bond_income(b, default_rate=Decimal("7")) == {"monthly": Decimal("1150000"), "default_rate_count": 1}  # 800.000 + 350.000
+    assert bond_income(b, default_rate=Decimal("7"), navs={}) == {"monthly": Decimal("1150000"), "default_rate_count": 1}  # 800.000 + 350.000
 
 
 @pytest.mark.parametrize("bad", [

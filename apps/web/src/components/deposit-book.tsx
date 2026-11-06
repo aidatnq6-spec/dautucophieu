@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatVnd, groupDigitsInput, parseMoneyInput } from "../lib/format";
 
@@ -81,146 +81,223 @@ export function reservePayload(raw: string): { ok: string | null } | { error: st
   return v === null ? { error: "Quỹ dự phòng: nhập số đồng, hoặc để trống để theo hồ sơ." } : { ok: v };
 }
 
-/** One list of Trái phiếu, Vàng or Tiền số: name and amount per row (bonds also an expected yield), added and removed before Lưu. */
-function HoldingList({ list, rows, onChange, disabled }: { list: keyof HoldingDrafts; rows: (HoldingDraft | BondDraft)[];
-  onChange: (rows: (HoldingDraft | BondDraft)[]) => void; disabled: boolean }) {
-  const label = LIST_NAME[list];
-  const set = (i: number, patch: Partial<BondDraft>) => onChange(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+/** The rows with this one saved: an edited row keeps its place, a new one goes last. */
+export function upsertRow<T extends { id: string }>(rows: T[], row: T): T[] {
+  return rows.some((r) => r.id === row.id) ? rows.map((r) => (r.id === row.id ? row : r)) : [...rows, row];
+}
+
+export function removeRow<T extends { id: string }>(rows: T[], id: string): T[] {
+  return rows.filter((r) => r.id !== id);
+}
+
+type Drafts = { accounts: AccountDraft[]; deposits: DepositDraft[] } & HoldingDrafts;
+type ListKey = keyof Drafts;
+type AnyDraft = AccountDraft | DepositDraft | HoldingDraft | BondDraft;
+type Editing = { list: ListKey; draft: AnyDraft; isNew: boolean } | null;
+type Field = { key: string; label: string; aria: string; kind: "text" | "money" | "rate" | "date" | "check" | "payout"; max?: number;
+  optional?: boolean; yes?: string; no?: string };
+
+const NAME_FIELD = (max: number): Field => ({ key: "name", label: "Tên", aria: "Tên", kind: "text", max });
+const AMOUNT: Field = { key: "amount", label: "Số tiền (đ)", aria: "Số tiền", kind: "money" };
+const FIELDS: Record<ListKey, Field[]> = {
+  accounts: [NAME_FIELD(60), AMOUNT, { key: "liquid", label: "Rút ngay", aria: "Rút ngay", kind: "check", yes: "rút ngay", no: "chưa rút được" }],
+  deposits: [{ key: "bank", label: "Ngân hàng", aria: "Ngân hàng", kind: "text", max: 40 },
+    { key: "matures", label: "Đáo hạn", aria: "Ngày đáo hạn", kind: "date" },
+    { key: "principal", label: "Gốc (đ)", aria: "Tiền gốc", kind: "money" },
+    { key: "rate", label: "Lãi suất %/năm", aria: "Lãi suất", kind: "rate", optional: true },
+    { key: "interest", label: "Lãi dự kiến (đ)", aria: "Lãi dự kiến", kind: "money", optional: true },
+    { key: "payout", label: "Trả lãi", aria: "Cách trả lãi", kind: "payout" },
+    { key: "locked", label: "Phong tỏa", aria: "Phong tỏa đến hạn", kind: "check", yes: "phong tỏa", no: "không" }],
+  bonds: [NAME_FIELD(80), AMOUNT, { key: "rate", label: "Lợi suất %/năm", aria: "Lợi suất", kind: "rate", optional: true }],
+  gold: [NAME_FIELD(80), AMOUNT],
+  crypto: [NAME_FIELD(80), AMOUNT],
+};
+const TABLE_NAME: Record<ListKey, string> = { accounts: "Tài khoản tiền mặt", deposits: "Sổ tiền gửi", ...LIST_NAME };
+const ROW_NAME: Record<ListKey, string> = { accounts: "tài khoản", deposits: "sổ", bonds: "trái phiếu", gold: "vàng", crypto: "tiền số" };
+const ADD_LABEL: Record<ListKey, string> = { accounts: "Thêm tài khoản", deposits: "Thêm sổ", bonds: "Thêm dòng trái phiếu", gold: "Thêm dòng vàng",
+  crypto: "Thêm dòng tiền số" };
+const MAX_ROWS: Record<ListKey, number> = { accounts: 30, deposits: 100, bonds: 30, gold: 30, crypto: 30 };
+const EMPTY: Record<ListKey, () => AnyDraft> = {
+  accounts: () => ({ id: requestId(), name: "", amount: "", liquid: true }),
+  deposits: () => ({ id: requestId(), bank: "", matures: "", principal: "", rate: "", interest: "", payout: "end", locked: true }),
+  bonds: () => ({ id: requestId(), name: "", amount: "", rate: "" }),
+  gold: () => ({ id: requestId(), name: "", amount: "" }),
+  crypto: () => ({ id: requestId(), name: "", amount: "" }),
+};
+const toDrafts = (b: View["book"]): Drafts => ({ accounts: b.accounts.map(toAccountDraft), deposits: b.deposits.map(toDepositDraft), ...toHoldingDrafts(b) });
+const field = (row: AnyDraft, key: string) => (row as unknown as Record<string, string | boolean>)[key];
+
+/** A saved value as read: a blank rate or interest is "chưa nhập", never 0. */
+function shown(f: Field, v: string | boolean) {
+  if (f.kind === "check") return v ? f.yes : <span className="muted">{f.no}</span>;
+  if (f.kind === "payout") return v === "upfront" ? "Đầu kỳ (đã nhận)" : "Cuối kỳ";
+  const text = String(v);
+  if (!text) return <span className="muted">chưa nhập</span>;
+  if (f.kind === "money") return `${text} đ`;
+  if (f.kind === "rate") return `${text}%`;
+  if (f.kind === "date") return `${text.slice(8)}/${text.slice(5, 7)}/${text.slice(0, 4)}`;
+  return text;
+}
+
+function FieldInput({ f, value, label, onChange }: { f: Field; value: string | boolean; label: string; onChange: (v: string | boolean) => void }) {
+  const aria = `${f.aria} ${label}`;
+  if (f.kind === "check") return <input type="checkbox" aria-label={aria} checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />;
+  if (f.kind === "payout") return <select aria-label={aria} value={String(value)} onChange={(e) => onChange(e.target.value)}>
+    <option value="end">Cuối kỳ</option><option value="upfront">Đầu kỳ (đã nhận)</option></select>;
+  if (f.kind === "date") return <input type="date" aria-label={aria} value={String(value)} onChange={(e) => onChange(e.target.value)} />;
+  if (f.kind === "money") return <input aria-label={aria} inputMode="numeric" placeholder={f.optional ? "chưa nhập" : undefined} value={String(value)}
+    onChange={(e) => onChange(groupDigitsInput(e.target.value))} />;
+  if (f.kind === "rate") return <input aria-label={aria} inputMode="decimal" placeholder="chưa nhập" value={String(value)} onChange={(e) => onChange(e.target.value)} />;
+  return <input aria-label={aria} maxLength={f.max} value={String(value)} onChange={(e) => onChange(e.target.value)} />;
+}
+
+/** One list of Sổ tài sản: each saved row read-only with Sửa and Xóa; the row being edited (or added) as inputs with Lưu and Hủy. */
+function RowTable({ list, rows, editing, locked, status, onEdit, onDraft, onSave, onCancel, onDelete }: {
+  list: ListKey; rows: AnyDraft[]; editing: Editing; locked: boolean; status: (id: string) => ReactNode;
+  onEdit: (row: AnyDraft) => void; onDraft: (row: AnyDraft) => void; onSave: () => void; onCancel: () => void; onDelete: (row: AnyDraft, n: number) => void }) {
+  const fields = FIELDS[list];
+  const mine = editing?.list === list ? editing : null;
+  const all = mine?.isNew ? [...rows, mine.draft] : rows;
+  if (!all.length) return <p className="caption">Chưa có dòng nào.</p>;
   return (
-    <>
-      {rows.length > 0 && <table className="fv-table db-table" aria-label={label}>
-        <thead><tr><th>Tên</th><th>Số tiền (đ)</th>{list === "bonds" && <th>Lợi suất %/năm</th>}<th /></tr></thead>
-        <tbody>{rows.map((r, i) => (
-          <tr key={r.id}>
-            <td data-label="Tên"><input aria-label={`Tên ${label.toLowerCase()} ${i + 1}`} maxLength={80} value={r.name} onChange={(e) => set(i, { name: e.target.value })} /></td>
-            <td data-label="Số tiền"><input aria-label={`Số tiền ${label.toLowerCase()} ${i + 1}`} inputMode="numeric" value={r.amount}
-              onChange={(e) => set(i, { amount: groupDigitsInput(e.target.value) })} /></td>
-            {list === "bonds" && <td data-label="Lợi suất"><input aria-label={`Lợi suất trái phiếu ${i + 1}`} inputMode="decimal" placeholder="chưa nhập"
-              value={(r as BondDraft).rate} onChange={(e) => set(i, { rate: e.target.value })} /></td>}
-            <td><button type="button" className="btn" aria-label={`Xóa ${label.toLowerCase()} ${i + 1}`} onClick={() => onChange(rows.filter((_, j) => j !== i))}>
-              <Trash2 size={14} aria-hidden="true" />Xóa</button></td>
-          </tr>))}</tbody>
-      </table>}
-      <button type="button" className="btn" disabled={disabled || rows.length >= 30}
-        onClick={() => onChange([...rows, list === "bonds" ? { id: requestId(), name: "", amount: "", rate: "" } : { id: requestId(), name: "", amount: "" }])}>
-        <Plus size={14} aria-hidden="true" />Thêm dòng {label.toLowerCase()}</button>
-    </>
+    <table className="fv-table db-table" aria-label={TABLE_NAME[list]}>
+      <thead><tr>{fields.map((f) => <th key={f.key}>{f.label}</th>)}<th /></tr></thead>
+      <tbody>{all.map((r, i) => {
+        const draft = mine && mine.draft.id === r.id ? mine.draft : null;
+        const label = `${ROW_NAME[list]} ${i + 1}`;
+        return (
+          <tr key={r.id} className={draft ? "db-editing" : undefined}>
+            {fields.map((f) => <td key={f.key} data-label={f.aria}>
+              {draft ? <FieldInput f={f} label={label} value={field(draft, f.key)} onChange={(v) => onDraft({ ...draft, [f.key]: v } as AnyDraft)} />
+                : <>{shown(f, field(r, f.key))}{f.kind === "date" && status(r.id)}</>}</td>)}
+            <td className="db-actions">{draft ? <>
+              <button type="button" className="btn primary" disabled={locked} onClick={onSave}><Check size={14} aria-hidden="true" />Lưu</button>
+              <button type="button" className="btn" disabled={locked} onClick={onCancel}><X size={14} aria-hidden="true" />Hủy</button>
+            </> : <>
+              <button type="button" className="btn" aria-label={`Sửa ${label}`} disabled={locked || editing !== null} onClick={() => onEdit(r)}>
+                <Pencil size={14} aria-hidden="true" />Sửa</button>
+              <button type="button" className="btn" aria-label={`Xóa ${label}`} disabled={locked || editing !== null} onClick={() => onDelete(r, i + 1)}>
+                <Trash2 size={14} aria-hidden="true" />Xóa</button>
+            </>}</td>
+          </tr>
+        );
+      })}</tbody>
+    </table>
   );
 }
 
 const monthLabel = (m: string) => `${m.slice(5)}/${m.slice(0, 4)}`;
 
 /** Sổ tài sản: cash accounts, term deposits, bonds, gold and crypto; the months deposits come back, and cash now against the reserve.
- * A sổ not yet due is never cash now; one past its date is overdue, not guessed as rolled over or closed. */
+ * A sổ not yet due is never cash now; one past its date is overdue, not guessed as rolled over or closed. Each Lưu or Xóa saves the
+ * whole book at once, so Tháp tài sản recomputes. */
 export function DepositBook({ onSaved }: { onSaved?: () => void }) {
   const [view, setView] = useState<View | null>(null);
-  const [accounts, setAccounts] = useState<AccountDraft[]>([]);
-  const [deposits, setDeposits] = useState<DepositDraft[]>([]);
-  const [holdings, setHoldings] = useState<HoldingDrafts>(NO_HOLDINGS);
-  const [countLedger, setCountLedger] = useState(true);
-  const [reserve, setReserve] = useState("");
+  const [editing, setEditing] = useState<Editing>(null);
+  const [reserveDraft, setReserveDraft] = useState<string | null>(null);  // null = not editing the reserve
+  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  function show(v: View) {
-    setView(v);
-    setCountLedger(v.book.count_ledger_cash);
-    setReserve(v.book.reserve === null ? "" : money(v.book.reserve));
-    setAccounts(v.book.accounts.map(toAccountDraft));
-    setDeposits(v.book.deposits.map(toDepositDraft));
-    setHoldings(toHoldingDrafts(v.book));
-  }
-  useEffect(() => { api<View>("deposit-book").then(show, (e) => setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
-  async function save() {
-    if (!view) return;
-    const r = bookPayload(accounts, deposits, holdings);
-    if ("error" in r) { setMessage(r.error); return; }
-    const res = reservePayload(reserve);
-    if ("error" in res) { setMessage(res.error); return; }
+  useEffect(() => { api<View>("deposit-book").then(setView, (e) => setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
+  const saved = view ? toDrafts(view.book) : null;
+
+  async function put(drafts: Drafts, countLedger: boolean, reserve: string | null): Promise<boolean> {
+    if (!view) return false;
+    const r = bookPayload(drafts.accounts, drafts.deposits, drafts);
+    if ("error" in r) { setMessage(r.error); return false; }
+    setBusy(true);
     try {
-      show(await api<View>("deposit-book", { method: "PUT", body: { ...r.ok, count_ledger_cash: countLedger, reserve: res.ok, expected_version: view.version, request_id: requestId() } }));
+      setView(await api<View>("deposit-book", { method: "PUT", body: { ...r.ok, count_ledger_cash: countLedger, reserve, expected_version: view.version,
+        request_id: requestId() } }));
       setMessage(null);
       onSaved?.();
-    } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); }
+      return true;
+    } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); return false; }
+    finally { setBusy(false); }
   }
-  const setAccount = (i: number, patch: Partial<AccountDraft>) => setAccounts(accounts.map((a, j) => (j === i ? { ...a, ...patch } : a)));
-  const setDeposit = (i: number, patch: Partial<DepositDraft>) => setDeposits(deposits.map((d, j) => (j === i ? { ...d, ...patch } : d)));
+  async function saveRow() {
+    if (!view || !saved || !editing) return;
+    const next = { ...saved, [editing.list]: upsertRow(saved[editing.list] as AnyDraft[], editing.draft) } as Drafts;
+    if (await put(next, view.book.count_ledger_cash, view.book.reserve)) setEditing(null);
+  }
+  async function deleteRow(list: ListKey, row: AnyDraft, n: number) {
+    if (!view || !saved || !window.confirm(`Xóa ${ROW_NAME[list]} ${n}? Sổ tài sản lưu ngay và Tháp tài sản tính lại.`)) return;
+    await put({ ...saved, [list]: removeRow(saved[list] as AnyDraft[], row.id) } as Drafts, view.book.count_ledger_cash, view.book.reserve);
+  }
+  async function saveReserve(raw: string | null) {
+    if (!view || !saved) return;
+    const r = raw === null ? { ok: null } : reservePayload(raw);
+    if ("error" in r) { setMessage(r.error); return; }
+    if (await put(saved, view.book.count_ledger_cash, r.ok)) setReserveDraft(null);
+  }
+  const cancel = () => { setEditing(null); setReserveDraft(null); setMessage(null); };
+  const locked = !view || busy;
   const status = (id: string) => view?.calendar.overdue.includes(id) ? <span className="pill bad">quá hạn, cần cập nhật</span>
     : view?.calendar.due_soon.includes(id) ? <span className="pill warn">sắp đến hạn</span> : null;
+  const alert = message && <p className="errors" role="alert">{message}</p>;
+  const table = (list: ListKey) => saved && <>
+    <RowTable list={list} rows={saved[list] as AnyDraft[]} editing={editing} locked={locked} status={status}
+      onEdit={(row) => { setReserveDraft(null); setMessage(null); setEditing({ list, draft: row, isNew: false }); }}
+      onDraft={(draft) => setEditing({ list, draft, isNew: editing?.isNew ?? false })}
+      onSave={() => void saveRow()} onCancel={cancel} onDelete={(row, n) => void deleteRow(list, row, n)} />
+    {editing?.list === list && alert}
+    <button type="button" className="btn" disabled={locked || editing !== null || saved[list].length >= MAX_ROWS[list]}
+      onClick={() => { setReserveDraft(null); setMessage(null); setEditing({ list, draft: EMPTY[list](), isNew: true }); }}>
+      <Plus size={14} aria-hidden="true" />{ADD_LABEL[list]}</button>
+  </>;
   const l = view?.liquidity;
+  const reserve = view?.book.reserve ?? null;
   return (
     <section className="surface db" aria-label="Sổ tài sản">
       <h2>Sổ tài sản</h2>
       <p className="caption wrap">Ghi chi tiết tài khoản tiền mặt ngoài tài khoản chứng khoán, sổ tiết kiệm, trái phiếu và chứng chỉ quỹ, vàng, tiền số.
-        Đã lưu sổ thì Tháp tài sản lấy mọi lớp từ đây: mỗi lớp là tổng danh sách của nó, danh sách trống là 0; các số nhập tay trước đó không còn được
-        tính. Tài khoản tiền mặt cộng vào lớp Tiền mặt. Ô lãi hay lợi suất để trống là chưa nhập, không phải 0. Sổ chưa đến hạn không bao giờ được
-        tính là tiền rút ngay.</p>
+        Tháp tài sản lấy mọi lớp từ đây: mỗi lớp là tổng danh sách của nó, danh sách trống là 0. Bấm Sửa để đổi một dòng rồi Lưu, Thêm để mở dòng
+        mới; Xóa hỏi lại rồi xóa. Mỗi lần lưu hay xóa, Tháp tài sản tính lại. Ô lãi hay lợi suất để trống là chưa nhập, không phải 0. Sổ chưa đến
+        hạn không bao giờ được tính là tiền rút ngay.</p>
 
       <h3>Quỹ dự phòng</h3>
-      <label className="field">Quỹ dự phòng và khoản chi 12 tháng (đ)<input inputMode="numeric" value={reserve} disabled={!view}
-        onChange={(e) => setReserve(groupDigitsInput(e.target.value))}
-        placeholder={view ? `để trống = theo hồ sơ (${formatVnd(view.profile_reserve)})` : "để trống = theo hồ sơ"} /></label>
-      <p className="caption wrap">Lớp dưới cùng của Tháp tài sản, và mốc để so thanh khoản bên dưới. Để trống thì lấy quỹ dự phòng và khoản chi
-        trong 12 tháng ở hồ sơ đã xác nhận.</p>
+      {reserveDraft === null ? <div className="db-reserve">
+        <span>Quỹ dự phòng và khoản chi 12 tháng: <strong data-testid="book-reserve">{view ? formatVnd(reserve ?? view.profile_reserve) : ""}</strong>
+          {view && reserve === null && <span className="caption"> (theo hồ sơ)</span>}</span>
+        <span className="db-actions">
+          <button type="button" className="btn" aria-label="Sửa quỹ dự phòng" disabled={locked || editing !== null}
+            onClick={() => { setMessage(null); setReserveDraft(reserve === null ? "" : money(reserve)); }}><Pencil size={14} aria-hidden="true" />Sửa</button>
+          {reserve !== null && <button type="button" className="btn" aria-label="Xóa quỹ dự phòng" disabled={locked || editing !== null}
+            onClick={() => { if (window.confirm("Xóa số quỹ dự phòng đã nhập? Tháp tài sản sẽ dùng số theo hồ sơ.")) void saveReserve(null); }}>
+            <Trash2 size={14} aria-hidden="true" />Xóa</button>}
+        </span>
+      </div> : <div className="db-reserve">
+        <label className="field">Quỹ dự phòng và khoản chi 12 tháng (đ)<input inputMode="numeric" value={reserveDraft}
+          onChange={(e) => setReserveDraft(groupDigitsInput(e.target.value))}
+          placeholder={view ? `để trống = theo hồ sơ (${formatVnd(view.profile_reserve)})` : "để trống = theo hồ sơ"} /></label>
+        <span className="db-actions">
+          <button type="button" className="btn primary" disabled={locked} onClick={() => void saveReserve(reserveDraft)}><Check size={14} aria-hidden="true" />Lưu</button>
+          <button type="button" className="btn" disabled={locked} onClick={cancel}><X size={14} aria-hidden="true" />Hủy</button>
+        </span>
+      </div>}
+      {reserveDraft !== null && alert}
+      <p className="caption wrap">Lớp dưới cùng của Tháp tài sản, và mốc để so thanh khoản bên dưới. Chưa nhập hoặc đã xóa thì lấy quỹ dự phòng và
+        khoản chi trong 12 tháng ở hồ sơ đã xác nhận.</p>
 
       <h3>Tài khoản tiền mặt</h3>
-      {accounts.length > 0 && <table className="fv-table db-table" aria-label="Tài khoản tiền mặt">
-        <thead><tr><th>Tên</th><th>Số tiền (đ)</th><th>Rút ngay</th><th /></tr></thead>
-        <tbody>{accounts.map((a, i) => (
-          <tr key={a.id}>
-            <td data-label="Tên"><input aria-label={`Tên tài khoản ${i + 1}`} maxLength={60} value={a.name} onChange={(e) => setAccount(i, { name: e.target.value })} /></td>
-            <td data-label="Số tiền"><input aria-label={`Số tiền tài khoản ${i + 1}`} inputMode="numeric" value={a.amount}
-              onChange={(e) => setAccount(i, { amount: groupDigitsInput(e.target.value) })} /></td>
-            <td data-label="Rút ngay"><input type="checkbox" aria-label={`Tài khoản ${i + 1} rút ngay được`} checked={a.liquid}
-              onChange={(e) => setAccount(i, { liquid: e.target.checked })} /></td>
-            <td><button type="button" className="btn" aria-label={`Xóa tài khoản ${i + 1}`} onClick={() => setAccounts(accounts.filter((_, j) => j !== i))}>
-              <Trash2 size={14} aria-hidden="true" />Xóa</button></td>
-          </tr>))}</tbody>
-      </table>}
-      <label className="db-check"><input type="checkbox" checked={countLedger} disabled={!view} onChange={(e) => setCountLedger(e.target.checked)} />
+      {table("accounts")}
+      <label className="db-check"><input type="checkbox" checked={view?.book.count_ledger_cash ?? true} disabled={locked || editing !== null}
+        onChange={(e) => { if (view && saved) void put(saved, e.target.checked, view.book.reserve); }} />
         Cộng thêm tiền mặt trong tài khoản chứng khoán tính từ sổ giao dịch</label>
       <p className="caption wrap">Bỏ chọn khi các tài khoản ở trên đã là toàn bộ tiền mặt của bạn (ví dụ tiền trong tài khoản chứng khoán chính là iPower):
-        lớp Tiền mặt và ô Thanh khoản chỉ lấy các tài khoản này, không đếm hai lần. Lưu để áp dụng.</p>
-      <button type="button" className="btn" disabled={!view || accounts.length >= 30}
-        onClick={() => setAccounts([...accounts, { id: requestId(), name: "", amount: "", liquid: true }])}><Plus size={14} aria-hidden="true" />Thêm tài khoản</button>
+        lớp Tiền mặt và ô Thanh khoản chỉ lấy các tài khoản này, không đếm hai lần. Lưu ngay khi đổi.</p>
 
       <h3>Sổ tiền gửi</h3>
-      {deposits.length > 0 && <table className="fv-table db-table" aria-label="Sổ tiền gửi">
-        <thead><tr><th>Ngân hàng</th><th>Đáo hạn</th><th>Gốc (đ)</th><th>Lãi suất %/năm</th><th>Lãi dự kiến (đ)</th><th>Trả lãi</th><th>Phong tỏa</th><th /></tr></thead>
-        <tbody>{deposits.map((d, i) => (
-          <tr key={d.id}>
-            <td data-label="Ngân hàng"><input aria-label={`Ngân hàng sổ ${i + 1}`} maxLength={40} value={d.bank} onChange={(e) => setDeposit(i, { bank: e.target.value })} /></td>
-            <td data-label="Đáo hạn"><input type="date" aria-label={`Ngày đáo hạn sổ ${i + 1}`} value={d.matures} onChange={(e) => setDeposit(i, { matures: e.target.value })} />
-              {status(d.id)}</td>
-            <td data-label="Gốc"><input aria-label={`Tiền gốc sổ ${i + 1}`} inputMode="numeric" value={d.principal}
-              onChange={(e) => setDeposit(i, { principal: groupDigitsInput(e.target.value) })} /></td>
-            <td data-label="Lãi suất"><input aria-label={`Lãi suất sổ ${i + 1}`} inputMode="decimal" placeholder="chưa nhập" value={d.rate}
-              onChange={(e) => setDeposit(i, { rate: e.target.value })} /></td>
-            <td data-label="Lãi dự kiến"><input aria-label={`Lãi dự kiến sổ ${i + 1}`} inputMode="numeric" placeholder="chưa nhập" value={d.interest}
-              onChange={(e) => setDeposit(i, { interest: groupDigitsInput(e.target.value) })} /></td>
-            <td data-label="Trả lãi"><select aria-label={`Cách trả lãi sổ ${i + 1}`} value={d.payout} onChange={(e) => setDeposit(i, { payout: e.target.value as "end" | "upfront" })}>
-              <option value="end">Cuối kỳ</option><option value="upfront">Đầu kỳ (đã nhận)</option></select></td>
-            <td data-label="Phong tỏa"><input type="checkbox" aria-label={`Sổ ${i + 1} phong tỏa đến hạn`} checked={d.locked}
-              onChange={(e) => setDeposit(i, { locked: e.target.checked })} /></td>
-            <td><button type="button" className="btn" aria-label={`Xóa sổ ${i + 1}`} onClick={() => setDeposits(deposits.filter((_, j) => j !== i))}>
-              <Trash2 size={14} aria-hidden="true" />Xóa</button></td>
-          </tr>))}</tbody>
-      </table>}
-      <button type="button" className="btn" disabled={!view || deposits.length >= 100}
-        onClick={() => setDeposits([...deposits, { id: requestId(), bank: "", matures: "", principal: "", rate: "", interest: "", payout: "end", locked: true }])}>
-        <Plus size={14} aria-hidden="true" />Thêm sổ</button>
+      {table("deposits")}
 
       <h3>Trái phiếu và chứng chỉ quỹ</h3>
       <p className="caption wrap">Lợi suất là mức bạn kỳ vọng mỗi năm, dùng cho Dòng tiền thụ động; để trống thì dùng lãi suất trái phiếu ở mục đó.
         Hiệu suất năm trước không phải lợi suất bảo đảm.</p>
-      <HoldingList list="bonds" rows={holdings.bonds} disabled={!view} onChange={(rows) => setHoldings({ ...holdings, bonds: rows as BondDraft[] })} />
+      {table("bonds")}
       <h3>Vàng</h3>
-      <HoldingList list="gold" rows={holdings.gold} disabled={!view} onChange={(rows) => setHoldings({ ...holdings, gold: rows })} />
+      {table("gold")}
       <h3>Tiền số</h3>
-      <HoldingList list="crypto" rows={holdings.crypto} disabled={!view} onChange={(rows) => setHoldings({ ...holdings, crypto: rows })} />
-
-      <div className="actions">
-        <button type="button" className="btn primary" disabled={!view} onClick={() => void save()}><Save size={16} aria-hidden="true" />Lưu sổ tài sản</button>
-      </div>
-      {message && <p className="errors" role="alert">{message}</p>}
+      {table("crypto")}
+      {!editing && reserveDraft === null && alert}
 
       {view && view.calendar.months.length > 0 && <>
         <h3>Lịch đáo hạn</h3>

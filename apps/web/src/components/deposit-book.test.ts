@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { bookPayload, reservePayload, type AccountDraft, type BondDraft, type DepositDraft, type HoldingDraft } from "./deposit-book";
+import { bookPayload, removeRow, reservePayload, upsertRow, type AccountDraft, type BondDraft, type DepositDraft, type HoldingDraft } from "./deposit-book";
 
 const depo = (d: Partial<DepositDraft> = {}): DepositDraft => ({ id: "a", bank: "Ngân hàng A", matures: "2027-03-05", principal: "50.000.000", rate: "",
   interest: "", payout: "end", locked: true, ...d });
@@ -44,4 +44,12 @@ it("takes the reserve in whole đồng, a blank one meaning the profile's figure
   expect(reservePayload(" 120.000.000 ")).toEqual({ ok: "120000000" });
   expect(reservePayload("12,5")).toEqual({ error: "Quỹ dự phòng: nhập số đồng, hoặc để trống để theo hồ sơ." });
   expect(reservePayload("abc")).toEqual({ error: "Quỹ dự phòng: nhập số đồng, hoặc để trống để theo hồ sơ." });
+});
+
+it("saves one row at a time: an edited row keeps its place, a new one goes last, a deleted one leaves the rest as they were", () => {
+  const rows = [item({ id: "a" }), item({ id: "b", name: "Vàng miếng" })];
+  expect(upsertRow(rows, item({ id: "b", amount: "1.000" }))).toEqual([item({ id: "a" }), item({ id: "b", amount: "1.000" })]);
+  expect(upsertRow(rows, item({ id: "c" })).map((r) => r.id)).toEqual(["a", "b", "c"]);
+  expect(removeRow(rows, "a")).toEqual([item({ id: "b", name: "Vàng miếng" })]);
+  expect(removeRow(rows, "z")).toEqual(rows);
 });

@@ -73,6 +73,8 @@ def main() -> int:
     sectors = commands.add_parser("industries", help="save ICB level-2 sectors of the synced tickers for the market page")
     sectors.add_argument("--symbols", required=True, help="comma-separated tickers, or @file with one ticker per line")
     sectors.add_argument("--output", type=Path, required=True)
+    deposits = commands.add_parser("deposit-alerts", help="Sổ tiết kiệm: Telegram once per sổ from the day before it matures")
+    deposits.add_argument("--data-dir", type=Path, required=True)
     contrib = commands.add_parser("contribution-remind", help="Góp vốn đều: Telegram once a month from the contribution day until it is met")
     contrib.add_argument("--data-dir", type=Path, required=True)
     drawdown = commands.add_parser("drawdown-check", help="full price history for drawdowns; Telegram when a holding falls past the threshold")
@@ -128,6 +130,8 @@ def main() -> int:
         return run_backup(args.data_dir, args.backup_dir, args.kind)
     if args.command == "scheduled-run":
         return scheduled_run(args.calendar, args.data_dir)
+    if args.command == "deposit-alerts":
+        return deposit_alerts_cli(args.data_dir)
     if args.command == "contribution-remind":
         return contribution_cli(args.data_dir)
     if args.command == "drawdown-check":
@@ -611,6 +615,25 @@ def _http_text(url: str) -> str:
     response = httpx.get(url, timeout=30, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
     response.raise_for_status()
     return response.text
+
+
+def deposit_alerts_cli(data_dir: Path) -> int:
+    """Nhắc sổ tiết kiệm đáo hạn over Telegram; skipped (the book is not read) while scheduled delivery is off."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from investment_agent.services.deposit_alerts import deposit_alerts_run
+    from investment_agent.services.deposit_book import read_book
+
+    telegram = _scheduled_telegram(data_dir)
+    if telegram is None:
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
+        return 0
+    send, repo, owner = telegram
+    book, _ = read_book(repo, owner)
+    out = deposit_alerts_run(data_dir, book=book, send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
+    print(json.dumps(out))  # counts only, never the book
+    return 0
 
 
 def insider_alerts_cli(data_dir: Path) -> int:

@@ -31,3 +31,11 @@ def test_sections_pass_through_and_no_snapshot_gives_none():
     v = market_view(SNAP, watched=[], held=set())
     assert v["proprietary"]["reason"] == "Chưa có nguồn miễn phí" and v["hose"]["status"] == "missing" and v["session_date"] == "2026-10-26"
     assert market_view(None, watched=[], held=set()) is None
+
+
+def test_the_session_shape_and_hose_value_pass_through_and_older_snapshots_name_them_missing():
+    shape = {"status": "ok", "range": {}, "streak": {}, "volume": {"status": "missing", "reason": "x"}}
+    v = market_view({**SNAP, "index_session": shape, "hose_liquidity": {"status": "missing", "reason": "HOSE chưa công bố"}}, watched=[], held=set())
+    assert v["index_session"] == shape and v["hose_liquidity"]["reason"] == "HOSE chưa công bố"
+    old = market_view(SNAP, watched=[], held=set())  # snapshots stored before this feature
+    assert old["index_session"]["status"] == "missing" and old["hose_liquidity"]["status"] == "missing"

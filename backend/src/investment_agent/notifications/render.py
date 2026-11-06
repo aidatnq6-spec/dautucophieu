@@ -37,6 +37,33 @@ def _missing(name: str, section: dict | None) -> str:
     return f"{name}: chưa có số liệu ({(section or {}).get('reason', 'không rõ lý do')})"
 
 
+def _session_lines(shape: dict | None) -> list[str]:
+    """VN-Index's range, its run of sessions and matched volume against its base (brief.session_shape); numbers only."""
+    if not shape or shape.get("status") != "ok":
+        return [_missing("Trong phiên", shape)] if shape else []
+    r, k, v = shape["range"], shape["streak"], shape["volume"]
+    lines = [f"Trong phiên: cao {_num(r['high'])} · thấp {_num(r['low'])} · đóng cửa cách đỉnh {_num(r['from_high'])} điểm, "
+             f"cách đáy {_num(r['from_low'])} điểm"]
+    if k["direction"] == "flat":
+        lines.append("Chuỗi: đứng giá so với phiên trước")
+    elif k["direction"]:
+        word = "tăng" if k["direction"] == "up" else "giảm"
+        lines.append(f"Chuỗi: {word} ít nhất {k['sessions']} phiên liên tiếp" if k["at_least"]
+                     else f"Chuỗi: {word} {k['sessions']} phiên liên tiếp, {_num(k['change'], sign=True)} điểm ({_pct(k['pct'])})")
+    lines.append(_base_line(f"Khối lượng khớp lệnh: {_num(v['today'], 0)} cp", v, "change_pct") if v.get("status") == "ok"
+                 else _missing("Khối lượng khớp lệnh", v))
+    return lines
+
+
+def _base_line(head: str, figures: dict, change_key: str) -> str:
+    parts = [head]
+    if figures.get(change_key) is not None:
+        parts.append(f"{_pct(figures[change_key])} so với phiên trước")
+    if figures.get("ratio20") is not None:
+        parts.append(f"bằng {_num(figures['ratio20'])} lần trung bình 20 phiên")
+    return ", ".join(parts)
+
+
 def render_market_brief(report: dict, market: dict) -> str:
     """Short phone version agreed on 2026-10-26: market first, holdings' prices, a few news, one portfolio line, reminders."""
     day = report["session_date"]
@@ -45,13 +72,19 @@ def render_market_brief(report: dict, market: dict) -> str:
         name = "VN-Index" if row["id"] == "VNINDEX" else row["id"]
         lines.append(f"{name} {_num(row['close'])} ({_num(row['change'], sign=True)} điểm, {_pct(row['pct'])})" if row["status"] == "ok"
                      else _missing(name, row))
+    lines += _session_lines(market.get("index_session"))
     board, hose = market.get("board") or {}, market.get("hose") or {}
     if board.get("status") == "ok":
         b, f = board["breadth"], board["foreign"]
         lines += [f"Giá trị khớp lệnh HOSE: {_num(board['value_matched_bn'])} tỷ đồng ({_num(board['volume_matched'], 0)} cp)"]
         if hose.get("status") == "ok":
-            lines.append(f"HOSE công bố tổng (gồm thỏa thuận): {_num(hose['total_value_bn'])} tỷ đồng")
-        lines += [f"Độ rộng: {b['up']} tăng · {b['down']} giảm · {b['flat']} đứng giá · {b['no_trade']} không giao dịch",
+            value = market.get("hose_liquidity") or {}
+            head = f"HOSE công bố tổng (gồm thỏa thuận): {_num(hose['total_value_bn'])} tỷ đồng"
+            lines.append(_base_line(head, value, "change_pct") if value.get("status") == "ok" else head)
+        lines += [f"Độ rộng: {b['up']} tăng · {b['down']} giảm · {b['flat']} đứng giá · {b['no_trade']} không giao dịch"]
+        if board["sectors"]:
+            lines.append(f"Ngành tăng: {sum(1 for s in board['sectors'] if float(s['pct']) > 0)}/{len(board['sectors'])}")
+        lines += [
                   f"Khối ngoại: mua {_num(f['buy_value_bn'])} tỷ · bán {_num(f['sell_value_bn'])} tỷ · ròng {_num(f['net_value_bn'], sign=True)} tỷ"]
         if f["top_sell"]:
             lines.append("Bán ròng mạnh: " + "; ".join(f"{x['symbol']} {_num(x['net_value_bn'], sign=True)} tỷ" for x in f["top_sell"]))

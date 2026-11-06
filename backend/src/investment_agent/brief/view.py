@@ -33,6 +33,8 @@ def market_view(snapshot: dict | None, *, watched: list[str], held: set[str], ne
         news = {"status": "ok", "items": pick_news(news["items"], watched=watched, held=held, sector_names=sector_names, limit=news_limit)}
     view = {k: snapshot.get(k) for k in ("session_date", "updated_at", "indices", "hose", "proprietary")}
     view["board"] = {k: v for k, v in board.items() if k != "symbols"}
+    for name in ("index_session", "hose_liquidity"):  # snapshots stored before 06/11/2026 have neither
+        view[name] = snapshot.get(name) or {"status": "missing", "reason": "Ảnh chụp phiên này chưa có mục này"}
     return {**view, "tickers": first + others, "news": news}
 
 

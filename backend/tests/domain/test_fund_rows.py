@@ -25,7 +25,7 @@ def test_a_fund_row_is_worth_its_units_times_the_latest_nav_and_shows_the_change
     assert rows[1] == {"id": "b", "cost": "50000000", "value": "50000000", "source": "amount"}
     assert rows[2] == {"id": "c", "cost": "50000000", "value": "50000000", "source": "no_nav", "fund": "NONE"}  # never a guessed NAV
     assert rows[3]["stale"] is True and rows[3]["value"] == "50000000"  # NAV of 20/10 is more than 14 days old
-    assert totals(b, NAVS)["bonds"] == Decimal("201722480")
+    assert totals(b, {"funds": NAVS})["bonds"] == Decimal("201722480")
     assert bond_income(b, default_rate=Decimal("7"), navs=NAVS)["monthly"] == (Decimal("51722480") * 7 + Decimal("100000000") * 7
                                                                              + Decimal("50000000") * 6) / 100 / 12
 

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { bookPayload, removeRow, reservePayload, upsertRow, type AccountDraft, type BondDraft, type DepositDraft, type HoldingDraft } from "./deposit-book";
+import { bookPayload, removeRow, reservePayload, upsertRow, type AccountDraft, type BondDraft, type DepositDraft, type GoldDraft, type HoldingDraft } from "./deposit-book";
 
 const depo = (d: Partial<DepositDraft> = {}): DepositDraft => ({ id: "a", bank: "Ngân hàng A", matures: "2027-03-05", principal: "50.000.000", rate: "",
   interest: "", payout: "end", locked: true, ...d });
@@ -24,18 +24,19 @@ it("names the row that cannot be saved", () => {
 
 const bond = (b: Partial<BondDraft> = {}): BondDraft => ({ id: "f", name: "Quỹ trái phiếu", amount: "50.000.000", rate: "", fund: "", units: "", ...b });
 const item = (h: Partial<HoldingDraft> = {}): HoldingDraft => ({ id: "g", name: "Vàng nhẫn", amount: "39.364.000", ...h });
+const gold = (g: Partial<GoldDraft> = {}): GoldDraft => ({ ...item(), kind: "", chi: "", ...g });
 
 it("adds bonds, gold and crypto, a blank bond rate staying unknown", () => {
-  const r = bookPayload([], [], { bonds: [bond({ rate: "7,4" }), bond({ id: "f2" })], gold: [item()], crypto: [item({ id: "c", name: "BTC", amount: "1.000" })] });
+  const r = bookPayload([], [], { bonds: [bond({ rate: "7,4" }), bond({ id: "f2" })], gold: [gold()], crypto: [item({ id: "c", name: "BTC", amount: "1.000" })] });
   expect(r).toEqual({ ok: { accounts: [], deposits: [], bonds: [{ id: "f", name: "Quỹ trái phiếu", amount: "50000000", rate: "7.4", fund: null, units: null },
-    { id: "f2", name: "Quỹ trái phiếu", amount: "50000000", rate: null, fund: null, units: null }], gold: [{ id: "g", name: "Vàng nhẫn", amount: "39364000" }],
+    { id: "f2", name: "Quỹ trái phiếu", amount: "50000000", rate: null, fund: null, units: null }], gold: [{ id: "g", name: "Vàng nhẫn", amount: "39364000", kind: null, chi: null }],
     crypto: [{ id: "c", name: "BTC", amount: "1000" }] } });
 });
 
 it("names the bond, gold or crypto row that cannot be saved", () => {
   expect(bookPayload([], [], { bonds: [bond({ amount: "" })], gold: [], crypto: [] })).toEqual({ error: "Trái phiếu 1: nhập số tiền (đồng)." });
   expect(bookPayload([], [], { bonds: [bond({ rate: "40" })], gold: [], crypto: [] })).toEqual({ error: "Trái phiếu 1: lợi suất từ 0 đến 30%/năm, hoặc để trống." });
-  expect(bookPayload([], [], { bonds: [], gold: [item({ name: "" })], crypto: [] })).toEqual({ error: "Vàng 1: nhập tên." });
+  expect(bookPayload([], [], { bonds: [], gold: [gold({ name: "" })], crypto: [] })).toEqual({ error: "Vàng 1: nhập tên." });
   expect(bookPayload([], [], { bonds: [], gold: [], crypto: [item(), item({ id: "d", amount: "x" })] })).toEqual({ error: "Tiền số 2: nhập số tiền (đồng)." });
 });
 
@@ -63,4 +64,14 @@ it("takes a fund code with its units, written the Vietnamese way, and refuses on
   expect(err({ units: "10" })).toEqual({ error: "Trái phiếu 1: nhập cả mã quỹ và số đơn vị, hoặc để trống cả hai." });
   expect(err({ fund: "VFF", units: "1,234" })).toEqual({ error: "Trái phiếu 1: số đơn vị lớn hơn 0, tối đa 2 chữ số thập phân." });
   expect(err({ fund: "V F F", units: "1" })).toEqual({ error: "Trái phiếu 1: mã quỹ như trên Fmarket, ví dụ VFF hoặc VCBF-FIF." });
+});
+
+it("takes a gold kind with its chi, and refuses one without the other", () => {
+  const ok = bookPayload([], [], { bonds: [], gold: [gold({ kind: "Nhẫn tròn Phú Quý 999.9", chi: "2,5" })], crypto: [] });
+  expect(ok).toEqual({ ok: { accounts: [], deposits: [], bonds: [], gold: [{ id: "g", name: "Vàng nhẫn", amount: "39364000",
+    kind: "Nhẫn tròn Phú Quý 999.9", chi: "2.5" }], crypto: [] } });
+  const err = (g: Partial<GoldDraft>) => bookPayload([], [], { bonds: [], gold: [gold(g)], crypto: [] });
+  expect(err({ kind: "Vàng miếng SJC" })).toEqual({ error: "Vàng 1: chọn cả loại giá và số chỉ, hoặc để trống cả hai." });
+  expect(err({ chi: "1" })).toEqual({ error: "Vàng 1: chọn cả loại giá và số chỉ, hoặc để trống cả hai." });
+  expect(err({ kind: "Vàng miếng SJC", chi: "1,255" })).toEqual({ error: "Vàng 1: số chỉ lớn hơn 0, tối đa 2 chữ số thập phân." });
 });

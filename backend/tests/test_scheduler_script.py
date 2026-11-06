@@ -63,3 +63,7 @@ def test_deposit_reminder_runs_on_every_wake_up():
 
 def test_fund_navs_are_synced_on_every_wake_up():
     assert any("investment_agent.cli fund-nav-sync" in l for l in lines())
+
+
+def test_gold_prices_are_synced_on_every_wake_up():
+    assert any("investment_agent.cli gold-price-sync" in l for l in lines())

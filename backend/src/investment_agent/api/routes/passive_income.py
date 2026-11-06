@@ -14,11 +14,10 @@ from investment_agent.domain.models import ContractModel
 from investment_agent.domain.ledger import replay
 from investment_agent.domain.passive_income import income_by_layer, passive_income
 from investment_agent.market.corporate_events import EventStore
-from investment_agent.market.fund_nav import fund_navs
 from investment_agent.market.leading import MacroStore
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.contributions import PLAN as CONTRIBUTION_PLAN
-from investment_agent.services.deposit_book import read_book
+from investment_agent.services.deposit_book import book_quotes, read_book
 from investment_agent.services.equity_budget import budget_view
 from investment_agent.services.records import LedgerBook, read_version
 
@@ -59,7 +58,7 @@ def _view(request: Request, repo, owner) -> dict:
     deposits = MacroStore(Path(data_dir)).read("deposit_12m") if data_dir is not None else []
     default_rate = deposits[-1]["value"] if deposits else None
     record = read_version(repo, owner, *RECORD, None)
-    budget, _ = budget_view(repo, owner, navs=fund_navs(request.app.state.data_dir))
+    budget, _ = budget_view(repo, owner, quotes=book_quotes(request.app.state.data_dir))
     capital = Decimal(budget["base"]) if budget.get("status") == "ok" else None
     plan = read_version(repo, owner, *CONTRIBUTION_PLAN, None)
     contribution = Decimal(plan.payload["amount"]) if plan else Decimal(0)
@@ -74,7 +73,7 @@ def _view(request: Request, repo, owner) -> dict:
         bond_rate = (record.payload.get("bond_rate") if record else None) or BOND_RATE
         bonds = None
         if (budget.get("layer_sources") or {}).get("bond") == "book":  # each row at its own rate; the owner's bond rate for the rest, counted
-            bonds = bond_income(read_book(repo, owner)[0], default_rate=Decimal(bond_rate), navs=fund_navs(request.app.state.data_dir))
+            bonds = bond_income(read_book(repo, owner)[0], default_rate=Decimal(bond_rate), navs=book_quotes(request.app.state.data_dir)["funds"])
         income = income_by_layer(deposit=layers.get("deposit", Decimal(0)), deposit_rate=Decimal(default_rate), bond=layers.get("bond", Decimal(0)),
                                  bond_rate=Decimal(bond_rate), dividends_12m=dividends_last_year(data_dir, repo, owner, today),
                                  stocks=layers.get("stocks", Decimal(0)),

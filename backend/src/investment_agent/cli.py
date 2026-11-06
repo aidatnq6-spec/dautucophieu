@@ -995,9 +995,15 @@ def brief_snapshot_cli(data_dir: Path, calendar_path: Path, *, listing=None, boa
         return fresh
 
     series = SeriesStore(data_dir / "trend-sources")
+    earlier = list(cal.sessions(max(cal.first, session - timedelta(days=120)), session - timedelta(days=1)))[-60:]
+
+    def index_bars():  # VN-Index daily bars from the price store (market-sync --index, KBS); public data
+        from investment_agent.market.prices import PriceStore
+        return {day: {"high": bar.high, "low": bar.low, "close": bar.close, "volume": bar.volume}
+                for day, (bar, _) in PriceStore(data_dir).latest("VNINDEX").items()}
     snap = build_snapshot(session_date=session, previous_session=_previous_session(cal, session), now=now, listing=cached_listing,
                           board=board, series=lambda index_id: series.read(f"{index_id}-1d"), hose_get=http_get, rss_get=http_get,
-                          store=BriefStore(data_dir))
+                          store=BriefStore(data_dir), earlier=earlier, index_bars=index_bars)
     print(json.dumps({"status": "ok", "session": session.isoformat(),
                       "sections": {k: v["status"] for k, v in snap.items() if isinstance(v, dict) and "status" in v}}, ensure_ascii=False))
     return 0

@@ -14,6 +14,7 @@ from .board import summarise_board
 from .hose import parse_hose
 from .indices import IDS, index_rows
 from .news import FEEDS, parse_rss, window_items
+from .session_shape import hose_liquidity, index_session
 
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
 CLOSE = time(15, 0)
@@ -59,7 +60,8 @@ def _missing(reason: str) -> dict:
 
 
 def build_snapshot(*, session_date: date, previous_session: date | None, now: datetime, listing, board, series, hose_get, rss_get,
-                   store: BriefStore) -> dict:
+                   store: BriefStore, earlier: list[date] = (), index_bars=lambda: {}) -> dict:
+    """earlier: the sessions before session_date on the trading calendar, ascending; index_bars(): VN-Index daily bars by session."""
     sections: dict[str, dict] = {}
     try:
         sections["indices"] = index_rows({i: series(i) for i in IDS}, session_date=session_date)
@@ -78,6 +80,14 @@ def build_snapshot(*, session_date: date, previous_session: date | None, now: da
         sections["hose"] = parse_hose(hose_get(HOSE_VALUE.format(day=day)), hose_get(HOSE_VOLUME.format(day=day)))
     except Exception:
         sections["hose"] = _missing("Không kết nối được HOSE")
+    try:
+        sections["index_session"] = index_session(index_bars(), session_date=session_date, earlier=list(earlier))
+    except Exception:
+        sections["index_session"] = _missing("Không đọc được nến VN-Index")
+    try:
+        sections["hose_liquidity"] = hose_liquidity(sections["hose"], earlier=list(earlier), hose_get=hose_get)
+    except Exception:
+        sections["hose_liquidity"] = _missing("Không kết nối được HOSE")
     items, failures = [], 0
     for source, url in FEEDS:
         try:

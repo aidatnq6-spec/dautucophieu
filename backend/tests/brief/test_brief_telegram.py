@@ -39,3 +39,34 @@ def test_short_telegram_brief_follows_the_agreed_order():
 
 def test_without_a_snapshot_the_old_text_is_kept():
     assert render_report(REPORT).startswith("BẢN TIN SAU PHIÊN 2026-10-26")
+
+
+SHAPE = {"status": "ok", "range": {"high": "1753.15", "low": "1733.02", "close": "1740.73", "from_high": "12.42", "from_low": "7.71"},
+         "streak": {"direction": "up", "sessions": 2, "at_least": False, "change": "41.11", "pct": "0.0242"},
+         "volume": {"status": "ok", "today": 673228995, "previous": 785061515, "change_pct": "-0.1425", "avg20": 609253076, "ratio20": "1.11"}}
+
+
+def test_the_brief_gives_the_session_range_streak_and_liquidity_against_its_base():
+    text = render_report(REPORT, market={**MARKET, "index_session": SHAPE,
+                                         "hose": {"status": "ok", "total_value_bn": "15963.62", "total_volume": 1, "foreign": {}},
+                                         "hose_liquidity": {"status": "ok", "today_bn": "15963.62", "previous_bn": "18051.57", "change_pct": "-0.1157",
+                                                            "avg20_bn": "16500.00", "ratio20": "0.97"}})
+    order = ["VN30: chưa có số liệu", "Trong phiên: cao 1.753,15 · thấp 1.733,02 · đóng cửa cách đỉnh 12,42 điểm, cách đáy 7,71 điểm",
+             "Chuỗi: tăng 2 phiên liên tiếp, +41,11 điểm (+2,42%)",
+             "Khối lượng khớp lệnh: 673.228.995 cp, −14,25% so với phiên trước, bằng 1,11 lần trung bình 20 phiên",
+             "Giá trị khớp lệnh HOSE", "HOSE công bố tổng (gồm thỏa thuận): 15.963,62 tỷ đồng, −11,57% so với phiên trước, bằng 0,97 lần trung bình 20 phiên",
+             "Độ rộng:", "Ngành tăng: 1/2"]
+    positions = [text.index(s) for s in order]
+    assert positions == sorted(positions)
+
+
+def test_a_short_or_unknown_streak_and_missing_bases_are_named():
+    shape = {**SHAPE, "streak": {"direction": "down", "sessions": 3, "at_least": True, "change": None, "pct": None},
+             "volume": {"status": "missing", "reason": "Thiếu nến 2 trong 20 phiên trước"}}
+    text = render_report(REPORT, market={**MARKET, "index_session": shape, "hose_liquidity": {"status": "missing", "reason": "HOSE chưa công bố"}})
+    assert "Chuỗi: giảm ít nhất 3 phiên liên tiếp" in text
+    assert "Khối lượng khớp lệnh: chưa có số liệu (Thiếu nến 2 trong 20 phiên trước)" in text
+    assert "HOSE công bố tổng" not in text  # nothing from HOSE yet: the existing line stays out, no comparison either
+    flat = render_report(REPORT, market={**MARKET, "index_session": {**SHAPE, "streak": {"direction": "flat", "sessions": 1, "at_least": False,
+                                                                                         "change": "0.00", "pct": "0.0000"}}})
+    assert "Chuỗi: đứng giá so với phiên trước" in flat

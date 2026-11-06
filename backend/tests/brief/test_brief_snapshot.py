@@ -85,3 +85,20 @@ def test_sector_codes_come_from_the_listing_when_the_board_has_none(tmp_path):
     listing = lambda: {"symbols": ["FPT"], "icb_names": {"9500": "Công nghệ Thông tin"}, "icb_codes": {"FPT": "9500"}}
     snap = build_snapshot(**deps(tmp_path, board=lambda s: board, listing=listing))
     assert snap["board"]["sectors"][0]["sector"] == "Công nghệ Thông tin"
+
+
+def test_the_session_shape_and_hose_value_are_added_and_a_good_one_is_kept(tmp_path):
+    from decimal import Decimal
+    earlier = [date(2026, 10, 23)]
+    bars = {D: {"high": Decimal("1660"), "low": Decimal("1640"), "close": Decimal("1650.12"), "volume": 1},
+            date(2026, 10, 23): {"high": Decimal("1660"), "low": Decimal("1650"), "close": Decimal("1658.52"), "volume": 1}}
+    snap = build_snapshot(**deps(tmp_path, earlier=earlier, index_bars=lambda: bars))
+    assert snap["index_session"]["range"]["from_low"] == "10.12" and snap["index_session"]["streak"]["direction"] == "down"
+    assert snap["hose_liquidity"] == {"status": "missing", "reason": "HOSE chưa công bố"}
+    later = build_snapshot(**deps(tmp_path, earlier=earlier, index_bars=lambda: {}))
+    assert later["index_session"]["range"]["from_low"] == "10.12"  # a later failure keeps what an earlier wake-up had
+
+
+def test_without_bars_the_session_shape_is_named_missing(tmp_path):
+    snap = build_snapshot(**deps(tmp_path))
+    assert snap["index_session"] == {"status": "missing", "reason": "Chưa có nến VN-Index phiên này"}

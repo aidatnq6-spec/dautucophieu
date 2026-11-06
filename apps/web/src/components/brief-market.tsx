@@ -11,8 +11,13 @@ type Hose = { status: "ok"; total_value_bn: string; total_volume: number; foreig
 type Ticker = { symbol: string; price: number | null; change: number | null; pct: string | null; held: boolean; sector: string | null;
   state?: "ok" | "no_trade" | "no_price" };
 type News = { status: "ok"; items: { title: string; url: string; source: string; published: string; reason: string }[] } | Missing;
+type Streak = { direction: "up" | "down" | "flat" | null; sessions: number; at_least: boolean; change: string | null; pct: string | null };
+type Volume = { status: "ok"; today: number; previous: number; change_pct: string | null; avg20: number; ratio20: string | null } | Missing;
+type IndexSession = { status: "ok"; range: { high: string; low: string; close: string; from_high: string; from_low: string }; streak: Streak;
+  volume: Volume } | Missing;
+type HoseLiquidity = { status: "ok"; today_bn: string; previous_bn: string; change_pct: string; avg20_bn: string; ratio20: string } | Missing;
 export type MarketSection = { session_date: string; updated_at: string; indices: { status: string; rows: IndexRow[] } | Missing; board: Board;
-  hose: Hose; proprietary: Missing; tickers: Ticker[]; news: News };
+  hose: Hose; proprietary: Missing; tickers: Ticker[]; news: News; index_session?: IndexSession; hose_liquidity?: HoseLiquidity };
 
 const TOP_TICKERS = 10;
 const num = (v: string | number, digits = 2) => Number(v).toLocaleString("vi-VN", { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -20,6 +25,21 @@ const signed = (v: string | number, digits = 2) => `${Number(v) > 0 ? "+" : Numb
 const pct = (v: string) => `${signed(Number(v) * 100)}%`;
 const tone = (v: string | number | null) => (v === null || Number(v) === 0 ? "" : Number(v) > 0 ? "positive" : "negative");
 const time = (iso: string) => new Date(iso).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
+
+/** The run of sessions in words; a run reaching past the stored bars gets no total, a run that cannot be read gets nothing. */
+export function streakText(k: Streak): string | null {
+  if (k.direction === null) return null;
+  if (k.direction === "flat") return "Đứng giá so với phiên trước";
+  const word = k.direction === "up" ? "Tăng" : "Giảm";
+  if (k.at_least || k.change === null || k.pct === null) return `${word} ít nhất ${k.sessions} phiên liên tiếp`;
+  return `${word} ${k.sessions} phiên liên tiếp, ${signed(k.change)} điểm (${pct(k.pct)})`;
+}
+
+/** A figure against the previous session and the 20 before it. */
+export function baseText(f: { change_pct: string | null; ratio20: string | null }): string {
+  return [f.change_pct !== null ? `${pct(f.change_pct)} so với phiên trước` : null,
+    f.ratio20 !== null ? `bằng ${num(f.ratio20)} lần trung bình 20 phiên` : null].filter(Boolean).join(" · ");
+}
 
 function Gap({ what, section }: { what: string; section: { reason?: string } }) {
   return <p className="muted">{what}: chưa có số liệu ({section.reason ?? "không rõ lý do"}).</p>;
@@ -32,6 +52,7 @@ export function BriefMarket({ market, session }: { market: MarketSection | null;
     <section aria-label="Thị trường phiên"><h2>Thị trường phiên {day}</h2>
       <p className="muted">Chưa có ảnh chụp số liệu thị trường cho phiên này (bản tin lập trước khi có tính năng, hoặc lịch chạy chưa lấy được số).</p></section>);
   const { indices, board, hose, news } = market;
+  const shape = market.index_session, liquidity = market.hose_liquidity;
   const tickers = all ? market.tickers : market.tickers.filter((t, i) => t.held || i < TOP_TICKERS);
   return (
     <section aria-label="Thị trường phiên" className="bm">
@@ -42,10 +63,22 @@ export function BriefMarket({ market, session }: { market: MarketSection | null;
           ? <li key={r.id}><strong>{r.id === "VNINDEX" ? "VN-Index" : r.id}</strong> {num(r.close)}{" "}
             <span className={tone(r.change)}>{signed(r.change)} điểm ({pct(r.pct)})</span></li>
           : <li key={r.id}>{r.id === "VNINDEX" ? "VN-Index" : r.id}: chưa có số liệu ({r.reason}).</li>)}</ul>)}
+      {shape && (shape.status === "ok" ? <>
+        <p data-testid="index-range">Trong phiên: cao {num(shape.range.high)} · thấp {num(shape.range.low)} · đóng cửa cách đỉnh{" "}
+          <strong>{num(shape.range.from_high)} điểm</strong>, cách đáy {num(shape.range.from_low)} điểm</p>
+        {streakText(shape.streak) && <p data-testid="index-streak">Chuỗi: {streakText(shape.streak)}</p>}
+        <p data-testid="index-volume">Khối lượng khớp lệnh: {shape.volume.status === "ok"
+          ? <>{num(shape.volume.today, 0)} cp · {baseText(shape.volume)} <span className="caption">(trung bình {num(shape.volume.avg20, 0)} cp)</span></>
+          : <span className="muted">chưa có số liệu ({shape.volume.reason})</span>}</p>
+        <p className="caption">Nến ngày VN-Index theo KBS (vnstock); cao/thấp có thể gồm mức tham chiếu đầu phiên.</p>
+      </> : <Gap what="Trong phiên" section={shape} />)}
       {board.status === "ok" ? <>
         <h3>Thanh khoản và độ rộng</h3>
         <p>Giá trị khớp lệnh HOSE <strong>{num(board.value_matched_bn)} tỷ đồng</strong> ({num(board.volume_matched, 0)} cp)
           {hose.status === "ok" && <> · HOSE công bố tổng (gồm thỏa thuận) {num(hose.total_value_bn)} tỷ đồng</>}</p>
+        {hose.status === "ok" && liquidity?.status === "ok" && <p data-testid="hose-liquidity">Giá trị HOSE công bố: {baseText(liquidity)}{" "}
+          <span className="caption">(phiên trước {num(liquidity.previous_bn)} tỷ, trung bình 20 phiên {num(liquidity.avg20_bn)} tỷ)</span></p>}
+        {hose.status === "ok" && liquidity && liquidity.status !== "ok" && <p className="muted">So với nền: chưa có số liệu ({liquidity.reason}).</p>}
         <p><span className="positive">{board.breadth.up} tăng</span> · <span className="negative">{board.breadth.down} giảm</span> ·{" "}
           {board.breadth.flat} đứng giá · {board.breadth.no_trade} không giao dịch</p>
         <h3>Khối ngoại</h3>
@@ -59,7 +92,7 @@ export function BriefMarket({ market, session }: { market: MarketSection | null;
       <h3>Tự doanh</h3>
       <p className="muted">Chưa có số liệu ({market.proprietary.reason}).</p>
       {board.status === "ok" && board.sectors.length > 0 && <>
-        <h3>Ngành (toàn HOSE)</h3>
+        <h3>Ngành (toàn HOSE): {board.sectors.filter((s) => Number(s.pct) > 0).length}/{board.sectors.length} ngành tăng</h3>
         <ul className="bm-sectors">{board.sectors.map((s) => <li key={s.sector}><span>{s.sector}</span>{" "}
           <span className={tone(s.pct)}>{pct(s.pct)}</span> <span className="caption">({s.count} mã)</span></li>)}</ul>
       </>}

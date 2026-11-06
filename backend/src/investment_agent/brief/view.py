@@ -8,6 +8,7 @@ from pathlib import Path
 from investment_agent.market.watchlist import load_watchlist
 
 from .news import pick_news
+from .recovery import recovery_checks
 from .snapshot import BriefStore
 
 NEWS_LIMIT = 8
@@ -35,6 +36,7 @@ def market_view(snapshot: dict | None, *, watched: list[str], held: set[str], ne
     view["board"] = {k: v for k, v in board.items() if k != "symbols"}
     for name in ("index_session", "hose_liquidity"):  # snapshots stored before 06/11/2026 have neither
         view[name] = snapshot.get(name) or {"status": "missing", "reason": "Ảnh chụp phiên này chưa có mục này"}
+    view["recovery"] = recovery_checks(snapshot.get("index_session"), board)  # Bảng kiểm "Thị trường phục hồi"
     return {**view, "tickers": first + others, "news": news}
 
 

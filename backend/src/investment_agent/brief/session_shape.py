@@ -56,6 +56,16 @@ def _volume(bars: dict, session_date: date, earlier: list[date]) -> dict:
             "avg20": int(avg.quantize(Decimal(1), ROUND_HALF_UP)), "ratio20": _s(Decimal(today) / avg, _Q2) if avg else None}
 
 
+def _ma20(bars: dict, session_date: date, earlier: list[date]) -> dict:
+    """Mean close of the session and the 19 before it; a missing bar is named, never filled."""
+    days = [*earlier[-(BASE - 1):], session_date]
+    lacking = BASE - sum(1 for d in days if bars.get(d))
+    if lacking:
+        return _missing(f"Thiếu nến {lacking} trong {BASE} phiên")
+    value = sum((bars[d]["close"] for d in days), Decimal(0)) / BASE
+    return {"status": "ok", "value": _s(value, _Q2), "above": bars[session_date]["close"] > value}
+
+
 def index_session(bars: dict[date, dict | None], *, session_date: date, earlier: list[date]) -> dict:
     """bars: VN-Index daily bars by session (high, low, close as Decimal; volume in shares); earlier: the sessions before
     session_date on the trading calendar, ascending."""
@@ -67,7 +77,7 @@ def index_session(bars: dict[date, dict | None], *, session_date: date, earlier:
             "range": {"high": _s(high, _Q2), "low": _s(low, _Q2), "close": _s(close, _Q2), "from_high": _s(high - close, _Q2),
                       "from_low": _s(close - low, _Q2)},
             "streak": _streak(bars, [session_date, *reversed(earlier)]),
-            "volume": _volume(bars, session_date, earlier)}
+            "volume": _volume(bars, session_date, earlier), "ma20": _ma20(bars, session_date, earlier)}
 
 
 def _hose_value_bn(raw: str) -> Decimal | None:

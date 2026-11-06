@@ -82,3 +82,16 @@ def test_the_spread_sits_beside_the_index_and_an_opposite_direction_is_named():
     assert text.index("Ngành tăng") < text.index("Lan tỏa") < text.index("Khối ngoại")
     old = render_report(REPORT, market=MARKET)  # snapshots before 06/11/2026 have no spread
     assert "Lan tỏa" not in old
+
+
+def test_the_recovery_checklist_is_one_line_after_the_sectors_count():
+    recovery = {"status": "ok", "met": 2, "known": 3, "total": 4, "checks": [
+        {"id": "ma20", "met": True, "label": "VN-Index trên MA20", "figure": "MA20 1.712,40"},
+        {"id": "volume", "met": None, "label": "Khối lượng khớp lệnh ≥ trung bình 20 phiên", "figure": "chưa có số (x)"},
+        {"id": "breadth", "met": False, "label": "Số mã tăng > số mã giảm", "figure": "107 tăng · 205 giảm"},
+        {"id": "spread", "met": True, "label": "Trung bình cộng các mã tăng", "figure": "+0,30%"}]}
+    text = render_report(REPORT, market={**MARKET, "recovery": recovery})
+    line = ("Bảng kiểm phục hồi: 2/4 đạt, 1 chưa có số — VN-Index trên MA20: đạt (MA20 1.712,40) · Khối lượng khớp lệnh ≥ trung bình 20 phiên: "
+            "chưa có số (x) · Số mã tăng > số mã giảm: chưa (107 tăng · 205 giảm) · Trung bình cộng các mã tăng: đạt (+0,30%)")
+    assert line in text and text.index("Ngành tăng") < text.index("Bảng kiểm phục hồi") < text.index("Khối ngoại")
+    assert "Bảng kiểm phục hồi" not in render_report(REPORT, market=MARKET)

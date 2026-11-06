@@ -31,5 +31,12 @@ giữ được" mà không có số. Thêm vào ảnh chụp phiên (`data/brief
 - Trung bình cộng và trung vị mức thay đổi của mọi mã HOSE có giao dịch trong phiên (bảng giá cả sàn, chỉ cổ phiếu), cùng trọng số, đặt cạnh
   mức thay đổi của VN-Index (theo vốn hóa). Ngược dấu thì ghi "ngược chiều"; không nhận định gì thêm. Có trên trang và tin 15:30.
 
+## Bảng kiểm "Thị trường phục hồi" (06/11/2026)
+- Bốn điều kiện, mỗi điều kiện kèm số: (1) VN-Index đóng cửa trên MA20 (trung bình giá đóng cửa 20 phiên gồm phiên này, kho giá);
+  (2) khối lượng khớp lệnh ≥ trung bình 20 phiên trước; (3) số mã tăng > số mã giảm; (4) trung bình cộng các mã (Lan tỏa) > 0.
+- Hiện "x/4 điều kiện đạt"; điều kiện thiếu số (ví dụ ảnh chụp cũ, thiếu nến) ghi "chưa có số" và không tính là đạt hay chưa. Bằng nhau
+  thì chưa đạt, trừ khối lượng (≥ như nhãn).
+- Trên trang Bản tin và một dòng trong tin 15:30. Là phép đếm trên số liệu, không phải khuyến nghị mua bán.
+
 ## Ngoài phạm vi
-Đóng góp điểm theo mã (chưa có nguồn công khai hợp lệ, xem trên); bảng kiểm "Thị trường phục hồi"; VN30 (kho giá chưa có nến ngày VN30).
+Đóng góp điểm theo mã (chưa có nguồn công khai hợp lệ, xem trên); VN30 (kho giá chưa có nến ngày VN30).

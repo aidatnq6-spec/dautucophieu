@@ -64,6 +64,20 @@ def _base_line(head: str, figures: dict, change_key: str) -> str:
     return ", ".join(parts)
 
 
+def _spread_line(spread: dict | None, indices: dict | None) -> str | None:
+    """Every traded stock at the same weight beside the cap-weighted VN-Index; an opposite direction is named, nothing more."""
+    if not spread or spread.get("mean_pct") is None:
+        return None
+    line = (f"Lan tỏa: trung bình cộng các mã {_pct(spread['mean_pct'])}, trung vị {_pct(spread['median_pct'])} "
+            f"({spread['count']} mã có giao dịch)")
+    vn = next((r for r in (indices or {}).get("rows", []) if r["id"] == "VNINDEX" and r["status"] == "ok"), None)
+    if vn:
+        line += f"; VN-Index {_pct(vn['pct'])}"
+        if float(vn["pct"]) * float(spread["mean_pct"]) < 0:
+            line += ", ngược chiều"
+    return line
+
+
 def render_market_brief(report: dict, market: dict) -> str:
     """Short phone version agreed on 2026-10-26: market first, holdings' prices, a few news, one portfolio line, reminders."""
     day = report["session_date"]
@@ -84,6 +98,8 @@ def render_market_brief(report: dict, market: dict) -> str:
         lines += [f"Độ rộng: {b['up']} tăng · {b['down']} giảm · {b['flat']} đứng giá · {b['no_trade']} không giao dịch"]
         if board["sectors"]:
             lines.append(f"Ngành tăng: {sum(1 for s in board['sectors'] if float(s['pct']) > 0)}/{len(board['sectors'])}")
+        if (spread := _spread_line(board.get("spread"), market.get("indices"))):
+            lines.append(spread)
         lines += [
                   f"Khối ngoại: mua {_num(f['buy_value_bn'])} tỷ · bán {_num(f['sell_value_bn'])} tỷ · ròng {_num(f['net_value_bn'], sign=True)} tỷ"]
         if f["top_sell"]:

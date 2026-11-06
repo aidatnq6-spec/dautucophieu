@@ -50,3 +50,10 @@ def test_a_board_row_without_foreign_figures_stores_no_foreign_value():
            "accumulated_volume": 100, "icb_code2": "8300"}
     out = summarise_board([row], session_date=D, icb_names=ICB)
     assert out["symbols"]["AAA"]["foreign_net_bn"] is None
+
+
+def test_the_equal_weight_spread_of_every_traded_stock():
+    s = summarise_board(RECORDS, session_date=D, icb_names=ICB)
+    # VCB +2%, MBB −2%, ACB 0%, FPT −1.754386%; XYZ has no trade and is left out
+    assert s["spread"] == {"count": 4, "mean_pct": "-0.0044", "median_pct": "-0.0088"}
+    assert summarise_board([rec("XYZ", 10000, 0)], session_date=D, icb_names=ICB)["spread"] == {"count": 0, "mean_pct": None, "median_pct": None}

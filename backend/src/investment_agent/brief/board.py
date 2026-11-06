@@ -7,6 +7,7 @@ Units as served by Vnstock's price board (checked 2026-10-26): prices in đồng
 from collections import defaultdict
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
+from statistics import median
 
 OTHER = "Khác"
 _Q2, _Q4 = Decimal("0.01"), Decimal("0.0001")
@@ -31,7 +32,7 @@ def summarise_board(records: list[dict], *, session_date: date, icb_names: dict[
     value = volume = Decimal(0)
     fb_vol = fs_vol = 0
     fb_val = fs_val = Decimal(0)
-    nets, groups, symbols = [], defaultdict(list), {}
+    nets, groups, symbols, moves = [], defaultdict(list), {}, []
     for r in rows:
         ref, price = _d(r.get("ref_price")), _d(r.get("match_price"))
         sector = icb_names.get(str(r.get("icb_code2") or ""), OTHER)
@@ -42,6 +43,7 @@ def summarise_board(records: list[dict], *, session_date: date, icb_names: dict[
         else:
             breadth["up" if price > ref else "down" if price < ref else "flat"] += 1
             groups[sector].append(pct)
+            moves.append(pct)
         value += _d(r.get("accumulated_value"))
         volume += _d(r.get("accumulated_volume"))
         fb_vol += int(_d(r.get("foreign_buy_volume")))
@@ -64,4 +66,7 @@ def summarise_board(records: list[dict], *, session_date: date, icb_names: dict[
                         "sell_value_bn": _s(fs_val / bn, _Q2), "net_value_bn": _s((fb_val - fs_val) / bn, _Q2),
                         "top_sell": top(sorted((x for x in nets if x[1] < 0), key=lambda x: x[1])),
                         "top_buy": top(sorted((x for x in nets if x[1] > 0), key=lambda x: -x[1]))},
-            "sectors": sectors, "symbols": symbols}
+            "sectors": sectors, "symbols": symbols,
+            # Lan tỏa: every traded stock with the same weight, to set beside the cap-weighted VN-Index (06/11/2026)
+            "spread": {"count": len(moves), "mean_pct": _s(sum(moves) / len(moves), _Q4) if moves else None,
+                       "median_pct": _s(median(moves), _Q4) if moves else None}}

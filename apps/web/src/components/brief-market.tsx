@@ -6,7 +6,8 @@ type IndexRow = { id: string; status: "ok"; close: string; change: string; pct: 
 type Foreign = { buy_volume: number; sell_volume: number; buy_value_bn: string; sell_value_bn: string; net_value_bn: string;
   top_sell: { symbol: string; net_value_bn: string }[]; top_buy: { symbol: string; net_value_bn: string }[] };
 type Board = { status: "ok"; value_matched_bn: string; volume_matched: number; breadth: { up: number; down: number; flat: number; no_trade: number };
-  foreign: Foreign; sectors: { sector: string; pct: string; count: number }[] } | Missing;
+  foreign: Foreign; sectors: { sector: string; pct: string; count: number }[]; spread?: Spread } | Missing;
+type Spread = { count: number; mean_pct: string | null; median_pct: string | null };
 type Hose = { status: "ok"; total_value_bn: string; total_volume: number; foreign: Omit<Foreign, "top_sell" | "top_buy"> } | Missing;
 type Ticker = { symbol: string; price: number | null; change: number | null; pct: string | null; held: boolean; sector: string | null;
   state?: "ok" | "no_trade" | "no_price" };
@@ -35,6 +36,14 @@ export function streakText(k: Streak): string | null {
   return `${word} ${k.sessions} phiên liên tiếp, ${signed(k.change)} điểm (${pct(k.pct)})`;
 }
 
+/** Lan tỏa: every traded stock at the same weight beside the cap-weighted VN-Index; an opposite direction is named, nothing more. */
+export function spreadText(s: Spread, vnPct: string | null): string | null {
+  if (s.mean_pct === null || s.median_pct === null) return null;
+  const head = `Trung bình cộng các mã ${pct(s.mean_pct)}, trung vị ${pct(s.median_pct)} (${s.count} mã có giao dịch)`;
+  if (vnPct === null) return head;
+  return `${head}; VN-Index ${pct(vnPct)}${Number(vnPct) * Number(s.mean_pct) < 0 ? ", ngược chiều" : ""}`;
+}
+
 /** A figure against the previous session and the 20 before it. */
 export function baseText(f: { change_pct: string | null; ratio20: string | null }): string {
   return [f.change_pct !== null ? `${pct(f.change_pct)} so với phiên trước` : null,
@@ -53,6 +62,8 @@ export function BriefMarket({ market, session }: { market: MarketSection | null;
       <p className="muted">Chưa có ảnh chụp số liệu thị trường cho phiên này (bản tin lập trước khi có tính năng, hoặc lịch chạy chưa lấy được số).</p></section>);
   const { indices, board, hose, news } = market;
   const shape = market.index_session, liquidity = market.hose_liquidity;
+  const vn = "rows" in indices ? indices.rows.find((r) => r.id === "VNINDEX") : undefined;
+  const vnPct = vn && vn.status === "ok" ? vn.pct : null;
   const tickers = all ? market.tickers : market.tickers.filter((t, i) => t.held || i < TOP_TICKERS);
   return (
     <section aria-label="Thị trường phiên" className="bm">
@@ -81,6 +92,8 @@ export function BriefMarket({ market, session }: { market: MarketSection | null;
         {hose.status === "ok" && liquidity && liquidity.status !== "ok" && <p className="muted">So với nền: chưa có số liệu ({liquidity.reason}).</p>}
         <p><span className="positive">{board.breadth.up} tăng</span> · <span className="negative">{board.breadth.down} giảm</span> ·{" "}
           {board.breadth.flat} đứng giá · {board.breadth.no_trade} không giao dịch</p>
+        {board.spread && spreadText(board.spread, vnPct) && <p data-testid="spread">Lan tỏa: {spreadText(board.spread, vnPct)}
+          <span className="caption"> · mọi mã HOSE có giao dịch, cùng trọng số; VN-Index tính theo vốn hóa</span></p>}
         <h3>Khối ngoại</h3>
         <p>Mua {num(board.foreign.buy_volume, 0)} cp / {num(board.foreign.buy_value_bn)} tỷ · Bán {num(board.foreign.sell_volume, 0)} cp /{" "}
           {num(board.foreign.sell_value_bn)} tỷ · Ròng <strong className={tone(board.foreign.net_value_bn)}>{signed(board.foreign.net_value_bn)} tỷ</strong></p>

@@ -24,5 +24,12 @@ giữ được" mà không có số. Thêm vào ảnh chụp phiên (`data/brief
 ## Ngành
 - "x/y ngành tăng" đếm từ mức tăng trung bình theo ngành của bảng giá cả sàn đã có.
 
+## Lan tỏa (thay cho đóng góp điểm theo mã, 06/11/2026)
+- Không có nguồn công khai hợp lệ cho điểm đóng góp từng mã: vnstock có `Insights().sentiment.contribution` nhưng không thuộc gói Cộng đồng;
+  Vietstock cần token và reCAPTCHA; SSI iBoard, CafeF không công bố API cho mục này; tự tính cần free-float và giới hạn tỷ trọng chưa có
+  nguồn. Chủ sở hữu chọn thay bằng số đo lan tỏa.
+- Trung bình cộng và trung vị mức thay đổi của mọi mã HOSE có giao dịch trong phiên (bảng giá cả sàn, chỉ cổ phiếu), cùng trọng số, đặt cạnh
+  mức thay đổi của VN-Index (theo vốn hóa). Ngược dấu thì ghi "ngược chiều"; không nhận định gì thêm. Có trên trang và tin 15:30.
+
 ## Ngoài phạm vi
-Đóng góp điểm theo mã (cần nguồn công khai); bảng kiểm "Thị trường phục hồi"; VN30 (kho giá chưa có nến ngày VN30).
+Đóng góp điểm theo mã (chưa có nguồn công khai hợp lệ, xem trên); bảng kiểm "Thị trường phục hồi"; VN30 (kho giá chưa có nến ngày VN30).

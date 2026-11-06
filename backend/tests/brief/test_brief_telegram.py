@@ -70,3 +70,15 @@ def test_a_short_or_unknown_streak_and_missing_bases_are_named():
     flat = render_report(REPORT, market={**MARKET, "index_session": {**SHAPE, "streak": {"direction": "flat", "sessions": 1, "at_least": False,
                                                                                          "change": "0.00", "pct": "0.0000"}}})
     assert "Chuỗi: đứng giá so với phiên trước" in flat
+
+
+def test_the_spread_sits_beside_the_index_and_an_opposite_direction_is_named():
+    board = {**MARKET["board"], "spread": {"count": 358, "mean_pct": "0.0030", "median_pct": "0.0000"}}
+    same = render_report(REPORT, market={**MARKET, "board": board})
+    assert "Lan tỏa: trung bình cộng các mã +0,30%, trung vị 0,00% (358 mã có giao dịch); VN-Index −0,51%, ngược chiều" in same
+    up = {**MARKET["indices"], "rows": [{**MARKET["indices"]["rows"][0], "pct": "0.0044"}]}
+    text = render_report(REPORT, market={**MARKET, "indices": up, "board": board})
+    assert "Lan tỏa: trung bình cộng các mã +0,30%, trung vị 0,00% (358 mã có giao dịch); VN-Index +0,44%\n" in text + "\n"
+    assert text.index("Ngành tăng") < text.index("Lan tỏa") < text.index("Khối ngoại")
+    old = render_report(REPORT, market=MARKET)  # snapshots before 06/11/2026 have no spread
+    assert "Lan tỏa" not in old

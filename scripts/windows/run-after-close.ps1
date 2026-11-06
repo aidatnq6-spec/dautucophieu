@@ -39,6 +39,9 @@ $ivs = & $python -W ignore -m investment_agent.cli index-valuation-sync --data-d
 # Chat luong bao cao: quarterly ratios of watched banks, securities firms and insurers (VNDirect public API), one call each.
 $frs = & $python -W ignore -m investment_agent.cli financial-ratios-sync --data-dir $data 2>$null
 "$(Get-Date -Format o) financial-ratios-sync exit=$LASTEXITCODE $frs" | Add-Content -LiteralPath $log -Encoding UTF8
+# Chung chi quy theo NAV: every open-ended fund's NAV from Fmarket (one public call, names no fund).
+$fn = & $python -W ignore -m investment_agent.cli fund-nav-sync --data-dir $data 2>$null
+"$(Get-Date -Format o) fund-nav-sync exit=$LASTEXITCODE $fn" | Add-Content -LiteralPath $log -Encoding UTF8
 # CAPM hint: beta of every watched ticker (VNDirect public API), one call.
 $bs = & $python -W ignore -m investment_agent.cli beta-sync --data-dir $data 2>$null
 "$(Get-Date -Format o) beta-sync exit=$LASTEXITCODE $bs" | Add-Content -LiteralPath $log -Encoding UTF8

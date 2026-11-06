@@ -33,8 +33,8 @@ def protected_deductions(repo, owner) -> tuple[Decimal, Decimal, str | None]:
     return (Decimal(manual) if manual is not None else from_profile), from_profile, manual
 
 
-def budget_view(repo, owner) -> tuple[dict, int]:
-    """(budget, version of the stored total); raises RepositoryUnavailable."""
+def budget_view(repo, owner, *, navs: dict[str, dict]) -> tuple[dict, int]:
+    """(budget, version of the stored total); navs: fund NAVs (market.fund_nav.fund_navs) for fund rows. Raises RepositoryUnavailable."""
     stored = read_version(repo, owner, *RECORD, None)
     book, _ = read_book(repo, owner)
     if stored is None and book is None:
@@ -49,7 +49,7 @@ def budget_view(repo, owner) -> tuple[dict, int]:
     layers = stored.payload.get("layers") if stored else None
     amounts, sources, cash_source = None, dict.fromkeys(LAYERS, "manual"), "ledger"
     if book is not None:  # Tháp tài sản from Sổ tài sản alone: every layer is its list, empty = 0; the figures by hand no longer count
-        from_book = totals(book)
+        from_book = totals(book, navs)
         sources = dict.fromkeys(LAYERS, "book")
         cash_source = "ledger" if book.count_ledger_cash else "book"  # False: the owner keeps cash to the book's accounts
         amounts = {"reserve": deductions, "cash": (state.cash if cash_source == "ledger" else Decimal(0)) + from_book["accounts"],

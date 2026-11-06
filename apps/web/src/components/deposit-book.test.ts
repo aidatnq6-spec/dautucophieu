@@ -22,13 +22,13 @@ it("names the row that cannot be saved", () => {
   expect(bookPayload([tk({ name: "" })], [])).toEqual({ error: "Tài khoản 1: nhập tên." });
 });
 
-const bond = (b: Partial<BondDraft> = {}): BondDraft => ({ id: "f", name: "Quỹ trái phiếu", amount: "50.000.000", rate: "", ...b });
+const bond = (b: Partial<BondDraft> = {}): BondDraft => ({ id: "f", name: "Quỹ trái phiếu", amount: "50.000.000", rate: "", fund: "", units: "", ...b });
 const item = (h: Partial<HoldingDraft> = {}): HoldingDraft => ({ id: "g", name: "Vàng nhẫn", amount: "39.364.000", ...h });
 
 it("adds bonds, gold and crypto, a blank bond rate staying unknown", () => {
   const r = bookPayload([], [], { bonds: [bond({ rate: "7,4" }), bond({ id: "f2" })], gold: [item()], crypto: [item({ id: "c", name: "BTC", amount: "1.000" })] });
-  expect(r).toEqual({ ok: { accounts: [], deposits: [], bonds: [{ id: "f", name: "Quỹ trái phiếu", amount: "50000000", rate: "7.4" },
-    { id: "f2", name: "Quỹ trái phiếu", amount: "50000000", rate: null }], gold: [{ id: "g", name: "Vàng nhẫn", amount: "39364000" }],
+  expect(r).toEqual({ ok: { accounts: [], deposits: [], bonds: [{ id: "f", name: "Quỹ trái phiếu", amount: "50000000", rate: "7.4", fund: null, units: null },
+    { id: "f2", name: "Quỹ trái phiếu", amount: "50000000", rate: null, fund: null, units: null }], gold: [{ id: "g", name: "Vàng nhẫn", amount: "39364000" }],
     crypto: [{ id: "c", name: "BTC", amount: "1000" }] } });
 });
 
@@ -52,4 +52,15 @@ it("saves one row at a time: an edited row keeps its place, a new one goes last,
   expect(upsertRow(rows, item({ id: "c" })).map((r) => r.id)).toEqual(["a", "b", "c"]);
   expect(removeRow(rows, "a")).toEqual([item({ id: "b", name: "Vàng miếng" })]);
   expect(removeRow(rows, "z")).toEqual(rows);
+});
+
+it("takes a fund code with its units, written the Vietnamese way, and refuses one without the other", () => {
+  const ok = bookPayload([], [], { bonds: [bond({ fund: " vcbf-fif ", units: "1.837,42" })], gold: [], crypto: [] });
+  expect(ok).toEqual({ ok: { accounts: [], deposits: [], bonds: [{ id: "f", name: "Quỹ trái phiếu", amount: "50000000", rate: null, fund: "VCBF-FIF",
+    units: "1837.42" }], gold: [], crypto: [] } });
+  const err = (b: Partial<BondDraft>) => bookPayload([], [], { bonds: [bond(b)], gold: [], crypto: [] });
+  expect(err({ fund: "VFF" })).toEqual({ error: "Trái phiếu 1: nhập cả mã quỹ và số đơn vị, hoặc để trống cả hai." });
+  expect(err({ units: "10" })).toEqual({ error: "Trái phiếu 1: nhập cả mã quỹ và số đơn vị, hoặc để trống cả hai." });
+  expect(err({ fund: "VFF", units: "1,234" })).toEqual({ error: "Trái phiếu 1: số đơn vị lớn hơn 0, tối đa 2 chữ số thập phân." });
+  expect(err({ fund: "V F F", units: "1" })).toEqual({ error: "Trái phiếu 1: mã quỹ như trên Fmarket, ví dụ VFF hoặc VCBF-FIF." });
 });

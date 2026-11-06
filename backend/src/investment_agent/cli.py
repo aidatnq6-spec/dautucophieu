@@ -42,6 +42,8 @@ def main() -> int:
     bs.add_argument("--data-dir", type=Path, required=True)
     es = commands.add_parser("erp-sync", help="Damodaran's equity risk premium for Vietnam into data/erp.json, at most weekly")
     es.add_argument("--data-dir", type=Path, required=True)
+    fn = commands.add_parser("fund-nav-sync", help="NAV/đơn vị of every open-ended fund from Fmarket into data/fund-nav.json, one call")
+    fn.add_argument("--data-dir", type=Path, required=True)
     wb = commands.add_parser("weekly-brief", help="Bản tin tuần over Telegram on the weekend, once per week")
     wb.add_argument("--data-dir", type=Path, required=True)
     wb.add_argument("--calendar", type=Path, required=True)
@@ -110,6 +112,8 @@ def main() -> int:
         return beta_sync(args.data_dir)
     if args.command == "erp-sync":
         return erp_sync_cli(args.data_dir)
+    if args.command == "fund-nav-sync":
+        return fund_nav_sync_cli(args.data_dir)
     if args.command == "quarter-alerts":
         return quarter_alerts_cli(args.data_dir)
     if args.command == "weekly-brief":
@@ -552,6 +556,23 @@ def erp_sync_cli(data_dir: Path, get=None) -> int:
             response.raise_for_status()
             return response.content, response.headers.get("last-modified")
     out = erp_sync(ErpStore(data_dir), get=get, now=datetime.now(timezone.utc))
+    print(json.dumps(out))
+    return 1 if out["status"] == "error" else 0
+
+
+def fund_nav_sync_cli(data_dir: Path, *, post=None) -> int:
+    """Public fund NAVs for Sổ tài sản's fund rows; the request names no fund, so nothing about the owner is sent."""
+    from datetime import datetime, timezone
+
+    from investment_agent.market.fund_nav import FundNavStore, fund_nav_sync
+    if post is None:
+        import httpx
+
+        def post(url, body):
+            response = httpx.post(url, json=body, timeout=30, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+            response.raise_for_status()
+            return response.json()
+    out = fund_nav_sync(FundNavStore(data_dir), post=post, now=datetime.now(timezone.utc))
     print(json.dumps(out))
     return 1 if out["status"] == "error" else 0
 

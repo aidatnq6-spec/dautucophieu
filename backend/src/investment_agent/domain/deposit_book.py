@@ -4,7 +4,7 @@ can be withdrawn now against the protected reserve. A deposit not yet due, locke
 
 from collections import Counter
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
@@ -12,6 +12,7 @@ from pydantic import Field, field_validator, model_validator
 from .models import ContractModel, UnsignedAmount
 
 DUE_SOON_DAYS, MATURING_DAYS = 30, 90
+NAV_STALE_DAYS = 14
 
 
 def _whole(value: Decimal | None) -> Decimal | None:
@@ -59,8 +60,17 @@ class Holding(ContractModel):
 
 
 class Bond(Holding):
-    """A bond or fund certificate; rate: the yearly yield the owner expects, for Dòng tiền thụ động (blank = their bond rate)."""
+    """A bond or fund certificate; amount: what it cost (vốn đã mua); rate: the yearly yield the owner expects, for Dòng tiền thụ động
+    (blank = their bond rate). fund and units, both or neither: a fund certificate valued at units × the latest public NAV."""
     rate: Decimal | None = Field(default=None, ge=0, le=30, allow_inf_nan=False)
+    fund: str | None = Field(default=None, pattern=r"^[A-Z0-9][A-Z0-9-]{1,15}$")  # as Fmarket lists it, e.g. VFF, VCBF-FIF
+    units: Decimal | None = Field(default=None, gt=0, max_digits=16, decimal_places=2, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def _fund_with_units(self):
+        if (self.fund is None) != (self.units is None):
+            raise ValueError("a fund code needs its units, and units need a fund code")
+        return self
 
 
 class DepositBook(ContractModel):
@@ -124,12 +134,37 @@ def liquidity(book: DepositBook, *, ledger_cash: Decimal, reserve: Decimal, toda
             "maturing_90d": _s(total(d.principal for d in ahead if d.matures <= today + timedelta(days=MATURING_DAYS)))}
 
 
-def totals(book: DepositBook) -> dict[str, Decimal]:
-    """Per list, for Tháp tài sản: principal of every deposit (overdue ones are still in the bank), and the amount of every other row."""
+def _bond_value(bond: Bond, navs: dict[str, dict]) -> Decimal:
+    """units × NAV rounded to the đồng when the fund has a NAV; otherwise what it cost (never a guessed NAV)."""
+    nav = navs.get(bond.fund) if bond.fund is not None else None
+    return (bond.units * Decimal(nav["nav"])).quantize(Decimal(1), ROUND_HALF_UP) if nav else bond.amount
+
+
+def bond_values(book: DepositBook, navs: dict[str, dict], *, today: date) -> list[dict]:
+    """Per bond row: cost, value and where the value comes from — "nav" (with the fund's NAV, its date, whether it is older than
+    14 days, and the change from cost), "no_nav" (a fund code without a stored NAV: valued at cost) or "amount" (no fund code)."""
+    out = []
+    for b in book.bonds:
+        row = {"id": b.id, "cost": _s(b.amount), "value": _s(b.amount), "source": "amount"}
+        if b.fund is not None:
+            nav = navs.get(b.fund)
+            if nav is None:
+                row |= {"source": "no_nav", "fund": b.fund}
+            else:
+                value = _bond_value(b, navs)
+                row |= {"value": _s(value), "source": "nav", "fund": b.fund, "nav": nav["nav"], "nav_date": nav["date"],
+                        "stale": (today - date.fromisoformat(nav["date"])).days > NAV_STALE_DAYS, "change": _s(value - b.amount)}
+        out.append(row)
+    return out
+
+
+def totals(book: DepositBook, navs: dict[str, dict]) -> dict[str, Decimal]:
+    """Per list, for Tháp tài sản: principal of every deposit (overdue ones are still in the bank), each bond at its value (units ×
+    NAV for a fund with one), and the amount of every other row."""
     def total(rows) -> Decimal:
         return sum((r.amount for r in rows), Decimal(0))
-    return {"deposits": sum((d.principal for d in book.deposits), Decimal(0)), "accounts": total(book.accounts), "bonds": total(book.bonds),
-            "gold": total(book.gold), "crypto": total(book.crypto)}
+    return {"deposits": sum((d.principal for d in book.deposits), Decimal(0)), "accounts": total(book.accounts),
+            "bonds": sum((_bond_value(b, navs) for b in book.bonds), Decimal(0)), "gold": total(book.gold), "crypto": total(book.crypto)}
 
 
 def deposit_income(book: DepositBook, *, market_rate: Decimal) -> dict:
@@ -138,7 +173,7 @@ def deposit_income(book: DepositBook, *, market_rate: Decimal) -> dict:
     return {"monthly": monthly, "market_rate_count": sum(1 for d in book.deposits if d.rate is None)}
 
 
-def bond_income(book: DepositBook, *, default_rate: Decimal) -> dict:
-    """Monthly yield, unrounded: amount × the row's own rate / 12, or the owner's bond rate for a row without one (counted)."""
-    monthly = sum((b.amount * (b.rate if b.rate is not None else default_rate) / 100 / 12 for b in book.bonds), Decimal(0))
+def bond_income(book: DepositBook, *, default_rate: Decimal, navs: dict[str, dict]) -> dict:
+    """Monthly yield, unrounded: value × the row's own rate / 12, or the owner's bond rate for a row without one (counted)."""
+    monthly = sum((_bond_value(b, navs) * (b.rate if b.rate is not None else default_rate) / 100 / 12 for b in book.bonds), Decimal(0))
     return {"monthly": monthly, "default_rate_count": sum(1 for b in book.bonds if b.rate is None)}

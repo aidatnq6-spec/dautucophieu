@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request
 from pydantic import Field
 
 from investment_agent.domain.deposit_book import DepositBook
+from investment_agent.market.fund_nav import FundNavStore
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.deposit_book import RECORD, book_view
 from investment_agent.services.equity_budget import protected_deductions
@@ -25,7 +26,10 @@ class BookRequest(DepositBook):
 
 def _view(request: Request, repo, owner) -> dict:
     reserve, from_profile, _ = protected_deductions(repo, owner)
-    return book_view(repo, owner, reserve=reserve, profile_reserve=from_profile, today=now(request).astimezone(VN).date())
+    data_dir = request.app.state.data_dir
+    stored = FundNavStore(data_dir).read() if data_dir is not None else {}
+    return book_view(repo, owner, reserve=reserve, profile_reserve=from_profile, navs=stored.get("funds", {}), nav_source=stored.get("source"),
+                     today=now(request).astimezone(VN).date())
 
 
 @router.get("/deposit-book")

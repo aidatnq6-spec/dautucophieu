@@ -228,3 +228,5 @@ main h2{scroll-margin-top:16px}
 .db-table input:not([type=checkbox]),.db-table select{width:100%;min-width:110px;padding:7px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
 .db-table td .pill{margin-top:4px}.db h3{margin:18px 0 8px;font-size:16px}
 .db-check{display:flex;gap:8px;align-items:center;margin:12px 0 2px;font-size:14px}
+.db-actions{white-space:nowrap}.db-actions .btn+.btn{margin-left:6px}.db-table tr.db-editing td{background:var(--soft,#f6f8fb)}
+.db-reserve{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 16px;margin-bottom:6px}.db-reserve .field{flex:1 1 260px;margin:0}

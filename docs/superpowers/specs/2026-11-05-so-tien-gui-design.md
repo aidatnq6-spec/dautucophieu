@@ -46,7 +46,7 @@ Thay con số "Tiền gửi" nhập tay của Tháp tài sản bằng danh sách
 - Chưa lưu Sổ tài sản lần nào: mọi trang giữ nguyên hành vi cũ (số nhập tay).
 
 ## Giao diện
-Hồ sơ & rủi ro, mục "Sổ tiền gửi và tiền mặt", ngay trước Tháp tài sản: bảng tài khoản tiền mặt, bảng sổ (thêm, sửa, xóa, rồi Lưu),
+Hồ sơ & rủi ro, mục "Sổ tiền gửi và tiền mặt", ngay trước Tháp tài sản: bảng tài khoản tiền mặt, bảng sổ; mỗi dòng hiện dạng chỉ đọc với nút Sửa (mở ô nhập cho riêng dòng đó, Lưu hoặc Hủy) và Xóa (hỏi lại rồi lưu ngay), nút Thêm mở một dòng mới; quỹ dự phòng cũng Sửa/Xóa như vậy (cập nhật 2026-11-06),
 lịch đáo hạn theo tháng, ô thanh khoản. Lưu xong, Tháp tài sản và Dòng tiền thụ động tải lại.
 
 ## Ngoài phạm vi (việc sau)

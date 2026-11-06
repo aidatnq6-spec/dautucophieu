@@ -1,5 +1,5 @@
-"""Sổ tiền gửi on Hồ sơ & rủi ro: the stored book (`settings/deposit_book`), its maturity calendar, and cash now against the reserve
-Tháp tài sản uses. Personal data; never sent to a model."""
+"""Sổ tài sản on Hồ sơ & rủi ro: the stored book (`settings/deposit_book`), its maturity calendar, and cash now against the reserve
+Tháp tài sản uses (entered in the book; blank = the profile's). Personal data; never sent to a model."""
 
 from datetime import date
 from decimal import Decimal
@@ -21,9 +21,11 @@ def ledger_cash(repo, owner) -> Decimal:
     return replay(list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)).cash
 
 
-def book_view(repo, owner, *, reserve: Decimal, today: date) -> dict:
-    """reserve: the deductions Tháp tài sản uses (services.equity_budget.protected_deductions)."""
+def book_view(repo, owner, *, reserve: Decimal, profile_reserve: Decimal, today: date) -> dict:
+    """reserve: the deductions Tháp tài sản uses (services.equity_budget.protected_deductions); profile_reserve: the confirmed profile's
+    figure, used when the book's reserve is blank."""
     book, version = read_book(repo, owner)
     book = book or DepositBook()
     return {"version": version, "book": book.model_dump(mode="json"), "calendar": maturity_calendar(book, today=today),
-            "liquidity": liquidity(book, ledger_cash=ledger_cash(repo, owner), reserve=reserve, today=today)}
+            "liquidity": liquidity(book, ledger_cash=ledger_cash(repo, owner), reserve=reserve, today=today),
+            "profile_reserve": format(profile_reserve, "f")}

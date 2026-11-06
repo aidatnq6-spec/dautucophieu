@@ -15,7 +15,8 @@ type Layers = { deposit: string; bond: string; gold: string; crypto: string };
 type Budget = { status: "no_total" | "no_risk" | "ok"; total?: string; deductions?: string; base?: string; group?: string; ratio?: string;
   budget?: string; held_cost?: string; held_weight?: string | null; room?: string | null; over?: string | null;
   deductions_source?: "manual" | "profile"; profile_deductions?: string; reserve?: string | null; layers?: Layers | null; pyramid?: Pyramid | null;
-  deposit_source?: "book" | "manual"; layer_sources?: Record<keyof Layers, "book" | "manual">; cash_source?: "book" | "ledger" };
+  deposit_source?: "book" | "manual"; layer_sources?: Record<keyof Layers, "book" | "manual">; cash_source?: "book" | "ledger";
+  pyramid_source?: "book" | "manual" };
 type View = { version: number; budget: Budget };
 
 const pct = (r: string) => formatRatio(r, 1).replace(",0%", "%");
@@ -127,10 +128,14 @@ export function EquityBudget() {
     } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); }
   }
   const b = view?.budget;
-  const fromBook = (layer: string) => b?.layer_sources?.[layer as keyof Layers] === "book";  // a list in Sổ tài sản replaces the figure by hand
+  const fromBook = (layer: string) => b?.layer_sources?.[layer as keyof Layers] === "book";
+  const bookOnly = b?.pyramid_source === "book";  // once Sổ tài sản is saved, every layer and the reserve come from it
   return (
     <section className="surface" aria-label="Tháp tài sản">
       <h2>Tháp tài sản</h2>
+      {bookOnly ? <p className="caption">Mọi lớp lấy từ Sổ tài sản ở trên (danh sách trống là 0), kể cả quỹ dự phòng; cổ phiếu theo giá mua từ sổ
+        giao dịch. Tổng tài sản là tổng các lớp. Mục tiêu tính trên phần còn lại sau quỹ dự phòng: vàng 10–15%, trái phiếu tối đa 10%, cổ phiếu theo
+        khẩu vị, tiền số tối đa 5%, tiền gửi là phần còn lại. Sửa số ở Sổ tài sản rồi lưu để tính lại.</p> : <>
       <p className="caption">Nhập số tiền bạn đang có ở từng lớp; cổ phiếu (theo giá mua) và tiền mặt trong tài khoản chứng khoán lấy từ sổ giao dịch
         (tiền mặt tính chung mục tiêu với tiền gửi).
         Tổng tài sản là tổng các lớp. Mục tiêu tính trên phần còn lại sau quỹ dự phòng: vàng 10–15%, trái phiếu tối đa 10%, cổ phiếu theo khẩu vị,
@@ -143,14 +148,14 @@ export function EquityBudget() {
           onChange={(e) => setReserve(groupDigitsInput(e.target.value))}
           placeholder={b?.profile_deductions ? `để trống = theo hồ sơ (${formatVnd(b.profile_deductions)})` : "để trống = theo hồ sơ"} /></label>
         <button type="submit" className="btn primary" disabled={!view}><Calculator size={16} aria-hidden="true" />Tính tháp tài sản</button>
-      </form>
+      </form></>}
       {message && <p className="errors" role="alert">{message}</p>}
       {b?.status === "ok" && !b.pyramid && <p className="notice">Đang dùng tổng tài sản nhập một con số ({formatVnd(b.total)}). Nhập số tiền từng lớp ở trên để xem tháp tài sản.</p>}
       {b?.status === "no_risk" && <p className="notice">Chưa có kết quả khảo sát rủi ro nên chưa biết tỷ trọng cổ phiếu.</p>}
       {b?.status === "ok" && b.pyramid && <PyramidView p={b.pyramid} intangibles={intangibles} fromBook={fromBook} cashFromBook={b.cash_source === "book"} />}
       {b?.status === "ok" && <dl className="eb-result">
         <div><dt>Tổng tài sản tài chính</dt><dd data-testid="equity-total">{formatVnd(b.total)}</dd></div>
-        <div><dt>Trừ quỹ dự phòng và khoản chi 12 tháng <span className="caption">({b.deductions_source === "manual" ? "nhập tay" : "theo hồ sơ"})</span></dt>
+        <div><dt>Trừ quỹ dự phòng và khoản chi 12 tháng <span className="caption">({b.deductions_source === "manual" ? (bookOnly ? "nhập ở Sổ tài sản" : "nhập tay") : "theo hồ sơ"})</span></dt>
           <dd data-testid="equity-deductions">{b.deductions === "0" ? "0 đ" : `−${formatVnd(b.deductions)}`}</dd></div>
         <div><dt>Nhóm khẩu vị</dt><dd>{GROUP_LABEL[b.group!] ?? b.group} → tỷ trọng cổ phiếu {pct(b.ratio!)}</dd></div>
         <div className="eb-main"><dt>Vốn dành cho cổ phiếu</dt><dd data-testid="equity-budget">{formatVnd(b.budget)}</dd></div>

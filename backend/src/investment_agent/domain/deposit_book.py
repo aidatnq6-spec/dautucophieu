@@ -70,6 +70,9 @@ class DepositBook(ContractModel):
     gold: tuple[Holding, ...] = Field(default=(), max_length=30)
     crypto: tuple[Holding, ...] = Field(default=(), max_length=30)
     count_ledger_cash: bool = True  # False: the owner's cash is the accounts here only; the ledger's cash is shown, not counted
+    reserve: UnsignedAmount | None = None  # quỹ dự phòng và khoản chi 12 tháng for Tháp tài sản; None = the confirmed profile's figure
+
+    _reserve_whole = field_validator("reserve")(_whole)
 
     @model_validator(mode="after")
     def _unique_ids(self):

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { baseText, spreadText, streakText } from "./brief-market";
+import { baseText, recoveryHead, spreadText, streakText } from "./brief-market";
 
 it("words the run of sessions, never giving a total for a run that reaches past the data", () => {
   expect(streakText({ direction: "up", sessions: 2, at_least: false, change: "41.11", pct: "0.0242" })).toBe("Tăng 2 phiên liên tiếp, +41,11 điểm (+2,42%)");
@@ -19,4 +19,9 @@ it("sets the equal-weight spread beside VN-Index and names an opposite direction
   expect(spreadText(spread, "-0.0051")).toBe("Trung bình cộng các mã +0,30%, trung vị 0,00% (358 mã có giao dịch); VN-Index −0,51%, ngược chiều");
   expect(spreadText(spread, null)).toBe("Trung bình cộng các mã +0,30%, trung vị 0,00% (358 mã có giao dịch)");
   expect(spreadText({ count: 0, mean_pct: null, median_pct: null }, "0.01")).toBeNull();
+});
+
+it("counts the recovery conditions met and names those without figures", () => {
+  expect(recoveryHead({ met: 2, known: 4, total: 4 })).toBe("2/4 điều kiện đạt");
+  expect(recoveryHead({ met: 1, known: 3, total: 4 })).toBe("1/4 điều kiện đạt, 1 điều kiện chưa có số");
 });

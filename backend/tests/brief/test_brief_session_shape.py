@@ -81,3 +81,12 @@ def test_hose_value_is_missing_until_hose_publishes_the_session_and_its_history(
     assert hose_liquidity({"status": "ok", "total_value_bn": "1"}, earlier=EARLIER, hose_get=lambda u: empty) == {
         "status": "missing", "reason": "HOSE chưa có số các phiên trước"}
     assert hose_liquidity({"status": "ok", "total_value_bn": "1"}, earlier=EARLIER[-5:], hose_get=lambda u: value("1"))["status"] == "missing"
+
+
+def test_ma20_is_the_mean_close_of_the_session_and_the_19_before_and_missing_when_a_bar_is():
+    b = {d: bar("1700") for d in EARLIER[-19:]}
+    b[S] = bar("1720")
+    out = index_session(b, session_date=S, earlier=EARLIER)
+    assert out["ma20"] == {"status": "ok", "value": "1701.00", "above": True}  # (19 × 1700 + 1720) / 20
+    del b[EARLIER[-7]]
+    assert index_session(b, session_date=S, earlier=EARLIER)["ma20"] == {"status": "missing", "reason": "Thiếu nến 1 trong 20 phiên"}

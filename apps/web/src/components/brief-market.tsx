@@ -18,7 +18,10 @@ type IndexSession = { status: "ok"; range: { high: string; low: string; close: s
   volume: Volume } | Missing;
 type HoseLiquidity = { status: "ok"; today_bn: string; previous_bn: string; change_pct: string; avg20_bn: string; ratio20: string } | Missing;
 export type MarketSection = { session_date: string; updated_at: string; indices: { status: string; rows: IndexRow[] } | Missing; board: Board;
-  hose: Hose; proprietary: Missing; tickers: Ticker[]; news: News; index_session?: IndexSession; hose_liquidity?: HoseLiquidity };
+  hose: Hose; proprietary: Missing; tickers: Ticker[]; news: News; index_session?: IndexSession; hose_liquidity?: HoseLiquidity;
+  recovery?: Recovery };
+type Check = { id: string; met: boolean | null; label: string; figure: string };
+type Recovery = { status: "ok"; met: number; known: number; total: number; checks: Check[] } | Missing;
 
 const TOP_TICKERS = 10;
 const num = (v: string | number, digits = 2) => Number(v).toLocaleString("vi-VN", { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -42,6 +45,12 @@ export function spreadText(s: Spread, vnPct: string | null): string | null {
   const head = `Trung bình cộng các mã ${pct(s.mean_pct)}, trung vị ${pct(s.median_pct)} (${s.count} mã có giao dịch)`;
   if (vnPct === null) return head;
   return `${head}; VN-Index ${pct(vnPct)}${Number(vnPct) * Number(s.mean_pct) < 0 ? ", ngược chiều" : ""}`;
+}
+
+/** Bảng kiểm "Thị trường phục hồi": how many conditions are met, and how many have no figures (counted neither way). */
+export function recoveryHead(r: { met: number; known: number; total: number }): string {
+  const unknown = r.total - r.known;
+  return `${r.met}/${r.total} điều kiện đạt${unknown ? `, ${unknown} điều kiện chưa có số` : ""}`;
 }
 
 /** A figure against the previous session and the 20 before it. */
@@ -83,6 +92,14 @@ export function BriefMarket({ market, session }: { market: MarketSection | null;
           : <span className="muted">chưa có số liệu ({shape.volume.reason})</span>}</p>
         <p className="caption">Nến ngày VN-Index theo KBS (vnstock); cao/thấp có thể gồm mức tham chiếu đầu phiên.</p>
       </> : <Gap what="Trong phiên" section={shape} />)}
+      {market.recovery?.status === "ok" && <section aria-label="Bảng kiểm thị trường phục hồi" data-testid="recovery">
+        <h3>Bảng kiểm &ldquo;Thị trường phục hồi&rdquo;: {recoveryHead(market.recovery)}</h3>
+        <ul className="bm-list">{market.recovery.checks.map((c) => <li key={c.id}>
+          <span className={`pill ${c.met === null ? "" : c.met ? "good" : "warn"}`}>{c.met === null ? "chưa có số" : c.met ? "đạt" : "chưa"}</span>{" "}
+          {c.label}{c.met !== null && <span className="caption"> · {c.figure}</span>}
+          {c.met === null && <span className="muted"> · {c.figure.replace(/^chưa có số /, "")}</span>}</li>)}</ul>
+        <p className="caption">Đếm điều kiện trên số liệu phiên, không phải khuyến nghị mua bán. Điều kiện chưa có số không tính là đạt hay chưa.</p>
+      </section>}
       {board.status === "ok" ? <>
         <h3>Thanh khoản và độ rộng</h3>
         <p>Giá trị khớp lệnh HOSE <strong>{num(board.value_matched_bn)} tỷ đồng</strong> ({num(board.volume_matched, 0)} cp)

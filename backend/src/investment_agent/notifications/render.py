@@ -78,6 +78,15 @@ def _spread_line(spread: dict | None, indices: dict | None) -> str | None:
     return line
 
 
+def _recovery_line(r: dict) -> str:
+    """Bảng kiểm "Thị trường phục hồi" in one line: the count met, then each condition with its figure (brief.recovery)."""
+    unknown = r["total"] - r["known"]
+    head = f"Bảng kiểm phục hồi: {r['met']}/{r['total']} đạt" + (f", {unknown} chưa có số" if unknown else "")
+    parts = [f"{c['label']}: {c['figure']}" if c["met"] is None else f"{c['label']}: {'đạt' if c['met'] else 'chưa'} ({c['figure']})"
+             for c in r["checks"]]
+    return head + " — " + " · ".join(parts)
+
+
 def render_market_brief(report: dict, market: dict) -> str:
     """Short phone version agreed on 2026-10-26: market first, holdings' prices, a few news, one portfolio line, reminders."""
     day = report["session_date"]
@@ -100,6 +109,8 @@ def render_market_brief(report: dict, market: dict) -> str:
             lines.append(f"Ngành tăng: {sum(1 for s in board['sectors'] if float(s['pct']) > 0)}/{len(board['sectors'])}")
         if (spread := _spread_line(board.get("spread"), market.get("indices"))):
             lines.append(spread)
+        if (recovery := market.get("recovery") or {}).get("status") == "ok":
+            lines.append(_recovery_line(recovery))
         lines += [
                   f"Khối ngoại: mua {_num(f['buy_value_bn'])} tỷ · bán {_num(f['sell_value_bn'])} tỷ · ròng {_num(f['net_value_bn'], sign=True)} tỷ"]
         if f["top_sell"]:

@@ -39,3 +39,8 @@ def test_the_session_shape_and_hose_value_pass_through_and_older_snapshots_name_
     assert v["index_session"] == shape and v["hose_liquidity"]["reason"] == "HOSE chưa công bố"
     old = market_view(SNAP, watched=[], held=set())  # snapshots stored before this feature
     assert old["index_session"]["status"] == "missing" and old["hose_liquidity"]["status"] == "missing"
+
+
+def test_the_recovery_checklist_is_read_from_the_snapshot():
+    v = market_view(SNAP, watched=[], held=set())
+    assert v["recovery"]["status"] == "ok" and [c["id"] for c in v["recovery"]["checks"]] == ["ma20", "volume", "breadth", "spread"]

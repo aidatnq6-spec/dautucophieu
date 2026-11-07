@@ -6,7 +6,8 @@ import { PriceMilestones } from "./price-milestones";
 
 type Point = { month: string; value: string | null; year: string | null; basis?: string; calc?: boolean };  // year: the period behind a ticker's point; null for an index
 type Series = { points: Point[]; median: string | null; sd: string | null; latest: string | null };
-type Calc = { from: string; to: string; check: { tickers?: number; pe?: { months: number; mean_abs: string | null }; pb?: { months: number; mean_abs: string | null } } | null };
+type Calc = { from: string; to: string; check: { tickers?: number; basket?: string; pe?: { months: number; mean_abs: string | null; max_abs?: string | null };
+  pb?: { months: number; mean_abs: string | null; max_abs?: string | null } } | null };
 type History = { symbol: string; kind?: "index"; calc?: Calc | null; source?: "vndirect" | "vnstock"; pe: Series; pb: Series; shares: number | null; from: string | null; to: string | null; reason: string | null };
 
 const H = 220, PAD = { top: 14, right: 58, bottom: 26, left: 36 };
@@ -37,8 +38,12 @@ const pct1 = (v: string | null | undefined) => (v == null ? "—" : `${(Number(v
 /** What the dashed, worked-out part of an index chart is, its limits, and how far the same method lands from VNDirect where both exist. */
 export function calcNote(c: Calc): string {
   const ch = c.check;
-  const span = `Nét đứt ${monthLabel(c.from)}–${monthLabel(c.to)}: tự tính từ ${ch?.tickers ?? "các"} mã còn niêm yết trên HOSE hôm nay (thiếu các mã đã hủy niêm yết nên quá khứ bị lệch).`;
-  return ch?.pe ? `${span} Cùng cách tính so với VNDirect ở ${ch.pe.months} tháng trùng nhau: P/E lệch trung bình ${pct1(ch.pe.mean_abs)}, P/B ${pct1(ch.pb?.mean_abs)}.` : span;
+  const who = ch?.basket === "top30"
+    ? `rổ ước tính: 30 mã vốn hoá lớn nhất mỗi kỳ trong ${ch?.tickers ?? "các"} mã còn niêm yết trên HOSE hôm nay (chọn ở phiên cuối tháng 12 và 6, áp dụng từ 1/2 và 1/8; luật thật còn xét free-float và thanh khoản)`
+    : `${ch?.tickers ?? "các"} mã còn niêm yết trên HOSE hôm nay`;
+  const span = `Nét đứt ${monthLabel(c.from)}–${monthLabel(c.to)}: tự tính từ ${who}; thiếu các mã đã hủy niêm yết nên quá khứ bị lệch.`;
+  const most = ch?.pe?.max_abs ? ` (tháng lệch nhiều nhất: P/E ${pct1(ch.pe.max_abs)}, P/B ${pct1(ch.pb?.max_abs)})` : "";
+  return ch?.pe ? `${span} Cùng cách tính so với VNDirect ở ${ch.pe.months} tháng trùng nhau: P/E lệch trung bình ${pct1(ch.pe.mean_abs)}, P/B ${pct1(ch.pb?.mean_abs)}${most}.` : span;
 }
 
 function niceTicks(max: number): number[] {

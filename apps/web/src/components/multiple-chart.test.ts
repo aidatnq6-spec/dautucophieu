@@ -19,6 +19,12 @@ it("each year is labelled at its first month; a label crowded by the next one is
 
 it("the worked-out part of an index chart is named with its limits and how far it is from VNDirect where both exist", () => {
   const calc = { from: "2013-01", to: "2017-11", check: { tickers: 380, pe: { months: 107, mean_abs: "0.0612" }, pb: { months: 107, mean_abs: "0.0435" } } };
-  expect(calcNote(calc)).toBe("Nét đứt 01/2013–11/2017: tự tính từ 380 mã còn niêm yết trên HOSE hôm nay (thiếu các mã đã hủy niêm yết nên quá khứ bị lệch). "
+  expect(calcNote(calc)).toBe("Nét đứt 01/2013–11/2017: tự tính từ 380 mã còn niêm yết trên HOSE hôm nay; thiếu các mã đã hủy niêm yết nên quá khứ bị lệch. "
     + "Cùng cách tính so với VNDirect ở 107 tháng trùng nhau: P/E lệch trung bình 6,1%, P/B 4,4%.");
+});
+
+it("the estimated VN30 basket is named as such", () => {
+  const calc = { from: "2013-01", to: "2017-11", check: { tickers: 408, basket: "top30", pe: { months: 107, mean_abs: "0.0700" }, pb: { months: 107, mean_abs: "0.0500" } } };
+  expect(calcNote(calc)).toContain("rổ ước tính: 30 mã vốn hoá lớn nhất mỗi kỳ trong 408 mã còn niêm yết trên HOSE hôm nay");
+  expect(calcNote(calc)).toContain("luật thật còn xét free-float và thanh khoản");
 });

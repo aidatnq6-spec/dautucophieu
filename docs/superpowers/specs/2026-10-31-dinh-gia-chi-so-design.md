@@ -54,4 +54,7 @@ chuỗi bắt đầu từ 12/2017; trước đó không có nguồn sẵn (tự 
 - Biểu đồ VN-Index nối phần tự tính trước 15/12/2017, **nét đứt màu xám**, chú thích ghi số mã, "thiếu các mã đã hủy niêm yết nên quá khứ bị lệch" và mức lệch
   so với VNDirect; trung vị, dải của biểu đồ tính trên chuỗi đã nối. Mức hợp lý ở bảng vẫn trung vị 5 năm VNDirect. **VN30 không có** phần này (không dựng
   lại được rổ từng kỳ). Dữ liệu trước 2018 không đổi nên không chạy theo lịch; chạy lại `index-history` khi cần.
+- **VN30 2013–2017** (chủ sở hữu chọn 07/11/2026): rổ thật không có dạng dữ liệu, nên dùng **rổ ước tính**: 30 mã vốn hóa lớn nhất trong 408 mã ở phiên cuối tháng 12
+  (áp dụng từ 1/2) và cuối tháng 6 (từ 1/8); trước kỳ đổi đầu tiên lấy theo 02/01/2013. Luật thật còn xét free-float và thanh khoản. Đối chiếu VNDirect 108 tháng:
+  P/E lệch trung bình 5,1 % (tháng nhiều nhất 29,8 %), P/B 4,1 % (29,7 %); đạt ngưỡng dưới 10 %. Chú thích ghi "rổ ước tính" và cả mức lệch nhiều nhất.
 

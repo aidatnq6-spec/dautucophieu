@@ -244,7 +244,7 @@ def index_history_cli(data_dir: Path, *, get=None, now=None, sleep=None) -> int:
     """Fetch what is missing, work the series out, compare it with VNDirect month by month and keep the days before VNDirect's first."""
     import time
     from datetime import datetime, timezone
-    from investment_agent.market.index_history import IndexHistoryStore, build_history, compare, compute_index
+    from investment_agent.market.index_history import IndexHistoryStore, build_history, compare, compute_index, top_members
     from investment_agent.market.series import SeriesStore
     if get is None:
         import httpx
@@ -256,17 +256,23 @@ def index_history_cli(data_dir: Path, *, get=None, now=None, sleep=None) -> int:
     symbols = json.loads((data_dir / "hose-listing.json").read_text(encoding="utf-8"))["listing"]["symbols"]
     store = IndexHistoryStore(data_dir / "index-history")
     built = build_history(store, symbols, get=get, now=now or datetime.now(timezone.utc), sleep=sleep or time.sleep)
-    calc = compute_index({s: rec for s in symbols if (rec := store.read(s))})
+    records = {s: rec for s in symbols if (rec := store.read(s))}
     multiples = SeriesStore(data_dir / "index-valuation")
-    vnd = {k: multiples.read(f"VNINDEX-{k}-1d") for k in ("pe", "pb")}
-    first = min((p[0][0].date() for p in vnd.values() if p), default=None)
-    check = {**compare(calc, vnd), "tickers": len([s for s in symbols if store.read(s)]), "vndirect_from": first.isoformat() if first else None}
-    for k in ("pe", "pb"):
-        multiples.upsert(f"VNINDEX-{k}-calc-1d", [(datetime.combine(d, datetime.min.time()), format(v[k], "f")) for d, v in sorted(calc.items())
-                                                 if first is None or d < first])
-    (data_dir / "index-valuation" / "VNINDEX-calc-check.json").write_text(json.dumps(check, ensure_ascii=False), encoding="utf-8")
+    checks = {}
+    # VN-Index: every ticker; VN30: an estimated basket, the thirty largest by capitalisation each half-year.
+    for index, basket, members in (("VNINDEX", "all", None), ("VN30", "top30", top_members(records, size=30))):
+        calc = compute_index(records, members=members)
+        vnd = {k: multiples.read(f"{index}-{k}-1d") for k in ("pe", "pb")}
+        first = min((p[0][0].date() for p in vnd.values() if p), default=None)
+        check = {**compare(calc, vnd), "tickers": len(records), "basket": basket, "vndirect_from": first.isoformat() if first else None}
+        for k in ("pe", "pb"):
+            multiples.upsert(f"{index}-{k}-calc-1d", [(datetime.combine(d, datetime.min.time()), format(v[k], "f")) for d, v in sorted(calc.items())
+                                                     if first is None or d < first])
+        (data_dir / "index-valuation" / f"{index}-calc-check.json").write_text(json.dumps(check, ensure_ascii=False), encoding="utf-8")
+        checks[index] = check
     failed = {k: v for k, v in built.items() if v != "ok"}
-    print(json.dumps({"status": "ok" if not failed else "partial", "built": built, "compare": check}, ensure_ascii=False))
+    print(json.dumps({"status": "ok" if not failed else "partial", "built": built, "compare": checks["VNINDEX"], "vn30": checks["VN30"]},
+                     ensure_ascii=False))
     return 0 if not failed else 1
 
 

@@ -10,7 +10,9 @@ from fastapi import APIRouter, Request
 from pydantic import Field
 
 from investment_agent.domain.models import ContractModel
+from investment_agent.domain.bank_figures import UnsafeUrl, check_public_https
 from investment_agent.domain.operating import group_view, valid_period
+from investment_agent.domain.operating_pdf import propose_values
 from investment_agent.market.watchlist import load_watchlist
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.records import read_version
@@ -37,6 +39,11 @@ class ValuesRequest(ContractModel):
     values: dict[str, str]
     source: str = Field(max_length=300)
     expected_version: int = Field(ge=0)
+    request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
+
+
+class ReadRequest(ContractModel):
+    url: str = Field(max_length=500)
     request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
 
 
@@ -171,3 +178,34 @@ def delete_values(symbol: str, group_id: str, period: str, request: Request, bod
                             "sources": {p: v for p, v in group.get("sources", {}).items() if p != period}}
         return {**data, "groups": groups}
     return _change(request, sym, body.expected_version, body.request_id, edit)
+
+
+def _read_pdf(url: str) -> list[str]:
+    from .bank_figures import _read_pdf as read  # the same guarded download: https, no redirects, 30 MB, 250 pages
+    return read(url)
+
+
+@router.post("/{symbol}/groups/{group_id}/read-pdf")
+def read_pdf(symbol: str, group_id: str, request: Request, body: ReadRequest):
+    """Proposed values for the group's lines from a public PDF bulletin; nothing is saved until the owner confirms them."""
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if not (sym := _watched(request, symbol)):
+        return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
+    if repo is None:
+        return unavailable()
+    try:
+        record = read_version(repo, owner, "settings", record_id(sym), None)
+    except RepositoryUnavailable:
+        return unavailable()
+    group = ((record.payload if record else {}).get("groups") or {}).get(group_id)
+    if group is None:
+        return error(404, "group_not_found", "Không có nhóm số liệu này.")
+    try:
+        check_public_https(body.url)
+    except UnsafeUrl as exc:
+        return error(422, "unsafe_url", str(exc))
+    try:
+        pages = _read_pdf(body.url)
+    except Exception:
+        return error(502, "pdf_unavailable", "Không tải được file PDF (kiểm tra đường dẫn, file tối đa 30 MB).")
+    return {"url": body.url, **propose_values(pages, group["series"])}

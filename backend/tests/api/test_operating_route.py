@@ -46,3 +46,24 @@ def test_definitions_and_values_are_checked(tmp_path):
     assert call(c, clock, "PUT", "/internal/operating/HPG/groups/x/values/2026-Q3", {**entry, "values": {"HRC": "abc"}, "request_id": "b8"}).status_code == 422
     assert call(c, clock, "PUT", "/internal/operating/HPG/groups/nope/values/2026-Q3", {**entry, "request_id": "b9"}).status_code == 404
     assert call(c, clock, "GET", "/internal/operating/ZZZ").status_code == 404
+
+
+def test_a_public_pdf_gives_proposed_values_for_the_group_s_lines_and_nothing_is_saved(tmp_path, monkeypatch):
+    from investment_agent.api.routes import operating
+    monkeypatch.setattr(operating, "_read_pdf", lambda url: ["Thép xây dựng đạt 412.300 tấn", "HRC 512.000 tấn"])
+    monkeypatch.setattr(operating, "check_public_https", lambda url: None)
+    c, clock = client(tmp_path)
+    call(c, clock, "PUT", "/internal/operating/HPG/groups/san-luong", {**GROUP, "series": ["Thép xây dựng", "HRC", "Tôn mạ"], "expected_version": 0,
+                                                                      "request_id": "g1"})
+    out = call(c, clock, "POST", "/internal/operating/HPG/groups/san-luong/read-pdf",
+               {"url": "https://www.hoaphat.com.vn/bantin-10-2026.pdf", "request_id": "r1"}).json()
+    assert out["url"] == "https://www.hoaphat.com.vn/bantin-10-2026.pdf" and out["missing"] == ["Tôn mạ"]
+    assert out["values"]["Thép xây dựng"][0] == {"value": "412300", "page": 1, "text": "Thép xây dựng đạt 412.300 tấn"}
+    assert call(c, clock, "GET", "/internal/operating/HPG").json()["version"] == 1  # proposals only, nothing written
+
+
+def test_reading_a_pdf_needs_a_safe_link_and_an_existing_group(tmp_path):
+    c, clock = client(tmp_path)
+    call(c, clock, "PUT", "/internal/operating/HPG/groups/x", {**GROUP, "expected_version": 0, "request_id": "g1"})
+    assert call(c, clock, "POST", "/internal/operating/HPG/groups/x/read-pdf", {"url": "http://example.com/a.pdf", "request_id": "r1"}).status_code == 422
+    assert call(c, clock, "POST", "/internal/operating/HPG/groups/none/read-pdf", {"url": "https://example.com/a.pdf", "request_id": "r2"}).status_code == 404

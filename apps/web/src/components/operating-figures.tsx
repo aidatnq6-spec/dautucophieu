@@ -7,6 +7,19 @@ type Row = { period: string; values: Record<string, string>; total: string | nul
 type Group = { id: string; name: string; unit: string; period: "month" | "quarter" | "year"; series: string[]; chart: "stack" | "line"; periods: string[]; rows: Row[] };
 type View = { symbol: string; version: number; groups: Group[] };
 
+type Candidate = { value: string; page: number; text: string };
+export type Proposal = { url: string; values: Record<string, Candidate[]>; missing: string[]; warnings: string[] };
+
+/** The first candidate of each line, and the link with the pages they came from as the source. */
+export function applyProposal(p: Proposal): { values: Record<string, string>; source: string } {
+  const values: Record<string, string> = {};
+  const pages = new Set<number>();
+  for (const [s, list] of Object.entries(p.values)) {
+    if (list[0]) { values[s] = list[0].value; pages.add(list[0].page); }
+  }
+  return { values, source: pages.size ? `${p.url} (trang ${[...pages].sort((a, b) => a - b).join(", ")})` : p.url };
+}
+
 const COLORS = ["#1f2a5c", "#3b82f6", "#15803d", "#a16207", "#7c3aed", "#b14249", "#0891b2", "#57534e"];
 const KIND: Record<Group["period"], [string, string]> = { month: ["tháng", "2026-09"], quarter: ["quý", "2026-Q3"], year: ["năm", "2026"] };
 const SHOWN = 12;
@@ -60,6 +73,23 @@ function GroupBlock({ g, symbol, version, onView, onError }: { g: Group; symbol:
   const [period, setPeriod] = useState("");
   const [values, setValues] = useState<Record<string, string>>({});
   const [source, setSource] = useState("");
+  const [pdf, setPdf] = useState("");
+  const [proposal, setProposal] = useState<Proposal | null>(null);
+  const [reading, setReading] = useState(false);
+  const read = async () => {
+    setReading(true);
+    try {
+      const p = await api<Proposal>(`operating/${encodeURIComponent(symbol)}/groups/${g.id}/read-pdf`, { method: "POST", body: { url: pdf.trim(), request_id: requestId() } });
+      const filled = applyProposal(p);
+      setProposal(p);
+      setValues(filled.values);
+      setSource(filled.source);
+    } catch (err) {
+      onError(err instanceof ApiError ? err.failure.message : "Không đọc được PDF.");
+    } finally {
+      setReading(false);
+    }
+  };
   const call = async (path: string, method: "PUT" | "POST", body: object) => {
     try {
       onView(await api<View>(`operating/${encodeURIComponent(symbol)}/groups/${g.id}${path}`, { method, body: { ...body, expected_version: version, request_id: requestId() } }));
@@ -71,7 +101,7 @@ function GroupBlock({ g, symbol, version, onView, onError }: { g: Group; symbol:
   };
   const save = async (e: FormEvent) => {
     e.preventDefault();
-    if (await call(`/values/${period.trim()}`, "PUT", { values, source })) { setValues({}); setPeriod(""); }
+    if (await call(`/values/${period.trim()}`, "PUT", { values, source })) { setValues({}); setPeriod(""); setProposal(null); }
   };
   const rows = g.rows.slice(-SHOWN);
   return (
@@ -92,6 +122,19 @@ function GroupBlock({ g, symbol, version, onView, onError }: { g: Group; symbol:
             <td><button type="button" className="btn" aria-label={`Xóa ${g.name} ${r.period}`} onClick={() => call(`/values/${r.period}/delete`, "POST", {})}>Xóa</button></td></tr>)}</tbody>
         </table></div>
       </> : <p className="muted">Chưa có kỳ nào.</p>}
+      <div className="ap-form" role="group" aria-label={`Đọc ${g.name} từ PDF`}>
+        <label className="field ap-source"><span>Đọc từ PDF công khai (link https)</span>
+          <input value={pdf} onChange={(e) => setPdf(e.target.value)} placeholder="https://…/ban-tin-san-xuat-kinh-doanh.pdf" /></label>
+        <button type="button" className="btn" disabled={reading || !pdf.trim()} onClick={read}>{reading ? "Đang đọc…" : "Đọc PDF"}</button>
+      </div>
+      {proposal && <div className="op-proposal" role="region" aria-label={`Số đề xuất từ PDF cho ${g.name}`}>
+        <p className="caption wrap">Số đề xuất từ PDF, chưa lưu: kiểm tra từng số và đơn vị (PDF có thể ghi tấn khi nhóm là nghìn tấn), nhập Kỳ rồi bấm Lưu kỳ.
+          {proposal.missing.length > 0 && ` Không thấy: ${proposal.missing.join(", ")}.`}{proposal.warnings.map((w) => ` ${w}`)}</p>
+        <ul className="ft-checks">{Object.entries(proposal.values).map(([s, list]) => <li key={s}><strong>{s}</strong>:{" "}
+          {list.map((c, k) => <button key={k} type="button" className={`btn ${values[s] === c.value ? "primary" : ""}`} aria-pressed={values[s] === c.value}
+            title={c.text} onClick={() => setValues({ ...values, [s]: c.value })}>{num(c.value)} · trang {c.page}</button>)}
+          <span className="caption"> “{list.find((c) => c.value === values[s])?.text ?? list[0].text}”</span></li>)}</ul>
+      </div>}
       <form className="ap-form" onSubmit={save} aria-label={`Nhập ${g.name}`}>
         <label className="field"><span>Kỳ (ví dụ {KIND[g.period][1]})</span><input value={period} onChange={(e) => setPeriod(e.target.value)} /></label>
         {g.series.map((s) => <label key={s} className="field"><span>{s} ({g.unit})</span>

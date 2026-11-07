@@ -216,6 +216,16 @@ if __name__ == "__main__":
             return [{"time": first + timedelta(days=i), "open": "50", "high": "55", "low": "49", "close": str(50 + i % 4), "volume": 1000 + i}
                     for i in range(60)]
     trend_routes._source = FixtureSource
+    # Số liệu vận hành: a synthetic public bulletin behind one example link; any other link is refused as the real check would do.
+    from investment_agent.api.routes import operating as operating_routes
+    from investment_agent.domain.bank_figures import UnsafeUrl
+    BULLETIN = "https://example.invalid/ban-tin-10-2026.pdf"
+    operating_routes._read_pdf = lambda url: ["BẢN TIN SẢN XUẤT KINH DOANH THÁNG 10/2026",
+                                              "Sản lượng bán hàng thép xây dựng đạt 412.300 tấn, tăng 18% so với cùng kỳ" + chr(10) + "Thép HRC: 512.000 tấn"]
+    def _only_bulletin(url):
+        if url != BULLETIN:
+            raise UnsafeUrl("Chỉ nhận đường dẫn https tới địa chỉ công khai.")
+    operating_routes.check_public_https = _only_bulletin
     # Kênh tuần: four years of US10Y closes in a rising saw-tooth that steepens each cycle (only the trend board reads this series).
     us_days, us_level, us_points = date.today() - timedelta(weeks=208), 2.0, []
     for w in range(208):

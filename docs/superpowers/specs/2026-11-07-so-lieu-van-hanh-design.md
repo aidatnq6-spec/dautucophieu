@@ -19,4 +19,11 @@ nghĩa và nhập, theo khuôn Số liệu ngân hàng. Không gọi AI, không 
   `POST …/groups/{nhóm}/values/{kỳ}/delete`.
 - Trang hồ sơ mã, khối **Số liệu vận hành** (sau Bảng số tài chính): mỗi nhóm một biểu đồ SVG 12 kỳ gần nhất (cột chồng hoặc đường) kèm chú
   thích màu, bảng (số, tỷ trọng, tổng, so cùng kỳ, nguồn, nút Xóa kỳ), biểu mẫu nhập kỳ; mục "Thêm nhóm số liệu".
-- Chưa có: đọc số từ PDF bản tin công khai (có thể làm sau theo cách của Số liệu ngân hàng).
+## Đọc số từ PDF công khai (07/11/2026)
+- Trong mỗi nhóm: ô "Đọc từ PDF công khai (link https)" và nút Đọc PDF → `POST /internal/operating/{mã}/groups/{nhóm}/read-pdf`. Cùng cách tải an toàn như
+  Số liệu ngân hàng (chỉ https tới địa chỉ công khai, không theo chuyển hướng, tối đa 30 MB, 250 trang). Không gọi AI.
+- `domain/operating_pdf.py`: với mỗi dòng của nhóm, tìm các dòng chữ trong PDF chứa tên dòng (bỏ qua hoa thường, dấu), lấy số đầu tiên sau tên (đọc kiểu Việt
+  Nam: dấu chấm nhóm nghìn, dấu phẩy thập phân; bỏ năm đứng riêng và phần của ngày tháng như 10/2026); tối đa 3 ứng viên, mỗi ứng viên kèm trang và đoạn chữ
+  gốc. PDF chỉ có ảnh (scan) thì ghi "hãy nhập tay".
+- **Không lưu gì** cho tới khi chủ sở hữu bấm Lưu kỳ: ứng viên đầu điền vào ô, link kèm số trang điền vào Nguồn; có thể bấm chọn ứng viên khác; chú thích nhắc
+  kiểm tra đơn vị (PDF có thể ghi tấn khi nhóm là nghìn tấn). Kỳ do chủ sở hữu nhập.

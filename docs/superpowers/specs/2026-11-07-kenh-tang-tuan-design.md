@@ -34,5 +34,13 @@ nguồn XAUUSD công khai (07/11/2026): Stooq chặn mọi bot trong robots.txt 
 - Trang Xu hướng, dưới bảng MACD/RSI: chọn mã, nút 3/5/10 năm; dòng trạng thái kênh final; điểm 0-1-2; bảng các kênh; bảng vùng đáy (đánh
   dấu điểm 0, so đáy trước); các lần phá kênh. Chú thích ghi đủ luật trên.
 
+## Vẽ lên biểu đồ nến (07/11/2026)
+- Chỉ ở khung **Tuần** của "Bảng giá và biểu đồ": nhóm nút "Kênh tuần: Tắt · 3 năm · 5 năm · 10 năm", **mặc định Tắt** để biểu đồ như cũ.
+- Lớp riêng, chỉ đọc, không lẫn với hình vẽ tay (màu cam, lưu trong kho cá nhân): không kéo, không xóa, không lưu.
+- Xanh: cạnh dưới và cạnh trên của từng kênh từ điểm nối đầu tới tuần đã kết thúc gần nhất (basic nét liền, tăng tốc nét đứt, final đậm); gấp
+  đôi (chấm) chỉ cho kênh final. Nâu: mỗi vùng đáy là một vạch ngang tại mức đáy, từ đầu vùng tới tuần cắt lên. Nhãn d1… dưới nến đáy (điểm 0 ghi
+  "· 0"); mũi tên đỏ "phá kênh" trên tuần phá kênh. Các đường không tham gia tự co giãn trục giá.
+- Thiếu điều kiện thì ghi lý do cạnh nút ("Chưa có kênh: …"); không vẽ gì ra sau tuần đã kết thúc gần nhất.
+
 ## Ngoài phạm vi
-Vẽ kênh lên biểu đồ nến (PR sau), nguồn XAUUSD, cảnh báo Telegram (chủ sở hữu không làm).
+Nguồn XAUUSD, cảnh báo Telegram (chủ sở hữu không làm).

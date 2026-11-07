@@ -36,3 +36,9 @@ Bước `index-valuation-sync` trong `run-after-close.ps1`, mỗi lượt: lần
 ## Giao diện
 
 Bảng nhỏ "Chỉ số thị trường" phía trên bảng cổ phiếu: chỉ số, điểm, mức hợp lý (khoảng), chênh lệch, kết luận, ngày số liệu; mỗi phương án ghi P/E (P/B) hiện tại, trung vị 5 năm và khoảng thời gian. Không lọc, không vào danh sách cổ phiếu.
+
+## Biểu đồ dùng toàn bộ lịch sử (07/11/2026, chủ sở hữu yêu cầu)
+Biểu đồ P/E, P/B theo tháng của VN-Index và VN30 (Định giá → Chi tiết) hiện mọi tháng đã lưu thay vì 5 năm, trung vị và dải ± độ lệch chuẩn tính
+trên toàn bộ số liệu theo ngày, như biểu đồ của mã cổ phiếu. API tỷ số của VNDirect chỉ có từ 15/12/2017 (gọi từ 2000 vẫn bắt đầu ngày đó), nên
+chuỗi bắt đầu từ 12/2017; trước đó không có nguồn sẵn (tự tính cần báo cáo của mọi mã trên sàn). Mức hợp lý ở bảng chỉ số giữ trung vị 5 năm.
+

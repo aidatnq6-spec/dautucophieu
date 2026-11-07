@@ -120,7 +120,7 @@ export function MultipleCharts({ symbol }: { symbol: string }) {
     <section aria-label={`Biểu đồ P/E và P/B ${symbol}`}>
       {data.kind === "index"
         ? <p className="caption">Mỗi tháng một điểm, {monthLabel(data.from!)}–{monthLabel(data.to!)}: P/E, P/B của chỉ số ngày cuối tháng (VNDirect).
-          Trung vị và dải ±1 độ lệch chuẩn tính trên số liệu theo ngày của cùng 5 năm, như bảng phía trên.</p>
+          Trung vị và dải ±1 độ lệch chuẩn tính trên toàn bộ số liệu theo ngày (VNDirect chỉ có từ 12/2017); mức hợp lý ở bảng phía trên dùng trung vị 5 năm.</p>
         : <p className="caption">Mỗi tháng một điểm, {monthLabel(data.from!)}–{monthLabel(data.to!)}: giá cuối tháng (đã điều chỉnh) × số cổ phiếu hiện tại,
           chia lợi nhuận 4 quý gần nhất (thiếu quý thì báo cáo năm) hoặc vốn chủ cuối kỳ đã công bố, như chuỗi theo tuần.{" "}
           {data.source === "vndirect" ? "Số của công ty mẹ theo báo cáo VNDirect; kỳ tính là đã công bố từ ngày VNDirect đưa số lên (trong 120 ngày sau khi hết kỳ), nếu không thì 45 ngày sau khi hết quý, năm từ 1/4 năm sau."

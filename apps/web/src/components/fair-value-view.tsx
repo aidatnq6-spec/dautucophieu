@@ -102,7 +102,7 @@ export function FairValueView() {
   const s = board.settings;
   return (
     <section className="surface">
-      <p className="notice">Định giá tham khảo từ báo cáo tài chính công bố (Vnstock, gói miễn phí), không phải khuyến nghị. Lợi suất yêu cầu {pct(s.required_return)},
+      <p className="notice">Định giá tham khảo từ báo cáo tài chính công bố (VNDirect; mã chưa có số VNDirect thì Vnstock gói miễn phí), không phải khuyến nghị. Lợi suất yêu cầu {pct(s.required_return)},
         tăng trưởng dài hạn {pct(s.long_term_growth)}, ngưỡng Rẻ/Đắt ±{pct(s.threshold)} so với giá hợp lý (trung vị các phương án). Sửa trong Cài đặt.</p>
       {board.indices && board.indices.length > 0 && <IndexTable rows={board.indices} />}
       <div className="actions" role="radiogroup" aria-label="Lọc">

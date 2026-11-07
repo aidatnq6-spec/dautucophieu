@@ -188,6 +188,14 @@ if __name__ == "__main__":
             raise RuntimeError("offline")
 
         def ohlcv(self, symbol, interval, start, end, index):
+            if symbol == "MWG":  # Đáy nhịp tuần: four years of a rising saw-tooth (12 weeks up, 4 down), only this row asks for it
+                first, price, out = date.today() - timedelta(weeks=208), 50.0, []
+                for w in range(208):
+                    price += 0.75 * (1 + w // 16 * 0.3) if w % 16 < 12 else -1.5  # steeper each cycle
+                    for d in range(5):
+                        t = datetime.combine(first + timedelta(weeks=w, days=d), datetime.min.time(), tzinfo=timezone(timedelta(hours=7)))
+                        out.append({"time": t, "open": f"{price:.2f}", "high": f"{price + 1:.2f}", "low": f"{price - 1:.2f}", "close": f"{price:.2f}", "volume": 1000})
+                return out
             first = datetime.combine(date.today() - timedelta(days=59), datetime.min.time(), tzinfo=timezone(timedelta(hours=7)))  # ends today
             return [{"time": first + timedelta(days=i), "open": "50", "high": "55", "low": "49", "close": str(50 + i % 4), "volume": 1000 + i}
                     for i in range(60)]

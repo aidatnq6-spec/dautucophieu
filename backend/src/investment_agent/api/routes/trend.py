@@ -3,15 +3,16 @@
 from datetime import timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Path as PathParam, Request
 from pydantic import Field
 
 from investment_agent.domain.models import ContractModel
 
+from investment_agent.market.channels import weekly_channels
 from investment_agent.market.live_board import INDICES, ChartStore, build_board, chart, in_session, regroup
 from investment_agent.market.macro_board import IDS as MACRO_IDS
 from investment_agent.market.macro_board import macro_chart, macro_rows
-from investment_agent.market.trend import SnapshotStore
+from investment_agent.market.trend import VN, SnapshotStore, load_board
 from investment_agent.market.watchlist import load_watchlist
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.chart_drawings import DrawingError, change_drawings, read_drawings
@@ -115,6 +116,36 @@ def live_chart(symbol: str, interval: str, request: Request):
         out = chart(ChartStore(Path(data_dir)), sym, base, fetch=_source().ohlcv, now=now(request), index=sym in INDICES)
     return regroup(out, interval) if base != interval else out
 
+
+
+@router.get("/trend/channels")
+def weekly_channel_rows(request: Request):
+    """The Xu hướng rows that Đáy nhịp tuần và kênh tăng can be asked for, in board order."""
+    require_owner(request)
+    return {"rows": [{"id": r["id"], "label": r["label"]} for g in load_board() for r in g["rows"]]}
+
+
+@router.get("/trend/channels/{symbol}/{years}")
+def weekly_channel(symbol: str, request: Request, years: int = PathParam(ge=1, le=20)):
+    """Đáy nhịp tuần và kênh tăng of one Xu hướng row: weekly MACD base zones from point 0 (lowest base low in `years`) and the
+    channels through them; daily candles for Vietnamese rows, stored closes for the Vĩ mô rows."""
+    require_owner(request)
+    data_dir = request.app.state.data_dir
+    if data_dir is None:
+        return unavailable()
+    sym = symbol.upper()
+    rows = {r["id"]: r for g in load_board() for r in g["rows"]}
+    if sym not in rows:
+        return error(404, "symbol_not_on_board", "Mã này không có trên bảng Xu hướng.")
+    row, at = rows[sym], now(request)
+    macro = sym in MACRO_IDS
+    daily = macro_chart(Path(data_dir), sym, "1D") if macro else chart(ChartStore(Path(data_dir)), sym, "1D", fetch=_source().ohlcv, now=at,
+                                                                          index=bool(row["source"].get("index")))
+    head = {"symbol": sym, "label": row["label"], "unit": daily.get("unit"), "basis": "close" if macro else "ohlc", "note": row.get("note")}
+    if daily.get("reason"):
+        return {**head, "years": years, "reason": daily["reason"], "bases": [], "zero": None, "points": {}, "channels": [], "status": None,
+                "breaks": [], "in_progress": None, "last_week": None, "weeks": 0}
+    return {**head, **weekly_channels(daily["bars"], today=at.astimezone(VN).date(), years=years)}
 
 class AlertChange(ContractModel):
     action: str = Field(pattern=r"^(add|remove|rearm)$")

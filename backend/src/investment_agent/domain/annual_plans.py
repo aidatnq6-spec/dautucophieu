@@ -1,0 +1,52 @@
+"""Kế hoạch năm (ĐHCĐ): the owner's entry of a ticker's revenue and profit plan for a year, with its source, against the year-to-date
+sum of VNDirect's quarters.
+
+Plans are in tỷ đồng as the meeting states them; revenue is compared with net revenue, profit with the line the plan names
+(LNST hợp nhất, LNST công ty mẹ or LNTT). The sum runs from the first quarter on and stops at the first quarter without that line,
+saying which; nothing is filled in or annualised. Newest years first.
+"""
+
+from decimal import ROUND_HALF_UP, Decimal
+
+KINDS = {"npat": "LNST", "npat_parent": "LNST công ty mẹ", "pbt": "LNTT"}
+_Q4 = Decimal("0.0001")
+_TY = Decimal(10**9)
+
+
+def _plain(v: Decimal) -> str:
+    return format(v.quantize(Decimal(1), ROUND_HALF_UP).normalize(), "f") if v != 0 else "0"
+
+
+def _line(year: str, quarters: dict | None, key: str, label: str, plan: str | None) -> dict | None:
+    if plan is None:
+        return None
+    target = Decimal(plan) * _TY
+    base = {"actual": None, "plan": _plain(target), "ratio": None}
+    if quarters is None:
+        return {**base, "reason": "Chưa có số quý VNDirect của mã này"}
+    total, last = Decimal(0), 0
+    for q in (1, 2, 3, 4):
+        value = (quarters.get(f"{year}-Q{q}") or {}).get(key)
+        if value is None:
+            break
+        total += Decimal(value)
+        last = q
+    if last == 0:
+        return {**base, "reason": f"Chưa có số quý 1/{year}"}
+    later = any(f"{year}-Q{q}" in quarters for q in range(last + 1, 5))
+    reason = f"Thiếu {label} quý {last + 1}/{year}: chỉ cộng tới quý {last}" if later else None
+    return {"actual": _plain(total), "plan": base["plan"], "ratio": str((total / target).quantize(_Q4, ROUND_HALF_UP)) if target > 0 else None,
+            "reason": reason}
+
+
+def plan_progress(plans: dict, quarters: dict | None) -> list[dict]:
+    out = []
+    for year in sorted(plans, reverse=True):
+        p = plans[year]
+        kind = p.get("profit_kind") or "npat"
+        seen = [q for q in (1, 2, 3, 4) if quarters and f"{year}-Q{q}" in quarters]
+        out.append({"year": year, "source": p.get("source"), "profit_kind": kind, "profit_label": KINDS[kind],
+                    "plan_revenue": p.get("revenue"), "plan_profit": p.get("profit"), "through": f"{year}-Q{seen[-1]}" if seen else None,
+                    "revenue": _line(year, quarters, "revenue", "doanh thu thuần", p.get("revenue")),
+                    "profit": _line(year, quarters, kind, KINDS[kind], p.get("profit"))})
+    return out

@@ -27,6 +27,7 @@ from investment_agent.valuation.forward import Assumptions, forward_valuation
 from investment_agent.valuation.history import monthly_multiples
 from investment_agent.valuation.index_reference import index_monthly_multiples
 from investment_agent.valuation.bands import percentile_bands
+from investment_agent.valuation.milestones import price_milestones
 from investment_agent.valuation.weekly import weekly_multiples
 from investment_agent.valuation.what_if import what_if
 from investment_agent.valuation.reference import _d, metrics
@@ -107,6 +108,21 @@ def fairvalue_what_if(symbol: str, request: Request, price: int = PathParam(gt=0
         return {"symbol": symbol, "price": str(price), "reason": out["reason"], "pe": None, "pb": None}
     return {"symbol": symbol, "price": str(price), "reason": None,
             **{k: what_if(out[k]["points"], shares=out["shares"], price=Decimal(price)) for k in ("pe", "pb")}}
+
+
+@router.get("/fairvalue/milestones/{symbol}/{threshold}")
+def fairvalue_milestones(symbol: str, request: Request, threshold: int = PathParam(ge=5, le=30)):
+    """Mốc giá quá khứ of one watched ticker: today against its own past troughs, with the owner's zigzag threshold in percent."""
+    require_owner(request)
+    data_dir = request.app.state.data_dir
+    if data_dir is None:
+        return unavailable()
+    data_dir, symbol = Path(data_dir), symbol.upper()
+    if symbol not in load_watchlist(data_dir).symbols:
+        return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
+    out = price_milestones(FundamentalsStore(data_dir / "fundamentals").read(symbol), SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"),
+                           today=now(request).astimezone(VN).date(), threshold=Decimal(threshold) / 100)
+    return {"symbol": symbol, **out}
 
 class ForwardRequest(ContractModel):
     assumptions: Assumptions

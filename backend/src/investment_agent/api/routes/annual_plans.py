@@ -1,5 +1,5 @@
 """Kế hoạch năm (ĐHCĐ) on the ticker profile: the owner's revenue and profit plan per year with its source (`settings/annual_plan_<MÃ>`),
-and the year-to-date progress from VNDirect's quarters."""
+CafeF's plan for the years the owner has not entered, and the year-to-date progress from VNDirect's quarters."""
 
 import re
 from decimal import Decimal, InvalidOperation
@@ -11,6 +11,7 @@ from pydantic import Field
 
 from investment_agent.domain.annual_plans import plan_progress
 from investment_agent.domain.models import ContractModel
+from investment_agent.market.plans_cafef import PlanStore
 from investment_agent.market.statements import StatementStore
 from investment_agent.market.watchlist import load_watchlist
 from investment_agent.repositories.personal import RepositoryUnavailable
@@ -49,9 +50,11 @@ def _watched(request: Request, symbol: str) -> str | None:
 
 def _view(request: Request, record, symbol: str) -> dict:
     plans = (record.payload if record else {}).get("years", {})
-    statements = StatementStore(Path(request.app.state.data_dir) / "statements").read(symbol)
+    data_dir = Path(request.app.state.data_dir)
+    statements = StatementStore(data_dir / "statements").read(symbol)
+    cafef = PlanStore(data_dir / "annual-plans-cafef").read(symbol)
     return {"symbol": symbol, "version": record.version if record else 0,
-            "plans": plan_progress(plans, statements.get("quarters") if statements else None)}
+            "plans": plan_progress(plans, statements.get("quarters") if statements else None, cafef=(cafef or {}).get("years"))}
 
 
 def _amount(raw: str, label: str):

@@ -44,3 +44,12 @@ def test_a_plan_needs_a_figure_a_source_and_a_watched_ticker(tmp_path):
     assert call(c, clock, "PUT", "/internal/annual-plans/ZZZ/2026", body).status_code == 404
     stale = call(c, clock, "PUT", "/internal/annual-plans/HPG/2026", {**body, "expected_version": 3, "request_id": "q5"})
     assert stale.status_code == 409
+
+
+def test_a_year_the_owner_has_not_entered_shows_cafef_s_plan_marked_as_such(tmp_path):
+    from investment_agent.market.plans_cafef import PlanStore
+    c, clock = client(tmp_path)
+    PlanStore(tmp_path / "annual-plans-cafef").save({"symbol": "HPG", "fetched_at": "2026-11-07T00:00:00+00:00", "source": "cafef",
+                                                     "years": {"2026": {"revenue": "200000", "pbt": None, "npat": "22000", "read_on": "2026-11-07"}}})
+    [p] = call(c, clock, "GET", "/internal/annual-plans/HPG").json()["plans"]
+    assert p["origin"] == "cafef" and p["revenue"]["ratio"] == "0.2500" and p["source"] == "CafeF (Kế hoạch kinh doanh), đọc 07/11/2026"

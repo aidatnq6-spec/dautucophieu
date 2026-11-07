@@ -34,3 +34,15 @@ def test_a_year_without_any_quarter_yet_and_newest_years_first():
     assert [p["year"] for p in out] == ["2027", "2026"]
     assert out[0]["through"] is None and out[0]["revenue"] == {"actual": None, "plan": str(B), "ratio": None, "reason": "Chưa có số quý 1/2027"}
     assert plan_progress({"2026": {"revenue": "1", "source": "x"}}, None)[0]["revenue"]["reason"] == "Chưa có số quý VNDirect của mã này"
+
+
+def test_cafef_fills_a_year_the_owner_has_not_entered_and_the_owner_s_entry_wins():
+    cafef = {"2026": {"revenue": "210000", "pbt": None, "npat": "22000", "read_on": "2026-11-07"},
+             "2025": {"revenue": "150000", "pbt": "16000", "npat": None, "read_on": "2025-05-01"}}
+    owner = {"2025": {"revenue": "140000", "profit": "15000", "profit_kind": "npat", "source": "Nghị quyết ĐHCĐ 2025"}}
+    out = plan_progress(owner, QUARTERS, cafef=cafef)
+    assert [(p["year"], p["origin"]) for p in out] == [("2026", "cafef"), ("2025", "owner")]
+    assert out[0]["profit_kind"] == "npat" and out[0]["plan_profit"] == "22000" and out[0]["source"] == "CafeF (Kế hoạch kinh doanh), đọc 07/11/2026"
+    assert out[1]["plan_revenue"] == "140000"
+    only_pbt = plan_progress({}, QUARTERS, cafef={"2026": {"revenue": None, "pbt": "30000", "npat": None, "read_on": "2026-11-07"}})[0]
+    assert only_pbt["profit_kind"] == "pbt" and only_pbt["profit"]["actual"] == str(27056 * B) and only_pbt["revenue"] is None

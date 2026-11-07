@@ -3,7 +3,8 @@ sum of VNDirect's quarters.
 
 Plans are in tỷ đồng as the meeting states them; revenue is compared with net revenue, profit with the line the plan names
 (LNST hợp nhất, LNST công ty mẹ or LNTT). The sum runs from the first quarter on and stops at the first quarter without that line,
-saying which; nothing is filled in or annualised. Newest years first.
+saying which; nothing is filled in or annualised. Newest years first. A year the owner has not entered takes CafeF's plan when
+one was read (profit: LNST when given, otherwise LNTT), marked as such; the owner's entry always wins.
 """
 
 from decimal import ROUND_HALF_UP, Decimal
@@ -39,13 +40,23 @@ def _line(year: str, quarters: dict | None, key: str, label: str, plan: str | No
             "reason": reason}
 
 
-def plan_progress(plans: dict, quarters: dict | None) -> list[dict]:
+def _from_cafef(c: dict) -> dict:
+    kind, profit = ("npat", c.get("npat")) if c.get("npat") else ("pbt", c.get("pbt"))
+    day = c.get("read_on") or ""
+    return {"revenue": c.get("revenue"), "profit": profit, "profit_kind": kind,
+            "source": f"CafeF (Kế hoạch kinh doanh), đọc {day[8:10]}/{day[5:7]}/{day[:4]}" if day else "CafeF (Kế hoạch kinh doanh)"}
+
+
+def plan_progress(plans: dict, quarters: dict | None, cafef: dict | None = None) -> list[dict]:
+    """The owner's plans, and CafeF's for the years the owner has not entered (the owner's entry wins)."""
+    merged = {y: (_from_cafef(c), "cafef") for y, c in (cafef or {}).items() if c.get("revenue") or c.get("npat") or c.get("pbt")}
+    merged.update({y: (p, "owner") for y, p in plans.items()})
     out = []
-    for year in sorted(plans, reverse=True):
-        p = plans[year]
+    for year in sorted(merged, reverse=True):
+        p, origin = merged[year]
         kind = p.get("profit_kind") or "npat"
         seen = [q for q in (1, 2, 3, 4) if quarters and f"{year}-Q{q}" in quarters]
-        out.append({"year": year, "source": p.get("source"), "profit_kind": kind, "profit_label": KINDS[kind],
+        out.append({"year": year, "origin": origin, "source": p.get("source"), "profit_kind": kind, "profit_label": KINDS[kind],
                     "plan_revenue": p.get("revenue"), "plan_profit": p.get("profit"), "through": f"{year}-Q{seen[-1]}" if seen else None,
                     "revenue": _line(year, quarters, "revenue", "doanh thu thuần", p.get("revenue")),
                     "profit": _line(year, quarters, kind, KINDS[kind], p.get("profit"))})

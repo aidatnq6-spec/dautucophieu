@@ -20,6 +20,17 @@ export function periodText(period: string, basis: string | undefined): string {
   return `số liệu năm ${period}`;
 }
 
+const LABEL_GAP = 24;  // px between two year labels before the earlier one is dropped
+
+/** Year labels at each year's first plotted month (every other year on a phone). A label with the next one closer than LABEL_GAP is
+ * dropped (a lone December at the start, as the index charts from 12/2017), and one at the left edge is anchored at its start. */
+export function yearLabels(months: string[], x: (i: number) => number, left: number, every: number) {
+  const firsts = months.map((m, i) => ({ i, year: m.slice(0, 4) }))
+    .filter(({ i, year }) => (i === 0 || months[i - 1].slice(0, 4) !== year) && Number(year) % every === 0);
+  return firsts.filter((f, k) => k === firsts.length - 1 || x(firsts[k + 1].i) - x(f.i) >= LABEL_GAP)
+    .map((f) => ({ ...f, anchor: (x(f.i) < left + 12 ? "start" : "middle") as "start" | "middle" }));
+}
+
 function niceTicks(max: number): number[] {
   const step = [1, 2, 2.5, 5, 10, 20, 25, 50, 100].find((s) => max / s <= 5) ?? Math.ceil(max / 5);
   return Array.from({ length: Math.floor(max / step) + 1 }, (_, i) => i * step);
@@ -56,9 +67,7 @@ function Chart({ title, symbol, series, unit }: { title: string; symbol: string;
   let d = "", pen = false;
   values.forEach((v, i) => { if (v === null) { pen = false; return; } d += `${pen ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`; pen = true; });
   const every = W < 420 ? 2 : 1;  // keep year labels apart on a phone
-  // First plotted month of each year carries the year label.
-  const years = pts.map((p, i) => ({ i, m: p.month })).filter(({ m }, k) => (k === 0 || pts[k - 1].month.slice(0, 4) !== m.slice(0, 4))
-    && Number(m.slice(0, 4)) % every === 0 && x(k) > PAD.left + 12);
+  const years = yearLabels(pts.map((p) => p.month), x, PAD.left, every);
   const lastIdx = values.map((v, i) => (v === null ? -1 : i)).filter((i) => i >= 0).pop()!;
   const onMove = (e: React.PointerEvent<SVGRectElement>) => {
     const box = e.currentTarget.getBoundingClientRect();
@@ -85,7 +94,7 @@ function Chart({ title, symbol, series, unit }: { title: string; symbol: string;
               <line key={v} x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)} className="mc-sd" data-testid="mc-sd" />)}
             <text x={W - PAD.right + 10} y={y(median) + 4} className="mc-axis">Trung vị</text>
           </>}
-          {years.map(({ i, m }) => <text key={m} x={x(i)} y={H - 8} className="mc-axis" textAnchor="middle">{m.slice(0, 4)}</text>)}
+          {years.map(({ i, year, anchor }) => <text key={year} x={x(i)} y={H - 8} className="mc-axis" textAnchor={anchor}>{year}</text>)}
           <path d={d} className="mc-line" />
           <circle cx={x(lastIdx)} cy={y(values[lastIdx]!)} r={4} className="mc-dot" />
           {hover !== null && <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={H - PAD.bottom} className="mc-cross" />}

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { axisDomain, type BandWindow, zoneCounts } from "./percentile-bands";
+import { axisDomain, type BandWindow, episodeLine, presetPrice, zoneCounts } from "./percentile-bands";
 
 const win = (over: Partial<BandWindow>): BandWindow => ({
   label: "3 năm", years: 3, weeks: 157, empty_weeks: 0, from: "2023-11-10", bases: { "năm": 157 }, reason: null,
@@ -17,4 +17,21 @@ it("counts the drawn windows where today is at or below P20 and at or below P10"
   const windows = [win({}), win({ p: { ...win({}).p!, p20: "1.30", p10: "1.25" } }), win({ reason: "x", p: null })];
   expect(zoneCounts(windows, "1.25")).toEqual({ drawn: 2, p20: 1, p10: 1 });
   expect(zoneCounts(windows, null)).toEqual({ drawn: 2, p20: 0, p10: 0 });
+});
+
+it("the axis also reaches the assumed multiple", () => {
+  expect(axisDomain([win({})], "1.20", "0.50")).toEqual([0.5, 1.8]);
+});
+
+it("a preset price is today's close less the percentage, rounded to 10 đồng", () => {
+  expect(presetPrice("32450", 5)).toBe(30830);
+  expect(presetPrice("15100", 20)).toBe(12080);
+});
+
+it("the twelve-month line names how many episodes and gives a rate only from the minimum sample", () => {
+  const ep = { list: [], done: 2, pending: 1, wins: 2, win_rate: null, median: null, worst_return: "0.1000", worst_drawdown: "-0.0270", min_episodes: 5 };
+  expect(episodeLine(ep)).toBe("Có lãi 2/2 đợt — chưa đủ mẫu để tính tỉ lệ (cần ít nhất 5 đợt) · 1 đợt chưa đủ 12 tháng");
+  expect(episodeLine({ ...ep, done: 6, wins: 5, pending: 0, win_rate: "0.8333", median: "0.1520" }))
+    .toBe("Có lãi 5/6 đợt (83%) · trung vị +15,2%");
+  expect(episodeLine({ ...ep, done: 0, wins: 0, pending: 0, worst_return: null, worst_drawdown: null })).toBe("Chưa lần nào về mức này trong chuỗi");
 });

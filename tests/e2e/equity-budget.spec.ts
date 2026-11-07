@@ -65,9 +65,12 @@ test("money for more stocks comes from layers above their ceiling, after filling
   const funding = box.getByRole("region", { name: "Nguồn tiền để mua thêm cổ phiếu" });
   await expect(funding.getByTestId("funding-source-deposit")).toContainText("Tiền gửi + tiền mặt");
   await expect(funding.getByTestId("funding-source-bond")).toContainText("không lấy");
-  // gold is filled first, by exactly its shortfall
-  const goldGap = (await box.getByTestId("layer-gold").locator(".pill").innerText()).replace(/^thiếu /, "");
-  await expect(funding.getByTestId("funding-fill-gold")).toContainText(goldGap);
+  // gold is filled first, by exactly its shortfall; both are read again until the page has worked out the new layers (a single
+  // read of the shortfall right after typing sometimes caught the previous figure, 07/11/2026)
+  await expect.poll(async () => {
+    const gap = (await box.getByTestId("layer-gold").locator(".pill").innerText()).replace(/^thiếu /, "");
+    return (await funding.getByTestId("funding-fill-gold").innerText()).includes(gap);
+  }, { timeout: 10_000 }).toBe(true);
   // the surplus is large, so what can be bought is the room left in the stock target
   await expect(funding.getByTestId("funding-buyable")).toHaveText(await funding.getByTestId("funding-room").innerText());
   await expect(funding).toContainText("không phải khuyến nghị");

@@ -132,19 +132,27 @@ def test_chart_drawings_without_personal_store_are_unavailable(tmp_path):
     assert call(client(tmp_path, clock, repo=False), clock, "GET", "/internal/trend/drawings").status_code == 503
 
 
-def test_weekly_channels_cover_the_trend_board_rows_only(tmp_path, monkeypatch):
+def test_channels_cover_the_trend_board_rows_on_weekly_daily_and_hourly_bars(tmp_path, monkeypatch):
     from investment_agent.api.routes import trend
     source = FakeSource()
     monkeypatch.setattr(trend, "_source", lambda: source)
     clock = Clock()
     c = client(tmp_path, clock)
-    hpg = call(c, clock, "GET", "/internal/trend/channels/HPG/5").json()
-    assert hpg["symbol"] == "HPG" and hpg["basis"] == "ohlc" and hpg["years"] == 5
-    assert hpg["reason"] == "Chỉ có 1 tuần, cần ít nhất 35 tuần để có MACD tuần" and ("ohlcv", "HPG", "1D", False) in source.calls
-    gold = call(c, clock, "GET", "/internal/trend/channels/GOLD/5").json()
+    hpg = call(c, clock, "GET", "/internal/trend/channels/HPG/1W/5").json()
+    assert hpg["symbol"] == "HPG" and hpg["basis"] == "ohlc" and hpg["frame"] == "W" and hpg["n"] == 5
+    assert hpg["reason"] == "Chỉ có 1 nến tuần, cần ít nhất 35 nến để có MACD" and ("ohlcv", "HPG", "1D", False) in source.calls
+    hourly = call(c, clock, "GET", "/internal/trend/channels/HPG/1H/4").json()
+    assert hourly["frame"] == "H" and ("ohlcv", "HPG", "1H", False) in source.calls
+    assert call(c, clock, "GET", "/internal/trend/channels/HPG/1D/12").json()["frame"] == "D"
+    gold = call(c, clock, "GET", "/internal/trend/channels/GOLD/1W/5").json()
     assert gold["basis"] == "close" and gold["reason"] == "Chưa có số" and gold["note"] == "Gần đúng: PAXG, token bám giá vàng."
-    assert call(c, clock, "GET", "/internal/trend/channels/ZZZ/5").status_code == 404
-    assert call(c, clock, "GET", "/internal/trend/channels/HPG/0").status_code == 422
+    assert call(c, clock, "GET", "/internal/trend/channels/DXY/1H/4").json()["reason"] == "Nguồn chỉ có giá ngày"
+    assert call(c, clock, "GET", "/internal/trend/channels/ZZZ/1W/5").status_code == 404
+    assert call(c, clock, "GET", "/internal/trend/channels/HPG/1W/0").status_code == 422
+    assert call(c, clock, "GET", "/internal/trend/channels/HPG/1W/21").status_code == 422
+    assert call(c, clock, "GET", "/internal/trend/channels/HPG/1D/61").status_code == 422
+    assert call(c, clock, "GET", "/internal/trend/channels/HPG/1H/53").status_code == 422
+    assert call(c, clock, "GET", "/internal/trend/channels/HPG/1M/5").status_code == 422
 
 
 def test_weekly_channels_list_every_trend_board_row(tmp_path):

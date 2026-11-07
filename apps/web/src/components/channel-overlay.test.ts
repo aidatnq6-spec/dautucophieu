@@ -1,9 +1,9 @@
 import { expect, it } from "vitest";
 import { channelMarkers, channelSegments } from "./channel-overlay";
-import type { Channels } from "./weekly-channels";
+import type { Channels } from "./bar-channels";
 
 const data: Channels = {
-  symbol: "HPG", label: "HPG", unit: "nghìn đồng", basis: "ohlc", note: null, years: 5, reason: null, weeks: 200, last_week: "2026-11-02", in_progress: null,
+  symbol: "HPG", label: "HPG", unit: "nghìn đồng", basis: "ohlc", note: null, frame: "W", n: 5, reason: null, bars: 200, last_bar: "2026-11-02", in_progress: null,
   zero: 0, points: {},
   bases: [
     { cross: "2022-12-05", low_date: "2022-11-14", low: "7.98", zone_from: "2022-10-31", zone_to: "2022-12-05", vs_prev: null },
@@ -19,7 +19,7 @@ const data: Channels = {
   breaks: [{ date: "2026-06-01", close: "23.75", lower: "23.88", from: { date: "2025-04-07", price: "15.85" }, to: { date: "2026-03-23", price: "22.54" } }],
 };
 
-it("each channel runs from its first joining point to the last finished week, the upper line the channel's width above", () => {
+it("each channel runs from its first joining point to the last finished bar, the upper line the channel's width above", () => {
   const segs = channelSegments(data);
   const basicLower = segs.find((s) => s.key === "basic-lower")!;
   expect(basicLower.points).toEqual([{ t: "2022-11-14", p: 7.98 }, { t: "2026-11-02", p: 20.95 }]);
@@ -47,7 +47,7 @@ it("markers name the zones, point 0 and each break, in time order", () => {
   ]);
 });
 
-it("nothing is drawn without channels or a finished week", () => {
+it("nothing is drawn without channels or a finished bar", () => {
   expect(channelSegments({ ...data, channels: [], bases: [] })).toEqual([]);
-  expect(channelSegments({ ...data, last_week: null })).toEqual([]);
+  expect(channelSegments({ ...data, last_bar: null })).toEqual([]);
 });

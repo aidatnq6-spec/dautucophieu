@@ -44,3 +44,19 @@ nguồn XAUUSD công khai (07/11/2026): Stooq chặn mọi bot trong robots.txt 
 
 ## Ngoài phạm vi
 Nguồn XAUUSD, cảnh báo Telegram (chủ sở hữu không làm).
+
+## Khung ngày và 1 giờ (07/11/2026)
+Chủ sở hữu hỏi áp dụng cho khung ngày và 1 giờ: cùng luật trên, với các điểm khác sau.
+- **Khung**: tuần (gộp từ nến ngày), ngày, 1 giờ (nến như biểu đồ; khóa giờ là giờ Hà Nội). Khung tháng không có.
+- **Điểm 0 trong**: tuần 3/5/10 năm (mặc định 5), ngày 6/12/24 tháng (mặc định 12), 1 giờ 2/4/8 tuần (mặc định 4; nguồn giữ khoảng 1 năm nến giờ).
+- **Đo theo số nến, không theo ngày lịch** (mọi khung, kể cả tuần): biểu đồ vẽ đường thẳng theo khoảng cách nến, nên nghỉ cuối tuần, ban đêm,
+  nghỉ trưa không làm cong đường. Khung tuần gần như không đổi so với bản tính theo ngày lịch (HPG: cạnh dưới 20,93 thay 20,95).
+- **Nến đang chạy không dùng**: tuần này; hôm nay theo giờ Hà Nội hoặc theo UTC (nến ngày Coinbase đóng lúc 07:00 giờ Hà Nội); giờ này.
+- **Nguồn**: cổ phiếu, chỉ số có nến ngày 10 năm và nến giờ 1 năm (Vnstock); Vĩ mô chỉ có giá đóng cửa, nến giờ chỉ có BTC và vàng (PAXG),
+  dòng khác ghi "Nguồn chỉ có giá ngày".
+- Khi giá đang giảm, đáy thấp nhất trong khoảng tìm nằm gần hiện tại nên chưa đủ 2 vùng đáy từ điểm 0: trang ghi "Cần ít nhất 2 đáy vùng
+  từ điểm 0 để có kênh"; không có kênh tăng để vẽ là đúng luật.
+- API: `GET /internal/trend/channels/{mã}/{1W|1D|1H}/{n}` (n tối đa 20 năm, 60 tháng, 52 tuần; ngoài khoảng hoặc khung khác trả 422) thay
+  cho đường dẫn chỉ có tuần.
+- Giao diện: khối "Đáy nhịp và kênh tăng" có thêm chọn khung; trên biểu đồ nến, nhóm nút "Kênh" hiện ở khung Tuần, Ngày, 1 giờ, mỗi khung
+  bật tắt riêng, mặc định Tắt.

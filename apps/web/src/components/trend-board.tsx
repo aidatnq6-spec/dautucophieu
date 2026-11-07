@@ -6,7 +6,7 @@ import { formatDecimal, formatRatio, formatVnd } from "../lib/format";
 import { type Marker, type Segment, channelMarkers, channelSegments } from "./channel-overlay";
 import { type Add, type At, type Drawing, DrawingList, DrawingToolbar, type Interval, type Tool, dragResult, useChartDrawings } from "./chart-drawings";
 import { PriceAlerts } from "./price-alerts";
-import type { Channels } from "./weekly-channels";
+import { type Channels, type Frame, LOOKBACK, fmtT } from "./bar-channels";
 
 type Row = { symbol: string; kind: "index" | "macro" | "stock"; price: string | null; ref: string | null; change: string | null; change_pct: string | null;
   ceiling?: string | null; floor?: string | null; high?: string | null; low?: string | null; volume?: number | null; time: string | null;
@@ -250,7 +250,7 @@ function CandleChart({ data, liveT, livePrice, drawings, tool, onDrawn, overlay 
       for (const t of trends) chart.removeSeries(t);
     };
   }, [drawings, built]);
-  // Kênh tuần: read-only lines and markers from the weekly channel rules, kept apart from the owner's own drawings.
+  // Kênh: read-only lines and markers from the weekly channel rules, kept apart from the owner's own drawings.
   useEffect(() => {
     const chart = chartRef.current, series = price.current, Line = LineRef.current, makeMarkers = MarkersRef.current;
     if (!chart || !series || !Line || !makeMarkers || !overlay) {
@@ -291,7 +291,7 @@ export function TrendBoard() {
   const [reload, setReload] = useState(0);
   const reloadedAt = useRef(0);
   const tools = useChartDrawings(selected, interval);
-  const [channelYears, setChannelYears] = useState<0 | 3 | 5 | 10>(0);
+  const [channelN, setChannelN] = useState<Record<Frame, number>>({ "1W": 0, "1D": 0, "1H": 0 });  // 0 = off, the default
   const [channels, setChannels] = useState<Channels | null>(null);
   const frameWord = FRAMES.find(([iv]) => iv === interval)?.[2] ?? "";
 
@@ -316,12 +316,15 @@ export function TrendBoard() {
 
   useEffect(() => {
     let alive = true;
-    if (interval !== "1W" || channelYears === 0) return;
-    api<Channels>(`trend/channels/${encodeURIComponent(selected)}/${channelYears}`).then((c) => { if (alive) setChannels(c); },
+    const n = interval in LOOKBACK ? channelN[interval as Frame] : 0;
+    if (n === 0) return;
+    api<Channels>(`trend/channels/${encodeURIComponent(selected)}/${interval}/${n}`).then((c) => { if (alive) setChannels(c); },
       () => { if (alive) setChannels(null); });
     return () => { alive = false; };
-  }, [selected, interval, channelYears]);
-  const channelData = interval === "1W" && channelYears > 0 && channels?.symbol === selected && channels.years === channelYears ? channels : null;
+  }, [selected, interval, channelN]);
+  const frame = interval in LOOKBACK ? (interval as Frame) : null;
+  const channelOn = frame !== null ? channelN[frame] : 0;
+  const channelData = frame && channelOn > 0 && channels?.symbol === selected && `1${channels.frame}` === frame && channels.n === channelOn ? channels : null;
   const overlay = useMemo(() => (channelData && !channelData.reason ? { segments: channelSegments(channelData), markers: channelMarkers(channelData) } : null),
     [channelData]);
 
@@ -354,18 +357,18 @@ export function TrendBoard() {
           {current?.reason && <p className="muted">{current.reason}.</p>}
           {current && !current.reason && <>
             <DrawingToolbar tools={tools} symbol={row?.label ?? selected} />
-            {interval === "1W" && <div className="tb-channels" role="group" aria-label="Kênh tuần">
-              <span className="caption">Kênh tuần</span>
-              {([0, 3, 5, 10] as const).map((y) => <button key={y} type="button" className={`btn ${channelYears === y ? "primary" : ""}`} aria-pressed={channelYears === y}
-                onClick={() => setChannelYears(y)}>{y === 0 ? "Tắt" : `${y} năm`}</button>)}
-              {channelYears > 0 && !channelData && <span className="caption fx-loading" role="status">Đang tải kênh…</span>}
+            {frame && <div className="tb-channels" role="group" aria-label="Kênh">
+              <span className="caption">Kênh {LOOKBACK[frame].word}</span>
+              {[0, ...LOOKBACK[frame].opts].map((v) => <button key={v} type="button" className={`btn ${channelOn === v ? "primary" : ""}`} aria-pressed={channelOn === v}
+                onClick={() => setChannelN((old) => ({ ...old, [frame]: v }))}>{v === 0 ? "Tắt" : `${v} ${LOOKBACK[frame].unit}`}</button>)}
+              {channelOn > 0 && !channelData && <span className="caption fx-loading" role="status">Đang tải kênh…</span>}
               {channelData?.reason && <span className="caption">Chưa có kênh: {channelData.reason}.</span>}
               {overlay && <span className="caption" data-testid="tb-channel-caption">Xanh: kênh basic, tăng tốc (nét đứt), final (đậm), cạnh trên và gấp đôi
-                (chấm) tới tuần {channelData!.last_week!.split("-").reverse().join("/")}; nâu: vùng đáy MACD tuần, d1… từ điểm 0 trong {channelYears} năm;
-                mũi tên đỏ: tuần phá kênh final. Luật xem ở khối Đáy nhịp tuần và kênh tăng bên dưới; không kéo ra tương lai.</span>}
+                (chấm) tới nến {fmtT(channelData!.last_bar!)}; nâu: vùng đáy MACD, d1… từ điểm 0 trong {channelOn} {LOOKBACK[frame].unit};
+                mũi tên đỏ: nến phá kênh final. Luật xem ở khối Đáy nhịp và kênh tăng bên dưới; không kéo ra tương lai.</span>}
             </div>}
             <CandleChart data={current} liveT={liveT} livePrice={livePrice} drawings={tools.shown} tool={tools.tool} onDrawn={tools.onDrawn}
-              overlay={interval === "1W" ? overlay : null} />
+              overlay={frame ? overlay : null} />
             <p className="caption" data-testid="tb-chart-caption">{current.style === "line"
               ? `Giá đóng cửa theo ${frameWord} · ${current.bars.length} điểm · ${current.unit ?? ""} · số mới nhất ${current.as_of ?? "—"}`
               : `${current.interval === "1H" ? "Nến 1 giờ" : `Nến ${frameWord}`} · ${current.bars.length} nến · ${current.unit ?? ""}`}

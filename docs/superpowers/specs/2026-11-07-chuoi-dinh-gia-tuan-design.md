@@ -50,4 +50,8 @@ Phân vị, z, độ lệch và giao diện (bước 2); giá giả định (bư
   sơ mã dùng `merged_fundamentals`: hồ sơ Vnstock với LNST và vốn chủ công ty mẹ theo năm, quý của VNDirect; giữ EPS Vnstock cùng năm (để suy ra số
   cổ phiếu), cổ tức, phát hành, cổ phiếu niêm yết, các dòng chất lượng báo cáo. Mã chưa có số VNDirect: Vnstock như cũ.
 - HPG: P/E và P/B lịch sử theo năm có 16 năm thay 8; ROE 20,0 % (vốn chủ công ty mẹ) thay 19,8 %; EPS 4 quý không đổi.
+- **Độ dài lịch sử** (chủ sở hữu quyết 07/11/2026 sau khi chạy thử dữ liệu thật): các phương án theo lịch sử (P/E, P/B lịch sử, P/E trên lợi nhuận bình
+  quân) dùng **toàn bộ** các năm VNDirect có (từ 2010), không cắt 8 hay 10 năm. Hệ quả đã chấp nhận: 12/50 mã đổi nhận định so với khi chỉ có 8 năm
+  Vnstock (FPT: giá hợp lý 55.334 → 34.477 vì P/E 2010–2016 chỉ 4–9x; DCM: lợi nhuận bình quân 11 năm). Năm đổi năm tài chính (SBT 2023: hai báo
+  cáo "năm") bị để trống vì nguồn ghi hai số.
 

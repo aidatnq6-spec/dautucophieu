@@ -46,3 +46,15 @@ def test_cafef_fills_a_year_the_owner_has_not_entered_and_the_owner_s_entry_wins
     assert out[1]["plan_revenue"] == "140000"
     only_pbt = plan_progress({}, QUARTERS, cafef={"2026": {"revenue": None, "pbt": "30000", "npat": None, "read_on": "2026-11-07"}})[0]
     assert only_pbt["profit_kind"] == "pbt" and only_pbt["profit"]["actual"] == str(27056 * B) and only_pbt["revenue"] is None
+
+
+def test_a_cafef_plan_far_below_last_year_s_consolidated_revenue_is_set_aside_as_another_basis():
+    quarters = {f"2025-Q{k}": {"revenue": str(v * B), "npat": str(100 * B)} for k, v in zip((1, 2, 3, 4), (1918, 2210, 2420, 2563))}
+    quarters.update({"2026-Q1": {"revenue": str(2367 * B), "npat": str(118 * B)}})
+    cafef = {"2026": {"revenue": "311", "pbt": "290", "npat": "290", "read_on": "2026-11-07"}}  # CMG: the parent company alone
+    [p] = plan_progress({}, quarters, cafef=cafef)
+    assert p["revenue"]["ratio"] is None and p["profit"]["ratio"] is None
+    assert p["revenue"]["reason"] == p["profit"]["reason"] == (
+        "Kế hoạch CafeF (doanh thu 311 tỷ) dưới 1/3 doanh thu hợp nhất cả năm 2025 (9.111 tỷ): có thể là số công ty mẹ riêng lẻ; nhập số của bạn")
+    [mine] = plan_progress({"2026": {"revenue": "311", "source": "x"}}, quarters)  # the owner's own figure is taken as entered
+    assert mine["revenue"]["ratio"] is not None

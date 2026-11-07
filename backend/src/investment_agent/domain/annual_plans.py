@@ -40,6 +40,24 @@ def _line(year: str, quarters: dict | None, key: str, label: str, plan: str | No
             "reason": reason}
 
 
+def _other_basis(year: str, quarters: dict | None, plan_revenue: str | None) -> str | None:
+    """A CafeF revenue plan under a third of last year's consolidated revenue is most likely the parent company's own (CMG: 311 tỷ against
+    9,111 tỷ); its share would mean nothing, so it is set aside with the reason."""
+    if not quarters or plan_revenue is None:
+        return None
+    prior = str(int(year) - 1)
+    parts = [(quarters.get(f"{prior}-Q{q}") or {}).get("revenue") for q in (1, 2, 3, 4)]
+    if any(v is None for v in parts):
+        return None
+    last = sum(Decimal(v) for v in parts)
+    plan = Decimal(plan_revenue) * _TY
+    if last > 0 and plan * 3 < last:
+        ty = lambda v: f"{int((v / _TY).quantize(Decimal(1), ROUND_HALF_UP)):,}".replace(",", ".")  # noqa: E731
+        return (f"Kế hoạch CafeF (doanh thu {ty(plan)} tỷ) dưới 1/3 doanh thu hợp nhất cả năm {prior} ({ty(last)} tỷ): "
+                "có thể là số công ty mẹ riêng lẻ; nhập số của bạn")
+    return None
+
+
 def _from_cafef(c: dict) -> dict:
     kind, profit = ("npat", c.get("npat")) if c.get("npat") else ("pbt", c.get("pbt"))
     day = c.get("read_on") or ""
@@ -56,8 +74,12 @@ def plan_progress(plans: dict, quarters: dict | None, cafef: dict | None = None)
         p, origin = merged[year]
         kind = p.get("profit_kind") or "npat"
         seen = [q for q in (1, 2, 3, 4) if quarters and f"{year}-Q{q}" in quarters]
+        revenue_line = _line(year, quarters, "revenue", "doanh thu thuần", p.get("revenue"))
+        profit_line = _line(year, quarters, kind, KINDS[kind], p.get("profit"))
+        mismatch = _other_basis(year, quarters, p.get("revenue")) if origin == "cafef" else None
+        if mismatch:
+            revenue_line, profit_line = ({**line, "ratio": None, "reason": mismatch} if line else None for line in (revenue_line, profit_line))
         out.append({"year": year, "origin": origin, "source": p.get("source"), "profit_kind": kind, "profit_label": KINDS[kind],
                     "plan_revenue": p.get("revenue"), "plan_profit": p.get("profit"), "through": f"{year}-Q{seen[-1]}" if seen else None,
-                    "revenue": _line(year, quarters, "revenue", "doanh thu thuần", p.get("revenue")),
-                    "profit": _line(year, quarters, kind, KINDS[kind], p.get("profit"))})
+                    "revenue": revenue_line, "profit": profit_line})
     return out

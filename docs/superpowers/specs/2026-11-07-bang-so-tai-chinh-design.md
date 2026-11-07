@@ -14,20 +14,23 @@ năm ĐHCĐ, dự phóng quý tới, số liệu vận hành nhập tay. Chỉ d
   có hai số khác nhau trong cùng kỳ là **xung đột**: không lấy số nào, liệt kê cả hai.
 - Bỏ qua ngân hàng, chứng khoán, bảo hiểm (mẫu khác; đã có bảng số liệu ngành).
 - `statements-sync`: lượt 20:00, 8 mã cũ nhất (chưa có trước), làm mới sau 7 ngày; lần đầu lấy toàn bộ lịch sử, sau đó 2 năm gần nhất và giữ
-  kỳ cũ. Hai lượt gọi mỗi mã. `--all` cho lần nạp đầu. `data/statements/<mã>.json`.
+  kỳ cũ. Ba lượt gọi mỗi mã (quý, năm, giá thực). `--all` cho lần nạp đầu. `data/statements/<mã>.json`.
 
 ## Bảng (`valuation/statement_table.py`)
 - Quý và năm: doanh thu bán hàng, giảm trừ, doanh thu thuần, giá vốn, lãi gộp, chi phí bán hàng, quản lý, **LN HĐKD lõi** (= gộp − bán hàng
   − quản lý), doanh thu và chi phí tài chính, lãi vay, liên doanh liên kết, LN khác, LNTT, LNST công ty mẹ; **EBIT** = LNTT + lãi vay;
   **EBITDA** = EBIT + khấu hao; % so cùng kỳ (doanh thu, lãi gộp, LNST, EBITDA), biên gộp, ròng, EBIT, EBITDA; lưu chuyển tiền HĐKD, capex,
   **FCFF** = lưu chuyển HĐKD + lãi vay × (1 − thuế ÷ LNTT) + capex, không tính khi LNTT ≤ 0 hoặc thuế suất ngoài 0–100 %.
-- Năm thêm: **vốn hoá** = giá điều chỉnh cuối năm × số cổ phiếu hiện tại (như P/E, P/B khác của ứng dụng); nợ vay; tiền và đầu tư tài chính
+- Năm thêm: **vốn hoá** = giá đóng cửa thực (chưa điều chỉnh) phiên cuối năm × số cổ phiếu cuối năm (vốn góp ÷ mệnh giá 10.000 đ), đổi ngày
+  07/11/2026 theo chủ sở hữu (bản đầu dùng giá điều chỉnh × số cổ phiếu hiện tại, làm các năm cũ thấp: HPG 2018 63.152 so với 65.735 tỷ). Giá
+  thực từ API giá VNDirect (`v4/stock_prices`, từ 02/01/2013; một lượt gọi mỗi mã, giữ giá phiên cuối mỗi năm); năm không có giá thực hoặc vốn góp
+  thì để trống vốn hoá và các bội số theo nó; nợ vay; tiền và đầu tư tài chính
   ngắn hạn; **nợ ròng** = nợ vay − tiền − đầu tư tài chính ngắn hạn; **EV** = vốn hoá + nợ ròng + lợi ích cổ đông không kiểm soát; P/E (LNST
   công ty mẹ), P/B (vốn chủ công ty mẹ), EV/EBITDA, EV/doanh thu, lợi suất FCFF = FCFF ÷ EV, ROE = LNST công ty mẹ ÷ vốn chủ công ty mẹ bình
   quân năm đó và năm trước.
 - Tóm tắt 4 quý gần nhất liền nhau với giá đóng cửa gần nhất: LNST, EBITDA, ROE, P/E, P/B, EV/EBITDA.
 - Thiếu một thành phần thì để trống, không ước lượng. Đối chiếu HPG với ảnh: Q3/26 khớp từng số; 2025 nợ ròng 64.389 và FCFF −5.704 khớp,
-  EV/EBITDA 9,1x khớp; vốn hoá lệch 0,2 % do cách tính giá.
+  EV/EBITDA 9,1x khớp; vốn hoá 2018 = 30,95 nghìn đ × 2.123,9 triệu cổ phiếu = 65.735 tỷ, khớp ảnh.
 - **Kiểm tra chéo** (lệch hơn 0,5 %): lãi gộp với doanh thu thuần − giá vốn; tổng 4 quý với cả năm (doanh thu, LNST công ty mẹ, khấu hao,
   capex, lưu chuyển HĐKD); LNST công ty mẹ VNDirect với Vnstock. Dòng tiền quý những năm cũ thường lệch số cả năm đã kiểm toán (HPG
   2010–2023); trang liệt kê, không sửa.

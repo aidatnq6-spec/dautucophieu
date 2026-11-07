@@ -300,8 +300,10 @@ def test_statements_give_the_quarterly_and_yearly_tables_of_a_watched_non_financ
     SeriesStore(tmp_path / "trend-sources").upsert("FPT-1d", [(datetime(2025, 12, 31), "12")])
     StatementStore(tmp_path / "statements").save({"symbol": "FPT", "fetched_at": "2026-11-07T00:00:00+00:00", "source": "vndirect:finfo",
                                                   "quarters": {"2025-Q4": {"revenue": "5000000000", "npat_parent": "250000000"}},
-                                                  "years": {"2025": {"revenue": "20000000000", "npat_parent": "1000000000", "equity": "10000000000"}},
-                                                  "quarters_conflicts": [], "years_conflicts": []})
+                                                  "years": {"2025": {"revenue": "20000000000", "npat_parent": "1000000000", "equity": "10000000000",
+                                                                     "charter_capital": "10000000000"}},
+                                                  "quarters_conflicts": [], "years_conflicts": [],
+                                                  "year_end_close": {"2025": {"date": "2025-12-31", "close": "12"}}})
     clock = Clock()
     app = create_app(InternalAuthSettings("owner-1", TOKEN, SECRET), clock=clock, personal_repository=PersonalRepository("owner-1", MemoryDocumentStore()),
                      market=SyntheticMarket(prices={}), data_dir=tmp_path)

@@ -1,7 +1,7 @@
 import json
 from datetime import date, datetime, timezone
 
-from investment_agent.market.statements import StatementStore, parse_statements, sync_statements
+from investment_agent.market.statements import StatementStore, parse_statements, parse_year_end_closes, sync_statements
 
 
 def row(item, value, fiscal, model=2, created="2026-10-29 00:00:00", code="HPG", kind="QUARTER"):
@@ -43,8 +43,10 @@ class Get:
         self.urls.append(url)
         if any(f"code:{s}~" in url for s in self.fail):
             raise RuntimeError("offline")
+        sym = url.split("code:")[1].split("~")[0].split("&")[0]
+        if "stock_prices" in url:
+            return json.dumps({"data": [{"code": sym, "date": "2025-12-31", "close": 26.4}, {"code": sym, "date": "2025-12-30", "close": 26.5}]})
         kind = "ANNUAL" if "ANNUAL" in url else "QUARTER"
-        sym = url.split("code:")[1].split("~")[0]
         fiscal = "2025-12-31"
         return text(row(21001, 1e12 if kind == "QUARTER" else 4e12, fiscal, code=sym, kind=kind))
 
@@ -57,17 +59,18 @@ def test_sync_takes_the_whole_history_once_then_two_years_merged_skipping_financ
     sectors = {"HPG": "Tài nguyên Cơ bản", "FPT": "Công nghệ Thông tin", "VCB": "Ngân hàng"}
     out = sync_statements(store, sectors, get=get, now=NOW, limit=None, sleep=lambda s: None)
     assert out == {"FPT": "ok", "HPG": "ok"} and store.read("VCB") is None
-    assert all("fiscalDate:gte:2010-01-01" in u for u in get.urls) and len(get.urls) == 4
+    assert len(get.urls) == 6 and all("fiscalDate:gte:2010-01-01" in u or "date:gte:2010-01-01" in u for u in get.urls)
     rec = store.read("HPG")
     assert rec["quarters"] == {"2025-Q4": {"revenue": "1000000000000"}} and rec["years"] == {"2025": {"revenue": "4000000000000"}}
     assert rec["source"] == "vndirect:finfo" and rec["fetched_at"] == NOW.isoformat()
+    assert rec["year_end_close"] == {"2025": {"date": "2025-12-31", "close": "26.4"}}
     rec["quarters"]["2015-Q1"] = {"revenue": "5"}
     rec["fetched_at"] = "2026-11-01T00:00:00+00:00"  # older than FPT's, so HPG is the stalest
     store.save(rec)
     get2 = Get()
     later = datetime(2026, 11, 20, tzinfo=timezone.utc)
     sync_statements(store, sectors, get=get2, now=later, limit=1, sleep=lambda s: None)
-    assert len(get2.urls) == 2 and all("code:HPG~" in u and "fiscalDate:gte:2024-11-20" in u for u in get2.urls)  # the stalest, two years back
+    assert len(get2.urls) == 3 and all("code:HPG" in u and "ate:gte:2024-11-20" in u for u in get2.urls)  # the stalest, two years back
     assert store.read("HPG")["quarters"] == {"2015-Q1": {"revenue": "5"}, "2025-Q4": {"revenue": "1000000000000"}}  # older periods kept
 
 
@@ -93,3 +96,20 @@ def test_cli_statements_sync_reads_the_watchlist_and_sectors(tmp_path, capsys):
     assert statements_sync(tmp_path, limit=5, get=Get(), now=NOW, sleep=lambda s: None) == 0
     assert json.loads(capsys.readouterr().out) == {"status": "ok", "results": {"HPG": "ok"}}
     assert StatementStore(tmp_path / "statements").read("HPG")["years"] == {"2025": {"revenue": "4000000000000"}}
+
+
+def test_the_last_unadjusted_close_of_each_year_is_kept_with_its_day():
+    page = json.dumps({"data": [{"code": "HPG", "date": "2026-11-06", "close": 21.2}, {"code": "HPG", "date": "2025-12-31", "close": 26.4},
+                                {"code": "HPG", "date": "2025-12-30", "close": 26.5}, {"code": "HPG", "date": "2018-12-28", "close": 30.95},
+                                {"code": "FPT", "date": "2018-12-31", "close": 99}, {"code": "HPG", "date": "2017-12-29", "close": None}]})
+    assert parse_year_end_closes(page, symbol="HPG") == {"2018": {"date": "2018-12-28", "close": "30.95"}, "2025": {"date": "2025-12-31", "close": "26.4"},
+                                                         "2026": {"date": "2026-11-06", "close": "21.2"}}
+
+
+def test_a_ticker_synced_before_year_end_closes_existed_takes_the_whole_price_history(tmp_path):
+    store = StatementStore(tmp_path)
+    store.save({"symbol": "HPG", "fetched_at": "2026-10-01T00:00:00+00:00", "source": "vndirect:finfo", "quarters": {}, "years": {}})
+    get = Get()
+    sync_statements(store, {"HPG": "Tài nguyên Cơ bản"}, get=get, now=NOW, limit=None, sleep=lambda s: None)
+    prices = [u for u in get.urls if "stock_prices" in u]
+    assert len(prices) == 1 and "date:gte:2010-01-01" in prices[0] and all("fiscalDate:gte:2024-11-07" in u for u in get.urls if u not in prices)

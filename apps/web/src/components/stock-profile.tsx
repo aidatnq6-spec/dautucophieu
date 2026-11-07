@@ -17,6 +17,7 @@ import { CompanyPeople } from "./company-people";
 import { InsiderDeals } from "./insider-deals";
 import { FinancialTables } from "./financial-tables";
 import { AnnualPlans } from "./annual-plans";
+import { OperatingFigures } from "./operating-figures";
 
 type Facts = { price: string | null; price_date: string | null; change_pct: string | null; high_52w: string | null; low_52w: string | null;
   shares: number | null; market_cap: string | null; avg_volume: number | null; avg_volume_sessions: number };
@@ -79,6 +80,11 @@ export function StockProfile({ symbol }: { symbol: string }) {
         <h2>Bảng số tài chính</h2>
         <AnnualPlans symbol={p.symbol} />
         <FinancialTables symbol={p.symbol} />
+      </section>}
+
+      {p.watched && <section className="surface" aria-label="Số liệu vận hành">
+        <h2>Số liệu vận hành</h2>
+        <OperatingFigures symbol={p.symbol} />
       </section>}
 
       {p.watched && <ForwardValuation symbol={p.symbol} />}

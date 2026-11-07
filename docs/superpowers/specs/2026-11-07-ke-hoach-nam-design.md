@@ -27,4 +27,8 @@ và hiện thành thẻ ở đầu khối Bảng số tài chính trên trang h�
 - `plans-sync`: lượt 20:00, mỗi mã đang theo dõi một lượt gọi, làm mới sau 7 ngày; `data/annual-plans-cafef/<mã>.json` (dữ liệu công khai).
 - Năm bạn chưa nhập: dùng kế hoạch CafeF (lợi nhuận = LNST nếu có, không thì LNTT), ghi "theo CafeF (Kế hoạch kinh doanh), đọc ngày…" và gợi ý
   nhập số của bạn để thay. Năm bạn đã nhập: số của bạn luôn thắng. Kế hoạch theo CafeF không có nút Xóa.
+- **Khác cơ sở** (chạy thử dữ liệu thật 07/11/2026): CafeF ghi kế hoạch CMG 2026 là doanh thu 311 tỷ, LNST 290 tỷ, số của công ty mẹ riêng lẻ, trong khi
+  số quý là hợp nhất (doanh thu 2025: 9.111 tỷ), cho "đạt 2.338 %". Kế hoạch **lấy từ CafeF** có doanh thu dưới 1/3 doanh thu hợp nhất cả năm trước thì
+  không tính %, ghi lý do và gợi ý nhập số của bạn. Số chủ sở hữu tự nhập không bị kiểm tra này.
+- CafeF có thể chưa cập nhật năm mới (VCG vẫn là kế hoạch 2025); khi đó là kế hoạch của năm ghi trên CafeF, không gán sang năm khác.
 

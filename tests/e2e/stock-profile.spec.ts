@@ -218,3 +218,27 @@ test("the owner defines an operating group, enters periods with sources and sees
   await group.getByRole("button", { name: "Xóa nhóm" }).click();
   await expect(box.getByRole("group", { name: "Sản lượng bán" })).toHaveCount(0);
 });
+
+test("a public PDF bulletin proposes each line's figure with its page and text, and nothing is kept until the owner saves", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Số liệu vận hành" });
+  const add = box.getByRole("form", { name: "Thêm nhóm số liệu vận hành" });
+  await add.getByLabel("Tên nhóm").fill("Sản lượng bán PDF");
+  await add.getByLabel("Đơn vị").fill("tấn");
+  await add.getByLabel("Các dòng (cách nhau dấu phẩy)").fill("Thép xây dựng, HRC, Tôn mạ");
+  await add.getByRole("button", { name: "Thêm nhóm" }).click();
+  const group = box.getByRole("group", { name: "Sản lượng bán PDF" });
+  await group.getByLabel("Đọc từ PDF công khai (link https)").fill("https://example.invalid/ban-tin-10-2026.pdf");
+  await group.getByRole("button", { name: "Đọc PDF" }).click();
+  const proposal = group.getByRole("region", { name: "Số đề xuất từ PDF cho Sản lượng bán PDF" });
+  await expect(proposal).toContainText("Không thấy: Tôn mạ");
+  await expect(proposal.getByRole("button", { name: "412.300 · trang 2" })).toHaveAttribute("aria-pressed", "true");
+  await expect(proposal).toContainText("thép xây dựng đạt 412.300 tấn");
+  const entry = group.getByRole("form", { name: "Nhập Sản lượng bán PDF" });
+  await expect(entry.getByLabel("Thép xây dựng (tấn)")).toHaveValue("412300");
+  await expect(entry.getByLabel("Nguồn (bắt buộc)")).toHaveValue("https://example.invalid/ban-tin-10-2026.pdf (trang 2)");
+  await entry.getByLabel(/^Kỳ/).fill("2026-Q3");
+  await entry.getByRole("button", { name: "Lưu kỳ" }).click();
+  await expect(group.getByRole("row", { name: /^Q3\/26/ })).toContainText("412.300");
+  await group.getByRole("button", { name: "Xóa nhóm" }).click();
+});

@@ -15,6 +15,7 @@ import { DividendHistory } from "./dividend-history";
 import { CapmTicker } from "./capm";
 import { CompanyPeople } from "./company-people";
 import { InsiderDeals } from "./insider-deals";
+import { FinancialTables } from "./financial-tables";
 
 type Facts = { price: string | null; price_date: string | null; change_pct: string | null; high_52w: string | null; low_52w: string | null;
   shares: number | null; market_cap: string | null; avg_volume: number | null; avg_volume_sessions: number };
@@ -72,6 +73,11 @@ export function StockProfile({ symbol }: { symbol: string }) {
           <p className="caption"><Link href="/fair-value">So sánh với các mã khác ở Định giá</Link></p>
         </>}
       </section>
+
+      {p.watched && <section className="surface" aria-label="Bảng số tài chính">
+        <h2>Bảng số tài chính</h2>
+        <FinancialTables symbol={p.symbol} />
+      </section>}
 
       {p.watched && <ForwardValuation symbol={p.symbol} />}
 

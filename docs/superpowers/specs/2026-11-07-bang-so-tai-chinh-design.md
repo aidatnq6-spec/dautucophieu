@@ -1,0 +1,39 @@
+# Bảng số tài chính (07/11/2026)
+
+Từ 3 ảnh bảng số HPG chủ sở hữu gửi (kết quả kinh doanh 10 quý có EBIT/EBITDA; định giá theo năm có vốn hoá, nợ ròng, EV, EV/EBITDA, FCFF).
+Chủ sở hữu chọn (07/11/2026): làm **bảng số quý/năm**; với lãi vay, khấu hao, nợ vay, capex thì **kiểm tra VNDirect trước** rồi dùng
+VNDirect làm nguồn; **giữ** quy tắc 45 ngày của chuỗi định giá theo tuần (dùng ngày VNDirect đưa số lên là việc sau). Chưa làm: kế hoạch
+năm ĐHCĐ, dự phóng quý tới, số liệu vận hành nhập tay. Chỉ dữ liệu công khai, không đọc danh mục, không gọi AI.
+
+## Nguồn (`market/statements.py`)
+- Vnstock gói Cộng đồng chỉ có 8 kỳ, không có lãi vay, khấu hao, nợ vay, capex (đã kiểm với HPG 07/11/2026).
+- API công khai VNDirect `v4/financial_statements` (robots.txt trả 404: không cấm gì; cùng API đang dùng cho tỷ số ngân hàng): báo cáo đầy
+  đủ theo mã dòng, quý từ 2010–2015 tuỳ mã, năm từ 2010–2012. Số quý là **từng quý, không lũy kế** (HPG 2025: 4 quý cộng đúng bằng cả năm
+  ở doanh thu, khấu hao, lãi vay, capex). Dấu: chi phí dương, tiền chi ra âm.
+- Chỉ giữ các dòng cần (mẫu chung TT200; dòng liên doanh liên kết và lợi ích cổ đông không kiểm soát của mẫu trước 2015 được nhận). Một dòng
+  có hai số khác nhau trong cùng kỳ là **xung đột**: không lấy số nào, liệt kê cả hai.
+- Bỏ qua ngân hàng, chứng khoán, bảo hiểm (mẫu khác; đã có bảng số liệu ngành).
+- `statements-sync`: lượt 20:00, 8 mã cũ nhất (chưa có trước), làm mới sau 7 ngày; lần đầu lấy toàn bộ lịch sử, sau đó 2 năm gần nhất và giữ
+  kỳ cũ. Hai lượt gọi mỗi mã. `--all` cho lần nạp đầu. `data/statements/<mã>.json`.
+
+## Bảng (`valuation/statement_table.py`)
+- Quý và năm: doanh thu bán hàng, giảm trừ, doanh thu thuần, giá vốn, lãi gộp, chi phí bán hàng, quản lý, **LN HĐKD lõi** (= gộp − bán hàng
+  − quản lý), doanh thu và chi phí tài chính, lãi vay, liên doanh liên kết, LN khác, LNTT, LNST công ty mẹ; **EBIT** = LNTT + lãi vay;
+  **EBITDA** = EBIT + khấu hao; % so cùng kỳ (doanh thu, lãi gộp, LNST, EBITDA), biên gộp, ròng, EBIT, EBITDA; lưu chuyển tiền HĐKD, capex,
+  **FCFF** = lưu chuyển HĐKD + lãi vay × (1 − thuế ÷ LNTT) + capex, không tính khi LNTT ≤ 0 hoặc thuế suất ngoài 0–100 %.
+- Năm thêm: **vốn hoá** = giá điều chỉnh cuối năm × số cổ phiếu hiện tại (như P/E, P/B khác của ứng dụng); nợ vay; tiền và đầu tư tài chính
+  ngắn hạn; **nợ ròng** = nợ vay − tiền − đầu tư tài chính ngắn hạn; **EV** = vốn hoá + nợ ròng + lợi ích cổ đông không kiểm soát; P/E (LNST
+  công ty mẹ), P/B (vốn chủ công ty mẹ), EV/EBITDA, EV/doanh thu, lợi suất FCFF = FCFF ÷ EV, ROE = LNST công ty mẹ ÷ vốn chủ công ty mẹ bình
+  quân năm đó và năm trước.
+- Tóm tắt 4 quý gần nhất liền nhau với giá đóng cửa gần nhất: LNST, EBITDA, ROE, P/E, P/B, EV/EBITDA.
+- Thiếu một thành phần thì để trống, không ước lượng. Đối chiếu HPG với ảnh: Q3/26 khớp từng số; 2025 nợ ròng 64.389 và FCFF −5.704 khớp,
+  EV/EBITDA 9,1x khớp; vốn hoá lệch 0,2 % do cách tính giá.
+- **Kiểm tra chéo** (lệch hơn 0,5 %): lãi gộp với doanh thu thuần − giá vốn; tổng 4 quý với cả năm (doanh thu, LNST công ty mẹ, khấu hao,
+  capex, lưu chuyển HĐKD); LNST công ty mẹ VNDirect với Vnstock. Dòng tiền quý những năm cũ thường lệch số cả năm đã kiểm toán (HPG
+  2010–2023); trang liệt kê, không sửa.
+
+## API và giao diện
+- `GET /internal/fairvalue/statements/{mã}`: mã trong danh sách theo dõi (khác: 404); ngân hàng, chứng khoán, bảo hiểm và mã chưa đồng bộ trả
+  lý do.
+- Trang hồ sơ mã, sau Định giá tham khảo: khối **Bảng số tài chính**: 4 thẻ tóm tắt 4 quý; nút Quý/Năm; nút 8 · 12 · 20 quý · Tất cả; bảng
+  (tỷ đồng, chi phí âm, % so cùng kỳ xanh/đỏ, cột nhãn đứng yên khi cuộn ngang); mục Kiểm tra chéo; chú thích công thức và nguồn.

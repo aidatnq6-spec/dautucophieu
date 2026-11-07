@@ -287,3 +287,28 @@ def test_milestones_list_past_troughs_for_a_watched_ticker_with_the_owner_s_thre
     assert [r["kind"] for r in body["rows"]] == ["current", "trough", "pb_floor"] and body["rows"][1]["price"] == "6500"
     assert call(client, clock, "GET", "/internal/fairvalue/milestones/FPT/3").status_code == 422
     assert call(client, clock, "GET", "/internal/fairvalue/milestones/ZZZ/15").status_code == 404
+
+
+def test_statements_give_the_quarterly_and_yearly_tables_of_a_watched_non_financial_ticker(tmp_path):
+    from investment_agent.market.statements import StatementStore
+    (tmp_path / "market-symbols.txt").write_text("FPT" + chr(10) + "VCB" + chr(10), encoding="utf-8")
+    (tmp_path / "industries.json").write_text(json.dumps({"as_of": "2026-10-25", "source": "t", "level": 2,
+                                                         "sectors": {"FPT": "Công nghệ Thông tin", "VCB": "Ngân hàng"}}), encoding="utf-8")
+    years = {str(y): {"npat": "1000000000", "eps": "1000", "equity": "10000000000"} for y in range(2018, 2026)}
+    FundamentalsStore(tmp_path / "fundamentals").save({"symbol": "FPT", "fetched_at": "2026-10-26T00:00:00+00:00", "source": "t",
+                                                      "years": years, "quarters": {}, "dividends": [], "issues": []})
+    SeriesStore(tmp_path / "trend-sources").upsert("FPT-1d", [(datetime(2025, 12, 31), "12")])
+    StatementStore(tmp_path / "statements").save({"symbol": "FPT", "fetched_at": "2026-11-07T00:00:00+00:00", "source": "vndirect:finfo",
+                                                  "quarters": {"2025-Q4": {"revenue": "5000000000", "npat_parent": "250000000"}},
+                                                  "years": {"2025": {"revenue": "20000000000", "npat_parent": "1000000000", "equity": "10000000000"}},
+                                                  "quarters_conflicts": [], "years_conflicts": []})
+    clock = Clock()
+    app = create_app(InternalAuthSettings("owner-1", TOKEN, SECRET), clock=clock, personal_repository=PersonalRepository("owner-1", MemoryDocumentStore()),
+                     market=SyntheticMarket(prices={}), data_dir=tmp_path)
+    client = TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000))
+    body = call(client, clock, "GET", "/internal/fairvalue/statements/FPT").json()
+    assert body["reason"] is None and body["years"]["periods"] == ["2025"] and body["quarters"]["periods"] == ["2025-Q4"]
+    pe = next(r for r in body["years"]["rows"] if r["key"] == "pe")
+    assert pe["values"] == ["12.00"]  # 12,000 đ × 1 million shares / 1 tỷ
+    assert call(client, clock, "GET", "/internal/fairvalue/statements/VCB").json()["reason"] == "Ngân hàng, chứng khoán, bảo hiểm có bảng số liệu ngành riêng"
+    assert call(client, clock, "GET", "/internal/fairvalue/statements/ZZZ").status_code == 404

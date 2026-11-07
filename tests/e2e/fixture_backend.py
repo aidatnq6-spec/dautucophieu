@@ -73,6 +73,20 @@ if __name__ == "__main__":
                                                               "2025": (110, 25, 9, 105, 60, 38, 25, 12, 12)}.items()},
         "share_issues": [{"date": "2025-06-01", "kind": "bonus"}],
         "latest_quarter_seen": {"quarter": "2026-Q2", "on": date.today().isoformat()}})
+    # Bang so tai chinh: VNDirect-style statements for FPT (tỷ đồng × 1e9; costs positive, capex negative); VCB is a bank and has none.
+    from investment_agent.market.statements import StatementStore
+    def fs(rev, npat, **more):
+        base = {"revenue": rev, "cogs": rev * 0.6, "gross_profit": rev * 0.4, "selling": rev * 0.1, "admin": rev * 0.05, "fin_income": 5,
+                "fin_expense": 8, "interest": 6, "associates": 0, "other_profit": 1, "pbt": npat * 1.25, "tax": npat * 0.25, "npat": npat,
+                "npat_parent": npat, "depreciation": 20, "cfo": npat * 1.2, "capex": -npat * 0.5, "equity": 1000, "minority_equity": 10,
+                "st_debt": 300, "lt_debt": 200, "cash": 100, "st_investments": 50}
+        base.update(more)
+        return {k: str(int(v * 10**9)) for k, v in base.items()}
+    StatementStore(os.path.join(data, "statements")).save({
+        "symbol": "FPT", "fetched_at": "2026-11-07T00:00:00+00:00", "source": "vndirect:finfo",
+        "quarters": {f"{y}-Q{k}": fs(250 + 20 * (y - 2024) + k, 25 + 2 * (y - 2024) + k) for y in (2024, 2025) for k in (1, 2, 3, 4)},
+        "years": {"2024": fs(1010, 110), "2025": fs(1090, 118)}, "quarters_created": {}, "years_created": {},
+        "quarters_conflicts": [], "years_conflicts": []})
     SeriesStore(os.path.join(data, "trend-sources")).upsert("FPT-1d", [(datetime(y, 12, 31), "12") for y in range(2020, 2026)])
     # Month-end closes that move around (P/E chart); the 31 December closes above stay 12 for the valuation tests.
     SeriesStore(os.path.join(data, "trend-sources")).upsert("FPT-1d", [(datetime(y, m, 28), str(12 + ((y * 12 + m) % 9) - 4))

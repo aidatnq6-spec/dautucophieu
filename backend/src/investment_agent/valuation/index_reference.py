@@ -62,14 +62,14 @@ def _monthly(points: Points, since: date) -> dict:
 
 
 def index_monthly_multiples(index: str, *, pe: Points, pb: Points) -> dict:
-    """Charts of P/E and P/B for Định giá → Chi tiết: the last five years, same shape as the tickers' monthly history."""
+    """Charts of P/E and P/B for Định giá → Chi tiết: every stored month (VNDirect's index ratios start on 15/12/2017), median and spread
+    over the whole series, as the tickers' charts; the valuation row above keeps its five-year median."""
     latest = max((p[-1][0].date() for p in (pe, pb) if p), default=None)
     if latest is None:
         empty = {"points": [], "median": None, "sd": None, "latest": None}
         return {"symbol": index, "kind": "index", "pe": empty, "pb": empty, "shares": None, "from": None, "to": None,
                 "reason": "Chưa có số liệu P/E, P/B"}
-    since = _years_before(latest, WINDOW_YEARS)
-    out = {"pe": _monthly(pe, since), "pb": _monthly(pb, since)}
+    out = {"pe": _monthly(pe, date.min), "pb": _monthly(pb, date.min)}
     months = [p["month"] for s in out.values() for p in s["points"]]
     return {"symbol": index, "kind": "index", **out, "shares": None, "from": min(months), "to": max(months), "reason": None}
 

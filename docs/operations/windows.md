@@ -7,7 +7,7 @@
 1. Kiểm tra môi trường: `powershell -ExecutionPolicy Bypass -File scripts\windows\doctor.ps1`.
 2. Tạo `.env.local` ở gốc kho từ `.env.example` (Git bỏ qua). Điền Firebase, `INTERNAL_API_TOKEN`, `INTERNAL_API_HMAC_SECRET`, `APP_ORIGIN=http://127.0.0.1:3000`, và tùy chọn `TELEGRAM_BOT_TOKEN`, `OPENROUTER_API_KEY`. Không dán giá trị vào hội thoại hay tài liệu.
 3. Build giao diện một lần: `npm --prefix apps/web run build`.
-4. Chạy `scripts\windows\start-app.ps1`: khởi động API Python (cổng 8000) và Next.js (cổng 3000) trong cửa sổ ẩn. Script từ chối chạy nếu còn biến `INVESTMENT_E2E_AUTH`.
+4. Chạy `scripts\windows\start-app.ps1`: khởi động API Python (cổng 8000) và Next.js (cổng 3000) trong cửa sổ ẩn. Script từ chối chạy nếu còn biến `INVESTMENT_E2E_AUTH`. Dừng bằng `scripts\windows\stop-app.ps1` (trả mã 0 cả khi tiến trình con của Python đã tự tắt theo tiến trình cha).
 
 Dữ liệu cục bộ (`data\jobs.sqlite`, `data\deliveries.sqlite`, cache) nằm trong `data\`, Git bỏ qua. Firestore vẫn là nguồn sự thật của dữ liệu cá nhân.
 

@@ -6,7 +6,8 @@ test.beforeEach(async ({ context }) => signIn(context));
 
 async function openPage(page: import("@playwright/test").Page) {
   await page.goto("/fair-value");
-  await expect(page.getByText("Đang tải…")).toHaveCount(0);
+  // The board values every watched ticker at once; with the suite running in parallel it sometimes took over the default 5 s.
+  await expect(page.getByText("Đang tải…")).toHaveCount(0, { timeout: 15_000 });
 }
 
 test("each watched ticker gets a fair-value range and a verdict, with the methods behind it", async ({ page }) => {

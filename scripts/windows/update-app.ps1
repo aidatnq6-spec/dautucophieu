@@ -41,11 +41,8 @@ try {
 }
 git checkout --quiet -- apps/web/next-env.d.ts 2>$null  # the build rewrites it; never committed
 
-# Restart: stop this repository's API and web processes, then start them again with start-app.ps1.
-$repo = [regex]::Escape($script:RepoRoot)
-Get-CimInstance Win32_Process | Where-Object {
-    $_.CommandLine -and ($_.CommandLine -match 'investment_agent\.api\.app' -or ($_.CommandLine -match "$repo\\apps\\web" -and $_.CommandLine -match 'next.*start'))
-} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+# Restart: stop this repository's API and web processes (stop-app.ps1), then start them again with start-app.ps1.
+& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'stop-app.ps1') | Out-Null
 Start-Sleep -Seconds 2
 & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'start-app.ps1') | Out-Null
 Write-Log "$result restart exit=$LASTEXITCODE"

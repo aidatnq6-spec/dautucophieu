@@ -144,3 +144,28 @@ for (const width of [375, 1440]) {
     expect(tooWide).toBe(0);
   });
 }
+
+test("weekly MACD base zones and the rising channels through them, with the owner's N years and no forecast", async ({ page }) => {
+  await openTrend(page);
+  const box = page.getByRole("region", { name: "Đáy nhịp tuần và kênh tăng" });
+  await expect(box.getByLabel("Mã")).toHaveValue("VNINDEX");
+  await expect(box).toContainText("Chưa có kênh");  // the fixture's VN-Index has a few weeks only
+  await box.getByLabel("Mã").selectOption("MWG");
+  const chans = box.getByRole("table", { name: /Các kênh/ });
+  await expect(chans).toContainText("Kênh final");
+  await expect(box.getByRole("table", { name: /Vùng đáy MACD tuần trong 5 năm/ })).toContainText("điểm 0");
+  await expect(box).toContainText(/Tuần \d{2}\/\d{2}\/\d{4} đóng cửa/);
+  await expect(box).toContainText("không kéo kênh ra tương lai");
+  await box.getByRole("button", { name: "3 năm" }).click();
+  await expect(box.getByRole("table", { name: /Vùng đáy MACD tuần trong 3 năm/ })).toBeVisible();
+});
+
+test("no horizontal scroll with the channel tables at 375px", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 900 });
+  await openTrend(page);
+  const box = page.getByRole("region", { name: "Đáy nhịp tuần và kênh tăng" });
+  await box.getByLabel("Mã").selectOption("MWG");
+  await expect(box.getByRole("table", { name: /Các kênh/ })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});

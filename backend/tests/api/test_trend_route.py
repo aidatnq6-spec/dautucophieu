@@ -130,3 +130,24 @@ def test_chart_drawings_are_listed_added_and_refused_for_unknown_tickers(tmp_pat
 def test_chart_drawings_without_personal_store_are_unavailable(tmp_path):
     clock = Clock()
     assert call(client(tmp_path, clock, repo=False), clock, "GET", "/internal/trend/drawings").status_code == 503
+
+
+def test_weekly_channels_cover_the_trend_board_rows_only(tmp_path, monkeypatch):
+    from investment_agent.api.routes import trend
+    source = FakeSource()
+    monkeypatch.setattr(trend, "_source", lambda: source)
+    clock = Clock()
+    c = client(tmp_path, clock)
+    hpg = call(c, clock, "GET", "/internal/trend/channels/HPG/5").json()
+    assert hpg["symbol"] == "HPG" and hpg["basis"] == "ohlc" and hpg["years"] == 5
+    assert hpg["reason"] == "Chỉ có 1 tuần, cần ít nhất 35 tuần để có MACD tuần" and ("ohlcv", "HPG", "1D", False) in source.calls
+    gold = call(c, clock, "GET", "/internal/trend/channels/GOLD/5").json()
+    assert gold["basis"] == "close" and gold["reason"] == "Chưa có số" and gold["note"] == "Gần đúng: PAXG, token bám giá vàng."
+    assert call(c, clock, "GET", "/internal/trend/channels/ZZZ/5").status_code == 404
+    assert call(c, clock, "GET", "/internal/trend/channels/HPG/0").status_code == 422
+
+
+def test_weekly_channels_list_every_trend_board_row(tmp_path):
+    clock = Clock()
+    rows = call(client(tmp_path, clock), clock, "GET", "/internal/trend/channels").json()["rows"]
+    assert rows[0] == {"id": "DXY", "label": "DXY"} and {"id": "GOLD", "label": "Vàng"} in rows and {"id": "VNINDEX", "label": "VN-Index"} in rows

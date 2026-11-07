@@ -9,6 +9,7 @@ it("money is shown in tỷ đồng, growth with its sign, margins and returns as
   expect(cell("0.1916", "pct", "gross_margin")).toBe("19,2%");
   expect(cell("13.14", "x", "pe")).toBe("13,1x");
   expect(cell(null, "money", "ebitda")).toBe("—");
+  expect(cell("-400000000", "money", "associates")).toBe("0");  // under half a tỷ: rounds to 0, never "-0"
 });
 
 it("periods read as the screenshots do and the last n are kept", () => {

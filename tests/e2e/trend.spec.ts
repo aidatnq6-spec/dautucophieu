@@ -145,45 +145,59 @@ for (const width of [375, 1440]) {
   });
 }
 
-test("weekly MACD base zones and the rising channels through them, with the owner's N years and no forecast", async ({ page }) => {
+test("MACD base zones and the rising channels through them, on weekly, daily and hourly bars, with the owner's lookback and no forecast", async ({ page }) => {
   await openTrend(page);
-  const box = page.getByRole("region", { name: "Đáy nhịp tuần và kênh tăng" });
+  const box = page.getByRole("region", { name: "Đáy nhịp và kênh tăng" });
   await expect(box.getByLabel("Mã")).toHaveValue("VNINDEX");
   await expect(box).toContainText("Chưa có kênh");  // the fixture's VN-Index has a few weeks only
   await box.getByLabel("Mã").selectOption("MWG");
   const chans = box.getByRole("table", { name: /Các kênh/ });
   await expect(chans).toContainText("Kênh final");
-  await expect(box.getByRole("table", { name: /Vùng đáy MACD tuần trong 5 năm/ })).toContainText("điểm 0");
-  await expect(box).toContainText(/Tuần \d{2}\/\d{2}\/\d{4} đóng cửa/);
-  await expect(box).toContainText("không kéo kênh ra tương lai");
+  await expect(box.getByRole("table", { name: /Vùng đáy MACD nến tuần trong 5 năm/ })).toContainText("điểm 0");
+  await expect(box).toContainText(/Nến tuần \d{2}\/\d{2}\/\d{4} đóng cửa/);
+  await expect(box).toContainText("không kéo kênh ra");
   await box.getByRole("button", { name: "3 năm" }).click();
-  await expect(box.getByRole("table", { name: /Vùng đáy MACD tuần trong 3 năm/ })).toBeVisible();
+  await expect(box.getByRole("table", { name: /Vùng đáy MACD nến tuần trong 3 năm/ })).toBeVisible();
+  await box.getByRole("radio", { name: "Ngày" }).click();
+  await expect(box.getByRole("button", { name: "12 tháng" })).toHaveAttribute("aria-pressed", "true");
+  await expect(box).toContainText(/nến ngày/);
+  await box.getByRole("radio", { name: "1 giờ" }).click();
+  await expect(box.getByRole("button", { name: "4 tuần" })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("no horizontal scroll with the channel tables at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 900 });
   await openTrend(page);
-  const box = page.getByRole("region", { name: "Đáy nhịp tuần và kênh tăng" });
+  const box = page.getByRole("region", { name: "Đáy nhịp và kênh tăng" });
   await box.getByLabel("Mã").selectOption("MWG");
   await expect(box.getByRole("table", { name: /Các kênh/ })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
 
-test("on the weekly chart, Kênh tuần draws the base zones and channels as a read-only layer, off by default", async ({ page }) => {
+test("on the weekly and daily charts, Kênh draws the base zones and channels as a read-only layer, off by default", async ({ page }) => {
   await openTrend(page);
   const box = page.getByRole("region", { name: "Bảng giá và biểu đồ" });
   await box.getByRole("table", { name: "Bảng giá" }).getByRole("row", { name: /US10Y/ }).click();
   const chart = box.getByRole("group", { name: "Biểu đồ US10Y" });
-  await expect(chart.getByRole("group", { name: "Kênh tuần" })).toHaveCount(0);  // weekly frame only
+  await chart.getByRole("radio", { name: "Tháng" }).click();
+  await expect(chart.getByRole("group", { name: "Kênh" })).toHaveCount(0);  // not on monthly bars
   await chart.getByRole("radio", { name: "Tuần" }).click();
   const canvas = chart.getByTestId("tb-canvas");
   await expect(chart.getByRole("button", { name: "Tắt" })).toHaveAttribute("aria-pressed", "true");
   await expect(canvas).toHaveAttribute("data-overlay", "0");
   await chart.getByRole("button", { name: "5 năm" }).click();
-  await expect(chart.getByTestId("tb-channel-caption")).toContainText("vùng đáy MACD tuần");
+  await expect(chart.getByTestId("tb-channel-caption")).toContainText("vùng đáy MACD");
   await expect(canvas).not.toHaveAttribute("data-overlay", "0");
   await expect(chart.getByRole("list", { name: "Hình vẽ" })).toHaveCount(0);  // not mixed with the owner's drawings
   await chart.getByRole("button", { name: "Tắt" }).click();
   await expect(canvas).toHaveAttribute("data-overlay", "0");
+  await chart.getByRole("radio", { name: "Ngày" }).click();
+  await expect(chart.getByRole("button", { name: "Tắt" })).toHaveAttribute("aria-pressed", "true");  // each frame has its own switch
+  await chart.getByRole("button", { name: "12 tháng" }).click();
+  await expect(chart.getByTestId("tb-channel-caption")).toContainText("vùng đáy MACD");
+  await expect(canvas).not.toHaveAttribute("data-overlay", "0");
+  await chart.getByRole("radio", { name: "1 giờ" }).click();
+  await expect(chart).toContainText("Nguồn chỉ có giá ngày");  // no hourly closes for US10Y, so no chart and no channel switch
+  await expect(chart.getByRole("group", { name: "Kênh" })).toHaveCount(0);
 });

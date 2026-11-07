@@ -191,3 +191,30 @@ test("the owner's assumptions for the next quarter add a yellow F column, and bl
   await expect(table.getByRole("row", { name: /^Lợi nhuận gộp/ })).toContainText("119");  // 40 %
   await expect(box).toContainText("không phải dự báo của ứng dụng");
 });
+
+test("the owner defines an operating group, enters periods with sources and sees totals, shares and growth", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Số liệu vận hành" });
+  const add = box.getByRole("form", { name: "Thêm nhóm số liệu vận hành" });
+  await add.getByLabel("Tên nhóm").fill("Sản lượng bán");
+  await add.getByLabel("Đơn vị").fill("nghìn tấn");
+  await add.getByLabel("Các dòng (cách nhau dấu phẩy)").fill("Thép XD, HRC");
+  await add.getByRole("button", { name: "Thêm nhóm" }).click();
+  const group = box.getByRole("group", { name: "Sản lượng bán" });
+  const entry = group.getByRole("form", { name: "Nhập Sản lượng bán" });
+  for (const [period, a, b] of [["2025-Q3", "1060", "1270"], ["2026-Q3", "1340", "2100"]]) {
+    await entry.getByLabel(/^Kỳ/).fill(period);
+    await entry.getByLabel("Thép XD (nghìn tấn)").fill(a);
+    await entry.getByLabel("HRC (nghìn tấn)").fill(b);
+    await entry.getByLabel("Nguồn (bắt buộc)").fill(`Bản tin SXKD ${period}`);
+    await entry.getByRole("button", { name: "Lưu kỳ" }).click();
+    await expect(group.getByRole("table")).toContainText(period === "2025-Q3" ? "Q3/25" : "Q3/26");
+  }
+  const latest = group.getByRole("row", { name: /^Q3\/26/ });
+  await expect(latest).toContainText("3.440");
+  await expect(latest).toContainText("+47,6%");  // 3,440 against 2,330
+  await expect(latest).toContainText("Bản tin SXKD 2026-Q3");
+  await expect(group.getByRole("img", { name: "Sản lượng bán (nghìn tấn)" })).toBeVisible();
+  await group.getByRole("button", { name: "Xóa nhóm" }).click();
+  await expect(box.getByRole("group", { name: "Sản lượng bán" })).toHaveCount(0);
+});

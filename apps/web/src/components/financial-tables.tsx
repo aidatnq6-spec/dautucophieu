@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
+import { type Forecast, ForecastForm } from "./quarter-forecast";
 
 type Row = { key: string | null; label: string; kind: "group" | "money" | "pct" | "x"; indent: number; values: (string | null)[] };
 type Part = { periods: string[]; rows: Row[] };
@@ -44,16 +45,20 @@ export function checkLines(checks: Check[]): string[] {
 const tone = (v: string | null, key: string | null) => (v !== null && key && SIGNED.has(key) ? (Number(v) > 0 ? "positive" : Number(v) < 0 ? "negative" : "") : "");
 const ty = (v: string | null) => (v === null ? "—" : `${cell(v, "money", null)} tỷ`);
 
-function Table({ part, cols, caption }: { part: Part; cols: number[]; caption: string }) {
+type Extra = { label: string; values: Record<string, string | null> } | null;  // the owner's forecast column, shown after the last quarter
+
+function Table({ part, cols, caption, extra = null }: { part: Part; cols: number[]; caption: string; extra?: Extra }) {
   return (
     <div className="pb-scroll">
       <table className="pb-table ft-table">
         <caption className="caption">{caption}</caption>
-        <thead><tr><th>Tỷ đồng</th>{cols.map((i) => <th key={part.periods[i]} className="num">{periodLabel(part.periods[i])}</th>)}</tr></thead>
+        <thead><tr><th>Tỷ đồng</th>{cols.map((i) => <th key={part.periods[i]} className="num">{periodLabel(part.periods[i])}</th>)}
+          {extra && <th className="num ft-forecast">{extra.label}</th>}</tr></thead>
         <tbody>{part.rows.map((r, k) => r.kind === "group"
-          ? <tr key={`g${k}`} className="ft-group"><th colSpan={cols.length + 1}>{r.label}</th></tr>
+          ? <tr key={`g${k}`} className="ft-group"><th colSpan={cols.length + 1 + (extra ? 1 : 0)}>{r.label}</th></tr>
           : <tr key={r.key ?? k}><td className={r.indent ? "ft-indent" : undefined}>{r.label}</td>
-            {cols.map((i) => <td key={part.periods[i]} className={`num ${tone(r.values[i], r.key)}`}>{cell(r.values[i], r.kind, r.key)}</td>)}</tr>)}</tbody>
+            {cols.map((i) => <td key={part.periods[i]} className={`num ${tone(r.values[i], r.key)}`}>{cell(r.values[i], r.kind, r.key)}</td>)}
+            {extra && <td className={`num ft-forecast ${tone(extra.values[r.key ?? ""] ?? null, r.key)}`}>{cell(extra.values[r.key ?? ""] ?? null, r.kind, r.key)}</td>}</tr>)}</tbody>
       </table>
     </div>
   );
@@ -64,8 +69,10 @@ export function FinancialTables({ symbol }: { symbol: string }) {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"quarters" | "years">("quarters");
   const [count, setCount] = useState<(typeof COUNTS)[number]>(8);
+  const [forecast, setForecast] = useState<Forecast | null>(null);
   useEffect(() => {
     api<Tables>(`fairvalue/statements/${encodeURIComponent(symbol)}`).then(setData, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải."));
+    api<Forecast>(`quarter-forecast/${encodeURIComponent(symbol)}`).then(setForecast, () => setForecast(null));
   }, [symbol]);
   if (error) return <p className="errors" role="alert">{error}</p>;
   if (!data) return <p className="muted fx-loading" role="status">Đang tải bảng số…</p>;
@@ -91,7 +98,9 @@ export function FinancialTables({ symbol }: { symbol: string }) {
             {n === 0 ? "Tất cả" : `${n} quý`}</button>)}</span>}
       </div>
       {part.periods.length === 0 ? <p className="muted">Chưa có kỳ nào.</p>
-        : <Table part={part} cols={cols} caption={view === "quarters" ? `${cols.length} quý, cũ bên trái` : `${cols.length} năm`} />}
+        : <Table part={part} cols={cols} caption={view === "quarters" ? `${cols.length} quý, cũ bên trái` : `${cols.length} năm`}
+          extra={view === "quarters" && forecast?.quarter && Object.keys(forecast.values).length ? { label: `${periodLabel(forecast.quarter)}F`, values: forecast.values } : null} />}
+      {view === "quarters" && forecast && <ForecastForm key={`${forecast.quarter}-${forecast.version}`} symbol={symbol} data={forecast} onSaved={setForecast} />}
       {(data.checks.length > 0 || data.conflicts.length > 0) && <details className="mc-table">
         <summary>Kiểm tra chéo: {data.checks.length} chỗ lệch hơn 0,5% ở {new Set(data.checks.map((c) => c.period)).size} kỳ{data.conflicts.length ? `, ${data.conflicts.length} dòng nguồn ghi hai số` : ""}</summary>
         <ul className="ft-checks">

@@ -176,3 +176,18 @@ test("the owner enters a year's plan with its source and sees the year-to-date s
   await box.getByRole("button", { name: "Xóa kế hoạch 2025" }).click();
   await expect(box).not.toContainText("DT lũy kế Q4/2025");
 });
+
+test("the owner's assumptions for the next quarter add a yellow F column, and blank ones leave their lines blank", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Bảng số tài chính" });
+  const form = box.getByRole("form", { name: "Giả định dự phóng quý tới" });
+  await expect(box).toContainText("Dự phóng Q1/2026 (giả định của bạn) · chưa nhập");
+  await form.getByLabel("Doanh thu so cùng kỳ (%)").fill("10");
+  await form.getByLabel("Biên gộp (%)").fill("40");
+  await form.getByRole("button", { name: "Lưu giả định" }).click();
+  const table = box.getByRole("table");
+  await expect(table.getByRole("columnheader", { name: "Q1/26F" })).toBeVisible();
+  await expect(table.getByRole("row", { name: /^Doanh thu thuần/ })).toContainText("298");  // 271 tỷ in Q1/2025 × 1.1
+  await expect(table.getByRole("row", { name: /^Lợi nhuận gộp/ })).toContainText("119");  // 40 %
+  await expect(box).toContainText("không phải dự báo của ứng dụng");
+});

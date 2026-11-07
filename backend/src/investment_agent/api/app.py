@@ -22,6 +22,7 @@ from .routes.fairvalue import router as fairvalue_router
 from .routes.glance import router as glance_router
 from .routes.intangibles import router as intangibles_router
 from .routes.annual_plans import router as annual_plans_router
+from .routes.quarter_forecast import router as quarter_forecast_router
 from .routes.bank_figures import router as bank_figures_router
 from .routes.journal import router as journal_router
 from .routes.passive_income import router as passive_income_router
@@ -119,6 +120,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(intangibles_router)
     app.include_router(bank_figures_router)
     app.include_router(annual_plans_router)
+    app.include_router(quarter_forecast_router)
     app.include_router(performance_router)
     app.include_router(concentration_router)
     app.include_router(insights_router)

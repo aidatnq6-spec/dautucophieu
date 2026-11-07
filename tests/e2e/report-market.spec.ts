@@ -50,9 +50,10 @@ for (const width of [1280, 375]) {
     const gain = table.locator("td.gain").first();
     await expect(gain).toHaveText(/^[+−]\d/);  // a sign, no "Lãi"/"Lỗ" word
     for (const cell of await table.locator("td.gain").all()) await expect(cell).not.toHaveText(/Lãi|Lỗ/);
-    const scrollers = await page.evaluate(() => [...document.querySelectorAll("main *")]
-      .filter((el) => el.scrollWidth > el.clientWidth + 1 && ["auto", "scroll"].includes(getComputedStyle(el).overflowX)).length);
-    expect(scrollers).toBe(0);
+    // Polled: under a parallel run other blocks of the page may still be laying out when the table first shows (seen 07/11/2026).
+    await expect.poll(() => page.evaluate(() => [...document.querySelectorAll("main *")]
+      .filter((el) => el.scrollWidth > el.clientWidth + 1 && ["auto", "scroll"].includes(getComputedStyle(el).overflowX)).length),
+    { timeout: 10_000 }).toBe(0);
   });
 }
 

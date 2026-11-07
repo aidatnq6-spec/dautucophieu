@@ -156,3 +156,23 @@ test("no horizontal page scroll with the statement table at 375px", async ({ pag
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test("the owner enters a year's plan with its source and sees the year-to-date share of it", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Bảng số tài chính" });
+  await box.getByText(/Kế hoạch năm \(ĐHCĐ\)/).click();
+  const form = box.getByRole("form", { name: "Nhập kế hoạch năm" });
+  await form.getByLabel("Năm").fill("2025");
+  await form.getByLabel("Doanh thu (tỷ đồng)").fill("2180");  // the synthetic 2025 quarters add up to 1,090 tỷ
+  await form.getByLabel("Lợi nhuận (tỷ đồng)").fill("2");
+  await form.getByRole("button", { name: "Lưu kế hoạch" }).click();
+  await expect(box.getByRole("alert")).toContainText("Ghi nguồn của kế hoạch");
+  await form.getByLabel("Nguồn (bắt buộc)").fill("Nghị quyết ĐHCĐ 2025");
+  await form.getByRole("button", { name: "Lưu kế hoạch" }).click();
+  await expect(box).toContainText("DT lũy kế Q4/2025 · % kế hoạch");
+  await expect(box).toContainText("50,0%");
+  await expect(box).toContainText("1.090 / KH 2.180 tỷ");
+  await expect(box).toContainText("nguồn: Nghị quyết ĐHCĐ 2025");
+  await box.getByRole("button", { name: "Xóa kế hoạch 2025" }).click();
+  await expect(box).not.toContainText("DT lũy kế Q4/2025");
+});

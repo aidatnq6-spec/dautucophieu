@@ -30,3 +30,31 @@ def test_years_and_dates_are_not_taken_and_at_most_three_candidates_are_kept():
 def test_a_scanned_pdf_without_text_says_so():
     out = propose_values(["", "  "], ["HRC"])
     assert out["values"] == {} and out["missing"] == ["HRC"] and out["warnings"] == ["PDF không có chữ (bản scan ảnh): hãy nhập tay."]
+
+
+def test_a_first_number_not_written_the_vietnamese_way_leaves_the_line_without_a_candidate_instead_of_taking_a_later_one():
+    pages = ["HRC, and steel billets reached 3.5 million tonnes, up 35% year-on-year.", "Thép xây dựng 1,234,567 tấn, tăng 12%",
+             "Ống thép 12.5% so với 2025, đạt 300 tấn"]
+    out = propose_values(pages, ["HRC", "Thép xây dựng", "Ống thép"])
+    assert out["values"] == {} and out["missing"] == ["HRC", "Thép xây dựng", "Ống thép"]
+
+
+def test_digits_glued_to_letters_are_words_not_numbers():
+    out = propose_values(["Ống thép quý Q3 đạt 228.000 tấn", "steel pipes, up l3%, while galvanized"], ["Ống thép", "steel pipe"])
+    assert [v["value"] for v in out["values"]["Ống thép"]] == ["228000"] and out["missing"] == ["steel pipe"]
+
+
+GARBLED_FONT = "S/A.hookN LƯ/Ohorn.dotblNG HRC N/Ocir.dotblI /dcroat062/I.dotblA /P016/H008/Aacute033 HRC 92"
+GARBLED_OCR = "v6i qu!' 2 vit ttutg 54o/o so v6i qtty. Th6p cuQn ciin n6ng (HRC) tl6ng g6p sdn 6 th6ng, ch6t luqng ph6i th6p HRC dqt 5,47"
+
+
+def test_pages_whose_text_is_broken_give_no_candidates_and_are_named_in_a_warning():
+    out = propose_values([GARBLED_FONT, "HRC: 512.000 tấn", GARBLED_OCR], ["HRC"])
+    assert [(v["value"], v["page"]) for v in out["values"]["HRC"]] == [("512000", 2)]
+    assert out["warnings"] == ["Chữ ở trang 1, 3 bị lỗi phông hoặc nhận dạng kém: không lấy số từ các trang này, hãy nhập tay."]
+
+
+def test_ordinary_text_with_codes_units_and_dates_is_not_taken_for_broken_text():
+    page = "Quý Q3/2026 HRC đạt 2.000.000 tấn, công suất 8,6 triệu tấn/năm; phát thải CO2 giảm; nhóm VN30; tỷ lệ 54%."
+    out = propose_values([page], ["HRC"])
+    assert out["values"]["HRC"][0]["value"] == "2000000" and out["warnings"] == []

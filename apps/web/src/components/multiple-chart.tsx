@@ -4,13 +4,21 @@ import { ApiError, api } from "../lib/api";
 import { PercentileBands } from "./percentile-bands";
 import { PriceMilestones } from "./price-milestones";
 
-type Point = { month: string; value: string | null; year: string | null };  // year: fiscal year behind a ticker's point; null for an index
+type Point = { month: string; value: string | null; year: string | null; basis?: string };  // year: the period behind a ticker's point; null for an index
 type Series = { points: Point[]; median: string | null; sd: string | null; latest: string | null };
-type History = { symbol: string; kind?: "index"; pe: Series; pb: Series; shares: number | null; from: string | null; to: string | null; reason: string | null };
+type History = { symbol: string; kind?: "index"; source?: "vndirect" | "vnstock"; pe: Series; pb: Series; shares: number | null; from: string | null; to: string | null; reason: string | null };
 
 const H = 220, PAD = { top: 14, right: 58, bottom: 26, left: 36 };
 const num = (v: string | number) => Number(v).toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const monthLabel = (m: string) => `${m.slice(5)}/${m.slice(0, 4)}`;
+
+/** What a ticker's point rests on: the four quarters to a quarter, a quarter's equity, or a year's report. */
+export function periodText(period: string, basis: string | undefined): string {
+  const q = period.includes("-Q") ? `Q${period.slice(-1)}/${period.slice(0, 4)}` : null;
+  if (q && basis === "4 quý") return `4 quý đến ${q}`;
+  if (q) return `vốn chủ cuối ${q}`;
+  return `số liệu năm ${period}`;
+}
 
 function niceTicks(max: number): number[] {
   const step = [1, 2, 2.5, 5, 10, 20, 25, 50, 100].find((s) => max / s <= 5) ?? Math.ceil(max / 5);
@@ -87,13 +95,13 @@ function Chart({ title, symbol, series, unit }: { title: string; symbol: string;
         </svg>
         {h && <div className="mc-tip" style={{ left: `${Math.min(80, Math.max(20, (x(hover!) / W) * 100))}%` }} role="status">
           <strong>{monthLabel(h.month)}</strong>: {h.value ? `${num(h.value)}${unit}` : "không xác định (lỗ hoặc vốn âm)"}
-          {h.year && <div className="caption">theo số liệu năm {h.year}</div>}</div>}
+          {h.year && <div className="caption">theo {periodText(h.year, h.basis)}</div>}</div>}
       </div>
       <details className="mc-table">
         <summary>Bảng số liệu</summary>
-        <table><thead><tr><th>Tháng</th><th className="num">{title.split(" ")[0]}</th>{pts[0]?.year !== null && <th>Năm tài chính</th>}</tr></thead>
+        <table><thead><tr><th>Tháng</th><th className="num">{title.split(" ")[0]}</th>{pts[0]?.year !== null && <th>Theo số liệu</th>}</tr></thead>
           <tbody>{[...pts].reverse().map((p) => <tr key={p.month}><td>{monthLabel(p.month)}</td>
-            <td className="num">{p.value ? num(p.value) : "—"}</td>{p.year !== null && <td>{p.year}</td>}</tr>)}</tbody></table>
+            <td className="num">{p.value ? num(p.value) : "—"}</td>{p.year !== null && <td>{periodText(p.year, p.basis)}</td>}</tr>)}</tbody></table>
       </details>
     </figure>
   );
@@ -114,7 +122,9 @@ export function MultipleCharts({ symbol }: { symbol: string }) {
         ? <p className="caption">Mỗi tháng một điểm, {monthLabel(data.from!)}–{monthLabel(data.to!)}: P/E, P/B của chỉ số ngày cuối tháng (VNDirect).
           Trung vị và dải ±1 độ lệch chuẩn tính trên số liệu theo ngày của cùng 5 năm, như bảng phía trên.</p>
         : <p className="caption">Mỗi tháng một điểm, {monthLabel(data.from!)}–{monthLabel(data.to!)}: giá cuối tháng (đã điều chỉnh) × số cổ phiếu hiện tại,
-          chia lợi nhuận hoặc vốn chủ của năm tài chính đã công bố gần nhất (số liệu năm N dùng từ 1/4 năm N+1).</p>}
+          chia lợi nhuận 4 quý gần nhất (thiếu quý thì báo cáo năm) hoặc vốn chủ cuối kỳ đã công bố, như chuỗi theo tuần.{" "}
+          {data.source === "vndirect" ? "Số của công ty mẹ theo báo cáo VNDirect; kỳ tính là đã công bố từ ngày VNDirect đưa số lên (trong 120 ngày sau khi hết kỳ), nếu không thì 45 ngày sau khi hết quý, năm từ 1/4 năm sau."
+            : "Số liệu Vnstock; quý tính là đã công bố 45 ngày sau khi hết quý, năm từ 1/4 năm sau."}</p>}
       <div className="mc-grid2">
         <Chart title="P/E lịch sử" symbol={symbol} series={data.pe} unit="x" />
         <Chart title="P/B lịch sử" symbol={symbol} series={data.pb} unit="x" />

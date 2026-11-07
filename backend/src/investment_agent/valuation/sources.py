@@ -60,3 +60,22 @@ def valuation_record(data_dir: Path, symbol: str, *, today: date) -> dict:
         return {"source": "vndirect", "shares": shares, "published": publication_dates(statements),
                 "record": {"quarters": pick(statements.get("quarters", {})), "years": pick(statements.get("years", {}))}}
     return {"source": "vnstock", "shares": shares, "published": None, "record": fundamentals}
+
+
+def merged_fundamentals(data_dir: Path, symbol: str) -> tuple[dict | None, str | None]:
+    """The Vnstock fundamentals record with VNDirect's parent profit and parent equity in place of its own by year and quarter, when
+    the ticker has VNDirect statements; Vnstock's EPS of the same year stays (the reference valuation's share count comes from it),
+    and dividends, share issues, listed shares and the report-quality lines are kept. Vnstock's record unchanged otherwise."""
+    fundamentals = FundamentalsStore(Path(data_dir) / "fundamentals").read(symbol)
+    statements = StatementStore(Path(data_dir) / "statements").read(symbol)
+    if not statements or not statements.get("quarters"):
+        return fundamentals, ("vnstock" if fundamentals else None)
+    old_years = (fundamentals or {}).get("years", {})
+    years = {}
+    for y, f in sorted(statements.get("years", {}).items()):
+        figures = _parent(f)
+        if figures:
+            eps = old_years.get(y, {}).get("eps")
+            years[y] = {**figures, **({"eps": eps} if eps is not None else {})}
+    quarters = {q: v for q, v in ((q, _parent(f)) for q, f in sorted(statements["quarters"].items())) if v}
+    return {**(fundamentals or {"symbol": symbol, "dividends": [], "issues": []}), "years": years, "quarters": quarters}, "vndirect"

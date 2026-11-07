@@ -37,3 +37,17 @@ def test_without_statements_or_prices_there_is_a_reason_not_a_chart():
     assert monthly_multiples({"years": {}, "quarters": {}}, [], today=date(2026, 1, 1))["reason"] == "Chưa có báo cáo tài chính"
     out = monthly_multiples(RECORD, [], today=date(2026, 1, 1))
     assert out["reason"] == "Chưa có lịch sử giá" and out["pe"]["points"] == []
+
+
+def test_months_use_four_real_quarters_when_the_record_has_them_and_name_the_period():
+    quarters = {q: {"npat": "250000000", "equity": "10000000000"} for q in ("2021-Q2", "2021-Q3", "2021-Q4", "2022-Q1")}
+    out = monthly_multiples({**RECORD, "quarters": quarters}, points(("2022-05-31", 30.0)), today=date(2022, 6, 15))
+    p = out["pe"]["points"][0]
+    assert (p["month"], p["value"], p["year"], p["basis"]) == ("2022-05", "30.00", "2022-Q1", "4 quý")  # 30,000 × 1 million / 1 tỷ
+
+
+def test_a_publication_calendar_and_a_share_count_can_be_given():
+    quarters = {q: {"npat": "250000000", "equity": "10000000000"} for q in ("2021-Q2", "2021-Q3", "2021-Q4", "2022-Q1")}
+    early = lambda p: date(2022, 4, 20) if p == "2022-Q1" else date(2099, 1, 1)  # noqa: E731
+    out = monthly_multiples({"years": {}, "quarters": quarters}, points(("2022-04-29", 30.0)), today=date(2022, 6, 15), shares=2000000, published=early)
+    assert out["pe"]["points"][0]["value"] == "60.00" and out["shares"] == 2000000

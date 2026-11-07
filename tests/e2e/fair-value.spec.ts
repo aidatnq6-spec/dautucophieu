@@ -72,6 +72,21 @@ test("a typed price gives its P/B and P/E, its rank in each window and the earli
   await expect(bands.getByTestId("pb-assumed")).toHaveCount(0);
 });
 
+test("past price milestones list today and the earlier troughs, with the owner's threshold and no forecast", async ({ page }) => {
+  await openPage(page);
+  await page.getByRole("button", { name: "Chi tiết FPT" }).click();
+  const section = page.getByRole("region", { name: "Mốc giá quá khứ FPT" });
+  const table = section.getByRole("table");
+  await expect(table).toContainText("Giá hiện tại");
+  await expect(table).toContainText("Đáy nhịp");
+  await expect(table).toContainText("Giá tại P/B thấp nhất");
+  await expect(section).toContainText("đi ngược 15%");
+  await expect(section).toContainText("không dự phóng bao lâu nữa giá về");
+  await section.getByRole("button", { name: "20%" }).click();
+  await expect(section.getByRole("button", { name: "20%" })).toHaveAttribute("aria-pressed", "true");
+  await expect(section).toContainText("đi ngược 20%");
+});
+
 test("no horizontal scroll with the P/E chart open at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 900 });
   await openPage(page);
@@ -80,6 +95,7 @@ test("no horizontal scroll with the P/E chart open at 375px", async ({ page }) =
   await expect(page.getByRole("figure", { name: "Dải phân vị P/B FPT" })).toBeVisible();
   await page.getByRole("button", { name: "−10%" }).click();
   await expect(page.getByRole("region", { name: "Kết quả giá giả định" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Mốc giá quá khứ FPT" }).getByRole("table")).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });

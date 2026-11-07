@@ -268,3 +268,22 @@ def test_what_if_prices_both_multiples_at_a_typed_price_for_a_watched_ticker_onl
     assert body["pb"]["windows"][2]["rank"] == 0 and body["pb"]["episodes"]["done"] == 0
     assert call(client, clock, "GET", "/internal/fairvalue/whatif/FPT/0").status_code == 422
     assert call(client, clock, "GET", "/internal/fairvalue/whatif/ZZZ/12000").status_code == 404
+
+
+def test_milestones_list_past_troughs_for_a_watched_ticker_with_the_owner_s_threshold(tmp_path):
+    from datetime import timedelta
+    (tmp_path / "market-symbols.txt").write_text("FPT" + chr(10), encoding="utf-8")
+    years = {str(y): {"npat": "1000000000", "eps": "1000", "equity": "10000000000"} for y in range(2018, 2026)}
+    FundamentalsStore(tmp_path / "fundamentals").save({"symbol": "FPT", "fetched_at": "2026-10-26T00:00:00+00:00", "source": "t",
+                                                      "years": years, "quarters": {}, "dividends": [], "issues": []})
+    prices = [10, 13, 6.5, 9, 11, 9]
+    SeriesStore(tmp_path / "trend-sources").upsert("FPT-1d", [(datetime(2025, 6, 6) + timedelta(weeks=i), str(p)) for i, p in enumerate(prices)])
+    clock = Clock()
+    app = create_app(InternalAuthSettings("owner-1", TOKEN, SECRET), clock=clock, personal_repository=PersonalRepository("owner-1", MemoryDocumentStore()),
+                     market=SyntheticMarket(prices={}), data_dir=tmp_path)
+    client = TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000))
+    body = call(client, clock, "GET", "/internal/fairvalue/milestones/FPT/15").json()
+    assert body["symbol"] == "FPT" and body["threshold"] == "0.1500" and body["close"] == "9000" and body["peak"]["price"] == "11000"
+    assert [r["kind"] for r in body["rows"]] == ["current", "trough", "pb_floor"] and body["rows"][1]["price"] == "6500"
+    assert call(client, clock, "GET", "/internal/fairvalue/milestones/FPT/3").status_code == 422
+    assert call(client, clock, "GET", "/internal/fairvalue/milestones/ZZZ/15").status_code == 404

@@ -142,6 +142,16 @@ def _quarter_seen(record: dict, previous: dict | None, today) -> dict | None:
     return seen if seen and seen.get("quarter") == quarter else {"quarter": quarter, "on": today.isoformat()}
 
 
+_PERIOD_KEYS = ("years", "quarters", "annual")
+
+
+def _keep_older_periods(record: dict, previous: dict | None) -> dict:
+    """The free tier returns only the latest eight periods: periods already stored stay, and a period returned again is replaced."""
+    for key in _PERIOD_KEYS:
+        record[key] = dict(sorted({**(previous or {}).get(key, {}), **record[key]}.items()))
+    return record
+
+
 def sync_fundamentals(store: "FundamentalsStore", series, symbols: list[str], *, provider, now, limit: int | None,
                       max_age_days: int = 7, sleep=time.sleep) -> dict:
     """Refresh statements (and 8 years of daily closes for year-end prices) for the stalest tickers, paced for the rate limit."""
@@ -156,7 +166,8 @@ def sync_fundamentals(store: "FundamentalsStore", series, symbols: list[str], *,
             key = f"{sym}-1d"
             start = today - timedelta(days=2920 if len(series.read(key)) < 400 else 60)
             series.upsert(key, _with_retry(lambda: provider.fetch_closes(sym, start, today, interval="1D", index=False), sleep))
-            record, previous = build_record(sym, frames, now), store.read(sym)
+            previous = store.read(sym)
+            record = _keep_older_periods(build_record(sym, frames, now), previous)
             record["latest_quarter_seen"] = _quarter_seen(record, previous, today)
             store.save(record)
             updated.append(sym)

@@ -14,6 +14,7 @@ Tra cứu ngày 2026-10-25. Số liệu máy đọc: `config/market-rules-hose.j
 | Thuế bán chứng khoán | 0,1% giá chuyển nhượng từng lần | Luật Thuế TNCN 109/2025/QH15, hiệu lực 01/7/2026, Điều 13 | Nội dung luật trích qua trang pháp luật; nghị định hướng dẫn đang dự thảo |
 | Thuế cổ tức | 5% thu nhập từ đầu tư vốn | Luật 109/2025/QH15, Điều 12 | Như trên |
 | Phí môi giới | Theo biểu phí của công ty chứng khoán của bạn | Nhập trong Cài đặt | Không có mức mặc định |
+| Báo cáo tài chính đã công bố từ ngày nào (chuỗi định giá) | Năm Y: từ 01/4 năm Y+1. Quý: 45 ngày sau ngày kết thúc quý (Q1 15/5, Q2 14/8, Q3 14/11, Q4 14/2 năm sau) | Thông tư 96/2020/TT-BTC Điều 14 khoản 3: tổ chức niêm yết công bố báo cáo quý trong 20 ngày sau khi hết quý, bản soát xét không quá 45 ngày; báo cáo năm kiểm toán trong 90 ngày | **Chỉ nguồn thứ cấp** (bài tư vấn pháp luật, tra 07/11/2026). Gói Cộng đồng không có ngày công bố thật, nên lấy hạn muộn nhất để không dùng số trước khi công bố; doanh nghiệp xin gia hạn hoặc nộp trễ thì vẫn có thể lệch |
 
 ## Lịch nghỉ giao dịch 2026
 
@@ -34,6 +35,7 @@ Lịch năm sau: khi HOSE công bố (thường tháng 12), tạo `config/tradin
 2. Điều khoản thời hạn thanh toán trong Thông tư 119/2020 sau sửa đổi 18/2025.
 3. Bản gốc thông báo lịch nghỉ 2026 trên hsx.vn.
 4. Nghị định hướng dẫn Luật Thuế TNCN 2025 về chứng khoán khi ban hành.
+5. Điều 14 Thông tư 96/2020/TT-BTC trên văn bản gốc (hạn công bố báo cáo quý, báo cáo năm).
 
 ## Nguồn
 

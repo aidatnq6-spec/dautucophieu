@@ -163,3 +163,19 @@ def test_share_issues_keep_their_ratio_so_stock_dividends_can_be_summed():
         {"event_code": "ISS", "event_title_vi": "Phát hành cổ phiếu - Phát hành cho CBCNV", "exright_date": pd.Timestamp("2025-06-05")}]}
     assert build_record("ACB", frames, NOW)["share_issues"] == [{"date": "2025-05-23", "kind": "bonus", "ratio": "0.15"},
                                                                 {"date": "2025-06-05", "kind": "raise", "ratio": None}]
+
+
+def test_sync_keeps_periods_the_source_no_longer_returns(tmp_path):
+    # The free tier returns only the latest eight periods; older ones already stored are kept, newer figures win.
+    store, series = FundamentalsStore(tmp_path / "f"), SeriesStore(tmp_path / "s")
+    old = build_record("FPT", FRAMES, NOW)
+    old["years"]["2017"] = {"npat": "1", "equity": "2"}
+    old["quarters"]["2024-Q1"] = {"npat": "3", "equity": "4"}
+    old["quarters"]["2026-Q1"] = {"npat": "999"}
+    old["annual"]["2017"] = {"revenue": "5"}
+    store.save(old)
+    sync_fundamentals(store, series, ["FPT"], provider=FakeProvider(), now=NOW, limit=None, max_age_days=0, sleep=lambda s: None)
+    r = store.read("FPT")
+    assert r["years"]["2017"] == {"npat": "1", "equity": "2"} and r["quarters"]["2024-Q1"] == {"npat": "3", "equity": "4"}
+    assert r["annual"]["2017"] == {"revenue": "5"} and r["quarters"]["2026-Q1"] == {"npat": "550000000"}
+    assert list(r["quarters"]) == sorted(r["quarters"])

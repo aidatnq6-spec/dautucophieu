@@ -230,3 +230,19 @@ def test_insider_route_reads_vndirect_notices_for_a_watched_ticker(tmp_path, mon
     body = call(c, clock, "GET", "/internal/fairvalue/insider/FPT").json()
     assert body["deals"][0]["kind"] == "Bán" and body["deals"][0]["shares"] == 2000000 and body["reason"] is None
     assert call(c, clock, "GET", "/internal/fairvalue/insider/ZZZ").status_code == 404
+
+
+def test_weekly_gives_pe_pb_by_week_for_a_watched_ticker_only(tmp_path):
+    (tmp_path / "market-symbols.txt").write_text("FPT\n", encoding="utf-8")
+    years = {str(y): {"npat": "1000000000", "eps": "1000", "equity": "10000000000"} for y in range(2018, 2026)}
+    FundamentalsStore(tmp_path / "fundamentals").save({"symbol": "FPT", "fetched_at": "2026-10-26T00:00:00+00:00", "source": "t",
+                                                      "years": years, "quarters": {}, "dividends": [], "issues": []})
+    SeriesStore(tmp_path / "trend-sources").upsert("FPT-1d", [(datetime(2025, 6, d), "12") for d in (2, 3, 9, 16)])
+    clock = Clock()
+    app = create_app(InternalAuthSettings("owner-1", TOKEN, SECRET), clock=clock, personal_repository=PersonalRepository("owner-1", MemoryDocumentStore()),
+                     market=SyntheticMarket(prices={}), data_dir=tmp_path)
+    client = TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000))
+    body = call(client, clock, "GET", "/internal/fairvalue/weekly/FPT").json()
+    assert body["symbol"] == "FPT" and [p["date"] for p in body["pe"]["points"]] == ["2025-06-03", "2025-06-09", "2025-06-16"]
+    assert body["pe"]["points"][-1]["value"] == "12.00" and body["pe"]["points"][-1]["basis"] == "năm" and "2025-Q1" in body["missing_quarters"]
+    assert call(client, clock, "GET", "/internal/fairvalue/weekly/ZZZ").status_code == 404

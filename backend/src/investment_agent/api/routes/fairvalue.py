@@ -26,6 +26,7 @@ from investment_agent.valuation.dividend_history import dividend_history
 from investment_agent.valuation.forward import Assumptions, forward_valuation
 from investment_agent.valuation.history import monthly_multiples
 from investment_agent.valuation.index_reference import index_monthly_multiples
+from investment_agent.valuation.weekly import weekly_multiples
 from investment_agent.valuation.reference import _d, metrics
 
 from ..auth import require_owner
@@ -71,6 +72,21 @@ def fairvalue_history(symbol: str, request: Request):
                             today=now(request).astimezone(VN).date())
     return {"symbol": symbol, **out}
 
+
+
+@router.get("/fairvalue/weekly/{symbol}")
+def fairvalue_weekly(symbol: str, request: Request):
+    """Weekly P/E (trailing four quarters) and P/B of one watched ticker, each with its basis and the quarters missing."""
+    require_owner(request)
+    data_dir = request.app.state.data_dir
+    if data_dir is None:
+        return unavailable()
+    data_dir, symbol = Path(data_dir), symbol.upper()
+    if symbol not in load_watchlist(data_dir).symbols:
+        return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
+    out = weekly_multiples(FundamentalsStore(data_dir / "fundamentals").read(symbol), SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"),
+                           today=now(request).astimezone(VN).date())
+    return {"symbol": symbol, **out}
 
 class ForwardRequest(ContractModel):
     assumptions: Assumptions

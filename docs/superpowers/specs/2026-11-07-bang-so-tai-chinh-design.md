@@ -2,8 +2,8 @@
 
 Từ 3 ảnh bảng số HPG chủ sở hữu gửi (kết quả kinh doanh 10 quý có EBIT/EBITDA; định giá theo năm có vốn hoá, nợ ròng, EV, EV/EBITDA, FCFF).
 Chủ sở hữu chọn (07/11/2026): làm **bảng số quý/năm**; với lãi vay, khấu hao, nợ vay, capex thì **kiểm tra VNDirect trước** rồi dùng
-VNDirect làm nguồn; **giữ** quy tắc 45 ngày của chuỗi định giá theo tuần (dùng ngày VNDirect đưa số lên là việc sau). Chưa làm: kế hoạch
-năm ĐHCĐ, dự phóng quý tới, số liệu vận hành nhập tay. Chỉ dữ liệu công khai, không đọc danh mục, không gọi AI.
+VNDirect làm nguồn; lúc đầu **giữ** quy tắc 45 ngày của chuỗi định giá theo tuần. Các việc sau ghi lúc đó đều đã làm (07/11/2026): ngày VNDirect đưa số lên ([Số quý VNDirect](2026-11-07-chuoi-dinh-gia-tuan-design.md)), kế hoạch
+năm ĐHCĐ, dự phóng quý tới, số liệu vận hành nhập tay (và đọc từ PDF). Chỉ dữ liệu công khai, không đọc danh mục, không gọi AI.
 
 ## Nguồn (`market/statements.py`)
 - Vnstock gói Cộng đồng chỉ có 8 kỳ, không có lãi vay, khấu hao, nợ vay, capex (đã kiểm với HPG 07/11/2026).
@@ -40,3 +40,8 @@ năm ĐHCĐ, dự phóng quý tới, số liệu vận hành nhập tay. Chỉ d
   lý do.
 - Trang hồ sơ mã, sau Định giá tham khảo: khối **Bảng số tài chính**: 4 thẻ tóm tắt 4 quý; nút Quý/Năm; nút 8 · 12 · 20 quý · Tất cả; bảng
   (tỷ đồng, chi phí âm, % so cùng kỳ xanh/đỏ, cột nhãn đứng yên khi cuộn ngang); mục Kiểm tra chéo; chú thích công thức và nguồn.
+
+## Ngày công bố cho VN-Index, VN30 tự tính 2013–2017 (07/11/2026)
+Chuỗi tự tính ([index_history](../../../backend/src/investment_agent/market/index_history.py)) vẫn dùng quy tắc 45 ngày. Đã kiểm trên báo cáo VNDirect
+đã lưu của các mã theo dõi: gần như mọi quý 2013–2017 (690/692) có `createdDate` là đợt nạp số cũ tháng 12/2019, nằm ngoài 120 ngày, nên quy tắc ngày
+VNDirect cũng rơi về 45 ngày. Đổi sang ngày VNDirect không làm khác chuỗi này, nên không đổi.

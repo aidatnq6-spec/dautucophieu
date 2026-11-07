@@ -17,7 +17,7 @@ const COUNTS = [8, 12, 20, 0] as const;
 export function cell(v: string | null, kind: Row["kind"], key: string | null): string {
   if (v === null) return "—";
   const n = Number(v);
-  if (kind === "money") return Math.round(n / 1e9).toLocaleString("vi-VN");
+  if (kind === "money") return (Math.round(n / 1e9) || 0).toLocaleString("vi-VN");  // || 0: a small loss rounds to 0, not -0
   if (kind === "x") return `${n.toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x`;
   const pct = (n * 100).toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   return `${key && SIGNED.has(key) && n > 0 ? "+" : ""}${pct}%`;
@@ -34,7 +34,7 @@ export function lastN<T>(periods: T[], n: number): number[] {
 }
 
 const tone = (v: string | null, key: string | null) => (v !== null && key && SIGNED.has(key) ? (Number(v) > 0 ? "positive" : Number(v) < 0 ? "negative" : "") : "");
-const ty = (v: string | null) => (v === null ? "—" : `${Math.round(Number(v) / 1e9).toLocaleString("vi-VN")} tỷ`);
+const ty = (v: string | null) => (v === null ? "—" : `${cell(v, "money", null)} tỷ`);
 
 function Table({ part, cols, caption }: { part: Part; cols: number[]; caption: string }) {
   return (

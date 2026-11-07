@@ -27,3 +27,11 @@ nghĩa và nhập, theo khuôn Số liệu ngân hàng. Không gọi AI, không 
   gốc. PDF chỉ có ảnh (scan) thì ghi "hãy nhập tay".
 - **Không lưu gì** cho tới khi chủ sở hữu bấm Lưu kỳ: ứng viên đầu điền vào ô, link kèm số trang điền vào Nguồn; có thể bấm chọn ứng viên khác; chú thích nhắc
   kiểm tra đơn vị (PDF có thể ghi tấn khi nhóm là nghìn tấn). Kỳ do chủ sở hữu nhập.
+- **Sửa sau khi thử PDF thật của HPG (07/11/2026, chủ sở hữu đồng ý).** Hòa Phát đăng PDF dạng scan: bản chỉ có ảnh, bản có lớp chữ nhận dạng sai
+  ("th6p" thay cho "thép") hoặc ra tên ký tự phông (`/Ohorn.dotbl`). Bộ đọc trước đó đề xuất số sai: "3.5 million tonnes, up 35%" cho ra 35.
+  - Số đầu tiên sau tên viết không theo kiểu Việt Nam (3.5, 1,234,567, 12.5%) thì dòng đó **không có ứng viên**, không lấy số sau nó. Chữ số
+    dính vào chữ (Q3, th6p, l3%) là một phần của từ, bỏ qua.
+  - Trang có chữ bị lỗi (từ 3 tên ký tự phông trở lên, hoặc từ 3 từ có chữ số ở giữa và chiếm ít nhất 2 % số từ) không cho ứng viên; cảnh báo
+    "Chữ ở trang … bị lỗi phông hoặc nhận dạng kém: không lấy số từ các trang này, hãy nhập tay."
+  - Kiểm trên dữ liệu thật: 6 PDF của HPG (2 chỉ có ảnh, 4 có chữ lỗi, đều báo đúng); 77 trang của 4 báo cáo ACBS có chữ sạch, không trang nào bị
+    coi là lỗi.

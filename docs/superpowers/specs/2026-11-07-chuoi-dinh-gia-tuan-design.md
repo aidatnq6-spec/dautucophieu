@@ -31,3 +31,15 @@ tài chính"; không có giá thì trả "Chưa có lịch sử giá".
 
 ## Ngoài phạm vi
 Phân vị, z, độ lệch và giao diện (bước 2); giá giả định (bước 3); mốc giá quá khứ (bước 4). Chỉ số VN-Index/VN30 đã có chuỗi ngày riêng.
+
+## Số quý VNDirect (07/11/2026, chủ sở hữu đồng ý)
+- Mã đã có báo cáo VNDirect ([Bảng số tài chính](2026-11-07-bang-so-tai-chinh-design.md)) dùng **LNST công ty mẹ và vốn chủ công ty mẹ** (vốn chủ
+  − lợi ích cổ đông không kiểm soát; trước 2015 phần này nằm ngoài vốn chủ) theo quý từ 2010–2015 và theo năm của VNDirect. Mã chưa có thì vẫn
+  dùng Vnstock như trên. Số cổ phiếu hiện tại vẫn lấy theo định giá tham khảo. Kết quả ghi `source` (`vndirect` hoặc `vnstock`).
+- **Ngày công bố**: một kỳ tính là đã công bố từ ngày VNDirect đưa số lên (`createdDate`) khi ngày đó sau ngày hết kỳ và trong vòng 120 ngày;
+  nếu không (VNDirect nạp số cũ ngày 01/12/2019) thì giữ quy tắc 45 ngày / 1-4. Ngày VNDirect muộn hơn quy tắc cũng được giữ, để báo cáo nộp
+  muộn không bị dùng sớm. Số năm VNDirect thường có từ cuối tháng 1 (trước kiểm toán) và có thể được sửa sau; chấp nhận, đã ghi.
+- HPG: P/E theo 4 quý thật cho 813/813 tuần từ 05/2010 (trước: 51/394 tuần từ 04/2019), không còn quý thiếu; Q3/2026 được dùng từ 29/10/2026.
+- Dải phân vị, giá giả định, mốc giá quá khứ dùng chuỗi này nên đổi theo; khung "Toàn bộ" giờ dài hơn (HPG từ 2010). Biểu đồ P/E, P/B theo tháng
+  vẫn theo số năm Vnstock như cũ.
+

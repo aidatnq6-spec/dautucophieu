@@ -30,6 +30,7 @@ from investment_agent.valuation.history import monthly_multiples
 from investment_agent.valuation.index_reference import index_monthly_multiples
 from investment_agent.valuation.bands import percentile_bands
 from investment_agent.valuation.milestones import price_milestones
+from investment_agent.valuation.sources import valuation_record
 from investment_agent.valuation.statement_table import statement_table
 from investment_agent.valuation.weekly import weekly_multiples
 from investment_agent.valuation.what_if import what_if
@@ -80,6 +81,14 @@ def fairvalue_history(symbol: str, request: Request):
 
 
 
+def _weekly(data_dir: Path, symbol: str, request: Request) -> tuple[str, dict]:
+    """The weekly P/E and P/B series on VNDirect's quarters when the ticker has them, the free Vnstock figures otherwise."""
+    today = now(request).astimezone(VN).date()
+    v = valuation_record(data_dir, symbol, today=today)
+    return v["source"], weekly_multiples(v["record"], SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"), today=today,
+                                         shares=v["shares"], published=v["published"])
+
+
 @router.get("/fairvalue/weekly/{symbol}")
 def fairvalue_weekly(symbol: str, request: Request):
     """Weekly P/E (trailing four quarters) and P/B of one watched ticker, each with its basis and the quarters missing, and their percentile bands."""
@@ -90,9 +99,8 @@ def fairvalue_weekly(symbol: str, request: Request):
     data_dir, symbol = Path(data_dir), symbol.upper()
     if symbol not in load_watchlist(data_dir).symbols:
         return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
-    out = weekly_multiples(FundamentalsStore(data_dir / "fundamentals").read(symbol), SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"),
-                           today=now(request).astimezone(VN).date())
-    return {"symbol": symbol, **out, "bands": {k: percentile_bands(out[k]["points"]) for k in ("pe", "pb")}}
+    src, out = _weekly(data_dir, symbol, request)
+    return {"symbol": symbol, "source": src, **out, "bands": {k: percentile_bands(out[k]["points"]) for k in ("pe", "pb")}}
 
 
 @router.get("/fairvalue/whatif/{symbol}/{price}")
@@ -105,11 +113,10 @@ def fairvalue_what_if(symbol: str, request: Request, price: int = PathParam(gt=0
     data_dir, symbol = Path(data_dir), symbol.upper()
     if symbol not in load_watchlist(data_dir).symbols:
         return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
-    out = weekly_multiples(FundamentalsStore(data_dir / "fundamentals").read(symbol), SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"),
-                           today=now(request).astimezone(VN).date())
+    src, out = _weekly(data_dir, symbol, request)
     if out["reason"]:
-        return {"symbol": symbol, "price": str(price), "reason": out["reason"], "pe": None, "pb": None}
-    return {"symbol": symbol, "price": str(price), "reason": None,
+        return {"symbol": symbol, "source": src, "price": str(price), "reason": out["reason"], "pe": None, "pb": None}
+    return {"symbol": symbol, "source": src, "price": str(price), "reason": None,
             **{k: what_if(out[k]["points"], shares=out["shares"], price=Decimal(price)) for k in ("pe", "pb")}}
 
 
@@ -123,9 +130,11 @@ def fairvalue_milestones(symbol: str, request: Request, threshold: int = PathPar
     data_dir, symbol = Path(data_dir), symbol.upper()
     if symbol not in load_watchlist(data_dir).symbols:
         return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
-    out = price_milestones(FundamentalsStore(data_dir / "fundamentals").read(symbol), SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"),
-                           today=now(request).astimezone(VN).date(), threshold=Decimal(threshold) / 100)
-    return {"symbol": symbol, **out}
+    today = now(request).astimezone(VN).date()
+    v = valuation_record(data_dir, symbol, today=today)
+    out = price_milestones(v["record"], SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"), today=today,
+                           threshold=Decimal(threshold) / 100, shares=v["shares"], published=v["published"])
+    return {"symbol": symbol, "source": v["source"], **out}
 
 
 @router.get("/fairvalue/statements/{symbol}")

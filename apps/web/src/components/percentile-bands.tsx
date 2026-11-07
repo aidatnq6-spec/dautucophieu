@@ -8,7 +8,7 @@ export type BandWindow = {
   min: string | null; max: string | null; mean: string | null; sd: string | null; skew: string | null; z: string | null; rank: number | null;
 };
 type Bands = { current: string | null; date: string | null; windows: BandWindow[]; reason: string | null };
-type Weekly = { symbol: string; reason: string | null; missing_quarters: string[]; bands: { pe: Bands; pb: Bands };
+type Weekly = { symbol: string; source?: "vndirect" | "vnstock"; reason: string | null; missing_quarters: string[]; bands: { pe: Bands; pb: Bands };
   pe: { points: { close: string }[] }; pb: { points: { close: string }[] } };
 type Metric = "pb" | "pe";
 export type Episode = { entry: string; multiple: string; entry_close: string; exit: string | null; exit_close: string | null; return: string | null; drawdown: string | null };
@@ -30,6 +30,13 @@ export function axisDomain(windows: BandWindow[], current: string | null, assume
   if (ws.length === 0) return null;
   const marks = [current, assumed].filter((v): v is string => v !== null).map(Number);
   return [Math.min(...ws.map((w) => Number(w.min)), ...marks), Math.max(...ws.map((w) => Number(w.p!.p95)), ...marks)];
+}
+
+/** Where the quarters come from and when a report counts as out. */
+export function sourceNote(source: "vndirect" | "vnstock"): string {
+  return source === "vndirect"
+    ? "Lợi nhuận và vốn chủ của công ty mẹ theo báo cáo VNDirect; một kỳ tính là đã công bố từ ngày VNDirect đưa số lên nếu trong 120 ngày sau khi hết kỳ, nếu không thì 45 ngày sau khi hết quý, năm từ 1/4 năm sau."
+    : "Số liệu Vnstock (8 kỳ gần nhất); quý tính là đã công bố 45 ngày sau khi hết quý, năm từ 1/4 năm sau.";
 }
 
 /** Today's close less `pct` percent, rounded to 10 đồng. */
@@ -225,7 +232,7 @@ export function PercentileBands({ symbol }: { symbol: string }) {
       <p className="caption wrap">
         Mỗi tuần một điểm, giá cuối tuần{bands.date ? ` (mới nhất ${dayLabel(bands.date)})` : ""}.
         {metric === "pe" ? " P/E theo lợi nhuận 4 quý gần nhất đã công bố; tuần thiếu quý thì theo báo cáo năm." : " P/B theo vốn chủ cuối quý đã công bố; thiếu quý thì theo cuối năm."}
-        {" "}Quý tính là đã công bố 45 ngày sau khi hết quý, năm từ 1/4 năm sau. Phân vị so với chính lịch sử của mã, không phải tín hiệu mua bán.
+        {" "}{sourceNote(data.source ?? "vnstock")} Phân vị so với chính lịch sử của mã, không phải tín hiệu mua bán.
       </p>
       {bands.reason || axisDomain(bands.windows, bands.current) === null
         ? <p className="muted">Chưa vẽ được: {bands.reason ?? bands.windows.map((w) => `${w.label}: ${w.reason}`).join(" · ")}.</p>

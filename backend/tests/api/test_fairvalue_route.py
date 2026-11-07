@@ -314,3 +314,26 @@ def test_statements_give_the_quarterly_and_yearly_tables_of_a_watched_non_financ
     assert pe["values"] == ["12.00"]  # 12,000 đ × 1 million shares / 1 tỷ
     assert call(client, clock, "GET", "/internal/fairvalue/statements/VCB").json()["reason"] == "Ngân hàng, chứng khoán, bảo hiểm có bảng số liệu ngành riêng"
     assert call(client, clock, "GET", "/internal/fairvalue/statements/ZZZ").status_code == 404
+
+
+def test_the_weekly_series_takes_vndirect_quarters_when_the_ticker_has_them(tmp_path):
+    from datetime import timedelta
+    from investment_agent.market.statements import StatementStore
+    (tmp_path / "market-symbols.txt").write_text("FPT" + chr(10), encoding="utf-8")
+    years = {str(y): {"npat": "1000000000", "eps": "1000", "equity": "10000000000"} for y in range(2018, 2026)}
+    FundamentalsStore(tmp_path / "fundamentals").save({"symbol": "FPT", "fetched_at": "2026-10-26T00:00:00+00:00", "source": "t",
+                                                      "years": years, "quarters": {}, "dividends": [], "issues": []})
+    SeriesStore(tmp_path / "trend-sources").upsert("FPT-1d", [(datetime(2025, 6, 6) + timedelta(weeks=i), "12") for i in range(3)])
+    quarters = {q: {"npat_parent": "500000000", "equity": "20000000000", "minority_equity": "0"} for q in ("2024-Q2", "2024-Q3", "2024-Q4", "2025-Q1")}
+    StatementStore(tmp_path / "statements").save({"symbol": "FPT", "fetched_at": "2026-11-07T00:00:00+00:00", "source": "vndirect:finfo",
+                                                  "quarters": quarters, "years": {}, "quarters_created": {"2025-Q1": "2025-04-25"}, "years_created": {}})
+    clock = Clock()
+    app = create_app(InternalAuthSettings("owner-1", TOKEN, SECRET), clock=clock, personal_repository=PersonalRepository("owner-1", MemoryDocumentStore()),
+                     market=SyntheticMarket(prices={}), data_dir=tmp_path)
+    client = TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000))
+    body = call(client, clock, "GET", "/internal/fairvalue/weekly/FPT").json()
+    assert body["source"] == "vndirect"
+    first = body["pe"]["points"][0]
+    assert (first["basis"], first["period"], first["value"]) == ("4 quý", "2025-Q1", "6.00")  # 12,000 × 1 million / 2 tỷ; listed 25/04
+    assert call(client, clock, "GET", "/internal/fairvalue/whatif/FPT/6000").json()["pe"]["multiple"] == "3.00"
+    assert call(client, clock, "GET", "/internal/fairvalue/milestones/FPT/15").json()["source"] == "vndirect"

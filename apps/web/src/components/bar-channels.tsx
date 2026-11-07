@@ -79,7 +79,7 @@ export function BarChannels() {
             onClick={() => setN((old) => ({ ...old, [frame]: v }))}>{v} {look.unit}</button>)}</span>
       </div>
       {error && <p className="errors" role="alert">{error}</p>}
-      {!error && !shown && <p className="muted fx-loading" role="status">Đang tải…</p>}
+      {!error && !shown && <p className="muted fx-loading" role="status">Đang tải kênh…</p>}
       {shown && <>
         {shown.status && shown.last_bar !== null && <p className={`wc-status ${shown.status.state}`}>{statusLine(shown.status, shown.last_bar, look.word)}.</p>}
         {shown.reason && <p className="muted">Chưa có kênh: {shown.reason}.</p>}

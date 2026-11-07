@@ -4,9 +4,10 @@ import { ApiError, api } from "../lib/api";
 import { PercentileBands } from "./percentile-bands";
 import { PriceMilestones } from "./price-milestones";
 
-type Point = { month: string; value: string | null; year: string | null; basis?: string };  // year: the period behind a ticker's point; null for an index
+type Point = { month: string; value: string | null; year: string | null; basis?: string; calc?: boolean };  // year: the period behind a ticker's point; null for an index
 type Series = { points: Point[]; median: string | null; sd: string | null; latest: string | null };
-type History = { symbol: string; kind?: "index"; source?: "vndirect" | "vnstock"; pe: Series; pb: Series; shares: number | null; from: string | null; to: string | null; reason: string | null };
+type Calc = { from: string; to: string; check: { tickers?: number; pe?: { months: number; mean_abs: string | null }; pb?: { months: number; mean_abs: string | null } } | null };
+type History = { symbol: string; kind?: "index"; calc?: Calc | null; source?: "vndirect" | "vnstock"; pe: Series; pb: Series; shares: number | null; from: string | null; to: string | null; reason: string | null };
 
 const H = 220, PAD = { top: 14, right: 58, bottom: 26, left: 36 };
 const num = (v: string | number) => Number(v).toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -29,6 +30,15 @@ export function yearLabels(months: string[], x: (i: number) => number, left: num
     .filter(({ i, year }) => (i === 0 || months[i - 1].slice(0, 4) !== year) && Number(year) % every === 0);
   return firsts.filter((f, k) => k === firsts.length - 1 || x(firsts[k + 1].i) - x(f.i) >= LABEL_GAP)
     .map((f) => ({ ...f, anchor: (x(f.i) < left + 12 ? "start" : "middle") as "start" | "middle" }));
+}
+
+const pct1 = (v: string | null | undefined) => (v == null ? "—" : `${(Number(v) * 100).toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`);
+
+/** What the dashed, worked-out part of an index chart is, its limits, and how far the same method lands from VNDirect where both exist. */
+export function calcNote(c: Calc): string {
+  const ch = c.check;
+  const span = `Nét đứt ${monthLabel(c.from)}–${monthLabel(c.to)}: tự tính từ ${ch?.tickers ?? "các"} mã còn niêm yết trên HOSE hôm nay (thiếu các mã đã hủy niêm yết nên quá khứ bị lệch).`;
+  return ch?.pe ? `${span} Cùng cách tính so với VNDirect ở ${ch.pe.months} tháng trùng nhau: P/E lệch trung bình ${pct1(ch.pe.mean_abs)}, P/B ${pct1(ch.pb?.mean_abs)}.` : span;
 }
 
 function niceTicks(max: number): number[] {
@@ -64,8 +74,15 @@ function Chart({ title, symbol, series, unit }: { title: string; symbol: string;
   const x = (i: number) => PAD.left + (pts.length === 1 ? 0 : (i / (pts.length - 1)) * (W - PAD.left - PAD.right));
   const y = (v: number) => PAD.top + (1 - v / yMax) * (H - PAD.top - PAD.bottom);
   // Gaps where the multiple is undefined (loss years) instead of a line through them.
-  let d = "", pen = false;
-  values.forEach((v, i) => { if (v === null) { pen = false; return; } d += `${pen ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`; pen = true; });
+  // The worked-out part of an index chart (before VNDirect's series) is drawn apart, dashed, joined to the first VNDirect point.
+  let d = "", dCalc = "", pen = false, penCalc = false;
+  values.forEach((v, i) => {
+    if (v === null) { pen = penCalc = false; return; }
+    const at = `${x(i).toFixed(1)},${y(v).toFixed(1)}`;
+    if (pts[i].calc) { dCalc += `${penCalc ? "L" : "M"}${at}`; penCalc = true; return; }
+    if (penCalc) { dCalc += `L${at}`; penCalc = false; }
+    d += `${pen ? "L" : "M"}${at}`; pen = true;
+  });
   const every = W < 420 ? 2 : 1;  // keep year labels apart on a phone
   const years = yearLabels(pts.map((p) => p.month), x, PAD.left, every);
   const lastIdx = values.map((v, i) => (v === null ? -1 : i)).filter((i) => i >= 0).pop()!;
@@ -96,6 +113,7 @@ function Chart({ title, symbol, series, unit }: { title: string; symbol: string;
           </>}
           {years.map(({ i, year, anchor }) => <text key={year} x={x(i)} y={H - 8} className="mc-axis" textAnchor={anchor}>{year}</text>)}
           <path d={d} className="mc-line" />
+          {dCalc && <path d={dCalc} className="mc-line-calc" data-testid="mc-calc" />}
           <circle cx={x(lastIdx)} cy={y(values[lastIdx]!)} r={4} className="mc-dot" />
           {hover !== null && <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={H - PAD.bottom} className="mc-cross" />}
           {hover !== null && values[hover] !== null && <circle cx={x(hover)} cy={y(values[hover]!)} r={4} className="mc-dot" />}
@@ -104,7 +122,8 @@ function Chart({ title, symbol, series, unit }: { title: string; symbol: string;
         </svg>
         {h && <div className="mc-tip" style={{ left: `${Math.min(80, Math.max(20, (x(hover!) / W) * 100))}%` }} role="status">
           <strong>{monthLabel(h.month)}</strong>: {h.value ? `${num(h.value)}${unit}` : "không xác định (lỗ hoặc vốn âm)"}
-          {h.year && <div className="caption">theo {periodText(h.year, h.basis)}</div>}</div>}
+          {h.year && <div className="caption">theo {periodText(h.year, h.basis)}</div>}
+          {h.calc && <div className="caption">tự tính từ các mã còn niêm yết</div>}</div>}
       </div>
       <details className="mc-table">
         <summary>Bảng số liệu</summary>
@@ -129,7 +148,8 @@ export function MultipleCharts({ symbol }: { symbol: string }) {
     <section aria-label={`Biểu đồ P/E và P/B ${symbol}`}>
       {data.kind === "index"
         ? <p className="caption">Mỗi tháng một điểm, {monthLabel(data.from!)}–{monthLabel(data.to!)}: P/E, P/B của chỉ số ngày cuối tháng (VNDirect).
-          Trung vị và dải ±1 độ lệch chuẩn tính trên toàn bộ số liệu theo ngày (VNDirect chỉ có từ 12/2017); mức hợp lý ở bảng phía trên dùng trung vị 5 năm.</p>
+          Trung vị và dải ±1 độ lệch chuẩn tính trên toàn bộ số liệu theo ngày (VNDirect chỉ có từ 12/2017); mức hợp lý ở bảng phía trên dùng trung vị 5 năm.
+          {data.calc && <> {calcNote(data.calc)}</>}</p>
         : <p className="caption">Mỗi tháng một điểm, {monthLabel(data.from!)}–{monthLabel(data.to!)}: giá cuối tháng (đã điều chỉnh) × số cổ phiếu hiện tại,
           chia lợi nhuận 4 quý gần nhất (thiếu quý thì báo cáo năm) hoặc vốn chủ cuối kỳ đã công bố, như chuỗi theo tuần.{" "}
           {data.source === "vndirect" ? "Số của công ty mẹ theo báo cáo VNDirect; kỳ tính là đã công bố từ ngày VNDirect đưa số lên (trong 120 ngày sau khi hết kỳ), nếu không thì 45 ngày sau khi hết quý, năm từ 1/4 năm sau."

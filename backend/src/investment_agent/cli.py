@@ -66,6 +66,8 @@ def main() -> int:
     frs.add_argument("--data-dir", type=Path, required=True)
     ivs = commands.add_parser("index-valuation-sync", help="fetch daily P/E and P/B of VNINDEX and VN30 (VNDirect) into data/index-valuation")
     ivs.add_argument("--data-dir", type=Path, required=True)
+    ihist = commands.add_parser("index-history", help="work out VN-Index P/E and P/B before VNDirect's series from today's HOSE tickers (one-off, ~15 min)")
+    ihist.add_argument("--data-dir", type=Path, required=True)
     psync = commands.add_parser("plans-sync", help="business plans of watched tickers from CafeF (current year) into data/annual-plans-cafef")
     psync.add_argument("--data-dir", type=Path, required=True)
     ssync = commands.add_parser("statements-sync", help="full statements of watched non-financial tickers (VNDirect) for Bảng số tài chính")
@@ -107,6 +109,8 @@ def main() -> int:
         return index_groups([g.strip().upper() for g in args.groups.split(",") if g.strip()], args.output)
     if args.command == "market-sync":
         return market_sync(_symbols(args.symbols), args.data_dir, args.calendar, args.days, index=args.index)
+    if args.command == "index-history":
+        return index_history_cli(args.data_dir)
     if args.command == "plans-sync":
         return plans_sync(args.data_dir)
     if args.command == "statements-sync":
@@ -234,6 +238,36 @@ def _same_bar(a, b) -> bool:
 
 # Months with quarterly or annual report deadlines: 17 tickers older than 3 days a night covers the 50 watched in 3 days.
 REPORTING_MONTHS = (1, 2, 4, 5, 7, 8, 10, 11)
+
+
+def index_history_cli(data_dir: Path, *, get=None, now=None, sleep=None) -> int:
+    """Fetch what is missing, work the series out, compare it with VNDirect month by month and keep the days before VNDirect's first."""
+    import time
+    from datetime import datetime, timezone
+    from investment_agent.market.index_history import IndexHistoryStore, build_history, compare, compute_index
+    from investment_agent.market.series import SeriesStore
+    if get is None:
+        import httpx
+
+        def get(url):
+            response = httpx.get(url, timeout=60, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+            response.raise_for_status()
+            return response.text
+    symbols = json.loads((data_dir / "hose-listing.json").read_text(encoding="utf-8"))["listing"]["symbols"]
+    store = IndexHistoryStore(data_dir / "index-history")
+    built = build_history(store, symbols, get=get, now=now or datetime.now(timezone.utc), sleep=sleep or time.sleep)
+    calc = compute_index({s: rec for s in symbols if (rec := store.read(s))})
+    multiples = SeriesStore(data_dir / "index-valuation")
+    vnd = {k: multiples.read(f"VNINDEX-{k}-1d") for k in ("pe", "pb")}
+    first = min((p[0][0].date() for p in vnd.values() if p), default=None)
+    check = {**compare(calc, vnd), "tickers": len([s for s in symbols if store.read(s)]), "vndirect_from": first.isoformat() if first else None}
+    for k in ("pe", "pb"):
+        multiples.upsert(f"VNINDEX-{k}-calc-1d", [(datetime.combine(d, datetime.min.time()), format(v[k], "f")) for d, v in sorted(calc.items())
+                                                 if first is None or d < first])
+    (data_dir / "index-valuation" / "VNINDEX-calc-check.json").write_text(json.dumps(check, ensure_ascii=False), encoding="utf-8")
+    failed = {k: v for k, v in built.items() if v != "ok"}
+    print(json.dumps({"status": "ok" if not failed else "partial", "built": built, "compare": check}, ensure_ascii=False))
+    return 0 if not failed else 1
 
 
 def plans_sync(data_dir: Path, *, get=None, now=None, sleep=None) -> int:

@@ -6,8 +6,8 @@ Derived lines (đồng; costs shown negative):
   depreciation. Margins over net revenue; growth against the same quarter a year before, or the year before.
 - FCFF = operating cash flow + interest expense × (1 − effective tax rate) + capital spending (negative), the tax rate being the
   period's tax ÷ profit before tax; no value when profit before tax is not positive or the rate falls outside 0–100 %.
-- Years: market capitalisation = the year's last adjusted close × today's share count (as the app's other P/E and P/B, so splits
-  and bonus shares do not distort it); net debt = short + long borrowings − cash − short-term financial investments; EV =
+- Years: market capitalisation = the year's last unadjusted close (VNDirect, from 2013) × that year-end's shares (charter capital ÷
+  10,000 đ par), as the market valued it then; no value without both; net debt = short + long borrowings − cash − short-term financial investments; EV =
   capitalisation + net debt + non-controlling interests; P/E on parent profit, P/B on parent equity (equity − non-controlling
   interests), EV/EBITDA, EV/revenue, FCFF yield = FCFF ÷ EV, ROE = parent profit ÷ average parent equity of the year and the one
   before.
@@ -20,6 +20,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 _Q2, _Q4 = Decimal("0.01"), Decimal("0.0001")
 TOLERANCE = Decimal("0.005")
+PAR = Decimal(10000)  # đồng per share: charter capital ÷ par = shares at the period's end
 NEGATIVE = {"deductions", "cogs", "selling", "admin", "fin_expense", "interest", "tax"}
 P_AND_L = [
     ("g", "Doanh thu"), ("gross_revenue", "Doanh thu bán hàng", "money", 0), ("deductions", "Các khoản giảm trừ", "money", 1),
@@ -121,17 +122,13 @@ def _part(periods: dict, keys: list[str], extra: dict[str, dict] | None = None, 
     return {"periods": keys, "rows": rows}
 
 
-def _year_end_close(closes, year: int) -> Decimal | None:
-    inside = [c for t, c in closes if t.year == year]
-    return Decimal(str(inside[-1])) * 1000 if inside else None
-
-
-def _valuation(years: dict, closes, shares: int | None) -> dict[str, dict]:
+def _valuation(years: dict, year_end_close: dict) -> dict[str, dict]:
     out = {}
     for y, f in years.items():
         d = _derived(f)
-        close = _year_end_close(closes, int(y))
-        cap = close * shares if close is not None and shares else None
+        close = _d((year_end_close.get(y) or {}).get("close"))
+        capital = _d(f.get("charter_capital"))
+        cap = close * 1000 * (capital / PAR) if close is not None and capital is not None and capital > 0 else None
         debt = _sum(d.get("st_debt"), d.get("lt_debt"))
         cash_like = _sum(d.get("cash"), d.get("st_investments"))
         net = None if debt is None or cash_like is None else debt - cash_like
@@ -200,7 +197,7 @@ def _checks(quarters: dict, years: dict, vnstock: dict | None) -> list[dict]:
 
 def statement_table(record: dict, *, closes, shares: int | None, vnstock: dict | None) -> dict:
     quarters, years = record.get("quarters", {}), record.get("years", {})
-    valuation = _valuation(years, closes, shares)
+    valuation = _valuation(years, record.get("year_end_close", {}))
     year_part = _part(years, sorted(years), extra=valuation, spec=P_AND_L + SCALE)
     for row in year_part["rows"]:  # money lines of the valuation block arrive as Decimals
         if row["kind"] == "money":

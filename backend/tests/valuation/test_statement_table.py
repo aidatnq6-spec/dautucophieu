@@ -17,10 +17,11 @@ def q(revenue, npat, **more):
 
 
 QUARTERS = {f"{y}-Q{k}": q(100 * (y - 2023) + 10 * k, 20 * (y - 2023) + k) for y in (2024, 2025) for k in (1, 2, 3, 4)}
-YEARS = {"2024": q(1000, 84, equity=900, cfo=200, capex=-120, interest=24, depreciation=80),
-         "2025": q(2000, 164, equity=1000, cfo=210, capex=-130, interest=24, depreciation=80)}
+YEARS = {"2024": q(1000, 84, equity=900, cfo=200, capex=-120, interest=24, depreciation=80, charter_capital=100),
+         "2025": q(2000, 164, equity=1000, cfo=210, capex=-130, interest=24, depreciation=80, charter_capital=100)}  # 10 million shares
 RECORD = {"symbol": "AAA", "fetched_at": "2026-11-07T00:00:00+00:00", "source": "vndirect:finfo", "quarters": QUARTERS, "years": YEARS,
-          "quarters_conflicts": [], "years_conflicts": [{"period": "2012", "line": "depreciation", "values": ["1", "2"]}]}
+          "quarters_conflicts": [], "years_conflicts": [{"period": "2012", "line": "depreciation", "values": ["1", "2"]}],
+          "year_end_close": {"2024": {"date": "2024-12-31", "close": "20"}, "2025": {"date": "2025-12-31", "close": "30"}}}
 # Adjusted closes in thousand đồng; 10,000,000 shares today.
 CLOSES = [(datetime(2024, 12, 31), 20.0), (datetime(2025, 12, 31), 30.0), (datetime(2026, 11, 6), 25.0)]
 
@@ -42,11 +43,11 @@ def test_quarters_carry_the_income_statement_core_profit_ebit_ebitda_and_their_g
     assert r["revenue_yoy"][0] is None  # 2024-Q1 has no quarter a year before it
 
 
-def test_years_add_scale_and_valuation_on_the_year_end_adjusted_close_and_today_s_share_count():
+def test_years_add_scale_and_valuation_on_the_year_end_close_and_that_year_s_share_count():
     t = statement_table(RECORD, closes=CLOSES, shares=10_000_000, vnstock=None)
     r = rows(t, "years")
     i = t["years"]["periods"].index("2025")
-    assert r["market_cap"][i] == "300000000000"  # 30,000 đ × 10 million
+    assert r["market_cap"][i] == "300000000000"  # unadjusted 30,000 đ × charter capital 100 tỷ ÷ 10,000 đ
     assert r["net_debt"][i] == "400000000000"  # 300 + 200 − 40 − 60
     assert r["ev"][i] == "710000000000"  # 300 + 400 + minority 10
     assert r["pe"][i] == "1.83" and r["pb"][i] == "0.30"  # 300 / 164 ; 300 / (1000 − 10)
@@ -59,7 +60,7 @@ def test_years_add_scale_and_valuation_on_the_year_end_adjusted_close_and_today_
 
 def test_fcff_needs_a_positive_profit_before_tax_and_valuation_needs_a_price():
     years = {**YEARS, "2025": q(2000, -10, pbt=-12, tax=-2)}
-    t = statement_table({**RECORD, "years": years}, closes=[], shares=None, vnstock=None)
+    t = statement_table({**RECORD, "years": years, "year_end_close": {}}, closes=[], shares=None, vnstock=None)
     r = rows(t, "years")
     i = t["years"]["periods"].index("2025")
     assert r["fcff"][i] is None and r["pe"][i] is None and r["market_cap"][i] is None
@@ -80,3 +81,9 @@ def test_checks_flag_quarters_that_do_not_add_up_to_the_year_and_a_second_source
     assert ("2025", "revenue") in found  # 210 + 220 + 230 + 240 ≠ 2000
     assert ("2025-Q2", "vnstock_npat") in found and ("2025-Q3", "vnstock_npat") not in found
     assert t["conflicts"] == [{"period": "2012", "line": "depreciation", "values": ["1", "2"]}]
+
+
+def test_a_year_without_an_unadjusted_close_or_a_charter_capital_has_no_valuation():
+    years = {**YEARS, "2025": {k: v for k, v in YEARS["2025"].items() if k != "charter_capital"}}
+    r = rows(statement_table({**RECORD, "years": years}, closes=CLOSES, shares=10_000_000, vnstock=None), "years")
+    assert r["market_cap"] == ["200000000000", None] and r["pe"][1] is None  # 2024 still valued; 2025 lacks the share count

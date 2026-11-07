@@ -8,7 +8,8 @@ of banks, securities firms and insurers already come from the same API.
 Only the lines the table needs are kept, as decimal strings in đồng with VNDirect's signs (costs positive, cash paid out
 negative). A line given twice with different values is a conflict: no value is kept and both are listed, never one chosen.
 Financial companies (banks, securities firms, insurers) use other layouts and are skipped. The first sync of a ticker takes the
-whole history; later ones take the last two years and replace those periods, keeping the older ones. One JSON file per ticker
+whole history; later ones take the last two years and replace those periods, keeping the older ones. A third call keeps each
+year's last unadjusted close (VNDirect prices, from 2013) for the market capitalisation of that year. One JSON file per ticker
 under data/statements.
 """
 
@@ -26,6 +27,8 @@ from .leading import _get_with_retry
 
 URL = ("https://api-finfo.vndirect.com.vn/v4/financial_statements?q=code:{symbol}~reportType:{kind}~modelType:1,2,3"
        "~fiscalDate:gte:{start}&size=20000")
+# Unadjusted daily closes (thousand đồng; from 2013), for each year's market capitalisation at that year's own price and share count.
+PRICE_URL = "https://api-finfo.vndirect.com.vn/v4/stock_prices?sort=date&q=code:{symbol}~date:gte:{start}&size=9999&fields=code,date,close"
 FIRST_START, REFRESH_DAYS, MAX_AGE_DAYS, PACE_SECONDS = "2010-01-01", 730, 7, 1.0
 # (model, item code) → line. Model 1 balance sheet, 2 income statement, 3 cash flow (indirect); the general layout (TT200).
 LINES = {
@@ -81,6 +84,22 @@ def parse_statements(text: str, *, symbol: str, kind: str) -> dict:
     return {"periods": dict(sorted(periods.items())), "created": dict(sorted(created.items())), "conflicts": conflicts}
 
 
+def parse_year_end_closes(text: str, *, symbol: str) -> dict[str, dict[str, str]]:
+    """The last unadjusted close of each year with its day (the current year's latest close until the year ends)."""
+    out: dict[str, dict[str, str]] = {}
+    for r in json.loads(text).get("data") or []:
+        try:
+            if r.get("code") != symbol or r.get("close") is None:
+                continue
+            day, close = str(r["date"])[:10], Decimal(str(r["close"]))
+        except (InvalidOperation, KeyError, TypeError, ValueError):
+            continue
+        year = day[:4]
+        if close.is_finite() and close > 0 and (year not in out or day > out[year]["date"]):
+            out[year] = {"date": day, "close": _plain(close)}
+    return dict(sorted(out.items()))
+
+
 class StatementStore:
     def __init__(self, root: Path):
         self.root = Path(root)
@@ -132,7 +151,10 @@ def sync_statements(store: StatementStore, sectors: dict[str, str | None], *, ge
             if not parsed["QUARTER"]["periods"] and not parsed["ANNUAL"]["periods"] and old is None:
                 results[symbol] = "error:no_observations"
                 continue
-            record = {"symbol": symbol, "fetched_at": now.isoformat(), "source": "vndirect:finfo"}
+            price_start = start if old and old.get("year_end_close") else FIRST_START  # synced before the closes were kept: all of them
+            closes = parse_year_end_closes(_get_with_retry(get, PRICE_URL.format(symbol=symbol, start=price_start), sleep), symbol=symbol)
+            record = {"symbol": symbol, "fetched_at": now.isoformat(), "source": "vndirect:finfo",
+                      "year_end_close": dict(sorted({**(old or {}).get("year_end_close", {}), **closes}.items()))}
             for kind, key in (("QUARTER", "quarters"), ("ANNUAL", "years")):
                 record[key], record[f"{key}_created"], record[f"{key}_conflicts"] = _merge(old, key, parsed[kind])
             store.save(record)

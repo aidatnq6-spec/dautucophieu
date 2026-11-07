@@ -36,11 +36,27 @@ test("the detail of a ticker charts its monthly P/E and P/B against their own hi
   await expect(pe.getByRole("table")).toContainText("12/2025");
 });
 
+test("under the charts, the weekly P/B and P/E sit on percentile bands over 3 years, 5 years and the whole series", async ({ page }) => {
+  await openPage(page);
+  await page.getByRole("button", { name: "Chi tiết FPT" }).click();
+  const bands = page.getByRole("region", { name: "Dải phân vị FPT" });
+  await expect(bands).toContainText("P/B hôm nay");
+  await expect(bands.getByRole("figure", { name: "Dải phân vị P/B FPT" })).toBeVisible();
+  const table = bands.getByRole("table");
+  await expect(table.getByRole("row", { name: /5 năm/ })).toContainText(/P\d+/);
+  await expect(table.getByRole("row", { name: /3 năm/ })).toContainText("cần ít nhất 52");  // the synthetic series is monthly before 2026
+  await expect(bands).toContainText("khung đang ≤ P20");
+  await bands.getByRole("button", { name: "P/E" }).click();
+  await expect(bands.getByRole("button", { name: "P/E" })).toHaveAttribute("aria-pressed", "true");
+  await expect(bands.getByRole("figure", { name: "Dải phân vị P/E FPT" })).toBeVisible();
+});
+
 test("no horizontal scroll with the P/E chart open at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 900 });
   await openPage(page);
   await page.getByRole("button", { name: "Chi tiết FPT" }).click();
   await expect(page.getByRole("figure", { name: "P/E lịch sử FPT" })).toBeVisible();
+  await expect(page.getByRole("figure", { name: "Dải phân vị P/B FPT" })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });

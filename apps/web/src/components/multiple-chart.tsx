@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../lib/api";
+import { PercentileBands } from "./percentile-bands";
 
 type Point = { month: string; value: string | null; year: string | null };  // year: fiscal year behind a ticker's point; null for an index
 type Series = { points: Point[]; median: string | null; sd: string | null; latest: string | null };
@@ -117,6 +118,7 @@ export function MultipleCharts({ symbol }: { symbol: string }) {
         <Chart title="P/E lịch sử" symbol={symbol} series={data.pe} unit="x" />
         <Chart title="P/B lịch sử" symbol={symbol} series={data.pb} unit="x" />
       </div>
+      {data.kind !== "index" && <PercentileBands symbol={symbol} />}
     </section>
   );
 }

@@ -157,27 +157,70 @@ def _month_end(d: date) -> date:
     return date(d.year, d.month, calendar.monthrange(d.year, d.month)[1])
 
 
-def compute_index(records: dict[str, dict], *, before: date | None = None) -> dict[date, dict]:
-    """Daily values before 2018 (each ticker's latest close within 30 days), then one value per month (key: the month's last day)."""
+def _load(rec: dict) -> tuple[dict, list]:
+    quarters = {q: {k: Decimal(v) for k, v in f.items()} for q, f in rec.get("quarters", {}).items()}
+    closes = [(date.fromisoformat(d), Decimal(c)) for d, c in rec.get("closes", [])]
+    return quarters, closes
+
+
+def _close_on(closes: list, day: date) -> Decimal | None:
+    days = [d for d, _ in closes]
+    i = bisect_right(days, day) - 1
+    return closes[i][1] if i >= 0 and (day - days[i]).days <= CARRY_DAYS else None
+
+
+def top_members(records: dict[str, dict], *, size: int = 30) -> Callable[[str, date], bool]:
+    """An estimated VN30-like basket: the `size` largest by capitalisation on the last day of December (holding from 1 February) and
+    of June (from 1 August); before the first change, the largest on the first day with prices. Free float and liquidity, which the
+    real rules also weigh, are not known here."""
+    loaded = {s: _load(r) for s, r in records.items()}
+    first = min((c[0][0] for _, c in loaded.values() if c), default=None)
+    if first is None:
+        return lambda symbol, day: False
+    reviews = [(first, first)]
+    for year in range(first.year - 1, max(c[-1][0].year for _, c in loaded.values() if c) + 1):
+        reviews += [(date(year, 12, 31), date(year + 1, 2, 1)), (date(year, 6, 30), date(year, 8, 1))]
+    baskets = []
+    for seen, start in sorted(reviews, key=lambda r: r[1]):
+        if seen < first:
+            continue
+        caps = []
+        for symbol, (quarters, closes) in loaded.items():
+            close, f = _close_on(closes, seen), quarters.get(_latest_quarter_out(seen), {})
+            if close is not None and f.get("shares"):
+                caps.append((close * f["shares"], symbol))
+        baskets.append((start, {s for _, s in sorted(caps, reverse=True)[:size]}))
+    starts = [b[0] for b in baskets]
+
+    def member(symbol: str, day: date) -> bool:
+        i = bisect_right(starts, day) - 1
+        return i >= 0 and symbol in baskets[i][1]
+    return member
+
+
+def compute_index(records: dict[str, dict], *, before: date | None = None, members: Callable[[str, date], bool] | None = None) -> dict[date, dict]:
+    """Daily values before 2018 (each ticker's latest close within 30 days), then one value per month (key: the month's last day);
+    `members` limits each day to a basket."""
     tickers = []
-    for rec in records.values():
+    for symbol, rec in records.items():
         quarters = {q: {k: Decimal(v) for k, v in f.items()} for q, f in rec.get("quarters", {}).items()}
         closes = [(date.fromisoformat(d), Decimal(c)) for d, c in rec.get("closes", [])]
         if quarters and closes:
-            tickers.append((quarters, closes))
-    daily_days = sorted({d for _, closes in tickers for d, _ in closes if d < DAILY_BEFORE and (before is None or d < before)})
-    months = sorted({_month_end(d) for _, closes in tickers for d, _ in closes if d >= DAILY_BEFORE})
+            tickers.append((symbol, quarters, closes))
+    daily_days = sorted({d for _, _, closes in tickers for d, _ in closes if d < DAILY_BEFORE and (before is None or d < before)})
+    months = sorted({_month_end(d) for _, _, closes in tickers for d, _ in closes if d >= DAILY_BEFORE})
     sums: dict[date, list] = defaultdict(lambda: [Decimal(0), Decimal(0), Decimal(0), 0])
-    for quarters, closes in tickers:
+    inside = members or (lambda symbol, day: True)
+    for symbol, quarters, closes in tickers:
         days = [d for d, _ in closes]
         cache: dict[str, object] = {}
         for day in daily_days:
             i = bisect_right(days, day) - 1
-            if i < 0 or (day - days[i]).days > CARRY_DAYS or days[i] >= DAILY_BEFORE:
+            if i < 0 or (day - days[i]).days > CARRY_DAYS or days[i] >= DAILY_BEFORE or not inside(symbol, day):
                 continue
             _add(sums[day], closes[i][1], quarters, day, cache)
         for d, close in closes:
-            if d >= DAILY_BEFORE:
+            if d >= DAILY_BEFORE and inside(symbol, _month_end(d)):
                 _add(sums[_month_end(d)], close, quarters, _month_end(d), cache)
     out = {}
     for day in daily_days + months:

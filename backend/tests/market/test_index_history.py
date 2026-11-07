@@ -89,6 +89,9 @@ def test_cli_builds_works_out_compares_and_keeps_the_part_before_vndirect(tmp_pa
     assert out["built"] == {"AAA": "ok"} and out["compare"]["pe"]["months"] == 2  # 2017-12 and 2018-01 are on both sides
     kept = SeriesStore(tmp_path / "index-valuation").read("VNINDEX-pe-calc-1d")
     assert [t.date() for t, _ in kept] == [date(2016, 3, 1), date(2017, 12, 14)]  # only the days before VNDirect's first
+    assert out["vn30"]["basket"] == "top30" and out["compare"]["basket"] == "all"
+    assert SeriesStore(tmp_path / "index-valuation").read("VN30-pe-calc-1d")  # one ticker is the largest thirty here
+    assert json.loads((tmp_path / "index-valuation" / "VN30-calc-check.json").read_text(encoding="utf-8"))["basket"] == "top30"
 
 
 def test_a_ticker_missing_the_quarter_due_is_left_out_not_valued_on_older_figures():
@@ -96,3 +99,22 @@ def test_a_ticker_missing_the_quarter_due_is_left_out_not_valued_on_older_figure
     a = record(full, [(date(2016, 3, 1), Decimal(10)), (date(2016, 6, 1), Decimal(10))])  # 2016-Q1 is due from 15/05/2016 and absent
     out = compute_index({"A": a})
     assert date(2016, 3, 1) in out and date(2016, 6, 1) not in out
+
+
+def test_a_basket_of_the_largest_by_capitalisation_holds_from_february_and_august():
+    from investment_agent.market.index_history import top_members
+    full = {f"{y}-Q{k}": {"npat_parent": 1 * B, "equity_parent": 20 * B, "shares": 10**8} for y in (2015, 2016) for k in (1, 2, 3, 4)}
+    big = record(full, [(date(2015, 12, 31), Decimal(50)), (date(2016, 6, 30), Decimal(5))])
+    small = record(full, [(date(2015, 12, 31), Decimal(10)), (date(2016, 6, 30), Decimal(40))])
+    member = top_members({"BIG": big, "SMALL": small}, size=1)
+    assert member("BIG", date(2016, 3, 1)) and not member("SMALL", date(2016, 3, 1))  # chosen on 31/12/2015, from 01/02/2016
+    assert member("SMALL", date(2016, 8, 10)) and not member("BIG", date(2016, 8, 10))  # chosen on 30/06/2016, from 01/08/2016
+    assert member("BIG", date(2016, 7, 20))  # until 31 July the January choice stands
+
+
+def test_the_index_can_be_limited_to_a_basket():
+    full = {f"2015-Q{k}": {"npat_parent": 1 * B, "equity_parent": 20 * B, "shares": 10**8} for k in (1, 2, 3, 4)}
+    a = record(full, [(date(2016, 3, 1), Decimal(10))])
+    b = record(full, [(date(2016, 3, 1), Decimal(30))])
+    out = compute_index({"A": a, "B": b}, members=lambda s, d: s == "B")
+    assert out[date(2016, 3, 1)] == {"pe": Decimal("750"), "pb": Decimal("150"), "tickers": 1}  # 3,000 tỷ / 4 tỷ ; / 20 tỷ

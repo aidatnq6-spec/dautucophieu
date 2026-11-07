@@ -33,6 +33,14 @@ export function lastN<T>(periods: T[], n: number): number[] {
   return periods.map((_, i) => i).slice(start);
 }
 
+/** One line per period, newest first: every check that failed there with its two figures in tỷ đồng. */
+export function checkLines(checks: Check[]): string[] {
+  const by = new Map<string, Check[]>();
+  for (const c of checks) by.set(c.period, [...(by.get(c.period) ?? []), c]);
+  return [...by.keys()].sort().reverse().map((p) => `${periodLabel(p)} · ${by.get(p)!
+    .map((c) => `${c.label} (${c.a === null ? "—" : cell(c.a, "money", null)} so với ${c.b === null ? "—" : cell(c.b, "money", null)} tỷ)`).join("; ")}`);
+}
+
 const tone = (v: string | null, key: string | null) => (v !== null && key && SIGNED.has(key) ? (Number(v) > 0 ? "positive" : Number(v) < 0 ? "negative" : "") : "");
 const ty = (v: string | null) => (v === null ? "—" : `${cell(v, "money", null)} tỷ`);
 
@@ -85,9 +93,9 @@ export function FinancialTables({ symbol }: { symbol: string }) {
       {part.periods.length === 0 ? <p className="muted">Chưa có kỳ nào.</p>
         : <Table part={part} cols={cols} caption={view === "quarters" ? `${cols.length} quý, cũ bên trái` : `${cols.length} năm`} />}
       {(data.checks.length > 0 || data.conflicts.length > 0) && <details className="mc-table">
-        <summary>Kiểm tra chéo: {data.checks.length} chỗ lệch hơn 0,5%{data.conflicts.length ? `, ${data.conflicts.length} dòng nguồn ghi hai số` : ""}</summary>
+        <summary>Kiểm tra chéo: {data.checks.length} chỗ lệch hơn 0,5% ở {new Set(data.checks.map((c) => c.period)).size} kỳ{data.conflicts.length ? `, ${data.conflicts.length} dòng nguồn ghi hai số` : ""}</summary>
         <ul className="ft-checks">
-          {data.checks.map((c) => <li key={`${c.period}-${c.check}`}>{periodLabel(c.period)} · {c.label}: {ty(c.a)} so với {ty(c.b)}</li>)}
+          {checkLines(data.checks).map((line) => <li key={line}>{line}</li>)}
           {data.conflicts.map((c) => <li key={`${c.period}-${c.line}`}>{periodLabel(c.period)} · dòng {c.line}: nguồn ghi {c.values.map(ty).join(" và ")}, không lấy số nào</li>)}
         </ul>
       </details>}

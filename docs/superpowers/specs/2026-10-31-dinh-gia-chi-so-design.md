@@ -42,3 +42,16 @@ Biểu đồ P/E, P/B theo tháng của VN-Index và VN30 (Định giá → Chi 
 trên toàn bộ số liệu theo ngày, như biểu đồ của mã cổ phiếu. API tỷ số của VNDirect chỉ có từ 15/12/2017 (gọi từ 2000 vẫn bắt đầu ngày đó), nên
 chuỗi bắt đầu từ 12/2017; trước đó không có nguồn sẵn (tự tính cần báo cáo của mọi mã trên sàn). Mức hợp lý ở bảng chỉ số giữ trung vị 5 năm.
 
+## VN-Index 2013–2017 tự tính (07/11/2026, chủ sở hữu yêu cầu, biết rõ giới hạn)
+- Không có nguồn công khai, miễn phí, hợp lệ cho P/E, P/B VN-Index trước 12/2017 (đã tìm: CEIC, EODHD, Bloomberg, FiinPro trả phí; báo cáo công ty chứng khoán
+  chỉ có số rời; Smoney chặn bot). Nên **tự tính** (`market/index_history.py`, lệnh một lần `index-history`):
+  - 408 mã cổ phiếu HOSE hôm nay (`hose-listing.json`); mỗi mã một lượt báo cáo quý VNDirect lọc theo các dòng mọi mẫu báo cáo dùng chung (LNST công ty mẹ
+    23000, vốn chủ 14000, lợi ích cổ đông không kiểm soát 14240/15000, vốn góp 14110; cả ngân hàng, chứng khoán, bảo hiểm) và một lượt giá thực (từ 2013).
+  - Mỗi ngày: tổng vốn hóa (giá đóng cửa gần nhất trong 30 ngày × vốn góp ÷ 10.000 đ của quý đã công bố) ÷ tổng LNST công ty mẹ 4 quý, ÷ tổng vốn chủ công
+    ty mẹ; chỉ các mã có đủ quý **lẽ ra đã công bố** (45 ngày), thiếu thì loại khỏi ngày đó, không dùng số cũ.
+- **Đối chiếu** cùng cách tính với VNDirect ở 108 tháng trùng nhau (12/2017–11/2026): P/E lệch trung bình 4,6 % (lớn nhất 14,8 %), P/B 2,3 % (lớn nhất 19,1 %);
+  ngưỡng chấp nhận đặt trước là dưới 10 %. Lưu `index-valuation/VNINDEX-calc-check.json`.
+- Biểu đồ VN-Index nối phần tự tính trước 15/12/2017, **nét đứt màu xám**, chú thích ghi số mã, "thiếu các mã đã hủy niêm yết nên quá khứ bị lệch" và mức lệch
+  so với VNDirect; trung vị, dải của biểu đồ tính trên chuỗi đã nối. Mức hợp lý ở bảng vẫn trung vị 5 năm VNDirect. **VN30 không có** phần này (không dựng
+  lại được rổ từng kỳ). Dữ liệu trước 2018 không đổi nên không chạy theo lịch; chạy lại `index-history` khi cần.
+

@@ -47,31 +47,37 @@ def _method(name: str, points: Points, closes: dict[date, Decimal], today: date)
                        "since": since.isoformat(), "points": len(window)}}
 
 
-def _monthly(points: Points, since: date) -> dict:
-    """Month-end values after `since`; median and spread from the daily values of the same window, as the board uses."""
-    window = [(t.date(), Decimal(str(v))) for t, v in points if t.date() > since]
-    month_end: dict[str, Decimal] = {}
-    for day, v in window:
-        month_end[day.strftime("%Y-%m")] = v  # last value of the month wins
-    values = [v for _, v in window]
+def _monthly(points: Points, since: date, calc: Points = ()) -> dict:
+    """Month-end values after `since`; median and spread from the daily values of the same window, as the board uses. `calc` (the
+    worked-out series) is put in front of the first stored day and its months are marked."""
+    first = points[0][0].date() if points else None
+    window = [(t.date(), Decimal(str(v)), True) for t, v in calc if first is None or t.date() < first]
+    window += [(t.date(), Decimal(str(v)), False) for t, v in points if t.date() > since]
+    month_end: dict[str, tuple[Decimal, bool]] = {}
+    for day, v, worked in window:
+        month_end[day.strftime("%Y-%m")] = (v, worked)  # last value of the month wins
+    values = [v for _, v, _ in window]
     sd = Decimal(str(statistics.pstdev(float(v) for v in values))) if values else None
-    return {"points": [{"month": m, "value": str(v.quantize(_P2, ROUND_HALF_UP)), "year": None} for m, v in sorted(month_end.items())],
+    return {"points": [{"month": m, "value": str(v.quantize(_P2, ROUND_HALF_UP)), "year": None, **({"calc": True} if worked else {})}
+                       for m, (v, worked) in sorted(month_end.items())],
             "median": str(_median(values).quantize(_P2, ROUND_HALF_UP)) if values else None,
             "sd": str(sd.quantize(_P2, ROUND_HALF_UP)) if sd is not None else None,
             "latest": str(values[-1].quantize(_P2, ROUND_HALF_UP)) if values else None}
 
 
-def index_monthly_multiples(index: str, *, pe: Points, pb: Points) -> dict:
+def index_monthly_multiples(index: str, *, pe: Points, pb: Points, calc: dict | None = None) -> dict:
     """Charts of P/E and P/B for Định giá → Chi tiết: every stored month (VNDirect's index ratios start on 15/12/2017), median and spread
     over the whole series, as the tickers' charts; the valuation row above keeps its five-year median."""
     latest = max((p[-1][0].date() for p in (pe, pb) if p), default=None)
     if latest is None:
         empty = {"points": [], "median": None, "sd": None, "latest": None}
-        return {"symbol": index, "kind": "index", "pe": empty, "pb": empty, "shares": None, "from": None, "to": None,
+        return {"symbol": index, "kind": "index", "pe": empty, "pb": empty, "shares": None, "from": None, "to": None, "calc": None,
                 "reason": "Chưa có số liệu P/E, P/B"}
-    out = {"pe": _monthly(pe, date.min), "pb": _monthly(pb, date.min)}
+    out = {k: _monthly(series, date.min, (calc or {}).get(k, ())) for k, series in (("pe", pe), ("pb", pb))}
     months = [p["month"] for s in out.values() for p in s["points"]]
-    return {"symbol": index, "kind": "index", **out, "shares": None, "from": min(months), "to": max(months), "reason": None}
+    worked = sorted({p["month"] for s in out.values() for p in s["points"] if p.get("calc")})
+    extra = {"from": worked[0], "to": worked[-1], "check": (calc or {}).get("check")} if worked else None
+    return {"symbol": index, "kind": "index", **out, "shares": None, "from": min(months), "to": max(months), "calc": extra, "reason": None}
 
 
 def value_index(index: str, *, pe: Points, pb: Points, closes: Points, settings: Settings, today: date) -> dict:

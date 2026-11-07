@@ -66,3 +66,17 @@ def test_monthly_chart_covers_the_whole_stored_history_with_its_daily_median_and
     assert out["pe"]["points"][-1] == {"month": "2026-10", "value": "12.00", "year": None}
     assert out["pe"]["latest"] == "12.00" and out["pe"]["median"] is not None and out["pe"]["sd"] is not None
     assert index_monthly_multiples("VN30", pe=[], pb=[])["reason"] == "Chưa có số liệu P/E, P/B"
+
+
+def test_a_worked_out_series_before_vndirect_s_first_day_is_put_in_front_and_marked():
+    from investment_agent.valuation.index_reference import index_monthly_multiples
+    pe = _daily(date(2017, 12, 15), date(2018, 3, 30), lambda i: 20.0)  # VNDirect's first day, as stored
+    calc = _daily(date(2017, 10, 2), date(2017, 12, 29), lambda i: 10.0)  # what overlaps VNDirect is dropped
+    check = {"pe": {"months": 98, "mean_abs": "0.0500"}, "pb": {"months": 98, "mean_abs": "0.0400"}, "tickers": 380}
+    out = index_monthly_multiples("VNINDEX", pe=pe, pb=pe, calc={"pe": calc, "pb": calc, "check": check})
+    months = [p["month"] for p in out["pe"]["points"]]
+    assert months[:4] == ["2017-10", "2017-11", "2017-12", "2018-01"]
+    assert out["pe"]["points"][0]["calc"] is True and out["pe"]["points"][2].get("calc") is None  # December ends on VNDirect's figure
+    assert out["from"] == "2017-10" and out["calc"] == {"from": "2017-10", "to": "2017-11", "check": check}
+    plain = index_monthly_multiples("VNINDEX", pe=pe, pb=pe)
+    assert plain["calc"] is None and plain["from"] == "2017-12"

@@ -105,7 +105,7 @@ legend{font-weight:600;padding:0 6px}
 .mc{margin:8px 0;min-width:0;white-space:normal}.mc-plot{position:relative;width:100%;min-width:0}.mc-plot svg{display:block;touch-action:pan-y}
 .mc-grid{stroke:var(--line);stroke-width:1}.mc-axis{fill:var(--muted);font-size:11px}.mc-band{fill:var(--brand);opacity:.09}
 .mc-median{stroke:var(--muted);stroke-width:1;stroke-dasharray:4 4}.mc-sd{stroke:var(--muted);stroke-width:1;stroke-dasharray:2 5;opacity:.55}.mc-line{fill:none;stroke:var(--brand);stroke-width:2;stroke-linejoin:round}
-.mc-dot{fill:var(--brand);stroke:var(--paper);stroke-width:2}.mc-cross{stroke:var(--muted);stroke-width:1}
+.mc-line-calc{fill:none;stroke:var(--muted);stroke-width:2;stroke-dasharray:5 4}.mc-dot{fill:var(--brand);stroke:var(--paper);stroke-width:2}.mc-cross{stroke:var(--muted);stroke-width:1}
 .mc-tip{position:absolute;top:4px;transform:translateX(-50%);background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.08)}
 .pb-section{margin-top:18px;border-top:1px solid var(--line);padding-top:14px;min-width:0;white-space:normal}
 .pb-head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between}.pb-toggle{display:inline-flex;gap:6px}.pb-toggle .btn{padding:4px 12px}

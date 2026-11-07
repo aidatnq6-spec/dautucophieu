@@ -1,5 +1,6 @@
 """Reference valuation of the watched tickers (Định giá page): computed on request from stored statements."""
 
+import json
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -72,7 +73,10 @@ def fairvalue_history(symbol: str, request: Request):
     data_dir, symbol = Path(data_dir), symbol.upper()
     if symbol in INDICES:
         multiples = SeriesStore(data_dir / "index-valuation")
-        return index_monthly_multiples(symbol, pe=multiples.read(series_key(symbol, "pe")), pb=multiples.read(series_key(symbol, "pb")))
+        check_path = data_dir / "index-valuation" / f"{symbol}-calc-check.json"
+        calc = {"pe": multiples.read(f"{symbol}-pe-calc-1d"), "pb": multiples.read(f"{symbol}-pb-calc-1d"),
+                "check": json.loads(check_path.read_text(encoding="utf-8"))} if check_path.is_file() else None  # VN-Index only (index-history)
+        return index_monthly_multiples(symbol, pe=multiples.read(series_key(symbol, "pe")), pb=multiples.read(series_key(symbol, "pb")), calc=calc)
     if symbol not in load_watchlist(data_dir).symbols:
         return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
     today = now(request).astimezone(VN).date()

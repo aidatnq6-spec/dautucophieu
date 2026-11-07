@@ -18,3 +18,13 @@ và hiện thành thẻ ở đầu khối Bảng số tài chính trên trang h�
 ## Giao diện
 - Hai thẻ cho năm mới nhất có kế hoạch: "DT lũy kế Qn/năm · % kế hoạch" (ví dụ 81,1% · 170.274 / KH 210.000 tỷ) và tương tự cho lợi nhuận.
 - Mục "Kế hoạch năm (ĐHCĐ)": danh sách các năm đã nhập kèm nguồn và nút Xóa; biểu mẫu Năm, Doanh thu, Lợi nhuận, Loại lợi nhuận, Nguồn.
+
+## Tự lấy từ CafeF (07/11/2026, chủ sở hữu hỏi "cào số tự động")
+- Không có nguồn kế hoạch trong API VNDirect. CafeF có dữ liệu công khai của trang mã: `cafef.vn/du-lieu/Ajax/PageNew/KeHoachKinhDoanh.ashx?Symbol=<mã>`
+  (robots.txt của cafef.vn cho phép mọi bot, kiểm 07/11/2026). Chỉ có **năm hiện tại** (bỏ qua tham số năm), nên mỗi năm đã đọc được giữ lại.
+- Số ghi bằng tỷ ("210.000 tỷ", "48.660,13 tỷ") được đọc; "N/A" và kế hoạch ghi bằng lời (ngân hàng: "Tăng ~10%") giữ nguyên văn, không đổi thành số.
+  Có doanh thu, LNTT, LNST tuỳ mã (HPG, MWG chỉ LNST; FPT chỉ LNTT; PNJ cả hai).
+- `plans-sync`: lượt 20:00, mỗi mã đang theo dõi một lượt gọi, làm mới sau 7 ngày; `data/annual-plans-cafef/<mã>.json` (dữ liệu công khai).
+- Năm bạn chưa nhập: dùng kế hoạch CafeF (lợi nhuận = LNST nếu có, không thì LNTT), ghi "theo CafeF (Kế hoạch kinh doanh), đọc ngày…" và gợi ý
+  nhập số của bạn để thay. Năm bạn đã nhập: số của bạn luôn thắng. Kế hoạch theo CafeF không có nút Xóa.
+

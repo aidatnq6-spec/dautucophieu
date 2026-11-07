@@ -91,6 +91,9 @@ if ((Get-Date).Hour -ge 20) {
     # Bang so tai chinh: full statements of the 8 stalest watched non-financial tickers (VNDirect public API, two calls each).
     $ss = & $python -W ignore -m investment_agent.cli statements-sync --data-dir $data --limit 8 2>$null
     "$(Get-Date -Format o) statements-sync exit=$LASTEXITCODE $ss" | Add-Content -LiteralPath $log -Encoding UTF8
+    # Ke hoach nam: the current year's business plan of each watched ticker from CafeF (one public call each, weekly per ticker).
+    $ps = & $python -W ignore -m investment_agent.cli plans-sync --data-dir $data 2>$null
+    "$(Get-Date -Format o) plans-sync exit=$LASTEXITCODE $ps" | Add-Content -LiteralPath $log -Encoding UTF8
 }
 # Bo loc tin hieu: tickers new to the owner's notifying screens (after Xu huong and the session snapshot above).
 $sc = & $python -W ignore -m investment_agent.cli screen-check --data-dir $data --calendar $calendar 2>$null

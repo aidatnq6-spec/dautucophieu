@@ -3,7 +3,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { ApiError, api, requestId } from "../lib/api";
 
 type Line = { actual: string | null; plan: string; ratio: string | null; reason: string | null };
-export type Plan = { year: string; source: string; profit_kind: string; profit_label: string; plan_revenue: string | null; plan_profit: string | null;
+export type Plan = { year: string; origin: "owner" | "cafef"; source: string; profit_kind: string; profit_label: string; plan_revenue: string | null; plan_profit: string | null;
   through: string | null; revenue: Line | null; profit: Line | null };
 type View = { symbol: string; version: number; plans: Plan[] };
 
@@ -20,6 +20,13 @@ export function planCard(p: Plan, which: "revenue" | "profit"): { title: string;
   const pct = line.ratio === null ? "—" : `${(Number(line.ratio) * 100).toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
   return { title: `${name} lũy kế ${p.through ? quarter(p.through) : p.year} · % kế hoạch`, value: pct,
     note: `${ty(line.actual)} / KH ${ty(line.plan)} tỷ${line.reason ? ` · ${line.reason}` : ""}` };
+}
+
+/** One line of the list: the plan's figures and where they came from; CafeF's can be replaced by the owner's entry. */
+export function planLine(p: Plan): string {
+  const parts = [p.plan_revenue ? `doanh thu ${Number(p.plan_revenue).toLocaleString("vi-VN")} tỷ` : "",
+    p.plan_profit ? `${p.profit_label} ${Number(p.plan_profit).toLocaleString("vi-VN")} tỷ` : ""].filter(Boolean).join(", ");
+  return p.origin === "cafef" ? `${p.year}: ${parts} · theo ${p.source} — nhập số của bạn để thay` : `${p.year}: ${parts} · nguồn: ${p.source}`;
 }
 
 export function AnnualPlans({ symbol }: { symbol: string }) {
@@ -61,11 +68,9 @@ export function AnnualPlans({ symbol }: { symbol: string }) {
           <div key={c!.title}><span className="caption">{c!.title}</span><strong>{c!.value}</strong><span className="caption">{c!.note}</span></div>)}
       </div>}
       <details className="mc-table">
-        <summary>Kế hoạch năm (ĐHCĐ){view.plans.length ? ` · ${view.plans.length} năm đã nhập` : " · chưa nhập"}</summary>
-        {view.plans.length > 0 && <ul className="ft-checks">{view.plans.map((p) => <li key={p.year}>
-          {p.year}: {p.plan_revenue ? `doanh thu ${Number(p.plan_revenue).toLocaleString("vi-VN")} tỷ` : ""}
-          {p.plan_revenue && p.plan_profit ? ", " : ""}{p.plan_profit ? `${p.profit_label} ${Number(p.plan_profit).toLocaleString("vi-VN")} tỷ` : ""} · nguồn: {p.source}{" "}
-          <button type="button" className="btn" onClick={() => remove(p.year)} aria-label={`Xóa kế hoạch ${p.year}`}>Xóa</button></li>)}</ul>}
+        <summary>Kế hoạch năm (ĐHCĐ){view.plans.length ? ` · ${view.plans.length} năm` : " · chưa có"}</summary>
+        {view.plans.length > 0 && <ul className="ft-checks">{view.plans.map((p) => <li key={p.year}>{planLine(p)}{" "}
+          {p.origin === "owner" && <button type="button" className="btn" onClick={() => remove(p.year)} aria-label={`Xóa kế hoạch ${p.year}`}>Xóa</button>}</li>)}</ul>}
         <form className="ap-form" onSubmit={save} aria-label="Nhập kế hoạch năm">
           <label className="field"><span>Năm</span><input value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} inputMode="numeric" /></label>
           <label className="field"><span>Doanh thu (tỷ đồng)</span><input value={form.revenue} onChange={(e) => setForm({ ...form, revenue: e.target.value })} inputMode="decimal" /></label>
@@ -77,8 +82,8 @@ export function AnnualPlans({ symbol }: { symbol: string }) {
           <button type="submit" className="btn primary" disabled={busy}>Lưu kế hoạch</button>
         </form>
         {error && <p className="errors" role="alert">{error}</p>}
-        <p className="caption wrap">Số kế hoạch bạn nhập từ tài liệu ĐHCĐ công khai, lưu trong kho cá nhân. Doanh thu so với doanh thu thuần; lợi nhuận so với dòng bạn
-          chọn. Lũy kế = cộng các quý VNDirect từ quý 1 của năm; thiếu một quý thì dừng và ghi rõ, không ước lượng phần còn lại của năm.</p>
+        <p className="caption wrap">Kế hoạch năm hiện tại tự lấy từ CafeF mỗi tuần (lợi nhuận: LNST nếu có, không thì LNTT; ngân hàng ghi bằng lời nên không có số).
+          Số bạn nhập từ tài liệu ĐHCĐ (lưu trong kho cá nhân) luôn được ưu tiên. Doanh thu so với doanh thu thuần; lợi nhuận so với dòng đã chọn. Lũy kế = cộng các quý VNDirect từ quý 1 của năm; thiếu một quý thì dừng và ghi rõ, không ước lượng phần còn lại của năm.</p>
       </details>
     </div>
   );

@@ -1,10 +1,12 @@
 "use client";
-import { type RefObject, useEffect, useRef, useState } from "react";
-import type { IChartApi, IPriceLine, ISeriesApi, SeriesType, Time } from "lightweight-charts";
+import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import type { IChartApi, IPriceLine, ISeriesApi, ISeriesMarkersPluginApi, SeriesType, Time } from "lightweight-charts";
 import { ApiError, api } from "../lib/api";
 import { formatDecimal, formatRatio, formatVnd } from "../lib/format";
+import { type Marker, type Segment, channelMarkers, channelSegments } from "./channel-overlay";
 import { type Add, type At, type Drawing, DrawingList, DrawingToolbar, type Interval, type Tool, dragResult, useChartDrawings } from "./chart-drawings";
 import { PriceAlerts } from "./price-alerts";
+import type { Channels } from "./weekly-channels";
 
 type Row = { symbol: string; kind: "index" | "macro" | "stock"; price: string | null; ref: string | null; change: string | null; change_pct: string | null;
   ceiling?: string | null; floor?: string | null; high?: string | null; low?: string | null; volume?: number | null; time: string | null;
@@ -109,13 +111,15 @@ function applyLive({ box, price, last, latest }: ChartRefs, style: Chart["style"
   if (box.current) box.current.dataset.liveClose = String(p);
 }
 
+type Overlay = { segments: Segment[]; markers: Marker[] };
 type ChartProps = { data: Chart; liveT: string | number | null; livePrice: number | null; drawings: Drawing[]; tool: Tool;
-  onDrawn: (add: Add) => void };
+  onDrawn: (add: Add) => void; overlay: Overlay | null };
 
-function CandleChart({ data, liveT, livePrice, drawings, tool, onDrawn }: ChartProps) {
+function CandleChart({ data, liveT, livePrice, drawings, tool, onDrawn, overlay }: ChartProps) {
   const box = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const LineRef = useRef<typeof import("lightweight-charts").LineSeries | null>(null);
+  const MarkersRef = useRef<typeof import("lightweight-charts").createSeriesMarkers | null>(null);
   const [built, setBuilt] = useState(0);
   const toolRef = useRef(tool);
   const drawnRef = useRef(onDrawn);
@@ -127,7 +131,7 @@ function CandleChart({ data, liveT, livePrice, drawings, tool, onDrawn }: ChartP
     let chart: IChartApi | null = null;
     let cancelled = false;
     let unlisten = () => {};
-    void import("lightweight-charts").then(({ createChart, CandlestickSeries, HistogramSeries, LineSeries }) => {
+    void import("lightweight-charts").then(({ createChart, CandlestickSeries, HistogramSeries, LineSeries, createSeriesMarkers }) => {
       if (cancelled || !box.current) return;
       chart = createChart(box.current, {
         autoSize: true, layout: { background: { color: "#fff" }, textColor: C.ink, panes: { separatorColor: C.line } },
@@ -219,6 +223,7 @@ function CandleChart({ data, liveT, livePrice, drawings, tool, onDrawn }: ChartP
       };
       chartRef.current = chart;
       LineRef.current = LineSeries;
+      MarkersRef.current = createSeriesMarkers;
       setBuilt((n) => n + 1);
     });
     return () => { cancelled = true; unlisten(); price.current = null; last.current = null; chartRef.current = null; chart?.remove(); };
@@ -245,6 +250,28 @@ function CandleChart({ data, liveT, livePrice, drawings, tool, onDrawn }: ChartP
       for (const t of trends) chart.removeSeries(t);
     };
   }, [drawings, built]);
+  // Kênh tuần: read-only lines and markers from the weekly channel rules, kept apart from the owner's own drawings.
+  useEffect(() => {
+    const chart = chartRef.current, series = price.current, Line = LineRef.current, makeMarkers = MarkersRef.current;
+    if (!chart || !series || !Line || !makeMarkers || !overlay) {
+      if (box.current) box.current.dataset.overlay = "0";
+      return;
+    }
+    const added: ISeriesApi<"Line">[] = [];
+    for (const seg of overlay.segments) {
+      const line = chart.addSeries(Line, { color: seg.color, lineWidth: seg.width, lineStyle: seg.style, lastValueVisible: false, priceLineVisible: false,
+        crosshairMarkerVisible: false, autoscaleInfoProvider: () => null });
+      line.setData(seg.points.map((pt) => ({ time: pt.t as Time, value: pt.p })));
+      added.push(line);
+    }
+    const markers: ISeriesMarkersPluginApi<Time> = makeMarkers(series, overlay.markers.map((m) => ({ ...m, time: m.time as Time })));
+    if (box.current) box.current.dataset.overlay = String(overlay.segments.length);
+    return () => {
+      if (chartRef.current !== chart) return;
+      markers.detach();
+      for (const l of added) chart.removeSeries(l);
+    };
+  }, [overlay, built]);
   // While a drawing tool is held, a drag draws instead of scrolling or zooming the chart.
   useEffect(() => { chartRef.current?.applyOptions({ handleScroll: tool === "pointer", handleScale: tool === "pointer" }); }, [tool, built]);
   useEffect(() => {
@@ -264,6 +291,8 @@ export function TrendBoard() {
   const [reload, setReload] = useState(0);
   const reloadedAt = useRef(0);
   const tools = useChartDrawings(selected, interval);
+  const [channelYears, setChannelYears] = useState<0 | 3 | 5 | 10>(0);
+  const [channels, setChannels] = useState<Channels | null>(null);
   const frameWord = FRAMES.find(([iv]) => iv === interval)?.[2] ?? "";
 
   useEffect(() => {
@@ -284,6 +313,17 @@ export function TrendBoard() {
       () => { if (alive) setChart({ symbol: selected, interval, bars: [], macd: [], rsi: [], fetched_at: null, stale: false, reason: "Lỗi tải biểu đồ" }); });
     return () => { alive = false; };
   }, [selected, interval, reload]);
+
+  useEffect(() => {
+    let alive = true;
+    if (interval !== "1W" || channelYears === 0) return;
+    api<Channels>(`trend/channels/${encodeURIComponent(selected)}/${channelYears}`).then((c) => { if (alive) setChannels(c); },
+      () => { if (alive) setChannels(null); });
+    return () => { alive = false; };
+  }, [selected, interval, channelYears]);
+  const channelData = interval === "1W" && channelYears > 0 && channels?.symbol === selected && channels.years === channelYears ? channels : null;
+  const overlay = useMemo(() => (channelData && !channelData.reason ? { segments: channelSegments(channelData), markers: channelMarkers(channelData) } : null),
+    [channelData]);
 
   const row = board?.rows.find((r) => r.symbol === selected);
   const current = chart && chart.symbol === selected && chart.interval === interval ? chart : null;
@@ -314,7 +354,18 @@ export function TrendBoard() {
           {current?.reason && <p className="muted">{current.reason}.</p>}
           {current && !current.reason && <>
             <DrawingToolbar tools={tools} symbol={row?.label ?? selected} />
-            <CandleChart data={current} liveT={liveT} livePrice={livePrice} drawings={tools.shown} tool={tools.tool} onDrawn={tools.onDrawn} />
+            {interval === "1W" && <div className="tb-channels" role="group" aria-label="Kênh tuần">
+              <span className="caption">Kênh tuần</span>
+              {([0, 3, 5, 10] as const).map((y) => <button key={y} type="button" className={`btn ${channelYears === y ? "primary" : ""}`} aria-pressed={channelYears === y}
+                onClick={() => setChannelYears(y)}>{y === 0 ? "Tắt" : `${y} năm`}</button>)}
+              {channelYears > 0 && !channelData && <span className="caption fx-loading" role="status">Đang tải kênh…</span>}
+              {channelData?.reason && <span className="caption">Chưa có kênh: {channelData.reason}.</span>}
+              {overlay && <span className="caption" data-testid="tb-channel-caption">Xanh: kênh basic, tăng tốc (nét đứt), final (đậm), cạnh trên và gấp đôi
+                (chấm) tới tuần {channelData!.last_week!.split("-").reverse().join("/")}; nâu: vùng đáy MACD tuần, d1… từ điểm 0 trong {channelYears} năm;
+                mũi tên đỏ: tuần phá kênh final. Luật xem ở khối Đáy nhịp tuần và kênh tăng bên dưới; không kéo ra tương lai.</span>}
+            </div>}
+            <CandleChart data={current} liveT={liveT} livePrice={livePrice} drawings={tools.shown} tool={tools.tool} onDrawn={tools.onDrawn}
+              overlay={interval === "1W" ? overlay : null} />
             <p className="caption" data-testid="tb-chart-caption">{current.style === "line"
               ? `Giá đóng cửa theo ${frameWord} · ${current.bars.length} điểm · ${current.unit ?? ""} · số mới nhất ${current.as_of ?? "—"}`
               : `${current.interval === "1H" ? "Nến 1 giờ" : `Nến ${frameWord}`} · ${current.bars.length} nến · ${current.unit ?? ""}`}

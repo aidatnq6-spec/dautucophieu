@@ -200,6 +200,12 @@ if __name__ == "__main__":
             return [{"time": first + timedelta(days=i), "open": "50", "high": "55", "low": "49", "close": str(50 + i % 4), "volume": 1000 + i}
                     for i in range(60)]
     trend_routes._source = FixtureSource
+    # Kênh tuần: four years of US10Y closes in a rising saw-tooth that steepens each cycle (only the trend board reads this series).
+    us_days, us_level, us_points = date.today() - timedelta(weeks=208), 2.0, []
+    for w in range(208):
+        us_level += 0.015 * (1 + w // 16 * 0.3) if w % 16 < 12 else -0.03
+        us_points += [(datetime.combine(us_days + timedelta(weeks=w, days=d), datetime.min.time()), f"{us_level:.3f}") for d in range(5)]
+    SeriesStore(os.path.join(data, "trend-sources")).upsert("US10Y-1d", us_points)
     SeriesStore(os.path.join(data, "trend-sources")).upsert("DXY-ecb-1d", [(datetime(2026, 8, 1) + timedelta(days=i), str(99 + (i % 3) / 10))
                                                                        for i in range(60)])
     app = create_app(InternalAuthSettings.from_env(), personal_repository=repository, market=MARKET,

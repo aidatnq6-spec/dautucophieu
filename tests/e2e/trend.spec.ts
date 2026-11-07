@@ -169,3 +169,21 @@ test("no horizontal scroll with the channel tables at 375px", async ({ page }) =
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test("on the weekly chart, Kênh tuần draws the base zones and channels as a read-only layer, off by default", async ({ page }) => {
+  await openTrend(page);
+  const box = page.getByRole("region", { name: "Bảng giá và biểu đồ" });
+  await box.getByRole("table", { name: "Bảng giá" }).getByRole("row", { name: /US10Y/ }).click();
+  const chart = box.getByRole("group", { name: "Biểu đồ US10Y" });
+  await expect(chart.getByRole("group", { name: "Kênh tuần" })).toHaveCount(0);  // weekly frame only
+  await chart.getByRole("radio", { name: "Tuần" }).click();
+  const canvas = chart.getByTestId("tb-canvas");
+  await expect(chart.getByRole("button", { name: "Tắt" })).toHaveAttribute("aria-pressed", "true");
+  await expect(canvas).toHaveAttribute("data-overlay", "0");
+  await chart.getByRole("button", { name: "5 năm" }).click();
+  await expect(chart.getByTestId("tb-channel-caption")).toContainText("vùng đáy MACD tuần");
+  await expect(canvas).not.toHaveAttribute("data-overlay", "0");
+  await expect(chart.getByRole("list", { name: "Hình vẽ" })).toHaveCount(0);  // not mixed with the owner's drawings
+  await chart.getByRole("button", { name: "Tắt" }).click();
+  await expect(canvas).toHaveAttribute("data-overlay", "0");
+});

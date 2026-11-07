@@ -185,6 +185,8 @@ export function OperatingFigures({ symbol }: { symbol: string }) {
             <option value="stack">Cột chồng (cộng thành tổng)</option><option value="line">Đường (không cộng, ví dụ thị phần %)</option></select></label>
           <button type="submit" className="btn primary">Thêm nhóm</button>
         </form>
+        <p className="caption wrap">Muốn đọc số từ PDF bản tin: tạo nhóm trước, đặt tên các dòng đúng như chữ trong bản tin (ví dụ “Thép xây dựng”, không viết tắt
+          “Thép XD”); ô “Đọc từ PDF công khai” sẽ hiện trong nhóm vừa tạo.</p>
       </details>
       <p className="caption wrap">Số liệu bạn nhập từ bản tin sản xuất kinh doanh, thuyết minh báo cáo tài chính hoặc báo cáo ngành công khai, mỗi kỳ ghi nguồn; lưu trong
         kho cá nhân. Cột chồng cộng các dòng thành tổng, tỷ trọng và % so cùng kỳ; kỳ thiếu một dòng thì không có tổng. Biểu đồ đường giữ nguyên số đã nhập.</p>

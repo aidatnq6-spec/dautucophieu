@@ -222,6 +222,7 @@ test("the owner defines an operating group, enters periods with sources and sees
 test("a public PDF bulletin proposes each line's figure with its page and text, and nothing is kept until the owner saves", async ({ page }) => {
   await page.goto("/research/FPT");
   const box = page.getByRole("region", { name: "Số liệu vận hành" });
+  await expect(box).toContainText("ô “Đọc từ PDF công khai” sẽ hiện trong nhóm vừa tạo");  // where to find it before any group exists
   const add = box.getByRole("form", { name: "Thêm nhóm số liệu vận hành" });
   await add.getByLabel("Tên nhóm").fill("Sản lượng bán PDF");
   await add.getByLabel("Đơn vị").fill("tấn");

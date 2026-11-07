@@ -337,3 +337,5 @@ def test_the_weekly_series_takes_vndirect_quarters_when_the_ticker_has_them(tmp_
     assert (first["basis"], first["period"], first["value"]) == ("4 quý", "2025-Q1", "6.00")  # 12,000 × 1 million / 2 tỷ; listed 25/04
     assert call(client, clock, "GET", "/internal/fairvalue/whatif/FPT/6000").json()["pe"]["multiple"] == "3.00"
     assert call(client, clock, "GET", "/internal/fairvalue/milestones/FPT/15").json()["source"] == "vndirect"
+    monthly = call(client, clock, "GET", "/internal/fairvalue/history/FPT").json()
+    assert monthly["source"] == "vndirect" and (monthly["pe"]["points"][0]["basis"], monthly["pe"]["points"][0]["year"]) == ("4 quý", "2025-Q1")

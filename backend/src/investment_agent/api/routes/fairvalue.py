@@ -30,7 +30,7 @@ from investment_agent.valuation.history import monthly_multiples
 from investment_agent.valuation.index_reference import index_monthly_multiples
 from investment_agent.valuation.bands import percentile_bands
 from investment_agent.valuation.milestones import price_milestones
-from investment_agent.valuation.sources import valuation_record
+from investment_agent.valuation.sources import merged_fundamentals, valuation_record
 from investment_agent.valuation.statement_table import statement_table
 from investment_agent.valuation.weekly import weekly_multiples
 from investment_agent.valuation.what_if import what_if
@@ -75,9 +75,11 @@ def fairvalue_history(symbol: str, request: Request):
         return index_monthly_multiples(symbol, pe=multiples.read(series_key(symbol, "pe")), pb=multiples.read(series_key(symbol, "pb")))
     if symbol not in load_watchlist(data_dir).symbols:
         return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
-    out = monthly_multiples(FundamentalsStore(data_dir / "fundamentals").read(symbol), SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"),
-                            today=now(request).astimezone(VN).date())
-    return {"symbol": symbol, **out}
+    today = now(request).astimezone(VN).date()
+    v = valuation_record(data_dir, symbol, today=today)
+    out = monthly_multiples(v["record"], SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"), today=today, shares=v["shares"],
+                            published=v["published"])
+    return {"symbol": symbol, "source": v["source"], **out}
 
 
 
@@ -175,13 +177,15 @@ def _forward_id(symbol: str) -> str:
 def _forward_view(request: Request, data_dir: Path, symbol: str, record) -> dict:
     """The saved scenario priced on today's base figures and the ticker's monthly P/E and P/B bands."""
     today = now(request).astimezone(VN).date()
-    fundamentals = FundamentalsStore(data_dir / "fundamentals").read(symbol)
+    fundamentals, _ = merged_fundamentals(data_dir, symbol)
     m = metrics(fundamentals, today=today, year_end_prices={}) if fundamentals and fundamentals.get("years") else None
     latest = fundamentals["years"].get(m["latest_year"], {}) if m else {}
     point = request.app.state.market.price(symbol) if request.app.state.market else None
     base = {"year": m["latest_year"] if m else None, "profit": _d(latest.get("npat")), "equity": _d(latest.get("equity")),
             "shares": m["shares"] if m else None, "price": point.price if point else None}
-    history = monthly_multiples(fundamentals, SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"), today=today)
+    v = valuation_record(data_dir, symbol, today=today)
+    history = monthly_multiples(v["record"], SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"), today=today, shares=v["shares"],
+                                published=v["published"])
     bands = {k: {"median": history[k]["median"], "sd": history[k]["sd"]} for k in ("pe", "pb")}
     saved = record.payload if record else None
     if saved is None:  # nothing saved yet: base figures and reason only, no forward years

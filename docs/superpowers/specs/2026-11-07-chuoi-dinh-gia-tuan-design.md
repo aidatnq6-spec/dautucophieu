@@ -40,6 +40,14 @@ Phân vị, z, độ lệch và giao diện (bước 2); giá giả định (bư
   nếu không (VNDirect nạp số cũ ngày 01/12/2019) thì giữ quy tắc 45 ngày / 1-4. Ngày VNDirect muộn hơn quy tắc cũng được giữ, để báo cáo nộp
   muộn không bị dùng sớm. Số năm VNDirect thường có từ cuối tháng 1 (trước kiểm toán) và có thể được sửa sau; chấp nhận, đã ghi.
 - HPG: P/E theo 4 quý thật cho 813/813 tuần từ 05/2010 (trước: 51/394 tuần từ 04/2019), không còn quý thiếu; Q3/2026 được dùng từ 29/10/2026.
-- Dải phân vị, giá giả định, mốc giá quá khứ dùng chuỗi này nên đổi theo; khung "Toàn bộ" giờ dài hơn (HPG từ 2010). Biểu đồ P/E, P/B theo tháng
-  vẫn theo số năm Vnstock như cũ.
+- Dải phân vị, giá giả định, mốc giá quá khứ dùng chuỗi này nên đổi theo; khung "Toàn bộ" giờ dài hơn (HPG từ 2010).
+
+## Mọi số định giá dùng chung số VNDirect (07/11/2026, chủ sở hữu đồng ý)
+- **Biểu đồ P/E, P/B theo tháng** (trung vị ± độ lệch chuẩn) tính như chuỗi tuần, với giá cuối tháng: 4 quý thật (thiếu quý thì báo cáo năm), vốn
+  chủ cuối kỳ, ngày công bố VNDirect; mỗi điểm ghi "4 quý đến Qn/năm", "vốn chủ cuối Qn/năm" hoặc "số liệu năm". Trước: chỉ số năm Vnstock với
+  quy tắc 1/4. Dải ± độ lệch chuẩn của Định giá dự phóng lấy từ biểu đồ này nên đổi theo.
+- **Định giá tham khảo** (P/E, P/B lịch sử, P/B hợp lý theo ROE, P/E bình quân…), **mức nền của Định giá dự phóng** và **Thông tin nhanh** của hồ
+  sơ mã dùng `merged_fundamentals`: hồ sơ Vnstock với LNST và vốn chủ công ty mẹ theo năm, quý của VNDirect; giữ EPS Vnstock cùng năm (để suy ra số
+  cổ phiếu), cổ tức, phát hành, cổ phiếu niêm yết, các dòng chất lượng báo cáo. Mã chưa có số VNDirect: Vnstock như cũ.
+- HPG: P/E và P/B lịch sử theo năm có 16 năm thay 8; ROE 20,0 % (vốn chủ công ty mẹ) thay 19,8 %; EPS 4 quý không đổi.
 

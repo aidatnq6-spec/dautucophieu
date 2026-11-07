@@ -97,6 +97,32 @@ def _point(day: date, price: Decimal, shares: Decimal, base: dict) -> dict:
             "basis": base["basis"], "period": base["period"], "denominator": _plain(d), "missing": base["missing"]}
 
 
+def last_close_by(points, key) -> list[tuple[date, Decimal]]:
+    """The last positive close (đồng) of each period that `key` names (a week, a month), oldest first."""
+    last: dict = {}
+    for t, close in points:
+        price = Decimal(str(close)) * 1000
+        if price > 0:  # the source sometimes returns 0 for very old sessions
+            last[key(t.date())] = (t.date(), price)  # the period's last close wins
+    return [last[k] for k in sorted(last)]
+
+
+def multiples_at(record: dict, closes: list[tuple[date, Decimal]], *, shares, pub=published_from) -> tuple[list, list, set]:
+    """P/E and P/B points at the given closes, each on the figures already out that day; the missing quarters named."""
+    shares, pe, pb, missing = Decimal(shares), [], [], set()
+    for day, price in closes:
+        profit, equity = _profit(record, day, pub), _equity(record, day, pub)
+        if profit is None and equity is None:
+            continue
+        if profit is not None:
+            pe.append(_point(day, price, shares, profit))
+            missing.update(profit["missing"])
+        if equity is not None:
+            pb.append(_point(day, price, shares, equity))
+            missing.update(equity["missing"])
+    return pe, pb, missing
+
+
 def weekly_multiples(record: dict | None, points, *, today: date, shares: int | None = None, published=None) -> dict:
     """`published` maps a period to the day its report counts as out (default: the fixed rule); `shares` is today's share count
     (default: the reference valuation's, from the same record)."""
@@ -107,22 +133,7 @@ def weekly_multiples(record: dict | None, points, *, today: date, shares: int | 
         shares = m["shares"] if m else None
     if shares is None or not record or not (record.get("years") or record.get("quarters")):
         return {**empty, "reason": "Chưa có báo cáo tài chính"}
-    week_close: dict[tuple[int, int], tuple[date, Decimal]] = {}
-    for t, close in points:
-        price = Decimal(str(close)) * 1000
-        if price > 0:  # the source sometimes returns 0 for very old sessions
-            week_close[t.date().isocalendar()[:2]] = (t.date(), price)  # last close of the week wins
-    shares, pe, pb, missing = Decimal(shares), [], [], set()
-    for _, (day, price) in sorted(week_close.items()):
-        profit, equity = _profit(record, day, pub), _equity(record, day, pub)
-        if profit is None and equity is None:
-            continue
-        if profit is not None:
-            pe.append(_point(day, price, shares, profit))
-            missing.update(profit["missing"])
-        if equity is not None:
-            pb.append(_point(day, price, shares, equity))
-            missing.update(equity["missing"])
+    pe, pb, missing = multiples_at(record, last_close_by(points, lambda d: d.isocalendar()[:2]), shares=shares, pub=pub)
     days = [p["date"] for p in pe + pb]
     if not days:
         return {**empty, "shares": int(shares), "reason": "Chưa có lịch sử giá"}

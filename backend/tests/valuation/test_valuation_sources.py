@@ -44,3 +44,23 @@ def test_a_period_counts_as_out_from_the_day_vndirect_listed_it_when_that_is_wit
 def test_a_listed_day_after_the_rule_is_kept_so_a_late_report_is_not_used_early():
     pub = publication_dates({"quarters_created": {"2026-Q1": "2026-06-20"}, "years_created": {}})
     assert pub("2026-Q1") == date(2026, 6, 20)  # the rule would say 15 May
+
+
+def test_the_fundamentals_record_takes_vndirect_parent_figures_and_keeps_everything_else(tmp_path):
+    from investment_agent.valuation.sources import merged_fundamentals
+    fund = {**FUND, "years": {"2025": {"npat": "999", "eps": "1000", "equity": "1"}, "2024": {"npat": "5", "eps": "500", "equity": "2"}},
+            "dividends": [{"date": "2025-07-01", "cash": "500"}], "issues": [], "annual": {"2025": {"revenue": "9"}}, "shares_outstanding": "7"}
+    FundamentalsStore(tmp_path / "fundamentals").save(fund)
+    StatementStore(tmp_path / "statements").save(STATEMENTS)
+    rec, source = merged_fundamentals(tmp_path, "HPG")
+    assert source == "vndirect"
+    assert rec["years"] == {"2025": {"npat": "1200", "equity": "1900", "eps": "1000"}}  # Vnstock's EPS kept for the share count
+    assert rec["quarters"] == {"2015-Q1": {"npat": "100", "equity": "990"}, "2026-Q2": {"npat": "300", "equity": "1950"}}
+    assert rec["dividends"] == fund["dividends"] and rec["annual"] == fund["annual"] and rec["shares_outstanding"] == "7"
+    assert merged_fundamentals(tmp_path, "ZZZ") == (None, None)
+
+
+def test_without_vndirect_the_fundamentals_record_is_vnstock_s_unchanged(tmp_path):
+    from investment_agent.valuation.sources import merged_fundamentals
+    FundamentalsStore(tmp_path / "fundamentals").save(FUND)
+    assert merged_fundamentals(tmp_path, "HPG") == (FundamentalsStore(tmp_path / "fundamentals").read("HPG"), "vnstock")

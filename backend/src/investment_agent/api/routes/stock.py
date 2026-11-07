@@ -15,7 +15,6 @@ from fastapi import APIRouter, Request
 from investment_agent.insights.store import InsightStore
 from investment_agent.insights.summary import link, linking_sectors, summarise
 from investment_agent.market.corporate_events import EventStore
-from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.prices import PriceStore
 from investment_agent.market.sectors import load_sectors
 from investment_agent.market.series import SeriesStore
@@ -23,6 +22,7 @@ from investment_agent.market.watchlist import load_watchlist
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.holdings_view import fair_value_board
 from investment_agent.valuation.reference import metrics
+from investment_agent.valuation.sources import merged_fundamentals
 
 from ..auth import require_owner
 from .common import error, now, unavailable
@@ -43,7 +43,7 @@ def _facts(data_dir: Path, market, symbol: str, today) -> dict:
     change = None
     if len(closes) >= 2 and closes[-2][1] > 0:
         change = str(((Decimal(str(closes[-1][1])) / Decimal(str(closes[-2][1]))) - 1).quantize(Decimal("0.0001"), ROUND_HALF_UP))
-    record = FundamentalsStore(data_dir / "fundamentals").read(symbol)
+    record, _ = merged_fundamentals(data_dir, symbol)
     m = metrics(record, today=today, year_end_prices={}) if record and record.get("years") else None
     shares = int(m["shares"]) if m else None
     bars = [bar for bar, _ in sorted(PriceStore(data_dir).latest(symbol).values(), key=lambda br: br[0].session_date)][-VOLUME_SESSIONS:]

@@ -51,12 +51,35 @@ test("under the charts, the weekly P/B and P/E sit on percentile bands over 3 ye
   await expect(bands.getByRole("figure", { name: "Dải phân vị P/E FPT" })).toBeVisible();
 });
 
+test("a typed price gives its P/B and P/E, its rank in each window and the earlier episodes, counted", async ({ page }) => {
+  await openPage(page);
+  await page.getByRole("button", { name: "Chi tiết FPT" }).click();
+  const bands = page.getByRole("region", { name: "Dải phân vị FPT" });
+  await bands.getByRole("button", { name: "Tự gõ giá" }).click();
+  await bands.getByLabel("Giá giả định (đồng)").fill("10000");
+  const result = bands.getByRole("region", { name: "Kết quả giá giả định" });
+  await expect(result).toContainText("P/B · P/E tại 10.000");
+  await expect(result).toContainText("1,00 · 10,00");  // equity 10 tỷ and 2025 profit 1 tỷ over 1 triệu shares
+  await expect(result).toContainText(/Có lãi \d+\/\d+ đợt/);
+  await expect(result).toContainText("Toàn bộ P");
+  await expect(bands.getByTestId("pb-assumed")).toHaveCount(1);
+  await result.getByText(/Các đợt trước/).click();
+  await expect(result.getByRole("table")).toContainText("Vào vùng");
+  await bands.getByRole("button", { name: "−10%" }).click();
+  await expect(result).toContainText("So giá hiện tại");
+  await bands.getByRole("button", { name: "Tắt" }).click();
+  await expect(result).toHaveCount(0);
+  await expect(bands.getByTestId("pb-assumed")).toHaveCount(0);
+});
+
 test("no horizontal scroll with the P/E chart open at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 900 });
   await openPage(page);
   await page.getByRole("button", { name: "Chi tiết FPT" }).click();
   await expect(page.getByRole("figure", { name: "P/E lịch sử FPT" })).toBeVisible();
   await expect(page.getByRole("figure", { name: "Dải phân vị P/B FPT" })).toBeVisible();
+  await page.getByRole("button", { name: "−10%" }).click();
+  await expect(page.getByRole("region", { name: "Kết quả giá giả định" })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });

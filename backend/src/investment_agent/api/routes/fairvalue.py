@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Path as PathParam, Request
 from pydantic import Field
 
 from investment_agent.domain.models import ContractModel
@@ -28,6 +28,7 @@ from investment_agent.valuation.history import monthly_multiples
 from investment_agent.valuation.index_reference import index_monthly_multiples
 from investment_agent.valuation.bands import percentile_bands
 from investment_agent.valuation.weekly import weekly_multiples
+from investment_agent.valuation.what_if import what_if
 from investment_agent.valuation.reference import _d, metrics
 
 from ..auth import require_owner
@@ -88,6 +89,24 @@ def fairvalue_weekly(symbol: str, request: Request):
     out = weekly_multiples(FundamentalsStore(data_dir / "fundamentals").read(symbol), SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"),
                            today=now(request).astimezone(VN).date())
     return {"symbol": symbol, **out, "bands": {k: percentile_bands(out[k]["points"]) for k in ("pe", "pb")}}
+
+
+@router.get("/fairvalue/whatif/{symbol}/{price}")
+def fairvalue_what_if(symbol: str, request: Request, price: int = PathParam(gt=0, le=10_000_000)):
+    """Giá giả định: P/E and P/B of one watched ticker at a typed price in đồng, their rank in each window, and the earlier episodes."""
+    require_owner(request)
+    data_dir = request.app.state.data_dir
+    if data_dir is None:
+        return unavailable()
+    data_dir, symbol = Path(data_dir), symbol.upper()
+    if symbol not in load_watchlist(data_dir).symbols:
+        return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
+    out = weekly_multiples(FundamentalsStore(data_dir / "fundamentals").read(symbol), SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"),
+                           today=now(request).astimezone(VN).date())
+    if out["reason"]:
+        return {"symbol": symbol, "price": str(price), "reason": out["reason"], "pe": None, "pb": None}
+    return {"symbol": symbol, "price": str(price), "reason": None,
+            **{k: what_if(out[k]["points"], shares=out["shares"], price=Decimal(price)) for k in ("pe", "pb")}}
 
 class ForwardRequest(ContractModel):
     assumptions: Assumptions

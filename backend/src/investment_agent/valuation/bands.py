@@ -64,15 +64,24 @@ def percentile_bands(points: list[dict]) -> dict:
     """Points as weekly_multiples gives them (date, value or None, basis), oldest first; today = the last point."""
     if not points:
         return {"current": None, "date": None, "windows": [], "reason": "Chưa có chuỗi theo tuần"}
-    end, first = date.fromisoformat(points[-1]["date"]), date.fromisoformat(points[0]["date"])
     current = Decimal(points[-1]["value"]) if points[-1]["value"] is not None else None
     windows = []
+    for label, years, sample, reason in window_samples(points):
+        if reason is not None:
+            windows.append({"label": label, "years": years, **_stats([], None), "weeks": 0, "reason": reason})
+        else:
+            windows.append({"label": label, "years": years, **_stats(sample, current)})
+    return {"current": _fmt(current), "date": points[-1]["date"], "windows": windows, "reason": None}
+
+
+def window_samples(points: list[dict]) -> list[tuple[str, int | None, list[dict], str | None]]:
+    """Each window's weeks (label, years, points, reason); a window the series does not reach back to has a reason and no points."""
+    end, first = date.fromisoformat(points[-1]["date"]), date.fromisoformat(points[0]["date"])
+    out = []
     for label, years in WINDOWS:
         start = _years_before(end, years) if years else None
         if start is not None and first > start + timedelta(days=7):  # the series must reach back to the window's first week
-            windows.append({"label": label, "years": years, **_stats([], None), "weeks": 0,
-                            "reason": f"Chuỗi chỉ có từ {first.month:02d}/{first.year}, chưa đủ {years} năm"})
-            continue
-        sample = [p for p in points if start is None or date.fromisoformat(p["date"]) > start]
-        windows.append({"label": label, "years": years, **_stats(sample, current)})
-    return {"current": _fmt(current), "date": points[-1]["date"], "windows": windows, "reason": None}
+            out.append((label, years, [], f"Chuỗi chỉ có từ {first.month:02d}/{first.year}, chưa đủ {years} năm"))
+        else:
+            out.append((label, years, [p for p in points if start is None or date.fromisoformat(p["date"]) > start], None))
+    return out

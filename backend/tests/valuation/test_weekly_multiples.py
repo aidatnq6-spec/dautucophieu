@@ -92,3 +92,13 @@ def test_without_statements_or_prices_there_is_a_reason():
     assert weekly_multiples(None, [], today=date(2026, 1, 1))["reason"] == "Chưa có báo cáo tài chính"
     out = weekly_multiples(record(), [], today=date(2026, 1, 1))
     assert out["reason"] == "Chưa có lịch sử giá" and out["pe"]["points"] == [] and out["missing_quarters"] == []
+
+
+def test_a_publication_calendar_and_a_share_count_can_be_given():
+    early = lambda p: date(2021, 4, 20) if p == "2021-Q1" else published_from(p)  # noqa: E731  listed well before the 45-day rule
+    full = dict(QUARTERS, **{"2020-Q2": {"npat": "1000000000", "equity": "20000000000"}})
+    out = weekly_multiples(record(quarters=full), points(("2021-04-23", 30.0)), today=date(2021, 12, 1), published=early, shares=2000000)
+    pe = by_date(out["pe"])["2021-04-23"]
+    assert (pe["basis"], pe["period"], pe["value"]) == ("4 quý", "2021-Q1", "20.00")  # 30,000 × 2,000,000 / 3e9
+    assert out["shares"] == 2000000
+    assert weekly_multiples({"years": {}, "quarters": full}, points(("2021-04-23", 30.0)), today=date(2021, 12, 1), shares=2000000)["reason"] is None

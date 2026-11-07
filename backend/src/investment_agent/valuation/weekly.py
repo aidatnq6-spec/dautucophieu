@@ -44,9 +44,9 @@ def published_from(period: str) -> date:
     return date(year, *_QUARTER_END[q]) + timedelta(days=QUARTER_LAG_DAYS)
 
 
-def _latest_quarter_out(day: date) -> str:
+def _latest_quarter_out(day: date, pub=published_from) -> str:
     year, q = day.year, (day.month - 1) // 3 + 1
-    while published_from(_quarter(year, q)) > day:
+    while pub(_quarter(year, q)) > day:
         year, q = (year, q - 1) if q > 1 else (year - 1, 4)
     return _quarter(year, q)
 
@@ -60,30 +60,30 @@ def _window(quarter: str) -> list[str]:
     return out[::-1]
 
 
-def _latest_year_out(years: dict, field: str, day: date) -> str | None:
-    usable = [y for y in sorted(years) if _d(years[y].get(field)) is not None and published_from(y) <= day]
+def _latest_year_out(years: dict, field: str, day: date, pub=published_from) -> str | None:
+    usable = [y for y in sorted(years) if _d(years[y].get(field)) is not None and pub(y) <= day]
     return usable[-1] if usable else None
 
 
-def _profit(record: dict, day: date) -> dict | None:
-    quarters, latest = record.get("quarters", {}), _latest_quarter_out(day)
+def _profit(record: dict, day: date, pub=published_from) -> dict | None:
+    quarters, latest = record.get("quarters", {}), _latest_quarter_out(day, pub)
     window = _window(latest)
     missing = [q for q in window if _d(quarters.get(q, {}).get("npat")) is None]
     if not missing:
         return {"basis": "4 quý", "period": latest, "denominator": sum(_d(quarters[q]["npat"]) for q in window), "missing": []}
-    year = _latest_year_out(record["years"], "npat", day)
+    year = _latest_year_out(record.get("years", {}), "npat", day, pub)
     if year is None:
         return None
     return {"basis": "năm", "period": year, "denominator": _d(record["years"][year]["npat"]),
             "missing": [] if latest == _quarter(int(year), 4) else missing}
 
 
-def _equity(record: dict, day: date) -> dict | None:
-    quarters, latest = record.get("quarters", {}), _latest_quarter_out(day)
+def _equity(record: dict, day: date, pub=published_from) -> dict | None:
+    quarters, latest = record.get("quarters", {}), _latest_quarter_out(day, pub)
     equity = _d(quarters.get(latest, {}).get("equity"))
     if equity is not None:
         return {"basis": "quý", "period": latest, "denominator": equity, "missing": []}
-    year = _latest_year_out(record["years"], "equity", day)
+    year = _latest_year_out(record.get("years", {}), "equity", day, pub)
     if year is None:
         return None
     return {"basis": "năm", "period": year, "denominator": _d(record["years"][year]["equity"]),
@@ -97,19 +97,24 @@ def _point(day: date, price: Decimal, shares: Decimal, base: dict) -> dict:
             "basis": base["basis"], "period": base["period"], "denominator": _plain(d), "missing": base["missing"]}
 
 
-def weekly_multiples(record: dict | None, points, *, today: date) -> dict:
+def weekly_multiples(record: dict | None, points, *, today: date, shares: int | None = None, published=None) -> dict:
+    """`published` maps a period to the day its report counts as out (default: the fixed rule); `shares` is today's share count
+    (default: the reference valuation's, from the same record)."""
     empty = {"pe": {"points": []}, "pb": {"points": []}, "shares": None, "from": None, "to": None, "missing_quarters": []}
-    m = metrics(record, today=today, year_end_prices={}) if record and record.get("years") else None
-    if m is None:
+    pub = published or published_from
+    if shares is None:
+        m = metrics(record, today=today, year_end_prices={}) if record and record.get("years") else None
+        shares = m["shares"] if m else None
+    if shares is None or not record or not (record.get("years") or record.get("quarters")):
         return {**empty, "reason": "Chưa có báo cáo tài chính"}
     week_close: dict[tuple[int, int], tuple[date, Decimal]] = {}
     for t, close in points:
         price = Decimal(str(close)) * 1000
         if price > 0:  # the source sometimes returns 0 for very old sessions
             week_close[t.date().isocalendar()[:2]] = (t.date(), price)  # last close of the week wins
-    shares, pe, pb, missing = m["shares"], [], [], set()
+    shares, pe, pb, missing = Decimal(shares), [], [], set()
     for _, (day, price) in sorted(week_close.items()):
-        profit, equity = _profit(record, day), _equity(record, day)
+        profit, equity = _profit(record, day, pub), _equity(record, day, pub)
         if profit is None and equity is None:
             continue
         if profit is not None:

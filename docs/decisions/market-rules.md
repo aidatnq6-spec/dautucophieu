@@ -14,7 +14,7 @@ Tra cứu ngày 2026-10-25. Số liệu máy đọc: `config/market-rules-hose.j
 | Thuế bán chứng khoán | 0,1% giá chuyển nhượng từng lần | Luật Thuế TNCN 109/2025/QH15, hiệu lực 01/7/2026, Điều 13 | Nội dung luật trích qua trang pháp luật; nghị định hướng dẫn đang dự thảo |
 | Thuế cổ tức | 5% thu nhập từ đầu tư vốn | Luật 109/2025/QH15, Điều 12 | Như trên |
 | Phí môi giới | Theo biểu phí của công ty chứng khoán của bạn | Nhập trong Cài đặt | Không có mức mặc định |
-| Báo cáo tài chính đã công bố từ ngày nào (chuỗi định giá) | Năm Y: từ 01/4 năm Y+1. Quý: 45 ngày sau ngày kết thúc quý (Q1 15/5, Q2 14/8, Q3 14/11, Q4 14/2 năm sau) | Thông tư 96/2020/TT-BTC Điều 14 khoản 3: tổ chức niêm yết công bố báo cáo quý trong 20 ngày sau khi hết quý, bản soát xét không quá 45 ngày; báo cáo năm kiểm toán trong 90 ngày | **Chỉ nguồn thứ cấp** (bài tư vấn pháp luật, tra 07/11/2026). Gói Cộng đồng không có ngày công bố thật, nên lấy hạn muộn nhất để không dùng số trước khi công bố; doanh nghiệp xin gia hạn hoặc nộp trễ thì vẫn có thể lệch |
+| Báo cáo tài chính đã công bố từ ngày nào (chuỗi định giá) | Năm Y: từ 01/4 năm Y+1. Quý: 45 ngày sau ngày kết thúc quý (Q1 15/5, Q2 14/8, Q3 14/11, Q4 14/2 năm sau) | Thông tư 96/2020/TT-BTC Điều 14 khoản 3: tổ chức niêm yết công bố báo cáo quý trong 20 ngày sau khi hết quý, bản soát xét không quá 45 ngày; báo cáo năm kiểm toán trong 90 ngày | **Chỉ nguồn thứ cấp** (bài tư vấn pháp luật, tra 07/11/2026). Gói Cộng đồng không có ngày công bố thật, nên lấy hạn muộn nhất để không dùng số trước khi công bố; doanh nghiệp xin gia hạn hoặc nộp trễ thì vẫn có thể lệch. Mã có báo cáo VNDirect: dùng ngày VNDirect đưa số lên nếu trong 120 ngày sau khi hết kỳ (từ 07/11/2026) |
 
 ## Lịch nghỉ giao dịch 2026
 

@@ -83,7 +83,7 @@ def _multiple(price: Decimal, shares: int | None, series: dict | None) -> Decima
     return (price * shares / d).quantize(_Q2, ROUND_HALF_UP) if d > 0 else None
 
 
-def price_milestones(record: dict | None, points, *, today: date, threshold: Decimal) -> dict:
+def price_milestones(record: dict | None, points, *, today: date, threshold: Decimal, shares: int | None = None, published=None) -> dict:
     closes = weekly_closes(points)
     if not closes:
         return {"reason": "Chưa có lịch sử giá", "rows": [], "corrections": [], "floor": None, "threshold": _r(threshold)}
@@ -96,7 +96,7 @@ def price_milestones(record: dict | None, points, *, today: date, threshold: Dec
         peak = ext
     else:
         peak = max(closes, key=lambda c: (c[1], c[0]))
-    multiples = weekly_multiples(record, points, today=today)
+    multiples = weekly_multiples(record, points, today=today, shares=shares, published=published)
     shares = multiples["shares"]
     pb_series = multiples["pb"] if multiples["reason"] is None else None
     pe_series = multiples["pe"] if multiples["reason"] is None else None

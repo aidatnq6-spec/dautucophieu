@@ -84,9 +84,10 @@ if __name__ == "__main__":
         return {k: str(int(v * 10**9)) for k, v in base.items()}
     StatementStore(os.path.join(data, "statements")).save({
         "symbol": "FPT", "fetched_at": "2026-11-07T00:00:00+00:00", "source": "vndirect:finfo",
-        "quarters": {f"{y}-Q{k}": fs(250 + 20 * (y - 2024) + k, 25 + 2 * (y - 2024) + k) for y in (2024, 2025) for k in (1, 2, 3, 4)},
-        "years": {"2024": fs(1010, 110, charter_capital=100), "2025": fs(1090, 118, charter_capital=100)}, "quarters_created": {}, "years_created": {},
-        "year_end_close": {"2024": {"date": "2024-12-31", "close": "11"}, "2025": {"date": "2025-12-31", "close": "12"}},
+        # Parent profit 0.25 tỷ a quarter and parent equity 10 tỷ, as the Vnstock figures above, so the weekly series reads the same.
+        "quarters": {f"{y}-Q{k}": fs(250 + 20 * (y - 2024) + k, 0.25, equity=10, minority_equity=0) for y in range(2020, 2026) for k in (1, 2, 3, 4)},
+        "years": {str(y): fs(1010, 1, equity=10, minority_equity=0, charter_capital=10) for y in range(2020, 2026)}, "quarters_created": {},
+        "years_created": {}, "year_end_close": {"2024": {"date": "2024-12-31", "close": "11"}, "2025": {"date": "2025-12-31", "close": "12"}},
         "quarters_conflicts": [], "years_conflicts": []})
     SeriesStore(os.path.join(data, "trend-sources")).upsert("FPT-1d", [(datetime(y, 12, 31), "12") for y in range(2020, 2026)])
     # Month-end closes that move around (P/E chart); the 31 December closes above stay 12 for the valuation tests.

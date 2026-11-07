@@ -131,3 +131,28 @@ test("the CAPM hint starts from Damodaran's premium for Vietnam, takes the owner
   await expect(insider.getByRole("link", { name: /Bùi Quang Ngọc/ })).toHaveAttribute("href", /^https:\/\/dstock\.vndirect\.com\.vn\//);
   await expect(people.getByRole("table", { name: "Ban lãnh đạo FPT" })).toContainText("Phó Chủ tịch Hội đồng Quản trị");
 });
+
+test("Bảng số tài chính gives quarters and years with EBITDA, valuation and checks, and says why a bank has none", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Bảng số tài chính" });
+  const table = box.getByRole("table");
+  await expect(table).toContainText("Doanh thu thuần");
+  await expect(table).toContainText("EBITDA");
+  await expect(table).toContainText("Q4/25");
+  await expect(box.getByRole("button", { name: "8 quý" })).toHaveAttribute("aria-pressed", "true");
+  await box.getByRole("radio", { name: "Năm" }).click();
+  await expect(box.getByRole("table")).toContainText("EV/EBITDA");
+  await expect(box.getByRole("table")).toContainText("2025");
+  await expect(box).toContainText("Kiểm tra chéo");  // the synthetic quarters do not add up to the years
+  await expect(box).toContainText("không ước lượng");
+  await page.goto("/research/VCB");
+  await expect(page.getByRole("region", { name: "Bảng số tài chính" })).toContainText("bảng số liệu ngành riêng");
+});
+
+test("no horizontal page scroll with the statement table at 375px", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 900 });
+  await page.goto("/research/FPT");
+  await expect(page.getByRole("region", { name: "Bảng số tài chính" }).getByRole("table")).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});

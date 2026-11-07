@@ -66,6 +66,10 @@ def main() -> int:
     frs.add_argument("--data-dir", type=Path, required=True)
     ivs = commands.add_parser("index-valuation-sync", help="fetch daily P/E and P/B of VNINDEX and VN30 (VNDirect) into data/index-valuation")
     ivs.add_argument("--data-dir", type=Path, required=True)
+    ssync = commands.add_parser("statements-sync", help="full statements of watched non-financial tickers (VNDirect) for Bảng số tài chính")
+    ssync.add_argument("--data-dir", type=Path, required=True)
+    ssync.add_argument("--limit", type=int, default=8)
+    ssync.add_argument("--all", action="store_true", help="every watched ticker, for the first load")
     fsync = commands.add_parser("fundamentals-sync", help="refresh statements for the Định giá page (paced for Vnstock's limit)")
     fsync.add_argument("--data-dir", type=Path, required=True)
     fsync.add_argument("--limit", type=int, default=8)
@@ -101,6 +105,8 @@ def main() -> int:
         return index_groups([g.strip().upper() for g in args.groups.split(",") if g.strip()], args.output)
     if args.command == "market-sync":
         return market_sync(_symbols(args.symbols), args.data_dir, args.calendar, args.days, index=args.index)
+    if args.command == "statements-sync":
+        return statements_sync(args.data_dir, limit=None if args.all else args.limit)
     if args.command == "fundamentals-sync":
         return fundamentals_sync(args.data_dir, limit=None if args.all or args.symbols else args.limit,
                                  symbols=_symbols(args.symbols) if args.symbols else None)
@@ -224,6 +230,29 @@ def _same_bar(a, b) -> bool:
 
 # Months with quarterly or annual report deadlines: 17 tickers older than 3 days a night covers the 50 watched in 3 days.
 REPORTING_MONTHS = (1, 2, 4, 5, 7, 8, 10, 11)
+
+
+def statements_sync(data_dir: Path, *, limit: int | None, get=None, now=None, sleep=None) -> int:
+    """Exit 0 when every ticker due was refreshed, 1 when some failed (each is reported)."""
+    import time
+    from datetime import datetime, timezone
+    from investment_agent.market.sectors import load_sectors
+    from investment_agent.market.statements import StatementStore, sync_statements
+    from investment_agent.market.watchlist import load_watchlist
+    if get is None:
+        import httpx
+
+        def get(url):
+            response = httpx.get(url, timeout=60, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+            response.raise_for_status()
+            return response.text
+    sectors = load_sectors(data_dir)[0]
+    watched = {s: sectors.get(s) for s in load_watchlist(data_dir).symbols}
+    results = sync_statements(StatementStore(data_dir / "statements"), watched, get=get, now=now or datetime.now(timezone.utc), limit=limit,
+                              sleep=sleep or time.sleep)
+    failed = {k: v for k, v in results.items() if v != "ok"}
+    print(json.dumps({"status": "ok" if not failed else "partial", "results": results}, ensure_ascii=False))
+    return 0 if not failed else 1
 
 
 def fundamentals_sync(data_dir: Path, *, limit: int | None, symbols: list[str] | None = None, provider=None, now=None, sleep=None) -> int:

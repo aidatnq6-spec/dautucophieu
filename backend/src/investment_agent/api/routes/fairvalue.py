@@ -11,12 +11,14 @@ from investment_agent.domain.models import ContractModel
 from investment_agent.market.beta import BetaStore
 from investment_agent.market.company_people import PeopleStore, company_people
 from investment_agent.market.erp import ErpStore
-from investment_agent.market.financial_ratios import DISPLAY, FinancialRatioStore
+from investment_agent.market.financial_ratios import DISPLAY, FinancialRatioStore, kind_of
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.insider_deals import InsiderStore, insider_deals
 from investment_agent.market.index_valuation import INDICES, series_key
 from investment_agent.market.leading import MacroStore
+from investment_agent.market.sectors import load_sectors
 from investment_agent.market.series import SeriesStore
+from investment_agent.market.statements import StatementStore
 from investment_agent.market.watchlist import load_watchlist
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.holdings_view import fair_value_board
@@ -28,6 +30,7 @@ from investment_agent.valuation.history import monthly_multiples
 from investment_agent.valuation.index_reference import index_monthly_multiples
 from investment_agent.valuation.bands import percentile_bands
 from investment_agent.valuation.milestones import price_milestones
+from investment_agent.valuation.statement_table import statement_table
 from investment_agent.valuation.weekly import weekly_multiples
 from investment_agent.valuation.what_if import what_if
 from investment_agent.valuation.reference import _d, metrics
@@ -123,6 +126,31 @@ def fairvalue_milestones(symbol: str, request: Request, threshold: int = PathPar
     out = price_milestones(FundamentalsStore(data_dir / "fundamentals").read(symbol), SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"),
                            today=now(request).astimezone(VN).date(), threshold=Decimal(threshold) / 100)
     return {"symbol": symbol, **out}
+
+
+@router.get("/fairvalue/statements/{symbol}")
+def statements(symbol: str, request: Request):
+    """Bảng số tài chính of a watched non-financial ticker: quarterly and yearly tables from VNDirect's statements, with checks."""
+    require_owner(request)
+    data_dir = request.app.state.data_dir
+    if data_dir is None:
+        return unavailable()
+    data_dir, symbol = Path(data_dir), symbol.upper()
+    if symbol not in load_watchlist(data_dir).symbols:
+        return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
+    empty = {"symbol": symbol, "quarters": {"periods": [], "rows": []}, "years": {"periods": [], "rows": []}, "summary": None, "checks": [],
+             "conflicts": []}
+    if kind_of(load_sectors(data_dir)[0].get(symbol)) is not None:
+        return {**empty, "reason": "Ngân hàng, chứng khoán, bảo hiểm có bảng số liệu ngành riêng"}
+    record = StatementStore(data_dir / "statements").read(symbol)
+    if record is None:
+        return {**empty, "reason": "Chưa có số liệu VNDirect cho mã này (đồng bộ lúc 20:00, mỗi lượt vài mã)"}
+    fundamentals = FundamentalsStore(data_dir / "fundamentals").read(symbol)
+    today = now(request).astimezone(VN).date()
+    m = metrics(fundamentals, today=today, year_end_prices={}) if fundamentals and fundamentals.get("years") else None
+    table = statement_table(record, closes=SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"), shares=int(m["shares"]) if m else None,
+                            vnstock=(fundamentals or {}).get("quarters"))
+    return {**table, "reason": None}
 
 class ForwardRequest(ContractModel):
     assumptions: Assumptions

@@ -1,0 +1,82 @@
+from datetime import datetime
+from decimal import Decimal
+
+from investment_agent.valuation.statement_table import statement_table
+
+B = 10**9
+
+
+def q(revenue, npat, **more):
+    """A quarter in tỷ đồng: costs positive, cash paid negative, as VNDirect gives them."""
+    base = {"revenue": revenue, "cogs": revenue * 0.8, "gross_profit": revenue * 0.2, "selling": 10, "admin": 5, "fin_income": 2,
+            "fin_expense": 8, "interest": 6, "associates": 0, "other_profit": 1, "pbt": npat * 1.25, "tax": npat * 0.25, "npat": npat,
+            "npat_parent": npat, "depreciation": 20, "cfo": 50, "capex": -30, "equity": 1000, "minority_equity": 10, "st_debt": 300,
+            "lt_debt": 200, "cash": 40, "st_investments": 60}
+    base.update(more)
+    return {k: str(Decimal(str(v)) * B) for k, v in base.items()}
+
+
+QUARTERS = {f"{y}-Q{k}": q(100 * (y - 2023) + 10 * k, 20 * (y - 2023) + k) for y in (2024, 2025) for k in (1, 2, 3, 4)}
+YEARS = {"2024": q(1000, 84, equity=900, cfo=200, capex=-120, interest=24, depreciation=80),
+         "2025": q(2000, 164, equity=1000, cfo=210, capex=-130, interest=24, depreciation=80)}
+RECORD = {"symbol": "AAA", "fetched_at": "2026-11-07T00:00:00+00:00", "source": "vndirect:finfo", "quarters": QUARTERS, "years": YEARS,
+          "quarters_conflicts": [], "years_conflicts": [{"period": "2012", "line": "depreciation", "values": ["1", "2"]}]}
+# Adjusted closes in thousand đồng; 10,000,000 shares today.
+CLOSES = [(datetime(2024, 12, 31), 20.0), (datetime(2025, 12, 31), 30.0), (datetime(2026, 11, 6), 25.0)]
+
+
+def rows(table, part):
+    return {r["key"]: r["values"] for r in table[part]["rows"]}
+
+
+def test_quarters_carry_the_income_statement_core_profit_ebit_ebitda_and_their_growth_and_margins():
+    t = statement_table(RECORD, closes=CLOSES, shares=10_000_000, vnstock=None)
+    assert t["quarters"]["periods"][-1] == "2025-Q4" and len(t["quarters"]["periods"]) == 8
+    r = rows(t, "quarters")
+    i = t["quarters"]["periods"].index("2025-Q4")
+    assert r["revenue"][i] == "240000000000" and r["revenue_yoy"][i] == "0.7143"  # 240 against 140 a year before
+    assert r["cogs"][i] == "-192000000000" and r["selling"][i] == "-10000000000"  # costs shown negative
+    assert r["core_profit"][i] == "33000000000"  # gross 48 − selling 10 − admin 5
+    assert r["gross_margin"][i] == "0.2000"
+    assert r["ebit"][i] == "61000000000" and r["ebitda"][i] == "81000000000"  # profit before tax 55 + interest 6 ; + depreciation 20
+    assert r["revenue_yoy"][0] is None  # 2024-Q1 has no quarter a year before it
+
+
+def test_years_add_scale_and_valuation_on_the_year_end_adjusted_close_and_today_s_share_count():
+    t = statement_table(RECORD, closes=CLOSES, shares=10_000_000, vnstock=None)
+    r = rows(t, "years")
+    i = t["years"]["periods"].index("2025")
+    assert r["market_cap"][i] == "300000000000"  # 30,000 đ × 10 million
+    assert r["net_debt"][i] == "400000000000"  # 300 + 200 − 40 − 60
+    assert r["ev"][i] == "710000000000"  # 300 + 400 + minority 10
+    assert r["pe"][i] == "1.83" and r["pb"][i] == "0.30"  # 300 / 164 ; 300 / (1000 − 10)
+    assert r["ev_ebitda"][i] == "2.30"  # 710 / (205 + 24 + 80)
+    assert r["fcff"][i] == "99200000000"  # 210 + 24 × (1 − 0.2) − 130, effective tax 41 / 205
+    assert r["fcff_yield"][i] == "0.1397"
+    assert r["roe"][i] == "0.1745"  # 164 / average(990, 890)
+    assert r["roe"][t["years"]["periods"].index("2024")] is None  # no year before 2024 to average with
+
+
+def test_fcff_needs_a_positive_profit_before_tax_and_valuation_needs_a_price():
+    years = {**YEARS, "2025": q(2000, -10, pbt=-12, tax=-2)}
+    t = statement_table({**RECORD, "years": years}, closes=[], shares=None, vnstock=None)
+    r = rows(t, "years")
+    i = t["years"]["periods"].index("2025")
+    assert r["fcff"][i] is None and r["pe"][i] is None and r["market_cap"][i] is None
+
+
+def test_the_summary_uses_the_last_four_quarters_and_today_s_close():
+    s = statement_table(RECORD, closes=CLOSES, shares=10_000_000, vnstock=None)["summary"]
+    assert s["period"] == "2025-Q4" and s["market_cap"] == "250000000000" and s["npat_ttm"] == "170000000000"  # 41 + 42 + 43 + 44 tỷ
+    assert s["pe"] == "1.47" and s["roe"] == "0.1717"  # 250 / 170 ; 170 / average(990, 990)
+
+
+def test_checks_flag_quarters_that_do_not_add_up_to_the_year_and_a_second_source_that_differs():
+    quarters = {**QUARTERS, "2025-Q4": q(240, 24, gross_profit=50)}  # 240 − 192 ≠ 50
+    t = statement_table({**RECORD, "quarters": quarters}, closes=CLOSES, shares=10_000_000,
+                        vnstock={"2025-Q3": {"npat": str(43 * B)}, "2025-Q2": {"npat": str(30 * B)}})
+    found = {(c["period"], c["check"]) for c in t["checks"]}
+    assert ("2025-Q4", "gross_profit") in found
+    assert ("2025", "revenue") in found  # 210 + 220 + 230 + 240 ≠ 2000
+    assert ("2025-Q2", "vnstock_npat") in found and ("2025-Q3", "vnstock_npat") not in found
+    assert t["conflicts"] == [{"period": "2012", "line": "depreciation", "values": ["1", "2"]}]

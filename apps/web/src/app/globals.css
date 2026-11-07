@@ -107,6 +107,13 @@ legend{font-weight:600;padding:0 6px}
 .mc-median{stroke:var(--muted);stroke-width:1;stroke-dasharray:4 4}.mc-sd{stroke:var(--muted);stroke-width:1;stroke-dasharray:2 5;opacity:.55}.mc-line{fill:none;stroke:var(--brand);stroke-width:2;stroke-linejoin:round}
 .mc-dot{fill:var(--brand);stroke:var(--paper);stroke-width:2}.mc-cross{stroke:var(--muted);stroke-width:1}
 .mc-tip{position:absolute;top:4px;transform:translateX(-50%);background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.pb-section{margin-top:18px;border-top:1px solid var(--line);padding-top:14px;min-width:0;white-space:normal}
+.pb-head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between}.pb-toggle{display:inline-flex;gap:6px}.pb-toggle .btn{padding:4px 12px}
+.pb-k1{fill:#2f8f5b}.pb-k2{fill:#7cc49a}.pb-k3{fill:#cfe9d9}.pb-k4{fill:#dfe4ea}.pb-k5{fill:#f0bcbc}
+.pb-now{stroke:var(--ink);stroke-width:2}.pb-now-label{fill:var(--ink);font-size:11px;font-weight:600}
+.pb-legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);margin:4px 0 8px}.pb-legend span{display:inline-flex;align-items:center;gap:5px}
+.pb-legend i{display:inline-block;width:12px;height:10px;border-radius:2px}.pb-legend i.pb-k1{background:#2f8f5b}.pb-legend i.pb-k2{background:#7cc49a}.pb-legend i.pb-k3{background:#cfe9d9}.pb-legend i.pb-k4{background:#dfe4ea}.pb-legend i.pb-k5{background:#f0bcbc}.pb-legend i.pb-now-key{width:2px;height:12px;background:var(--ink)}
+.pb-scroll{overflow-x:auto;max-width:100%}.pb-table{width:100%;font-size:12px}.pb-table td,.pb-table th{padding:5px 6px}.pb-table caption{text-align:left;padding:4px 0}
 .mc-table summary{cursor:pointer;color:var(--brand);font-size:13px}.mc-table table{width:100%;font-size:13px}.mc-table td,.mc-table th{padding:4px 6px}.mc-table>table{display:block;max-height:240px;overflow-y:auto}
 .ins-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px;margin-bottom:16px}
 .ins-card h2{margin-top:0}.ins-reasons,.ins-list{margin:6px 0;padding-left:18px}.ins-reasons li,.ins-list li{margin:6px 0;overflow-wrap:anywhere}

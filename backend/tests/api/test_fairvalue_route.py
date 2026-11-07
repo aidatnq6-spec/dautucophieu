@@ -245,4 +245,7 @@ def test_weekly_gives_pe_pb_by_week_for_a_watched_ticker_only(tmp_path):
     body = call(client, clock, "GET", "/internal/fairvalue/weekly/FPT").json()
     assert body["symbol"] == "FPT" and [p["date"] for p in body["pe"]["points"]] == ["2025-06-03", "2025-06-09", "2025-06-16"]
     assert body["pe"]["points"][-1]["value"] == "12.00" and body["pe"]["points"][-1]["basis"] == "năm" and "2025-Q1" in body["missing_quarters"]
+    bands = body["bands"]["pb"]
+    assert bands["current"] == "1.20" and [w["label"] for w in bands["windows"]] == ["3 năm", "5 năm", "Toàn bộ"]
+    assert bands["windows"][2]["reason"] == "Chỉ có 3 tuần có số, cần ít nhất 52" and body["bands"]["pe"]["date"] == "2025-06-16"
     assert call(client, clock, "GET", "/internal/fairvalue/weekly/ZZZ").status_code == 404

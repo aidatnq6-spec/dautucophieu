@@ -30,3 +30,8 @@ it("cross-checks are gathered into one line per period, newest first", () => {
     "2019 · Capex: tổng 4 quý ≠ cả năm (-21.622 so với -20.825 tỷ); Lưu chuyển tiền từ HĐKD: tổng 4 quý ≠ cả năm (8.354 so với 7.715 tỷ)",
   ]);
 });
+
+it("book value per share is shown in whole đồng", () => {
+  expect(cell("13940", "vnd", "bvps")).toBe("13.940 đ");
+  expect(cell(null, "vnd", "bvps")).toBe("—");
+});

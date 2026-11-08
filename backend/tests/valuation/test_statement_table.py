@@ -121,3 +121,47 @@ def test_a_quarter_without_four_quarters_behind_it_has_no_earnings_multiples():
     i = periods.index("2025-Q4")
     assert r["market_cap"][i] == "300000000000" and r["pb"][i] == "0.30"
     assert r["pe"][i] is None and r["ev_ebitda"][i] is None and r["roe"][i] is None and r["fcff_yield"][i] is None
+
+
+def fin(npat, **more):
+    """A bank or securities firm's period in tỷ đồng: equity with 10 tỷ of non-controlling interests, 10 million shares."""
+    base = {"npat_parent": npat, "equity": 1000, "minority_equity": 10, "charter_capital": 100, "ppop": 2 * npat, "operating_income": 3 * npat,
+            "operating_revenue": 4 * npat, "st_debt": 300, "lt_debt": 200}
+    base.update(more)
+    return {k: str(Decimal(str(v)) * B) for k, v in base.items()}
+
+
+FIN_RECORD = {"symbol": "BBB", "fetched_at": "2026-11-07T00:00:00+00:00", "source": "vndirect:finfo", "kind": "bank",
+              "quarters": {f"{y}-Q{k}": fin(20 * (y - 2023) + k) for y in (2024, 2025) for k in (1, 2, 3, 4)},
+              "years": {"2024": fin(84, equity=900), "2025": fin(164)}, "quarters_conflicts": [], "years_conflicts": [],
+              "year_end_close": {"2025": {"date": "2025-12-31", "close": "30"}}, "quarter_end_close": QUARTER_CLOSES}
+
+
+def test_a_bank_gets_only_its_scale_and_valuation_block_on_four_quarters_and_on_the_year():
+    t = statement_table(FIN_RECORD, closes=CLOSES, shares=10_000_000, vnstock=None, kind="bank")
+    assert [r["label"] for r in t["quarters"]["rows"]][0] == "Quy mô và định giá" and t["summary"] is None
+    assert [r["key"] for r in t["quarters"]["rows"][1:]] == ["market_cap", "parent_equity", "bvps", "pb", "pe", "roe", "p_ppop", "p_toi"]
+    r = rows(t, "quarters")
+    i = t["quarters"]["periods"].index("2025-Q4")
+    assert r["market_cap"][i] == "300000000000" and r["parent_equity"][i] == "990000000000"
+    assert r["bvps"][i] == "99000"  # 990 tỷ ÷ 10 million shares
+    assert r["pb"][i] == "0.30" and r["pe"][i] == "1.76" and r["roe"][i] == "0.1717"  # 300 / 990 ; 300 / 170 ; 170 / 990
+    assert r["p_ppop"][i] == "0.88" and r["p_toi"][i] == "0.59"  # 300 / 340 ; 300 / 510
+    y = rows(t, "years")
+    j = t["years"]["periods"].index("2025")
+    assert y["pe"][j] == "1.83" and y["p_ppop"][j] == "0.91" and y["roe"][j] == "0.1745"  # 300 / 164 ; 300 / 328 ; 164 / average(990, 890)
+    assert y["market_cap"][t["years"]["periods"].index("2024")] is None  # no close kept for 2024
+
+
+def test_a_securities_firm_gets_borrowings_to_equity_and_capitalisation_to_operating_revenue():
+    t = statement_table({**FIN_RECORD, "kind": "securities"}, closes=CLOSES, shares=10_000_000, vnstock=None, kind="securities")
+    assert [r["key"] for r in t["quarters"]["rows"][1:]] == ["market_cap", "parent_equity", "bvps", "pb", "pe", "roe", "debt_to_equity", "p_revenue"]
+    r = rows(t, "quarters")
+    i = t["quarters"]["periods"].index("2025-Q4")
+    assert r["debt_to_equity"][i] == "0.50" and r["p_revenue"][i] == "0.44"  # (300 + 200) / 1000 ; 300 / 680
+
+
+def test_a_bank_s_checks_compare_four_quarters_with_the_year_and_with_vnstock():
+    years = {**FIN_RECORD["years"], "2025": fin(164, npat_parent=200)}  # 41 + 42 + 43 + 44 = 170, not 200
+    t = statement_table({**FIN_RECORD, "years": years}, closes=CLOSES, shares=None, vnstock={"2025-Q2": {"npat": str(30 * B)}}, kind="bank")
+    assert {(c["period"], c["check"]) for c in t["checks"]} >= {("2025", "npat_parent"), ("2025-Q2", "vnstock_npat")}

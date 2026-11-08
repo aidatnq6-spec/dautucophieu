@@ -7,7 +7,8 @@ of banks, securities firms and insurers already come from the same API.
 
 Only the lines the table needs are kept, as decimal strings in đồng with VNDirect's signs (costs positive, cash paid out
 negative). A line given twice with different values is a conflict: no value is kept and both are listed, never one chosen.
-Financial companies (banks, securities firms, insurers) use other layouts and are skipped. The first sync of a ticker takes the
+Banks and securities firms use their own layouts (LAYOUTS) and are kept apart, under data/statements-financial, with only the
+lines of their scale and valuation block; insurers are skipped. The first sync of a ticker takes the
 whole history; later ones take the last two years and replace those periods, keeping the older ones. A third call keeps each
 year's last unadjusted close (VNDirect prices, from 2013) for the market capitalisation of that year. One JSON file per ticker
 under data/statements.
@@ -25,8 +26,9 @@ from typing import Callable
 from .financial_ratios import kind_of
 from .leading import _get_with_retry
 
-URL = ("https://api-finfo.vndirect.com.vn/v4/financial_statements?q=code:{symbol}~reportType:{kind}~modelType:1,2,3"
-       "~fiscalDate:gte:{start}&size=20000")
+URL = ("https://api-finfo.vndirect.com.vn/v4/financial_statements?q=code:{symbol}~reportType:{kind}~modelType:{models}"
+       "~fiscalDate:gte:{start}&size={page}")
+PAGE = 60000  # rows per call: a securities firm's whole quarterly history is about 27,000; a full page may be cut and is refused
 # Unadjusted daily closes (thousand đồng; from 2013), for each year's market capitalisation at that year's own price and share count.
 PRICE_URL = "https://api-finfo.vndirect.com.vn/v4/stock_prices?sort=date&q=code:{symbol}~date:gte:{start}&size=9999&fields=code,date,close"
 FIRST_START, REFRESH_DAYS, MAX_AGE_DAYS, PACE_SECONDS = "2010-01-01", 730, 7, 1.0
@@ -40,6 +42,16 @@ LINES = {
     (1, 13340): "lt_debt", (1, 14000): "equity", (1, 14240): "minority_equity", (1, 15000): "minority_equity_outside", (1, 14110): "charter_capital",
     (3, 22230): "depreciation", (3, 32000): "cfo", (3, 32100): "capex", (3, 33000): "cfi", (3, 34000): "cff", (3, 33600): "dividends_paid",
 }
+# Banks (TT49 layout: models 101 balance sheet, 102 income statement) and securities firms (TT334: 89, 90): only what their scale
+# and valuation block needs. Equity includes non-controlling interests in both, as in the general layout.
+_FIN_COMMON = {"charter_capital": 14110, "equity": 14000, "minority_equity": 14240, "minority_equity_outside": 15000, "total_assets": 12700}
+LAYOUTS = {
+    None: {"models": "1,2,3", "lines": LINES},
+    "bank": {"models": "101,102,103", "lines": {**{(101, c): k for k, c in _FIN_COMMON.items()}, (102, 421701): "operating_income",
+                                                 (102, 88888): "ppop", (102, 23800): "pbt", (102, 23003): "npat", (102, 23000): "npat_parent"}},
+    "securities": {"models": "89,90,91", "lines": {**{(89, c): k for k, c in _FIN_COMMON.items()}, (89, 13110): "st_debt", (89, 13340): "lt_debt",
+                                                   (90, 21000): "operating_revenue", (90, 23800): "pbt", (90, 23003): "npat", (90, 23000): "npat_parent"}},
+}
 _SYMBOL = re.compile(r"^[A-Z0-9]{1,10}$")
 
 
@@ -52,14 +64,18 @@ def _period(fiscal: str, kind: str) -> str:
     return str(year) if kind == "ANNUAL" else f"{year}-Q{(month + 2) // 3}"
 
 
-def parse_statements(text: str, *, symbol: str, kind: str) -> dict:
+def parse_statements(text: str, *, symbol: str, kind: str, lines: dict | None = None) -> dict:
+    lines = LINES if lines is None else lines
+    data = json.loads(text).get("data") or []
+    if len(data) >= PAGE:
+        raise ValueError("page full: the answer may be cut")
     seen: dict[tuple[str, str], set[Decimal]] = {}
     created: dict[str, str] = {}
-    for r in json.loads(text).get("data") or []:
+    for r in data:
         try:
             if r.get("code") != symbol or r.get("reportType") != kind:
                 continue
-            line = LINES.get((int(r["modelType"]), int(r["itemCode"])))
+            line = lines.get((int(r["modelType"]), int(r["itemCode"])))
             value = Decimal(str(r["numericValue"]))
             period = _period(str(r["fiscalDate"]), kind)
         except (InvalidOperation, KeyError, TypeError, ValueError):
@@ -139,10 +155,11 @@ def _merge(old: dict | None, key: str, new: dict) -> tuple[dict, dict, list]:
 
 
 def sync_statements(store: StatementStore, sectors: dict[str, str | None], *, get: Callable[[str], str], now: datetime, limit: int | None,
-                    max_age_days: int = MAX_AGE_DAYS, sleep: Callable[[float], None] = time.sleep) -> dict[str, str]:
-    """Refresh the stalest watched non-financial tickers (never fetched first); one failing is reported and the others still update."""
+                    max_age_days: int = MAX_AGE_DAYS, sleep: Callable[[float], None] = time.sleep, kinds: tuple = (None,)) -> dict[str, str]:
+    """Refresh the stalest watched tickers of `kinds` (None: non-financial; "bank", "securities"), never fetched first; one failing is
+    reported and the others still update."""
     ages = []
-    for symbol in sorted(s for s, sector in sectors.items() if kind_of(sector) is None):
+    for symbol in sorted(s for s, sector in sectors.items() if kind_of(sector) in kinds):
         rec = store.read(symbol)
         fetched = datetime.fromisoformat(rec["fetched_at"]) if rec else None
         if fetched is None or (now - fetched).days >= max_age_days or "quarter_end_close" not in rec:  # synced before quarter closes were kept
@@ -155,7 +172,9 @@ def sync_statements(store: StatementStore, sectors: dict[str, str | None], *, ge
         old = store.read(symbol)
         start = FIRST_START if old is None else (now.date() - timedelta(days=REFRESH_DAYS)).isoformat()
         try:
-            parsed = {kind: parse_statements(_get_with_retry(get, URL.format(symbol=symbol, kind=kind, start=start), sleep), symbol=symbol, kind=kind)
+            layout = LAYOUTS[kind_of(sectors[symbol])]
+            parsed = {kind: parse_statements(_get_with_retry(get, URL.format(symbol=symbol, kind=kind, start=start, models=layout["models"], page=PAGE),
+                                                             sleep), symbol=symbol, kind=kind, lines=layout["lines"])
                       for kind in ("QUARTER", "ANNUAL")}
             if not parsed["QUARTER"]["periods"] and not parsed["ANNUAL"]["periods"] and old is None:
                 results[symbol] = "error:no_observations"
@@ -163,7 +182,8 @@ def sync_statements(store: StatementStore, sectors: dict[str, str | None], *, ge
             kept = old and old.get("year_end_close") and "quarter_end_close" in old
             price_start = start if kept else FIRST_START  # synced before the closes were kept: all of them
             prices = _get_with_retry(get, PRICE_URL.format(symbol=symbol, start=price_start), sleep)
-            record = {"symbol": symbol, "fetched_at": now.isoformat(), "source": "vndirect:finfo"}
+            record = {"symbol": symbol, "fetched_at": now.isoformat(), "source": "vndirect:finfo",
+                      **({"kind": kind_of(sectors[symbol])} if kind_of(sectors[symbol]) else {})}
             for key, parse in (("year_end_close", parse_year_end_closes), ("quarter_end_close", parse_quarter_end_closes)):
                 record[key] = dict(sorted({**(old or {}).get(key, {}), **parse(prices, symbol=symbol)}.items()))
             for kind, key in (("QUARTER", "quarters"), ("ANNUAL", "years")):

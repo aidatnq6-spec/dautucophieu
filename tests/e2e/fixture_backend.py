@@ -73,7 +73,7 @@ if __name__ == "__main__":
                                                               "2025": (110, 25, 9, 105, 60, 38, 25, 12, 12)}.items()},
         "share_issues": [{"date": "2025-06-01", "kind": "bonus"}],
         "latest_quarter_seen": {"quarter": "2026-Q2", "on": date.today().isoformat()}})
-    # Bang so tai chinh: VNDirect-style statements for FPT (tỷ đồng × 1e9; costs positive, capex negative); VCB is a bank and has none.
+    # Bang so tai chinh: VNDirect-style statements for FPT (tỷ đồng × 1e9; costs positive, capex negative).
     from investment_agent.market.statements import StatementStore
     def fs(rev, npat, **more):
         base = {"revenue": rev, "cogs": rev * 0.6, "gross_profit": rev * 0.4, "selling": rev * 0.1, "admin": rev * 0.05, "fin_income": 5,
@@ -90,6 +90,13 @@ if __name__ == "__main__":
         "years_created": {}, "year_end_close": {"2024": {"date": "2024-12-31", "close": "11"}, "2025": {"date": "2025-12-31", "close": "12"}},
         "quarters_conflicts": [], "years_conflicts": []})
     SeriesStore(os.path.join(data, "trend-sources")).upsert("FPT-1d", [(datetime(y, 12, 31), "12") for y in range(2020, 2026)])
+    # Quy mo va dinh gia of a bank: VCB's own layout, apart from the general statements; 1 tỷ parent profit a quarter, 100 tỷ equity.
+    StatementStore(os.path.join(data, "statements-financial")).save({
+        "symbol": "VCB", "kind": "bank", "fetched_at": "2026-11-07T00:00:00+00:00", "source": "vndirect:finfo",
+        "quarters": {f"{y}-Q{k}": {"npat_parent": str(10**9), "equity": str(100 * 10**9), "charter_capital": str(10 * 10**9),
+                                   "ppop": str(2 * 10**9), "operating_income": str(3 * 10**9)} for y in (2025, 2026) for k in (1, 2, 3, 4)},
+        "years": {}, "quarters_conflicts": [], "years_conflicts": [], "year_end_close": {},
+        "quarter_end_close": {"2026-Q3": {"date": "2026-09-30", "close": "60"}}})
     # Month-end closes that move around (P/E chart); the 31 December closes above stay 12 for the valuation tests.
     SeriesStore(os.path.join(data, "trend-sources")).upsert("FPT-1d", [(datetime(y, m, 28), str(12 + ((y * 12 + m) % 9) - 4))
                                                                        for y in range(2020, 2026) for m in range(1, 12)])

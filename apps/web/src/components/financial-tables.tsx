@@ -5,13 +5,13 @@ import { ApiError, api } from "../lib/api";
 import { type Forecast, ForecastForm } from "./quarter-forecast";
 import { Spark, StatementChart, seriesName, toggleRow } from "./statement-chart";
 
-type Row = { key: string | null; label: string; kind: "group" | "money" | "pct" | "x"; indent: number; values: (string | null)[] };
+type Row = { key: string | null; label: string; kind: "group" | "money" | "pct" | "x" | "vnd"; indent: number; values: (string | null)[] };
 type Part = { periods: string[]; rows: Row[] };
 type Check = { period: string; check: string; label: string; a: string | null; b: string | null };
 type Conflict = { period: string; line: string; values: string[] };
 type Summary = { period: string; close_date: string | null; market_cap: string | null; npat_ttm: string | null; ebitda_ttm: string | null;
   ev: string | null; pe: string | null; pb: string | null; ev_ebitda: string | null; roe: string | null; quarters: string[] };
-type Tables = { symbol: string; reason: string | null; source?: string; fetched_at?: string; quarters: Part; years: Part; summary: Summary | null;
+type Tables = { symbol: string; kind?: "bank" | "securities" | "insurance" | null; reason: string | null; source?: string; fetched_at?: string; quarters: Part; years: Part; summary: Summary | null;
   checks: Check[]; conflicts: Conflict[] };
 
 const SIGNED = new Set(["revenue_yoy", "gross_profit_yoy", "npat_parent_yoy", "ebitda_yoy", "fcff_yield"]);
@@ -21,6 +21,7 @@ export function cell(v: string | null, kind: Row["kind"], key: string | null): s
   if (v === null) return "—";
   const n = Number(v);
   if (kind === "money") return (Math.round(n / 1e9) || 0).toLocaleString("vi-VN");  // || 0: a small loss rounds to 0, not -0
+  if (kind === "vnd") return `${Math.round(n).toLocaleString("vi-VN")} đ`;
   if (kind === "x") return `${n.toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x`;
   const pct = (n * 100).toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   return `${key && SIGNED.has(key) && n > 0 ? "+" : ""}${pct}%`;
@@ -74,20 +75,33 @@ function Table({ part, cols, caption, extra = null, picked, onPick }: { part: Pa
   );
 }
 
-export function FinancialTables({ symbol }: { symbol: string }) {
+const FINANCIAL = new Set(["bank", "securities"]);
+
+/** Bảng số tài chính of a non-financial company; with `financial`, the Quy mô và định giá block of a bank or securities firm, in its
+ * own section (nothing for any other ticker). */
+export function FinancialTables({ symbol, financial = false }: { symbol: string; financial?: boolean }) {
   const [data, setData] = useState<Tables | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"quarters" | "years">("quarters");
   const [count, setCount] = useState<(typeof COUNTS)[number]>(8);
   const [forecast, setForecast] = useState<Forecast | null>(null);
-  const [picked, setPicked] = useState<string[]>(["revenue", "gross_margin"]);
+  const [picked, setPicked] = useState<string[]>(financial ? ["pb", "roe"] : ["revenue", "gross_margin"]);
   useEffect(() => {
     api<Tables>(`fairvalue/statements/${encodeURIComponent(symbol)}`).then(setData, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải."));
-    api<Forecast>(`quarter-forecast/${encodeURIComponent(symbol)}`).then(setForecast, () => setForecast(null));
-  }, [symbol]);
+    if (!financial) api<Forecast>(`quarter-forecast/${encodeURIComponent(symbol)}`).then(setForecast, () => setForecast(null));
+  }, [symbol, financial]);
+  if (financial) {
+    if (!data || !FINANCIAL.has(data.kind ?? "")) return null;
+    return <section className="surface" aria-label="Quy mô và định giá"><h2>Quy mô và định giá</h2>{body(data)}</section>;
+  }
   if (error) return <p className="errors" role="alert">{error}</p>;
   if (!data) return <p className="muted fx-loading" role="status">Đang tải bảng số…</p>;
+  if (FINANCIAL.has(data.kind ?? "")) return <p className="muted">Ngân hàng và công ty chứng khoán không dùng bảng này: xem khối Quy mô và định giá bên dưới, sau Chỉ số ngành theo quý.</p>;
   if (data.reason) return <p className="muted">Chưa có bảng số tài chính: {data.reason}.</p>;
+  return body(data);
+
+  function body(data: Tables) {
+  if (financial && data.reason) return <p className="muted">Chưa có số: {data.reason}.</p>;
   const part = data[view];
   const cols = view === "quarters" ? lastN(part.periods, count) : lastN(part.periods, 0);
   const s = data.summary;
@@ -116,7 +130,7 @@ export function FinancialTables({ symbol }: { symbol: string }) {
           <Table part={part} cols={cols} caption={`${view === "quarters" ? `${cols.length} quý, cũ bên trái` : `${cols.length} năm`} · bấm tên dòng để vẽ (tối đa 2 dòng)`}
             extra={extra} picked={picked} onPick={(key) => setPicked((p) => toggleRow(p, key))} />
         </>}
-      {view === "quarters" && forecast && <ForecastForm key={`${forecast.quarter}-${forecast.version}`} symbol={symbol} data={forecast} onSaved={setForecast} />}
+      {!financial && view === "quarters" && forecast && <ForecastForm key={`${forecast.quarter}-${forecast.version}`} symbol={symbol} data={forecast} onSaved={setForecast} />}
       {(data.checks.length > 0 || data.conflicts.length > 0) && <details className="mc-table">
         <summary>Kiểm tra chéo: {data.checks.length} chỗ lệch hơn 0,5% ở {new Set(data.checks.map((c) => c.period)).size} kỳ{data.conflicts.length ? `, ${data.conflicts.length} dòng nguồn ghi hai số` : ""}</summary>
         <ul className="ft-checks">
@@ -124,7 +138,14 @@ export function FinancialTables({ symbol }: { symbol: string }) {
           {data.conflicts.map((c) => <li key={`${c.period}-${c.line}`}>{periodLabel(c.period)} · dòng {c.line}: nguồn ghi {c.values.map(ty).join(" và ")}, không lấy số nào</li>)}
         </ul>
       </details>}
-      <p className="caption wrap">
+      {financial ? <p className="caption wrap">
+        Nguồn: báo cáo tài chính trên API công khai của VNDirect{data.fetched_at ? `, đọc ${new Date(data.fetched_at).toLocaleDateString("vi-VN")}` : ""}. Vốn hoá = giá đóng
+        cửa thực (chưa điều chỉnh) phiên cuối kỳ × số cổ phiếu cuối kỳ (vốn góp ÷ 10.000 đ); giá thực có từ 2013. Vốn chủ công ty mẹ = vốn chủ sở hữu − lợi
+        ích cổ đông không kiểm soát; giá trị sổ sách / cổ phiếu = vốn chủ công ty mẹ ÷ số cổ phiếu. Quý: P/E, ROE và các bội số theo lợi nhuận, thu nhập tính
+        trên 4 quý tới quý đó (thiếu một quý thì để trống); năm: số cả năm. ROE = LNST công ty mẹ ÷ vốn chủ công ty mẹ bình quân kỳ đó và cùng kỳ năm
+        trước, nên có thể lệch ROAE của VNDirect ở bảng chỉ số. {data.kind === "bank" ? "LN trước dự phòng = lợi nhuận thuần từ hoạt động kinh doanh trước chi phí dự phòng rủi ro tín dụng." : "Vay = vay và nợ ngắn hạn + dài hạn, trên vốn chủ sở hữu (cả phần không kiểm soát)."} Không
+        tính nợ ròng, EV, EBITDA, FCFF: với ngân hàng và công ty chứng khoán, đi vay là hoạt động kinh doanh. Thiếu một thành phần thì để trống, không ước lượng.
+      </p> : <p className="caption wrap">
         Nguồn: báo cáo tài chính trên API công khai của VNDirect{data.fetched_at ? `, đọc ${new Date(data.fetched_at).toLocaleDateString("vi-VN")}` : ""}; số từng quý (không lũy kế),
         chi phí ghi số âm. LN HĐKD lõi = lãi gộp − chi phí bán hàng − quản lý. EBIT = LNTT + lãi vay; EBITDA = EBIT + khấu hao. FCFF = lưu chuyển tiền
         HĐKD + lãi vay × (1 − thuế ÷ LNTT) + capex; không tính khi LNTT ≤ 0. Vốn hoá năm = giá đóng cửa thực (chưa điều chỉnh) phiên cuối năm × số cổ
@@ -133,7 +154,8 @@ export function FinancialTables({ symbol }: { symbol: string }) {
         ngắn + dài hạn − tiền − đầu tư tài chính ngắn hạn; EV = vốn hoá + nợ ròng + lợi ích cổ đông không kiểm soát; P/B trên vốn chủ của công ty mẹ;
         ROE = LNST công ty mẹ ÷ vốn chủ bình quân đầu và cuối kỳ. Thiếu một thành phần thì để trống, không ước lượng. Kiểm tra chéo: lãi gộp với doanh thu
         − giá vốn, tổng 4 quý với cả năm, LNST với nguồn Vnstock; dòng tiền quý những năm cũ thường lệch số cả năm đã kiểm toán.
-      </p>
+      </p>}
     </div>
   );
+  }
 }

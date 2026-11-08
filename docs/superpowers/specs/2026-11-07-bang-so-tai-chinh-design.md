@@ -28,6 +28,11 @@ năm ĐHCĐ, dự phóng quý tới, số liệu vận hành nhập tay (và đ�
   ngắn hạn; **nợ ròng** = nợ vay − tiền − đầu tư tài chính ngắn hạn; **EV** = vốn hoá + nợ ròng + lợi ích cổ đông không kiểm soát; P/E (LNST
   công ty mẹ), P/B (vốn chủ công ty mẹ), EV/EBITDA, EV/doanh thu, lợi suất FCFF = FCFF ÷ EV, ROE = LNST công ty mẹ ÷ vốn chủ công ty mẹ bình
   quân năm đó và năm trước.
+- Quý thêm cùng khối **Quy mô và định giá** (08/11/2026, chủ sở hữu yêu cầu): vốn hoá = giá đóng cửa thực phiên cuối quý × số cổ phiếu cuối
+  quý (vốn góp quý ÷ 10.000 đ); nợ vay, tiền, nợ ròng, EV theo bảng cân đối cuối quý; P/E, EV/EBITDA, EV/doanh thu, lợi suất FCFF trên tổng 4
+  quý tới quý đó; P/B trên vốn chủ công ty mẹ cuối quý; ROE = LNST 4 quý ÷ vốn chủ công ty mẹ bình quân quý đó và cùng quý năm trước. Thiếu
+  một trong 4 quý thì để trống các bội số theo lợi nhuận. Đồng bộ giữ thêm giá phiên cuối mỗi quý (`quarter_end_close`), cùng lượt gọi giá;
+  mã đồng bộ trước khi có giá cuối quý được làm lại ngay lượt sau, lấy giá từ 2010.
 - Tóm tắt 4 quý gần nhất liền nhau với giá đóng cửa gần nhất: LNST, EBITDA, ROE, P/E, P/B, EV/EBITDA.
 - Thiếu một thành phần thì để trống, không ước lượng. Đối chiếu HPG với ảnh: Q3/26 khớp từng số; 2025 nợ ròng 64.389 và FCFF −5.704 khớp,
   EV/EBITDA 9,1x khớp; vốn hoá 2018 = 30,95 nghìn đ × 2.123,9 triệu cổ phiếu = 65.735 tỷ, khớp ảnh.

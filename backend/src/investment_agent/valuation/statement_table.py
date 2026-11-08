@@ -11,6 +11,9 @@ Derived lines (đồng; costs shown negative):
   capitalisation + net debt + non-controlling interests; P/E on parent profit, P/B on parent equity (equity − non-controlling
   interests), EV/EBITDA, EV/revenue, FCFF yield = FCFF ÷ EV, ROE = parent profit ÷ average parent equity of the year and the one
   before.
+- Quarters: the same block at the quarter's last unadjusted close × that quarter-end's shares and balance sheet; P/E, EV/EBITDA,
+  EV/revenue, FCFF yield and ROE on the four quarters to it (ROE over the average parent equity of the quarter and the same quarter a
+  year before); none when one of the four quarters is missing.
 - Summary: the last four quarters and today's close.
 Checks (more than 0.5 % apart): gross profit against revenue − cost of sales; four quarters against the year for revenue, parent
 profit, depreciation, capital spending and operating cash flow; parent profit against the free Vnstock statements.
@@ -122,23 +125,46 @@ def _part(periods: dict, keys: list[str], extra: dict[str, dict] | None = None, 
     return {"periods": keys, "rows": rows}
 
 
+def _block(f: dict, close: Decimal | None, flows: dict[str, Decimal | None], parent_before: Decimal | None) -> dict:
+    """Scale and valuation at a period's end: its close × its shares, its balance sheet, and the profit and cash of `flows`."""
+    d = _derived(f)
+    capital = _d(f.get("charter_capital"))
+    cap = close * 1000 * (capital / PAR) if close is not None and capital is not None and capital > 0 else None
+    debt = _sum(d.get("st_debt"), d.get("lt_debt"))
+    cash_like = _sum(d.get("cash"), d.get("st_investments"))
+    net = None if debt is None or cash_like is None else debt - cash_like
+    ev = None if cap is None or net is None else cap + net + _minority(f)
+    parent, npat = _parent_equity(f), flows.get("npat_parent")
+    return {"market_cap": cap, "debt": debt, "cash_like": cash_like, "net_debt": net, "ev": ev,
+            "pe": _ratio(cap, npat, _Q2, positive=True), "pb": _ratio(cap, parent, _Q2, positive=True),
+            "ev_ebitda": _ratio(ev, flows.get("ebitda"), _Q2, positive=True), "ev_revenue": _ratio(ev, flows.get("revenue"), _Q2, positive=True),
+            "fcff_yield": _ratio(flows.get("fcff"), ev) if ev and ev > 0 and flows.get("fcff") is not None else None,
+            "roe": _ratio(npat, (parent + parent_before) / 2)
+            if npat is not None and parent is not None and parent_before is not None and parent + parent_before > 0 else None}
+
+
+FLOWS = ("npat_parent", "ebitda", "revenue", "fcff")
+
+
 def _valuation(years: dict, year_end_close: dict) -> dict[str, dict]:
     out = {}
     for y, f in years.items():
         d = _derived(f)
-        close = _d((year_end_close.get(y) or {}).get("close"))
-        capital = _d(f.get("charter_capital"))
-        cap = close * 1000 * (capital / PAR) if close is not None and capital is not None and capital > 0 else None
-        debt = _sum(d.get("st_debt"), d.get("lt_debt"))
-        cash_like = _sum(d.get("cash"), d.get("st_investments"))
-        net = None if debt is None or cash_like is None else debt - cash_like
-        ev = None if cap is None or net is None else cap + net + _minority(f)
-        parent, before = _parent_equity(f), _parent_equity(years.get(str(int(y) - 1), {}))
-        out[y] = {"market_cap": cap, "debt": debt, "cash_like": cash_like, "net_debt": net, "ev": ev,
-                  "pe": _ratio(cap, d.get("npat_parent"), _Q2, positive=True), "pb": _ratio(cap, parent, _Q2, positive=True),
-                  "ev_ebitda": _ratio(ev, d.get("ebitda"), _Q2, positive=True), "ev_revenue": _ratio(ev, d.get("revenue"), _Q2, positive=True),
-                  "fcff_yield": _ratio(d.get("fcff"), ev) if ev and ev > 0 else None,
-                  "roe": _ratio(d.get("npat_parent"), (parent + before) / 2) if parent is not None and before is not None and parent + before > 0 else None}
+        out[y] = _block(f, _d((year_end_close.get(y) or {}).get("close")), {k: d.get(k) for k in FLOWS},
+                        _parent_equity(years.get(str(int(y) - 1), {})))
+    return out
+
+
+def _quarter_valuation(quarters: dict, quarter_end_close: dict) -> dict[str, dict]:
+    """Each quarter at its last session's close, its multiples and ROE on the four quarters to it (none when one is missing)."""
+    out = {}
+    for p, f in quarters.items():
+        window = [p]
+        while len(window) < 4:
+            window.append(_previous_quarter(window[-1]))
+        figures = [_derived(quarters[w]) if w in quarters else {} for w in window]
+        flows = {k: _sum(*(x.get(k) for x in figures)) for k in FLOWS}
+        out[p] = _block(f, _d((quarter_end_close.get(p) or {}).get("close")), flows, _parent_equity(quarters.get(_prior(p), {})))
     return out
 
 
@@ -197,12 +223,12 @@ def _checks(quarters: dict, years: dict, vnstock: dict | None) -> list[dict]:
 
 def statement_table(record: dict, *, closes, shares: int | None, vnstock: dict | None) -> dict:
     quarters, years = record.get("quarters", {}), record.get("years", {})
-    valuation = _valuation(years, record.get("year_end_close", {}))
-    year_part = _part(years, sorted(years), extra=valuation, spec=P_AND_L + SCALE)
-    for row in year_part["rows"]:  # money lines of the valuation block arrive as Decimals
+    year_part = _part(years, sorted(years), extra=_valuation(years, record.get("year_end_close", {})), spec=P_AND_L + SCALE)
+    quarter_part = _part(quarters, sorted(quarters), extra=_quarter_valuation(quarters, record.get("quarter_end_close", {})), spec=P_AND_L + SCALE)
+    for row in year_part["rows"] + quarter_part["rows"]:  # money lines of the valuation block arrive as Decimals
         if row["kind"] == "money":
             row["values"] = [_money(v) if isinstance(v, Decimal) else v for v in row["values"]]
     return {"symbol": record.get("symbol"), "source": record.get("source"), "fetched_at": record.get("fetched_at"),
-            "quarters": _part(quarters, sorted(quarters)), "years": year_part, "summary": _summary(quarters, closes, shares),
+            "quarters": quarter_part, "years": year_part, "summary": _summary(quarters, closes, shares),
             "checks": _checks(quarters, years, vnstock),
             "conflicts": record.get("quarters_conflicts", []) + record.get("years_conflicts", [])}

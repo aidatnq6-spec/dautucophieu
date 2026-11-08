@@ -139,6 +139,7 @@ test("Bảng số tài chính gives quarters and years with EBITDA, valuation an
   await expect(table).toContainText("Doanh thu thuần");
   await expect(table).toContainText("EBITDA");
   await expect(table).toContainText("Q4/25");
+  await expect(table).toContainText("Quy mô và định giá");  // the valuation block shows by quarter too
   await expect(box.getByRole("button", { name: "8 quý" })).toHaveAttribute("aria-pressed", "true");
   await box.getByRole("radio", { name: "Năm" }).click();
   await expect(box.getByRole("table")).toContainText("EV/EBITDA");

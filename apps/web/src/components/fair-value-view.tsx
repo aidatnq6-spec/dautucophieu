@@ -116,7 +116,12 @@ export function FairValueView() {
           <option value="">Tất cả ngành</option>{sectors.map((s) => <option key={s} value={s}>{s}</option>)}</select></label>
         <p className="caption" role="status">Đang hiện {rows.length}/{board.rows.length} mã
           {(query || sector || filter !== "all") && <> · <button type="button" className="link-btn"
-            onClick={() => { setQuery(""); setSector(""); setFilter("all"); }}>Bỏ lọc</button></>}</p>
+            onClick={() => { setQuery(""); setSector(""); setFilter("all"); }}>Bỏ lọc</button></>}
+          {sector && (() => {
+            // The sector's comparison lives on each ticker's page; open it on the first ticker of the sector.
+            const first = board.rows.filter((r) => r.sector === sector).map((r) => r.symbol).sort()[0];
+            return first ? <> · <Link href={`/research/${first}#so-sanh-cung-nganh`}>So sánh ngành này</Link></> : null;
+          })()}</p>
       </div>
       {rows.length === 0 && <p className="muted">Không có mã nào khớp bộ lọc.</p>}
       <table className="fv-table" aria-label="Định giá tham khảo">

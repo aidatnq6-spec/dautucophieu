@@ -107,6 +107,8 @@ def test_quarters_carry_the_valuation_block_on_the_quarter_end_close_and_the_fou
     assert r["ev_ebitda"][i] == "2.24"  # 710 / four quarters of (pbt + 6 + 20): 212.5 + 104
     assert r["ev_revenue"][i] == "0.79"  # 710 / (210 + 220 + 230 + 240)
     assert r["roe"][i] == "0.1717"  # 170 / average(990, 990)
+    assert r["debt_to_equity"][i] == "0.50"  # borrowings (300 + 200) / equity with minority (1000), as for a securities firm
+    assert r["debt_to_equity"][t["quarters"]["periods"].index("2025-Q2")] == "0.50"  # the balance sheet alone: no price needed
     assert r["fcff_yield"][i] is not None
     assert r["market_cap"][t["quarters"]["periods"].index("2025-Q2")] is None  # no close kept for that quarter
     assert r["pe"][t["quarters"]["periods"].index("2024-Q4")] is not None and r["roe"][t["quarters"]["periods"].index("2024-Q4")] is None

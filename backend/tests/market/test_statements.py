@@ -48,8 +48,10 @@ class Get:
             return json.dumps({"data": [{"code": sym, "date": "2025-12-31", "close": 26.4}, {"code": sym, "date": "2025-12-30", "close": 26.5}]})
         kind = "ANNUAL" if "ANNUAL" in url else "QUARTER"
         fiscal = "2025-12-31"
-        if "modelType:101" in url or "modelType:89" in url:  # bank, securities: parent profit in their income statement model
-            return text(row(23000, 1e11, fiscal, model=102 if "modelType:101" in url else 90, code=sym, kind=kind))
+        models = {"modelType:101": 102, "modelType:89": 90, "modelType:411": 412}  # bank, securities, insurer: their income statement model
+        for key, model in models.items():
+            if key in url:
+                return text(row(23000, 1e11, fiscal, model=model, code=sym, kind=kind))
         return text(row(21001, 1e12 if kind == "QUARTER" else 4e12, fiscal, code=sym, kind=kind))
 
 
@@ -185,3 +187,20 @@ def test_cli_statements_sync_keeps_banks_and_securities_apart(tmp_path, capsys):
     assert json.loads(capsys.readouterr().out)["results"] == {"HPG": "ok", "MBB": "ok"}
     assert StatementStore(tmp_path / "statements").read("MBB") is None
     assert StatementStore(tmp_path / "statements-financial").read("MBB")["kind"] == "bank"
+
+
+def test_an_insurer_keeps_its_own_lines_with_both_associates_lines_apart():
+    from investment_agent.market.statements import LAYOUTS
+    page = text(row(21440, 9.59e12, "2026-09-30", model=412, code="BVH"), row(23110, -2.541e12, "2026-09-30", model=412, code="BVH"),
+                row(22175, 3.515e12, "2026-09-30", model=412, code="BVH"), row(23200, 3.5e10, "2026-09-30", model=412, code="BVH"),
+                row(23300, 0, "2026-09-30", model=412, code="BVH"), row(12500, 1.76e14, "2026-09-30", model=411, code="BVH"))
+    assert parse_statements(page, symbol="BVH", kind="QUARTER", lines=LAYOUTS["insurance"]["lines"])["periods"] == {"2026-Q3": {
+        "net_premium": "9590000000000", "ins_result": "-2541000000000", "fin_profit": "3515000000000", "associates_before": "35000000000",
+        "associates": "0", "lt_investments": "176000000000000"}}
+
+
+def test_sync_of_insurers_asks_for_their_models(tmp_path):
+    get = Get()
+    out = sync_statements(StatementStore(tmp_path), {"BVH": "Bảo hiểm", "MBB": "Ngân hàng"}, get=get, now=NOW, limit=None, sleep=lambda s: None,
+                          kinds=("insurance",))
+    assert out == {"BVH": "ok"} and all("modelType:411,412,413" in u for u in get.urls if "financial_statements" in u)

@@ -16,7 +16,10 @@ Derived lines (đồng; costs shown negative):
   year before); none when one of the four quarters is missing.
 - Banks and securities firms (kind): only a scale and valuation block, by quarter (four quarters to it) and by year: market cap,
   parent equity, book value per share, P/B, P/E, ROE; banks add capitalisation ÷ profit before provisions and ÷ total operating
-  income, securities firms borrowings ÷ equity and capitalisation ÷ operating revenue. No net debt, EV, EBITDA or FCFF.
+  income, securities firms borrowings ÷ equity and capitalisation ÷ operating revenue, insurers capitalisation ÷ net premium,
+  investments (cash, short and long-term financial investments) ÷ equity, and the insurance and investment results (four quarters
+  in the quarterly view); the insurance result only where the parts add up to profit before tax, listed as a check where they do
+  not. No net debt, EV, EBITDA or FCFF.
 - Summary: the last four quarters and today's close.
 Checks (more than 0.5 % apart): gross profit against revenue − cost of sales; four quarters against the year for revenue, parent
 profit, depreciation, capital spending and operating cash flow; parent profit against the free Vnstock statements.
@@ -53,10 +56,16 @@ _FIN_HEAD = [("g", "Quy mô và định giá"), ("market_cap", "Vốn hoá", "mo
              ("bvps", "Giá trị sổ sách / cổ phiếu", "vnd", 0), ("pb", "P/B", "x", 0), ("pe", "P/E", "x", 0), ("roe", "ROE", "pct", 0)]
 # Banks and securities firms: borrowing is their trade, so net debt, EV, EBITDA and FCFF say nothing; their block stands alone.
 FIN_SCALE = {"bank": _FIN_HEAD + [("p_ppop", "Vốn hoá / LN trước dự phòng", "x", 0), ("p_toi", "Vốn hoá / Tổng thu nhập hoạt động", "x", 0)],
-             "securities": _FIN_HEAD + [("debt_to_equity", "Vay / vốn chủ", "x", 0), ("p_revenue", "Vốn hoá / Doanh thu hoạt động", "x", 0)]}
+             "securities": _FIN_HEAD + [("debt_to_equity", "Vay / vốn chủ", "x", 0), ("p_revenue", "Vốn hoá / Doanh thu hoạt động", "x", 0)],
+             "insurance": _FIN_HEAD + [("p_premium", "Vốn hoá / Doanh thu phí bảo hiểm thuần", "x", 0),
+                                       ("investments_to_equity", "Danh mục đầu tư / vốn chủ", "x", 0),
+                                       ("ins_result", "Kết quả kinh doanh bảo hiểm", "money", 0), ("fin_profit", "Lợi nhuận hoạt động tài chính", "money", 0)]}
+FIN_FLOW_ROWS = {"ins_result", "fin_profit"}  # money over the period: four quarters in the quarterly view
+INS_PARTS = ("ins_result", "fin_profit", "other_ops", "other_profit", "associates_before", "associates")
 SUMMED = (("revenue", "Doanh thu thuần"), ("npat_parent", "LNST công ty mẹ"), ("depreciation", "Khấu hao"), ("capex", "Capex"),
           ("cfo", "Lưu chuyển tiền từ HĐKD"), ("ppop", "LN trước dự phòng"), ("operating_income", "Tổng thu nhập hoạt động"),
-          ("operating_revenue", "Doanh thu hoạt động"))
+          ("operating_revenue", "Doanh thu hoạt động"), ("net_premium", "Doanh thu phí bảo hiểm thuần"),
+          ("fin_profit", "Lợi nhuận hoạt động tài chính"))
 
 
 def _d(v) -> Decimal | None:
@@ -172,7 +181,18 @@ def _quarter_valuation(quarters: dict, quarter_end_close: dict) -> dict[str, dic
     return out
 
 
-FIN_FLOWS = ("npat_parent", "ppop", "operating_income", "operating_revenue")
+FIN_FLOWS = ("npat_parent", "ppop", "operating_income", "operating_revenue", "net_premium", "ins_result", "fin_profit")
+
+
+def _reconciles(f: dict) -> bool:
+    """An insurer's parts add up to its profit before tax (true of the layout from mid-2014, not of the one before)."""
+    pbt, parts = _d(f.get("pbt")), [_d(f.get(k)) or Decimal(0) for k in INS_PARTS]
+    return pbt is not None and f.get("ins_result") is not None and not _off(sum(parts, Decimal(0)), pbt, max(abs(pbt), Decimal(10**9)))
+
+
+def _insurer(periods: dict) -> dict:
+    """The periods with the insurance result kept only where the parts add up."""
+    return {p: (f if _reconciles(f) else {k: v for k, v in f.items() if k != "ins_result"}) for p, f in periods.items()}
 
 
 def _fin_block(f: dict, close: Decimal | None, flows: dict[str, Decimal | None], parent_before: Decimal | None) -> dict:
@@ -189,7 +209,11 @@ def _fin_block(f: dict, close: Decimal | None, flows: dict[str, Decimal | None],
             if npat is not None and parent is not None and parent_before is not None and parent + parent_before > 0 else None,
             "p_ppop": _ratio(cap, flows.get("ppop"), _Q2, positive=True), "p_toi": _ratio(cap, flows.get("operating_income"), _Q2, positive=True),
             "debt_to_equity": _ratio(debt, equity, _Q2) if equity is not None and equity > 0 else None,
-            "p_revenue": _ratio(cap, flows.get("operating_revenue"), _Q2, positive=True)}
+            "p_revenue": _ratio(cap, flows.get("operating_revenue"), _Q2, positive=True),
+            "p_premium": _ratio(cap, flows.get("net_premium"), _Q2, positive=True),
+            "investments_to_equity": _ratio(_sum(_d(f.get("cash")), _d(f.get("st_investments")), _d(f.get("lt_investments"))), equity, _Q2)
+            if equity is not None and equity > 0 else None,
+            "ins_result": flows.get("ins_result"), "fin_profit": flows.get("fin_profit")}
 
 
 def _four(quarters: dict, p: str, keys) -> dict[str, Decimal | None]:
@@ -201,7 +225,7 @@ def _four(quarters: dict, p: str, keys) -> dict[str, Decimal | None]:
     return {k: _sum(*(x.get(k) for x in figures)) for k in keys}
 
 
-def _fin_part(periods: dict, blocks: dict[str, dict], spec) -> dict:
+def _fin_part(periods: dict, blocks: dict[str, dict], spec, four: bool = False) -> dict:
     keys = sorted(periods)
     rows = []
     for item in spec:
@@ -210,22 +234,34 @@ def _fin_part(periods: dict, blocks: dict[str, dict], spec) -> dict:
             continue
         key, label, kind, indent = item
         values = [blocks[p].get(key) for p in keys]
-        rows.append({"key": key, "label": label, "kind": kind, "indent": indent,
+        rows.append({"key": key, "label": f"{label} (4 quý)" if four and key in FIN_FLOW_ROWS else label, "kind": kind, "indent": indent,
                      "values": [_money(v) if isinstance(v, Decimal) else v for v in values]})
     return {"periods": keys, "rows": rows}
 
 
 def _fin_table(record: dict, kind: str, vnstock: dict | None) -> dict:
-    quarters, years = record.get("quarters", {}), record.get("years", {})
+    raw_q, raw_y = record.get("quarters", {}), record.get("years", {})
+    quarters, years = (_insurer(raw_q), _insurer(raw_y)) if kind == "insurance" else (raw_q, raw_y)
     qclose, yclose = record.get("quarter_end_close", {}), record.get("year_end_close", {})
     q = {p: _fin_block(f, _d((qclose.get(p) or {}).get("close")), _four(quarters, p, FIN_FLOWS), _parent_equity(quarters.get(_prior(p), {})))
          for p, f in quarters.items()}
     y = {p: _fin_block(f, _d((yclose.get(p) or {}).get("close")), {k: _d(f.get(k)) for k in FIN_FLOWS},
                        _parent_equity(years.get(str(int(p) - 1), {}))) for p, f in years.items()}
     return {"symbol": record.get("symbol"), "source": record.get("source"), "fetched_at": record.get("fetched_at"),
-            "quarters": _fin_part(quarters, q, FIN_SCALE[kind]), "years": _fin_part(years, y, FIN_SCALE[kind]), "summary": None,
-            "checks": _checks(quarters, years, vnstock),
+            "quarters": _fin_part(quarters, q, FIN_SCALE[kind], four=True), "years": _fin_part(years, y, FIN_SCALE[kind]), "summary": None,
+            "checks": sorted(_checks(quarters, years, vnstock) + (_ins_checks(raw_q) + _ins_checks(raw_y) if kind == "insurance" else []),
+                             key=lambda c: (c["period"], c["check"])),
             "conflicts": record.get("quarters_conflicts", []) + record.get("years_conflicts", [])}
+
+
+def _ins_checks(periods: dict) -> list[dict]:
+    out = []
+    for p, f in periods.items():
+        pbt = _d(f.get("pbt"))
+        if f.get("ins_result") is not None and pbt is not None and not _reconciles(f):
+            out.append({"period": p, "check": "ins_reconcile", "label": "Kết quả kinh doanh bảo hiểm để trống: các phần không cộng ra LNTT (mẫu báo cáo cũ)",
+                        "a": _money(sum((_d(f.get(k)) or Decimal(0) for k in INS_PARTS), Decimal(0))), "b": _money(pbt)})
+    return out
 
 
 def _summary(quarters: dict, closes, shares: int | None) -> dict | None:

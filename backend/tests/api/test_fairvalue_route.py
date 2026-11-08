@@ -323,7 +323,8 @@ def test_statements_give_the_quarterly_and_yearly_tables_of_a_watched_non_financ
                                                             "year_end_close": {"2025": {"date": "2025-12-31", "close": "12"}}})
     vcb = call(client, clock, "GET", "/internal/fairvalue/statements/VCB").json()
     assert vcb["reason"] is None and vcb["kind"] == "bank" and next(r for r in vcb["years"]["rows"] if r["key"] == "pb")["values"] == ["1.20"]
-    assert call(client, clock, "GET", "/internal/fairvalue/statements/BVH").json()["reason"] == "Bảo hiểm chưa có bảng số tài chính"
+    bvh = call(client, clock, "GET", "/internal/fairvalue/statements/BVH").json()
+    assert bvh["kind"] == "insurance" and bvh["reason"].startswith("Chưa có số liệu VNDirect")
     assert call(client, clock, "GET", "/internal/fairvalue/statements/ZZZ").status_code == 404
 
 

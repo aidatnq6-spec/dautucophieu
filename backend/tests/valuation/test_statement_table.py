@@ -165,3 +165,40 @@ def test_a_bank_s_checks_compare_four_quarters_with_the_year_and_with_vnstock():
     years = {**FIN_RECORD["years"], "2025": fin(164, npat_parent=200)}  # 41 + 42 + 43 + 44 = 170, not 200
     t = statement_table({**FIN_RECORD, "years": years}, closes=CLOSES, shares=None, vnstock={"2025-Q2": {"npat": str(30 * B)}}, kind="bank")
     assert {(c["period"], c["check"]) for c in t["checks"]} >= {("2025", "npat_parent"), ("2025-Q2", "vnstock_npat")}
+
+
+def ins(npat, **more):
+    """An insurer's period in tỷ đồng whose parts add up to its profit before tax: 2 × npat from investments, the rest from insurance."""
+    pbt = npat * 1.25
+    base = {"npat_parent": npat, "pbt": pbt, "equity": 1000, "minority_equity": 10, "charter_capital": 100, "net_premium": 10 * npat,
+            "fin_profit": 2 * npat, "other_ops": 0, "other_profit": 1, "associates_before": 2, "associates": 0, "ins_result": pbt - 2 * npat - 3,
+            "cash": 50, "st_investments": 4000, "lt_investments": 5950}
+    base.update(more)
+    return {k: str(Decimal(str(v)) * B) for k, v in base.items()}
+
+
+INS_RECORD = {**FIN_RECORD, "kind": "insurance", "quarters": {f"{y}-Q{k}": ins(20 * (y - 2023) + k) for y in (2024, 2025) for k in (1, 2, 3, 4)},
+              "years": {"2024": ins(84, equity=900), "2025": ins(164)}}
+
+
+def test_an_insurer_gets_premium_and_investment_multiples_and_where_its_profit_comes_from():
+    t = statement_table(INS_RECORD, closes=CLOSES, shares=None, vnstock=None, kind="insurance")
+    assert [r["key"] for r in t["quarters"]["rows"][1:]] == ["market_cap", "parent_equity", "bvps", "pb", "pe", "roe", "p_premium",
+                                                             "investments_to_equity", "ins_result", "fin_profit"]
+    labels = {r["key"]: r["label"] for r in t["quarters"]["rows"]}
+    assert labels["ins_result"] == "Kết quả kinh doanh bảo hiểm (4 quý)"
+    assert {r["key"]: r["label"] for r in t["years"]["rows"]}["ins_result"] == "Kết quả kinh doanh bảo hiểm"
+    r = rows(t, "quarters")
+    i = t["quarters"]["periods"].index("2025-Q4")
+    assert r["p_premium"][i] == "0.18" and r["investments_to_equity"][i] == "10.00"  # 300 / 1700 ; (50 + 4000 + 5950) / 1000
+    assert r["fin_profit"][i] == "340000000000" and r["ins_result"][i] == "-139500000000"  # 2 × 170 ; 212.5 − 340 − 4 × 3
+    assert not [c for c in t["checks"] if c["check"] == "ins_reconcile"]  # every period adds up
+
+
+def test_an_insurer_s_result_is_left_blank_where_its_parts_do_not_add_up_to_profit_before_tax():
+    quarters = {**INS_RECORD["quarters"], "2025-Q2": ins(42, ins_result=-200)}  # an older layout: the parts miss the profit before tax
+    t = statement_table({**INS_RECORD, "quarters": quarters}, closes=CLOSES, shares=None, vnstock=None, kind="insurance")
+    r = rows(t, "quarters")
+    assert r["ins_result"][t["quarters"]["periods"].index("2025-Q4")] is None and r["fin_profit"][t["quarters"]["periods"].index("2025-Q4")] is not None
+    assert r["ins_result"][t["quarters"]["periods"].index("2025-Q1")] is not None
+    assert ("2025-Q2", "ins_reconcile") in {(c["period"], c["check"]) for c in t["checks"]}

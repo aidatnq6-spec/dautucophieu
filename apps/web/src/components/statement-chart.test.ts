@@ -77,3 +77,8 @@ it("book value per share is drawn in đồng, and a bank's cross-checks star the
   expect([...flaggedFor(checks, ["p_ppop"]).keys()]).toEqual(["2025"]);
   expect([...flaggedFor(checks, ["pb"]).keys()]).toEqual([]);
 });
+
+it("an insurer's blank insurance result is starred where its parts miss the profit before tax", () => {
+  const checks = [{ period: "2013-Q4", check: "ins_reconcile", label: "Kết quả kinh doanh bảo hiểm để trống", a: "1", b: "2" }];
+  expect([...flaggedFor(checks, ["ins_result", "fin_profit"]).keys()]).toEqual(["2013-Q4"]);
+});

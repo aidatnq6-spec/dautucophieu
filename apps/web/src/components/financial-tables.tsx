@@ -75,10 +75,10 @@ function Table({ part, cols, caption, extra = null, picked, onPick }: { part: Pa
   );
 }
 
-const FINANCIAL = new Set(["bank", "securities"]);
+const FINANCIAL = new Set(["bank", "securities", "insurance"]);
 
-/** Bảng số tài chính of a non-financial company; with `financial`, the Quy mô và định giá block of a bank or securities firm, in its
- * own section (nothing for any other ticker). */
+/** Bảng số tài chính of a non-financial company; with `financial`, the Quy mô và định giá block of a bank, securities firm or insurer,
+ * in its own section (nothing for any other ticker). */
 export function FinancialTables({ symbol, financial = false }: { symbol: string; financial?: boolean }) {
   const [data, setData] = useState<Tables | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +87,10 @@ export function FinancialTables({ symbol, financial = false }: { symbol: string;
   const [forecast, setForecast] = useState<Forecast | null>(null);
   const [picked, setPicked] = useState<string[]>(financial ? ["pb", "roe"] : ["revenue", "gross_margin"]);
   useEffect(() => {
-    api<Tables>(`fairvalue/statements/${encodeURIComponent(symbol)}`).then(setData, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải."));
+    api<Tables>(`fairvalue/statements/${encodeURIComponent(symbol)}`).then((d) => {
+      if (financial && d.kind === "insurance") setPicked(["ins_result", "fin_profit"]);  // where an insurer's profit comes from
+      setData(d);
+    }, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải."));
     if (!financial) api<Forecast>(`quarter-forecast/${encodeURIComponent(symbol)}`).then(setForecast, () => setForecast(null));
   }, [symbol, financial]);
   if (financial) {
@@ -96,7 +99,7 @@ export function FinancialTables({ symbol, financial = false }: { symbol: string;
   }
   if (error) return <p className="errors" role="alert">{error}</p>;
   if (!data) return <p className="muted fx-loading" role="status">Đang tải bảng số…</p>;
-  if (FINANCIAL.has(data.kind ?? "")) return <p className="muted">Ngân hàng và công ty chứng khoán không dùng bảng này: xem khối Quy mô và định giá bên dưới, sau Chỉ số ngành theo quý.</p>;
+  if (FINANCIAL.has(data.kind ?? "")) return <p className="muted">Ngân hàng, công ty chứng khoán và bảo hiểm không dùng bảng này: xem khối Quy mô và định giá bên dưới, sau Chỉ số ngành theo quý.</p>;
   if (data.reason) return <p className="muted">Chưa có bảng số tài chính: {data.reason}.</p>;
   return body(data);
 
@@ -143,8 +146,10 @@ export function FinancialTables({ symbol, financial = false }: { symbol: string;
         cửa thực (chưa điều chỉnh) phiên cuối kỳ × số cổ phiếu cuối kỳ (vốn góp ÷ 10.000 đ); giá thực có từ 2013. Vốn chủ công ty mẹ = vốn chủ sở hữu − lợi
         ích cổ đông không kiểm soát; giá trị sổ sách / cổ phiếu = vốn chủ công ty mẹ ÷ số cổ phiếu. Quý: P/E, ROE và các bội số theo lợi nhuận, thu nhập tính
         trên 4 quý tới quý đó (thiếu một quý thì để trống); năm: số cả năm. ROE = LNST công ty mẹ ÷ vốn chủ công ty mẹ bình quân kỳ đó và cùng kỳ năm
-        trước, nên có thể lệch ROAE của VNDirect ở bảng chỉ số. {data.kind === "bank" ? "LN trước dự phòng = lợi nhuận thuần từ hoạt động kinh doanh trước chi phí dự phòng rủi ro tín dụng." : "Vay = vay và nợ ngắn hạn + dài hạn, trên vốn chủ sở hữu (cả phần không kiểm soát)."} Không
-        tính nợ ròng, EV, EBITDA, FCFF: với ngân hàng và công ty chứng khoán, đi vay là hoạt động kinh doanh. Thiếu một thành phần thì để trống, không ước lượng.
+        trước, nên có thể lệch ROAE của VNDirect ở bảng chỉ số. {data.kind === "bank" ? "LN trước dự phòng = lợi nhuận thuần từ hoạt động kinh doanh trước chi phí dự phòng rủi ro tín dụng."
+          : data.kind === "securities" ? "Vay = vay và nợ ngắn hạn + dài hạn, trên vốn chủ sở hữu (cả phần không kiểm soát)."
+          : "Danh mục đầu tư = tiền + đầu tư tài chính ngắn hạn + dài hạn, trên vốn chủ sở hữu (cả phần không kiểm soát). Kết quả kinh doanh bảo hiểm = lợi nhuận thuần từ hoạt động kinh doanh bảo hiểm; với bảo hiểm nhân thọ thường âm vì khoản tăng dự phòng toán học ghi vào chi phí và được bù bằng lãi đầu tư, không có nghĩa là lỗ. Chỉ hiện ở kỳ mà kết quả bảo hiểm, lợi nhuận hoạt động tài chính và các khoản khác cộng ra đúng LNTT (từ giữa 2014; mẫu báo cáo cũ không cộng ra được, để trống và ghi ở Kiểm tra chéo). Không tính P/EV: giá trị nội tại không có trong báo cáo tài chính. Tỷ lệ kết hợp xem ở bảng chỉ số ngành."} Không
+        tính nợ ròng, EV, EBITDA, FCFF: với ngân hàng, công ty chứng khoán và bảo hiểm, đi vay hay giữ tiền của khách là hoạt động kinh doanh. Thiếu một thành phần thì để trống, không ước lượng.
       </p> : <p className="caption wrap">
         Nguồn: báo cáo tài chính trên API công khai của VNDirect{data.fetched_at ? `, đọc ${new Date(data.fetched_at).toLocaleDateString("vi-VN")}` : ""}; số từng quý (không lũy kế),
         chi phí ghi số âm. LN HĐKD lõi = lãi gộp − chi phí bán hàng − quản lý. EBIT = LNTT + lãi vay; EBITDA = EBIT + khấu hao. FCFF = lưu chuyển tiền

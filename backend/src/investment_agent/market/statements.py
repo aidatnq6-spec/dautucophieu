@@ -7,8 +7,8 @@ of banks, securities firms and insurers already come from the same API.
 
 Only the lines the table needs are kept, as decimal strings in đồng with VNDirect's signs (costs positive, cash paid out
 negative). A line given twice with different values is a conflict: no value is kept and both are listed, never one chosen.
-Banks and securities firms use their own layouts (LAYOUTS) and are kept apart, under data/statements-financial, with only the
-lines of their scale and valuation block; insurers are skipped. The first sync of a ticker takes the
+Banks, securities firms and insurers use their own layouts (LAYOUTS) and are kept apart, under data/statements-financial, with
+only the lines of their scale and valuation block. The first sync of a ticker takes the
 whole history; later ones take the last two years and replace those periods, keeping the older ones. A third call keeps each
 year's last unadjusted close (VNDirect prices, from 2013) for the market capitalisation of that year. One JSON file per ticker
 under data/statements.
@@ -51,6 +51,13 @@ LAYOUTS = {
                                                  (102, 88888): "ppop", (102, 23800): "pbt", (102, 23003): "npat", (102, 23000): "npat_parent"}},
     "securities": {"models": "89,90,91", "lines": {**{(89, c): k for k, c in _FIN_COMMON.items()}, (89, 13110): "st_debt", (89, 13340): "lt_debt",
                                                    (90, 21000): "operating_revenue", (90, 23800): "pbt", (90, 23003): "npat", (90, 23000): "npat_parent"}},
+    # Insurers (models 411, 412): the result of insurance itself and of investments, the parts that add up to profit before tax (from
+    # mid-2014; the older layout's do not), the investment book. Both associates lines are kept apart: BVH still fills the old one.
+    "insurance": {"models": "411,412,413", "lines": {**{(411, c): k for k, c in _FIN_COMMON.items()}, (411, 11100): "cash",
+                                                     (411, 11200): "st_investments", (411, 12500): "lt_investments", (412, 21440): "net_premium",
+                                                     (412, 23110): "ins_result", (412, 22175): "fin_profit", (412, 22174): "other_ops",
+                                                     (412, 23900): "other_profit", (412, 23200): "associates_before", (412, 23300): "associates",
+                                                     (412, 23800): "pbt", (412, 23003): "npat", (412, 23000): "npat_parent"}},
 }
 _SYMBOL = re.compile(r"^[A-Z0-9]{1,10}$")
 

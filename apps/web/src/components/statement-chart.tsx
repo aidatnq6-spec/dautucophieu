@@ -65,6 +65,9 @@ const TOUCHES: Record<string, string[]> = {
   ppop: ["p_ppop"],  // banks and securities firms: the multiples made from the line checked
   operating_income: ["p_toi"],
   operating_revenue: ["p_revenue"],
+  net_premium: ["p_premium"],
+  fin_profit: ["fin_profit"],
+  ins_reconcile: ["ins_result"],  // an insurer's period whose parts miss its profit before tax: its insurance result is left blank
 };
 
 /** Periods to star on the chart, each with the cross-checks behind the star; only checks that touch a drawn row count. */

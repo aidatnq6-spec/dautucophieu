@@ -156,8 +156,6 @@ def statements(symbol: str, request: Request):
     kind = kind_of(load_sectors(data_dir)[0].get(symbol))
     empty = {"symbol": symbol, "kind": kind, "quarters": {"periods": [], "rows": []}, "years": {"periods": [], "rows": []}, "summary": None,
              "checks": [], "conflicts": []}
-    if kind == "insurance":
-        return {**empty, "reason": "Bảo hiểm chưa có bảng số tài chính"}
     record = StatementStore(data_dir / ("statements" if kind is None else "statements-financial")).read(symbol)
     if record is None:
         return {**empty, "reason": "Chưa có số liệu VNDirect cho mã này (đồng bộ lúc 20:00, mỗi lượt vài mã)"}

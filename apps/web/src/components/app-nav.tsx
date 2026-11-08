@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BookOpenText, Briefcase, CalendarDays, ChartLine, Eye, Globe, House, Newspaper, NotebookPen, Scale, Settings, UserRound } from "lucide-react";
+import { Activity, BookOpenText, Briefcase, Calculator, CalendarDays, ChartLine, Eye, Globe, House, Newspaper, NotebookPen, Scale, Settings, UserRound } from "lucide-react";
 
 const LINKS = [
   { href: "/", label: "Tổng quan", icon: House },
@@ -15,6 +15,7 @@ const LINKS = [
   { href: "/events", label: "Lịch sự kiện", icon: CalendarDays },
   { href: "/journal", label: "Nhật ký", icon: NotebookPen },
   { href: "/reports", label: "Bản tin sau phiên", icon: BookOpenText },
+  { href: "/loan", label: "Tính khoản vay", icon: Calculator },
   { href: "/profile", label: "Hồ sơ & rủi ro", icon: UserRound },
   { href: "/settings", label: "Cài đặt", icon: Settings },
 ];

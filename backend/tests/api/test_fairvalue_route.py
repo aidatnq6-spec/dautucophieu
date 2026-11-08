@@ -225,6 +225,40 @@ def test_a_banks_group2_share_and_casa_come_from_vietcaps_notes_with_entered_qua
     assert "Q3/2026 · CASA nhập tay 31,4% so với Vietcap 34,0%; bảng dùng số nhập tay." in body["notes"]
 
 
+def test_a_banks_year_end_car_sits_in_its_q4_column_from_vietcap_with_vndirect_and_entered_figures_checked(tmp_path):
+    from investment_agent.market.bank_notes import BankNoteStore
+    from investment_agent.market.financial_ratios import FinancialRatioStore
+    (tmp_path / "market-symbols.txt").write_text("BID\n", encoding="utf-8")
+    (tmp_path / "industries.json").write_text(json.dumps({"as_of": "2026-10-25", "source": "t", "level": 2, "sectors": {"BID": "Ngân hàng"}}),
+                                              encoding="utf-8")
+    FinancialRatioStore(tmp_path / "financial-ratios").save({"symbol": "BID", "kind": "bank", "fetched_at": "2026-11-08T00:00:00+00:00", "source": "t",
+                                                             "quarters": {"2021-12-31": {"BANK_CAR_AQ": "0.0905"},  # Vietcap lacks 2021
+                                                                          "2022-12-31": {"BANK_CAR_AQ": "0.08"},  # VNDirect's 8% placeholder
+                                                                          "2023-12-31": {"BANK_CAR_AQ": "0.0841"},
+                                                                          "2026-09-30": {"BAD_LOANS_RATIO_AQ": "0.017"}}})
+    BankNoteStore(tmp_path / "bank-notes").save({"symbol": "BID", "fetched_at": "2026-11-08T13:00:00+00:00", "source": "vietcap:iq", "quarters": {},
+                                                 "car_years": {"2022": "0.0934", "2023": "0.086", "2024": "0.0903", "2025": "0.0903"}})
+    c, clock = _app(tmp_path)
+    body = call(c, clock, "GET", "/internal/fairvalue/ratios/BID").json()
+    dates = [q["date"] for q in body["quarters"]]
+    car = {m["code"]: m for m in body["metrics"]}["CAR"]
+    codes = [m["code"] for m in body["metrics"]]
+    assert car["label"] == "CAR (cuối năm)" and car["format"] == "pct2" and codes.index("CAR") == codes.index("EQUITY_TO_ASSET_AQ") + 1
+    assert "BANK_CAR_AQ" not in codes  # VNDirect's figure only checks Vietcap's
+    assert dict(zip(dates, car["values"])) == {"2021-12-31": "0.0905", "2022-12-31": "0.0934", "2023-12-31": "0.086", "2024-12-31": "0.0903",
+                                               "2025-12-31": "0.0903", "2026-09-30": None}  # VNDirect only where Vietcap has no year
+    assert body["notes"] == ["2023 · CAR Vietcap 8,60% so với VNDirect 8,41%; bảng dùng số Vietcap.",
+                             "2025 · CAR Vietcap 9,03% trùng đúng năm 2024; kiểm tra lại với báo cáo."]
+    figures = {"group1": None, "group2": None, "group3": None, "group4": None, "group5": None, "demand_deposits": None, "margin_deposits": None,
+               "customer_deposits": None, "car": "9.25"}
+    assert call(c, clock, "PUT", "/internal/bank-figures/BID/2025-Q4",
+                {"values": figures, "source": {"kind": "manual"}, "expected_version": 0, "request_id": "c1"}).status_code == 200
+    body = call(c, clock, "GET", "/internal/fairvalue/ratios/BID").json()
+    car = {m["code"]: m for m in body["metrics"]}["CAR"]
+    assert dict(zip([q["date"] for q in body["quarters"]], car["values"]))["2025-12-31"] == "0.0925"  # the entered figure wins
+    assert "Q4/2025 · CAR nhập tay 9,25% so với Vietcap 9,03%; bảng dùng số nhập tay." in body["notes"]
+
+
 def test_dividend_history_route_uses_the_stored_record_and_the_current_price(tmp_path):
     (tmp_path / "market-symbols.txt").write_text("ACB\n", encoding="utf-8")
     FundamentalsStore(tmp_path / "fundamentals").save({"symbol": "ACB", "fetched_at": "2027-01-14T00:00:00+00:00", "source": "t",

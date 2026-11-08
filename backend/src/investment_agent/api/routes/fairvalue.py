@@ -246,9 +246,13 @@ def forward_put(symbol: str, request: Request, body: ForwardRequest):
 
 
 # A bank's ratios VNDirect does not publish: from the notes on Vietcap (data/bank-notes), and from the owner's Số liệu ngân hàng
-# (nhập tay) in the quarters entered there. Each is placed after the ratio it reads with; the last item is its decimal places.
-MANUAL_BANK = (("GROUP2_RATIO", "Tỷ lệ nợ nhóm 2", "pct2", "group2_ratio", "BAD_LOANS_RATIO_AQ", 2),
-               ("CASA", "CASA", "pct1", "casa", "NET_INTEREST_MARGIN_TR_AVG5Q", 1))
+# (nhập tay) in the quarters entered there. Each is placed after the ratio it reads with; then its decimal places and short name.
+# CAR is Vietcap's year-end figure, in the Q4 column (no free source gives it by quarter).
+MANUAL_BANK = (("GROUP2_RATIO", "Tỷ lệ nợ nhóm 2", "pct2", "group2_ratio", "BAD_LOANS_RATIO_AQ", 2, "Tỷ lệ nợ nhóm 2"),
+               ("CASA", "CASA", "pct1", "casa", "NET_INTEREST_MARGIN_TR_AVG5Q", 1, "CASA"),
+               ("CAR", "CAR (cuối năm)", "pct2", "car", "EQUITY_TO_ASSET_AQ", 2, "CAR"))
+CAR_GAP = Decimal("0.001")  # Vietcap and VNDirect further apart than 0,1 point: both are listed
+CAR_PLACEHOLDER = Decimal("0.08")  # VNDirect gives BID 8,00% year after year: the legal floor, not a reported figure
 _QUARTER_END = {"1": "03-31", "2": "06-30", "3": "09-30", "4": "12-31"}
 
 
@@ -267,7 +271,7 @@ def _entered_bank_ratios(request: Request, sym: str) -> dict[str, dict[str, str]
     out = {}
     for quarter, entry in ((record.payload if record else {}).get("quarters") or {}).items():
         derived = derive(entry.get("values") or {})
-        row = {code: derived[key] for code, _, _, key, _, _ in MANUAL_BANK if derived.get(key) is not None}
+        row = {code: derived[key] for code, _, _, key, _, _, _ in MANUAL_BANK if derived.get(key) is not None}
         if row:
             out[f"{quarter[:4]}-{_QUARTER_END[quarter[-1]]}"] = row
     return out
@@ -281,7 +285,27 @@ def _pct(value: str, places: int) -> str:
     return f"{Decimal(value) * 100:.{places}f}".replace(".", ",") + "%"
 
 
-def _bank_extra_ratios(request: Request, data_dir: Path, sym: str) -> tuple[dict[str, dict[str, str]], list[str], str | None]:
+def _year_end_car(car_years: dict[str, str], vndirect: dict[str, dict]) -> tuple[dict[str, str], list[str]]:
+    """{year-end date: CAR} from Vietcap, VNDirect's where Vietcap has no year (never its 8% placeholder); notes where the two differ
+    or where Vietcap repeats the year before exactly."""
+    out, notes = {}, []
+    years = sorted(set(car_years) | {d[:4] for d, row in vndirect.items() if d.endswith("-12-31") and "BANK_CAR_AQ" in row})
+    for year in years:
+        vc = car_years.get(year)
+        vd = (vndirect.get(f"{year}-12-31") or {}).get("BANK_CAR_AQ")
+        vd = None if vd is None or Decimal(vd) == CAR_PLACEHOLDER else vd
+        if vc is not None:
+            out[f"{year}-12-31"] = vc
+            if vd is not None and abs(Decimal(vc) - Decimal(vd)) > CAR_GAP:
+                notes.append(f"{year} · CAR Vietcap {_pct(vc, 2)} so với VNDirect {_pct(vd, 2)}; bảng dùng số Vietcap.")
+            if (before := car_years.get(str(int(year) - 1))) is not None and Decimal(before) == Decimal(vc):
+                notes.append(f"{year} · CAR Vietcap {_pct(vc, 2)} trùng đúng năm {int(year) - 1}; kiểm tra lại với báo cáo.")
+        elif vd is not None:
+            out[f"{year}-12-31"] = vd
+    return out, notes
+
+
+def _bank_extra_ratios(request: Request, data_dir: Path, sym: str, vndirect: dict[str, dict]) -> tuple[dict[str, dict[str, str]], list[str], str | None]:
     """{quarter-end date: {code: ratio}} from Vietcap's notes with the owner's entered quarters on top; notes on every blank or
     difference; when the notes were read."""
     from investment_agent.market.bank_notes import BankNoteStore, note_ratios
@@ -289,11 +313,15 @@ def _bank_extra_ratios(request: Request, data_dir: Path, sym: str) -> tuple[dict
     out, notes = {}, []
     for day, quarter in sorted((record.get("quarters") or {}).items()):
         ratios, problems = note_ratios(quarter)
-        if row := {code: ratios[key] for code, _, _, key, _, _ in MANUAL_BANK if key in ratios}:
+        if row := {code: ratios[key] for code, _, _, key, _, _, _ in MANUAL_BANK if key in ratios}:
             out[day] = row
         notes += [f"{_quarter_label(day)} · Vietcap: {p}; để trống." for p in problems]
+    car, car_notes = _year_end_car(record.get("car_years") or {}, vndirect)
+    for day, value in car.items():
+        out.setdefault(day, {})["CAR"] = value
+    notes += car_notes
     for day, entered in sorted(_entered_bank_ratios(request, sym).items()):
-        for code, label, _, _, _, places in MANUAL_BANK:
+        for code, _, _, _, _, places, label in MANUAL_BANK:
             if code not in entered:
                 continue
             other = out.get(day, {}).get(code)
@@ -319,10 +347,10 @@ def sector_ratios(symbol: str, request: Request):
     data = {q: dict(v) for q, v in record["quarters"].items()}
     rows, notes, notes_fetched_at = list(DISPLAY[record["kind"]]), [], None
     if record["kind"] == "bank":
-        extra, notes, notes_fetched_at = _bank_extra_ratios(request, data_dir, sym)
+        extra, notes, notes_fetched_at = _bank_extra_ratios(request, data_dir, sym, record["quarters"])
         for day, values in extra.items():
             data.setdefault(day, {}).update(values)
-        for code, label, fmt, _, after, _ in MANUAL_BANK:
+        for code, label, fmt, _, after, _, _ in MANUAL_BANK:
             rows.insert(next(i for i, r in enumerate(rows) if r[0] == after) + 1, (code, label, fmt))
     quarters = sorted(data)  # all of them: Bảng số tài chính picks how many to show
     return {"symbol": sym, "kind": record["kind"], "fetched_at": record.get("fetched_at"),

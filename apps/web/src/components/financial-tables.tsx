@@ -21,7 +21,7 @@ type Ratios = { kind: Kind; quarters: { date: string; label: string }[];
 
 const SIGNED = new Set(["revenue_yoy", "gross_profit_yoy", "npat_parent_yoy", "ebitda_yoy", "fcff_yield"]);
 // VNDirect's ratios read to two places (NPL 1,66%, not 1,7%), as their own table showed them.
-const TWO = new Set(["BAD_LOANS_RATIO_AQ", "GROUP2_RATIO", "OVERDUE_LOANS_RATIO_AQ", "NET_INTEREST_MARGIN_TR_AVG5Q", "ROAA_TR_AVG4Q", "LOANS_TO_EQUITY_AQ"]);
+const TWO = new Set(["BAD_LOANS_RATIO_AQ", "GROUP2_RATIO", "CAR", "OVERDUE_LOANS_RATIO_AQ", "NET_INTEREST_MARGIN_TR_AVG5Q", "ROAA_TR_AVG4Q", "LOANS_TO_EQUITY_AQ"]);
 const TITLE: Record<Kind, string> = { bank: "ngân hàng", securities: "công ty chứng khoán", insurance: "bảo hiểm" };
 const COUNTS = [8, 12, 20, 0] as const;
 
@@ -165,12 +165,12 @@ export function FinancialTables({ symbol }: { symbol: string }) {
         </ul>
       </details>}
       {ratios?.notes && ratios.notes.length > 0 && <details className="mc-table">
-        <summary>Đối chiếu nợ nhóm 2 và CASA: {ratios.notes.length} ghi chú</summary>
+        <summary>Đối chiếu nợ nhóm 2, CASA và CAR: {ratios.notes.length} ghi chú</summary>
         <ul className="ft-checks">{ratios.notes.map((n) => <li key={n}>{n}</li>)}</ul>
       </details>}
       {financial ? <p className="caption wrap">
         Chỉ số {TITLE[data.kind as Kind]}: tỷ lệ VNDirect tính sẵn (dữ liệu công khai, từ Q4/2017; ROAA, ROAE từ Q3/2023), chỉ có theo quý; NIM, ROAA, ROAE,
-        biên lợi nhuận trên 4–5 quý gần nhất, các tỷ lệ khác tại cuối quý; ô — là quý nguồn chưa có số.{data.kind === "bank" ? ` Tỷ lệ nợ nhóm 2 = nợ nhóm 2 / nợ nhóm 1–5 và CASA = (tiền gửi không kỳ hạn + ký quỹ) / tiền gửi của khách hàng: từ thuyết minh báo cáo tài chính trên API công khai của Vietcap (từ Q1/2018${ratios?.notes_fetched_at ? `, đọc ${new Date(ratios.notes_fetched_at).toLocaleDateString("vi-VN")}` : ""}), chỉ ở quý mà các nhóm nợ và các loại tiền gửi cộng ra đúng tổng; quý đã nhập ở Số liệu ngân hàng (nhập tay) dùng số nhập tay. Thiếu thì để trống, không nội suy.` : ""} Quy mô và định giá: báo cáo tài chính trên API công
+        biên lợi nhuận trên 4–5 quý gần nhất, các tỷ lệ khác tại cuối quý; ô — là quý nguồn chưa có số.{data.kind === "bank" ? ` Tỷ lệ nợ nhóm 2 = nợ nhóm 2 / nợ nhóm 1–5 và CASA = (tiền gửi không kỳ hạn + ký quỹ) / tiền gửi của khách hàng: từ thuyết minh báo cáo tài chính trên API công khai của Vietcap (từ Q1/2018${ratios?.notes_fetched_at ? `, đọc ${new Date(ratios.notes_fetched_at).toLocaleDateString("vi-VN")}` : ""}), chỉ ở quý mà các nhóm nợ và các loại tiền gửi cộng ra đúng tổng; quý đã nhập ở Số liệu ngân hàng (nhập tay) dùng số nhập tay. CAR (cuối năm): tỷ lệ an toàn vốn cuối năm của Vietcap, ở cột Q4 (không nguồn miễn phí nào có CAR theo quý); năm Vietcap chưa có thì dùng số của VNDirect (trừ mức 8% giữ chỗ); hai nguồn lệch quá 0,1 điểm hoặc Vietcap trùng đúng năm trước thì ghi ở mục đối chiếu. Thiếu thì để trống, không nội suy.` : ""} Quy mô và định giá: báo cáo tài chính trên API công
         khai của VNDirect{data.fetched_at ? `, đọc ${new Date(data.fetched_at).toLocaleDateString("vi-VN")}` : ""}. Vốn hoá = giá đóng
         cửa thực (chưa điều chỉnh) phiên cuối kỳ × số cổ phiếu cuối kỳ (vốn góp ÷ 10.000 đ); giá thực có từ 2013. Vốn chủ công ty mẹ = vốn chủ sở hữu − lợi
         ích cổ đông không kiểm soát; giá trị sổ sách / cổ phiếu = vốn chủ công ty mẹ ÷ số cổ phiếu. Quý: P/E, ROE và các bội số theo lợi nhuận, thu nhập tính

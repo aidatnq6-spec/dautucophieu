@@ -28,7 +28,9 @@ DISPLAY = {
     "insurance": (("COMBINED_RATIO_TR", "Tỷ lệ kết hợp", "pct1"), ("NET_MARGIN_TR", "Biên lợi nhuận ròng", "pct1"), ("ROAA_TR_AVG4Q", "ROAA", "pct2"),
                   ("ROAE_TR_AVG4Q", "ROAE", "pct1"), ("EQUITY_TO_ASSET_AQ", "Vốn chủ / tổng tài sản", "pct1")),
 }
-CODES = {kind: tuple(code for code, _, _ in rows) for kind, rows in DISPLAY.items()}
+# Fetched but not shown as rows: VNDirect's year-end CAR checks Vietcap's (Chỉ số ngân hàng shows Vietcap's, see bank_notes).
+EXTRA = {"bank": ("BANK_CAR_AQ",)}
+CODES = {kind: tuple(code for code, _, _ in rows) + EXTRA.get(kind, ()) for kind, rows in DISPLAY.items()}
 URL = "https://api-finfo.vndirect.com.vn/v4/ratios?q=code:{symbol}~ratioCode:{codes}~reportDate:gte:{start}&sort=reportDate:desc&size=2000"
 FIRST_START = "2017-01-01"  # all VNDirect keeps (from Q4/2017; ROAA, ROAE from Q3/2023), for the chart of Bảng số tài chính
 _SYMBOL = re.compile(r"^[A-Z0-9]{1,10}$")

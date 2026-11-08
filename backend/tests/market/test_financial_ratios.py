@@ -45,3 +45,8 @@ def test_cli_financial_ratios_sync_reads_watchlist_and_sectors(tmp_path, capsys)
     assert financial_ratios_sync(tmp_path, get=lambda url: _page("SSI", [("2026-09-30", "ROAA_TR_AVG4Q", 0.05)]), today=date(2026, 10, 31)) == 0
     assert json.loads(capsys.readouterr().out)["results"] == {"SSI": "ok"}
     assert FinancialRatioStore(tmp_path / "financial-ratios").read("SSI")["kind"] == "securities"
+
+
+def test_a_banks_year_end_car_is_fetched_with_its_ratios_to_check_vietcaps_but_not_shown_as_a_row():
+    from investment_agent.market.financial_ratios import CODES, DISPLAY
+    assert "BANK_CAR_AQ" in CODES["bank"] and "BANK_CAR_AQ" not in [code for code, _, _ in DISPLAY["bank"]]

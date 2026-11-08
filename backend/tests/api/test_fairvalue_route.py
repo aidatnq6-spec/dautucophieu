@@ -184,7 +184,45 @@ def test_a_banks_ratios_add_casa_and_group2_share_from_the_owners_entered_figure
     by = {m["code"]: m for m in body["metrics"]}
     assert by["CASA"]["values"] == ["0.3300", None, "0.3300"] and by["CASA"]["format"] == "pct1"  # Q2/2026 not entered: blank, not filled
     assert by["GROUP2_RATIO"]["values"] == ["0.0170", None, "0.0170"] and by["GROUP2_RATIO"]["format"] == "pct2"
-    assert "nhập tay" in by["CASA"]["label"] and by["BAD_LOANS_RATIO_AQ"]["values"] == [None, "0.0061", "0.0071"]
+    assert by["CASA"]["label"] == "CASA" and by["BAD_LOANS_RATIO_AQ"]["values"] == [None, "0.0061", "0.0071"]
+    assert body["notes"] == []
+
+
+def test_a_banks_group2_share_and_casa_come_from_vietcaps_notes_with_entered_quarters_first_and_every_gap_said(tmp_path):
+    from investment_agent.market.bank_notes import BankNoteStore
+    from investment_agent.market.financial_ratios import FinancialRatioStore
+    (tmp_path / "market-symbols.txt").write_text("MBB\n", encoding="utf-8")
+    (tmp_path / "industries.json").write_text(json.dumps({"as_of": "2026-10-25", "source": "t", "level": 2, "sectors": {"MBB": "Ngân hàng"}}),
+                                              encoding="utf-8")
+    FinancialRatioStore(tmp_path / "financial-ratios").save({"symbol": "MBB", "kind": "bank", "fetched_at": "2026-11-08T00:00:00+00:00", "source": "t",
+                                                             "quarters": {"2026-09-30": {"BAD_LOANS_RATIO_AQ": "0.0167"}}})
+    mbb = {"loans": "1288128443000000", "group1": "1249640585000000", "group2": "17013532000000", "group3": "7230947000000",
+           "group4": "4778315000000", "group5": "9465064000000", "deposits": "993988042000000", "demand": "326388841000000",
+           "term": "653687908000000", "savings": "0", "margin": "11576830000000", "special": "2334463000000"}
+    BankNoteStore(tmp_path / "bank-notes").save({"symbol": "MBB", "fetched_at": "2026-11-08T13:00:00+00:00", "source": "vietcap:iq", "quarters": {
+        "2026-06-30": {**mbb, "group4": "4773315000000"},  # parts miss the total: no group-2 share that quarter, CASA still there
+        "2026-09-30": mbb}})
+    c, clock = _app(tmp_path)
+    body = call(c, clock, "GET", "/internal/fairvalue/ratios/MBB").json()
+    by = {m["code"]: m for m in body["metrics"]}
+    assert [q["date"] for q in body["quarters"]] == ["2026-06-30", "2026-09-30"]
+    assert by["GROUP2_RATIO"]["values"] == [None, "0.0132"] and by["CASA"]["values"] == ["0.3400", "0.3400"]
+    assert body["notes_fetched_at"] == "2026-11-08T13:00:00+00:00"
+    assert body["notes"] == ["Q2/2026 · Vietcap: nợ nhóm 1–5 cộng ra 1.288.123.443, khác tổng dư nợ 1.288.128.443 triệu đồng; để trống."]
+    # A quarter the owner entered keeps the entered figures; where they differ from Vietcap's, both are listed.
+    figures = {"group1": "1249640.585", "group2": "17013.532", "group3": "7230.947", "group4": "4778.315", "group5": "9465.064",
+               "demand_deposits": "326388.841", "margin_deposits": "11578.83", "customer_deposits": "993988.042", "car": None}
+    assert call(c, clock, "PUT", "/internal/bank-figures/MBB/2026-Q3",
+                {"values": figures, "source": {"kind": "manual"}, "expected_version": 0, "request_id": "m1"}).status_code == 200
+    body = call(c, clock, "GET", "/internal/fairvalue/ratios/MBB").json()
+    by = {m["code"]: m for m in body["metrics"]}
+    assert by["GROUP2_RATIO"]["values"][-1] == "0.0132" and by["CASA"]["values"][-1] == "0.3400"  # same to four places: no note
+    assert len(body["notes"]) == 1
+    figures["demand_deposits"] = "300000"
+    call(c, clock, "PUT", "/internal/bank-figures/MBB/2026-Q3", {"values": figures, "source": {"kind": "manual"}, "expected_version": 1, "request_id": "m2"})
+    body = call(c, clock, "GET", "/internal/fairvalue/ratios/MBB").json()
+    assert {m["code"]: m for m in body["metrics"]}["CASA"]["values"][-1] == "0.3135"
+    assert "Q3/2026 · CASA nhập tay 31,4% so với Vietcap 34,0%; bảng dùng số nhập tay." in body["notes"]
 
 
 def test_dividend_history_route_uses_the_stored_record_and_the_current_price(tmp_path):

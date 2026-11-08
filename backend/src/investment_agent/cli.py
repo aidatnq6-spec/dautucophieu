@@ -64,6 +64,9 @@ def main() -> int:
     qa.add_argument("--data-dir", type=Path, required=True)
     frs = commands.add_parser("financial-ratios-sync", help="quarterly bank, securities and insurance ratios (VNDirect) into data/financial-ratios")
     frs.add_argument("--data-dir", type=Path, required=True)
+    bns = commands.add_parser("bank-notes-sync", help="loans by group and deposits by kind of watched banks (Vietcap notes, 10 s apart, weekly) into data/bank-notes")
+    bns.add_argument("--data-dir", type=Path, required=True)
+    bns.add_argument("--force", action="store_true", help="refresh every watched bank now, however recent its record")
     ivs = commands.add_parser("index-valuation-sync", help="fetch daily P/E and P/B of VNINDEX and VN30 (VNDirect) into data/index-valuation")
     ivs.add_argument("--data-dir", type=Path, required=True)
     ihist = commands.add_parser("index-history", help="work out VN-Index P/E and P/B before VNDirect's series from today's HOSE tickers (one-off, ~15 min)")
@@ -146,6 +149,8 @@ def main() -> int:
         return thesis_check_cli(args.data_dir, args.calendar, args.scope)
     if args.command == "financial-ratios-sync":
         return financial_ratios_sync(args.data_dir)
+    if args.command == "bank-notes-sync":
+        return bank_notes_sync(args.data_dir, force=args.force)
     if args.command == "industries":
         return industries(_symbols(args.symbols), args.output)
     if args.command == "backup":
@@ -393,6 +398,29 @@ def financial_ratios_sync(data_dir: Path, get=None, today=None) -> int:
     results = fetch_financial_ratios(FinancialRatioStore(data_dir / "financial-ratios"), watched, get=get,
                                      today=today or datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
     failed = {k: v for k, v in results.items() if v != "ok"}
+    print(json.dumps({"status": "ok" if not failed else "partial", "results": results}))
+    return 0 if not failed else 1
+
+
+def bank_notes_sync(data_dir: Path, get=None, sleep=None, force: bool = False) -> int:
+    """Exit 0 when every due watched bank updated (or none was due), 1 when some failed (each is reported)."""
+    import time
+
+    from investment_agent.market.bank_notes import BankNoteStore, sync_bank_notes
+    from investment_agent.market.sectors import load_sectors
+    from investment_agent.market.watchlist import load_watchlist
+    if get is None:
+        import httpx
+
+        def get(url):
+            # This application's own name; no browser headers. Vietcap answers 418 to callers faster than its Crawl-delay.
+            response = httpx.get(url, timeout=60, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+            response.raise_for_status()
+            return response.text
+    sectors = load_sectors(data_dir)[0]
+    watched = {s: sectors.get(s) for s in load_watchlist(data_dir).symbols}
+    results = sync_bank_notes(BankNoteStore(data_dir / "bank-notes"), watched, get=get, sleep=sleep or time.sleep, force=force)
+    failed = {k: v for k, v in results.items() if v.startswith("error")}
     print(json.dumps({"status": "ok" if not failed else "partial", "results": results}))
     return 0 if not failed else 1
 

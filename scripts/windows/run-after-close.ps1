@@ -91,6 +91,10 @@ if ((Get-Date).Hour -ge 20) {
     # Bang so tai chinh: full statements of the 8 stalest watched non-financial tickers (VNDirect public API, two calls each).
     $ss = & $python -W ignore -m investment_agent.cli statements-sync --data-dir $data --limit 8 2>$null
     "$(Get-Date -Format o) statements-sync exit=$LASTEXITCODE $ss" | Add-Content -LiteralPath $log -Encoding UTF8
+    # Thuyet minh ngan hang: loans by group and deposits by kind of watched banks from Vietcap's notes (one call each, 10 s apart,
+    # weekly per bank), for the group-2 share and CASA in Chi so ngan hang.
+    $bn = & $python -W ignore -m investment_agent.cli bank-notes-sync --data-dir $data 2>$null
+    "$(Get-Date -Format o) bank-notes-sync exit=$LASTEXITCODE $bn" | Add-Content -LiteralPath $log -Encoding UTF8
     # Ke hoach nam: the current year's business plan of each watched ticker from CafeF (one public call each, weekly per ticker).
     $ps = & $python -W ignore -m investment_agent.cli plans-sync --data-dir $data 2>$null
     "$(Get-Date -Format o) plans-sync exit=$LASTEXITCODE $ps" | Add-Content -LiteralPath $log -Encoding UTF8

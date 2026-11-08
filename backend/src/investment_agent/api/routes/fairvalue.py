@@ -245,9 +245,10 @@ def forward_put(symbol: str, request: Request, body: ForwardRequest):
         return write_error(exc)
 
 
-# A bank's ratios VNDirect does not publish, from the owner's Số liệu ngân hàng (nhập tay): each placed after the ratio it reads with.
-MANUAL_BANK = (("GROUP2_RATIO", "Tỷ lệ nợ nhóm 2 (nhập tay)", "pct2", "group2_ratio", "BAD_LOANS_RATIO_AQ"),
-               ("CASA", "CASA (nhập tay)", "pct1", "casa", "NET_INTEREST_MARGIN_TR_AVG5Q"))
+# A bank's ratios VNDirect does not publish: from the notes on Vietcap (data/bank-notes), and from the owner's Số liệu ngân hàng
+# (nhập tay) in the quarters entered there. Each is placed after the ratio it reads with; the last item is its decimal places.
+MANUAL_BANK = (("GROUP2_RATIO", "Tỷ lệ nợ nhóm 2", "pct2", "group2_ratio", "BAD_LOANS_RATIO_AQ", 2),
+               ("CASA", "CASA", "pct1", "casa", "NET_INTEREST_MARGIN_TR_AVG5Q", 1))
 _QUARTER_END = {"1": "03-31", "2": "06-30", "3": "09-30", "4": "12-31"}
 
 
@@ -266,16 +267,48 @@ def _entered_bank_ratios(request: Request, sym: str) -> dict[str, dict[str, str]
     out = {}
     for quarter, entry in ((record.payload if record else {}).get("quarters") or {}).items():
         derived = derive(entry.get("values") or {})
-        row = {code: derived[key] for code, _, _, key, _ in MANUAL_BANK if derived.get(key) is not None}
+        row = {code: derived[key] for code, _, _, key, _, _ in MANUAL_BANK if derived.get(key) is not None}
         if row:
             out[f"{quarter[:4]}-{_QUARTER_END[quarter[-1]]}"] = row
     return out
 
 
+def _quarter_label(day: str) -> str:
+    return f"Q{(int(day[5:7]) + 2) // 3}/{day[:4]}"
+
+
+def _pct(value: str, places: int) -> str:
+    return f"{Decimal(value) * 100:.{places}f}".replace(".", ",") + "%"
+
+
+def _bank_extra_ratios(request: Request, data_dir: Path, sym: str) -> tuple[dict[str, dict[str, str]], list[str], str | None]:
+    """{quarter-end date: {code: ratio}} from Vietcap's notes with the owner's entered quarters on top; notes on every blank or
+    difference; when the notes were read."""
+    from investment_agent.market.bank_notes import BankNoteStore, note_ratios
+    record = BankNoteStore(data_dir / "bank-notes").read(sym) or {}
+    out, notes = {}, []
+    for day, quarter in sorted((record.get("quarters") or {}).items()):
+        ratios, problems = note_ratios(quarter)
+        if row := {code: ratios[key] for code, _, _, key, _, _ in MANUAL_BANK if key in ratios}:
+            out[day] = row
+        notes += [f"{_quarter_label(day)} · Vietcap: {p}; để trống." for p in problems]
+    for day, entered in sorted(_entered_bank_ratios(request, sym).items()):
+        for code, label, _, _, _, places in MANUAL_BANK:
+            if code not in entered:
+                continue
+            other = out.get(day, {}).get(code)
+            if other is not None and Decimal(other) != Decimal(entered[code]):
+                notes.append(f"{_quarter_label(day)} · {label} nhập tay {_pct(entered[code], places)} so với Vietcap {_pct(other, places)}; "
+                             "bảng dùng số nhập tay.")
+            out.setdefault(day, {})[code] = entered[code]
+    return out, notes, record.get("fetched_at")
+
+
 @router.get("/fairvalue/ratios/{symbol}")
 def sector_ratios(symbol: str, request: Request):
     """Quarterly sector ratios of a watched bank, securities firm or insurer (VNDirect public data), oldest quarter first; for a
-    bank also CASA and the group-2 share from the figures the owner entered, blank in quarters not entered."""
+    bank also CASA and the group-2 share, from Vietcap's notes and the quarters the owner entered (those first), with notes on
+    every quarter left blank or entered differently."""
     require_owner(request)
     data_dir, sym = _forward_symbol(request, symbol)
     if data_dir is None:
@@ -284,16 +317,18 @@ def sector_ratios(symbol: str, request: Request):
     if not record or record.get("kind") not in DISPLAY:
         return error(404, "not_a_financial", "Chỉ có cho ngân hàng, chứng khoán, bảo hiểm trong danh sách theo dõi.")
     data = {q: dict(v) for q, v in record["quarters"].items()}
-    rows = list(DISPLAY[record["kind"]])
+    rows, notes, notes_fetched_at = list(DISPLAY[record["kind"]]), [], None
     if record["kind"] == "bank":
-        for day, entered in _entered_bank_ratios(request, sym).items():
-            data.setdefault(day, {}).update(entered)
-        for code, label, fmt, _, after in MANUAL_BANK:
+        extra, notes, notes_fetched_at = _bank_extra_ratios(request, data_dir, sym)
+        for day, values in extra.items():
+            data.setdefault(day, {}).update(values)
+        for code, label, fmt, _, after, _ in MANUAL_BANK:
             rows.insert(next(i for i, r in enumerate(rows) if r[0] == after) + 1, (code, label, fmt))
     quarters = sorted(data)  # all of them: Bảng số tài chính picks how many to show
     return {"symbol": sym, "kind": record["kind"], "fetched_at": record.get("fetched_at"),
             "quarters": [{"date": q, "label": f"Q{(int(q[5:7]) + 2) // 3}/{q[:4]}"} for q in quarters],
-            "metrics": [{"code": code, "label": label, "format": fmt, "values": [data[q].get(code) for q in quarters]} for code, label, fmt in rows]}
+            "metrics": [{"code": code, "label": label, "format": fmt, "values": [data[q].get(code) for q in quarters]} for code, label, fmt in rows],
+            "notes": notes, "notes_fetched_at": notes_fetched_at}
 
 
 @router.get("/fairvalue/dividends/{symbol}")

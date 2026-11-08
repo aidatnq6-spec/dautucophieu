@@ -41,7 +41,13 @@ năm ĐHCĐ, dự phóng quý tới, số liệu vận hành nhập tay (và đ�
   dùng, lưu riêng `data/statements-financial/` để Định giá tham khảo, chuỗi định giá tuần, kế hoạch năm và báo quý mới không đổi nguồn. Mỗi lượt
   gọi tối đa 60.000 dòng (lịch sử quý của SSI khoảng 27.000; giới hạn 20.000 cũ cắt mất các quý mới); trả đủ 60.000 dòng thì coi là có thể bị cắt,
   báo lỗi, không lưu. Kiểm tra chéo: tổng 4 quý với cả năm (LNST công ty mẹ, LN trước dự phòng, tổng thu nhập hoạt động, doanh thu hoạt động) và
-  LNST với Vnstock. Bảo hiểm chưa làm.
+  LNST với Vnstock.
+- **Bảo hiểm** (08/11/2026, chủ sở hữu duyệt; BVH): cùng khối, mẫu 411–413. Dòng chung như trên, thêm vốn hoá / doanh thu phí bảo hiểm thuần,
+  danh mục đầu tư (tiền + đầu tư tài chính ngắn và dài hạn) / vốn chủ, **kết quả kinh doanh bảo hiểm** và **lợi nhuận hoạt động tài chính**
+  (tỷ; 4 quý ở chế độ Quý); biểu đồ mở sẵn hai dòng này. Kết quả bảo hiểm chỉ hiện ở kỳ mà nó cộng lợi nhuận hoạt động tài chính, lợi nhuận
+  hoạt động khác, LN khác và liên kết (cả dòng cũ "trước 2015" BVH vẫn ghi) ra đúng LNTT: từ Q3/2014 chênh 0, mẫu cũ chênh tới vài trăm tỷ;
+  kỳ không khớp để trống và ghi ở Kiểm tra chéo. Không tính P/EV (giá trị nội tại không có trong báo cáo) và tỷ lệ kết hợp (BVH hợp nhất
+  nhân thọ; bảng chỉ số ngành đã có số của VNDirect).
 - Tóm tắt 4 quý gần nhất liền nhau với giá đóng cửa gần nhất: LNST, EBITDA, ROE, P/E, P/B, EV/EBITDA.
 - Thiếu một thành phần thì để trống, không ước lượng. Đối chiếu HPG với ảnh: Q3/26 khớp từng số; 2025 nợ ròng 64.389 và FCFF −5.704 khớp,
   EV/EBITDA 9,1x khớp; vốn hoá 2018 = 30,95 nghìn đ × 2.123,9 triệu cổ phiếu = 65.735 tỷ, khớp ảnh.

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Pencil, Plus, Undo2, XCircle } from "lucide-react";
+import { Download, Pencil, Plus, Undo2, XCircle } from "lucide-react";
 import { ApiError, api, requestId, type ApiFailure } from "../lib/api";
 import { formatVnd } from "../lib/format";
 import { FormErrors } from "./form-errors";
@@ -11,6 +11,7 @@ import { DrawdownView } from "./drawdown-view";
 import { StressView } from "./stress-view";
 import { PerformanceView } from "./performance-view";
 import { ThesisView } from "./thesis-view";
+import { download, filterLedger, spreadsheet, type LedgerFilter } from "./journal-tools";
 import { CorporateView } from "./corporate-view";
 
 type Holding = { security_id: string; quantity: number; pending_quantity: number; total_cost: string; average_cost: string; blocked_by: string[] };
@@ -34,6 +35,7 @@ export function PortfolioView() {
   const [editing, setEditing] = useState<LedgerEvent | null>(null);
   const [adding, setAdding] = useState(false);
   const [failure, setFailure] = useState<ApiFailure | null>(null);
+  const [filter, setFilter] = useState<LedgerFilter>({ symbol: "", type: "", from: "", to: "" });
 
   const load = useCallback(() => fetchPortfolio().then(([l, p]) => { setLedger(l); setPersonal(p); },
     (e) => { if (e instanceof ApiError) setFailure(e.failure); }), []);
@@ -53,6 +55,12 @@ export function PortfolioView() {
   if (!ledger) return <><FormErrors failure={failure} /><p className="muted fx-loading" role="status">Đang tải sổ…</p></>;
   const active = new Set(ledger.events.map((e) => e.event_id));
   const cancelled = ledger.original_events.filter((e) => !active.has(e.event_id));
+  const shownEvents = filterLedger(ledger.events, filter);
+  const shownCancelled = filterLedger(cancelled, filter);
+  const types = [...new Set(ledger.events.map((e) => e.type))];
+  const setField = (key: keyof LedgerFilter) => (e: { target: { value: string } }) => setFilter((f) => ({ ...f, [key]: e.target.value }));
+  const excelRow = (e: LedgerEvent, status: string) => [e.effective_at.slice(0, 10), TYPE_LABEL[e.type] ?? e.type, e.security_id ?? "", e.quantity ?? null, e.price !== undefined ? Number(e.price) : e.amount !== undefined ? Number(e.amount) : null,
+    e.fee !== undefined ? Number(e.fee) : null, e.tax !== undefined ? Number(e.tax) : null, status];
   const s = ledger.state;
   const saved = () => { setAdding(false); setEditing(null); void load(); };
 
@@ -108,10 +116,20 @@ export function PortfolioView() {
           {!adding && !editing && <button className="btn primary" onClick={() => setAdding(true)} disabled={ledger.stale}><Plus size={16} aria-hidden="true" />Ghi nhận giao dịch</button>}</div>
         {(adding || editing) && <div className="surface"><TransactionForm key={editing?.event_id ?? "new"} ledgerVersion={ledger.version} events={ledger.events}
           editing={editing} onSaved={saved} onCancel={() => { setAdding(false); setEditing(null); }} /></div>}
+        <div className="formgrid" aria-label="Tra cứu giao dịch">
+          <label className="field">Tìm mã<input value={filter.symbol} maxLength={12} onChange={setField("symbol")} /></label>
+          <label className="field">Loại<select value={filter.type} onChange={setField("type")}><option value="">Tất cả</option>
+            {types.map((t) => <option key={t} value={t}>{TYPE_LABEL[t] ?? t}</option>)}</select></label>
+          <label className="field">Từ ngày<input type="date" value={filter.from} onChange={setField("from")} /></label>
+          <label className="field">Đến ngày<input type="date" value={filter.to} onChange={setField("to")} /></label>
+        </div>
+        <div className="actions"><span className="caption" role="status">{shownEvents.length}/{ledger.events.length} giao dịch</span>
+          <button type="button" className="btn" disabled={shownEvents.length + shownCancelled.length === 0} onClick={() => download(spreadsheet("SoGiaoDich", ["Ngày", "Loại", "Mã", "Số lượng", "Giá / số tiền", "Phí", "Thuế", "Trạng thái"],
+            [...shownEvents.map((e) => excelRow(e, "Hiệu lực")), ...shownCancelled.map((e) => excelRow(e, "Đã hủy"))]), "so-giao-dich.xls")}><Download size={16} aria-hidden="true" />Xuất Excel</button></div>
         <div className="tablewrap"><table aria-label="Giao dịch">
           <thead><tr><th>Ngày</th><th className="num">Thứ tự</th><th>Loại</th><th>Mã</th><th className="num">Số lượng</th><th className="num">Giá / số tiền</th><th className="num">Phí / thuế</th><th>Thao tác</th></tr></thead>
           <tbody>
-            {ledger.events.map((e) => (
+            {shownEvents.map((e) => (
               <tr key={e.event_id}>
                 <td>{e.effective_at}</td><td className="num">{e.sequence}</td><td>{TYPE_LABEL[e.type] ?? e.type}</td><td>{e.security_id ?? ""}</td>
                 <td className="num">{e.quantity?.toLocaleString("vi-VN") ?? ""}</td><td className="num">{formatVnd(e.price ?? e.amount ?? null)}</td>
@@ -121,7 +139,7 @@ export function PortfolioView() {
                   <button className="btn text" onClick={() => void amend("cancel", e.event_id)} aria-label={`Hủy giao dịch ${e.event_id}`}><XCircle size={15} aria-hidden="true" />Hủy</button></>}</td>
               </tr>
             ))}
-            {cancelled.map((e) => (
+            {shownCancelled.map((e) => (
               <tr key={e.event_id} className="muted">
                 <td>{e.effective_at}</td><td className="num">{e.sequence}</td><td>{TYPE_LABEL[e.type] ?? e.type} (đã hủy)</td><td>{e.security_id ?? ""}</td><td /><td /><td />
                 <td><button className="btn text" onClick={() => void amend("restore", e.event_id)}><Undo2 size={15} aria-hidden="true" />Khôi phục</button></td>

@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from decimal import Decimal
 
-from investment_agent.domain.hindsight import hindsight
+from investment_agent.domain.hindsight import hindsight, imported_hindsight
 from investment_agent.domain.ledger import parse_events
 
 TODAY = date(2026, 11, 2)
@@ -190,3 +190,36 @@ def test_hindsight_replays_the_ledger_once(monkeypatch):
     rows = [("buy", (date(2025, 1, 2) + timedelta(days=i)).isoformat(), "AAA", 10, "10000") for i in range(30)]
     hindsight(_ev(*rows), closes=closes, index=_flat_index(), journal=[], theses=[], threshold=Decimal("0.3"), today=TODAY)
     assert calls == [1]
+
+
+def _old(i, symbol, kind, day, pnl=None):
+    return {"entry_id": f"imp-{i}", "symbol": symbol, "kind": kind, "date": date.fromisoformat(day), "price": "20000", "qty": "100", "pnl": pnl}
+
+
+def test_imported_trades_are_followed_on_the_adjusted_series_and_a_ticker_without_prices_says_so():
+    closes = {"AAA": _days(date(2025, 1, 1), [10 + i * 0.01 for i in range(600)])}
+    out = imported_hindsight([_old(1, "AAA", "buy", "2025-02-01"), _old(2, "ZZZ", "buy", "2025-03-01"), _old(3, "AAA", "sell", "2026-10-20", "500")],
+                             closes=closes, index=_flat_index(), today=TODAY)
+    assert [t["entry_id"] for t in out["trades"]] == ["imp-3", "imp-2", "imp-1"]  # newest first
+    first = out["trades"][2]
+    assert first["horizons"]["3"]["status"] == "ok" and Decimal(first["horizons"]["3"]["change"]) > 0  # close to close, not the typed price
+    assert first["price"] == "20000" and out["count"] == 3 and out["measured"] == 1
+    assert out["trades"][1]["horizons"]["6"]["status"] == "missing" and out["missing_symbols"] == ["ZZZ"]
+    assert out["trades"][0]["horizons"]["3"]["status"] == "not_yet"
+
+
+def test_imported_sales_are_grouped_by_the_profit_typed_with_them_and_what_the_price_did_next():
+    closes = {"AAA": _days(date(2024, 1, 1), [10 + i * 0.01 for i in range(1000)])}  # rises throughout: everything sold went on up
+    gains = [_old(i, "AAA", "sell", f"2024-0{i}-15", "100") for i in range(1, 7)]
+    losses = [_old(10 + i, "AAA", "sell", f"2025-0{i}-15", "-100") for i in range(1, 3)]
+    unknown = [_old(20, "AAA", "sell", "2025-05-15", "0"), _old(21, "AAA", "sell", "2025-06-15", None)]  # the old page saved a blank as 0
+    sold = imported_hindsight(gains + losses + unknown, closes=closes, index=_flat_index(date(2024, 1, 1), 1000), today=TODAY)["biases"]["sold"]
+    assert sold["gain"]["count"] == 6 and sold["gain"]["enough"] and Decimal(sold["gain"]["mean"]) > 0
+    assert sold["loss"]["count"] == 2 and not sold["loss"]["enough"] and sold["loss"]["mean"] is None
+
+
+def test_an_imported_buy_after_a_run_up_counts_as_chasing():
+    rising = [10] * 100 + [10 + i * 0.2 for i in range(1, 300)]
+    closes = {"AAA": _days(date(2024, 1, 1), rising)}
+    out = imported_hindsight([_old(1, "AAA", "buy", "2024-05-01"), _old(2, "AAA", "buy", "2024-02-15")], closes=closes, index=_flat_index(date(2024, 1, 1), 1000), today=TODAY)
+    assert out["biases"]["chasing"]["chasing"]["count"] == 1 and out["biases"]["chasing"]["other"]["count"] == 1

@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
 import { formatDecimal } from "../lib/format";
+import { Pager } from "./journal-view";
+import { pageOf } from "./journal-tools";
 
 type Horizon = { status: "ok" | "not_yet" | "missing"; on: string; change: string | null; index: string | null; diff: string | null;
   reason: string | null };
@@ -10,7 +12,9 @@ type LossHold = { symbol: string; start: string; end: string | null; days: numbe
 type Break = { symbol: string; kind: string; label: string; broken_on: string; broken_price: string; held_on: boolean; then: string | null; then_on: string | null;
   how: string; change: string | null };
 type Group = { key: string; count: number; matured: number; enough: boolean; mean: string | null; mean_diff: string | null };
-type Data = { trades: Trade[]; opening_skipped: number; loss_holds: LossHold[]; breaks: Break[]; threshold: string;
+type OldTrade = Omit<Trade, "event_id" | "price" | "quantity"> & { entry_id: string; price: string | null; quantity: string | null };
+type Imported = { trades: OldTrade[]; count: number; measured: number; missing_symbols: string[]; biases: { chasing: { chasing: Group; other: Group }; sold: { gain: Group; loss: Group } } };
+type Data = { imported?: Imported | null; trades: Trade[]; opening_skipped: number; loss_holds: LossHold[]; breaks: Break[]; threshold: string;
   biases: { disposition: { days: number; pgr: string | null; plr: string | null; enough: boolean }; by_emotion: Group[]; by_reason: Group[];
     chasing: { chasing: Group; other: Group } } };
 
@@ -46,6 +50,9 @@ export function HindsightView() {
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => { api<Data>("hindsight").then(setData, (e) => setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải hậu kiểm.")); }, []);
   const d = data?.biases.disposition;
+  const [oldPage, setOldPage] = useState(1);
+  const old = data?.imported;
+  const oldView = pageOf(old?.trades ?? [], oldPage, 50);
   return (
     <section className="surface" aria-label="Hậu kiểm quyết định">
       <h2>Hậu kiểm quyết định</h2>
@@ -97,6 +104,29 @@ export function HindsightView() {
         </table></div>}
         <p className="caption">Lệnh bán: số sau đó là giá đi tiếp sau khi bán (dương là bán non, âm là thoát đúng lúc). Giá tính bằng nghìn đồng.
           Một mã chỉ tính là đã thoát hết khi không còn cả cổ phiếu thưởng chờ về.</p>
+
+        {old && <>
+          <h3>Lệnh cũ từ nhật ký đã nhập</h3>
+          <p className="caption">Tách riêng khỏi Sổ giao dịch: file cũ không có phí, thuế và không dựng lại được vị thế, nên không tính tỷ lệ chốt lãi/lỗ theo Odean hay các lần giữ khi lỗ.
+            Đo được {old.measured}/{old.count} lệnh cổ phiếu.{old.missing_symbols.length > 0 && ` Chưa có giá đã lưu của ${old.missing_symbols.length} mã (phần mềm chỉ lưu giá mã đang theo dõi): ${old.missing_symbols.join(", ")}.`}</p>
+          <div className="tablewrap"><table aria-label="Thói quen lệnh cũ">
+            <thead><tr><th>Nhóm</th><th className="num">Số lần</th><th>Kết quả</th></tr></thead>
+            <tbody>
+              <GroupRows title="Bán khi đang lãi (lãi/lỗ ghi tay)" rows={[old.biases.sold.gain]} label={() => "giá sau khi bán"} />
+              <GroupRows title="Bán khi đang lỗ (lãi/lỗ ghi tay)" rows={[old.biases.sold.loss]} label={() => "giá sau khi bán"} />
+              <GroupRows title="Mua sau khi tăng hơn 15% trong 20 phiên" rows={[old.biases.chasing.chasing]} label={() => "mua đuổi"} />
+              <GroupRows title="Các lần mua khác" rows={[old.biases.chasing.other]} label={() => "còn lại"} />
+            </tbody>
+          </table></div>
+          <p className="caption">Với lệnh bán, kết quả dương nghĩa là giá còn đi lên sau khi bạn bán. Lãi/lỗ ghi bằng 0 hoặc để trống không xếp vào nhóm nào. Mỗi dòng trong file là một lần quan sát.</p>
+          <div className="tablewrap"><table aria-label="Từng lệnh cũ">
+            <thead><tr><th>Ngày</th><th>Lệnh</th><th className="num">Giá ghi</th><th>Sau 3 tháng</th><th>Sau 6 tháng</th><th>Sau 12 tháng</th></tr></thead>
+            <tbody>{oldView.items.map((t) => <tr key={t.entry_id}><td>{day(t.date)}</td><td>{t.type === "buy" ? "Mua" : "Bán"} {t.symbol}</td>
+              <td className="num">{t.price === null ? "—" : formatDecimal(String(Number(t.price) / 1000), 2)}</td>
+              {["3", "6", "12"].map((m) => <td key={m}>{horizonText(t.horizons[m])}</td>)}</tr>)}</tbody>
+          </table></div>
+          <Pager {...oldView} unit="lệnh" label="Trang lệnh cũ" onPage={setOldPage} />
+        </>}
       </>}
     </section>
   );

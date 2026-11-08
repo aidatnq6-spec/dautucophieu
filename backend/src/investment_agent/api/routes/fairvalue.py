@@ -200,9 +200,11 @@ def peers(symbol: str, request: Request, period: str | None = None):
         return {**base, "reason": f"Chỉ có 1 mã ngành {sector} trong danh sách theo dõi"}
     kind, today = kind_of(sector), now(request).astimezone(VN).date()
     figures: dict[str, dict[str, dict]] = {}
+    current: dict[str, dict] = {}
     for s in group:
         by_period: dict[str, dict] = {}
         table = _table_of(data_dir, s, kind, today)
+        current[s] = (table or {}).get("current") or {}
         for row in (table or {}).get("quarters", {}).get("rows", []):
             if row["key"]:
                 for p, v in zip(table["quarters"]["periods"], row["values"]):
@@ -227,8 +229,10 @@ def peers(symbol: str, request: Request, period: str | None = None):
     for s in group:
         row = board_rows.get(s) or {}
         f = ((row.get("quality") or {}).get("f_score")) or {}
-        today_values[s] = {"quality": f"{f['score']}/{f['evaluated']}" if f.get("evaluated") else None, "gap": row.get("gap")}
-    return {**base, **compare(kind, figures, today_values, focus=symbol, period=period), "sector": sector, "reason": None}
+        today_values[s] = {"quality": f"{f['score']}/{f['evaluated']}" if f.get("evaluated") else None, "gap": row.get("gap"),
+                           "pe_now": current[s].get("pe"), "pb_now": current[s].get("pb")}
+    price_date = max((c["close_date"] for c in current.values() if c.get("close_date")), default=None)
+    return {**base, **compare(kind, figures, today_values, focus=symbol, period=period), "sector": sector, "reason": None, "price_date": price_date}
 
 class ForwardRequest(ContractModel):
     assumptions: Assumptions

@@ -742,7 +742,7 @@ def quarter_alerts_cli(data_dir: Path) -> int:
         print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
         return 0
     sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
-    out = quarter_alerts_run(data_dir, send=_part_sender(sender, chosen.chat_id, data_dir))
+    out = quarter_alerts_run(data_dir, send=_part_sender(sender, chosen.chat_id, data_dir), repo=repo, owner=owner)
     print(json.dumps(out))
     return 0
 

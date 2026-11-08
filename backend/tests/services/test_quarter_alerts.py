@@ -49,3 +49,42 @@ def test_a_failed_send_is_retried_next_run_and_a_quarter_without_last_year_has_n
     texts = []
     assert quarter_alerts_run(tmp_path, send=lambda t: texts.append(t) or True)["sent"] is True
     assert "FPT · Q3/2026: LNST quý 2.500 tỷ (chưa có cùng kỳ năm trước)" in texts[0]
+
+
+def _notes(group2: int, demand: int) -> dict:
+    return {"loans": "1000", "group1": str(995 - group2), "group2": str(group2), "group3": "2", "group4": "1", "group5": "2",
+            "deposits": "1000", "demand": str(demand), "term": str(980 - demand), "savings": "0", "margin": "20", "special": "0"}
+
+
+def test_a_banks_note_scores_it_as_the_valuation_page_does_with_vietcaps_figures_and_entered_quarters(tmp_path):
+    from investment_agent.api.auth import OwnerContext
+    from investment_agent.market.bank_notes import BankNoteStore
+    from investment_agent.repositories.personal import MemoryDocumentStore, PersonalRepository
+    store = _setup(tmp_path)
+    full = {"ROAA_TR_AVG4Q": "0.019", "BAD_LOANS_RATIO_AQ": "0.012", "OVERDUE_LOANS_RATIO_AQ": "0.02", "PROVISION_BAD_LOANS_AQ": "1.0",
+            "NET_INTEREST_MARGIN_TR_AVG5Q": "0.037", "EQUITY_TO_ASSET_AQ": "0.09"}
+    better = {"ROAA_TR_AVG4Q": "0.02", "BAD_LOANS_RATIO_AQ": "0.011", "OVERDUE_LOANS_RATIO_AQ": "0.019", "PROVISION_BAD_LOANS_AQ": "1.1",
+              "NET_INTEREST_MARGIN_TR_AVG5Q": "0.038", "EQUITY_TO_ASSET_AQ": "0.095"}
+    FinancialRatioStore(tmp_path / "financial-ratios").save({"symbol": "TCB", "kind": "bank", "fetched_at": "x", "source": "t",
+                                                             "quarters": {"2025-09-30": full, "2026-09-30": better}})
+    # Vietcap: CASA up, group 2 down, so all nine criteria are met.
+    BankNoteStore(tmp_path / "bank-notes").save({"symbol": "TCB", "fetched_at": "2026-11-08T00:00:00+00:00", "source": "vietcap:iq", "car_years": {},
+                                                 "quarters": {"2025-09-30": _notes(15, 300), "2026-09-30": _notes(12, 330)}})
+    repo, owner = PersonalRepository("owner-1", MemoryDocumentStore()), OwnerContext("owner-1", "owner", "scheduler")
+    quarter_alerts_run(tmp_path, send=lambda t: True, repo=repo, owner=owner)
+    r = store.read("TCB")
+    store.save({**r, "latest_quarter_seen": {"quarter": "2026-Q3", "on": "2026-10-31"}})
+    texts = []
+
+    def fail_once(t):
+        texts.append(t)
+        return False
+    quarter_alerts_run(tmp_path, send=fail_once, repo=repo, owner=owner)
+    assert "Điểm sức khỏe ngân hàng 9/9 (mạnh)" in texts[0]
+    # A quarter the owner entered counts in place of Vietcap's, as on Định giá: CASA now falls.
+    entered = {"group1": "950", "group2": "12", "group3": "2", "group4": "1", "group5": "2", "demand_deposits": "100", "margin_deposits": "10",
+               "customer_deposits": "1000", "car": None}
+    repo.write(owner, "settings", "bank_figures_TCB", {"symbol": "TCB", "quarters": {"2026-Q3": {"values": entered, "source": {"kind": "manual"}}}},
+               expected_version=0, request_id="e1")
+    quarter_alerts_run(tmp_path, send=fail_once, repo=repo, owner=owner)
+    assert "Điểm sức khỏe ngân hàng 8/9" in texts[1]

@@ -1,5 +1,6 @@
 """Số liệu ngân hàng nhập tay on a bank's page: loans by group, deposits and CAR per quarter (`settings/bank_figures_<MÃ>`),
-and reading a public PDF of the quarterly statements into proposed values the owner confirms before saving."""
+and reading a public PDF of the quarterly statements into proposed values the owner confirms before saving. Scanned pages
+are read by OCR on this machine (Tesseract, Vietnamese), with their figures checked against the totals printed with them."""
 
 import re
 from decimal import Decimal, InvalidOperation
@@ -137,18 +138,22 @@ def delete_quarter(symbol: str, quarter: str, request: Request, body: DeleteRequ
                    lambda data: {**data, "quarters": {q: v for q, v in data["quarters"].items() if q != quarter}})
 
 
-def _read_pdf(url: str) -> list[str]:
+def _read_pdf(url: str, *, ocr: bool = True) -> tuple[list[str], frozenset[int], list[str]]:
+    """Text per page, with image pages read by OCR; the 0-based pages read that way; notes on what could not be read."""
     import ssl
 
     import httpx
 
     from investment_agent.insights.download import fetch_pdf
+    from investment_agent.insights.ocr import default_reader, with_ocr
     from investment_agent.insights.pdf import extract_pages
     # No redirects: a redirect could lead to an address check_public_https never saw. Certificates are still verified, against
     # the operating system's stores, which hold the intermediate certificates some bank file servers do not send (Eximbank).
     with httpx.Client(timeout=30, follow_redirects=False, verify=ssl.create_default_context(),
                       headers={"User-Agent": "investment-agent/0.1 (personal use)"}) as client:
-        return extract_pages(fetch_pdf(client, url, max_bytes=MAX_PDF_BYTES, max_seconds=MAX_PDF_SECONDS), max_pages=MAX_PDF_PAGES)
+        data = fetch_pdf(client, url, max_bytes=MAX_PDF_BYTES, max_seconds=MAX_PDF_SECONDS)
+    pages = extract_pages(data, max_pages=MAX_PDF_PAGES)
+    return with_ocr(data, pages, read=default_reader()) if ocr else (pages, frozenset(), [])
 
 
 @router.post("/{symbol}/read-pdf")
@@ -162,7 +167,8 @@ def read_pdf(symbol: str, request: Request, body: ReadRequest):
     except UnsafeUrl as exc:
         return error(422, "unsafe_url", str(exc))
     try:
-        pages = _read_pdf(body.url)
+        pages, ocr, notes = _read_pdf(body.url)
     except Exception:
         return error(502, "pdf_unavailable", "Không tải được file PDF (kiểm tra đường dẫn, file tối đa 30 MB).")
-    return {"url": body.url, **parse_report_pages(pages)}
+    out = parse_report_pages(pages, ocr=ocr)
+    return {"url": body.url, **out, "warnings": [*notes, *out["warnings"]], "ocr_pages": sorted(i + 1 for i in ocr)}

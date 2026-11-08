@@ -20,7 +20,17 @@ Chỉ số tính ra: NPL = (nhóm 3+4+5) / tổng nhóm 1–5; tỷ lệ nợ nh
 
 ## Điền sẵn từ báo cáo PDF
 
-Chủ sở hữu dán đường dẫn PDF công khai của báo cáo (trang nhà đầu tư của ngân hàng). Phần mềm tải về (chỉ `https`, không địa chỉ nội bộ, tối đa 30 MB), đọc chữ từng trang (pypdf, không OCR), tìm các dòng theo nhãn ("Nợ đủ tiêu chuẩn" … "Nợ có khả năng mất vốn", "Tiền gửi không kỳ hạn", "Tiền gửi ký quỹ", "Tiền gửi của khách hàng", "tỷ lệ an toàn vốn") và **điền sẵn vào form kèm số trang**; chủ sở hữu xem lại rồi lưu. Không dùng AI, không đổi chính sách AI. PDF dạng ảnh hoặc không tìm thấy nhãn thì báo rõ, để nhập tay. Số đọc được là gợi ý cho tới khi chủ sở hữu bấm lưu.
+Chủ sở hữu dán đường dẫn PDF công khai của báo cáo (trang nhà đầu tư của ngân hàng). Phần mềm tải về (chỉ `https`, không địa chỉ nội bộ, tối đa 30 MB), đọc chữ từng trang (pypdf; trang dạng ảnh thì OCR, xem dưới), tìm các dòng theo nhãn ("Nợ đủ tiêu chuẩn" … "Nợ có khả năng mất vốn", "Tiền gửi không kỳ hạn", "Tiền gửi ký quỹ", "Tiền gửi của khách hàng", "tỷ lệ an toàn vốn") và **điền sẵn vào form kèm số trang**; chủ sở hữu xem lại rồi lưu. Không dùng AI, không đổi chính sách AI. PDF dạng ảnh hoặc không tìm thấy nhãn thì báo rõ, để nhập tay. Số đọc được là gợi ý cho tới khi chủ sở hữu bấm lưu.
+
+**OCR cho bản scan** (08/11/2026, chủ sở hữu duyệt; BCTC hợp nhất Q3/2026 của MBB chỉ 5/61 trang có chữ). Trang không có lớp chữ tiếng
+Việt dùng được (dưới 20 chữ có dấu) được vẽ thành ảnh xám 300 dpi (pypdfium2) và nhận dạng bằng Tesseract với dữ liệu tiếng Việt
+(`vie`), ngay trên máy: không gửi file cho dịch vụ nào, không ghi ảnh ra đĩa; tối đa 120 trang và 4 phút một lượt (proxy web chờ tới 5 phút
+riêng cho `read-pdf`). Nhãn so khớp sau khi bỏ dấu ("Nợ cân chú ý", "mắt vốn" vẫn khớp), dòng đơn vị nhận cả "minh triệu đồng" và "đông".
+OCR có thể đọc sai chữ số (thử MBB: "Tiền ký quỹ" 11.578.830 trong khi hai dòng con cộng 11.576.830), nên số đọc từ ảnh phải khớp tổng in
+cùng bảng: nợ nhóm 1–5 với dòng tổng ngay dưới, tiền gửi không kỳ hạn và ký quỹ với các dòng con "bằng VND"/"bằng ngoại tệ", tiền gửi của
+khách hàng với tổng ở thuyết minh. Không khớp thì để trống và ghi cả hai số; không có dòng tổng thì ghi "chưa đối chiếu được". Ô điền
+từ ảnh ghi "đọc từ ảnh (OCR), so lại từng chữ số". Không có Tesseract thì báo rõ và nhập tay. Bản tin sản lượng (Số liệu hoạt động) vẫn
+chỉ đọc chữ, vì không có dòng tổng để đối chiếu.
 
 ## Điểm sức khỏe ngân hàng
 

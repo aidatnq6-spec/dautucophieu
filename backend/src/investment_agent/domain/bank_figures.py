@@ -3,7 +3,9 @@ spreadsheet computes from them. No free source publishes these (checked 31/10/20
 notes to the quarterly statements, or has them read from a public PDF and confirms before saving.
 
 The PDF reader only proposes values: each comes with its page, amounts are converted to tỷ đồng only when the page (or
-an earlier one) states its unit, and a label not found is reported missing, never filled in.
+an earlier one) states its unit, and a label not found is reported missing, never filled in. Labels are matched without
+accents, so a scanned page read by OCR ("Nợ cân chú ý", "mắt vốn") still matches; a figure read from such a page must also
+add up to the total printed with it where there is one, or it is left blank with both numbers shown.
 """
 
 import ipaddress
@@ -50,31 +52,42 @@ def derive(q: dict) -> dict:
 
 _NUMBER = re.compile(r"\(?-?\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?\)?|\(?-?\d+(?:[.,]\d+)?\)?%?")
 # "Đơn vị: triệu đồng", or a column-header line holding only the unit (and %), e.g. "triệu đồng % triệu đồng %" (Techcombank).
-_HEADER = r"^[ \t]*(?:{u}(?:[ \t]+%)?[ \t]*)+$"
-_UNITS = ((re.compile(r"đơn vị[^\n]{0,20}?triệu|" + _HEADER.format(u=r"triệu (?:đồng|vnd)"), re.I | re.M), Decimal(1000)),
-          (re.compile(r"đơn vị[^\n]{0,20}?tỷ|" + _HEADER.format(u=r"tỷ (?:đồng|vnd)"), re.I | re.M), Decimal(1)),
+# OCR may merge it with the "Thuyết minh" column ("minh triệu đồng") or read đồng as "đông".
+_HEADER = r"^[ \t]*(?:(?:thuyết[ \t]+)?minh[ \t]+)?(?:{u}(?:[ \t]+%)?[ \t]*)+$"
+_UNITS = ((re.compile(r"đơn vị[^\n]{0,20}?triệu|" + _HEADER.format(u=r"triệu (?:đồng|đông|vnd)"), re.I | re.M), Decimal(1000)),
+          (re.compile(r"đơn vị[^\n]{0,20}?tỷ|" + _HEADER.format(u=r"tỷ (?:đồng|đông|vnd)"), re.I | re.M), Decimal(1)),
           (re.compile(r"đơn vị[^\n]{0,20}?(?:đồng|vnd)", re.I), Decimal(1_000_000_000)))
 # The customer-deposit note runs from its numbered heading ("18. TIỀN GỬI CỦA KHÁCH HÀNG") to the next numbered note.
-_DEPOSIT_NOTE = re.compile(r"^\s*\d{1,2}\.?\s+tiền gửi của khách hàng\s*$", re.I)
+_DEPOSIT_NOTE = re.compile(r"^\s*\d{1,2}\.?\s+tien gui cua khach hang\s*$")  # matched on accent-free text, as all labels
 _NEXT_NOTE = re.compile(r"^\s*\d{1,2}\.\s+\S")
 # The customer-loan quality section ("9.1 Phân tích chất lượng nợ cho vay"); an interbank-credit quality table with the same
 # group labels can sit above it on the same page. Ends at the next sub-heading ("9.2 …") or a line starting with a total.
-_LOAN_NOTE = re.compile(r"(?:chất lượng|phân loại)\s+nợ\s+cho vay(?!.*ký quỹ)", re.I)
+_LOAN_NOTE = re.compile(r"(?:chat luong|phan loai)\s+no\s+cho vay(?!.*ky quy)")
 _SUB_HEADING = re.compile(r"^\s*\d+(?:\.\d+)+\s+\S|^\s*\d{1,2}\.\s+\S")
 # A capital-adequacy report: "G Tỷ lệ an toàn vốn 12.45  14.95 …" under a "Riêng lẻ Hợp nhất" header (consolidated second).
-_CAR_ROW = re.compile(r"tỷ lệ an toàn vốn(?: hợp nhất)?\s+(\d{1,2}[.,]\d+)\s+(\d{1,2}[.,]\d+)", re.I)
+_CAR_ROW = re.compile(r"ty le an toan von(?: hop nhat)?\s+(\d{1,2}[.,]\d+)\s+(\d{1,2}[.,]\d+)")
+# A total under a table: a line of amounts only, the first written with thousands separators (not a date like 30/09/2026).
+_TOTAL_LINE = re.compile(r"^[\s\-.:|]*\(?\d{1,3}(?:[.,]\d{3})+[^a-z]*$")
+_SUB_LINE = r"bang (?:vnd|ngoai te)"  # "- Tiền gửi ký quỹ bằng VND": a part of the line above, never its total
+
+
+def _fold(text: str) -> str:
+    """Lower case without accents (đ as d): what a label is matched on, so OCR's slipped accents do not hide it."""
+    decomposed = unicodedata.normalize("NFD", text.replace("đ", "d").replace("Đ", "D"))
+    return "".join(c for c in decomposed if unicodedata.category(c) != "Mn").lower()
 
 
 def _car(text: str) -> str | None:
     """CAR in %, from "… an toàn vốn … 11,50%" or from a separate/consolidated table row; 3–60% or nothing."""
-    m = re.search(r"an toàn vốn[^\n%]*?(\d{1,2}(?:[.,]\d+)?)\s*%", text, re.I)
+    text = _fold(text)
+    m = re.search(r"an toan von[^\n%]*?(\d{1,2}(?:[.,]\d+)?)\s*%", text)
     value = _to_decimal(m.group(1)) if m else None
     if value is None and (row := _CAR_ROW.search(text)):
-        value = _to_decimal(row.group(2) if re.search(r"riêng lẻ\s+hợp nhất", text, re.I) else row.group(1))
+        value = _to_decimal(row.group(2) if re.search(r"rieng le\s+hop nhat", text) else row.group(1))
     return _plain(value) if value is not None and Decimal(3) <= value <= Decimal(60) else None
-_LINE_LABELS = {"group1": r"nợ đủ tiêu chuẩn", "group2": r"nợ cần chú ý", "group3": r"nợ dưới tiêu chuẩn", "group4": r"nợ nghi ngờ",
-                "group5": r"nợ có khả năng mất vốn", "demand_deposits": r"tiền gửi không kỳ hạn", "margin_deposits": r"tiền gửi ký quỹ",
-                "customer_deposits": r"(?:^|\s)tiền gửi của khách hàng"}
+_LINE_LABELS = {"group1": r"no du tieu chuan", "group2": r"no can chu y", "group3": r"no duoi tieu chuan", "group4": r"no nghi ngo",
+                "group5": r"no co kha nang mat von", "demand_deposits": r"tien gui khong ky han", "margin_deposits": r"tien (?:gui )?ky quy",
+                "customer_deposits": r"(?:^|\s)tien gui cua khach hang"}
 IMAGE_ONLY = "Không đọc được chữ trong file (có thể là bản scan dạng ảnh); hãy nhập tay."
 
 
@@ -94,8 +107,9 @@ def _to_decimal(token: str) -> Decimal | None:
 
 def _amount_after(line: str, label: str) -> Decimal | None:
     """First amount after the label, skipping a note number (1–3 digits, no separators) placed before the amounts."""
-    m = re.search(label, line, re.I)
-    if not m:
+    line = _fold(line)
+    m = re.search(label, line)
+    if not m or (label in (_LINE_LABELS["demand_deposits"], _LINE_LABELS["margin_deposits"]) and re.search(_SUB_LINE, line)):
         return None
     for token in _NUMBER.findall(line[m.end():]):
         if token.endswith("%"):
@@ -110,11 +124,27 @@ def _plain(d: Decimal) -> str:
     return format(d.normalize(), "f")
 
 
-def parse_report_pages(pages: list[str]) -> dict:
-    """Proposed values {field: {value (tỷ đồng, CAR in %), page (1-based)}}, the fields not found, and warnings."""
+def _printed(d: Decimal) -> str:
+    """An amount as the report prints it: 1.288.128.443 (or 7.230,5)."""
+    whole, _, frac = format(abs(d).normalize(), "f").partition(".")
+    return ("-" if d < 0 else "") + f"{int(whole):,}".replace(",", ".") + (f",{frac}" if frac else "")
+
+
+def _total_after(part: list[tuple[int, str]], start: int, within: int = 3) -> Decimal | None:
+    """The total printed in the next few lines of a section after position `start`, if one is there."""
+    for _, ln in part[start + 1:start + 1 + within]:
+        if _TOTAL_LINE.match(_fold(ln)):
+            return _to_decimal(_NUMBER.findall(ln)[0])
+    return None
+
+
+def parse_report_pages(pages: list[str], *, ocr: frozenset[int] = frozenset()) -> dict:
+    """Proposed values {field: {value (tỷ đồng, CAR in %), page (1-based), ocr when read from an image}}, the fields not
+    found, and warnings. `ocr` holds the 0-based pages whose text came from OCR: their figures are checked against totals."""
     if not any(p.strip() for p in pages):
         return {"fields": {}, "missing": list(FIELDS), "warnings": [IMAGE_ONLY]}
-    pages = [unicodedata.normalize("NFC", p) for p in pages]  # PDFs may store Vietnamese letters decomposed (y + ̉ for ỷ)
+    # PDFs may store Vietnamese letters decomposed (y + ̉ for ỷ); Tesseract on Windows ends lines with \r\n, where "$" fails.
+    pages = [unicodedata.normalize("NFC", p).replace("\r\n", "\n").replace("\r", "\n") for p in pages]
     fields, warnings, unit = {}, [], None
     units = []
     for text in pages:
@@ -127,9 +157,9 @@ def parse_report_pages(pages: list[str]) -> dict:
         inside, out = False, []
         for i, page_lines in enumerate(lines):
             for ln in page_lines:
-                if start.search(ln) and not _NUMBER.search(start.split(ln)[-1]):
+                if start.search(folded := _fold(ln)) and not _NUMBER.search(start.split(folded)[-1]):
                     inside = True
-                elif inside and end.match(ln):
+                elif inside and end.match(ln) and not _TOTAL_LINE.match(folded):  # "1.288.128.443 …" is a total, not "9.2 …"
                     inside = False
                 elif inside:
                     out.append((i, ln))
@@ -137,8 +167,9 @@ def parse_report_pages(pages: list[str]) -> dict:
     note_lines = section(_DEPOSIT_NOTE, _NEXT_NOTE)
     loan_lines = section(_LOAN_NOTE, _SUB_HEADING)
     unitless = False
+    raw: dict[str, tuple[Decimal, Decimal, int]] = {}  # field → (amount as printed, its unit, position in its section)
 
-    def take(field: str, page_indexes, only: list[str] | None = None) -> None:
+    def take(field: str, page_indexes, only: list[str] | None = None, at: int = -1) -> None:
         nonlocal unitless
         for i in page_indexes:
             for ln in (lines[i] if only is None else only):
@@ -149,22 +180,25 @@ def parse_report_pages(pages: list[str]) -> dict:
                     unitless = True
                     return
                 fields[field] = {"value": _plain(amount / units[i]), "page": i + 1}
+                raw[field] = (amount, units[i], at)
                 return
 
     everywhere = range(len(pages))
     for f, part in ((g, loan_lines) for g in GROUPS):  # loan groups only from the loan-quality section
-        for i, ln in part:
+        for k, (i, ln) in enumerate(part):
             if f not in fields:
-                take(f, [i], only=[ln])
+                take(f, [i], only=[ln], at=k)
     for f in ("demand_deposits", "margin_deposits"):  # only from the customer-deposit note
-        for i, ln in note_lines:
+        for k, (i, ln) in enumerate(note_lines):
             if f not in fields:
-                take(f, [i], only=[ln])
+                take(f, [i], only=[ln], at=k)
     take("customer_deposits", everywhere)
     for i, text in enumerate(pages):
         if car := _car(text):
             fields["car"] = {"value": car, "page": i + 1}
             break
+    if ocr:
+        warnings.extend(_check_ocr(fields, raw, loan_lines, note_lines, ocr))
     if unitless:
         warnings.append("Không thấy dòng đơn vị (triệu/tỷ đồng) trên trang có số; không điền để tránh sai đơn vị.")
     if not loan_lines:
@@ -172,6 +206,51 @@ def parse_report_pages(pages: list[str]) -> dict:
     if not note_lines:
         warnings.append('Không thấy mục thuyết minh có đánh số "Tiền gửi của khách hàng".')
     return {"fields": fields, "missing": [f for f in FIELDS if f not in fields], "warnings": warnings}
+
+
+def _check_ocr(fields: dict, raw: dict, loan_lines: list, note_lines: list, ocr: frozenset[int]) -> list[str]:
+    """Figures read from an image page must add up to the total printed with them; a miss empties them, and says so."""
+    from_image = {f for f, x in fields.items() if x["page"] - 1 in ocr}
+    notes, unchecked = [], []
+
+    def drop(names, why: str) -> None:
+        for name in names:
+            fields.pop(name, None)
+        notes.append(why + " OCR đọc sai ít nhất một chữ số nên để trống, hãy nhập tay từ file.")
+
+    if from_image & set(GROUPS):
+        total = _total_after(loan_lines, raw["group5"][2]) if all(g in raw for g in GROUPS) else None
+        if total is None:
+            unchecked.append("nợ nhóm 1–5")
+        elif (added := sum(raw[g][0] for g in GROUPS)) != total:
+            drop(GROUPS, f"Nợ nhóm 1–5 đọc từ ảnh (trang {fields['group1']['page']}) cộng ra {_printed(added)}, khác dòng tổng {_printed(total)}.")
+    for f in ("demand_deposits", "margin_deposits"):
+        if f not in from_image:
+            continue
+        amount, _, at = raw[f]
+        parts = []
+        for _, ln in note_lines[at + 1:]:
+            if not re.search(_SUB_LINE, _fold(ln)) or (part := _amount_after(ln, _SUB_LINE)) is None:
+                break
+            parts.append(part)
+        if len(parts) < 2:
+            unchecked.append(LABELS[f].lower())
+        elif sum(parts) != amount:
+            drop([f], f"{LABELS[f]} đọc từ ảnh là {_printed(amount)} nhưng các dòng con cộng ra {_printed(sum(parts))} (trang {fields[f]['page']}).")
+    if "customer_deposits" in fields and ("customer_deposits" in from_image or any(i in ocr for i, _ in note_lines)):
+        amount = raw["customer_deposits"][0]
+        total = next((_to_decimal(_NUMBER.findall(ln)[0]) for _, ln in note_lines if _TOTAL_LINE.match(_fold(ln))), None)
+        if total is None:
+            unchecked.append("tiền gửi của khách hàng")
+        elif total != amount:  # the note and the balance sheet print the same unit
+            drop(["customer_deposits"], f"Tiền gửi của khách hàng đọc từ ảnh là {_printed(amount)} nhưng tổng ở thuyết minh là {_printed(total)}.")
+    for x in fields.values():
+        if x["page"] - 1 in ocr:
+            x["ocr"] = True
+    head = (f"Đã nhận dạng chữ từ ảnh (OCR) {len(ocr)} trang: số đọc từ ảnh có thể sai chữ số; ô nào không khớp dòng tổng đã để trống, "
+            "các ô còn lại vẫn cần so với file trước khi lưu.")
+    tail = [f"Chưa đối chiếu được với dòng tổng: {', '.join(unchecked)}."] if unchecked else []
+    return [head, *notes, *tail]
 
 
 class UnsafeUrl(ValueError):

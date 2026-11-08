@@ -33,6 +33,14 @@ npx.cmd --prefix apps/web playwright install chromium
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows\doctor.ps1
 ```
 
+Tuỳ chọn, để đọc báo cáo ngân hàng dạng scan (OCR, chạy trên máy, không gửi file đi đâu): cài Tesseract và dữ liệu tiếng Việt.
+Không có thì file scan báo "chưa cài Tesseract" và nhập tay như cũ.
+
+```powershell
+winget install -e --id UB-Mannheim.TesseractOCR
+curl.exe -L -o "C:\Program Files\Tesseract-OCR	essdataie.traineddata" https://github.com/tesseract-ocr/tessdata_best/raw/main/vie.traineddata
+```
+
 ## Kiểm tra
 
 ```powershell

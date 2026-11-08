@@ -82,3 +82,12 @@ it("rejects oversized bodies", async () => {
   const response = await proxyInternal(request("PUT", "profile", { body: "x".repeat(1_048_577) }), ["profile"], auth, config, bridge, fetcher);
   expect(response.status).toBe(413);
 });
+
+it("waits longer for a PDF to be read, as a scanned one is read by OCR page by page, and briefly for anything else", async () => {
+  const timeout = vi.spyOn(AbortSignal, "timeout");
+  const body = JSON.stringify({ url: "https://example.com/bctc.pdf", request_id: "r1" });
+  await proxyInternal(request("POST", "bank-figures/MBB/read-pdf", { body }), ["bank-figures", "MBB", "read-pdf"], auth, config, bridge, fetcher);
+  await proxyInternal(request("GET", "ledger"), ["ledger"], auth, config, bridge, fetcher);
+  expect(timeout.mock.calls.map(([ms]) => ms)).toEqual([300000, 15000]);
+  timeout.mockRestore();
+});

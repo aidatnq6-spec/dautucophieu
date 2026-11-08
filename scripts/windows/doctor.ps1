@@ -63,6 +63,14 @@ if (Test-Path (Join-Path $root 'apps/web/node_modules')) {
     Write-Output 'MISSING local dependency: apps/web/node_modules'
     $failed = $true
 }
+# Optional: Tesseract with its Vietnamese model reads scanned bank reports (Số liệu ngân hàng); without it scans are typed in.
+if (Test-Path $venvPython) {
+    try {
+        $tesseract = (& $venvPython -c 'from investment_agent.insights.ocr import find_tesseract; print(find_tesseract() or chr(45))' 2>$null | Out-String).Trim()
+    } catch { $tesseract = '-' }
+    if ($tesseract -and $tesseract -ne '-') { Write-Output "OK optional: Tesseract vie ($tesseract)" }
+    else { Write-Output 'WARN optional: Tesseract with Vietnamese (vie) not found; scanned PDFs are not read (see README, OCR).' }
+}
 # Process environment only: never load or print secret values from a file.
 if ($RequireServices) {
     foreach ($line in Get-Content (Join-Path $root '.env.example')) {

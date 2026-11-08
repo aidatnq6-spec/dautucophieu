@@ -53,11 +53,16 @@ def test_a_public_pdf_is_read_into_proposed_values(tmp_path, monkeypatch):
     from investment_agent.api.routes import bank_figures
     pages = ["11. Chất lượng nợ cho vay\nĐơn vị: triệu đồng\nNợ đủ tiêu chuẩn 447.734.000 1\nNợ cần chú ý 7.808.000 1\n"
              "Nợ dưới tiêu chuẩn 1.517.000 1\nNợ nghi ngờ 1.220.000 1\nNợ có khả năng mất vốn 2.293.000 1"]
-    monkeypatch.setattr(bank_figures, "_read_pdf", lambda url: pages)
+    monkeypatch.setattr(bank_figures, "_read_pdf", lambda url: (pages, frozenset(), []))
     monkeypatch.setattr(bank_figures, "check_public_https", lambda url: None)
     c, clock = client(tmp_path)
     r = call(c, clock, "POST", "/internal/bank-figures/ACB/read-pdf", {"url": "https://acb.com.vn/bctc.pdf", "request_id": "p1"})
     assert r.status_code == 200 and r.json()["fields"]["group1"] == {"value": "447734", "page": 1}
+    # A scanned file: its pages come back read by OCR, flagged as such, with the reader's own notes first.
+    monkeypatch.setattr(bank_figures, "_read_pdf", lambda url: (pages, frozenset({0}), ["Chỉ nhận dạng chữ 120/130 trang dạng ảnh đầu tiên."]))
+    body = call(c, clock, "POST", "/internal/bank-figures/ACB/read-pdf", {"url": "https://acb.com.vn/scan.pdf", "request_id": "p3"}).json()
+    assert body["fields"]["group1"] == {"value": "447734", "page": 1, "ocr": True} and body["ocr_pages"] == [1]
+    assert body["warnings"][0].startswith("Chỉ nhận dạng chữ 120/130") and any("OCR" in w for w in body["warnings"][1:])
     monkeypatch.setattr(bank_figures, "check_public_https", _refuse)
     r = call(c, clock, "POST", "/internal/bank-figures/ACB/read-pdf", {"url": "http://10.0.0.1/a.pdf", "request_id": "p2"})
     assert r.status_code == 422 and r.json()["code"] == "unsafe_url"

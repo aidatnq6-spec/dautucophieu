@@ -1,0 +1,20 @@
+# Tra cứu, nhập và xuất cho Nhật ký và Sổ giao dịch
+
+Duyệt 08/11/2026 (chủ sở hữu), lấy ý tưởng từ file HTML nhật ký đầu tư cũ của chủ sở hữu, bản đó lưu trong `localStorage` nên dễ mất.
+
+## Tra cứu
+
+- Nhật ký: lọc theo mã, lệnh, cảm xúc, loại tài sản, từ khóa (lý do, ghi chú cảm xúc, ghi chú thêm; không phân biệt dấu), từ ngày đến ngày; mới nhất theo ngày quyết định lên trước.
+  Dòng tóm tắt: số mục, thay đổi giá trung bình từ lúc ghi (chỉ các mục có giá), tổng lãi/lỗ ghi tay của mục nhập từ file cũ. Không cộng giá trị mua với bán.
+- Sổ giao dịch: lọc theo mã, loại, từ ngày đến ngày.
+- Xuất Excel (Excel 2003 XML, mọi ô có kiểu, nên lý do mở đầu bằng "=" vẫn là chữ) theo kết quả đang lọc; làm ngay trên trình duyệt.
+
+## Nhập từ nhật ký cũ
+
+Nhận file Excel mà trang HTML cũ xuất ra, hoặc CSV cùng cột (phẩy hoặc chấm phẩy, số kiểu Việt Nam). Xem trước rồi mới lưu.
+
+- Không đoán: ngày không tồn tại, ngày tương lai, lệnh không rõ, số không đọc được, thiếu giá trị, mã không hợp lệ thì báo số dòng và bỏ dòng đó (trang cũ tự ghi ngày hôm nay).
+- Tài sản khác cổ phiếu có tên tự do được giữ dưới mã thay thế (BDS, BTC, TIENGUI, TRAIPHIEU, VANG, KHAC), tên gốc lưu cùng mục.
+- Mã mục sinh từ nội dung dòng, nên nhập lại không trùng; hai dòng giống hệt vẫn là hai mục.
+- Mục nhập vào có ngày của file, không có bối cảnh thị trường và không nhắc xem lại theo giá. Chỉ vào Nhật ký, không vào Sổ giao dịch: file cũ không có phí, thuế và lãi/lỗ là số ghi tay.
+- Dữ liệu cá nhân: chỉ đi giữa trình duyệt, máy chủ nội bộ và kho của chủ sở hữu, không gửi AI.

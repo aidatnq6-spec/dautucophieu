@@ -56,3 +56,41 @@ test("no horizontal scroll on the journal page at 375px", async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test("an older journal file is previewed, imported once into the journal only, and found again by search", async ({ page }) => {
+  await seedOwner(page);
+  const stamp = Date.now();
+  const csv = `STT,Loại tài sản,Ngày giao dịch,Lệnh,Mã,SL tổng,Giá vốn,Giá trị vốn,Lãi/Lỗ,Lý do mua/ bán\n1,Cổ phiếu,2025-03-01,Mua,HPG,1000,20000,,,Định giá rẻ ${stamp}\n2,Vàng,2025-03-02,Mua,,2,8000000,,,Giữ giá trị ${stamp}\n3,Cổ phiếu,31/02/2025,Mua,HPG,1,1,,,hỏng\n`;
+  await page.goto("/portfolio");
+  const before = await page.getByRole("table", { name: "Giao dịch" }).locator("tbody tr").count();
+  await page.goto("/journal");
+  const box = page.getByRole("group", { name: "Nhập từ nhật ký cũ" });
+  await box.locator("summary").click();
+  await box.getByLabel("Chọn file nhật ký").setInputFiles({ name: "cu.csv", mimeType: "text/csv", buffer: Buffer.from(csv, "utf-8") });
+  await expect(box.getByRole("status").first()).toContainText("2 mục mới");
+  await expect(box.getByRole("list", { name: "Dòng lỗi" })).toContainText("Dòng 4: Ngày không hợp lệ: 31/02/2025");
+  await expect(page.getByRole("article").filter({ hasText: `Định giá rẻ ${stamp}` })).toHaveCount(0);  // a preview saves nothing
+  await box.getByRole("button", { name: "Nhập 2 mục" }).click();
+  const entry = page.getByRole("article").filter({ hasText: `Định giá rẻ ${stamp}` });
+  await expect(entry).toContainText("Nhập từ nhật ký cũ");
+  await expect(entry).toContainText("20.000.000");
+  await expect(entry.getByRole("button", { name: "Bối cảnh lúc ghi" })).toHaveCount(0);  // none was recorded
+  // Search, without accents; another asset keeps its class.
+  const search = page.getByRole("region", { name: "Tra cứu nhật ký" });
+  await search.getByLabel("Từ khóa trong lý do, ghi chú").fill(`dinh gia re ${stamp}`);
+  await expect(page.getByRole("article")).toHaveCount(1);
+  await search.getByRole("button", { name: "Xóa bộ lọc" }).click();
+  await search.getByLabel("Loại tài sản").selectOption("Vàng");
+  await expect(page.getByRole("article").filter({ hasText: `Giữ giá trị ${stamp}` })).toContainText("VANG");
+  const saved = page.waitForEvent("download");
+  await search.getByRole("button", { name: "Xuất Excel" }).click();
+  expect((await saved).suggestedFilename()).toBe("nhat-ky-dau-tu.xls");
+  // Importing the same file again adds nothing, and the ledger was never touched.
+  await box.getByLabel("Chọn file nhật ký").setInputFiles({ name: "cu.csv", mimeType: "text/csv", buffer: Buffer.from(csv, "utf-8") });
+  await expect(box.getByRole("status").first()).toContainText("0 mục mới");
+  await expect(box.getByRole("status").first()).toContainText("2 mục đã có");
+  await page.goto("/portfolio");
+  await expect(page.getByRole("table", { name: "Giao dịch" }).locator("tbody tr")).toHaveCount(before);
+  await page.getByLabel("Tìm mã").fill("ZZZ");
+  await expect(page.getByRole("table", { name: "Giao dịch" }).locator("tbody tr")).toHaveCount(0);
+});

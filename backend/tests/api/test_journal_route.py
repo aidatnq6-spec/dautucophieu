@@ -64,3 +64,26 @@ def test_the_review_threshold_is_set_in_settings(tmp_path):
     assert ok.status_code == 200 and call(c, clock, "GET", "/internal/journal").json()["threshold"] == "0.2"
     bad = call(c, clock, "PUT", "/internal/settings/portfolio", {"settings": {"journal_review_threshold": "0"}, "expected_version": 1, "request_id": "pf-j2"})
     assert bad.status_code == 422
+
+
+CSV = ("STT,Loại tài sản,Ngày giao dịch,Lệnh,Mã,SL tổng,Giá vốn,Giá trị vốn,Lãi/Lỗ,Lý do mua/ bán\n"
+       "1,Cổ phiếu,2025-03-01,Mua,FPT,100,50000,,,Lý do cũ\n2,Cổ phiếu,31/02/2025,Mua,FPT,1,1,,,hỏng\n")
+
+
+def test_an_older_journal_is_previewed_then_imported_once_without_a_review_reminder_or_a_ledger_change(tmp_path):
+    c, clock = client(tmp_path)
+    events = len(call(c, clock, "GET", "/internal/ledger").json()["events"])
+    before = len(call(c, clock, "GET", "/internal/journal").json()["entries"])
+    preview = call(c, clock, "POST", "/internal/journal/import", {"content": CSV, "request_id": "p1"}).json()
+    assert preview["new"] == 1 and preview["imported"] == 0 and preview["rows"][0]["symbol"] == "FPT" and preview["problems"][0]["line"] == 3
+    assert len(call(c, clock, "GET", "/internal/journal").json()["entries"]) == before  # a preview saves nothing
+    done = call(c, clock, "POST", "/internal/journal/import", {"content": CSV, "commit": True, "request_id": "c1"}).json()
+    assert done["imported"] == 1
+    entries = call(c, clock, "GET", "/internal/journal").json()["entries"]
+    mine = next(e for e in entries if e["reason"] == "Lý do cũ")
+    assert mine["created_on"] == "2025-03-01" and mine["imported"]["total"] == "5000000" and mine["context"] == {} and mine["change"] is None
+    again = call(c, clock, "POST", "/internal/journal/import", {"content": CSV, "commit": True, "request_id": "c2"}).json()
+    assert again["imported"] == 0 and again["duplicates"] == 1
+    assert len(call(c, clock, "GET", "/internal/ledger").json()["events"]) == events
+    bad = call(c, clock, "POST", "/internal/journal/import", {"content": "a,b\n1,2\n", "request_id": "b1"})
+    assert bad.status_code == 422 and bad.json()["code"] == "invalid_file"

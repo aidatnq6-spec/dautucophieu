@@ -6,10 +6,11 @@ from fastapi import APIRouter, Request
 from pydantic import Field
 
 from investment_agent.domain.journal import JournalEntry
+from investment_agent.domain.journal_import import ImportFileError, parse_journal_file
 from investment_agent.domain.models import ContractModel
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.holdings_view import held_from_repo
-from investment_agent.services.journal import EntryNotFound, append_entry, append_note, capture_context, change, read_journal
+from investment_agent.services.journal import EntryNotFound, append_entry, append_note, capture_context, change, import_entries, read_journal
 from investment_agent.services.records import portfolio_settings
 
 from ..auth import require_owner
@@ -33,6 +34,36 @@ class EntryRequest(ContractModel):
 class NoteRequest(ContractModel):
     text: str = Field(min_length=1, max_length=2000)
     request_id: str = Field(pattern=REQUEST_ID)
+
+
+class ImportRequest(ContractModel):
+    content: str = Field(min_length=1, max_length=900_000)
+    commit: bool = False
+    request_id: str = Field(pattern=REQUEST_ID)
+
+
+@router.post("/journal/import")
+def import_journal(request: Request, body: ImportRequest):
+    """An older journal file: with commit false what it would add, line by line; with commit true the new lines are saved at once."""
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None:
+        return unavailable()
+    try:
+        entries, problems = parse_journal_file(body.content, today=request_now(request).date())
+        have = {e.entry_id for e in read_journal(repo, owner)[0]}
+    except ImportFileError as exc:
+        return error(422, "invalid_file", str(exc))
+    except RepositoryUnavailable:
+        return unavailable()
+    fresh = [e for e in entries if e.entry_id not in have]
+    if not body.commit:
+        return {"rows": [e.model_dump(mode="json") for e in fresh], "new": len(fresh), "duplicates": len(entries) - len(fresh), "problems": problems,
+                "imported": 0}
+    try:
+        added = import_entries(repo, owner, fresh, request_id=body.request_id)
+    except WRITE_ERRORS as exc:
+        return write_error(exc)
+    return {"rows": [], "new": 0, "duplicates": len(entries) - added, "problems": problems, "imported": added}
 
 
 @router.get("/journal")

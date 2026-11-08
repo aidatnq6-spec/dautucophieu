@@ -32,6 +32,7 @@ class JournalEntry(ContractModel):
     ledger_event_id: str | None = None
     notes: tuple[JournalNote, ...] = ()
     reviewed_levels: tuple[int, ...] = ()
+    imported: dict | None = None  # from an older journal file: asset, ticker as written, qty, price, total, pnl (typed by hand there)
 
 
 def add_note(entry: JournalEntry, *, text: str, on: str | date) -> JournalEntry:

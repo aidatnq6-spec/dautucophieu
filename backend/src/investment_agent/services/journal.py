@@ -46,6 +46,16 @@ def append_entry(repo, owner, entry: JournalEntry, *, request_id: str) -> Journa
     return entry
 
 
+def import_entries(repo, owner, new: list[JournalEntry], *, request_id: str) -> int:
+    """Add the entries not already there, in one write; returns how many were added."""
+    entries, version = read_journal(repo, owner)
+    have = {e.entry_id for e in entries}
+    fresh = [e for e in new if e.entry_id not in have]
+    if fresh:
+        _write(repo, owner, [*entries, *fresh], version, request_id)
+    return len(fresh)
+
+
 def append_note(repo, owner, entry_id: str, *, text: str, on: date, request_id: str) -> JournalEntry:
     entries, version = read_journal(repo, owner)
     if not any(e.entry_id == entry_id for e in entries):

@@ -245,9 +245,37 @@ def forward_put(symbol: str, request: Request, body: ForwardRequest):
         return write_error(exc)
 
 
+# A bank's ratios VNDirect does not publish, from the owner's Số liệu ngân hàng (nhập tay): each placed after the ratio it reads with.
+MANUAL_BANK = (("GROUP2_RATIO", "Tỷ lệ nợ nhóm 2 (nhập tay)", "pct2", "group2_ratio", "BAD_LOANS_RATIO_AQ"),
+               ("CASA", "CASA (nhập tay)", "pct1", "casa", "NET_INTEREST_MARGIN_TR_AVG5Q"))
+_QUARTER_END = {"1": "03-31", "2": "06-30", "3": "09-30", "4": "12-31"}
+
+
+def _entered_bank_ratios(request: Request, sym: str) -> dict[str, dict[str, str]]:
+    """{quarter-end date: {code: ratio}} from the quarters the owner entered; none when the store cannot be read."""
+    from investment_agent.domain.bank_figures import derive
+
+    from .bank_figures import bank_record_id
+    repo = request.app.state.personal_repository
+    if repo is None:
+        return {}
+    try:
+        record = read_version(repo, require_owner(request), "settings", bank_record_id(sym), None)
+    except RepositoryUnavailable:
+        return {}
+    out = {}
+    for quarter, entry in ((record.payload if record else {}).get("quarters") or {}).items():
+        derived = derive(entry.get("values") or {})
+        row = {code: derived[key] for code, _, _, key, _ in MANUAL_BANK if derived.get(key) is not None}
+        if row:
+            out[f"{quarter[:4]}-{_QUARTER_END[quarter[-1]]}"] = row
+    return out
+
+
 @router.get("/fairvalue/ratios/{symbol}")
 def sector_ratios(symbol: str, request: Request):
-    """Quarterly sector ratios of a watched bank, securities firm or insurer (VNDirect public data), oldest quarter first."""
+    """Quarterly sector ratios of a watched bank, securities firm or insurer (VNDirect public data), oldest quarter first; for a
+    bank also CASA and the group-2 share from the figures the owner entered, blank in quarters not entered."""
     require_owner(request)
     data_dir, sym = _forward_symbol(request, symbol)
     if data_dir is None:
@@ -255,11 +283,17 @@ def sector_ratios(symbol: str, request: Request):
     record = FinancialRatioStore(data_dir / "financial-ratios").read(sym) if sym else None
     if not record or record.get("kind") not in DISPLAY:
         return error(404, "not_a_financial", "Chỉ có cho ngân hàng, chứng khoán, bảo hiểm trong danh sách theo dõi.")
-    quarters = sorted(record["quarters"])  # all of them: Bảng số tài chính picks how many to show
+    data = {q: dict(v) for q, v in record["quarters"].items()}
+    rows = list(DISPLAY[record["kind"]])
+    if record["kind"] == "bank":
+        for day, entered in _entered_bank_ratios(request, sym).items():
+            data.setdefault(day, {}).update(entered)
+        for code, label, fmt, _, after in MANUAL_BANK:
+            rows.insert(next(i for i, r in enumerate(rows) if r[0] == after) + 1, (code, label, fmt))
+    quarters = sorted(data)  # all of them: Bảng số tài chính picks how many to show
     return {"symbol": sym, "kind": record["kind"], "fetched_at": record.get("fetched_at"),
             "quarters": [{"date": q, "label": f"Q{(int(q[5:7]) + 2) // 3}/{q[:4]}"} for q in quarters],
-            "metrics": [{"code": code, "label": label, "format": fmt, "values": [record["quarters"][q].get(code) for q in quarters]}
-                        for code, label, fmt in DISPLAY[record["kind"]]]}
+            "metrics": [{"code": code, "label": label, "format": fmt, "values": [data[q].get(code) for q in quarters]} for code, label, fmt in rows]}
 
 
 @router.get("/fairvalue/dividends/{symbol}")

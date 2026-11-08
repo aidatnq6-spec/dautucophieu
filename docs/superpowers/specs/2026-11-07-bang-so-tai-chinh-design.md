@@ -76,3 +76,8 @@ năm ĐHCĐ, dự phóng quý tới, số liệu vận hành nhập tay (và đ�
 Chuỗi tự tính ([index_history](../../../backend/src/investment_agent/market/index_history.py)) vẫn dùng quy tắc 45 ngày. Đã kiểm trên báo cáo VNDirect
 đã lưu của các mã theo dõi: gần như mọi quý 2013–2017 (690/692) có `createdDate` là đợt nạp số cũ tháng 12/2019, nằm ngoài 120 ngày, nên quy tắc ngày
 VNDirect cũng rơi về 45 ngày. Đổi sang ngày VNDirect không làm khác chuỗi này, nên không đổi.
+
+- **CASA và tỷ lệ nợ nhóm 2 cho ngân hàng** (08/11/2026, chủ sở hữu duyệt): VNDirect không có hai tỷ lệ này (188 mã của MBB, chỉ có
+  tiền gửi / tổng tài sản và LDR), nên nhóm "Chỉ số ngân hàng" lấy chúng từ Số liệu ngân hàng (nhập tay), cùng công thức với khối đó:
+  nợ nhóm 2 / nợ nhóm 1–5 (2 chữ số thập phân, ngay sau NPL) và (không kỳ hạn + ký quỹ) / tiền gửi của khách hàng (ngay sau NIM). Nhãn ghi
+  "(nhập tay)"; quý chưa nhập để trống, không nội suy; quý đã nhập mà VNDirect chưa có thì vẫn thêm cột. Bấm tên dòng để vẽ như các chỉ số khác.

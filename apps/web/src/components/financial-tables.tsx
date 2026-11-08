@@ -20,7 +20,7 @@ type Ratios = { kind: Kind; quarters: { date: string; label: string }[];
 
 const SIGNED = new Set(["revenue_yoy", "gross_profit_yoy", "npat_parent_yoy", "ebitda_yoy", "fcff_yield"]);
 // VNDirect's ratios read to two places (NPL 1,66%, not 1,7%), as their own table showed them.
-const TWO = new Set(["BAD_LOANS_RATIO_AQ", "OVERDUE_LOANS_RATIO_AQ", "NET_INTEREST_MARGIN_TR_AVG5Q", "ROAA_TR_AVG4Q", "LOANS_TO_EQUITY_AQ"]);
+const TWO = new Set(["BAD_LOANS_RATIO_AQ", "GROUP2_RATIO", "OVERDUE_LOANS_RATIO_AQ", "NET_INTEREST_MARGIN_TR_AVG5Q", "ROAA_TR_AVG4Q", "LOANS_TO_EQUITY_AQ"]);
 const TITLE: Record<Kind, string> = { bank: "ngân hàng", securities: "công ty chứng khoán", insurance: "bảo hiểm" };
 const COUNTS = [8, 12, 20, 0] as const;
 
@@ -165,7 +165,7 @@ export function FinancialTables({ symbol }: { symbol: string }) {
       </details>}
       {financial ? <p className="caption wrap">
         Chỉ số {TITLE[data.kind as Kind]}: tỷ lệ VNDirect tính sẵn (dữ liệu công khai, từ Q4/2017; ROAA, ROAE từ Q3/2023), chỉ có theo quý; NIM, ROAA, ROAE,
-        biên lợi nhuận trên 4–5 quý gần nhất, các tỷ lệ khác tại cuối quý; ô — là quý nguồn chưa có số. Quy mô và định giá: báo cáo tài chính trên API công
+        biên lợi nhuận trên 4–5 quý gần nhất, các tỷ lệ khác tại cuối quý; ô — là quý nguồn chưa có số.{data.kind === "bank" ? " Tỷ lệ nợ nhóm 2 = nợ nhóm 2 / nợ nhóm 1–5 và CASA = (tiền gửi không kỳ hạn + ký quỹ) / tiền gửi của khách hàng: tính từ khối Số liệu ngân hàng (nhập tay), chỉ có ở quý đã nhập; quý chưa nhập để trống, không nội suy." : ""} Quy mô và định giá: báo cáo tài chính trên API công
         khai của VNDirect{data.fetched_at ? `, đọc ${new Date(data.fetched_at).toLocaleDateString("vi-VN")}` : ""}. Vốn hoá = giá đóng
         cửa thực (chưa điều chỉnh) phiên cuối kỳ × số cổ phiếu cuối kỳ (vốn góp ÷ 10.000 đ); giá thực có từ 2013. Vốn chủ công ty mẹ = vốn chủ sở hữu − lợi
         ích cổ đông không kiểm soát; giá trị sổ sách / cổ phiếu = vốn chủ công ty mẹ ÷ số cổ phiếu. Quý: P/E, ROE và các bội số theo lợi nhuận, thu nhập tính

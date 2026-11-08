@@ -17,6 +17,7 @@ from investment_agent.market.financial_ratios import FinancialRatioStore
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.sectors import load_sectors
 from investment_agent.market.watchlist import load_watchlist
+from investment_agent.services.holdings_view import _bank_figures
 from investment_agent.valuation.quality import _bn, _pct, report_quality
 
 LEVEL = {"strong": "mạnh", "medium": "trung bình", "weak": "yếu"}
@@ -38,7 +39,7 @@ def _label(quarter: str) -> str:
     return f"Q{quarter[-1]}/{quarter[:4]}"
 
 
-def _line(symbol: str, quarter: str, record: dict, sector: str | None, ratios: dict | None) -> str:
+def _line(symbol: str, quarter: str, record: dict, sector: str | None, ratios: dict | None, bank: dict | None = None) -> str:
     quarters = record.get("quarters", {})
     now = quarters.get(quarter, {}).get("npat")
     before = quarters.get(f"{int(quarter[:4]) - 1}{quarter[4:]}", {}).get("npat")
@@ -60,7 +61,7 @@ def _line(symbol: str, quarter: str, record: dict, sector: str | None, ratios: d
             earlier = [d for d in dates if d < current]
             prev = ratios["quarters"][earlier[-1]].get("BAD_LOANS_RATIO_AQ") if earlier else None
             parts.append(f"NPL {_pct(Decimal(npl), 2)}" + (f" (quý trước {_pct(Decimal(prev), 2)})" if prev else ""))
-    q = report_quality(record, sector, ratios)
+    q = report_quality(record, sector, ratios, bank)  # with CASA and the group-2 share, as on Định giá
     if (f := q.get("f_score")) and f.get("level"):
         parts.append(f"{f.get('title') or 'F-Score'} {f['score']}/{f['evaluated']} ({LEVEL[f['level']]})")
     text = " · ".join(parts)
@@ -73,7 +74,7 @@ def render(lines: list[str]) -> str:
     return "Báo cáo quý mới\n" + "\n".join(f"• {ln}" for ln in lines) + "\nXem chi tiết ở Định giá và trang từng mã. Không phải khuyến nghị."
 
 
-def quarter_alerts_run(data_dir: Path, *, send: Callable[[str], bool]) -> dict:
+def quarter_alerts_run(data_dir: Path, *, send: Callable[[str], bool], repo=None, owner=None) -> dict:
     data_dir = Path(data_dir)
     store, ratio_store = FundamentalsStore(data_dir / "fundamentals"), FinancialRatioStore(data_dir / "financial-ratios")
     sectors = load_sectors(data_dir)[0]
@@ -90,7 +91,8 @@ def quarter_alerts_run(data_dir: Path, *, send: Callable[[str], bool]) -> dict:
     pending = {s: (q, r) for s, (q, r) in seen.items() if sent.get(s) != q}
     if not pending:
         return {"baseline": False, "alerts": 0, "sent": False}
-    lines = [_line(s, q, r, sectors.get(s), ratio_store.read(s)) for s, (q, r) in sorted(pending.items())]
+    bank = _bank_figures(repo, owner, data_dir, list(pending), sectors)
+    lines = [_line(s, q, r, sectors.get(s), ratio_store.read(s), bank.get(s)) for s, (q, r) in sorted(pending.items())]
     delivered = bool(send(render(lines)))
     if delivered:
         _save_state(data_dir, {**sent, **{s: q for s, (q, _) in pending.items()}})

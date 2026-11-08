@@ -33,7 +33,7 @@ def _bank_figures(repo, owner, data_dir: Path, symbols, sectors) -> dict[str, di
     for s in symbols:
         if sectors.get(s) != "Ngân hàng":
             continue
-        record = read_version(repo, owner, "settings", f"bank_figures_{s}", None)
+        record = read_version(repo, owner, "settings", f"bank_figures_{s}", None) if repo is not None else None
         entered = {q: v["values"] for q, v in record.payload.get("quarters", {}).items()} if record else {}
         if rows := bank_ratio_rows(entered, (notes.read(s) or {}).get("quarters") or {}):
             out[s] = rows

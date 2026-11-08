@@ -81,3 +81,10 @@ VNDirect cũng rơi về 45 ngày. Đổi sang ngày VNDirect không làm khác 
   tiền gửi / tổng tài sản và LDR), nên nhóm "Chỉ số ngân hàng" lấy chúng từ Số liệu ngân hàng (nhập tay), cùng công thức với khối đó:
   nợ nhóm 2 / nợ nhóm 1–5 (2 chữ số thập phân, ngay sau NPL) và (không kỳ hạn + ký quỹ) / tiền gửi của khách hàng (ngay sau NIM). Nhãn ghi
   "(nhập tay)"; quý chưa nhập để trống, không nội suy; quý đã nhập mà VNDirect chưa có thì vẫn thêm cột. Bấm tên dòng để vẽ như các chỉ số khác.
+- **Nợ nhóm 2 và CASA từ Vietcap** (08/11/2026, chủ sở hữu duyệt): nguồn chính là thuyết minh báo cáo tài chính trên API IQ công khai của
+  Vietcap (`iq.vietcap.com.vn/.../financial-statement?section=NOTE`: nợ nhóm 1–5 và tổng dư nợ, tiền gửi theo loại và tổng tiền gửi;
+  từ Q1/2018). Đã dò: VNDirect có danh mục mục thuyết minh (mẫu 104) nhưng không trả số; Vnstock Cộng đồng khoá `note` và `ratio`; TCBS
+  chặn bằng Cloudflare. Lệnh `bank-notes-sync` (lượt 20:00) gọi mỗi ngân hàng theo dõi một lần, cách nhau 10 giây theo `Crawl-delay`
+  của Vietcap, dưới tên ứng dụng (không giả trình duyệt), mỗi mã làm mới tối đa một lần một tuần; lưu `data/bank-notes`. Tỷ lệ chỉ tính khi
+  nhóm 1–5 cộng ra đúng tổng dư nợ và các loại tiền gửi cộng ra đúng tổng tiền gửi; lệch thì để trống và ghi hai số ở "Đối chiếu nợ nhóm
+  2 và CASA". Quý đã nhập tay dùng số nhập tay; khác số Vietcap (ở 4 chữ số thập phân) thì ghi cả hai. Nhãn bỏ "(nhập tay)". CAR vẫn nhập tay.

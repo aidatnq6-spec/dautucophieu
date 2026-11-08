@@ -63,7 +63,7 @@ def glance(request: Request):
     # Quick numbers: value and unrealised gain at today's prices; the last session's move from stored daily closes (thousand đồng).
     value = sum((Decimal(h["market_value"]) for h in held if h["market_value"] is not None), Decimal(0))
     gain = sum((Decimal(h["unrealized_gain"]) for h in held if h["unrealized_gain"] is not None), Decimal(0))
-    day_change, day_base, session = Decimal(0), Decimal(0), None
+    day_change, day_base, session, no_prior = Decimal(0), Decimal(0), None, []
     index_points = series.read("VNINDEX-1d") if series else []
     if len(index_points) >= 2:
         session = index_points[-1][0].date()
@@ -74,6 +74,8 @@ def glance(request: Request):
             last, prev = Decimal(str(closes[-1][1])) * 1000, Decimal(str(closes[-2][1])) * 1000
             day_change += shares * (last - prev)
             day_base += shares * prev
+        else:
+            no_prior.append(h["security_id"])
     closes_by_symbol = {}
     if series:
         closes_by_symbol = {s: {t.date(): v * 1000 for t, v in series.read(f"{s}-1d")}
@@ -85,7 +87,10 @@ def glance(request: Request):
             "vnindex_change_ratio": _ratio(Decimal(str(index_points[-1][1])) - Decimal(str(index_points[-2][1])), Decimal(str(index_points[-2][1])))
             if len(index_points) >= 2 else None,
             "performance": perf, "room": budget.get("room") if budget["status"] == "ok" else None,
-            "over_budget": budget.get("over") if budget["status"] == "ok" else None}
+            "over_budget": budget.get("over") if budget["status"] == "ok" else None,
+            # What the numbers cover: holdings left out for want of a price or of two daily closes are named, never silently dropped.
+            "held_count": len(held), "unpriced": sorted(h["security_id"] for h in held if h["market_value"] is None),
+            "no_prior_close": sorted(no_prior), "price_dates": sorted({h["price_date"] for h in held if h["price_date"]})}
 
     # Worth a look: held tickers' corporate events within the reminder window, concentration flags, journal entries due for review.
     held_symbols = {h["security_id"] for h in held}

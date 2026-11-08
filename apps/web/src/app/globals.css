@@ -184,6 +184,8 @@ legend{font-weight:600;padding:0 6px}
 .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px 18px}
 .kpi-row>div{display:flex;flex-direction:column;gap:2px;min-width:0}
 .kpi-label{font-size:13px;color:var(--muted)}
+.kpi-note{font-size:12px;line-height:1.35;color:var(--muted)}
+.kpi-scope{margin:0 0 10px}
 .kpi-row strong{font-size:19px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .watch-list{margin:0;padding-left:0;list-style:none;display:grid;gap:8px}
 .watch-list li{overflow-wrap:anywhere}

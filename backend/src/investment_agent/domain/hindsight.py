@@ -180,6 +180,35 @@ def _group(rows: list[tuple[str, dict]], keys: tuple[str, ...] = ()) -> list[dic
     return out
 
 
+def _chasing(bought: list[dict], series: dict) -> dict:
+    """Buys after the price had risen more than CHASE_RISE in CHASE_SESSIONS, against the other buys."""
+    rows = []
+    for r in bought:
+        s = series.get(r["symbol"], EMPTY)
+        i = s.index_on(date.fromisoformat(r["date"]) - timedelta(days=1))  # the sessions before the buy day
+        if i is None or i < CHASE_SESSIONS:
+            continue
+        rows.append(("chasing" if s.values[i] / s.values[i - CHASE_SESSIONS] - 1 > CHASE_RISE else "other", r["horizons"]["6"]))
+    return {g["key"]: g for g in _group(rows, ("chasing", "other"))}
+
+
+def imported_hindsight(rows: list[dict], *, closes: dict, index: list, today: date) -> dict:
+    """Stock orders brought in from an older journal, kept apart from the ledger's: no fees or taxes, and no holdings to rebuild, so the
+    measures that need a position (Odean's ratios, losses held) are not computed. Each order is followed close to close on the adjusted
+    series, as the ledger's are. A sale counts as made at a gain or a loss by the profit typed with it; a typed 0 tells nothing (the
+    old page saved a blank as 0) and is left out."""
+    series = {s: _Series(p, today, 1000) for s, p in closes.items()}
+    idx = _Series(index, today, 1)
+    trades = [{"entry_id": r["entry_id"], "symbol": r["symbol"], "type": r["kind"], "date": r["date"].isoformat(), "price": r["price"], "quantity": r["qty"],
+               "horizons": {str(m): _horizon(series.get(r["symbol"], EMPTY), idx, r["date"], m, today) for m in HORIZONS}} for r in rows]
+    typed = {r["entry_id"]: Decimal(r["pnl"]) for r in rows if r.get("pnl") not in (None, "") and Decimal(r["pnl"]) != 0}
+    sold = _group([("gain" if typed[t["entry_id"]] > 0 else "loss", t["horizons"]["6"]) for t in trades if t["type"] == "sell" and t["entry_id"] in typed], ("gain", "loss"))
+    trades.sort(key=lambda t: t["date"], reverse=True)
+    return {"trades": trades, "count": len(trades), "measured": sum(1 for t in trades if any(h["status"] == "ok" for h in t["horizons"].values())),
+            "missing_symbols": sorted({r["symbol"] for r in rows if not series.get(r["symbol"], EMPTY).days}),
+            "biases": {"chasing": _chasing([t for t in trades if t["type"] == "buy"], series), "sold": {g["key"]: g for g in sold}}}
+
+
 def hindsight(events, *, closes: dict, index: list, journal: list[dict], theses: list[dict], threshold: Decimal, today: date) -> dict:
     series = {s: _Series(p, today, 1000) for s, p in closes.items()}
     book = _Book(list(events), series)
@@ -258,14 +287,7 @@ def hindsight(events, *, closes: dict, index: list, journal: list[dict], theses:
             if t["symbol"] == r["symbol"] and created and created <= d + timedelta(days=LINK_DAYS) and (closed is None or closed >= d):
                 reason_rows += [(reason, r["horizons"]["6"]) for reason in t.get("reasons", [])]
                 break
-    chase = []
-    for r in bought:
-        s = series.get(r["symbol"], EMPTY)
-        i = s.index_on(date.fromisoformat(r["date"]) - timedelta(days=1))  # the sessions before the buy day
-        if i is None or i < CHASE_SESSIONS:
-            continue
-        chase.append(("chasing" if s.values[i] / s.values[i - CHASE_SESSIONS] - 1 > CHASE_RISE else "other", r["horizons"]["6"]))
-    chasing = {g["key"]: g for g in _group(chase, ("chasing", "other"))}
+    chasing = _chasing(bought, series)
     return {"trades": rows, "opening_skipped": opening, "loss_holds": loss_holds, "breaks": breaks,
             "biases": {"disposition": disposition, "by_emotion": by_emotion, "by_reason": _group(reason_rows), "chasing": chasing}}
 

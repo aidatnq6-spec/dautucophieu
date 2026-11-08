@@ -36,6 +36,7 @@ it("book value per share is shown in whole đồng", () => {
   expect(cell(null, "vnd", "bvps")).toBe("—");
   expect(cell("0.0170", "pct", "GROUP2_RATIO")).toBe("1,70%");  // the owner's group-2 share to two places, as NPL beside it
   expect(cell("0.3300", "pct", "CASA")).toBe("33,0%");
+  expect(cell("0.1461", "pct", "CAR")).toBe("14,61%");  // year-end CAR to two places, as the banks report it
 });
 
 it("a financial company's quarters take its sector ratios first, over the quarters of both, gaps kept", async () => {

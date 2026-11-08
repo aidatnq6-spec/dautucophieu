@@ -2,8 +2,9 @@
 bank's statements on Vietcap's IQ API (public, no key; the source the owner approved on 08/11/2026, since VNDirect publishes no
 note figures and Vnstock's Community tier locks them). From them the bank ratios table shows the group-2 share and CASA.
 
-Vietcap's robots.txt asks for 10 seconds between requests, and its notes answer 418 to faster callers: one call per bank, 10
-seconds apart, under this application's own name, and a bank's record is refreshed at most weekly. A ratio is given only where
+Vietcap's robots.txt asks for 10 seconds between requests, and its notes answer 418 to faster callers (now and then even to
+slower ones): two calls per bank (the notes, and statistics-financial for the year-end CAR), 10 seconds apart, a refused call
+tried once more after 30 seconds, under this application's own name; a bank's record is refreshed at most weekly. A ratio is given only where
 the parts add up to the total Vietcap prints with them; otherwise it is left blank and the two figures are reported.
 """
 
@@ -17,6 +18,8 @@ from pathlib import Path
 from typing import Callable
 
 URL = "https://iq.vietcap.com.vn/api/iq-insight-service/v1/company/{symbol}/financial-statement?section=NOTE"
+STATS_URL = "https://iq.vietcap.com.vn/api/iq-insight-service/v1/company/{symbol}/statistics-financial"
+RETRY_SECONDS = 30
 SOURCE = "vietcap:iq"
 DELAY_SECONDS = 10  # robots.txt Crawl-delay
 MAX_AGE = timedelta(days=7)
@@ -74,6 +77,23 @@ def parse_notes(text: str, *, symbol: str) -> dict[str, dict[str, str]]:
     return dict(sorted(out.items()))
 
 
+def parse_car_years(text: str) -> dict[str, str]:
+    """Year-end CAR as a ratio by year, from the yearly rows (quarter 5); the quarterly rows carry 0.0 for "not given", and a
+    zero is never a capital adequacy ratio, so it is left out."""
+    rows = json.loads(text).get("data") or []
+    out = {}
+    for row in rows:
+        if row.get("quarter") != 5 or not row.get("year"):
+            continue
+        try:
+            value = Decimal(str(row.get("car")))
+        except (InvalidOperation, TypeError, ValueError):
+            continue
+        if value.is_finite() and value > 0:
+            out[str(int(row["year"]))] = format(value.normalize(), "f")
+    return dict(sorted(out.items()))
+
+
 def _million(d: Decimal) -> str:
     """Đồng as the notes print them, in triệu đồng: 1.288.128.443."""
     return f"{int((d / 1_000_000).to_integral_value(ROUND_HALF_UP)):,}".replace(",", ".")
@@ -119,21 +139,38 @@ def sync_bank_notes(store: BankNoteStore, sectors: dict[str, str | None], *, get
     """Refresh each watched bank whose record is a week old or missing; one failing is reported, the others still update."""
     now = now or datetime.now(timezone.utc)
     results, called = {}, False
-    for symbol in sorted(s for s, sector in sectors.items() if sector == BANK):
-        old = store.read(symbol)
-        if old and not force and now - datetime.fromisoformat(old["fetched_at"]) < MAX_AGE:
-            results[symbol] = "fresh"
-            continue
+
+    def fetch(url: str) -> str:
+        nonlocal called
         if called:
             sleep(DELAY_SECONDS)
         called = True
         try:
-            quarters = parse_notes(get(URL.format(symbol=symbol)), symbol=symbol)
-            if not quarters:
-                results[symbol] = "error:no_observations"
-                continue
-            store.save({"symbol": symbol, "fetched_at": now.isoformat(), "source": SOURCE, "quarters": quarters})
-            results[symbol] = "ok"
+            return get(url)
+        except Exception:
+            sleep(RETRY_SECONDS)
+            return get(url)
+
+    for symbol in sorted(s for s, sector in sectors.items() if sector == BANK):
+        old = store.read(symbol)
+        if old and not force and "car_years" in old and now - datetime.fromisoformat(old["fetched_at"]) < MAX_AGE:
+            results[symbol] = "fresh"
+            continue
+        try:
+            quarters = parse_notes(fetch(URL.format(symbol=symbol)), symbol=symbol)
         except Exception as exc:
             results[symbol] = f"error:{type(exc).__name__}"
+            continue
+        if not quarters:
+            results[symbol] = "error:no_observations"
+            continue
+        record = {"symbol": symbol, "fetched_at": now.isoformat(), "source": SOURCE, "quarters": quarters}
+        try:
+            record["car_years"] = parse_car_years(fetch(STATS_URL.format(symbol=symbol)))
+            results[symbol] = "ok"
+        except Exception as exc:  # the notes are kept; without "car_years" the bank is due again on the next run
+            if old and "car_years" in old:
+                record["car_years"] = old["car_years"]
+            results[symbol] = f"error:car:{type(exc).__name__}"
+        store.save(record)
     return results

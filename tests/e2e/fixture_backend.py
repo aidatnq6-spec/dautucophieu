@@ -27,7 +27,7 @@ FPT_HISTORY = [PricePoint(Decimal(v), d) for v, d in zip([50_000] * 19 + [55_000
 INDEX_HISTORY = [PricePoint(Decimal(v), d) for v, d in zip(["1700"] * 20 + ["1774.15"], _DAYS)]
 
 MARKET = SyntheticMarket(
-    prices={"FPT": PricePoint(Decimal(60_000), date(2026, 10, 23))},
+    prices={"FPT": PricePoint(Decimal(60_000), date(2026, 10, 23)), "ACB": PricePoint(Decimal(25_000), date(2026, 10, 23))},
     history={"FPT": FPT_HISTORY, "VNINDEX": INDEX_HISTORY},
     documents={"FPT": [EvidenceRef("doc-fpt-1", "BCTC quý III/2026 (tổng hợp)", "financial_statement",
                                    "https://example.invalid/fpt-q3.pdf", "2026-10-20", "FPT")]},
@@ -53,11 +53,11 @@ if __name__ == "__main__":
     data = tempfile.mkdtemp(prefix="investment-e2e-")  # job leases and outbox for this run only
     deliveries = DeliveryStore(os.path.join(data, "deliveries.sqlite"))
     with open(os.path.join(data, "market-symbols.txt"), "w", encoding="utf-8") as f:
-        f.write("FPT\nVCB\n")
+        f.write("FPT\nVCB\nACB\n")
     with open(os.path.join(data, "index-groups.json"), "w", encoding="utf-8") as f:
         json.dump({"as_of": "2026-10-25", "source": "synthetic", "groups": {"VN30": ["FPT"], "VN100": ["FPT", "VCB"]}}, f)
     with open(os.path.join(data, "industries.json"), "w", encoding="utf-8") as f:
-        json.dump({"as_of": "2026-10-25", "source": "synthetic", "level": 2, "sectors": {"FPT": "Công nghệ Thông tin", "VCB": "Ngân hàng"}}, f,
+        json.dump({"as_of": "2026-10-25", "source": "synthetic", "level": 2, "sectors": {"FPT": "Công nghệ Thông tin", "VCB": "Ngân hàng", "ACB": "Ngân hàng"}}, f,
                   ensure_ascii=False)
     SnapshotStore(os.path.join(data, "trend")).save(TREND)
     # Reference valuation: FPT with P/E 12 every year and yearly cash dividends; VCB has no statements.
@@ -97,6 +97,24 @@ if __name__ == "__main__":
                                    "ppop": str(2 * 10**9), "operating_income": str(3 * 10**9)} for y in (2025, 2026) for k in (1, 2, 3, 4)},
         "years": {}, "quarters_conflicts": [], "years_conflicts": [], "year_end_close": {},
         "quarter_end_close": {"2026-Q3": {"date": "2026-09-30", "close": "60"}}})
+    # So sánh cùng ngành: ACB, a second bank, with Q2 and Q3/2026 where VCB has only Q3 ratios (P/B 0,30x at Q3, 0,20x at Q2).
+    StatementStore(os.path.join(data, "statements-financial")).save({
+        "symbol": "ACB", "kind": "bank", "fetched_at": "2026-11-07T00:00:00+00:00", "source": "vndirect:finfo",
+        "quarters": {p: {"npat_parent": str(2 * 10**9), "equity": str(50 * 10**9), "charter_capital": str(5 * 10**9)}
+                     for p in ("2025-Q1", "2025-Q2", "2025-Q3", "2025-Q4", "2026-Q1", "2026-Q2", "2026-Q3")},
+        "years": {}, "quarters_conflicts": [], "years_conflicts": [], "year_end_close": {},
+        "quarter_end_close": {"2026-Q2": {"date": "2026-06-30", "close": "20"}, "2026-Q3": {"date": "2026-09-30", "close": "30"}}})
+    FundamentalsStore(os.path.join(data, "fundamentals")).save({
+        "symbol": "ACB", "fetched_at": "2026-10-26T00:00:00+00:00", "source": "synthetic",
+        "years": {str(y): {"npat": "1000000000", "eps": "2000", "equity": "5000000000"} for y in range(2020, 2026)},
+        "quarters": {q: {"npat": "250000000", "equity": "5000000000"} for q in ("2025-Q2", "2025-Q3", "2025-Q4", "2026-Q1", "2026-Q2")},
+        "dividends": [], "issues": []})
+    SeriesStore(os.path.join(data, "trend-sources")).upsert("ACB-1d", [(datetime(y, 12, 31), "20") for y in range(2020, 2026)])
+    from investment_agent.market.bank_notes import BankNoteStore
+    BankNoteStore(os.path.join(data, "bank-notes")).save({
+        "symbol": "ACB", "fetched_at": "2026-11-08T00:00:00+00:00", "source": "vietcap:iq", "car_years": {"2025": "0.1245"},
+        "quarters": {"2026-09-30": {"loans": "1000", "group1": "980", "group2": "15", "group3": "2", "group4": "1", "group5": "2", "deposits": "1000",
+                                    "demand": "300", "term": "680", "savings": "0", "margin": "20", "special": "0"}}})
     # Month-end closes that move around (P/E chart); the 31 December closes above stay 12 for the valuation tests.
     SeriesStore(os.path.join(data, "trend-sources")).upsert("FPT-1d", [(datetime(y, m, 28), str(12 + ((y * 12 + m) % 9) - 4))
                                                                        for y in range(2020, 2026) for m in range(1, 12)])
@@ -184,6 +202,8 @@ if __name__ == "__main__":
                                                            "PROVISION_BAD_LOANS_AQ": "2.02", "NET_INTEREST_MARGIN_TR_AVG5Q": "0.0223", "EQUITY_TO_ASSET_AQ": "0.094"},
                                             "2026-09-30": {"BAD_LOANS_RATIO_AQ": "0.0071", "ROAA_TR_AVG4Q": "0.0166", "OVERDUE_LOANS_RATIO_AQ": "0.0098",
                                                            "PROVISION_BAD_LOANS_AQ": "2.43", "NET_INTEREST_MARGIN_TR_AVG5Q": "0.024", "EQUITY_TO_ASSET_AQ": "0.095"}}})
+    FinancialRatioStore(os.path.join(data, "financial-ratios")).save({"symbol": "ACB", "kind": "bank", "fetched_at": "2026-10-31T00:00:00+00:00",
+        "source": "synthetic", "quarters": {"2026-06-30": {"BAD_LOANS_RATIO_AQ": "0.0150"}, "2026-09-30": {"BAD_LOANS_RATIO_AQ": "0.0120"}}})
     # Định giá chỉ số: VN30 at P/E 15 and P/B 2 for six years, today P/E 12 at 1,800 points (fair 2,025, −11,1%); VNINDEX has no multiples.
     ix_days = [datetime.combine(date.today() - timedelta(days=i), datetime.min.time()) for i in range(6 * 365, 0, -1)
                if (date.today() - timedelta(days=i)).weekday() < 5]

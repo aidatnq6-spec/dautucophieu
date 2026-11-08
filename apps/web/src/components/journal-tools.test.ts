@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterEntries, filterLedger, NO_FILTER, spreadsheet, summarize, type JournalRow } from "./journal-tools";
+import { filterEntries, filterLedger, NO_FILTER, pageOf, spreadsheet, summarize, type JournalRow } from "./journal-tools";
 
 const entry = (over: Partial<JournalRow>): JournalRow => ({ symbol: "FPT", kind: "buy", created_on: "2026-01-10", reason: "", emotion: null, emotion_note: "", notes: [],
   change: null, imported: null, ...over });
@@ -52,5 +52,19 @@ describe("spreadsheet", () => {
     expect(xml).toContain('<Data ss:Type="Number">1000</Data>');
     expect(xml).toContain('<Data ss:Type="String"></Data>');
     expect(xml.startsWith("<?xml")).toBe(true);
+  });
+});
+
+describe("pageOf", () => {
+  const items = Array.from({ length: 121 }, (_, i) => i);
+  it("gives one page of the results and where it sits", () => {
+    expect(pageOf(items, 1, 50)).toMatchObject({ page: 1, pages: 3, from: 1, to: 50 });
+    const last = pageOf(items, 3, 50);
+    expect(last.items).toEqual([100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120].slice(0, 21));
+    expect(last).toMatchObject({ from: 101, to: 121 });
+  });
+  it("stays on a page that exists when the results shrink, and copes with none", () => {
+    expect(pageOf(items.slice(0, 10), 3, 50)).toMatchObject({ page: 1, pages: 1, from: 1, to: 10 });
+    expect(pageOf([], 2, 50)).toMatchObject({ items: [], page: 1, pages: 1, from: 0, to: 0 });
   });
 });

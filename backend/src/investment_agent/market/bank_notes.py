@@ -2,9 +2,10 @@
 bank's statements on Vietcap's IQ API (public, no key; the source the owner approved on 08/11/2026, since VNDirect publishes no
 note figures and Vnstock's Community tier locks them). From them the bank ratios table shows the group-2 share and CASA.
 
-Vietcap's robots.txt asks for 10 seconds between requests, and its notes answer 418 to faster callers (now and then even to
-slower ones): two calls per bank (the notes, and statistics-financial for the year-end CAR), 10 seconds apart, a refused call
-tried once more after 30 seconds, under this application's own name; a bank's record is refreshed at most weekly. A ratio is given only where
+The robots.txt of trading.vietcap.com.vn asks for 10 seconds between requests (iq.vietcap.com.vn, which serves these figures, has
+none), and the notes answer 418 to faster callers, now and then to slower ones too. So two calls per bank (the notes, and
+statistics-financial for the year-end CAR), 10 seconds apart, under this application's own name; a refused call is not tried
+again and ends the run, the remaining banks waiting for the next one; a bank's record is refreshed at most weekly. A ratio is given only where
 the parts add up to the total Vietcap prints with them; otherwise it is left blank and the two figures are reported.
 """
 
@@ -19,7 +20,6 @@ from typing import Callable
 
 URL = "https://iq.vietcap.com.vn/api/iq-insight-service/v1/company/{symbol}/financial-statement?section=NOTE"
 STATS_URL = "https://iq.vietcap.com.vn/api/iq-insight-service/v1/company/{symbol}/statistics-financial"
-RETRY_SECONDS = 30
 SOURCE = "vietcap:iq"
 DELAY_SECONDS = 10  # robots.txt Crawl-delay
 MAX_AGE = timedelta(days=7)
@@ -145,21 +145,23 @@ def sync_bank_notes(store: BankNoteStore, sectors: dict[str, str | None], *, get
         if called:
             sleep(DELAY_SECONDS)
         called = True
-        try:
-            return get(url)
-        except Exception:
-            sleep(RETRY_SECONDS)
-            return get(url)
+        return get(url)
+
+    refused = False
 
     for symbol in sorted(s for s, sector in sectors.items() if sector == BANK):
         old = store.read(symbol)
         if old and not force and "car_years" in old and now - datetime.fromisoformat(old["fetched_at"]) < MAX_AGE:
             results[symbol] = "fresh"
             continue
+        if refused:  # Vietcap said no: ask nothing more in this run
+            results[symbol] = "skipped"
+            continue
         try:
             quarters = parse_notes(fetch(URL.format(symbol=symbol)), symbol=symbol)
         except Exception as exc:
             results[symbol] = f"error:{type(exc).__name__}"
+            refused = True
             continue
         if not quarters:
             results[symbol] = "error:no_observations"
@@ -172,5 +174,6 @@ def sync_bank_notes(store: BankNoteStore, sectors: dict[str, str | None], *, get
             if old and "car_years" in old:
                 record["car_years"] = old["car_years"]
             results[symbol] = f"error:car:{type(exc).__name__}"
+            refused = True
         store.save(record)
     return results

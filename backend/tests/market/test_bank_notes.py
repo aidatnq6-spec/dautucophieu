@@ -60,19 +60,19 @@ def _who(url):
     return url.split("/company/")[1].split("/")[0] + (":note" if "section=NOTE" in url else ":stats")
 
 
-def test_sync_reads_only_watched_banks_waits_between_calls_retries_once_and_skips_fresh_records(tmp_path):
+def test_sync_reads_only_watched_banks_waits_between_calls_skips_fresh_records_and_stops_at_a_refusal(tmp_path):
     store = BankNoteStore(tmp_path / "bank-notes")
     now = datetime(2026, 11, 8, 13, tzinfo=timezone.utc)
     store.save({"symbol": "ACB", "fetched_at": (now - timedelta(days=2)).isoformat(), "source": "vietcap:iq", "quarters": {}, "car_years": {}})
     calls, waits = [], []
-    results = sync_bank_notes(store, {"ACB": "Ngân hàng", "MBB": "Ngân hàng", "VCB": "Ngân hàng", "FPT": "Công nghệ Thông tin"},
+    results = sync_bank_notes(store, {"ACB": "Ngân hàng", "MBB": "Ngân hàng", "VCB": "Ngân hàng", "VIB": "Ngân hàng", "FPT": "Công nghệ Thông tin"},
                               get=_fake(calls, failing={"VCB"}), sleep=waits.append, now=now)
-    assert results == {"ACB": "fresh", "MBB": "ok", "VCB": "error:RuntimeError"}
-    # 10 s between calls, as robots.txt asks; a refusal is tried once more after 30 s.
-    assert [_who(u) for u in calls] == ["MBB:note", "MBB:stats", "VCB:note", "VCB:note"] and waits == [10, 10, 30]
+    assert results == {"ACB": "fresh", "MBB": "ok", "VCB": "error:RuntimeError", "VIB": "skipped"}
+    # 10 s between calls; a refusal is not tried again and nothing more is asked in this run: VIB waits for the next one.
+    assert [_who(u) for u in calls] == ["MBB:note", "MBB:stats", "VCB:note"] and waits == [10, 10]
     record = store.read("MBB")
     assert record["source"] == "vietcap:iq" and record["quarters"]["2026-09-30"]["deposits"] == "993988042000000"
-    assert record["car_years"] == {"2025": "0.1461"}
+    assert record["car_years"] == {"2025": "0.1461"} and store.read("VIB") is None
     assert sync_bank_notes(store, {"ACB": "Ngân hàng"}, get=_fake(calls), sleep=waits.append, now=now, force=True) == {"ACB": "ok"}
 
 
@@ -86,7 +86,9 @@ def test_a_refused_car_call_keeps_the_notes_and_the_earlier_car_and_comes_back_n
         if "section=NOTE" not in url:
             raise RuntimeError("418")
         return _text(_quarter(2026, 3))
-    assert sync_bank_notes(store, {"MBB": "Ngân hàng"}, get=get, sleep=waits.append, now=now) == {"MBB": "error:car:RuntimeError"}
+    assert sync_bank_notes(store, {"MBB": "Ngân hàng", "VCB": "Ngân hàng"}, get=get, sleep=waits.append, now=now) == {
+        "MBB": "error:car:RuntimeError", "VCB": "skipped"}
+    assert len(calls) == 2  # the notes, then the one refused call; no retry
     record = store.read("MBB")
     assert "2026-09-30" in record["quarters"] and "car_years" not in record  # no CAR yet: due again on the next run
     calls.clear()

@@ -85,12 +85,12 @@ VNDirect cũng rơi về 45 ngày. Đổi sang ngày VNDirect không làm khác 
   Vietcap (`iq.vietcap.com.vn/.../financial-statement?section=NOTE`: nợ nhóm 1–5 và tổng dư nợ, tiền gửi theo loại và tổng tiền gửi;
   từ Q1/2018). Đã dò: VNDirect có danh mục mục thuyết minh (mẫu 104) nhưng không trả số; Vnstock Cộng đồng khoá `note` và `ratio`; TCBS
   chặn bằng Cloudflare. Lệnh `bank-notes-sync` (lượt 20:00) gọi mỗi ngân hàng theo dõi một lần, cách nhau 10 giây theo `Crawl-delay`
-  của Vietcap, dưới tên ứng dụng (không giả trình duyệt), mỗi mã làm mới tối đa một lần một tuần; lưu `data/bank-notes`. Tỷ lệ chỉ tính khi
+  của `trading.vietcap.com.vn` (`iq.vietcap.com.vn` không có robots.txt), dưới tên ứng dụng (không giả trình duyệt), mỗi mã làm mới tối đa một lần một tuần; lưu `data/bank-notes`. Tỷ lệ chỉ tính khi
   nhóm 1–5 cộng ra đúng tổng dư nợ và các loại tiền gửi cộng ra đúng tổng tiền gửi; lệch thì để trống và ghi hai số ở "Đối chiếu nợ nhóm
   2 và CASA". Quý đã nhập tay dùng số nhập tay; khác số Vietcap (ở 4 chữ số thập phân) thì ghi cả hai. Nhãn bỏ "(nhập tay)". CAR vẫn nhập tay.
 - **CAR cuối năm** (08/11/2026, chủ sở hữu duyệt): không nguồn miễn phí nào có CAR theo quý (VNDirect: mục 55002 rỗng; Vietcap: dòng quý
   ghi 0,0). Dòng "CAR (cuối năm)" sau Vốn chủ / tổng tài sản, 2 chữ số thập phân, ở cột Q4: số của Vietcap (`statistics-financial`, dòng năm,
-  cùng lượt `bank-notes-sync`, thêm một lần gọi cách 10 giây; bị từ chối thì thử lại một lần sau 30 giây), năm Vietcap chưa có thì dùng
+  cùng lượt `bank-notes-sync`, thêm một lần gọi cách 10 giây; bị từ chối thì không thử lại và dừng cả lượt, các mã còn lại chờ lượt sau), năm Vietcap chưa có thì dùng
   `BANK_CAR_AQ` của VNDirect (lấy cùng `financial-ratios-sync`, không hiện thành dòng), trừ mức 8,00% VNDirect ghi nhiều năm cho BID (mức
   tối thiểu, không phải số báo cáo). Ghi ở mục đối chiếu khi hai nguồn lệch quá 0,1 điểm, hoặc Vietcap ghi đúng y số năm trước (EIB 2025).
   Quý đã nhập CAR ở Số liệu ngân hàng dùng số nhập tay. Chưa đưa CAR vào Điểm sức khỏe (chỉ có số năm).

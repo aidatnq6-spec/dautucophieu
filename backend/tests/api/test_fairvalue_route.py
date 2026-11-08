@@ -162,6 +162,31 @@ def test_sector_ratios_list_a_financial_ticker_quarters_oldest_first_with_labels
     assert call(c, clock, "GET", "/internal/fairvalue/ratios/FPT").status_code == 404
 
 
+def test_a_banks_ratios_add_casa_and_group2_share_from_the_owners_entered_figures_and_leave_other_quarters_blank(tmp_path):
+    from investment_agent.market.financial_ratios import FinancialRatioStore
+    (tmp_path / "market-symbols.txt").write_text("VCB\n", encoding="utf-8")
+    (tmp_path / "industries.json").write_text(json.dumps({"as_of": "2026-10-25", "source": "t", "level": 2, "sectors": {"VCB": "Ngân hàng"}}),
+                                              encoding="utf-8")
+    FinancialRatioStore(tmp_path / "financial-ratios").save({"symbol": "VCB", "kind": "bank", "fetched_at": "2026-10-31T00:00:00+00:00", "source": "t",
+                                                             "quarters": {"2026-06-30": {"BAD_LOANS_RATIO_AQ": "0.0061"},
+                                                                          "2026-09-30": {"BAD_LOANS_RATIO_AQ": "0.0071"}}})
+    c, clock = _app(tmp_path)
+    figures = {"group1": "447734", "group2": "7808", "group3": "1517", "group4": "1220", "group5": "2293",
+               "demand_deposits": "166971", "margin_deposits": "10354", "customer_deposits": "537304.578", "car": None}
+    for rid, (quarter, version) in enumerate((("2026-Q3", 0), ("2016-Q4", 1))):
+        r = call(c, clock, "PUT", f"/internal/bank-figures/VCB/{quarter}",
+                 {"values": figures, "source": {"kind": "manual"}, "expected_version": version, "request_id": f"f{rid}"})
+        assert r.status_code == 200
+    body = call(c, clock, "GET", "/internal/fairvalue/ratios/VCB").json()
+    assert [q["date"] for q in body["quarters"]] == ["2016-12-31", "2026-06-30", "2026-09-30"]  # an entered quarter VNDirect lacks is added
+    codes = [m["code"] for m in body["metrics"]]
+    assert codes.index("GROUP2_RATIO") == codes.index("BAD_LOANS_RATIO_AQ") + 1 and codes.index("CASA") == codes.index("NET_INTEREST_MARGIN_TR_AVG5Q") + 1
+    by = {m["code"]: m for m in body["metrics"]}
+    assert by["CASA"]["values"] == ["0.3300", None, "0.3300"] and by["CASA"]["format"] == "pct1"  # Q2/2026 not entered: blank, not filled
+    assert by["GROUP2_RATIO"]["values"] == ["0.0170", None, "0.0170"] and by["GROUP2_RATIO"]["format"] == "pct2"
+    assert "nhập tay" in by["CASA"]["label"] and by["BAD_LOANS_RATIO_AQ"]["values"] == [None, "0.0061", "0.0071"]
+
+
 def test_dividend_history_route_uses_the_stored_record_and_the_current_price(tmp_path):
     (tmp_path / "market-symbols.txt").write_text("ACB\n", encoding="utf-8")
     FundamentalsStore(tmp_path / "fundamentals").save({"symbol": "ACB", "fetched_at": "2027-01-14T00:00:00+00:00", "source": "t",

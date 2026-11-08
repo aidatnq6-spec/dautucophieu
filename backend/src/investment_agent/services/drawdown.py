@@ -96,7 +96,8 @@ def drawdown_run(repo, owner, data_dir: Path, *, fetch, send, request_id: str, b
     sent = False
     if alerts:
         entries, _ = read_journal(repo, owner)
-        reasons = {e.symbol: e.reason for e in entries if e.reason}  # the latest entry per ticker wins
+        # The latest decision per ticker wins, by its date: an older journal imported later is saved last but happened first.
+        reasons = {e.symbol: e.reason for e in sorted(entries, key=lambda e: e.created_on) if e.reason}
         sent = bool(send(render_alerts(alerts, threshold=settings.drawdown_threshold, reasons=reasons)))
         if not sent:
             alerted -= {a["symbol"] for a in alerts}  # not delivered: try again next run

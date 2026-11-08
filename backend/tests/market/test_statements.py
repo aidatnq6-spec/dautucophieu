@@ -113,3 +113,27 @@ def test_a_ticker_synced_before_year_end_closes_existed_takes_the_whole_price_hi
     sync_statements(store, {"HPG": "Tài nguyên Cơ bản"}, get=get, now=NOW, limit=None, sleep=lambda s: None)
     prices = [u for u in get.urls if "stock_prices" in u]
     assert len(prices) == 1 and "date:gte:2010-01-01" in prices[0] and all("fiscalDate:gte:2024-11-07" in u for u in get.urls if u not in prices)
+
+
+def test_the_last_unadjusted_close_of_each_quarter_is_kept_with_its_day():
+    from investment_agent.market.statements import parse_quarter_end_closes
+    page = json.dumps({"data": [{"code": "HPG", "date": "2025-12-31", "close": 26.4}, {"code": "HPG", "date": "2025-12-30", "close": 26.5},
+                                {"code": "HPG", "date": "2025-09-30", "close": 29.1}, {"code": "HPG", "date": "2025-07-01", "close": 27},
+                                {"code": "FPT", "date": "2025-03-31", "close": 99}]})
+    assert parse_quarter_end_closes(page, symbol="HPG") == {"2025-Q3": {"date": "2025-09-30", "close": "29.1"},
+                                                            "2025-Q4": {"date": "2025-12-31", "close": "26.4"}}
+
+
+def test_sync_keeps_quarter_end_closes_and_a_ticker_without_them_is_due_and_takes_the_whole_price_history(tmp_path):
+    store = StatementStore(tmp_path)
+    store.save({"symbol": "HPG", "fetched_at": "2026-11-06T00:00:00+00:00", "source": "vndirect:finfo", "quarters": {}, "years": {},
+                "year_end_close": {"2024": {"date": "2024-12-31", "close": "20"}}})
+    get = Get()
+    assert sync_statements(store, {"HPG": "Tài nguyên Cơ bản"}, get=get, now=NOW, limit=None, sleep=lambda s: None) == {"HPG": "ok"}
+    prices = [u for u in get.urls if "stock_prices" in u]
+    assert len(prices) == 1 and "date:gte:2010-01-01" in prices[0]
+    rec = store.read("HPG")
+    assert rec["quarter_end_close"] == {"2025-Q4": {"date": "2025-12-31", "close": "26.4"}}
+    assert rec["year_end_close"]["2024"] == {"date": "2024-12-31", "close": "20"}
+    get2 = Get()
+    assert sync_statements(store, {"HPG": "Tài nguyên Cơ bản"}, get=get2, now=NOW, limit=None, sleep=lambda s: None) == {} and get2.urls == []

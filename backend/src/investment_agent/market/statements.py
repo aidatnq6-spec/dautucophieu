@@ -86,6 +86,15 @@ def parse_statements(text: str, *, symbol: str, kind: str) -> dict:
 
 def parse_year_end_closes(text: str, *, symbol: str) -> dict[str, dict[str, str]]:
     """The last unadjusted close of each year with its day (the current year's latest close until the year ends)."""
+    return _period_end_closes(text, symbol=symbol, period=lambda day: day[:4])
+
+
+def parse_quarter_end_closes(text: str, *, symbol: str) -> dict[str, dict[str, str]]:
+    """The last unadjusted close of each quarter with its day (the current quarter's latest close until it ends)."""
+    return _period_end_closes(text, symbol=symbol, period=lambda day: f"{day[:4]}-Q{(int(day[5:7]) - 1) // 3 + 1}")
+
+
+def _period_end_closes(text: str, *, symbol: str, period: Callable[[str], str]) -> dict[str, dict[str, str]]:
     out: dict[str, dict[str, str]] = {}
     for r in json.loads(text).get("data") or []:
         try:
@@ -94,9 +103,9 @@ def parse_year_end_closes(text: str, *, symbol: str) -> dict[str, dict[str, str]
             day, close = str(r["date"])[:10], Decimal(str(r["close"]))
         except (InvalidOperation, KeyError, TypeError, ValueError):
             continue
-        year = day[:4]
-        if close.is_finite() and close > 0 and (year not in out or day > out[year]["date"]):
-            out[year] = {"date": day, "close": _plain(close)}
+        key = period(day)
+        if close.is_finite() and close > 0 and (key not in out or day > out[key]["date"]):
+            out[key] = {"date": day, "close": _plain(close)}
     return dict(sorted(out.items()))
 
 
@@ -136,7 +145,7 @@ def sync_statements(store: StatementStore, sectors: dict[str, str | None], *, ge
     for symbol in sorted(s for s, sector in sectors.items() if kind_of(sector) is None):
         rec = store.read(symbol)
         fetched = datetime.fromisoformat(rec["fetched_at"]) if rec else None
-        if fetched is None or (now - fetched).days >= max_age_days:
+        if fetched is None or (now - fetched).days >= max_age_days or "quarter_end_close" not in rec:  # synced before quarter closes were kept
             ages.append((fetched is not None, fetched or now, symbol))
     todo = [s for _, _, s in sorted(ages)]
     results = {}
@@ -151,10 +160,12 @@ def sync_statements(store: StatementStore, sectors: dict[str, str | None], *, ge
             if not parsed["QUARTER"]["periods"] and not parsed["ANNUAL"]["periods"] and old is None:
                 results[symbol] = "error:no_observations"
                 continue
-            price_start = start if old and old.get("year_end_close") else FIRST_START  # synced before the closes were kept: all of them
-            closes = parse_year_end_closes(_get_with_retry(get, PRICE_URL.format(symbol=symbol, start=price_start), sleep), symbol=symbol)
-            record = {"symbol": symbol, "fetched_at": now.isoformat(), "source": "vndirect:finfo",
-                      "year_end_close": dict(sorted({**(old or {}).get("year_end_close", {}), **closes}.items()))}
+            kept = old and old.get("year_end_close") and "quarter_end_close" in old
+            price_start = start if kept else FIRST_START  # synced before the closes were kept: all of them
+            prices = _get_with_retry(get, PRICE_URL.format(symbol=symbol, start=price_start), sleep)
+            record = {"symbol": symbol, "fetched_at": now.isoformat(), "source": "vndirect:finfo"}
+            for key, parse in (("year_end_close", parse_year_end_closes), ("quarter_end_close", parse_quarter_end_closes)):
+                record[key] = dict(sorted({**(old or {}).get(key, {}), **parse(prices, symbol=symbol)}.items()))
             for kind, key in (("QUARTER", "quarters"), ("ANNUAL", "years")):
                 record[key], record[f"{key}_created"], record[f"{key}_conflicts"] = _merge(old, key, parsed[kind])
             store.save(record)

@@ -87,3 +87,37 @@ def test_a_year_without_an_unadjusted_close_or_a_charter_capital_has_no_valuatio
     years = {**YEARS, "2025": {k: v for k, v in YEARS["2025"].items() if k != "charter_capital"}}
     r = rows(statement_table({**RECORD, "years": years}, closes=CLOSES, shares=10_000_000, vnstock=None), "years")
     assert r["market_cap"] == ["200000000000", None] and r["pe"][1] is None  # 2024 still valued; 2025 lacks the share count
+
+
+QUARTER_CLOSES = {"2024-Q4": {"date": "2024-12-31", "close": "20"}, "2025-Q3": {"date": "2025-09-30", "close": "28"},
+                  "2025-Q4": {"date": "2025-12-31", "close": "30"}}
+
+
+def test_quarters_carry_the_valuation_block_on_the_quarter_end_close_and_the_four_quarters_to_it():
+    quarters = {p: {**f, "charter_capital": str(100 * B)} for p, f in QUARTERS.items()}
+    t = statement_table({**RECORD, "quarters": quarters, "quarter_end_close": QUARTER_CLOSES}, closes=CLOSES, shares=10_000_000, vnstock=None)
+    labels = [r["label"] for r in t["quarters"]["rows"] if r["kind"] == "group"]
+    assert labels[-1] == "Quy mô và định giá"
+    r = rows(t, "quarters")
+    i = t["quarters"]["periods"].index("2025-Q4")
+    assert r["market_cap"][i] == "300000000000"  # unadjusted 30,000 đ at the quarter's last session × 10 million shares
+    assert r["net_debt"][i] == "400000000000" and r["ev"][i] == "710000000000"  # quarter-end balance: 300 + 200 − 40 − 60 ; + minority 10
+    assert r["pe"][i] == "1.76"  # 300 / (41 + 42 + 43 + 44)
+    assert r["pb"][i] == "0.30"  # 300 / (1000 − 10)
+    assert r["ev_ebitda"][i] == "2.24"  # 710 / four quarters of (pbt + 6 + 20): 212.5 + 104
+    assert r["ev_revenue"][i] == "0.79"  # 710 / (210 + 220 + 230 + 240)
+    assert r["roe"][i] == "0.1717"  # 170 / average(990, 990)
+    assert r["fcff_yield"][i] is not None
+    assert r["market_cap"][t["quarters"]["periods"].index("2025-Q2")] is None  # no close kept for that quarter
+    assert r["pe"][t["quarters"]["periods"].index("2024-Q4")] is not None and r["roe"][t["quarters"]["periods"].index("2024-Q4")] is None
+    assert r["pe"][t["quarters"]["periods"].index("2025-Q3")] == "1.87"  # 280 / (24 + 41 + 42 + 43)
+
+
+def test_a_quarter_without_four_quarters_behind_it_has_no_earnings_multiples():
+    quarters = {p: {**f, "charter_capital": str(100 * B)} for p, f in QUARTERS.items() if p != "2025-Q2"}
+    r = rows(statement_table({**RECORD, "quarters": quarters, "quarter_end_close": QUARTER_CLOSES}, closes=CLOSES, shares=10_000_000,
+                             vnstock=None), "quarters")
+    periods = sorted(quarters)
+    i = periods.index("2025-Q4")
+    assert r["market_cap"][i] == "300000000000" and r["pb"][i] == "0.30"
+    assert r["pe"][i] is None and r["ev_ebitda"][i] is None and r["roe"][i] is None and r["fcff_yield"][i] is None

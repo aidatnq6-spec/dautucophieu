@@ -40,6 +40,11 @@ năm ĐHCĐ, dự phóng quý tới, số liệu vận hành nhập tay (và đ�
   lý do.
 - Trang hồ sơ mã, sau Định giá tham khảo: khối **Bảng số tài chính**: 4 thẻ tóm tắt 4 quý; nút Quý/Năm; nút 8 · 12 · 20 quý · Tất cả; bảng
   (tỷ đồng, chi phí âm, % so cùng kỳ xanh/đỏ, cột nhãn đứng yên khi cuộn ngang); mục Kiểm tra chéo; chú thích công thức và nguồn.
+- **Biểu đồ** (08/11/2026, chủ sở hữu duyệt mức 1 và 2): cột **Xu hướng** cuối mỗi dòng theo đúng các kỳ đang chọn (tiền: cột nhỏ quanh
+  trục 0; %, bội số: đường). Bấm tên dòng để vẽ **biểu đồ lớn** trên bảng, tối đa 2 dòng (dòng thứ ba thay dòng chọn sớm nhất); mở sẵn
+  Doanh thu thuần với Biên gộp. Tiền vẽ cột theo tỷ đồng làm tròn như bảng (âm chúc xuống), %, bội số vẽ đường; mỗi đơn vị một trục (trái, phải). Ô trống là khoảng
+  trống, không nối, không nội suy. Cột dự phóng của chủ sở hữu (quý F) vẽ gạch chéo, không nối với số thật. Kỳ có lệch trong Kiểm tra chéo
+  gắn dấu * dưới trục. Chạm hoặc rê vào kỳ hiện số; mục **Xem số liệu** liệt kê đủ số đang vẽ. Không thêm thư viện, vẽ bằng SVG.
 
 ## Ngày công bố cho VN-Index, VN30 tự tính 2013–2017 (07/11/2026)
 Chuỗi tự tính ([index_history](../../../backend/src/investment_agent/market/index_history.py)) vẫn dùng quy tắc 45 ngày. Đã kiểm trên báo cáo VNDirect

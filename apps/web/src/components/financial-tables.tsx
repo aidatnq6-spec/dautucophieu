@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
+import { ChartColumn } from "lucide-react";
 import { ApiError, api } from "../lib/api";
 import { type Forecast, ForecastForm } from "./quarter-forecast";
+import { Spark, StatementChart, seriesName, toggleRow } from "./statement-chart";
 
 type Row = { key: string | null; label: string; kind: "group" | "money" | "pct" | "x"; indent: number; values: (string | null)[] };
 type Part = { periods: string[]; rows: Row[] };
@@ -47,18 +49,26 @@ const ty = (v: string | null) => (v === null ? "—" : `${cell(v, "money", null)
 
 type Extra = { label: string; values: Record<string, string | null> } | null;  // the owner's forecast column, shown after the last quarter
 
-function Table({ part, cols, caption, extra = null }: { part: Part; cols: number[]; caption: string; extra?: Extra }) {
+function Table({ part, cols, caption, extra = null, picked, onPick }: { part: Part; cols: number[]; caption: string; extra?: Extra; picked: string[];
+  onPick: (key: string) => void }) {
   return (
     <div className="pb-scroll">
       <table className="pb-table ft-table">
         <caption className="caption">{caption}</caption>
         <thead><tr><th>Tỷ đồng</th>{cols.map((i) => <th key={part.periods[i]} className="num">{periodLabel(part.periods[i])}</th>)}
-          {extra && <th className="num ft-forecast">{extra.label}</th>}</tr></thead>
+          {extra && <th className="num ft-forecast">{extra.label}</th>}<th>Xu hướng</th></tr></thead>
         <tbody>{part.rows.map((r, k) => r.kind === "group"
-          ? <tr key={`g${k}`} className="ft-group"><th colSpan={cols.length + 1 + (extra ? 1 : 0)}>{r.label}</th></tr>
-          : <tr key={r.key ?? k}><td className={r.indent ? "ft-indent" : undefined}>{r.label}</td>
+          ? <tr key={`g${k}`} className="ft-group"><th colSpan={cols.length + 2 + (extra ? 1 : 0)}>{r.label}</th></tr>
+          : <tr key={r.key ?? k} className={r.key && picked.includes(r.key) ? "ft-picked" : undefined}><td className={r.indent ? "ft-indent" : undefined}>
+            {r.key ? <>
+              {/* The label is a mouse shortcut; the icon button is the keyboard and screen-reader way to the same toggle. */}
+              <span className="ft-label" onClick={() => onPick(r.key!)}>{r.label}</span>
+              <button type="button" className="ft-pick" aria-pressed={picked.includes(r.key)} aria-label={`Vẽ biểu đồ: ${seriesName(part.rows, r.key)}`}
+                title="Vẽ dòng này trên biểu đồ" onClick={() => onPick(r.key!)}><ChartColumn size={13} aria-hidden="true" /></button>
+            </> : r.label}</td>
             {cols.map((i) => <td key={part.periods[i]} className={`num ${tone(r.values[i], r.key)}`}>{cell(r.values[i], r.kind, r.key)}</td>)}
-            {extra && <td className={`num ft-forecast ${tone(extra.values[r.key ?? ""] ?? null, r.key)}`}>{cell(extra.values[r.key ?? ""] ?? null, r.kind, r.key)}</td>}</tr>)}</tbody>
+            {extra && <td className={`num ft-forecast ${tone(extra.values[r.key ?? ""] ?? null, r.key)}`}>{cell(extra.values[r.key ?? ""] ?? null, r.kind, r.key)}</td>}
+            <td className="ft-spark"><Spark row={r} cols={cols} /></td></tr>)}</tbody>
       </table>
     </div>
   );
@@ -70,6 +80,7 @@ export function FinancialTables({ symbol }: { symbol: string }) {
   const [view, setView] = useState<"quarters" | "years">("quarters");
   const [count, setCount] = useState<(typeof COUNTS)[number]>(8);
   const [forecast, setForecast] = useState<Forecast | null>(null);
+  const [picked, setPicked] = useState<string[]>(["revenue", "gross_margin"]);
   useEffect(() => {
     api<Tables>(`fairvalue/statements/${encodeURIComponent(symbol)}`).then(setData, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải."));
     api<Forecast>(`quarter-forecast/${encodeURIComponent(symbol)}`).then(setForecast, () => setForecast(null));
@@ -80,6 +91,8 @@ export function FinancialTables({ symbol }: { symbol: string }) {
   const part = data[view];
   const cols = view === "quarters" ? lastN(part.periods, count) : lastN(part.periods, 0);
   const s = data.summary;
+  const extra = view === "quarters" && forecast?.quarter && Object.keys(forecast.values).length ? { label: `${periodLabel(forecast.quarter)}F`, values: forecast.values } : null;
+  const flagged = new Set(data.checks.map((c) => c.period));
   return (
     <div className="ft">
       {s && <div className="pb-cards" aria-label="Bốn quý gần nhất">
@@ -98,8 +111,12 @@ export function FinancialTables({ symbol }: { symbol: string }) {
             {n === 0 ? "Tất cả" : `${n} quý`}</button>)}</span>}
       </div>
       {part.periods.length === 0 ? <p className="muted">Chưa có kỳ nào.</p>
-        : <Table part={part} cols={cols} caption={view === "quarters" ? `${cols.length} quý, cũ bên trái` : `${cols.length} năm`}
-          extra={view === "quarters" && forecast?.quarter && Object.keys(forecast.values).length ? { label: `${periodLabel(forecast.quarter)}F`, values: forecast.values } : null} />}
+        : <>
+          <StatementChart rows={part.rows} periods={part.periods} cols={cols} keys={picked} forecast={extra} flagged={flagged}
+            onRemove={(key) => setPicked((p) => p.filter((k) => k !== key))} />
+          <Table part={part} cols={cols} caption={`${view === "quarters" ? `${cols.length} quý, cũ bên trái` : `${cols.length} năm`} · bấm tên dòng để vẽ (tối đa 2 dòng)`}
+            extra={extra} picked={picked} onPick={(key) => setPicked((p) => toggleRow(p, key))} />
+        </>}
       {view === "quarters" && forecast && <ForecastForm key={`${forecast.quarter}-${forecast.version}`} symbol={symbol} data={forecast} onSaved={setForecast} />}
       {(data.checks.length > 0 || data.conflicts.length > 0) && <details className="mc-table">
         <summary>Kiểm tra chéo: {data.checks.length} chỗ lệch hơn 0,5% ở {new Set(data.checks.map((c) => c.period)).size} kỳ{data.conflicts.length ? `, ${data.conflicts.length} dòng nguồn ghi hai số` : ""}</summary>

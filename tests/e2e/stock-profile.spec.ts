@@ -149,6 +149,22 @@ test("Bảng số tài chính gives quarters and years with EBITDA, valuation an
   await expect(page.getByRole("region", { name: "Bảng số tài chính" })).toContainText("bảng số liệu ngành riêng");
 });
 
+test("Bảng số tài chính draws picked rows: revenue with gross margin first, a third row replaces the earliest, numbers behind it", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Bảng số tài chính" });
+  const legend = box.getByLabel("Dòng đang vẽ");
+  await expect(legend.getByRole("button")).toHaveText([/Doanh thu thuần/, /Biên gộp/]);
+  await expect(box.getByRole("img", { name: "Biểu đồ Doanh thu thuần và Biên gộp" })).toBeVisible();
+  await expect(box.getByRole("columnheader", { name: "Xu hướng" })).toBeVisible();
+  await box.getByRole("button", { name: "Vẽ biểu đồ: LNST công ty mẹ", exact: true }).click();
+  await expect(legend.getByRole("button")).toHaveText([/Biên gộp/, /LNST công ty mẹ/]);
+  await expect(box.getByRole("button", { name: "Vẽ biểu đồ: Doanh thu thuần", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await box.getByText("Xem số liệu").click();
+  await expect(box.getByRole("table", { name: "Số liệu biểu đồ bảng số tài chính" })).toContainText("Q4/25");
+  await legend.getByRole("button", { name: "Bỏ Biên gộp khỏi biểu đồ" }).click();
+  await expect(legend.getByRole("button")).toHaveText([/LNST công ty mẹ/]);
+});
+
 test("no horizontal page scroll with the statement table at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 900 });
   await page.goto("/research/FPT");

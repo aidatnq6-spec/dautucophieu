@@ -92,7 +92,6 @@ export function FinancialTables({ symbol }: { symbol: string }) {
   const cols = view === "quarters" ? lastN(part.periods, count) : lastN(part.periods, 0);
   const s = data.summary;
   const extra = view === "quarters" && forecast?.quarter && Object.keys(forecast.values).length ? { label: `${periodLabel(forecast.quarter)}F`, values: forecast.values } : null;
-  const flagged = new Set(data.checks.map((c) => c.period));
   return (
     <div className="ft">
       {s && <div className="pb-cards" aria-label="Bốn quý gần nhất">
@@ -112,7 +111,7 @@ export function FinancialTables({ symbol }: { symbol: string }) {
       </div>
       {part.periods.length === 0 ? <p className="muted">Chưa có kỳ nào.</p>
         : <>
-          <StatementChart rows={part.rows} periods={part.periods} cols={cols} keys={picked} forecast={extra} flagged={flagged}
+          <StatementChart rows={part.rows} periods={part.periods} cols={cols} keys={picked} forecast={extra} checks={data.checks}
             onRemove={(key) => setPicked((p) => p.filter((k) => k !== key))} />
           <Table part={part} cols={cols} caption={`${view === "quarters" ? `${cols.length} quý, cũ bên trái` : `${cols.length} năm`} · bấm tên dòng để vẽ (tối đa 2 dòng)`}
             extra={extra} picked={picked} onPick={(key) => setPicked((p) => toggleRow(p, key))} />

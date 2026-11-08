@@ -156,20 +156,19 @@ def statements(symbol: str, request: Request):
     kind = kind_of(load_sectors(data_dir)[0].get(symbol))
     empty = {"symbol": symbol, "kind": kind, "quarters": {"periods": [], "rows": []}, "years": {"periods": [], "rows": []}, "summary": None,
              "checks": [], "conflicts": []}
-    table = _table_of(data_dir, symbol, kind, now(request).astimezone(VN).date())
+    table = _table_of(data_dir, symbol, kind)
     if table is None:
         return {**empty, "reason": "Chưa có số liệu VNDirect cho mã này (đồng bộ lúc 20:00, mỗi lượt vài mã)"}
     return {**table, "kind": kind, "reason": None}
 
 
-def _table_of(data_dir: Path, symbol: str, kind: str | None, today) -> dict | None:
+def _table_of(data_dir: Path, symbol: str, kind: str | None) -> dict | None:
     """Bảng số tài chính of one ticker from its stored statements; None when none are stored yet."""
     record = StatementStore(data_dir / ("statements" if kind is None else "statements-financial")).read(symbol)
     if record is None:
         return None
     fundamentals = FundamentalsStore(data_dir / "fundamentals").read(symbol)
-    m = metrics(fundamentals, today=today, year_end_prices={}) if fundamentals and fundamentals.get("years") else None
-    return statement_table(record, closes=SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"), shares=int(m["shares"]) if m else None,
+    return statement_table(record, closes=SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"),
                            vnstock=(fundamentals or {}).get("quarters"), kind=kind)
 
 
@@ -203,7 +202,7 @@ def peers(symbol: str, request: Request, period: str | None = None):
     current: dict[str, dict] = {}
     for s in group:
         by_period: dict[str, dict] = {}
-        table = _table_of(data_dir, s, kind, today)
+        table = _table_of(data_dir, s, kind)
         current[s] = (table or {}).get("current") or {}
         for row in (table or {}).get("quarters", {}).get("rows", []):
             if row["key"]:

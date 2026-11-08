@@ -94,3 +94,7 @@ VNDirect cũng rơi về 45 ngày. Đổi sang ngày VNDirect không làm khác 
   `BANK_CAR_AQ` của VNDirect (lấy cùng `financial-ratios-sync`, không hiện thành dòng), trừ mức 8,00% VNDirect ghi nhiều năm cho BID (mức
   tối thiểu, không phải số báo cáo). Ghi ở mục đối chiếu khi hai nguồn lệch quá 0,1 điểm, hoặc Vietcap ghi đúng y số năm trước (EIB 2025).
   Quý đã nhập CAR ở Số liệu ngân hàng dùng số nhập tay. Chưa đưa CAR vào Điểm sức khỏe (chỉ có số năm).
+- **Vốn hoá của 4 thẻ tóm tắt** (08/11/2026, chủ sở hữu duyệt): vốn hoá hiện tại = vốn hoá cuối quý mới nhất (giá thực × vốn điều lệ ÷ 10.000 đ) × giá đã
+  điều chỉnh mới nhất ÷ giá đã điều chỉnh của phiên cuối quý đó, thay cho giá × số cổ phiếu suy ra từ LNST / EPS (28/57 mã lệch quá 3% so với số niêm yết;
+  PLX +40%). Thiếu phiên cuối quý trong chuỗi giá thì vốn hoá, P/E, P/B, EV/EBITDA trên thẻ để trống. Phép định giá ở trang Định giá giữ nguyên: đo
+  08/11/2026 đổi sang số niêm yết không làm đổi kết luận của mã nào trong 57 mã.

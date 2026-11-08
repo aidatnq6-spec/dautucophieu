@@ -169,11 +169,11 @@ test("the ticker table can be narrowed by symbol and by sector, and the filters 
   await openPage(page);
   const table = page.getByRole("table", { name: "Định giá tham khảo" });
   const status = page.getByText(/^Đang hiện \d+\/\d+ mã/);
-  await expect(status).toContainText("Đang hiện 2/2 mã");
+  await expect(status).toContainText("Đang hiện 3/3 mã");
   await page.getByLabel("Tìm mã").fill("fp");
   await expect(table.getByRole("row", { name: /FPT/ }).first()).toBeVisible();
   await expect(table.getByRole("row", { name: /VCB/ })).toHaveCount(0);
-  await expect(status).toContainText("Đang hiện 1/2 mã");
+  await expect(status).toContainText("Đang hiện 1/3 mã");
   await page.getByRole("button", { name: "Bỏ lọc" }).click();
   await page.getByLabel("Ngành").selectOption("Ngân hàng");
   await expect(table.getByRole("row", { name: /VCB/ })).toBeVisible();

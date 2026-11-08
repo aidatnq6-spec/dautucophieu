@@ -88,10 +88,62 @@ test("a growth scenario prices forward EPS on the ticker's own P/E and P/B bands
   await expect(page.getByRole("figure", { name: "P/E lịch sử FPT" }).getByTestId("mc-sd").first()).toBeAttached();
 });
 
+test("So sánh cùng ngành sets a sector's tickers side by side: best and worst marked, sorted, another quarter, a chart", async ({ page }) => {
+  await page.goto("/research/VCB");
+  const box = page.getByRole("region", { name: "So sánh cùng ngành" });
+  const table = box.getByRole("table", { name: "So sánh ngành Ngân hàng, Q3/2026" });  // the latest quarter both banks have: VCB has a Q4, ACB does not
+  const cell = (symbol: string, column: string) => table.getByRole("row", { name: new RegExp(`^${symbol}`) }).locator(`td[data-label="${column}"]`);
+  const firstTicker = () => table.locator("tbody tr").first().locator('td[data-label="Mã"]');
+  await expect(table.getByRole("row", { name: /^VCB/ })).toHaveClass(/peer-focus/);
+  await expect(cell("VCB", "P/B")).toHaveText("0,60x");
+  await expect(cell("ACB", "P/B")).toHaveText("0,30x");
+  await expect(cell("ACB", "P/B")).toHaveClass(/positive/);  // the lower P/B is the better
+  await expect(cell("VCB", "P/B")).toHaveClass(/negative/);
+  await expect(cell("VCB", "NPL")).toHaveText("0,71%");
+  await expect(cell("VCB", "NPL")).toHaveClass(/positive/);  // the lower NPL is the better: the direction turns with the column
+  await expect(cell("ACB", "NPL")).toHaveClass(/negative/);
+  await expect(cell("ACB", "CASA")).toHaveText("32,0%");  // from Vietcap's notes
+  await expect(table.getByRole("columnheader", { name: /CAR cuối năm 2025/ })).toBeVisible();
+  await expect(cell("ACB", "CAR cuối năm")).toHaveText("12,45%");
+  await expect(cell("VCB", "CAR cuối năm")).toHaveText("—");
+  await expect(cell("ACB", "Giá so với giá hợp lý")).toHaveText(/^[+-]?\d+,\d%$/);  // the column that was empty without prices
+  await expect(cell("VCB", "Giá so với giá hợp lý")).toHaveText("—");  // no price stored: blank, not zero
+  await expect(table.getByRole("row", { name: /Trung vị ngành/ }).locator("td").nth(1)).toBeVisible();
+  await expect(table.getByRole("row", { name: /Trung vị ngành/ })).toContainText("0,96%");  // NPL between 0,71% and 1,20%
+  // Sorting: the first click puts the better end on top, the second turns it round.
+  await expect(firstTicker()).toContainText("ACB");
+  await table.getByRole("button", { name: "NPL", exact: true }).click();
+  await expect(firstTicker()).toContainText("VCB");
+  await table.getByRole("button", { name: "NPL", exact: true }).click();
+  await expect(firstTicker()).toContainText("ACB");
+  // A chart of one column.
+  await table.getByRole("button", { name: "Vẽ biểu đồ: NPL" }).click();
+  const chart = box.getByRole("figure", { name: "Biểu đồ NPL" });
+  await expect(chart).toContainText("VCB");
+  await expect(chart).toContainText("1,20%");
+  await chart.getByRole("button", { name: "Ẩn biểu đồ" }).click();
+  await expect(chart).toHaveCount(0);
+  // Another quarter: VCB has no ratios for it, so its NPL is blank rather than taken from Q3.
+  await box.getByLabel("Kỳ so sánh").selectOption("2026-Q2");
+  const q2 = box.getByRole("table", { name: "So sánh ngành Ngân hàng, Q2/2026" });
+  await expect(q2.getByRole("row", { name: /^ACB/ }).locator('td[data-label="NPL"]')).toHaveText("1,50%");
+  await expect(q2.getByRole("row", { name: /^ACB/ }).locator('td[data-label="P/B"]')).toHaveText("0,20x");
+  await expect(q2.getByRole("row", { name: /^VCB/ }).locator('td[data-label="NPL"]')).toHaveText("—");
+  await q2.getByRole("row", { name: /^ACB/ }).getByRole("link", { name: "ACB" }).click();
+  await expect(page).toHaveURL(/\/research\/ACB$/);
+  // A sector with one watched ticker says why there is no table.
+  await page.goto("/research/FPT");
+  await expect(page.getByRole("region", { name: "So sánh cùng ngành" })).toContainText("Chỉ có 1 mã ngành Công nghệ Thông tin trong danh sách theo dõi");
+  // From Định giá, the chosen sector opens the comparison.
+  await page.goto("/fair-value");
+  await page.getByLabel("Ngành").selectOption("Ngân hàng");
+  await page.getByRole("link", { name: "So sánh ngành này" }).click();
+  await expect(page).toHaveURL(/\/research\/ACB#so-sanh-cung-nganh$/);
+  await expect(page.getByRole("region", { name: "So sánh cùng ngành" }).getByRole("table", { name: /So sánh ngành Ngân hàng/ })).toBeVisible();
+});
+
 test("a bank's Bảng số tài chính holds its sector ratios with its valuation under one chart, and every watched ticker its dividend history", async ({ page }) => {
   await page.goto("/research/VCB");
-  // So sánh cùng ngành: the fixture watches one bank only, so the block says why it has no table.
-  await expect(page.getByRole("region", { name: "So sánh cùng ngành" })).toContainText("Chỉ có 1 mã ngành Ngân hàng trong danh sách theo dõi");
   // One block as for a company: chart on top, period buttons, then the sector ratios and the scale and valuation group in one table.
   const box = page.getByRole("region", { name: "Bảng số tài chính" });
   const table = box.getByRole("table", { name: /quý, cũ bên trái/ });

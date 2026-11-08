@@ -107,3 +107,56 @@ def test_decomposed_vietnamese_text_from_a_pdf_is_normalised_before_matching():
     import unicodedata
     page = "Riêng lẻ Hợp nhất Riêng lẻ Hợp nhất \nG Tỷ lệ an toàn vốn 12.45  14.95  11.97 14.61 "
     assert parse_report_pages([unicodedata.normalize("NFD", page)])["fields"]["car"] == {"value": "14.95", "page": 1}
+
+
+# Tesseract's text of a scanned bank report (MBB, Q3/2026 consolidated statements, 300 dpi): accents slip ("cân" for cần,
+# "nghỉ" for nghi, "mắt" for mất, "đông" for đồng), the unit sits in a merged column header, and a digit can be misread.
+OCR_PAGES = [
+    "BÁO CÁO TÌNH HÌNH TÀI CHÍNH HỢP NHÁT\nThuyết 30/09/2026 đã kiểm toán\nminh triệu đồng",
+    "NỢ PHẢI TRẢ\nTiền gửi của khách hàng IIL17 993.988.042 921.368.132",
+    "- . Phân tích chất lượng nợ cho vay:\n30/09/2026 51/12/2025\nTriệu đông Triệu đông\nDư nợ cho vay\n"
+    "Nợ đủ tiêu chuẩn 1.249.640.585 1.059.781.834\n+ Trong đó các khoản cho vay tại MBS 16.695.619 15.040.585\n"
+    "Nợ cân chú ý 17.013.532 10.210.040\nNợ dưới tiêu chuẩn 7.230.947 3.276.216\nNợ nghỉ ngờ 4.778.315 4.330.018\n"
+    "Nợ có khả năng mắt vốn 9.465.064 8.421.264\n1.288.128.443 1.084.019.370\n- . Phân tích dự nợ theo thời gian:",
+    "17. Tiền gửi của khách hàng\n- Thuyết minh theo loại tiền gửi:\n30/09/2026 31/12/2025\nTriệu đồng Triệu đông\n"
+    "Tiền gửi không kỳ hạn 326.388.841 339.352.789\n-Tiền gửi không kỳ hạn bằng VND 284.018.447 304.453.535\n"
+    "-Tiền gửi không kỳ hạn bằng ngoại tệ 42.370.394 34.899.254\nTiền gửi có kỳ hạn 653.687.908 573.482.507\n"
+    "Tiền ký quỹ 11.578.830 7.306.526\n-Tiền gửi ký quỹ bằng VND 6.059.277 4.544.143\n-Tiền gửi ký quỹ bằng ngoại tệ 5.517.553 2.762.383\n"
+    "993.988.042 921.368.132\n18. Các công cụ tài chính phái sinh",
+]
+ALL_OCR = frozenset(range(len(OCR_PAGES)))
+
+
+def test_scanned_pages_read_by_ocr_match_labels_whose_accents_slipped_and_say_they_came_from_an_image():
+    out = parse_report_pages(OCR_PAGES, ocr=ALL_OCR)
+    f = out["fields"]
+    assert f["group1"] == {"value": "1249640.585", "page": 3, "ocr": True}
+    assert [f[g]["value"] for g in ("group2", "group3", "group4", "group5")] == ["17013.532", "7230.947", "4778.315", "9465.064"]
+    assert f["demand_deposits"] == {"value": "326388.841", "page": 4, "ocr": True}  # matches its VND and foreign-currency lines
+    assert f["customer_deposits"] == {"value": "993988.042", "page": 2, "ocr": True}  # unit from "minh triệu đồng", same as the note's total
+    assert any("OCR" in w for w in out["warnings"])
+
+
+def test_an_ocr_figure_that_misses_its_total_is_left_blank_with_both_numbers_never_picked():
+    out = parse_report_pages(OCR_PAGES, ocr=ALL_OCR)
+    # Margin read as 11.578.830 while its two lines add to 11.576.830: one of them is misread, the reader does not choose.
+    assert "margin_deposits" in out["missing"]
+    assert any("11.578.830" in w and "11.576.830" in w for w in out["warnings"])
+    bad = [p.replace("Nợ nghỉ ngờ 4.778.315", "Nợ nghỉ ngờ 4.773.315") for p in OCR_PAGES]
+    out = parse_report_pages(bad, ocr=ALL_OCR)
+    assert not any(g in out["fields"] for g in ("group1", "group2", "group3", "group4", "group5"))
+    assert any("1.288.123.443" in w and "1.288.128.443" in w for w in out["warnings"])
+    off = [p.replace("IIL17 993.988.042", "IIL17 993.986.042") for p in OCR_PAGES]
+    assert "customer_deposits" in parse_report_pages(off, ocr=ALL_OCR)["missing"]
+
+
+def test_text_pages_keep_their_reading_without_totals_checks_or_an_ocr_mark():
+    out = parse_report_pages(OCR_PAGES)  # same text from a text layer: exact digits, no blanking on a total
+    assert out["fields"]["margin_deposits"] == {"value": "11578.83", "page": 4}
+    assert "ocr" not in out["fields"]["group1"] and not any("OCR" in w for w in out["warnings"])
+
+
+def test_windows_line_ends_from_tesseract_do_not_hide_a_unit_line():
+    # Tesseract on Windows writes \r\n; the unit header sits mid-page, above the balance sheet's first line.
+    crlf = [p.replace("\n", "\r\n") for p in [OCR_PAGES[0] + "\nTÀI SẢN\nTiền mặt, vàng bạc, đá quý 4.844.018", *OCR_PAGES[1:]]]
+    assert parse_report_pages(crlf, ocr=ALL_OCR)["fields"]["customer_deposits"]["value"] == "993988.042"

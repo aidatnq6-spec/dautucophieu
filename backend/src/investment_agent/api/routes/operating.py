@@ -182,7 +182,7 @@ def delete_values(symbol: str, group_id: str, period: str, request: Request, bod
 
 def _read_pdf(url: str) -> list[str]:
     from .bank_figures import _read_pdf as read  # the same guarded download: https, no redirects, 30 MB, 250 pages
-    return read(url)
+    return read(url, ocr=False)[0]  # bulletins have no totals to check an OCR reading against: text pages only
 
 
 @router.post("/{symbol}/groups/{group_id}/read-pdf")

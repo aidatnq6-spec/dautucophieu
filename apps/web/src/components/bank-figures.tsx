@@ -11,7 +11,9 @@ type Source = { kind: "manual" } | { kind: "pdf"; url: string | null; pages: Par
 type Quarter = { quarter: string; values: Record<Field, string | null>; source: Source;
   derived: { npl: string | null; group2_ratio: string | null; casa: string | null; car: string | null } };
 type View = { symbol: string; version: number; quarters: Quarter[]; labels: Record<Field, string> };
-type Read = { url: string; fields: Partial<Record<Field, { value: string; page: number }>>; missing: Field[]; warnings: string[] };
+// `ocr`: read from a scanned page by OCR on this machine, already checked against the printed total where there is one.
+type Read = { url: string; fields: Partial<Record<Field, { value: string; page: number; ocr?: boolean }>>; missing: Field[]; warnings: string[];
+  ocr_pages?: number[] };
 
 const pct = (v: string | null) => (v ? formatRatio(v, 2) : "—");
 const blank = () => Object.fromEntries(FIELDS.map((f) => [f, ""])) as Record<Field, string>;
@@ -25,6 +27,9 @@ export function fromInput(raw: string): string {
 
 const sourceFiles = (s: Extract<Source, { kind: "pdf" }>) => [...new Set([...Object.values(s.urls ?? {}), ...(s.url ? [s.url] : [])])];
 const fileName = (u: string | null | undefined) => (u ? decodeURIComponent(u.split("/").pop() ?? "PDF") : "PDF");
+/** Where a proposed value came from, and a reminder when OCR read it from an image: a misread digit is possible. */
+export const pageNote = (page: number, file: string, ocr: boolean) =>
+  `trang ${page} trong ${file}${ocr ? " · đọc từ ảnh (OCR), so lại từng chữ số" : ""}`;
 
 /** Owner-entered bank figures per quarter (loans by group, deposits, CAR), with a PDF reader that only proposes values. */
 export function BankFigures({ symbol }: { symbol: string }) {
@@ -35,6 +40,7 @@ export function BankFigures({ symbol }: { symbol: string }) {
   const [source, setSource] = useState<Source>({ kind: "manual" });
   const [url, setUrl] = useState("");
   const [read, setRead] = useState<Read | null>(null);
+  const [fromImage, setFromImage] = useState<Set<Field>>(new Set());  // fields filled by OCR and not yet saved
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => {
@@ -46,7 +52,7 @@ export function BankFigures({ symbol }: { symbol: string }) {
 
   function edit(q: Quarter) {
     setQuarter(q.quarter); setValues(Object.fromEntries(FIELDS.map((f) => [f, toInput(q.values[f])])) as Record<Field, string>);
-    setSource(q.source); setRead(null); setMessage(null);
+    setSource(q.source); setRead(null); setFromImage(new Set()); setMessage(null);
   }
   async function readPdf() {
     if (!url.trim()) { setMessage("Dán đường dẫn https của file PDF báo cáo."); return; }
@@ -54,6 +60,11 @@ export function BankFigures({ symbol }: { symbol: string }) {
     try {
       const r = await api<Read>(`bank-figures/${encodeURIComponent(symbol)}/read-pdf`, { method: "POST", body: { url: url.trim(), request_id: requestId() } });
       setRead(r);
+      setFromImage((old) => {
+        const next = new Set([...old].filter((f) => !(f in r.fields)));
+        for (const [f, x] of Object.entries(r.fields)) if (x!.ocr) next.add(f as Field);
+        return next;
+      });
       setValues((old) => ({ ...old, ...Object.fromEntries(Object.entries(r.fields).map(([f, x]) => [f, toInput(x!.value)])) }));
       setSource((old) => {
         const before = old.kind === "pdf" ? old : { pages: {}, urls: {} };
@@ -72,7 +83,7 @@ export function BankFigures({ symbol }: { symbol: string }) {
       setView(await api<View>(`bank-figures/${encodeURIComponent(symbol)}/${quarter.trim()}`, { method: "PUT",
         body: { values: Object.fromEntries(FIELDS.map((f) => [f, values[f].trim() ? fromInput(values[f]) : null])), source,
           expected_version: view.version, request_id: requestId() } }));
-      setQuarter(""); setValues(blank()); setSource({ kind: "manual" }); setRead(null); setUrl(""); setMessage(null);
+      setQuarter(""); setValues(blank()); setSource({ kind: "manual" }); setRead(null); setFromImage(new Set()); setUrl(""); setMessage(null);
     } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); }
   }
   async function remove(q: string) {
@@ -87,7 +98,8 @@ export function BankFigures({ symbol }: { symbol: string }) {
     <section className="surface" aria-label="Số liệu ngân hàng">
       <h2>Số liệu ngân hàng (nhập tay)</h2>
       <p className="caption">Nợ nhóm 1–5, tiền gửi và CAR không có ở nguồn miễn phí: nhập từ thuyết minh báo cáo tài chính quý (tỷ đồng), hoặc dán đường dẫn PDF
-        công khai để phần mềm đọc và điền sẵn — kiểm tra lại rồi mới lưu. CASA = (không kỳ hạn + ký quỹ) / tiền gửi khách hàng. Có số của hai quý cùng kỳ thì
+        công khai để phần mềm đọc và điền sẵn — kiểm tra lại rồi mới lưu. File scan dạng ảnh được nhận dạng chữ (OCR) ngay trên máy, mất khoảng 1–2 phút;
+        số đọc từ ảnh được cộng thử với dòng tổng, ô nào không khớp thì để trống. CASA = (không kỳ hạn + ký quỹ) / tiền gửi khách hàng. Có số của hai quý cùng kỳ thì
         Điểm sức khỏe thêm tiêu chí CASA tăng và nợ nhóm 2 giảm.</p>
       {view && view.quarters.length > 0 && <table className="fv-table" aria-label={`Số liệu ngân hàng ${symbol}`}>
         <thead><tr><th>Quý</th><th className="num">NPL</th><th className="num">Nợ nhóm 2</th><th className="num">CASA</th><th className="num">CAR</th><th>Nguồn</th><th /></tr></thead>
@@ -105,7 +117,7 @@ export function BankFigures({ symbol }: { symbol: string }) {
         <label className="field">Đường dẫn PDF báo cáo (https)<input type="url" value={url} placeholder="https://…/bctc-quy-3-2026.pdf" disabled={!view}
           onChange={(e) => setUrl(e.target.value)} /></label>
         <button type="button" className="btn" disabled={!view || busy} onClick={() => void readPdf()}><FileSearch size={16} aria-hidden="true" />
-          {busy ? "Đang đọc…" : "Đọc và điền sẵn"}</button>
+          {busy ? "Đang đọc… (file scan mất 1–2 phút)" : "Đọc và điền sẵn"}</button>
       </div>
       {read && <div className="notice" role="status">Đã điền {Object.keys(read.fields).length}/{FIELDS.length} ô từ PDF — kiểm tra lại với file trước khi lưu.
         {read.missing.length > 0 && <> Chưa tìm thấy: {read.missing.map((f) => view?.labels[f] ?? f).join(", ")}.</>}
@@ -114,7 +126,7 @@ export function BankFigures({ symbol }: { symbol: string }) {
         <label className="field">Quý<input value={quarter} placeholder="2026-Q3" maxLength={7} disabled={!view} onChange={(e) => setQuarter(e.target.value)} /></label>
         {FIELDS.map((f) => <label key={f} className="field">{view?.labels[f] ?? f}{f === "car" ? "" : " (tỷ đồng)"}
           <input inputMode="decimal" value={values[f]} disabled={!view} onChange={(e) => setValues({ ...values, [f]: e.target.value })} />
-          {pages[f] && <span className="caption">trang {pages[f]} trong {fileName(source.kind === "pdf" ? source.urls?.[f] ?? source.url : null)}</span>}</label>)}
+          {pages[f] && <span className="caption">{pageNote(pages[f], fileName(source.kind === "pdf" ? source.urls?.[f] ?? source.url : null), fromImage.has(f))}</span>}</label>)}
         <button type="submit" className="btn primary" disabled={!view}><Save size={16} aria-hidden="true" />Lưu quý này</button>
       </form>
       {message && <p className="errors" role="alert">{message}</p>}

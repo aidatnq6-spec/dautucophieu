@@ -9,6 +9,8 @@ import { apiError } from "./session-handlers";
 const AREAS = new Set(["profile", "risk", "ledger", "universe", "valuation", "overview", "research", "jobs", "reports", "notifications", "settings", "watchlist", "market", "macro", "trend", "fairvalue", "insights", "concentration", "performance", "events", "journal", "equity-budget", "deposit-book", "glance", "drawdown", "buy-check", "wealth-check", "contributions", "passive-income", "intangibles", "stock", "bank-figures", "annual-plans", "quarter-forecast", "operating", "theses", "hindsight", "screener", "stress"]);
 const SEGMENT = /^[A-Za-z0-9_-][A-Za-z0-9_.-]{0,127}$/;
 const MAX_BODY = 1_048_576;
+// Reading a PDF downloads it (up to 60 s) and may OCR scanned pages on this machine (about a minute for 60 pages).
+const PDF_READ_MS = 300_000, DEFAULT_MS = 15_000;
 
 type BridgeConfig = { origin: string; token: string; hmacSecret: string };
 
@@ -40,7 +42,7 @@ export async function proxyInternal(request: NextRequest, segments: string[], au
     let upstream: Response;
     try {
       upstream = await fetcher(bridge.origin + target, { method, headers: body ? { ...headers, "content-type": "application/json" } : headers,
-        body: body || undefined, cache: "no-store", redirect: "error", signal: AbortSignal.timeout(15000) });
+        body: body || undefined, cache: "no-store", redirect: "error", signal: AbortSignal.timeout(segments.at(-1) === "read-pdf" ? PDF_READ_MS : DEFAULT_MS) });
     } catch { throw new SessionError(502, "bridge_unavailable", "Dịch vụ nội bộ chưa sẵn sàng."); }
     let data: unknown;
     try { data = await upstream.json(); } catch { throw new SessionError(502, "bridge_unavailable", "Dịch vụ nội bộ trả dữ liệu không hợp lệ."); }

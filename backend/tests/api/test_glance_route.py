@@ -85,3 +85,19 @@ def test_one_page_view_reads_each_personal_record_once(tmp_path):
         Repo.read = original
     assert len(reads) > len(trips)  # the same records are asked for many times...
     assert len(trips) == len(set(reads))  # ...but each one costs a single store round trip per request
+
+
+def test_quick_numbers_say_what_they_cover(tmp_path):
+    c, clock = client(tmp_path)
+    k = call(c, clock, "GET", "/internal/glance").json()["kpis"]
+    assert k["held_count"] == 1 and k["unpriced"] == [] and k["no_prior_close"] == [] and k["price_dates"] == ["2027-01-14"]
+
+
+def test_a_holding_without_price_is_named_not_silently_left_out(tmp_path):
+    c, clock = client(tmp_path)
+    call(c, clock, "POST", "/internal/ledger/events", {"event": {"event_id": "b2", "type": "buy", "effective_at": "2027-01-06", "sequence": 0,
+                                                                 "security_id": "MBB", "quantity": 10, "price": "20000", "fee": "0", "tax": "0"},
+                                                       "expected_version": 2, "request_id": "l3"})
+    k = call(c, clock, "GET", "/internal/glance").json()["kpis"]
+    assert k["market_value"] == "6000000"  # FPT only; MBB has no price
+    assert k["held_count"] == 2 and k["unpriced"] == ["MBB"] and k["no_prior_close"] == ["MBB"]

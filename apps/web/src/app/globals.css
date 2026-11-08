@@ -262,3 +262,14 @@ main h2{scroll-margin-top:16px}
 .db-check{display:flex;gap:8px;align-items:center;margin:12px 0 2px;font-size:14px}
 .db-actions{white-space:nowrap}.db-actions .btn+.btn{margin-left:6px}.db-table tr.db-editing td{background:var(--soft,#f6f8fb)}
 .db-reserve{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 16px;margin-bottom:6px}.db-reserve .field{flex:1 1 260px;margin:0}
+/* So sánh cùng ngành */
+.peer-table-wrap{overflow-x:auto}
+.peer-table th{white-space:nowrap}.peer-table th .link-btn{color:inherit;text-decoration:none;font-weight:600;display:inline-flex;gap:3px;align-items:center}
+.peer-table tr.peer-focus td{font-weight:600;background:color-mix(in srgb,var(--brand) 6%,var(--paper))}
+.peer-table tr.peer-median td{color:var(--muted);border-top:2px solid var(--line)}
+.peer-mark{font-weight:600}
+.peer-chart{margin:8px 0 14px}.peer-chart figcaption{font-size:13px;color:var(--muted);margin-bottom:6px}
+.peer-bar-row{display:grid;grid-template-columns:52px 1fr 96px;gap:8px;align-items:center;font-size:13px;padding:2px 0}
+.peer-bar-row.peer-focus{font-weight:600}
+.peer-bar-track{background:var(--bg);height:10px;border-radius:3px;overflow:hidden}
+.peer-bar{display:block;height:100%;background:var(--brand)}.peer-bar.neg{background:var(--bad)}

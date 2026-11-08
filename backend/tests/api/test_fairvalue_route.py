@@ -259,6 +259,35 @@ def test_a_banks_year_end_car_sits_in_its_q4_column_from_vietcap_with_vndirect_a
     assert "Q4/2025 · CAR nhập tay 9,25% so với Vietcap 9,03%; bảng dùng số nhập tay." in body["notes"]
 
 
+def test_peers_of_a_bank_are_its_watched_sector_side_by_side_with_vietcaps_figures_and_a_lone_ticker_says_so(tmp_path):
+    from investment_agent.market.bank_notes import BankNoteStore
+    from investment_agent.market.financial_ratios import FinancialRatioStore
+    (tmp_path / "market-symbols.txt").write_text("VCB\nACB\nFPT\n", encoding="utf-8")
+    (tmp_path / "industries.json").write_text(json.dumps({"as_of": "2026-10-25", "source": "t", "level": 2,
+                                                         "sectors": {"VCB": "Ngân hàng", "ACB": "Ngân hàng", "FPT": "Công nghệ Thông tin"}}), encoding="utf-8")
+    store = FinancialRatioStore(tmp_path / "financial-ratios")
+    for sym, npl in (("VCB", "0.0071"), ("ACB", "0.0120")):
+        store.save({"symbol": sym, "kind": "bank", "fetched_at": "2026-11-08T00:00:00+00:00", "source": "t",
+                    "quarters": {"2026-06-30": {"BAD_LOANS_RATIO_AQ": "0.0100"}, "2026-09-30": {"BAD_LOANS_RATIO_AQ": npl}}})
+    quarter = {"loans": "1000", "group1": "980", "group2": "15", "group3": "2", "group4": "1", "group5": "2",
+               "deposits": "1000", "demand": "300", "term": "680", "savings": "0", "margin": "20", "special": "0"}
+    BankNoteStore(tmp_path / "bank-notes").save({"symbol": "ACB", "fetched_at": "2026-11-08T00:00:00+00:00", "source": "vietcap:iq",
+                                                 "quarters": {"2026-09-30": quarter}, "car_years": {"2025": "0.1245"}})
+    c, clock = _app(tmp_path)
+    body = call(c, clock, "GET", "/internal/fairvalue/peers/VCB").json()
+    assert body["sector"] == "Ngân hàng" and body["kind"] == "bank" and body["focus"] == "VCB" and body["reason"] is None
+    assert body["period"] == "2026-Q3" and [r["symbol"] for r in body["rows"]] == ["ACB", "VCB"]
+    rows = {r["symbol"]: r for r in body["rows"]}
+    assert rows["VCB"]["values"]["BAD_LOANS_RATIO_AQ"] == "0.0071" and body["best"]["BAD_LOANS_RATIO_AQ"] == ["VCB"]
+    assert rows["ACB"]["values"]["CASA"] == "0.3200" and rows["ACB"]["values"]["GROUP2_RATIO"] == "0.0150"  # from Vietcap's notes
+    assert rows["ACB"]["values"]["CAR"] == "0.1245" and rows["VCB"]["values"]["CAR"] is None and body["car_year"] == "2025"
+    q2 = call(c, clock, "GET", "/internal/fairvalue/peers/VCB/2026-Q2").json()
+    assert q2["period"] == "2026-Q2" and {r["symbol"]: r for r in q2["rows"]}["ACB"]["values"]["BAD_LOANS_RATIO_AQ"] == "0.0100"
+    lone = call(c, clock, "GET", "/internal/fairvalue/peers/FPT").json()
+    assert lone["rows"] == [] and lone["reason"] == "Chỉ có 1 mã ngành Công nghệ Thông tin trong danh sách theo dõi"
+    assert call(c, clock, "GET", "/internal/fairvalue/peers/ZZZ").status_code == 404
+
+
 def test_dividend_history_route_uses_the_stored_record_and_the_current_price(tmp_path):
     (tmp_path / "market-symbols.txt").write_text("ACB\n", encoding="utf-8")
     FundamentalsStore(tmp_path / "fundamentals").save({"symbol": "ACB", "fetched_at": "2027-01-14T00:00:00+00:00", "source": "t",

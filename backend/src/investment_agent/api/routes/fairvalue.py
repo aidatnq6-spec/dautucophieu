@@ -28,6 +28,7 @@ from investment_agent.valuation.capm import capm
 from investment_agent.valuation.dividend_history import dividend_history
 from investment_agent.valuation.forward import Assumptions, forward_valuation
 from investment_agent.valuation.history import monthly_multiples
+from investment_agent.valuation.peer_compare import compare
 from investment_agent.valuation.index_reference import index_monthly_multiples
 from investment_agent.valuation.bands import percentile_bands
 from investment_agent.valuation.milestones import price_milestones
@@ -155,15 +156,79 @@ def statements(symbol: str, request: Request):
     kind = kind_of(load_sectors(data_dir)[0].get(symbol))
     empty = {"symbol": symbol, "kind": kind, "quarters": {"periods": [], "rows": []}, "years": {"periods": [], "rows": []}, "summary": None,
              "checks": [], "conflicts": []}
+    table = _table_of(data_dir, symbol, kind, now(request).astimezone(VN).date())
+    if table is None:
+        return {**empty, "reason": "Chưa có số liệu VNDirect cho mã này (đồng bộ lúc 20:00, mỗi lượt vài mã)"}
+    return {**table, "kind": kind, "reason": None}
+
+
+def _table_of(data_dir: Path, symbol: str, kind: str | None, today) -> dict | None:
+    """Bảng số tài chính of one ticker from its stored statements; None when none are stored yet."""
     record = StatementStore(data_dir / ("statements" if kind is None else "statements-financial")).read(symbol)
     if record is None:
-        return {**empty, "reason": "Chưa có số liệu VNDirect cho mã này (đồng bộ lúc 20:00, mỗi lượt vài mã)"}
+        return None
     fundamentals = FundamentalsStore(data_dir / "fundamentals").read(symbol)
-    today = now(request).astimezone(VN).date()
     m = metrics(fundamentals, today=today, year_end_prices={}) if fundamentals and fundamentals.get("years") else None
-    table = statement_table(record, closes=SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"), shares=int(m["shares"]) if m else None,
-                            vnstock=(fundamentals or {}).get("quarters"), kind=kind)
-    return {**table, "kind": kind, "reason": None}
+    return statement_table(record, closes=SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"), shares=int(m["shares"]) if m else None,
+                           vnstock=(fundamentals or {}).get("quarters"), kind=kind)
+
+
+def _period_of(day: str) -> str:
+    return f"{day[:4]}-Q{(int(day[5:7]) + 2) // 3}"
+
+
+@router.get("/fairvalue/peers/{symbol}")
+@router.get("/fairvalue/peers/{symbol}/{period}")  # the quarter as a path segment: the web proxy forwards no query string
+def peers(symbol: str, request: Request, period: str | None = None):
+    """So sánh cùng ngành: every watched ticker of the ticker's sector at one quarter, with the figures its own page shows
+    (Bảng số tài chính, Chỉ số ngành, Định giá); the default quarter is the latest one all of them have."""
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    data_dir = request.app.state.data_dir
+    if data_dir is None:
+        return unavailable()
+    data_dir, symbol = Path(data_dir), symbol.upper()
+    watched = load_watchlist(data_dir).symbols
+    if symbol not in watched:
+        return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
+    sectors = load_sectors(data_dir)[0]
+    sector = sectors.get(symbol)
+    group = sorted(s for s in watched if sector and sectors.get(s) == sector)
+    base = {"symbol": symbol, "sector": sector, "focus": symbol, "rows": []}
+    if sector is None:
+        return {**base, "reason": "Chưa rõ ngành của mã này"}
+    if len(group) < 2:
+        return {**base, "reason": f"Chỉ có 1 mã ngành {sector} trong danh sách theo dõi"}
+    kind, today = kind_of(sector), now(request).astimezone(VN).date()
+    figures: dict[str, dict[str, dict]] = {}
+    for s in group:
+        by_period: dict[str, dict] = {}
+        table = _table_of(data_dir, s, kind, today)
+        for row in (table or {}).get("quarters", {}).get("rows", []):
+            if row["key"]:
+                for p, v in zip(table["quarters"]["periods"], row["values"]):
+                    if v is not None:
+                        by_period.setdefault(p, {})[row["key"]] = v
+        record = FinancialRatioStore(data_dir / "financial-ratios").read(s) if kind else None
+        if record:
+            for day, values in record["quarters"].items():
+                by_period.setdefault(_period_of(day), {}).update(values)
+            if kind == "bank":
+                extra, _, _ = _bank_extra_ratios(request, data_dir, s, record["quarters"])
+                for day, values in extra.items():
+                    by_period.setdefault(_period_of(day), {}).update(values)
+        figures[s] = by_period
+    board_rows = {}
+    if repo is not None:
+        try:  # today's fair value and quality from the Định giá board; no holdings are marked here
+            board_rows = {r["symbol"]: r for r in fair_value_board(data_dir, request.app.state.market, repo, owner, held=set(), today=today)["rows"]}
+        except RepositoryUnavailable:
+            board_rows = {}
+    today_values = {}
+    for s in group:
+        row = board_rows.get(s) or {}
+        f = ((row.get("quality") or {}).get("f_score")) or {}
+        today_values[s] = {"quality": f"{f['score']}/{f['evaluated']}" if f.get("evaluated") else None, "gap": row.get("gap")}
+    return {**base, **compare(kind, figures, today_values, focus=symbol, period=period), "sector": sector, "reason": None}
 
 class ForwardRequest(ContractModel):
     assumptions: Assumptions

@@ -15,6 +15,7 @@ import { CapmTicker } from "./capm";
 import { CompanyPeople } from "./company-people";
 import { InsiderDeals } from "./insider-deals";
 import { FinancialTables } from "./financial-tables";
+import { PeerCompare } from "./peer-compare";
 import { AnnualPlans } from "./annual-plans";
 import { OperatingFigures } from "./operating-figures";
 
@@ -79,6 +80,11 @@ export function StockProfile({ symbol }: { symbol: string }) {
         <h2>Bảng số tài chính</h2>
         <AnnualPlans symbol={p.symbol} />
         <FinancialTables symbol={p.symbol} />
+      </section>}
+
+      {p.watched && <section className="surface" id="so-sanh-cung-nganh" aria-label="So sánh cùng ngành">
+        <h2>So sánh cùng ngành{p.sector ? `: ${p.sector}` : ""}</h2>
+        <PeerCompare symbol={p.symbol} />
       </section>}
 
       {p.watched && <section className="surface" aria-label="Số liệu vận hành">

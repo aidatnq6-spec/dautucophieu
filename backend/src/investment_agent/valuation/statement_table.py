@@ -50,7 +50,7 @@ SCALE = [
     ("g", "Quy mô và định giá"), ("market_cap", "Vốn hoá", "money", 0), ("debt", "Nợ vay", "money", 1),
     ("cash_like", "Tiền và đầu tư tài chính ngắn hạn", "money", 1), ("net_debt", "Nợ ròng", "money", 0), ("ev", "EV", "money", 0),
     ("pe", "P/E", "x", 0), ("pb", "P/B", "x", 0), ("ev_ebitda", "EV/EBITDA", "x", 0), ("ev_revenue", "EV/Doanh thu", "x", 0),
-    ("fcff_yield", "Lợi suất FCFF", "pct", 0), ("roe", "ROE", "pct", 0),
+    ("fcff_yield", "Lợi suất FCFF", "pct", 0), ("roe", "ROE", "pct", 0), ("debt_to_equity", "Vay / vốn chủ", "x", 0),
 ]
 _FIN_HEAD = [("g", "Quy mô và định giá"), ("market_cap", "Vốn hoá", "money", 0), ("parent_equity", "Vốn chủ công ty mẹ", "money", 0),
              ("bvps", "Giá trị sổ sách / cổ phiếu", "vnd", 0), ("pb", "P/B", "x", 0), ("pe", "P/E", "x", 0), ("roe", "ROE", "pct", 0)]
@@ -127,7 +127,7 @@ def _part(periods: dict, keys: list[str], extra: dict[str, dict] | None = None, 
             return _ratio(cur.get("gross_profit"), cur.get("revenue"))
         if key in ("net_margin", "ebit_margin", "ebitda_margin"):
             return _ratio(cur.get({"net_margin": "npat_parent", "ebit_margin": "ebit", "ebitda_margin": "ebitda"}[key]), cur.get("revenue"))
-        if key in ("pe", "pb", "ev_ebitda", "ev_revenue"):
+        if key in ("pe", "pb", "ev_ebitda", "ev_revenue", "debt_to_equity"):
             return cur.get(key)
         if key in ("fcff_yield", "roe"):
             return cur.get(key)
@@ -152,8 +152,9 @@ def _block(f: dict, close: Decimal | None, flows: dict[str, Decimal | None], par
     cash_like = _sum(d.get("cash"), d.get("st_investments"))
     net = None if debt is None or cash_like is None else debt - cash_like
     ev = None if cap is None or net is None else cap + net + _minority(f)
-    parent, npat = _parent_equity(f), flows.get("npat_parent")
+    parent, npat, equity = _parent_equity(f), flows.get("npat_parent"), _d(f.get("equity"))
     return {"market_cap": cap, "debt": debt, "cash_like": cash_like, "net_debt": net, "ev": ev,
+            "debt_to_equity": _ratio(debt, equity, _Q2) if equity is not None and equity > 0 and debt is not None else None,
             "pe": _ratio(cap, npat, _Q2, positive=True), "pb": _ratio(cap, parent, _Q2, positive=True),
             "ev_ebitda": _ratio(ev, flows.get("ebitda"), _Q2, positive=True), "ev_revenue": _ratio(ev, flows.get("revenue"), _Q2, positive=True),
             "fcff_yield": _ratio(flows.get("fcff"), ev) if ev and ev > 0 and flows.get("fcff") is not None else None,

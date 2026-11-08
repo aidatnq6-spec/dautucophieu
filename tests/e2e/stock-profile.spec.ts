@@ -90,6 +90,8 @@ test("a growth scenario prices forward EPS on the ticker's own P/E and P/B bands
 
 test("a bank's Bảng số tài chính holds its sector ratios with its valuation under one chart, and every watched ticker its dividend history", async ({ page }) => {
   await page.goto("/research/VCB");
+  // So sánh cùng ngành: the fixture watches one bank only, so the block says why it has no table.
+  await expect(page.getByRole("region", { name: "So sánh cùng ngành" })).toContainText("Chỉ có 1 mã ngành Ngân hàng trong danh sách theo dõi");
   // One block as for a company: chart on top, period buttons, then the sector ratios and the scale and valuation group in one table.
   const box = page.getByRole("region", { name: "Bảng số tài chính" });
   const table = box.getByRole("table", { name: /quý, cũ bên trái/ });

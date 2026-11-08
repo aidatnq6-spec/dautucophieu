@@ -9,7 +9,7 @@ type Column = { key: string; label: string; format: Format; better: "high" | "lo
 type PeerRow = { symbol: string; values: Record<string, string | null>; reason?: string | null; top?: number };
 type Peers = { symbol: string; sector: string | null; focus: string; reason: string | null; rows: PeerRow[]; kind?: string | null;
   period?: string | null; periods?: string[]; car_year?: string | null; columns?: Column[]; best?: Record<string, string[]>;
-  worst?: Record<string, string[]>; median?: Record<string, string>; ranked?: number };
+  worst?: Record<string, string[]>; median?: Record<string, string>; ranked?: number; price_date?: string | null };
 
 const quarter = (p: string) => `Q${p.slice(-1)}/${p.slice(0, 4)}`;
 
@@ -115,7 +115,7 @@ export function PeerCompare({ symbol }: { symbol: string }) {
         Số ở {data.period ? quarter(data.period) : "quý gần nhất"}: quý gần nhất mà mọi mã có số liệu đều có (chọn quý khác ở trên); mã chưa có quý đó để trống
         và ghi lý do, không lấy quý khác bù vào. Mỗi số là số đã có ở trang của mã: Bảng số tài chính (P/E, P/B, ROE… tại giá cuối quý, 4 quý gần nhất), chỉ số
         ngành của VNDirect, nợ nhóm 2, CASA và CAR cuối năm từ Vietcap; cột &quot;hiện tại&quot; lấy từ trang Định giá (giá so với giá hợp lý: âm là đang rẻ hơn
-        giá hợp lý). Trong mỗi cột, xanh là tốt nhất, đỏ là kém nhất theo chiều của chỉ số (P/E, P/B, nợ xấu thấp là tốt; ROE, CASA, NIM cao là tốt); Vốn hoá
+        giá hợp lý). P/E và P/B theo giá dùng giá đóng cửa mới nhất đã lưu{data.price_date ? ` (${new Date(data.price_date).toLocaleDateString("vi-VN")})` : ""} : vốn hoá cuối quý mới nhất (giá thực × vốn điều lệ ÷ 10.000 đ) nhân với biến động của giá đã điều chỉnh từ phiên đó, trên LNST công ty mẹ 4 quý và vốn chủ của quý đó; hai cột này có tô màu nhưng không tính vào &quot;Đứng nhóm đầu&quot; để định giá không bị đếm hai lần. Trong mỗi cột, xanh là tốt nhất, đỏ là kém nhất theo chiều của chỉ số (P/E, P/B, nợ xấu thấp là tốt; ROE, CASA, NIM cao là tốt); Vốn hoá
         và LDR không xếp hạng. &quot;Đứng nhóm đầu&quot; đếm số cột mà mã nằm trong 1/3 tốt nhất. Không có điểm tổng: cách cộng các cột là nhận định của
         mỗi người, phần mềm không chọn thay.
       </p>

@@ -318,9 +318,29 @@ def _checks(quarters: dict, years: dict, vnstock: dict | None) -> list[dict]:
     return sorted(out, key=lambda c: (c["period"], c["check"]))
 
 
+def _current(record: dict, closes) -> dict:
+    """P/E and P/B at the latest close. The market value is the latest quarter's (its unadjusted close × its shares) moved by the
+    adjusted series since that session, so a bonus issue or split after the quarter does not change it; shares derived from profit
+    and EPS are not used, they miss by up to double. Blank without that session in the series."""
+    quarters, qclose = record.get("quarters", {}), record.get("quarter_end_close", {})
+    close_date = closes[-1][0].date().isoformat() if closes else None
+    blank = {"pe": None, "pb": None, "close_date": close_date}
+    based = [p for p in sorted(quarters) if p in qclose and _d(quarters[p].get("charter_capital"))]
+    if not closes or not based:
+        return blank
+    last = based[-1]
+    then = next((Decimal(str(v)) for t, v in closes if t.date().isoformat() == qclose[last].get("date")), None)
+    close = _d(qclose[last].get("close"))
+    if not then or close is None:
+        return blank
+    cap = close * 1000 * _d(quarters[last]["charter_capital"]) / PAR * Decimal(str(closes[-1][1])) / then
+    npat = _four(quarters, last, ("npat_parent",))["npat_parent"]
+    return {"pe": _ratio(cap, npat, _Q2, positive=True), "pb": _ratio(cap, _parent_equity(quarters[last]), _Q2, positive=True), "close_date": close_date}
+
+
 def statement_table(record: dict, *, closes, shares: int | None, vnstock: dict | None, kind: str | None = None) -> dict:
     if kind in FIN_SCALE:
-        return _fin_table(record, kind, vnstock)
+        return {**_fin_table(record, kind, vnstock), "current": _current(record, closes)}
     quarters, years = record.get("quarters", {}), record.get("years", {})
     year_part = _part(years, sorted(years), extra=_valuation(years, record.get("year_end_close", {})), spec=P_AND_L + SCALE)
     quarter_part = _part(quarters, sorted(quarters), extra=_quarter_valuation(quarters, record.get("quarter_end_close", {})), spec=P_AND_L + SCALE)
@@ -329,5 +349,6 @@ def statement_table(record: dict, *, closes, shares: int | None, vnstock: dict |
             row["values"] = [_money(v) if isinstance(v, Decimal) else v for v in row["values"]]
     return {"symbol": record.get("symbol"), "source": record.get("source"), "fetched_at": record.get("fetched_at"),
             "quarters": quarter_part, "years": year_part, "summary": _summary(quarters, closes, shares),
+            "current": _current(record, closes),
             "checks": _checks(quarters, years, vnstock),
             "conflicts": record.get("quarters_conflicts", []) + record.get("years_conflicts", [])}

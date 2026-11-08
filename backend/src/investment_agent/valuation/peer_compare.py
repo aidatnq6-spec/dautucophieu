@@ -15,21 +15,24 @@ from decimal import Decimal
 _HEAD = [("market_cap", "Vốn hoá", "money", None, "q"), ("pb", "P/B", "x", "low", "q"), ("pe", "P/E", "x", "low", "q"),
          ("roe", "ROE", "pct", "high", "q")]
 _NOW = [("quality", "Điểm sức khỏe", "score", "high", "now"), ("gap", "Giá so với giá hợp lý", "pct", "low", "now")]
+# Today's price: marked best and worst, but not counted again in "Đứng nhóm đầu" beside the same multiples at the quarter's end.
+_PRICE = [("pe_now", "P/E theo giá", "x", "low", "now"), ("pb_now", "P/B theo giá", "x", "low", "now")]
+UNCOUNTED = {"pe_now", "pb_now"}
 COLUMNS = {
     None: [("market_cap", "Vốn hoá", "money", None, "q"), ("pe", "P/E", "x", "low", "q"), ("pb", "P/B", "x", "low", "q"),
            ("ev_ebitda", "EV/EBITDA", "x", "low", "q"), ("roe", "ROE", "pct", "high", "q"), ("gross_margin", "Biên gộp", "pct", "high", "q"),
            ("revenue_yoy", "Doanh thu so cùng kỳ", "pct", "high", "q"), ("npat_parent_yoy", "LNST mẹ so cùng kỳ", "pct", "high", "q"),
            ("debt_to_equity", "Vay / vốn chủ", "x", "low", "q"),
-           ("quality", "F-Score", "score", "high", "now"), ("gap", "Giá so với giá hợp lý", "pct", "low", "now")],
+           ("quality", "F-Score", "score", "high", "now"), ("gap", "Giá so với giá hợp lý", "pct", "low", "now")] + _PRICE,
     "bank": _HEAD + [("ROAA_TR_AVG4Q", "ROAA", "pct2", "high", "q"), ("NET_INTEREST_MARGIN_TR_AVG5Q", "NIM", "pct2", "high", "q"),
                      ("BAD_LOANS_RATIO_AQ", "NPL", "pct2", "low", "q"), ("GROUP2_RATIO", "Nợ nhóm 2", "pct2", "low", "q"),
                      ("PROVISION_BAD_LOANS_AQ", "Bao phủ nợ xấu", "pct", "high", "q"), ("CASA", "CASA", "pct", "high", "q"),
                      ("LOANS_TO_DEPOSIT_AQ", "LDR", "pct", None, "q"), ("CUSTOMER_LOANS_AQ_GRYOY", "Tăng trưởng cho vay", "pct", "high", "q"),
-                     ("CAR", "CAR cuối năm", "pct2", "high", "year")] + _NOW,
+                     ("CAR", "CAR cuối năm", "pct2", "high", "year")] + _NOW + _PRICE,
     "securities": _HEAD + [("ROAA_TR_AVG4Q", "ROAA", "pct2", "high", "q"), ("NET_MARGIN_TR", "Biên lợi nhuận ròng", "pct", "high", "q"),
-                           ("LOANS_TO_EQUITY_AQ", "Cho vay / vốn chủ", "x", "low", "q")] + _NOW,
+                           ("LOANS_TO_EQUITY_AQ", "Cho vay / vốn chủ", "x", "low", "q")] + _NOW + _PRICE,
     "insurance": _HEAD + [("ROAA_TR_AVG4Q", "ROAA", "pct2", "high", "q"), ("COMBINED_RATIO_TR", "Tỷ lệ kết hợp", "pct", "low", "q"),
-                          ("NET_MARGIN_TR", "Biên lợi nhuận ròng", "pct", "high", "q")] + _NOW,
+                          ("NET_MARGIN_TR", "Biên lợi nhuận ròng", "pct", "high", "q")] + _NOW + _PRICE,
 }
 
 
@@ -92,10 +95,12 @@ def compare(kind: str | None, peers: dict[str, dict[str, dict[str, str | None]]]
             median[key] = format(m.quantize(Decimal("0.01") if fmt == "x" else Decimal(1) if fmt == "money" else Decimal("0.0001")), "f")
         if better is None or len(found) < 2:
             continue
-        ranked += 1
         ordered = sorted(found, key=lambda x: x[1], reverse=better == "high")
         best[key] = [s for s, n in ordered if n == ordered[0][1]]
         worst[key] = [s for s, n in ordered if n == ordered[-1][1]]
+        if key in UNCOUNTED:
+            continue
+        ranked += 1
         cut = ordered[math.ceil(len(ordered) / 3) - 1][1]
         for r in rows:
             n = _number(r["values"][key], fmt)

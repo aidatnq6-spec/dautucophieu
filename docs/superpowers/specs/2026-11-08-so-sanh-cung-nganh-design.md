@@ -35,6 +35,8 @@ trên vốn chủ sở hữu gồm phần không kiểm soát, như công ty ch�
 - Dòng "Trung vị ngành" cho mỗi cột số. "Đứng nhóm đầu" = số cột xếp hạng mà mã nằm trong 1/3 tốt nhất (làm tròn lên), trên số cột xếp
   hạng có số.
 - Không có điểm tổng: trọng số giữa các cột là nhận định của người dùng, phần mềm không chọn thay và không gợi ý mua.
+- **P/E và P/B theo giá** (08/11/2026, chủ sở hữu duyệt): hai cột "hiện tại" cho mọi nhóm ngành, vốn hoá = vốn hoá cuối quý mới nhất (giá thực × vốn điều lệ ÷ 10.000 đ) × giá đã điều chỉnh mới nhất ÷ giá đã điều chỉnh của phiên cuối quý đó (cổ phiếu thưởng, chia tách sau quý không làm đổi vốn hoá), trên LNST công ty mẹ 4 quý và vốn chủ của quý đó; không đổi theo kỳ so sánh, thiếu phiên cuối quý trong chuỗi giá thì để trống. Không dùng số cổ phiếu suy ra từ LNST / EPS: lệch tới gấp đôi so với vốn điều lệ (PLX +40%, PHR +96%, IJC −28%). Có tô tốt nhất, kém nhất
+  và trung vị, nhưng không tính vào "Đứng nhóm đầu", vì P/E, P/B tại giá cuối quý đã được tính.
 - Sắp xếp theo cột (lần bấm đầu đưa đầu tốt lên trên), biểu đồ thanh của một cột.
 - API: `GET /internal/fairvalue/peers/<MÃ>` và `/<MÃ>/<yyyy-Qn>` (kỳ là một đoạn đường dẫn vì proxy web không chuyển chuỗi truy vấn). Bảng
   Định giá được tính không đánh dấu mã đang nắm.

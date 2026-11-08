@@ -53,6 +53,15 @@ def test_year_end_car_is_read_at_the_last_year_end_before_the_quarter():
 
 def test_every_kind_has_its_columns_with_a_direction_or_none():
     assert [c[0] for c in COLUMNS[None]] == ["market_cap", "pe", "pb", "ev_ebitda", "roe", "gross_margin", "revenue_yoy", "npat_parent_yoy",
-                                            "debt_to_equity", "quality", "gap"]
+                                            "debt_to_equity", "quality", "gap", "pe_now", "pb_now"]
     assert {c[0] for c in COLUMNS["bank"]} >= {"GROUP2_RATIO", "CASA", "CAR", "NET_INTEREST_MARGIN_TR_AVG5Q"}
     assert all(c[3] in ("high", "low", None) for cols in COLUMNS.values() for c in cols)
+
+
+def test_multiples_at_todays_price_are_marked_but_not_counted_twice_with_the_quarter_end_ones():
+    now = {s: {**v, "pe_now": n, "pb_now": n} for (s, v), n in zip(NOW.items(), ("9.00", "7.00", None, None))}
+    plain = compare("bank", PEERS, NOW, focus="AAA", period="2026-Q2")
+    out = compare("bank", PEERS, now, focus="AAA", period="2026-Q2")
+    assert out["best"]["pe_now"] == ["BBB"] and out["worst"]["pe_now"] == ["AAA"]  # the lower is the cheaper
+    assert out["ranked"] == plain["ranked"] and [r["top"] for r in out["rows"]] == [r["top"] for r in plain["rows"]]
+    assert {r["symbol"]: r for r in out["rows"]}["BBB"]["values"]["pb_now"] == "7.00"

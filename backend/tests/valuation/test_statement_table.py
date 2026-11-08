@@ -204,3 +204,19 @@ def test_an_insurer_s_result_is_left_blank_where_its_parts_do_not_add_up_to_prof
     assert r["ins_result"][t["quarters"]["periods"].index("2025-Q4")] is None and r["fin_profit"][t["quarters"]["periods"].index("2025-Q4")] is not None
     assert r["ins_result"][t["quarters"]["periods"].index("2025-Q1")] is not None
     assert ("2025-Q2", "ins_reconcile") in {(c["period"], c["check"]) for c in t["checks"]}
+
+
+def test_every_kind_gets_its_multiples_at_the_latest_close_from_the_quarter_end_market_value():
+    quarters = {p: {"npat_parent": str(2 * B), "equity": str(50 * B), "charter_capital": str(5 * B)} for p in ("2025-Q4", "2026-Q1", "2026-Q2", "2026-Q3")}
+    record = {**RECORD, "quarters": quarters, "years": {}, "year_end_close": {}, "quarter_end_close": {"2026-Q3": {"date": "2026-09-30", "close": "30"}}}
+    # 500,000 shares × 30,000 đ = 15 tỷ at the quarter's end; the price has since fallen by a third: 10 tỷ, on 8 tỷ profit and 50 tỷ equity.
+    closes = [(datetime(2026, 9, 30), 30.0), (datetime(2026, 11, 6), 20.0)]
+    t = statement_table(record, closes=closes, shares=999, vnstock=None, kind="bank")
+    assert t["current"] == {"pe": "1.25", "pb": "0.20", "close_date": "2026-11-06"} and t["summary"] is None
+    # A bonus issue after the quarter: the adjusted series has the quarter's close at half, so the market value has not moved.
+    t = statement_table(record, closes=[(datetime(2026, 9, 30), 15.0), (datetime(2026, 11, 6), 15.0)], shares=999, vnstock=None, kind="bank")
+    assert t["current"]["pb"] == "0.30"
+    # No close on the quarter's last session: left blank, not worked out some other way.
+    t = statement_table(record, closes=[(datetime(2026, 11, 6), 20.0)], shares=999, vnstock=None, kind="bank")
+    assert t["current"] == {"pe": None, "pb": None, "close_date": "2026-11-06"}
+    assert statement_table(record, closes=[], shares=999, vnstock=None, kind="bank")["current"] == {"pe": None, "pb": None, "close_date": None}

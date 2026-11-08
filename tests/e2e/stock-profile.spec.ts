@@ -108,6 +108,7 @@ test("So sánh cùng ngành sets a sector's tickers side by side: best and worst
   await expect(cell("VCB", "CAR cuối năm")).toHaveText("—");
   await expect(cell("ACB", "Giá so với giá hợp lý")).toHaveText(/^[+-]?\d+,\d%$/);  // the column that was empty without prices
   await expect(cell("VCB", "Giá so với giá hợp lý")).toHaveText("—");  // no price stored: blank, not zero
+  await expect(cell("ACB", "P/B theo giá")).toHaveText("0,20x");  // the latest close, unlike the 0,30x at the quarter's end
   await expect(table.getByRole("row", { name: /Trung vị ngành/ }).locator("td").nth(1)).toBeVisible();
   await expect(table.getByRole("row", { name: /Trung vị ngành/ })).toContainText("0,96%");  // NPL between 0,71% and 1,20%
   // Sorting: the first click puts the better end on top, the second turns it round.

@@ -109,7 +109,7 @@ if __name__ == "__main__":
         "years": {str(y): {"npat": "1000000000", "eps": "2000", "equity": "5000000000"} for y in range(2020, 2026)},
         "quarters": {q: {"npat": "250000000", "equity": "5000000000"} for q in ("2025-Q2", "2025-Q3", "2025-Q4", "2026-Q1", "2026-Q2")},
         "dividends": [], "issues": []})
-    SeriesStore(os.path.join(data, "trend-sources")).upsert("ACB-1d", [(datetime(y, 12, 31), "20") for y in range(2020, 2026)])
+    SeriesStore(os.path.join(data, "trend-sources")).upsert("ACB-1d", [(datetime(y, 12, 31), "20") for y in range(2020, 2026)] + [(datetime(2026, 9, 30), "30"), (datetime(2026, 10, 23), "20")])
     from investment_agent.market.bank_notes import BankNoteStore
     BankNoteStore(os.path.join(data, "bank-notes")).save({
         "symbol": "ACB", "fetched_at": "2026-11-08T00:00:00+00:00", "source": "vietcap:iq", "car_years": {"2025": "0.1245"},

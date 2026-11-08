@@ -15,6 +15,31 @@ const pct = (v: string) => `${Number(v) > 0 ? "+" : Number(v) < 0 ? "−" : ""}$
 const tone = (v: string | null) => (v === null || Number(v) === 0 ? "" : Number(v) > 0 ? "positive" : "negative");
 const day = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 const signedVnd = (v: string) => `${Number(v) > 0 ? "+" : Number(v) < 0 ? "−" : ""}${formatVnd(v.replace(/^-/, ""))}`;
+const rebased = (v: string) => Number(v).toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** Every session drawn on the chart, newest first: the chart reads by hover only, the table can be read without a pointer. */
+export function chartRows(series: Point[]): Point[] {
+  return [...series].reverse();
+}
+
+/** Sessions left off the chart for want of a close, named so they can be checked. */
+export function skippedNote(days: string[]): string | null {
+  return days.length ? `Bỏ qua ${days.length} phiên thiếu giá: ${days.map(day).join(", ")}.` : null;
+}
+
+function ChartData({ series }: { series: Point[] }) {
+  return (
+    <details className="mc-table">
+      <summary>Xem số liệu ({series.length} phiên)</summary>
+      <table aria-label="Số liệu biểu đồ hiệu quả danh mục">
+        <thead><tr><th>Phiên</th><th className="num">Danh mục</th><th className="num">VN-Index</th><th className="num">Giá trị danh mục</th></tr></thead>
+        <tbody>{chartRows(series).map((r) => <tr key={r.date}><td>{day(r.date)}</td><td className="num">{rebased(r.portfolio)}</td>
+          <td className="num">{rebased(r.vnindex)}</td><td className="num">{formatVnd(r.value)}</td></tr>)}</tbody>
+      </table>
+      <p className="caption">Danh mục và VN-Index cùng quy về 100 ở phiên đầu; giá trị danh mục theo giá đóng cửa từng phiên.</p>
+    </details>
+  );
+}
 
 function Chart({ series }: { series: Point[] }) {
   const box = useRef<HTMLDivElement>(null);
@@ -92,7 +117,7 @@ export function PerformanceView() {
         {p.total && <p>Danh mục <strong className={tone(p.total.portfolio)}>{pct(p.total.portfolio)}</strong> · VN-Index{" "}
           <strong className={tone(p.total.vnindex)}>{pct(p.total.vnindex)}</strong> <span className="caption">từ {day(p.total.since)}, {p.total.days} phiên</span></p>}
         {p.total && p.benchmarks && <Benchmarks b={p.benchmarks} />}
-        {p.series.length >= 2 ? <Chart series={p.series} />
+        {p.series.length >= 2 ? <><Chart series={p.series} /><ChartData series={p.series} /></>
           : <p className="muted">Mới có {p.series.length} phiên có giá đủ để tính; biểu đồ sẽ dài dần theo thời gian.</p>}
         {p.monthly.length > 0 && <table className="fv-table cc-table" aria-label="Lợi nhuận theo tháng">
           <thead><tr><th>Tháng</th><th className="num">Danh mục</th><th className="num">VN-Index</th></tr></thead>
@@ -113,7 +138,7 @@ export function PerformanceView() {
           </tbody>
         </table>
         <p className="caption">Lãi/lỗ đã thực hiện (đã bán): <span className={tone(p.realized_gain)}>{signedVnd(p.realized_gain)}</span>.
-          {p.skipped_days.length > 0 && ` Bỏ qua ${p.skipped_days.length} phiên thiếu giá.`}</p>
+          {skippedNote(p.skipped_days) && ` ${skippedNote(p.skipped_days)}`}</p>
       </>}
     </section>
   );

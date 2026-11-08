@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { axes, linePath, plotValue, scaleOf, seriesName, toggleRow } from "./statement-chart";
+import { axes, flaggedFor, linePath, niceTicks, plotValue, scaleOf, seriesName, toggleRow } from "./statement-chart";
 
 const rows = [
   { key: null, label: "Doanh thu", kind: "group" as const, indent: 0, values: [] },
@@ -49,4 +49,24 @@ it("a missing value breaks the line instead of joining across it", () => {
   const d = linePath([1, 2, null, 4, 5], (i) => i * 10, (v) => v);
   expect(d).toBe("M0.0,1.0L10.0,2.0M30.0,4.0L40.0,5.0");
   expect(linePath([1, null, 3], (i) => i, (v) => v)).toBe("M0.0,1.0M2.0,3.0");
+});
+
+it("axis ticks are round numbers and hold zero when the values cross it", () => {
+  expect(niceTicks(-26879, 17452)).toEqual([-30000, -20000, -10000, 0, 10000, 20000]);
+  expect(niceTicks(5.5, 23.8)).toEqual([5, 10, 15, 20, 25]);
+  expect(niceTicks(0, 298)).toEqual([0, 50, 100, 150, 200, 250, 300]);
+  expect(niceTicks(39, 41)).toEqual([39, 39.5, 40, 40.5, 41]);
+});
+
+it("a period is starred only for a cross-check that touches a drawn row or a figure made from it", () => {
+  const checks = [
+    { period: "2018", check: "cfo", label: "Lưu chuyển tiền từ HĐKD: tổng 4 quý ≠ cả năm", a: "1", b: "2" },
+    { period: "2019", check: "revenue", label: "Doanh thu thuần: tổng 4 quý ≠ cả năm", a: "1", b: "2" },
+    { period: "2020", check: "vnstock_npat", label: "LNST công ty mẹ: VNDirect ≠ Vnstock", a: "1", b: "2" },
+  ];
+  const fcff = flaggedFor(checks, ["fcff"]);
+  expect([...fcff.keys()]).toEqual(["2018"]);
+  expect(fcff.get("2018")).toEqual(["Lưu chuyển tiền từ HĐKD: tổng 4 quý ≠ cả năm"]);
+  expect([...flaggedFor(checks, ["pe", "gross_margin"]).keys()]).toEqual(["2019", "2020"]);
+  expect(flaggedFor(checks, ["selling"]).size).toBe(0);
 });

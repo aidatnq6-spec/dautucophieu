@@ -98,6 +98,22 @@ def note_ratios(quarter: dict[str, str]) -> tuple[dict[str, str], list[str]]:
     return ratios, problems
 
 
+def bank_ratio_rows(entered: dict[str, dict], notes: dict[str, dict]) -> dict[str, dict[str, tuple[str, str]]]:
+    """{"2026-Q3": {"casa" | "group2_ratio": (ratio, source)}}: Vietcap's where its parts add up to its totals, with the quarters the
+    owner entered (Số liệu ngân hàng) on top; the source is "Vietcap" or "số nhập tay"."""
+    from investment_agent.domain.bank_figures import derive
+    rows: dict[str, dict[str, tuple[str, str]]] = {}
+    for day, quarter in notes.items():
+        ratios, _ = note_ratios(quarter)
+        rows[f"{day[:4]}-Q{(int(day[5:7]) + 2) // 3}"] = {key: (value, "Vietcap") for key, value in ratios.items()}
+    for quarter, values in entered.items():
+        derived = derive(values)
+        for key in ("casa", "group2_ratio"):
+            if derived[key] is not None:
+                rows.setdefault(quarter, {})[key] = (derived[key], "số nhập tay")
+    return {q: row for q, row in sorted(rows.items()) if row}
+
+
 def sync_bank_notes(store: BankNoteStore, sectors: dict[str, str | None], *, get: Callable[[str], str],
                     sleep: Callable[[float], None] = time.sleep, now: datetime | None = None, force: bool = False) -> dict[str, str]:
     """Refresh each watched bank whose record is a week old or missing; one failing is reported, the others still update."""

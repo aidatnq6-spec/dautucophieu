@@ -99,8 +99,8 @@ export function BankFigures({ symbol }: { symbol: string }) {
       <h2>Số liệu ngân hàng (nhập tay)</h2>
       <p className="caption">Nợ nhóm 1–5, tiền gửi và CAR không có ở nguồn miễn phí: nhập từ thuyết minh báo cáo tài chính quý (tỷ đồng), hoặc dán đường dẫn PDF
         công khai để phần mềm đọc và điền sẵn — kiểm tra lại rồi mới lưu. File scan dạng ảnh được nhận dạng chữ (OCR) ngay trên máy, mất khoảng 1–2 phút;
-        số đọc từ ảnh được cộng thử với dòng tổng, ô nào không khớp thì để trống. CASA = (không kỳ hạn + ký quỹ) / tiền gửi khách hàng. Có số của hai quý cùng kỳ thì
-        Điểm sức khỏe thêm tiêu chí CASA tăng và nợ nhóm 2 giảm.</p>
+        số đọc từ ảnh được cộng thử với dòng tổng, ô nào không khớp thì để trống. CASA = (không kỳ hạn + ký quỹ) / tiền gửi khách hàng. Nợ nhóm 2 và CASA
+        đã tự lấy từ thuyết minh trên Vietcap (Điểm sức khỏe dùng cho tiêu chí CASA tăng, nợ nhóm 2 giảm); quý nhập ở đây được dùng thay số Vietcap.</p>
       {view && view.quarters.length > 0 && <table className="fv-table" aria-label={`Số liệu ngân hàng ${symbol}`}>
         <thead><tr><th>Quý</th><th className="num">NPL</th><th className="num">Nợ nhóm 2</th><th className="num">CASA</th><th className="num">CAR</th><th>Nguồn</th><th /></tr></thead>
         <tbody>{view.quarters.map((q) => <tr key={q.quarter}>

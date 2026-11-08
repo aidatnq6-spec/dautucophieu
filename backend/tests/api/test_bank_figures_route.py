@@ -85,6 +85,21 @@ def test_saved_figures_reach_the_bank_health_score_on_the_valuation_board(tmp_pa
     assert ids["group2_down"]["passed"] is True and "casa_up" in ids
 
 
+def test_vietcaps_notes_reach_the_bank_health_score_without_any_entered_figures(tmp_path):
+    from investment_agent.market.bank_notes import BankNoteStore
+    from investment_agent.market.financial_ratios import FinancialRatioStore
+    c, clock = client(tmp_path)
+    FinancialRatioStore(tmp_path / "financial-ratios").save({"symbol": "ACB", "kind": "bank", "fetched_at": "2026-10-31T00:00:00+00:00", "source": "t",
+                                                             "quarters": {"2025-09-30": {"ROAA_TR_AVG4Q": "0.019"}, "2026-09-30": {"ROAA_TR_AVG4Q": "0.02"}}})
+    quarter = {"loans": "1000", "group1": "980", "group2": "15", "group3": "2", "group4": "1", "group5": "2",
+               "deposits": "1000", "demand": "300", "term": "680", "savings": "0", "margin": "20", "special": "0"}
+    BankNoteStore(tmp_path / "bank-notes").save({"symbol": "ACB", "fetched_at": "2026-11-08T00:00:00+00:00", "source": "vietcap:iq", "quarters": {
+        "2025-09-30": quarter, "2026-09-30": {**quarter, "group1": "983", "group2": "12", "demand": "330", "term": "650"}}})
+    rows = {r["symbol"]: r for r in call(c, clock, "GET", "/internal/fairvalue").json()["rows"]}
+    ids = {cr["id"]: cr for cr in rows["ACB"]["quality"]["f_score"]["criteria"]}
+    assert ids["group2_down"]["passed"] is True and ids["casa_up"]["detail"] == "CASA 35,0% so với 32,0% Q3/2025 (Vietcap)"
+
+
 def test_each_figure_keeps_the_file_it_was_read_from(tmp_path):
     c, clock = client(tmp_path)
     src = {"kind": "pdf", "url": "https://bank.example/car.pdf", "pages": {"group1": 45, "car": 6},

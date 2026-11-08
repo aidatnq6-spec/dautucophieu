@@ -1,6 +1,6 @@
 """Quarterly sector ratios of watched banks, securities firms and insurers from VNDirect's public ratios API (the free
 statements carry no non-performing loans, provisions or combined ratio). robots.txt of api-finfo.vndirect.com.vn allows
-all user agents (use=reference, checked 31/10/2026). One call per ticker, about two years of quarters; rows for another
+all user agents (use=reference, checked 31/10/2026). One call per ticker, every quarter VNDirect keeps (from 2017); rows for another
 ticker or code and non-numeric values are dropped, never repaired. One JSON file per ticker under data/financial-ratios.
 """
 
@@ -8,7 +8,7 @@ import json
 import os
 import re
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Callable
@@ -29,8 +29,8 @@ DISPLAY = {
                   ("ROAE_TR_AVG4Q", "ROAE", "pct1"), ("EQUITY_TO_ASSET_AQ", "Vốn chủ / tổng tài sản", "pct1")),
 }
 CODES = {kind: tuple(code for code, _, _ in rows) for kind, rows in DISPLAY.items()}
-URL = "https://api-finfo.vndirect.com.vn/v4/ratios?q=code:{symbol}~ratioCode:{codes}~reportDate:gte:{start}&sort=reportDate:desc&size=500"
-HISTORY_DAYS = 800  # the latest quarter and the same quarter a year before, with room for a late report
+URL = "https://api-finfo.vndirect.com.vn/v4/ratios?q=code:{symbol}~ratioCode:{codes}~reportDate:gte:{start}&sort=reportDate:desc&size=2000"
+FIRST_START = "2017-01-01"  # all VNDirect keeps (from Q4/2017; ROAA, ROAE from Q3/2023), for the chart of Bảng số tài chính
 _SYMBOL = re.compile(r"^[A-Z0-9]{1,10}$")
 
 
@@ -82,7 +82,7 @@ def fetch_financial_ratios(store: FinancialRatioStore, sectors: dict[str, str], 
         if kind is None:
             continue
         try:
-            url = URL.format(symbol=symbol, codes=",".join(CODES[kind]), start=(today - timedelta(days=HISTORY_DAYS)).isoformat())
+            url = URL.format(symbol=symbol, codes=",".join(CODES[kind]), start=FIRST_START)
             quarters = parse_ratios(_get_with_retry(get, url, sleep), symbol=symbol, codes=CODES[kind])
             if not quarters:
                 results[symbol] = "error:no_observations"

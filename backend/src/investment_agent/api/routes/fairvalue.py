@@ -43,7 +43,6 @@ from .watchlist import held_tickers
 
 router = APIRouter(prefix="/internal")
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
-QUARTERS_SHOWN = 8
 
 
 @router.get("/fairvalue")
@@ -256,7 +255,7 @@ def sector_ratios(symbol: str, request: Request):
     record = FinancialRatioStore(data_dir / "financial-ratios").read(sym) if sym else None
     if not record or record.get("kind") not in DISPLAY:
         return error(404, "not_a_financial", "Chỉ có cho ngân hàng, chứng khoán, bảo hiểm trong danh sách theo dõi.")
-    quarters = sorted(record["quarters"])[-QUARTERS_SHOWN:]
+    quarters = sorted(record["quarters"])  # all of them: Bảng số tài chính picks how many to show
     return {"symbol": sym, "kind": record["kind"], "fetched_at": record.get("fetched_at"),
             "quarters": [{"date": q, "label": f"Q{(int(q[5:7]) + 2) // 3}/{q[:4]}"} for q in quarters],
             "metrics": [{"code": code, "label": label, "format": fmt, "values": [record["quarters"][q].get(code) for q in quarters]}

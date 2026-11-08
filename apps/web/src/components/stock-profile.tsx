@@ -10,7 +10,6 @@ import { MultipleCharts } from "./multiple-chart";
 import { QualityList } from "./report-quality";
 import { BankFigures } from "./bank-figures";
 import { ForwardValuation } from "./forward-valuation";
-import { SectorRatios } from "./sector-ratios";
 import { DividendHistory } from "./dividend-history";
 import { CapmTicker } from "./capm";
 import { CompanyPeople } from "./company-people";
@@ -89,9 +88,6 @@ export function StockProfile({ symbol }: { symbol: string }) {
 
       {p.watched && <ForwardValuation symbol={p.symbol} />}
 
-      {p.watched && <SectorRatios symbol={p.symbol} />}
-
-      {p.watched && <FinancialTables symbol={p.symbol} financial />}
 
       {p.watched && <BankFigures symbol={p.symbol} />}
 

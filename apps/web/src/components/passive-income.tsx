@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Target } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatRatio, formatVnd, groupDigitsInput, parseMoneyInput } from "../lib/format";
+import { GrowthPath } from "./growth-path";
 
 type Result = { required: string; income_now: string | null; progress: string | null; months: number | null; reached_on: string | null; rate: string };
 type Income = { deposit: string; bond: string; dividends: string; stocks?: string; total: string; deposit_market_rate_count?: number;
@@ -87,6 +88,9 @@ export function PassiveIncome() {
         <div className="eb-main"><dt>Đạt mục tiêu{Number(view!.contribution) > 0 ? ` (góp đều ${formatVnd(view!.contribution)}/tháng)` : " (không góp thêm)"}</dt>
           <dd data-testid="pi-when">{when(r)}</dd></div>
       </dl>}
+      {r && (view!.capital
+        ? <GrowthPath key={r.rate} capital={Number(view!.capital)} monthly={Number(view!.contribution)} rate={Number(r.rate)} required={Number(r.required)} />
+        : <p className="caption">Nhập Tháp tài sản để xem đường tăng trưởng tài sản.</p>)}
     </section>
   );
 }

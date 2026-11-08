@@ -25,6 +25,12 @@ export function summarize(rows: JournalRow[]) {
     pnl: typed.length ? typed.reduce((a, b) => a + b, 0) : null, withPnl: typed.length };
 }
 
+export function pageOf<T>(items: T[], page: number, size: number) {
+  const pages = Math.max(1, Math.ceil(items.length / size)), at = Math.min(Math.max(1, page), pages);
+  const start = (at - 1) * size;
+  return { items: items.slice(start, start + size), page: at, pages, from: items.length ? start + 1 : 0, to: Math.min(start + size, items.length), total: items.length };
+}
+
 export type LedgerFilter = { symbol: string; type: string; from: string; to: string };
 export function filterLedger<T extends { effective_at: string; type: string; security_id?: string | null }>(events: T[], f: LedgerFilter): T[] {
   const symbol = f.symbol.trim().toUpperCase();

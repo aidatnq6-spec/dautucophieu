@@ -6,6 +6,7 @@ Duyệt 08/11/2026 (chủ sở hữu), lấy ý tưởng từ file HTML nhật k
 
 - Nhật ký: lọc theo mã, lệnh, cảm xúc, loại tài sản, từ khóa (lý do, ghi chú cảm xúc, ghi chú thêm; không phân biệt dấu), từ ngày đến ngày; mới nhất theo ngày quyết định lên trước.
   Dòng tóm tắt: số mục, thay đổi giá trung bình từ lúc ghi (chỉ các mục có giá), tổng lãi/lỗ ghi tay của mục nhập từ file cũ. Không cộng giá trị mua với bán.
+- Nhật ký chia trang 50 mục (08/11/2026, sau khi nhập 621 mục cũ); số mục, trung bình và Xuất Excel luôn tính trên toàn bộ kết quả lọc.
 - Sổ giao dịch: lọc theo mã, loại, từ ngày đến ngày.
 - Xuất Excel (Excel 2003 XML, mọi ô có kiểu, nên lý do mở đầu bằng "=" vẫn là chữ) theo kết quả đang lọc; làm ngay trên trình duyệt.
 

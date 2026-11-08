@@ -1,9 +1,9 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, FileUp, NotebookPen, Plus } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatDecimal, formatRatio, formatVnd } from "../lib/format";
-import { NO_FILTER, download, filterEntries, spreadsheet, summarize, type Imported, type JournalFilter } from "./journal-tools";
+import { NO_FILTER, download, filterEntries, pageOf, spreadsheet, summarize, type Imported, type JournalFilter } from "./journal-tools";
 
 export const EMOTIONS: [string, string][] = [["calm", "Bình tĩnh"], ["excited", "Hào hứng"], ["fomo", "Sợ bỏ lỡ (FOMO)"], ["anxious", "Lo lắng"],
   ["panic", "Hoảng sợ"], ["regret", "Tiếc nuối"]];
@@ -117,6 +117,7 @@ function HoldForm({ held, onSaved }: { held: string[]; onSaved: () => void }) {
 
 const IMPORT_HEADERS = ["Ngày giao dịch", "Lệnh", "Mã", "Loại tài sản", "SL tổng", "Giá vốn", "Giá trị vốn", "Lãi/Lỗ", "Lý do mua/ bán"];
 const MAX_FILE_CHARS = 900_000;
+const PAGE_SIZE = 50;
 type Preview = { rows: Entry[]; new: number; duplicates: number; problems: { line: number; message: string }[]; imported: number };
 
 function ImportBox({ onDone }: { onDone: () => void }) {
@@ -171,6 +172,17 @@ function ImportBox({ onDone }: { onDone: () => void }) {
   );
 }
 
+export function Pager({ page, pages, from, to, total, unit, label, onPage }: { page: number; pages: number; from: number; to: number; total: number; unit: string; label: string; onPage: (p: number) => void }) {
+  if (pages <= 1) return null;
+  return (
+    <nav className="actions" aria-label={label}>
+      <button type="button" className="btn" disabled={page <= 1} onClick={() => onPage(page - 1)}>Trước</button>
+      <span className="caption" role="status">Trang {page}/{pages} · {unit} {from}–{to} trên {total}</span>
+      <button type="button" className="btn" disabled={page >= pages} onClick={() => onPage(page + 1)}>Sau</button>
+    </nav>
+  );
+}
+
 function exportJournal(rows: Entry[]) {
   const headers = [...IMPORT_HEADERS, "Cảm xúc", "Ghi chú cảm xúc", "Ghi chú thêm", "Giá lúc ghi", "Giá nay", "Thay đổi"];
   const num = (v: string | null | undefined) => (v === null || v === undefined || v === "" ? null : Number(v));
@@ -188,10 +200,13 @@ export function JournalView() {
   const [filter, setFilter] = useState<JournalFilter>(NO_FILTER);
   const shown = useMemo(() => filterEntries(d?.entries ?? [], filter), [d, filter]);
   const assets = useMemo(() => [...new Set((d?.entries ?? []).map((e) => e.imported?.asset ?? "Cổ phiếu"))].sort((a, b) => a.localeCompare(b, "vi")), [d]);
-  const set = (key: keyof JournalFilter) => (e: { target: { value: string } }) => setFilter((f) => ({ ...f, [key]: e.target.value }));
+  const [page, setPage] = useState(1);
+  const top = useRef<HTMLDivElement>(null);
+  const set = (key: keyof JournalFilter) => (e: { target: { value: string } }) => { setPage(1); setFilter((f) => ({ ...f, [key]: e.target.value })); };
   if (error) return <p className="errors" role="alert">{error}</p>;
   if (!d) return <p className="muted fx-loading" role="status">Đang tải…</p>;
-  const sum = summarize(shown);
+  const sum = summarize(shown);  // the whole result, not the page on screen
+  const view = pageOf(shown, page, PAGE_SIZE);
   return (
     <>
       <p className="notice">Mỗi mục lưu lý do, cảm xúc và bối cảnh thị trường lúc ghi; không sửa hay xóa, chỉ thêm ghi chú. Khi giá đi thêm
@@ -216,12 +231,14 @@ export function JournalView() {
           {sum.average !== null && <> · thay đổi giá trung bình từ lúc ghi {sum.average >= 0 ? "+" : ""}{formatRatio(String(sum.average), 1)} ({sum.withChange} mục có giá)</>}
           {sum.pnl !== null && <> · lãi/lỗ ghi tay trong mục nhập từ file cũ {formatVnd(String(sum.pnl))} ({sum.withPnl} mục)</>}</p>
         <div className="actions">
-          <button type="button" className="btn" onClick={() => setFilter(NO_FILTER)}>Xóa bộ lọc</button>
+          <button type="button" className="btn" onClick={() => { setPage(1); setFilter(NO_FILTER); }}>Xóa bộ lọc</button>
           <button type="button" className="btn" disabled={shown.length === 0} onClick={() => exportJournal(shown)}><Download size={16} aria-hidden="true" />Xuất Excel</button></div>
       </section>}
+      <div ref={top} />
       {d.entries.length === 0 ? <p className="muted">Chưa có mục nào. Ghi lý do khi nhập giao dịch mua/bán, ghi lý do đang giữ ở trên, hoặc nhập từ nhật ký cũ.</p>
         : shown.length === 0 ? <p className="muted">Không có mục nào khớp bộ lọc.</p>
-        : shown.map((e) => <EntryCard key={e.entry_id} e={e} onChanged={load} />)}
+        : view.items.map((e) => <EntryCard key={e.entry_id} e={e} onChanged={load} />)}
+      <Pager {...view} unit="mục" label="Trang nhật ký" onPage={(p) => { setPage(p); top.current?.scrollIntoView(); }} />
     </>
   );
 }

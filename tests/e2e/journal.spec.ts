@@ -94,3 +94,26 @@ test("an older journal file is previewed, imported once into the journal only, a
   await page.getByLabel("Tìm mã").fill("ZZZ");
   await expect(page.getByRole("table", { name: "Giao dịch" }).locator("tbody tr")).toHaveCount(0);
 });
+
+test("a long journal is shown a page at a time, while search and totals cover all of it", async ({ page }) => {
+  await seedOwner(page);
+  const stamp = Date.now();
+  const lines = Array.from({ length: 60 }, (_, i) => `${i + 1},Cổ phiếu,2024-01-${String((i % 28) + 1).padStart(2, "0")},Mua,HPG,1,${1000 + i},,,Trang ${stamp} số ${i}`);
+  await page.goto("/journal");
+  const box = page.getByRole("group", { name: "Nhập từ nhật ký cũ" });
+  await box.locator("summary").click();
+  await box.getByLabel("Chọn file nhật ký").setInputFiles({ name: "dai.csv", mimeType: "text/csv", buffer: Buffer.from(`STT,Loại tài sản,Ngày giao dịch,Lệnh,Mã,SL tổng,Giá vốn,Giá trị vốn,Lãi/Lỗ,Lý do mua/ bán\n${lines.join("\n")}\n`, "utf-8") });
+  await box.getByRole("button", { name: "Nhập 60 mục" }).click();
+  const search = page.getByRole("region", { name: "Tra cứu nhật ký" });
+  await search.getByLabel("Từ khóa trong lý do, ghi chú").fill(`Trang ${stamp}`);
+  await expect(search).toContainText("60/");  // the count is of the whole result
+  await expect(page.getByRole("article")).toHaveCount(50);
+  const pager = page.getByRole("navigation", { name: "Trang nhật ký" });
+  await expect(pager).toContainText("Trang 1/2");
+  await pager.getByRole("button", { name: "Sau" }).click();
+  await expect(page.getByRole("article")).toHaveCount(10);
+  await expect(pager.getByRole("button", { name: "Sau" })).toBeDisabled();
+  await search.getByLabel("Từ khóa trong lý do, ghi chú").fill(`Trang ${stamp} số 7`);  // a new search starts from its first page
+  await expect(page.getByRole("article")).toHaveCount(1);
+  await expect(pager).toHaveCount(0);
+});

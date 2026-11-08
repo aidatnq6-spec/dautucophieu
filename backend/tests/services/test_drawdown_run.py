@@ -66,3 +66,17 @@ def test_history_is_filled_for_watched_tickers_a_few_at_a_time_holdings_first(tm
     second = drawdown_run(repo, OWNER, tmp_path, fetch=fetch, send=lambda t: True, request_id="r2", backfill_limit=3)
     assert list(second["history"]) == ["FPT", "HPG", "VCB"]
     assert drawdown_run(repo, OWNER, tmp_path, fetch=fetch, send=lambda t: True, request_id="r3", backfill_limit=3)["history"] == {}
+
+
+def test_the_alert_quotes_the_latest_decision_by_its_date_not_an_old_entry_imported_later(tmp_path):
+    from investment_agent.domain.journal import JournalEntry
+    from investment_agent.services.journal import append_entry, import_entries
+    repo = repo_holding_kdh()
+    series = SeriesStore(tmp_path / "trend-sources")
+    series.upsert("KDH-1d", [(datetime(2026, 10, 26), "14.75")])
+    series.upsert("VNINDEX-1d", [(datetime(2026, 10, 26), "1763.55")])
+    append_entry(repo, OWNER, JournalEntry(entry_id="new", symbol="KDH", kind="buy", created_on=date(2026, 10, 2), reason="Lý do mới"), request_id="j1")
+    import_entries(repo, OWNER, [JournalEntry(entry_id="imp-old", symbol="KDH", kind="buy", created_on=date(2020, 1, 2), reason="Lý do từ 2020")], request_id="j2")
+    sent = []
+    drawdown_run(repo, OWNER, tmp_path, fetch=lambda *a: [], send=lambda t: sent.append(t) or True, request_id="r1")
+    assert "Lý do mới" in sent[0] and "Lý do từ 2020" not in sent[0]

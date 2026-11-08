@@ -88,28 +88,26 @@ test("a growth scenario prices forward EPS on the ticker's own P/E and P/B bands
   await expect(page.getByRole("figure", { name: "P/E lịch sử FPT" }).getByTestId("mc-sd").first()).toBeAttached();
 });
 
-test("a bank's page shows its sector ratios by quarter, and every watched ticker its dividend history", async ({ page }) => {
+test("a bank's Bảng số tài chính holds its sector ratios with its valuation under one chart, and every watched ticker its dividend history", async ({ page }) => {
   await page.goto("/research/VCB");
-  const ratios = page.getByRole("region", { name: "Chỉ số ngành theo quý" });
-  await expect(ratios).toContainText("Chỉ số ngân hàng theo quý");
-  const table = ratios.getByRole("table", { name: "Chỉ số theo quý VCB" });
-  await expect(table).toContainText("Q3/2026");
-  await expect(table.getByRole("row", { name: /Tỷ lệ nợ xấu/ })).toContainText("0,71%");
-  // The ratios draw like Bảng số tài chính: the first two at first, a click on another adds it in place of the earliest.
-  await expect(ratios.getByRole("button", { name: "Vẽ biểu đồ: Tỷ lệ nợ xấu (NPL)" })).toHaveAttribute("aria-pressed", "true");
-  await ratios.getByRole("button", { name: "Vẽ biểu đồ: ROAA" }).click();
-  await expect(ratios.getByRole("button", { name: "Vẽ biểu đồ: ROAA" })).toHaveAttribute("aria-pressed", "true");
-  await expect(ratios.getByRole("button", { name: "Vẽ biểu đồ: Tỷ lệ nợ xấu (NPL)" })).toHaveAttribute("aria-pressed", "false");
-  await ratios.getByText("Xem số liệu").click();
-  await expect(ratios.getByRole("table").first()).toContainText("ROAA");
-  const scale = page.getByRole("region", { name: "Quy mô và định giá" });  // the bank's own block, after its sector ratios
-  await expect(scale.getByRole("table")).toContainText("Q3/26");
-  await expect(scale.getByRole("table").getByRole("row", { name: /^P\/B/ })).toContainText("0,6x");  // 60,000 đ × 1 million shares = 60 tỷ ÷ 100 tỷ
-  await expect(scale.getByRole("table").getByRole("row", { name: /Giá trị sổ sách/ })).toContainText("100.000 đ");
-  await expect(page.getByRole("region", { name: "Bảng số tài chính" })).toContainText("xem khối Quy mô và định giá bên dưới");
+  // One block as for a company: chart on top, period buttons, then the sector ratios and the scale and valuation group in one table.
+  const box = page.getByRole("region", { name: "Bảng số tài chính" });
+  const table = box.getByRole("table", { name: /quý, cũ bên trái/ });
+  await expect(table).toContainText("Chỉ số ngân hàng");
+  await expect(table).toContainText("Quy mô và định giá");
+  await expect(table).toContainText("Q3/26");
+  await expect(table.getByRole("row", { name: /Tỷ lệ nợ xấu/ })).toContainText("0,71%");  // VNDirect's ratio to two places
+  await expect(table.getByRole("row", { name: /^P\/B/ })).toContainText("0,6x");  // 60,000 đ × 1 million shares = 60 tỷ ÷ 100 tỷ
+  await expect(table.getByRole("row", { name: /Giá trị sổ sách/ })).toContainText("100.000 đ");
+  await expect(box.getByRole("button", { name: "8 quý" })).toHaveAttribute("aria-pressed", "true");
+  await expect(box.getByRole("button", { name: "Vẽ biểu đồ: P/B" })).toHaveAttribute("aria-pressed", "true");
+  await box.getByRole("button", { name: "Vẽ biểu đồ: Tỷ lệ nợ xấu (NPL)" }).click();
+  await expect(box.getByRole("button", { name: "Vẽ biểu đồ: Tỷ lệ nợ xấu (NPL)" })).toHaveAttribute("aria-pressed", "true");
+  await expect(box.getByRole("button", { name: "Vẽ biểu đồ: P/B" })).toHaveAttribute("aria-pressed", "false");  // the earliest makes room
+  await box.getByRole("radio", { name: "Năm" }).click();
+  await expect(box).toContainText("Chỉ số ngân hàng chỉ có theo quý");
   await page.goto("/research/FPT");
-  await expect(page.getByRole("region", { name: "Chỉ số ngành theo quý" })).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Quy mô và định giá" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Bảng số tài chính" })).not.toContainText("Chỉ số ngân hàng");
   const div = page.getByRole("region", { name: "Lịch sử cổ tức" });
   await expect(div).toContainText("Cổ tức tiền (đ/cp)");
   await expect(div.getByRole("table", { name: "Lịch sử cổ tức FPT" }).getByRole("row", { name: /^2025/ })).toContainText("500");
@@ -145,7 +143,7 @@ test("the CAPM hint starts from Damodaran's premium for Vietnam, takes the owner
   await expect(people.getByRole("table", { name: "Ban lãnh đạo FPT" })).toContainText("Phó Chủ tịch Hội đồng Quản trị");
 });
 
-test("Bảng số tài chính gives quarters and years with EBITDA, valuation and checks, and sends a bank to its own valuation block", async ({ page }) => {
+test("Bảng số tài chính gives quarters and years with EBITDA, valuation and checks, and gives a bank its ratios and valuation in the same block", async ({ page }) => {
   await page.goto("/research/FPT");
   const box = page.getByRole("region", { name: "Bảng số tài chính" });
   const table = box.getByRole("table");
@@ -160,7 +158,7 @@ test("Bảng số tài chính gives quarters and years with EBITDA, valuation an
   await expect(box).toContainText("Kiểm tra chéo");  // the synthetic quarters do not add up to the years
   await expect(box).toContainText("không ước lượng");
   await page.goto("/research/VCB");
-  await expect(page.getByRole("region", { name: "Bảng số tài chính" })).toContainText("xem khối Quy mô và định giá bên dưới");
+  await expect(page.getByRole("region", { name: "Bảng số tài chính" })).toContainText("Chỉ số ngân hàng");
 });
 
 test("Bảng số tài chính draws picked rows: revenue with gross margin first, a third row replaces the earliest, numbers behind it", async ({ page }) => {

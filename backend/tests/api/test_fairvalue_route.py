@@ -151,12 +151,14 @@ def test_sector_ratios_list_a_financial_ticker_quarters_oldest_first_with_labels
     (tmp_path / "industries.json").write_text(json.dumps({"as_of": "2026-10-25", "source": "t", "level": 2,
                                                          "sectors": {"VCB": "Ngân hàng", "FPT": "Công nghệ Thông tin"}}), encoding="utf-8")
     FinancialRatioStore(tmp_path / "financial-ratios").save({"symbol": "VCB", "kind": "bank", "fetched_at": "2026-10-31T00:00:00+00:00", "source": "t",
-                                                             "quarters": {"2026-09-30": {"BAD_LOANS_RATIO_AQ": "0.0071"}, "2026-06-30": {"BAD_LOANS_RATIO_AQ": "0.0061"}}})
+                                                             "quarters": {"2026-09-30": {"BAD_LOANS_RATIO_AQ": "0.0071"}, "2026-06-30": {"BAD_LOANS_RATIO_AQ": "0.0061"},
+                                                                          **{f"{y}-12-31": {"BAD_LOANS_RATIO_AQ": "0.01"} for y in range(2017, 2026)}}})
     c, clock = _app(tmp_path)
     body = call(c, clock, "GET", "/internal/fairvalue/ratios/VCB").json()
-    assert body["kind"] == "bank" and [q["label"] for q in body["quarters"]] == ["Q2/2026", "Q3/2026"]
+    assert body["kind"] == "bank" and len(body["quarters"]) == 11 and [q["label"] for q in body["quarters"]][-2:] == ["Q2/2026", "Q3/2026"]
+    assert body["quarters"][0] == {"date": "2017-12-31", "label": "Q4/2017"}  # every quarter kept, for the chart's Tất cả
     npl = next(m for m in body["metrics"] if m["code"] == "BAD_LOANS_RATIO_AQ")
-    assert npl["label"] == "Tỷ lệ nợ xấu (NPL)" and npl["format"] == "pct2" and npl["values"] == ["0.0061", "0.0071"]
+    assert npl["label"] == "Tỷ lệ nợ xấu (NPL)" and npl["format"] == "pct2" and npl["values"][-2:] == ["0.0061", "0.0071"]
     assert call(c, clock, "GET", "/internal/fairvalue/ratios/FPT").status_code == 404
 
 

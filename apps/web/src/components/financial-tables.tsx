@@ -14,7 +14,14 @@ type Summary = { period: string; close_date: string | null; market_cap: string |
 type Tables = { symbol: string; kind?: "bank" | "securities" | "insurance" | null; reason: string | null; source?: string; fetched_at?: string; quarters: Part; years: Part; summary: Summary | null;
   checks: Check[]; conflicts: Conflict[] };
 
+type Kind = "bank" | "securities" | "insurance";
+type Ratios = { kind: Kind; quarters: { date: string; label: string }[];
+  metrics: { code: string; label: string; format: "pct0" | "pct1" | "pct2" | "times"; values: (string | null)[] }[] };
+
 const SIGNED = new Set(["revenue_yoy", "gross_profit_yoy", "npat_parent_yoy", "ebitda_yoy", "fcff_yield"]);
+// VNDirect's ratios read to two places (NPL 1,66%, not 1,7%), as their own table showed them.
+const TWO = new Set(["BAD_LOANS_RATIO_AQ", "OVERDUE_LOANS_RATIO_AQ", "NET_INTEREST_MARGIN_TR_AVG5Q", "ROAA_TR_AVG4Q", "LOANS_TO_EQUITY_AQ"]);
+const TITLE: Record<Kind, string> = { bank: "ngân hàng", securities: "công ty chứng khoán", insurance: "bảo hiểm" };
 const COUNTS = [8, 12, 20, 0] as const;
 
 export function cell(v: string | null, kind: Row["kind"], key: string | null): string {
@@ -22,8 +29,9 @@ export function cell(v: string | null, kind: Row["kind"], key: string | null): s
   const n = Number(v);
   if (kind === "money") return (Math.round(n / 1e9) || 0).toLocaleString("vi-VN");  // || 0: a small loss rounds to 0, not -0
   if (kind === "vnd") return `${Math.round(n).toLocaleString("vi-VN")} đ`;
-  if (kind === "x") return `${n.toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x`;
-  const pct = (n * 100).toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const places = key && TWO.has(key) ? 2 : 1;
+  if (kind === "x") return `${n.toLocaleString("vi-VN", { minimumFractionDigits: places, maximumFractionDigits: places })}x`;
+  const pct = (n * 100).toLocaleString("vi-VN", { minimumFractionDigits: places, maximumFractionDigits: places });
   return `${key && SIGNED.has(key) && n > 0 ? "+" : ""}${pct}%`;
 }
 
@@ -77,35 +85,47 @@ function Table({ part, cols, caption, extra = null, picked, onPick }: { part: Pa
 
 const FINANCIAL = new Set(["bank", "securities", "insurance"]);
 
-/** Bảng số tài chính of a non-financial company; with `financial`, the Quy mô và định giá block of a bank, securities firm or insurer,
- * in its own section (nothing for any other ticker). */
-export function FinancialTables({ symbol, financial = false }: { symbol: string; financial?: boolean }) {
+/** A bank's, securities firm's or insurer's quarters with its sector ratios (VNDirect) as the first group, over the quarters of both;
+ * a quarter one side lacks stays blank. */
+export function withRatios(part: Part, ratios: Ratios): Part {
+  const own = ratios.quarters.map((q) => `${q.date.slice(0, 4)}-Q${Math.floor((Number(q.date.slice(5, 7)) - 1) / 3) + 1}`);
+  const periods = [...new Set([...part.periods, ...own])].sort();
+  const at = (from: string[], values: (string | null)[]) => periods.map((p) => { const i = from.indexOf(p); return i < 0 ? null : values[i] ?? null; });
+  const ratioRows: Row[] = [{ key: null, label: `Chỉ số ${TITLE[ratios.kind]}`, kind: "group", indent: 0, values: [] },
+    ...ratios.metrics.map((m) => ({ key: m.code, label: m.label, kind: m.format === "times" ? "x" as const : "pct" as const, indent: 0, values: at(own, m.values) }))];
+  return { periods, rows: [...ratioRows, ...part.rows.map((r) => (r.kind === "group" ? r : { ...r, values: at(part.periods, r.values) }))] };
+}
+
+const PICKED: Record<string, string[]> = { insurance: ["ins_result", "fin_profit"], bank: ["pb", "roe"], securities: ["pb", "roe"] };
+
+/** Bảng số tài chính: a non-financial company's statements, or a bank's, securities firm's or insurer's sector ratios with its scale
+ * and valuation block, with the same chart, period buttons and table. */
+export function FinancialTables({ symbol }: { symbol: string }) {
   const [data, setData] = useState<Tables | null>(null);
+  const [ratios, setRatios] = useState<Ratios | null>(null);
+  const [ratioError, setRatioError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"quarters" | "years">("quarters");
   const [count, setCount] = useState<(typeof COUNTS)[number]>(8);
   const [forecast, setForecast] = useState<Forecast | null>(null);
-  const [picked, setPicked] = useState<string[]>(financial ? ["pb", "roe"] : ["revenue", "gross_margin"]);
+  const [picked, setPicked] = useState<string[]>(["revenue", "gross_margin"]);
   useEffect(() => {
-    api<Tables>(`fairvalue/statements/${encodeURIComponent(symbol)}`).then((d) => {
-      if (financial && d.kind === "insurance") setPicked(["ins_result", "fin_profit"]);  // where an insurer's profit comes from
+    const sym = encodeURIComponent(symbol);
+    api<Tables>(`fairvalue/statements/${sym}`).then((d) => {
+      if (d.kind && FINANCIAL.has(d.kind)) {
+        setPicked(PICKED[d.kind]);
+        api<Ratios>(`fairvalue/ratios/${sym}`).then(setRatios, (e) => setRatioError(e instanceof ApiError ? e.failure.message : "Lỗi tải."));
+      } else {
+        api<Forecast>(`quarter-forecast/${sym}`).then(setForecast, () => setForecast(null));
+      }
       setData(d);
     }, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải."));
-    if (!financial) api<Forecast>(`quarter-forecast/${encodeURIComponent(symbol)}`).then(setForecast, () => setForecast(null));
-  }, [symbol, financial]);
-  if (financial) {
-    if (!data || !FINANCIAL.has(data.kind ?? "")) return null;
-    return <section className="surface" aria-label="Quy mô và định giá"><h2>Quy mô và định giá</h2>{body(data)}</section>;
-  }
+  }, [symbol]);
   if (error) return <p className="errors" role="alert">{error}</p>;
   if (!data) return <p className="muted fx-loading" role="status">Đang tải bảng số…</p>;
-  if (FINANCIAL.has(data.kind ?? "")) return <p className="muted">Ngân hàng, công ty chứng khoán và bảo hiểm không dùng bảng này: xem khối Quy mô và định giá bên dưới, sau Chỉ số ngành theo quý.</p>;
-  if (data.reason) return <p className="muted">Chưa có bảng số tài chính: {data.reason}.</p>;
-  return body(data);
-
-  function body(data: Tables) {
-  if (financial && data.reason) return <p className="muted">Chưa có số: {data.reason}.</p>;
-  const part = data[view];
+  const financial = FINANCIAL.has(data.kind ?? "");
+  if (data.reason && !(financial && ratios)) return <p className="muted">Chưa có bảng số tài chính: {data.reason}.</p>;
+  const part = view === "quarters" && ratios ? withRatios(data.quarters, ratios) : data[view];
   const cols = view === "quarters" ? lastN(part.periods, count) : lastN(part.periods, 0);
   const s = data.summary;
   const extra = view === "quarters" && forecast?.quarter && Object.keys(forecast.values).length ? { label: `${periodLabel(forecast.quarter)}F`, values: forecast.values } : null;
@@ -126,6 +146,8 @@ export function FinancialTables({ symbol, financial = false }: { symbol: string;
           <button key={n} type="button" className={`btn ${count === n ? "primary" : ""}`} aria-pressed={count === n} onClick={() => setCount(n)}>
             {n === 0 ? "Tất cả" : `${n} quý`}</button>)}</span>}
       </div>
+      {financial && view === "years" && <p className="caption">Chỉ số {TITLE[data.kind as Kind]} chỉ có theo quý; chế độ Năm chỉ có Quy mô và định giá.</p>}
+      {ratioError && <p className="errors" role="alert">Chưa có chỉ số {TITLE[data.kind as Kind]}: {ratioError}</p>}
       {part.periods.length === 0 ? <p className="muted">Chưa có kỳ nào.</p>
         : <>
           <StatementChart rows={part.rows} periods={part.periods} cols={cols} keys={picked} forecast={extra} checks={data.checks}
@@ -142,13 +164,15 @@ export function FinancialTables({ symbol, financial = false }: { symbol: string;
         </ul>
       </details>}
       {financial ? <p className="caption wrap">
-        Nguồn: báo cáo tài chính trên API công khai của VNDirect{data.fetched_at ? `, đọc ${new Date(data.fetched_at).toLocaleDateString("vi-VN")}` : ""}. Vốn hoá = giá đóng
+        Chỉ số {TITLE[data.kind as Kind]}: tỷ lệ VNDirect tính sẵn (dữ liệu công khai, từ Q4/2017; ROAA, ROAE từ Q3/2023), chỉ có theo quý; NIM, ROAA, ROAE,
+        biên lợi nhuận trên 4–5 quý gần nhất, các tỷ lệ khác tại cuối quý; ô — là quý nguồn chưa có số. Quy mô và định giá: báo cáo tài chính trên API công
+        khai của VNDirect{data.fetched_at ? `, đọc ${new Date(data.fetched_at).toLocaleDateString("vi-VN")}` : ""}. Vốn hoá = giá đóng
         cửa thực (chưa điều chỉnh) phiên cuối kỳ × số cổ phiếu cuối kỳ (vốn góp ÷ 10.000 đ); giá thực có từ 2013. Vốn chủ công ty mẹ = vốn chủ sở hữu − lợi
         ích cổ đông không kiểm soát; giá trị sổ sách / cổ phiếu = vốn chủ công ty mẹ ÷ số cổ phiếu. Quý: P/E, ROE và các bội số theo lợi nhuận, thu nhập tính
         trên 4 quý tới quý đó (thiếu một quý thì để trống); năm: số cả năm. ROE = LNST công ty mẹ ÷ vốn chủ công ty mẹ bình quân kỳ đó và cùng kỳ năm
-        trước, nên có thể lệch ROAE của VNDirect ở bảng chỉ số. {data.kind === "bank" ? "LN trước dự phòng = lợi nhuận thuần từ hoạt động kinh doanh trước chi phí dự phòng rủi ro tín dụng."
+        trước, nên có thể lệch ROAE của VNDirect ở nhóm chỉ số. {data.kind === "bank" ? "LN trước dự phòng = lợi nhuận thuần từ hoạt động kinh doanh trước chi phí dự phòng rủi ro tín dụng."
           : data.kind === "securities" ? "Vay = vay và nợ ngắn hạn + dài hạn, trên vốn chủ sở hữu (cả phần không kiểm soát)."
-          : "Danh mục đầu tư = tiền + đầu tư tài chính ngắn hạn + dài hạn, trên vốn chủ sở hữu (cả phần không kiểm soát). Kết quả kinh doanh bảo hiểm = lợi nhuận thuần từ hoạt động kinh doanh bảo hiểm; với bảo hiểm nhân thọ thường âm vì khoản tăng dự phòng toán học ghi vào chi phí và được bù bằng lãi đầu tư, không có nghĩa là lỗ. Chỉ hiện ở kỳ mà kết quả bảo hiểm, lợi nhuận hoạt động tài chính và các khoản khác cộng ra đúng LNTT (từ giữa 2014; mẫu báo cáo cũ không cộng ra được, để trống và ghi ở Kiểm tra chéo). Không tính P/EV: giá trị nội tại không có trong báo cáo tài chính. Tỷ lệ kết hợp xem ở bảng chỉ số ngành."} Không
+          : "Danh mục đầu tư = tiền + đầu tư tài chính ngắn hạn + dài hạn, trên vốn chủ sở hữu (cả phần không kiểm soát). Kết quả kinh doanh bảo hiểm = lợi nhuận thuần từ hoạt động kinh doanh bảo hiểm; với bảo hiểm nhân thọ thường âm vì khoản tăng dự phòng toán học ghi vào chi phí và được bù bằng lãi đầu tư, không có nghĩa là lỗ. Chỉ hiện ở kỳ mà kết quả bảo hiểm, lợi nhuận hoạt động tài chính và các khoản khác cộng ra đúng LNTT (từ giữa 2014; mẫu báo cáo cũ không cộng ra được, để trống và ghi ở Kiểm tra chéo). Không tính P/EV: giá trị nội tại không có trong báo cáo tài chính. Tỷ lệ kết hợp là số của VNDirect ở nhóm chỉ số."} Không
         tính nợ ròng, EV, EBITDA, FCFF: với ngân hàng, công ty chứng khoán và bảo hiểm, đi vay hay giữ tiền của khách là hoạt động kinh doanh. Thiếu một thành phần thì để trống, không ước lượng.
       </p> : <p className="caption wrap">
         Nguồn: báo cáo tài chính trên API công khai của VNDirect{data.fetched_at ? `, đọc ${new Date(data.fetched_at).toLocaleDateString("vi-VN")}` : ""}; số từng quý (không lũy kế),
@@ -162,5 +186,4 @@ export function FinancialTables({ symbol, financial = false }: { symbol: string;
       </p>}
     </div>
   );
-  }
 }

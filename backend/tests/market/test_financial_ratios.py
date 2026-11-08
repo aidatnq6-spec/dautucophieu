@@ -20,7 +20,7 @@ def test_each_financial_ticker_gets_its_sector_codes_by_quarter(tmp_path):
     store = FinancialRatioStore(tmp_path)
     out = fetch_financial_ratios(store, {"VCB": "Ngân hàng", "FPT": "Công nghệ Thông tin"}, get=get, today=date(2026, 10, 31))
     assert out == {"VCB": "ok"} and len(urls) == 1
-    assert "code:VCB" in urls[0] and ",".join(CODES["bank"]) in urls[0] and "reportDate:gte:2024-08-22" in urls[0]
+    assert "code:VCB" in urls[0] and ",".join(CODES["bank"]) in urls[0] and "reportDate:gte:2017-01-01" in urls[0] and "size=2000" in urls[0]  # all VNDirect keeps: from Q4/2017
     rec = store.read("VCB")
     assert rec["kind"] == "bank" and rec["quarters"] == {"2025-09-30": {"BAD_LOANS_RATIO_AQ": "0.0103"}, "2026-09-30": {"BAD_LOANS_RATIO_AQ": "0.0071"}}
 

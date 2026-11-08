@@ -95,6 +95,13 @@ test("a bank's page shows its sector ratios by quarter, and every watched ticker
   const table = ratios.getByRole("table", { name: "Chỉ số theo quý VCB" });
   await expect(table).toContainText("Q3/2026");
   await expect(table.getByRole("row", { name: /Tỷ lệ nợ xấu/ })).toContainText("0,71%");
+  // The ratios draw like Bảng số tài chính: the first two at first, a click on another adds it in place of the earliest.
+  await expect(ratios.getByRole("button", { name: "Vẽ biểu đồ: Tỷ lệ nợ xấu (NPL)" })).toHaveAttribute("aria-pressed", "true");
+  await ratios.getByRole("button", { name: "Vẽ biểu đồ: ROAA" }).click();
+  await expect(ratios.getByRole("button", { name: "Vẽ biểu đồ: ROAA" })).toHaveAttribute("aria-pressed", "true");
+  await expect(ratios.getByRole("button", { name: "Vẽ biểu đồ: Tỷ lệ nợ xấu (NPL)" })).toHaveAttribute("aria-pressed", "false");
+  await ratios.getByText("Xem số liệu").click();
+  await expect(ratios.getByRole("table").first()).toContainText("ROAA");
   const scale = page.getByRole("region", { name: "Quy mô và định giá" });  // the bank's own block, after its sector ratios
   await expect(scale.getByRole("table")).toContainText("Q3/26");
   await expect(scale.getByRole("table").getByRole("row", { name: /^P\/B/ })).toContainText("0,6x");  // 60,000 đ × 1 million shares = 60 tỷ ÷ 100 tỷ

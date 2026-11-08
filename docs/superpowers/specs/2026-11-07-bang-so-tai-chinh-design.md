@@ -48,6 +48,9 @@ năm ĐHCĐ, dự phóng quý tới, số liệu vận hành nhập tay (và đ�
   hoạt động khác, LN khác và liên kết (cả dòng cũ "trước 2015" BVH vẫn ghi) ra đúng LNTT: từ Q3/2014 chênh 0, mẫu cũ chênh tới vài trăm tỷ;
   kỳ không khớp để trống và ghi ở Kiểm tra chéo. Không tính P/EV (giá trị nội tại không có trong báo cáo) và tỷ lệ kết hợp (BVH hợp nhất
   nhân thọ; bảng chỉ số ngành đã có số của VNDirect).
+- **Biểu đồ cho Chỉ số ngành theo quý** (08/11/2026, chủ sở hữu yêu cầu): bảng chỉ số ngân hàng, công ty chứng khoán, bảo hiểm (VNDirect, 8 quý)
+  dùng cùng biểu đồ: bấm tên chỉ số hoặc nút biểu đồ để vẽ, tối đa 2 dòng, mở sẵn 2 chỉ số đầu bảng; tỷ lệ vẽ đường theo %, chỉ số “lần” theo bội
+  số, mỗi đơn vị một trục; có Xem số liệu. Bảng giữ cách ghi số cũ (2 chữ số thập phân với NPL, NIM, ROAA); biểu đồ ghi 1 chữ số như Bảng số tài chính.
 - Tóm tắt 4 quý gần nhất liền nhau với giá đóng cửa gần nhất: LNST, EBITDA, ROE, P/E, P/B, EV/EBITDA.
 - Thiếu một thành phần thì để trống, không ước lượng. Đối chiếu HPG với ảnh: Q3/26 khớp từng số; 2025 nợ ròng 64.389 và FCFF −5.704 khớp,
   EV/EBITDA 9,1x khớp; vốn hoá 2018 = 30,95 nghìn đ × 2.123,9 triệu cổ phiếu = 65.735 tỷ, khớp ảnh.

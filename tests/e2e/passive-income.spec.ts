@@ -45,6 +45,23 @@ test("income today is counted layer by layer: deposits, bonds at their coupon, l
   await expect(lines).toContainText(/Cổ tức tiền mặt 12 tháng: [\d.]+ đ\/tháng/);
   await expect(lines).toContainText("Vàng, tiền mặt, tiền số: không tạo dòng tiền");
   await expect(box).toContainText(/~[\d.]+ đ\/tháng · đạt \d{1,3}(,\d)?% mục tiêu/);  // e.g. "đạt 22% mục tiêu", never "0,22%"
+  // The path of today's capital plus the monthly contribution, at three rates the owner sets: an illustration, labelled so.
+  const path = box.getByRole("region", { name: "Đường tăng trưởng tài sản" });
+  await expect(path.getByRole("img")).toBeVisible();
+  await expect(path).toContainText("giả định");
+  await expect(path.getByLabel("Lợi suất cơ sở (%/năm)")).toHaveValue("6");
+  await expect(path).not.toContainText("sức mua hôm nay");
+  await path.getByLabel("Lạm phát giả định (%/năm)").fill("3");
+  await expect(path).toContainText("Cơ sở theo sức mua hôm nay");
+  await path.getByText("Xem số liệu theo năm").click();
+  await path.getByLabel("Số năm").fill("5");
+  await expect(path.getByRole("table", { name: "Tăng trưởng tài sản theo năm" }).locator("tbody tr")).toHaveCount(6);  // today and five year ends
+  await path.getByLabel("Lợi suất thấp (%/năm)").fill("abc");
+  await expect(path.getByRole("alert")).toContainText("Lợi suất phải là số");
+  await path.getByLabel("Lợi suất thấp (%/năm)").fill("4");
+  await page.setViewportSize({ width: 375, height: 900 });
+  await expect(path.getByRole("img")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });
 
 test("a stock yield entered by hand replaces last year's dividends", async ({ page }) => {

@@ -91,6 +91,8 @@ export function StockProfile({ symbol }: { symbol: string }) {
 
       {p.watched && <SectorRatios symbol={p.symbol} />}
 
+      {p.watched && <FinancialTables symbol={p.symbol} financial />}
+
       {p.watched && <BankFigures symbol={p.symbol} />}
 
       {p.watched && <DividendHistory symbol={p.symbol} />}

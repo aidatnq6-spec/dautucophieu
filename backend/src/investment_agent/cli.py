@@ -70,7 +70,7 @@ def main() -> int:
     ihist.add_argument("--data-dir", type=Path, required=True)
     psync = commands.add_parser("plans-sync", help="business plans of watched tickers from CafeF (current year) into data/annual-plans-cafef")
     psync.add_argument("--data-dir", type=Path, required=True)
-    ssync = commands.add_parser("statements-sync", help="full statements of watched non-financial tickers (VNDirect) for Bảng số tài chính")
+    ssync = commands.add_parser("statements-sync", help="full statements of watched tickers (VNDirect) for Bảng số tài chính; banks and securities firms apart")
     ssync.add_argument("--data-dir", type=Path, required=True)
     ssync.add_argument("--limit", type=int, default=8)
     ssync.add_argument("--all", action="store_true", help="every watched ticker, for the first load")
@@ -312,8 +312,10 @@ def statements_sync(data_dir: Path, *, limit: int | None, get=None, now=None, sl
             return response.text
     sectors = load_sectors(data_dir)[0]
     watched = {s: sectors.get(s) for s in load_watchlist(data_dir).symbols}
-    results = sync_statements(StatementStore(data_dir / "statements"), watched, get=get, now=now or datetime.now(timezone.utc), limit=limit,
-                              sleep=sleep or time.sleep)
+    now = now or datetime.now(timezone.utc)
+    results = sync_statements(StatementStore(data_dir / "statements"), watched, get=get, now=now, limit=limit, sleep=sleep or time.sleep)
+    results |= sync_statements(StatementStore(data_dir / "statements-financial"), watched, get=get, now=now, limit=limit, sleep=sleep or time.sleep,
+                               kinds=("bank", "securities"))  # their own layouts, apart from the statements other features read
     failed = {k: v for k, v in results.items() if v != "ok"}
     print(json.dumps({"status": "ok" if not failed else "partial", "results": results}, ensure_ascii=False))
     return 0 if not failed else 1

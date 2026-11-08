@@ -48,6 +48,8 @@ class Get:
             return json.dumps({"data": [{"code": sym, "date": "2025-12-31", "close": 26.4}, {"code": sym, "date": "2025-12-30", "close": 26.5}]})
         kind = "ANNUAL" if "ANNUAL" in url else "QUARTER"
         fiscal = "2025-12-31"
+        if "modelType:101" in url or "modelType:89" in url:  # bank, securities: parent profit in their income statement model
+            return text(row(23000, 1e11, fiscal, model=102 if "modelType:101" in url else 90, code=sym, kind=kind))
         return text(row(21001, 1e12 if kind == "QUARTER" else 4e12, fiscal, code=sym, kind=kind))
 
 
@@ -94,7 +96,7 @@ def test_cli_statements_sync_reads_the_watchlist_and_sectors(tmp_path, capsys):
     (tmp_path / "industries.json").write_text(json.dumps({"as_of": "2026-10-25", "source": "t", "level": 2,
                                                          "sectors": {"HPG": "Tài nguyên Cơ bản", "VCB": "Ngân hàng"}}), encoding="utf-8")
     assert statements_sync(tmp_path, limit=5, get=Get(), now=NOW, sleep=lambda s: None) == 0
-    assert json.loads(capsys.readouterr().out) == {"status": "ok", "results": {"HPG": "ok"}}
+    assert json.loads(capsys.readouterr().out) == {"status": "ok", "results": {"HPG": "ok", "VCB": "ok"}}  # the bank into statements-financial
     assert StatementStore(tmp_path / "statements").read("HPG")["years"] == {"2025": {"revenue": "4000000000000"}}
 
 
@@ -137,3 +139,49 @@ def test_sync_keeps_quarter_end_closes_and_a_ticker_without_them_is_due_and_take
     assert rec["year_end_close"]["2024"] == {"date": "2024-12-31", "close": "20"}
     get2 = Get()
     assert sync_statements(store, {"HPG": "Tài nguyên Cơ bản"}, get=get2, now=NOW, limit=None, sleep=lambda s: None) == {} and get2.urls == []
+
+
+def test_bank_and_securities_layouts_keep_their_own_lines():
+    from investment_agent.market.statements import LAYOUTS
+    page = text(row(14110, 1e11, "2026-09-30", model=101, code="MBB"), row(14000, 1e12, "2026-09-30", model=101, code="MBB"),
+                row(14240, 1e10, "2026-09-30", model=101, code="MBB"), row(88888, 5e10, "2026-09-30", model=102, code="MBB"),
+                row(421701, 7e10, "2026-09-30", model=102, code="MBB"), row(23000, 3e10, "2026-09-30", model=102, code="MBB"),
+                row(21001, 9e10, "2026-09-30", model=102, code="MBB"))  # a general-layout code under the bank model: not a bank line
+    assert parse_statements(page, symbol="MBB", kind="QUARTER", lines=LAYOUTS["bank"]["lines"])["periods"] == {"2026-Q3": {
+        "charter_capital": "100000000000", "equity": "1000000000000", "minority_equity": "10000000000", "ppop": "50000000000",
+        "operating_income": "70000000000", "npat_parent": "30000000000"}}
+    page = text(row(13110, 5e10, "2026-09-30", model=89, code="SSI"), row(13340, 0, "2026-09-30", model=89, code="SSI"),
+                row(21000, 3e10, "2026-09-30", model=90, code="SSI"), row(23000, 1e10, "2026-09-30", model=90, code="SSI"))
+    assert parse_statements(page, symbol="SSI", kind="QUARTER", lines=LAYOUTS["securities"]["lines"])["periods"] == {"2026-Q3": {
+        "st_debt": "50000000000", "lt_debt": "0", "operating_revenue": "30000000000", "npat_parent": "10000000000"}}
+
+
+def test_sync_of_financial_kinds_asks_for_their_models_and_skips_the_others(tmp_path):
+    store, get = StatementStore(tmp_path), Get()
+    sectors = {"HPG": "Tài nguyên Cơ bản", "MBB": "Ngân hàng", "SSI": "Dịch vụ tài chính", "BVH": "Bảo hiểm"}
+    out = sync_statements(store, sectors, get=get, now=NOW, limit=None, sleep=lambda s: None, kinds=("bank", "securities"))
+    assert out == {"MBB": "ok", "SSI": "ok"} and store.read("HPG") is None and store.read("BVH") is None
+    statements = [u for u in get.urls if "financial_statements" in u]
+    assert all("modelType:101,102,103" in u for u in statements if "code:MBB" in u)
+    assert all("modelType:89,90,91" in u for u in statements if "code:SSI" in u)
+    assert store.read("MBB")["kind"] == "bank" and store.read("SSI")["kind"] == "securities"
+    assert sync_statements(StatementStore(tmp_path / "general"), sectors, get=Get(), now=NOW, limit=None, sleep=lambda s: None) == {"HPG": "ok"}
+
+
+def test_a_page_filled_to_its_size_may_be_cut_and_is_not_kept(tmp_path, monkeypatch):
+    import investment_agent.market.statements as st
+    monkeypatch.setattr(st, "PAGE", 1)
+    store = StatementStore(tmp_path)
+    out = sync_statements(store, {"HPG": "Tài nguyên Cơ bản"}, get=Get(), now=NOW, limit=None, sleep=lambda s: None)
+    assert out["HPG"].startswith("error:") and store.read("HPG") is None
+
+
+def test_cli_statements_sync_keeps_banks_and_securities_apart(tmp_path, capsys):
+    from investment_agent.cli import statements_sync
+    (tmp_path / "market-symbols.txt").write_text("HPG\nMBB\n", encoding="utf-8")
+    (tmp_path / "industries.json").write_text(json.dumps({"as_of": "2026-10-25", "source": "t", "level": 2,
+                                                         "sectors": {"HPG": "Tài nguyên Cơ bản", "MBB": "Ngân hàng"}}), encoding="utf-8")
+    assert statements_sync(tmp_path, limit=5, get=Get(), now=NOW, sleep=lambda s: None) == 0
+    assert json.loads(capsys.readouterr().out)["results"] == {"HPG": "ok", "MBB": "ok"}
+    assert StatementStore(tmp_path / "statements").read("MBB") is None
+    assert StatementStore(tmp_path / "statements-financial").read("MBB")["kind"] == "bank"

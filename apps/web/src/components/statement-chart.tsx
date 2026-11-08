@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { cell, periodLabel } from "./financial-tables";
 
-type Kind = "money" | "pct" | "x";
+type Kind = "money" | "pct" | "x" | "vnd";
 type Row = { key: string | null; label: string; kind: "group" | Kind; indent: number; values: (string | null)[] };
 
 /** Click a row: add it, click again: remove it; at most two rows, a new one replaces the one picked earliest. */
@@ -62,6 +62,9 @@ const TOUCHES: Record<string, string[]> = {
   depreciation: ["depreciation", "ebitda", "ebitda_yoy", "ebitda_margin", "ev_ebitda"],
   capex: ["capex", "fcff", "fcff_yield"],
   cfo: ["cfo", "fcff", "fcff_yield"],
+  ppop: ["p_ppop"],  // banks and securities firms: the multiples made from the line checked
+  operating_income: ["p_toi"],
+  operating_revenue: ["p_revenue"],
 };
 
 /** Periods to star on the chart, each with the cross-checks behind the star; only checks that touch a drawn row count. */
@@ -82,8 +85,8 @@ export function linePath(values: (number | null)[], x: (i: number) => number, y:
   return d;
 }
 
-const UNIT: Record<Kind, string> = { money: "tỷ đồng", pct: "%", x: "lần" };
-const tick = (v: number, kind: Kind) => `${v.toLocaleString("vi-VN", { maximumFractionDigits: kind === "money" ? 0 : 1 })}${kind === "pct" ? "%" : kind === "x" ? "x" : ""}`;
+const UNIT: Record<Kind, string> = { money: "tỷ đồng", pct: "%", x: "lần", vnd: "đồng/cổ phiếu" };
+const tick = (v: number, kind: Kind) => `${v.toLocaleString("vi-VN", { maximumFractionDigits: kind === "money" || kind === "vnd" ? 0 : 1 })}${kind === "pct" ? "%" : kind === "x" ? "x" : ""}`;
 
 /** A small trend in the row's last cell, over the periods shown: bars around zero for money, a broken line for ratios. */
 export function Spark({ row, cols }: { row: Row; cols: number[] }) {

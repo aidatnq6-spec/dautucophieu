@@ -33,6 +33,15 @@ năm ĐHCĐ, dự phóng quý tới, số liệu vận hành nhập tay (và đ�
   quý tới quý đó; P/B trên vốn chủ công ty mẹ cuối quý; ROE = LNST 4 quý ÷ vốn chủ công ty mẹ bình quân quý đó và cùng quý năm trước. Thiếu
   một trong 4 quý thì để trống các bội số theo lợi nhuận. Đồng bộ giữ thêm giá phiên cuối mỗi quý (`quarter_end_close`), cùng lượt gọi giá;
   mã đồng bộ trước khi có giá cuối quý được làm lại ngay lượt sau, lấy giá từ 2010.
+- **Ngân hàng và chứng khoán** (08/11/2026, chủ sở hữu duyệt): khối **Quy mô và định giá** riêng, đặt sau Chỉ số ngành theo quý, nút Quý/Năm,
+  Xu hướng và biểu đồ như bảng trên (mở sẵn P/B với ROE). Dòng: vốn hoá, vốn chủ công ty mẹ, giá trị sổ sách / cổ phiếu (đồng), P/B, P/E, ROE;
+  ngân hàng thêm vốn hoá / LN trước dự phòng và vốn hoá / tổng thu nhập hoạt động; chứng khoán thêm vay (ngắn + dài hạn) / vốn chủ sở hữu và
+  vốn hoá / doanh thu hoạt động. Quý tính trên 4 quý tới quý đó, năm trên số cả năm, giá và số cổ phiếu cuối kỳ như trên. Không có nợ ròng, EV,
+  EBITDA, FCFF (đi vay là hoạt động kinh doanh). Nguồn: cùng API, mẫu ngân hàng (101–103, TT49) và chứng khoán (89–91, TT334), chỉ giữ dòng cần
+  dùng, lưu riêng `data/statements-financial/` để Định giá tham khảo, chuỗi định giá tuần, kế hoạch năm và báo quý mới không đổi nguồn. Mỗi lượt
+  gọi tối đa 60.000 dòng (lịch sử quý của SSI khoảng 27.000; giới hạn 20.000 cũ cắt mất các quý mới); trả đủ 60.000 dòng thì coi là có thể bị cắt,
+  báo lỗi, không lưu. Kiểm tra chéo: tổng 4 quý với cả năm (LNST công ty mẹ, LN trước dự phòng, tổng thu nhập hoạt động, doanh thu hoạt động) và
+  LNST với Vnstock. Bảo hiểm chưa làm.
 - Tóm tắt 4 quý gần nhất liền nhau với giá đóng cửa gần nhất: LNST, EBITDA, ROE, P/E, P/B, EV/EBITDA.
 - Thiếu một thành phần thì để trống, không ước lượng. Đối chiếu HPG với ảnh: Q3/26 khớp từng số; 2025 nợ ròng 64.389 và FCFF −5.704 khớp,
   EV/EBITDA 9,1x khớp; vốn hoá 2018 = 30,95 nghìn đ × 2.123,9 triệu cổ phiếu = 65.735 tỷ, khớp ảnh.

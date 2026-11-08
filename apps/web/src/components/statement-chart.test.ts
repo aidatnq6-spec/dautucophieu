@@ -70,3 +70,10 @@ it("a period is starred only for a cross-check that touches a drawn row or a fig
   expect([...flaggedFor(checks, ["pe", "gross_margin"]).keys()]).toEqual(["2019", "2020"]);
   expect(flaggedFor(checks, ["selling"]).size).toBe(0);
 });
+
+it("book value per share is drawn in đồng, and a bank's cross-checks star the multiples made from the line checked", () => {
+  expect(plotValue("13940", "vnd")).toBe(13940);
+  const checks = [{ period: "2025", check: "ppop", label: "LN trước dự phòng: tổng 4 quý ≠ cả năm", a: "1", b: "2" }];
+  expect([...flaggedFor(checks, ["p_ppop"]).keys()]).toEqual(["2025"]);
+  expect([...flaggedFor(checks, ["pb"]).keys()]).toEqual([]);
+});

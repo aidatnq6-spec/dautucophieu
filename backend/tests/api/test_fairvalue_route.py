@@ -291,9 +291,10 @@ def test_milestones_list_past_troughs_for_a_watched_ticker_with_the_owner_s_thre
 
 def test_statements_give_the_quarterly_and_yearly_tables_of_a_watched_non_financial_ticker(tmp_path):
     from investment_agent.market.statements import StatementStore
-    (tmp_path / "market-symbols.txt").write_text("FPT" + chr(10) + "VCB" + chr(10), encoding="utf-8")
+    (tmp_path / "market-symbols.txt").write_text("FPT" + chr(10) + "VCB" + chr(10) + "BVH" + chr(10), encoding="utf-8")
     (tmp_path / "industries.json").write_text(json.dumps({"as_of": "2026-10-25", "source": "t", "level": 2,
-                                                         "sectors": {"FPT": "Công nghệ Thông tin", "VCB": "Ngân hàng"}}), encoding="utf-8")
+                                                         "sectors": {"FPT": "Công nghệ Thông tin", "VCB": "Ngân hàng", "BVH": "Bảo hiểm"}}),
+                                              encoding="utf-8")
     years = {str(y): {"npat": "1000000000", "eps": "1000", "equity": "10000000000"} for y in range(2018, 2026)}
     FundamentalsStore(tmp_path / "fundamentals").save({"symbol": "FPT", "fetched_at": "2026-10-26T00:00:00+00:00", "source": "t",
                                                       "years": years, "quarters": {}, "dividends": [], "issues": []})
@@ -312,7 +313,17 @@ def test_statements_give_the_quarterly_and_yearly_tables_of_a_watched_non_financ
     assert body["reason"] is None and body["years"]["periods"] == ["2025"] and body["quarters"]["periods"] == ["2025-Q4"]
     pe = next(r for r in body["years"]["rows"] if r["key"] == "pe")
     assert pe["values"] == ["12.00"]  # 12,000 đ × 1 million shares / 1 tỷ
-    assert call(client, clock, "GET", "/internal/fairvalue/statements/VCB").json()["reason"] == "Ngân hàng, chứng khoán, bảo hiểm có bảng số liệu ngành riêng"
+    assert body["kind"] is None
+    vcb = call(client, clock, "GET", "/internal/fairvalue/statements/VCB").json()
+    assert vcb["kind"] == "bank" and vcb["reason"].startswith("Chưa có số liệu VNDirect")
+    StatementStore(tmp_path / "statements-financial").save({"symbol": "VCB", "kind": "bank", "fetched_at": "2026-11-07T00:00:00+00:00",
+                                                            "source": "vndirect:finfo", "quarters": {}, "quarters_conflicts": [], "years_conflicts": [],
+                                                            "years": {"2025": {"npat_parent": "1000000000", "equity": "10000000000",
+                                                                               "charter_capital": "10000000000"}},
+                                                            "year_end_close": {"2025": {"date": "2025-12-31", "close": "12"}}})
+    vcb = call(client, clock, "GET", "/internal/fairvalue/statements/VCB").json()
+    assert vcb["reason"] is None and vcb["kind"] == "bank" and next(r for r in vcb["years"]["rows"] if r["key"] == "pb")["values"] == ["1.20"]
+    assert call(client, clock, "GET", "/internal/fairvalue/statements/BVH").json()["reason"] == "Bảo hiểm chưa có bảng số tài chính"
     assert call(client, clock, "GET", "/internal/fairvalue/statements/ZZZ").status_code == 404
 
 

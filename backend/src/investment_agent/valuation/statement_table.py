@@ -14,6 +14,9 @@ Derived lines (đồng; costs shown negative):
 - Quarters: the same block at the quarter's last unadjusted close × that quarter-end's shares and balance sheet; P/E, EV/EBITDA,
   EV/revenue, FCFF yield and ROE on the four quarters to it (ROE over the average parent equity of the quarter and the same quarter a
   year before); none when one of the four quarters is missing.
+- Banks and securities firms (kind): only a scale and valuation block, by quarter (four quarters to it) and by year: market cap,
+  parent equity, book value per share, P/B, P/E, ROE; banks add capitalisation ÷ profit before provisions and ÷ total operating
+  income, securities firms borrowings ÷ equity and capitalisation ÷ operating revenue. No net debt, EV, EBITDA or FCFF.
 - Summary: the last four quarters and today's close.
 Checks (more than 0.5 % apart): gross profit against revenue − cost of sales; four quarters against the year for revenue, parent
 profit, depreciation, capital spending and operating cash flow; parent profit against the free Vnstock statements.
@@ -46,8 +49,14 @@ SCALE = [
     ("pe", "P/E", "x", 0), ("pb", "P/B", "x", 0), ("ev_ebitda", "EV/EBITDA", "x", 0), ("ev_revenue", "EV/Doanh thu", "x", 0),
     ("fcff_yield", "Lợi suất FCFF", "pct", 0), ("roe", "ROE", "pct", 0),
 ]
+_FIN_HEAD = [("g", "Quy mô và định giá"), ("market_cap", "Vốn hoá", "money", 0), ("parent_equity", "Vốn chủ công ty mẹ", "money", 0),
+             ("bvps", "Giá trị sổ sách / cổ phiếu", "vnd", 0), ("pb", "P/B", "x", 0), ("pe", "P/E", "x", 0), ("roe", "ROE", "pct", 0)]
+# Banks and securities firms: borrowing is their trade, so net debt, EV, EBITDA and FCFF say nothing; their block stands alone.
+FIN_SCALE = {"bank": _FIN_HEAD + [("p_ppop", "Vốn hoá / LN trước dự phòng", "x", 0), ("p_toi", "Vốn hoá / Tổng thu nhập hoạt động", "x", 0)],
+             "securities": _FIN_HEAD + [("debt_to_equity", "Vay / vốn chủ", "x", 0), ("p_revenue", "Vốn hoá / Doanh thu hoạt động", "x", 0)]}
 SUMMED = (("revenue", "Doanh thu thuần"), ("npat_parent", "LNST công ty mẹ"), ("depreciation", "Khấu hao"), ("capex", "Capex"),
-          ("cfo", "Lưu chuyển tiền từ HĐKD"))
+          ("cfo", "Lưu chuyển tiền từ HĐKD"), ("ppop", "LN trước dự phòng"), ("operating_income", "Tổng thu nhập hoạt động"),
+          ("operating_revenue", "Doanh thu hoạt động"))
 
 
 def _d(v) -> Decimal | None:
@@ -159,13 +168,64 @@ def _quarter_valuation(quarters: dict, quarter_end_close: dict) -> dict[str, dic
     """Each quarter at its last session's close, its multiples and ROE on the four quarters to it (none when one is missing)."""
     out = {}
     for p, f in quarters.items():
-        window = [p]
-        while len(window) < 4:
-            window.append(_previous_quarter(window[-1]))
-        figures = [_derived(quarters[w]) if w in quarters else {} for w in window]
-        flows = {k: _sum(*(x.get(k) for x in figures)) for k in FLOWS}
-        out[p] = _block(f, _d((quarter_end_close.get(p) or {}).get("close")), flows, _parent_equity(quarters.get(_prior(p), {})))
+        out[p] = _block(f, _d((quarter_end_close.get(p) or {}).get("close")), _four(quarters, p, FLOWS), _parent_equity(quarters.get(_prior(p), {})))
     return out
+
+
+FIN_FLOWS = ("npat_parent", "ppop", "operating_income", "operating_revenue")
+
+
+def _fin_block(f: dict, close: Decimal | None, flows: dict[str, Decimal | None], parent_before: Decimal | None) -> dict:
+    """A bank's or securities firm's block at a period's end: its close × its shares and equity, with the profit of `flows`."""
+    capital = _d(f.get("charter_capital"))
+    shares = capital / PAR if capital is not None and capital > 0 else None
+    cap = close * 1000 * shares if close is not None and shares is not None else None
+    parent, equity, npat = _parent_equity(f), _d(f.get("equity")), flows.get("npat_parent")
+    debt = _sum(_d(f.get("st_debt")), _d(f.get("lt_debt")))
+    return {"market_cap": cap, "parent_equity": parent,
+            "bvps": None if parent is None or shares is None else _money(parent / shares),
+            "pb": _ratio(cap, parent, _Q2, positive=True), "pe": _ratio(cap, npat, _Q2, positive=True),
+            "roe": _ratio(npat, (parent + parent_before) / 2)
+            if npat is not None and parent is not None and parent_before is not None and parent + parent_before > 0 else None,
+            "p_ppop": _ratio(cap, flows.get("ppop"), _Q2, positive=True), "p_toi": _ratio(cap, flows.get("operating_income"), _Q2, positive=True),
+            "debt_to_equity": _ratio(debt, equity, _Q2) if equity is not None and equity > 0 else None,
+            "p_revenue": _ratio(cap, flows.get("operating_revenue"), _Q2, positive=True)}
+
+
+def _four(quarters: dict, p: str, keys) -> dict[str, Decimal | None]:
+    """Each of `keys` added over the four quarters to p; none when one of them is missing."""
+    window = [p]
+    while len(window) < 4:
+        window.append(_previous_quarter(window[-1]))
+    figures = [_derived(quarters[w]) if w in quarters else {} for w in window]
+    return {k: _sum(*(x.get(k) for x in figures)) for k in keys}
+
+
+def _fin_part(periods: dict, blocks: dict[str, dict], spec) -> dict:
+    keys = sorted(periods)
+    rows = []
+    for item in spec:
+        if item[0] == "g":
+            rows.append({"key": None, "label": item[1], "kind": "group", "indent": 0, "values": []})
+            continue
+        key, label, kind, indent = item
+        values = [blocks[p].get(key) for p in keys]
+        rows.append({"key": key, "label": label, "kind": kind, "indent": indent,
+                     "values": [_money(v) if isinstance(v, Decimal) else v for v in values]})
+    return {"periods": keys, "rows": rows}
+
+
+def _fin_table(record: dict, kind: str, vnstock: dict | None) -> dict:
+    quarters, years = record.get("quarters", {}), record.get("years", {})
+    qclose, yclose = record.get("quarter_end_close", {}), record.get("year_end_close", {})
+    q = {p: _fin_block(f, _d((qclose.get(p) or {}).get("close")), _four(quarters, p, FIN_FLOWS), _parent_equity(quarters.get(_prior(p), {})))
+         for p, f in quarters.items()}
+    y = {p: _fin_block(f, _d((yclose.get(p) or {}).get("close")), {k: _d(f.get(k)) for k in FIN_FLOWS},
+                       _parent_equity(years.get(str(int(p) - 1), {}))) for p, f in years.items()}
+    return {"symbol": record.get("symbol"), "source": record.get("source"), "fetched_at": record.get("fetched_at"),
+            "quarters": _fin_part(quarters, q, FIN_SCALE[kind]), "years": _fin_part(years, y, FIN_SCALE[kind]), "summary": None,
+            "checks": _checks(quarters, years, vnstock),
+            "conflicts": record.get("quarters_conflicts", []) + record.get("years_conflicts", [])}
 
 
 def _summary(quarters: dict, closes, shares: int | None) -> dict | None:
@@ -221,7 +281,9 @@ def _checks(quarters: dict, years: dict, vnstock: dict | None) -> list[dict]:
     return sorted(out, key=lambda c: (c["period"], c["check"]))
 
 
-def statement_table(record: dict, *, closes, shares: int | None, vnstock: dict | None) -> dict:
+def statement_table(record: dict, *, closes, shares: int | None, vnstock: dict | None, kind: str | None = None) -> dict:
+    if kind in FIN_SCALE:
+        return _fin_table(record, kind, vnstock)
     quarters, years = record.get("quarters", {}), record.get("years", {})
     year_part = _part(years, sorted(years), extra=_valuation(years, record.get("year_end_close", {})), spec=P_AND_L + SCALE)
     quarter_part = _part(quarters, sorted(quarters), extra=_quarter_valuation(quarters, record.get("quarter_end_close", {})), spec=P_AND_L + SCALE)

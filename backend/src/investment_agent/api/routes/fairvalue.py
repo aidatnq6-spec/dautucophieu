@@ -153,19 +153,20 @@ def statements(symbol: str, request: Request):
     data_dir, symbol = Path(data_dir), symbol.upper()
     if symbol not in load_watchlist(data_dir).symbols:
         return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
-    empty = {"symbol": symbol, "quarters": {"periods": [], "rows": []}, "years": {"periods": [], "rows": []}, "summary": None, "checks": [],
-             "conflicts": []}
-    if kind_of(load_sectors(data_dir)[0].get(symbol)) is not None:
-        return {**empty, "reason": "Ngân hàng, chứng khoán, bảo hiểm có bảng số liệu ngành riêng"}
-    record = StatementStore(data_dir / "statements").read(symbol)
+    kind = kind_of(load_sectors(data_dir)[0].get(symbol))
+    empty = {"symbol": symbol, "kind": kind, "quarters": {"periods": [], "rows": []}, "years": {"periods": [], "rows": []}, "summary": None,
+             "checks": [], "conflicts": []}
+    if kind == "insurance":
+        return {**empty, "reason": "Bảo hiểm chưa có bảng số tài chính"}
+    record = StatementStore(data_dir / ("statements" if kind is None else "statements-financial")).read(symbol)
     if record is None:
         return {**empty, "reason": "Chưa có số liệu VNDirect cho mã này (đồng bộ lúc 20:00, mỗi lượt vài mã)"}
     fundamentals = FundamentalsStore(data_dir / "fundamentals").read(symbol)
     today = now(request).astimezone(VN).date()
     m = metrics(fundamentals, today=today, year_end_prices={}) if fundamentals and fundamentals.get("years") else None
     table = statement_table(record, closes=SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"), shares=int(m["shares"]) if m else None,
-                            vnstock=(fundamentals or {}).get("quarters"))
-    return {**table, "reason": None}
+                            vnstock=(fundamentals or {}).get("quarters"), kind=kind)
+    return {**table, "kind": kind, "reason": None}
 
 class ForwardRequest(ContractModel):
     assumptions: Assumptions

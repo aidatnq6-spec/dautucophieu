@@ -24,12 +24,19 @@ def held_from_repo(repo, owner) -> set[str]:
     return {p.security_id for p in replay(list(book.effective().events)).positions if p.quantity + p.pending_quantity > 0}
 
 
-def _bank_figures(repo, owner, symbols, sectors) -> dict[str, dict]:
-    """Owner-entered quarterly bank figures (Số liệu ngân hàng), values only, for the banks' health score."""
+def _bank_figures(repo, owner, data_dir: Path, symbols, sectors) -> dict[str, dict]:
+    """Each watched bank's CASA and group-2 share by quarter for its health score: Vietcap's notes (data/bank-notes), with the
+    quarters the owner entered (Số liệu ngân hàng) on top."""
+    from investment_agent.market.bank_notes import BankNoteStore, bank_ratio_rows
+    notes = BankNoteStore(Path(data_dir) / "bank-notes")
     out = {}
     for s in symbols:
-        if sectors.get(s) == "Ngân hàng" and (record := read_version(repo, owner, "settings", f"bank_figures_{s}", None)):
-            out[s] = {q: v["values"] for q, v in record.payload.get("quarters", {}).items()}
+        if sectors.get(s) != "Ngân hàng":
+            continue
+        record = read_version(repo, owner, "settings", f"bank_figures_{s}", None)
+        entered = {q: v["values"] for q, v in record.payload.get("quarters", {}).items()} if record else {}
+        if rows := bank_ratio_rows(entered, (notes.read(s) or {}).get("quarters") or {}):
+            out[s] = rows
     return out
 
 
@@ -46,7 +53,7 @@ def fair_value_board(data_dir: Path, market, repo, owner, *, held: set[str], tod
     sectors = load_sectors(data_dir)[0]
     board = reference_board(symbols, sectors=sectors, records=records, prices=prices,
                             year_end={t: year_end_prices(series.read(f"{t}-1d"), today=today) for t in symbols}, settings=s, today=today, held=held,
-                            ratios={t: ratio_store.read(t) for t in symbols}, bank=_bank_figures(repo, owner, symbols, sectors))
+                            ratios={t: ratio_store.read(t) for t in symbols}, bank=_bank_figures(repo, owner, data_dir, symbols, sectors))
     multiples = SeriesStore(data_dir / "index-valuation")
     board["indices"] = [value_index(i, pe=multiples.read(series_key(i, "pe")), pb=multiples.read(series_key(i, "pb")),
                                     closes=series.read(f"{i}-1d"), settings=s, today=today) for i in INDICES]

@@ -1,3 +1,4 @@
+from investment_agent.market.bank_notes import bank_ratio_rows
 from investment_agent.valuation.quality import report_quality
 
 BN = 1_000_000_000
@@ -128,10 +129,33 @@ def test_owner_entered_bank_figures_add_casa_and_group_two_criteria_only_when_pr
     groups = {"group1": "450", "group3": "2", "group4": "1", "group5": "2"}
     bank = {"2025-Q3": {**groups, "group2": "8", "demand_deposits": "160", "margin_deposits": "10", "customer_deposits": "500"},
             "2026-Q3": {**groups, "group2": "5", "demand_deposits": "150", "margin_deposits": "10", "customer_deposits": "500"}}
-    f = report_quality({}, "Ngân hàng", ratios=ratios, bank=bank)["f_score"]
+    f = report_quality({}, "Ngân hàng", ratios=ratios, bank=bank_ratio_rows(bank, {}))["f_score"]
     by_id = {c["id"]: c for c in f["criteria"]}
     assert by_id["casa_up"]["passed"] is False and by_id["casa_up"]["detail"] == "CASA 32,0% so với 34,0% Q3/2025 (số nhập tay)"
     assert by_id["group2_down"]["passed"] is True and f["evaluated"] == 9 and f["score"] == 8 and f["level"] == "strong"
     only_now = {"2026-Q3": bank["2026-Q3"]}
-    f = report_quality({}, "Ngân hàng", ratios=ratios, bank=only_now)["f_score"]
-    assert {c["id"]: c for c in f["criteria"]}["casa_up"]["detail"] == "Cần số nhập tay của cùng quý năm trước (Q3/2025)"
+    f = report_quality({}, "Ngân hàng", ratios=ratios, bank=bank_ratio_rows(only_now, {}))["f_score"]
+    assert {c["id"]: c for c in f["criteria"]}["casa_up"]["detail"] == "Cần số của cùng quý năm trước (Q3/2025): Vietcap chưa có, chưa nhập tay"
+
+
+def _notes(group2: str, demand: str) -> dict:
+    """One quarter of Vietcap's notes in đồng, adding up: loans 1.000, deposits 1.000 (group 2 and demand vary, term takes the rest)."""
+    return {"loans": "1000", "group1": str(1000 - 5 - int(group2)), "group2": group2, "group3": "2", "group4": "1", "group5": "2",
+            "deposits": "1000", "demand": demand, "term": str(1000 - int(demand) - 20), "savings": "0", "margin": "20", "special": "0"}
+
+
+def test_vietcaps_notes_score_casa_and_group_two_for_every_bank_with_entered_quarters_first():
+    ratios = {"kind": "bank", "quarters": {"2025-09-30": {"ROAA_TR_AVG4Q": "0.019"}, "2026-09-30": {"ROAA_TR_AVG4Q": "0.02"}}}
+    notes = {"2025-09-30": _notes("15", "300"), "2026-09-30": _notes("12", "330")}
+    by_id = {c["id"]: c for c in report_quality({}, "Ngân hàng", ratios=ratios, bank=bank_ratio_rows({}, notes))["f_score"]["criteria"]}
+    assert by_id["casa_up"]["passed"] is True and by_id["casa_up"]["detail"] == "CASA 35,0% so với 32,0% Q3/2025 (Vietcap)"
+    assert by_id["group2_down"]["passed"] is True and by_id["group2_down"]["detail"] == "Nợ nhóm 2 1,2% so với 1,5% Q3/2025 (Vietcap)"
+    # The owner's entered quarter wins over Vietcap's for that quarter, and each side names its source.
+    entered = {"2026-Q3": {"group1": "450", "group2": "5", "group3": "2", "group4": "1", "group5": "2",
+                           "demand_deposits": "170", "margin_deposits": "10", "customer_deposits": "500"}}
+    by_id = {c["id"]: c for c in report_quality({}, "Ngân hàng", ratios=ratios, bank=bank_ratio_rows(entered, notes))["f_score"]["criteria"]}
+    assert by_id["casa_up"]["passed"] is True and by_id["casa_up"]["detail"] == "CASA 36,0% (số nhập tay) so với 32,0% Q3/2025 (Vietcap)"
+    # A Vietcap quarter whose parts miss the total is not scored from.
+    notes["2025-09-30"] = {**_notes("15", "300"), "group4": "9"}
+    by_id = {c["id"]: c for c in report_quality({}, "Ngân hàng", ratios=ratios, bank=bank_ratio_rows({}, notes))["f_score"]["criteria"]}
+    assert by_id["group2_down"]["passed"] is None and by_id["casa_up"]["passed"] is True

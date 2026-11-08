@@ -36,6 +36,11 @@ chỉ đọc chữ, vì không có dòng tổng để đối chiếu.
 
 Khi một ngân hàng đã có số nhập tay, Điểm sức khỏe thêm hai tiêu chí, so quý gần nhất có số với cùng quý năm trước: **CASA tăng**, **tỷ lệ nợ nhóm 2 giảm**. Ngân hàng chưa có số nhập tay thì giữ 7 tiêu chí như cũ (không bị hạ mức vì thiếu ô nhập).
 
+**Số Vietcap cho Điểm sức khỏe** (08/11/2026, chủ sở hữu duyệt): hai tiêu chí trên lấy số từ thuyết minh trên Vietcap (`data/bank-notes`,
+xem spec Bảng số tài chính), chỉ ở quý mà các nhóm nợ và các loại tiền gửi cộng ra đúng tổng; quý chủ sở hữu đã nhập thì dùng số nhập tay.
+Dòng chi tiết ghi nguồn từng bên, ví dụ "CASA 36,0% (số nhập tay) so với 32,0% Q3/2025 (Vietcap)". Không có cặp cùng kỳ thì tiêu chí
+không chấm và ghi "Cần số của cùng quý năm trước (…): Vietcap chưa có, chưa nhập tay". Ngân hàng không có số nào vẫn giữ 7 tiêu chí.
+
 ## Giao diện
 
 Trang hồ sơ mã ngân hàng: mục "Số liệu ngân hàng (nhập tay)" — bảng theo quý (nhóm nợ, NPL, nợ nhóm 2, CASA, CAR, nguồn), form nhập/sửa một quý, ô dán đường dẫn PDF để điền sẵn, nút xóa một quý.

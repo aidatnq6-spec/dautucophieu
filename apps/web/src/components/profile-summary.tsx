@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
 import { PropertyBook } from "./property-book";
+import { CycleTargets } from "./cycle-targets";
 import { NewMoney } from "./new-money";
 import { DepositBook } from "./deposit-book";
 import { EquityBudget } from "./equity-budget";
@@ -58,6 +59,7 @@ export function ProfileSummary() {
       <PropertyBook key={`property-${riskChanges}-${bookSaves}`} />
       <EquityBudget key={`${riskChanges}-${intangibleChanges}-${bookSaves}`} />
       <NewMoney />
+      <CycleTargets key={`cycle-${riskChanges}-${bookSaves}`} />
     </>
   );
 }

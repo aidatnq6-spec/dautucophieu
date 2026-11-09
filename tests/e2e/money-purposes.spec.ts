@@ -14,7 +14,7 @@ test("a purpose is added and a row's tag stays after a reload", async ({ page })
     const response = await route.fetch();
     await route.fulfill({ response, json: { ...(await response.json()), rows: [{ id: "mp-a", kind: "account", name: "TK cho con", value: "100000000", at_cost: false }] } });
   });
-  await page.goto("/profile");
+  await page.goto("/profile?tab=tai-san");
   const box = region(page);
   await expect(box.getByLabel("Tên mục đích")).toBeEnabled();
   await box.getByLabel("Tên mục đích").fill("Cho con");
@@ -29,7 +29,7 @@ test("a purpose is added and a row's tag stays after a reload", async ({ page })
 
 test("the section adds no sideways scroll at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 800 });
-  await page.goto("/profile");
+  await page.goto("/profile?tab=tai-san");
   await expect(region(page).getByLabel("Tên mục đích")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });

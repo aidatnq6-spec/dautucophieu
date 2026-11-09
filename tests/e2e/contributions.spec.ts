@@ -13,7 +13,7 @@ test("a monthly plan shows each month from the ledger, the streak and the totals
     expect((await call(page, "POST", "ledger/events", { event: { event_id: "contrib-d", type: "deposit", effective_at: "2026-09-15", sequence: 7,
       amount: "8000000" }, expected_version: ledger.version, request_id: "contrib-d" })).ok()).toBe(true);
   }
-  await page.goto("/profile");
+  await page.goto("/profile?tab=ke-hoach");
   const box = page.getByRole("region", { name: "Góp vốn đều" });
   await expect(box.getByLabel("Số tiền góp mỗi tháng (đ)")).toBeEnabled();
   await box.getByLabel("Số tiền góp mỗi tháng (đ)").fill("");
@@ -29,7 +29,7 @@ test("a monthly plan shows each month from the ledger, the streak and the totals
 
 test("no horizontal scroll on the profile page at 375px with the plan", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 900 });
-  await page.goto("/profile");
+  await page.goto("/profile?tab=ke-hoach");
   await expect(page.getByRole("region", { name: "Góp vốn đều" })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);

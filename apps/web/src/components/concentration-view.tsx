@@ -51,7 +51,7 @@ export function ConcentrationView() {
       ) : <>
         <p className="caption">Tỷ trọng trên {view.basis === "equity_budget" ? "vốn dành cho cổ phiếu" : "vốn có thể đầu tư"} ({formatVnd(view.capital)}), tính theo giá mua; ngưỡng {limitText} cho một mã hoặc một ngành (sửa trong Cài đặt).
           Chỉ để theo dõi, không phải khuyến nghị.</p>
-        {view.basis !== "equity_budget" && <p className="caption">Chưa nhập tổng tài sản tài chính: <Link href="/profile">nhập ở Hồ sơ & rủi ro</Link> để tính
+        {view.basis !== "equity_budget" && <p className="caption">Chưa nhập tổng tài sản tài chính: <Link href="/profile?tab=tai-san">nhập ở Hồ sơ & rủi ro</Link> để tính
           trên vốn dành cho cổ phiếu theo khẩu vị rủi ro.</p>}
         {view.what_if && <p className="notice">Chỉ là thử: {Number(view.what_if.amount) >= 0 ? "mua thêm" : "bán bớt"} {view.what_if.symbol}{" "}
           {formatVnd(String(Math.abs(Number(view.what_if.amount))))}; không ghi vào sổ. <button className="btn" type="button" onClick={() => void load()}>Bỏ thử</button></p>}

@@ -9,7 +9,7 @@ test("a plan is set, a buy is recorded and the average cost is worked out", asyn
   await seedOwner(page);
   const stored = await (await call(page, "GET", "accumulation")).json();
   await call(page, "PUT", "accumulation", { plans: [], buys: [], expected_version: stored.version, request_id: `ac-r-${Date.now()}` });
-  await page.goto("/profile");
+  await page.goto("/profile?tab=ke-hoach");
   const box = region(page);
   await expect(box.getByLabel("Tên kế hoạch")).toBeEnabled();
   await box.getByLabel("Tên kế hoạch").fill("Vàng thử");
@@ -31,7 +31,7 @@ test("a plan is set, a buy is recorded and the average cost is worked out", asyn
 
 test("the section adds no sideways scroll at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 800 });
-  await page.goto("/profile");
+  await page.goto("/profile?tab=ke-hoach");
   await expect(region(page).getByLabel("Tên kế hoạch")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });
@@ -51,7 +51,7 @@ test("a buy is sent to the chosen row of the book after a confirmation, and is t
     await route.fulfill({ json: rows({ ...saved, data: { ...saved.data, buys: [{ ...buy, book_row: "r1" }] } }) });
   });
   page.on("dialog", (d) => d.accept());
-  await page.goto("/profile");
+  await page.goto("/profile?tab=ke-hoach");
   const card = region(page).getByRole("article", { name: "Vàng nút" });
   await expect(card.getByLabel("Cộng vào dòng")).toHaveValue("r1");
   await card.getByRole("button", { name: "Cộng vào Sổ tài sản" }).click();

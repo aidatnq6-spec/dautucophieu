@@ -9,7 +9,7 @@ const group = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 
 test("income, spending and birth year give the savings rate against the age rule", async ({ page }) => {
   await seedOwner(page);
-  await page.goto("/profile");
+  await page.goto("/profile?tab=dong-tien");
   const box = page.getByRole("region", { name: "Sức khỏe tài chính" });
   await expect(box.getByLabel("Thu nhập hằng tháng (đ)")).toBeEnabled();  // enabled once the saved figures have loaded
   await box.getByLabel("Thu nhập hằng tháng (đ)").fill("");
@@ -29,7 +29,7 @@ test("income, spending and birth year give the savings rate against the age rule
 
 test("no horizontal scroll on the profile page at 375px with the check", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 900 });
-  await page.goto("/profile");
+  await page.goto("/profile?tab=dong-tien");
   await expect(page.getByRole("region", { name: "Sức khỏe tài chính" })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);

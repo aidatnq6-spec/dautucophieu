@@ -68,4 +68,4 @@ def test_it_is_among_the_things_to_look_at(tmp_path):
     (data / "market-symbols.txt").write_text("KDH\n", encoding="utf-8")
     repo.write(owner, *RECORD, book(LOAN).model_dump(mode="json"), expected_version=0, request_id="p1")
     items = [i for i in attention_items(repo, owner, data, now=datetime(2026, 11, 9, 8, 0, tzinfo=timezone.utc)) if i["kind"] == "loan_promo"]
-    assert items == [{"level": "high", "kind": "loan_promo", "symbol": None, "text": "Vay nhà: hết ưu đãi sau 53 ngày (01/01/2027), khoản trả 18.000.000 đ lên 22.000.000 đ", "href": "/profile"}]
+    assert items == [{"level": "high", "kind": "loan_promo", "symbol": None, "text": "Vay nhà: hết ưu đãi sau 53 ngày (01/01/2027), khoản trả 18.000.000 đ lên 22.000.000 đ", "href": "/profile?tab=tai-san"}]

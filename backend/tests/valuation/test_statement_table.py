@@ -230,3 +230,16 @@ def test_every_kind_gets_its_multiples_at_the_latest_close_from_the_quarter_end_
     t = statement_table(record, closes=[(datetime(2026, 11, 6), 20.0)], vnstock=None, kind="bank")
     assert t["current"] == {"pe": None, "pb": None, "close_date": "2026-11-06"}
     assert statement_table(record, closes=[], vnstock=None, kind="bank")["current"] == {"pe": None, "pb": None, "close_date": None}
+
+
+def test_roic_is_core_profit_after_the_effective_tax_over_average_invested_capital():
+    s = statement_table(RECORD, closes=CLOSES, vnstock=None)["summary"]
+    # Core profit of the four quarters of 2025: gross 42 + 44 + 46 + 48, less 15 a quarter = 120; tax 42,5 on 212,5 = 20%: 96.
+    # Invested capital at both ends: equity 1000 (minority included) + borrowings 500 - cash and short-term investments 100 = 1400.
+    assert s["roic"] == "0.0686"
+    missing = {p: f for p, f in QUARTERS.items() if p != "2024-Q4"}  # no balance sheet a year before: no average, no figure
+    assert statement_table({**RECORD, "quarters": missing}, closes=CLOSES, vnstock=None)["summary"]["roic"] is None
+    odd = {p: {**f, "tax": str(900 * B)} for p, f in QUARTERS.items()}  # tax above the profit is no rate to use
+    assert statement_table({**RECORD, "quarters": odd}, closes=CLOSES, vnstock=None)["summary"]["roic"] is None
+    loss = {p: {**f, "pbt": str(-1 * B)} for p, f in QUARTERS.items()}  # no effective tax rate from a loss
+    assert statement_table({**RECORD, "quarters": loss}, closes=CLOSES, vnstock=None)["summary"]["roic"] is None

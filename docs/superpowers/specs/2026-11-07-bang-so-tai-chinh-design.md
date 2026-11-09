@@ -98,3 +98,4 @@ VNDirect cũng rơi về 45 ngày. Đổi sang ngày VNDirect không làm khác 
   điều chỉnh mới nhất ÷ giá đã điều chỉnh của phiên cuối quý đó, thay cho giá × số cổ phiếu suy ra từ LNST / EPS (28/57 mã lệch quá 3% so với số niêm yết;
   PLX +40%). Thiếu phiên cuối quý trong chuỗi giá thì vốn hoá, P/E, P/B, EV/EBITDA trên thẻ để trống. Phép định giá ở trang Định giá giữ nguyên: đo
   08/11/2026 đổi sang số niêm yết không làm đổi kết luận của mã nào trong 57 mã.
+- **ROIC vận hành 4 quý** (09/11/2026, chủ sở hữu duyệt), trên thẻ tóm tắt của doanh nghiệp thường: LN HĐKD lõi 4 quý × (1 − thuế ÷ LNTT 4 quý) ÷ vốn đầu tư bình quân cuối kỳ và cùng kỳ năm trước; vốn đầu tư = vốn chủ gồm cổ đông thiểu số + nợ vay − tiền và đầu tư tài chính ngắn hạn. Thu nhập tài chính và khoản bất thường không tính. Thiếu một thành phần, LNTT âm hoặc vốn đầu tư không dương thì để trống.

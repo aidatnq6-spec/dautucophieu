@@ -265,6 +265,22 @@ def _ins_checks(periods: dict) -> list[dict]:
     return out
 
 
+def _invested(f: dict) -> Decimal | None:
+    """Equity with minority interests + borrowings - cash and short-term investments, at a period's end."""
+    d, parent = _derived(f), _parent_equity(f)
+    debt, cash_like = _sum(d.get("st_debt"), d.get("lt_debt")), _sum(d.get("cash"), d.get("st_investments"))
+    return None if parent is None or debt is None or cash_like is None else parent + _minority(f) + debt - cash_like
+
+
+def _roic(figures: list[dict], now: Decimal | None, before: Decimal | None) -> str | None:
+    """Core profit of four quarters after their effective tax, over the average invested capital; financial income and one-offs are out."""
+    core, pbt, tax = (_sum(*(f.get(k) for f in figures)) for k in ("core_profit", "pbt", "tax"))
+    if core is None or pbt is None or tax is None or pbt <= 0 or now is None or before is None or now + before <= 0:
+        return None
+    rate = tax / pbt
+    return None if not 0 <= rate <= 1 else _ratio(core * (1 - rate), (now + before) / 2)  # the same limits as FCFF's tax rate
+
+
 def _market_value_now(record: dict, closes) -> tuple[Decimal | None, str | None]:
     """Today's market value and the quarter it starts from: that quarter's unadjusted close × its shares (charter capital ÷ par), moved
     by the adjusted series since that session, so a bonus issue or split after the quarter does not change it. Shares derived from
@@ -303,6 +319,7 @@ def _summary(record: dict, closes) -> dict | None:
             "ebitda_ttm": _money(ebitda), "ev": _money(ev), "pe": _ratio(cap, npat, _Q2, positive=True), "pb": _ratio(cap, parent, _Q2, positive=True),
             "ev_ebitda": _ratio(ev, ebitda, _Q2, positive=True),
             "roe": _ratio(npat, (parent + before) / 2) if npat is not None and parent is not None and before is not None and parent + before > 0 else None,
+            "roic": _roic(figures, _invested(latest), _invested(quarters[_prior(last)]) if _prior(last) in quarters else None),
             "quarters": list(reversed(window))}
 
 

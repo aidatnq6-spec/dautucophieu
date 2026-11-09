@@ -11,6 +11,8 @@ import { WealthCheck } from "./wealth-check";
 import { LifestyleInflation } from "./lifestyle";
 import { Intangibles } from "./intangibles";
 import { Contributions } from "./contributions";
+import { Accumulation } from "./accumulation";
+import { MoneyPurposes } from "./money-purposes";
 import { PassiveIncome } from "./passive-income";
 import { type Assessment } from "./profile-form";
 import { RiskSection } from "./risk-section";
@@ -53,9 +55,11 @@ export function ProfileSummary() {
       <WealthCheck onSaved={() => setWealthSaves((n) => n + 1)} />
       <LifestyleInflation refresh={wealthSaves} />
       <Contributions />
+      <Accumulation />
       <PassiveIncome key={bookSaves} />
       <Intangibles onChanged={() => setIntangibleChanges((n) => n + 1)} />
       <DepositBook onSaved={() => setBookSaves((n) => n + 1)} />
+      <MoneyPurposes refresh={bookSaves} />
       <PropertyBook key={`property-${riskChanges}-${bookSaves}`} />
       <EquityBudget key={`${riskChanges}-${intangibleChanges}-${bookSaves}`} />
       <NewMoney />

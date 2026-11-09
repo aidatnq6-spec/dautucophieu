@@ -10,6 +10,7 @@ from pathlib import Path
 from investment_agent.api.routes.value_chains import chain_labels
 from investment_agent.domain.screener import CRITERIA, MAX_SCREENS, ScreenError, build_rows, entered, match, validate_screen
 from investment_agent.market.corporate_events import EventStore
+from investment_agent.market.sectors import load_sectors
 from investment_agent.market.trend import SnapshotStore
 from investment_agent.market.view import EmptyMarket
 from investment_agent.market.watchlist import load_watchlist
@@ -86,10 +87,12 @@ def gather_rows(data_dir: Path, repo, owner, *, held: set[str], today: date, mar
         chains = chain_labels(data_dir, today=today)
     except (OSError, ValueError):
         chains = None
-    return build_rows(symbols=symbols, valuation=valuation, trend=trend,
+    rows = build_rows(symbols=symbols, valuation=valuation, trend=trend,
                       trend_meta={"session_date": snapshot.get("session_date"), "previous_date": snapshot.get("previous_date")},
                       chains=chains, foreign=foreign_by_symbol(data_dir), events=store.events(symbols),
                       events_known={s for s in symbols if store.read(s) is not None}, held=held, today=today)
+    sectors = load_sectors(data_dir)[0]
+    return [{**r, "sector": sectors.get(r["symbol"])} for r in rows]
 
 
 def _describe(row: dict, criteria: dict) -> str:

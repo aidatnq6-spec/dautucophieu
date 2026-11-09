@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cashflowAfterLoan, loanSchedule, parseAmount, paymentStep, savedByPrepaying, shareText, stressLoan } from "./loan-calc";
+import { caretAfterDigits, cashflowAfterLoan, groupDigits, loanSchedule, parseDong, parseAmount, paymentStep, savedByPrepaying, shareText, stressLoan } from "./loan-calc";
 
 const BASE = { principal: 2_000_000_000, months: 300, promoMonths: 12, promoRate: 7.5, afterRate: 11, method: "declining" as const };
 
@@ -149,6 +149,34 @@ describe("the money left after the loan", () => {
   });
   it("has no short month when income is enough", () => {
     expect(cashflowAfterLoan(loan, { income: 100_000_000, expense: 10_000_000, reserve: 5 }).firstNegative).toBeNull();
+  });
+});
+
+describe("whole đồng typed with thousands marks", () => {
+  it("marks every three digits as they are typed, and leaves nothing odd behind", () => {
+    expect(groupDigits("2000000")).toBe("2.000.000");
+    expect(groupDigits("2.000.0005")).toBe("20.000.005");
+    expect(groupDigits("999")).toBe("999");
+    expect(groupDigits("007000")).toBe("7.000");
+    expect(groupDigits("0")).toBe("0");
+    expect(groupDigits("")).toBe("");
+  });
+  it("leaves what is not a whole number as typed, rather than dropping characters and changing its value", () => {
+    expect(groupDigits("15,5")).toBe("15,5");
+    expect(groupDigits("abc")).toBe("abc");
+  });
+  it("reads the marked number, and nothing else", () => {
+    expect(parseDong("30.000.000")).toBe(30_000_000);
+    expect(parseDong("2000000")).toBe(2_000_000);
+    expect(parseDong("  ")).toBeNull();
+    expect(parseDong("15,5")).toBeNull();
+    expect(parseDong("-5")).toBeNull();
+  });
+  it("puts the caret back after the same digit once the marks have moved", () => {
+    expect(caretAfterDigits("1.234.567", 1)).toBe(1);
+    expect(caretAfterDigits("1.234.567", 4)).toBe(5);
+    expect(caretAfterDigits("1.234.567", 7)).toBe(9);
+    expect(caretAfterDigits("1.234.567", 0)).toBe(0);
   });
 });
 

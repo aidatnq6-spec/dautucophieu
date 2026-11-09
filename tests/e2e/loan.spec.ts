@@ -79,20 +79,34 @@ test("trying higher rates shows each payment, and income shows whether the loan 
   await expect(stress.locator("tbody tr")).toHaveCount(5);
   const flow = page.getByRole("region", { name: "Dòng tiền sau khi vay" });
   await expect(flow).toContainText("Nhập thu nhập");
-  await flow.getByLabel("Thu nhập mỗi tháng (triệu đ)").fill("30");
+  await flow.getByLabel("Thu nhập mỗi tháng (đ)").fill("30000000");
+  await expect(flow.getByLabel("Thu nhập mỗi tháng (đ)")).toHaveValue("30.000.000");
   await expect(flow.getByTestId("ln-ratio")).toContainText("80,9%");
   await expect(flow.getByTestId("ln-over")).toContainText("vượt ngưỡng 40%");
   await expect(flow.getByTestId("ln-left")).toContainText("Chưa nhập chi tiêu");
-  await flow.getByLabel("Chi tiêu mỗi tháng (triệu đ)").fill("10");
+  await flow.getByLabel("Chi tiêu mỗi tháng (đ)").fill("10000000");
   await expect(flow.getByTestId("ln-left")).toContainText("833.333 đ");
   await expect(flow.getByTestId("ln-negative")).toHaveText("Tháng 13");
-  await flow.getByLabel("Tiền dự phòng (triệu đ)").fill("10");
+  await flow.getByLabel("Tiền dự phòng (đ)").fill("10000000");
+  await expect(flow.getByLabel("Tiền dự phòng (đ)")).toHaveValue("10.000.000");
   await expect(flow.getByTestId("ln-reserve")).toHaveText("Trụ được 2 tháng, hết vào tháng 15");
   await flow.getByLabel("Ngưỡng cảnh báo trả nợ (% thu nhập)").fill("90");
   await expect(flow.getByTestId("ln-over")).toHaveCount(0);
   await expect(stress.locator("tbody tr").nth(0)).toContainText("80,9%");
   await page.getByRole("button", { name: "Đặt lại" }).click();
-  await expect(flow.getByLabel("Thu nhập mỗi tháng (triệu đ)")).toHaveValue("");
+  await expect(flow.getByLabel("Thu nhập mỗi tháng (đ)")).toHaveValue("");
+});
+
+test("typing in the middle of a marked amount keeps the caret where it was", async ({ page }) => {
+  await page.goto("/loan");
+  const field = page.getByRole("region", { name: "Dòng tiền sau khi vay" }).getByLabel("Tiền dự phòng (đ)");
+  await field.pressSequentially("1000000");
+  await expect(field).toHaveValue("1.000.000");
+  await field.evaluate((el: HTMLInputElement) => el.setSelectionRange(1, 1));
+  await page.keyboard.type("5");
+  await expect(field).toHaveValue("15.000.000");
+  await page.keyboard.type("2");
+  await expect(field).toHaveValue("152.000.000");
 });
 
 test("the printout uses the whole page width, states the loan and leaves out the controls", async ({ page }, info) => {

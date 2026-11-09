@@ -1,6 +1,6 @@
 "use client";
 import { formatVnd } from "../lib/format";
-import { cashflowAfterLoan, parseAmount, shareText, stressLoan, type Loan, type LoanInput } from "./loan-calc";
+import { caretAfterDigits, cashflowAfterLoan, groupDigits, parseDong, shareText, stressLoan, type Loan, type LoanInput } from "./loan-calc";
 
 export const STRESS_DEFAULTS = { customRate: "", income: "", extra: "", expense: "", reserve: "", ceiling: "40" };
 export type StressFields = typeof STRESS_DEFAULTS;
@@ -9,19 +9,24 @@ type Key = keyof StressFields;
 const STEPS = [0, 2, 4, 6];
 const vnd = (v: number) => formatVnd(String(Math.round(v)));
 const num = (s: string) => { const t = s.trim().replace(",", "."); return /^\d+(\.\d+)?$/.test(t) ? Number(t) : null; };
-const trieu = (s: string) => (s.trim() === "" ? null : parseAmount(s, "trieu"));
 const rateText = (r: number) => `${String(Math.round(r * 100) / 100).replace(".", ",")}%`;
 const times = (v: number | null) => (v === null ? "—" : `${v.toFixed(2).replace(".", ",")} lần`);
 
 function Money({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return <label className="field">{label}<input inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value)} /></label>;
+  return <label className="field">{label}<input inputMode="numeric" value={value} onChange={(e) => {
+    const el = e.target;
+    const digits = el.value.slice(0, el.selectionStart ?? el.value.length).replace(/\D/g, "").length;
+    const next = groupDigits(el.value);
+    onChange(next);
+    requestAnimationFrame(() => { const at = caretAfterDigits(el.value, digits); el.setSelectionRange(at, at); });
+  }} /></label>;
 }
 
 /** Thử sức chịu lãi suất and Dòng tiền sau khi vay. In the browser only, like the rest of the page: what is typed here is neither saved nor sent. */
 export function LoanStress({ input, full, afterRate, v, onField }: { input: LoanInput; full: Loan; afterRate: number; v: StressFields; onField: (k: Key, value: string) => void }) {
   const custom = v.customRate.trim() === "" ? null : num(v.customRate);
   const customBad = v.customRate.trim() !== "" && (custom === null || custom > 100);
-  const salary = trieu(v.income), extra = trieu(v.extra), expense = trieu(v.expense), reserve = trieu(v.reserve), ceiling = num(v.ceiling);
+  const salary = parseDong(v.income), extra = parseDong(v.extra), expense = parseDong(v.expense), reserve = parseDong(v.reserve), ceiling = num(v.ceiling);
   const unread = ([["Thu nhập", v.income, salary], ["Thu nhập thêm", v.extra, extra], ["Chi tiêu", v.expense, expense], ["Tiền dự phòng", v.reserve, reserve]] as [string, string, number | null][])
     .filter(([, raw, parsed]) => raw.trim() !== "" && parsed === null).map(([name]) => name);
   const ceilingOk = ceiling !== null && ceiling > 0 && ceiling <= 100;
@@ -50,13 +55,13 @@ export function LoanStress({ input, full, afterRate, v, onField }: { input: Loan
       <section className="surface" aria-label="Dòng tiền sau khi vay">
         <h2>Dòng tiền sau khi vay</h2>
         <div className="formgrid">
-          <Money label="Thu nhập mỗi tháng (triệu đ)" value={v.income} onChange={(x) => onField("income", x)} />
-          <Money label="Thu nhập thêm nếu có (triệu đ)" value={v.extra} onChange={(x) => onField("extra", x)} />
-          <Money label="Chi tiêu mỗi tháng (triệu đ)" value={v.expense} onChange={(x) => onField("expense", x)} />
-          <Money label="Tiền dự phòng (triệu đ)" value={v.reserve} onChange={(x) => onField("reserve", x)} />
-          <Money label="Ngưỡng cảnh báo trả nợ (% thu nhập)" value={v.ceiling} onChange={(x) => onField("ceiling", x)} />
+          <Money label="Thu nhập mỗi tháng (đ)" value={v.income} onChange={(x) => onField("income", x)} />
+          <Money label="Thu nhập thêm nếu có (đ)" value={v.extra} onChange={(x) => onField("extra", x)} />
+          <Money label="Chi tiêu mỗi tháng (đ)" value={v.expense} onChange={(x) => onField("expense", x)} />
+          <Money label="Tiền dự phòng (đ)" value={v.reserve} onChange={(x) => onField("reserve", x)} />
+          <label className="field">Ngưỡng cảnh báo trả nợ (% thu nhập)<input inputMode="decimal" value={v.ceiling} onChange={(e) => onField("ceiling", e.target.value)} /></label>
         </div>
-        {unread.length > 0 && <ul className="errors" role="alert"><li>Chưa đọc được: {unread.join(", ")}. Nhập số triệu đồng, ví dụ 15 hoặc 15,5.</li></ul>}
+        {unread.length > 0 && <ul className="errors" role="alert"><li>Chưa đọc được: {unread.join(", ")}. Nhập số đồng, không có phần lẻ, ví dụ 15.000.000.</li></ul>}
         {!ceilingOk && <ul className="errors" role="alert"><li>Ngưỡng cảnh báo từ trên 0 đến 100%.</li></ul>}
         {flow === null ? <p className="muted ln-flow-empty">Nhập thu nhập lớn hơn 0 để xem phần còn lại sau khi trả nợ.</p> : <>
           {over && <p className="notice ln-flow-note" data-testid="ln-over">Khoản trả cao nhất chiếm {pct(flow.peakRatio)} thu nhập, vượt ngưỡng {String(ceiling).replace(".", ",")}% bạn đặt.</p>}

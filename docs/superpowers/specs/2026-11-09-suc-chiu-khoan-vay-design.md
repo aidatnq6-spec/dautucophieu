@@ -8,7 +8,7 @@ Chủ sở hữu duyệt ngày 09/11/2026. Mọi số chỉ tính trên trình d
 - Đây là kịch bản để thử, không dự báo lãi suất.
 
 ## Dòng tiền sau khi vay
-- Nhập thu nhập (bắt buộc), thu nhập thêm, chi tiêu, tiền dự phòng (triệu đồng), ngưỡng cảnh báo.
+- Nhập thu nhập (bắt buộc), thu nhập thêm, chi tiêu, tiền dự phòng (bằng đồng, tự thêm dấu chấm sau mỗi 3 chữ số), ngưỡng cảnh báo.
 - Ngưỡng mặc định 40% thu nhập, do chủ sở hữu chọn, sửa được trên trang; không phải quy định của ngân hàng.
 - Thiếu số nào thì phần cần số đó ghi rõ là chưa nhập; không đoán.
 - Tiền dự phòng dùng từ tháng âm đầu tiên, mỗi tháng trừ phần thiếu; tháng dư sau đó không cộng lại.

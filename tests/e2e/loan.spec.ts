@@ -68,6 +68,33 @@ test("the page's actions sit where they act: schedule and print by the result, r
   await expect(page.getByRole("region", { name: "Thông tin khoản vay" }).getByRole("button", { name: "Đặt lại" })).toBeVisible();
 });
 
+test("trying higher rates shows each payment, and income shows whether the loan can be carried", async ({ page }) => {
+  await page.goto("/loan");
+  const stress = page.getByRole("table", { name: "Thử sức chịu lãi suất" });
+  await expect(stress.locator("tbody tr")).toHaveCount(4);
+  await expect(stress.locator("tbody tr").nth(0)).toContainText("24.266.667 đ");
+  await expect(stress.locator("tbody tr").nth(1)).toContainText("27.466.667 đ");
+  await expect(stress.locator("tbody tr").nth(1)).toContainText("1,43 lần");
+  await page.getByLabel("Mức lãi tự chọn (%/năm)").fill("15");
+  await expect(stress.locator("tbody tr")).toHaveCount(5);
+  const flow = page.getByRole("region", { name: "Dòng tiền sau khi vay" });
+  await expect(flow).toContainText("Nhập thu nhập");
+  await flow.getByLabel("Thu nhập mỗi tháng (triệu đ)").fill("30");
+  await expect(flow.getByTestId("ln-ratio")).toContainText("80,9%");
+  await expect(flow.getByTestId("ln-over")).toContainText("vượt ngưỡng 40%");
+  await expect(flow.getByTestId("ln-left")).toContainText("Chưa nhập chi tiêu");
+  await flow.getByLabel("Chi tiêu mỗi tháng (triệu đ)").fill("10");
+  await expect(flow.getByTestId("ln-left")).toContainText("833.333 đ");
+  await expect(flow.getByTestId("ln-negative")).toHaveText("Tháng 13");
+  await flow.getByLabel("Tiền dự phòng (triệu đ)").fill("10");
+  await expect(flow.getByTestId("ln-reserve")).toHaveText("Trụ được 2 tháng, hết vào tháng 15");
+  await flow.getByLabel("Ngưỡng cảnh báo trả nợ (% thu nhập)").fill("90");
+  await expect(flow.getByTestId("ln-over")).toHaveCount(0);
+  await expect(stress.locator("tbody tr").nth(0)).toContainText("80,9%");
+  await page.getByRole("button", { name: "Đặt lại" }).click();
+  await expect(flow.getByLabel("Thu nhập mỗi tháng (triệu đ)")).toHaveValue("");
+});
+
 test("the printout uses the whole page width, states the loan and leaves out the controls", async ({ page }, info) => {
   await page.setViewportSize({ width: 794, height: 1123 });  // A4 at 96 dpi
   await page.goto("/loan");

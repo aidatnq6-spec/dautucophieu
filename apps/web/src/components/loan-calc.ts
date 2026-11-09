@@ -55,6 +55,47 @@ export function paymentStep(loan: Loan, promoMonths: number, graceMonths = 0): {
   return { first: loan.rows[0].payment, after: after.payment, period: after.period, rise: after.payment - loan.rows[index - 1].payment };
 }
 
+export type StressRow = { rate: number; peak: number; peakPeriod: number; times: number | null; interestTimes: number | null; interest: number };
+
+/** The loan at each rate after the promotion, repaid to term. times: the highest payment over the planned first payment. interestTimes: the
+ * first month's interest after the promotion over the last month's within it; null without a promotion or a month after it. */
+export function stressLoan(input: LoanInput, rates: number[]): StressRow[] {
+  const first = loanSchedule({ ...input, prepay: null }).rows[0].payment;
+  return rates.map((rate) => {
+    const s = loanSchedule({ ...input, afterRate: rate, prepay: null });
+    const top = s.rows.reduce((a, r) => (r.payment > a.payment ? r : a));
+    const before = s.rows[input.promoMonths - 1], after = s.rows[input.promoMonths];
+    return { rate, peak: top.payment, peakPeriod: top.period, times: first > 0 ? top.payment / first : null,
+      interestTimes: before && after && before.interest > 0 ? after.interest / before.interest : null, interest: s.interest };
+  });
+}
+
+export type Cashflow = { firstRatio: number; peakRatio: number; peak: number; peakPeriod: number; firstLeft: number | null; worstLeft: number | null; firstNegative: number | null;
+  reserve: { covered: number | null; runsOut: number | null } | null };
+
+/** What a loan repaid to term leaves of a month's income. Anything resting on a figure not given is null. The reserve is drawn from the first short
+ * month on, one month's shortfall at a time; a later month's surplus is not added back. covered and runsOut are null when it lasts through every short month. */
+export function cashflowAfterLoan(loan: Loan, money: { income: number; expense: number | null; reserve: number | null }): Cashflow {
+  const { income, expense, reserve } = money;
+  const top = loan.rows.reduce((a, r) => (r.payment > a.payment ? r : a));
+  const base = { firstRatio: loan.rows[0].payment / income, peakRatio: top.payment / income, peak: top.payment, peakPeriod: top.period };
+  if (expense === null) return { ...base, firstLeft: null, worstLeft: null, firstNegative: null, reserve: null };
+  const left = loan.rows.map((r) => income - expense - r.payment);
+  const firstIndex = left.findIndex((v) => v < 0);
+  let result: Cashflow["reserve"] = null;
+  if (reserve !== null) {
+    result = { covered: null, runsOut: null };
+    let balance = reserve, covered = 0;
+    for (let i = Math.max(firstIndex, 0); firstIndex >= 0 && i < left.length; i++) {
+      if (left[i] >= 0) continue;
+      if (balance + left[i] < 0) { result = { covered, runsOut: loan.rows[i].period }; break; }
+      balance += left[i];
+      covered++;
+    }
+  }
+  return { ...base, firstLeft: left[0], worstLeft: Math.min(...left), firstNegative: firstIndex >= 0 ? loan.rows[firstIndex].period : null, reserve: result };
+}
+
 export const shareText = (part: number, whole: number) => `${((part / whole) * 100).toFixed(1).replace(".", ",")}%`;
 
 export const savedByPrepaying = (full: Loan, early: Loan) => full.interest - early.interest - early.fee;

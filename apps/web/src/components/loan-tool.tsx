@@ -3,15 +3,16 @@ import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 import { Download, Printer, RotateCcw, TableProperties } from "lucide-react";
 import { formatVnd } from "../lib/format";
 import { download, spreadsheet } from "./journal-tools";
-import { loanSchedule, parseAmount, paymentStep, savedByPrepaying, shareText, type Loan, type Method } from "./loan-calc";
+import { LoanStress, STRESS_DEFAULTS } from "./loan-stress";
+import { loanSchedule, parseAmount, paymentStep, savedByPrepaying, shareText, type Loan, type LoanInput, type Method } from "./loan-calc";
 
 type Unit = "ty" | "trieu";
 type Span = "year" | "month";
 const DEFAULTS = { mode: "loan" as "loan" | "property", loan: "2", loanUnit: "ty" as Unit, property: "3", propertyUnit: "ty" as Unit, ltv: "70", term: "25", termUnit: "year" as Span,
-  promoRate: "7,5", promo: "1", promoUnit: "year" as Span, afterRate: "11", method: "declining" as Method, grace: "0", prepayOn: false, prepayMonth: "60", prepayFee: "2" };
+  promoRate: "7,5", promo: "1", promoUnit: "year" as Span, afterRate: "11", method: "declining" as Method, grace: "0", prepayOn: false, prepayMonth: "60", prepayFee: "2", ...STRESS_DEFAULTS };
 type Form = typeof DEFAULTS;
 type Blocked = { errors: string[] };
-type Ready = { errors: string[]; loan: Loan; full: Loan; principal: number; months: number; promoMonths: number; grace: number; upfront: number; ratio: number };
+type Ready = { errors: string[]; loan: Loan; full: Loan; input: LoanInput; afterRate: number; principal: number; months: number; promoMonths: number; grace: number; upfront: number; ratio: number };
 
 const num = (s: string) => { const t = s.trim().replace(",", "."); return /^\d+(\.\d+)?$/.test(t) ? Number(t) : null; };
 const vnd = (v: number) => formatVnd(String(Math.round(v)));
@@ -76,7 +77,7 @@ export function LoanTool() {
     const base = { principal: principal!, months: months!, promoMonths: promoMonths!, promoRate: promoRate!, afterRate: afterRate!, method: f.method, graceMonths: grace! };
     const full = loanSchedule(base);
     const loan = f.prepayOn ? loanSchedule({ ...base, prepay: { month: prepayMonth!, feePercent: fee! } }) : full;
-    return { errors: [], loan, full, principal: principal!, months: months!, promoMonths: promoMonths!, grace: grace!, upfront: f.mode === "property" ? value! - principal! : 0, ratio: f.mode === "property" ? ltv! : 100 };
+    return { errors: [], loan, full, input: base, afterRate: afterRate!, principal: principal!, months: months!, promoMonths: promoMonths!, grace: grace!, upfront: f.mode === "property" ? value! - principal! : 0, ratio: f.mode === "property" ? ltv! : 100 };
   }, [f]);
   const ok = "loan" in result ? result : null;
   function exportRows() {
@@ -173,6 +174,7 @@ export function LoanTool() {
           </div>
         </aside>
       </div>
+      {ok && <LoanStress input={ok.input} full={ok.full} afterRate={ok.afterRate} v={f} onField={(k, value) => setF((old) => ({ ...old, [k]: value }))} />}
       {ok && open && <section className="surface" aria-label="Lịch thanh toán từng tháng">
         <div className="row"><h2>Lịch thanh toán: {ok.loan.rows.length} kỳ</h2>
           <button type="button" className="btn" onClick={exportRows}><Download size={16} aria-hidden="true" />Xuất Excel</button></div>

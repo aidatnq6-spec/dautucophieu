@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loanSchedule, parseAmount, paymentStep, savedByPrepaying, shareText } from "./loan-calc";
+import { cashflowAfterLoan, loanSchedule, parseAmount, paymentStep, savedByPrepaying, shareText, stressLoan } from "./loan-calc";
 
 const BASE = { principal: 2_000_000_000, months: 300, promoMonths: 12, promoRate: 7.5, afterRate: 11, method: "declining" as const };
 
@@ -97,6 +97,59 @@ describe("the payment when the promotion ends", () => {
 it("gives a share of a total to one decimal, with a comma", () => {
   expect(shareText(2_000_000_000, 4_690_450_000)).toBe("42,6%");
   expect(shareText(2_690_450_000, 4_690_450_000)).toBe("57,4%");
+});
+
+describe("trying the rate after the promotion", () => {
+  it("gives each rate's highest payment, its multiple of the planned first payment and how far the interest jumps", () => {
+    const [plan, up2] = stressLoan(BASE, [11, 13]);
+    expect(plan.peakPeriod).toBe(13);
+    expect(Math.round(plan.peak)).toBe(24_266_667);
+    expect(plan.times).toBeCloseTo(24_266_667 / 19_166_667, 4);
+    expect(plan.interestTimes).toBeCloseTo(17_600_000 / 12_041_667, 4);
+    expect(Math.round(up2.peak)).toBe(27_466_667);  // 1,92 tỷ left × 13% ÷ 12 + 6.666.667 of principal
+    expect(up2.times).toBeCloseTo(27_466_667 / 19_166_667, 4);
+    expect(up2.interestTimes).toBeCloseTo(20_800_000 / 12_041_667, 4);
+    expect(up2.interest).toBeGreaterThan(plan.interest);
+  });
+  it("has no interest jump without a promotion, and measures against the plan", () => {
+    const [plan, up] = stressLoan({ ...BASE, promoMonths: 0 }, [11, 13]);
+    expect(plan.interestTimes).toBeNull();
+    expect(plan.times).toBeCloseTo(1, 8);
+    expect(up.times).toBeGreaterThan(1);
+  });
+  it("ignores an early repayment, whose last payment is the whole balance", () => {
+    expect(stressLoan({ ...BASE, prepay: { month: 60, feePercent: 2 } }, [11])[0].peakPeriod).toBe(13);
+  });
+});
+
+describe("the money left after the loan", () => {
+  const loan = loanSchedule(BASE);
+  it("gives the share of income going to the loan, first and at the highest payment", () => {
+    const c = cashflowAfterLoan(loan, { income: 30_000_000, expense: 10_000_000, reserve: 10_000_000 });
+    expect(c.firstRatio).toBeCloseTo(19_166_667 / 30_000_000, 6);
+    expect(c.peakRatio).toBeCloseTo(24_266_667 / 30_000_000, 6);
+    expect(c.peakPeriod).toBe(13);
+  });
+  it("finds the first month that runs short and the lowest month", () => {
+    const c = cashflowAfterLoan(loan, { income: 30_000_000, expense: 10_000_000, reserve: null });
+    expect(Math.round(c.firstLeft!)).toBe(833_333);
+    expect(Math.round(c.worstLeft!)).toBe(-4_266_667);
+    expect(c.firstNegative).toBe(13);
+    expect(c.reserve).toBeNull();
+  });
+  it("counts the months a reserve covers from the first short month, not adding later surpluses", () => {
+    // Short by 4.266.667, 4.205.556, then 4.144.444: 10 triệu covers two whole months and runs out in month 15.
+    expect(cashflowAfterLoan(loan, { income: 30_000_000, expense: 10_000_000, reserve: 10_000_000 }).reserve).toEqual({ covered: 2, runsOut: 15 });
+    expect(cashflowAfterLoan(loan, { income: 30_000_000, expense: 10_000_000, reserve: 1_000_000_000 }).reserve).toEqual({ covered: null, runsOut: null });
+  });
+  it("leaves out what depends on a figure not given", () => {
+    const c = cashflowAfterLoan(loan, { income: 30_000_000, expense: null, reserve: 10_000_000 });
+    expect(c.peakRatio).not.toBeNull();
+    expect([c.firstLeft, c.worstLeft, c.firstNegative, c.reserve]).toEqual([null, null, null, null]);
+  });
+  it("has no short month when income is enough", () => {
+    expect(cashflowAfterLoan(loan, { income: 100_000_000, expense: 10_000_000, reserve: 5 }).firstNegative).toBeNull();
+  });
 });
 
 describe("parseAmount", () => {

@@ -1,5 +1,5 @@
-import { expect, it } from "vitest";
-import { applyProposal, parseSeries, slugify, stackTop } from "./operating-figures";
+import { describe, expect, it } from "vitest";
+import { applyProposal, parseSeries, slugify, stackTop, windowed } from "./operating-figures";
 
 it("a group's id comes from its Vietnamese name without accents", () => {
   expect(slugify("Sản lượng bán theo sản phẩm")).toBe("san-luong-ban-theo-san-pham");
@@ -22,4 +22,12 @@ it("a PDF proposal fills each line with its first candidate and the link with th
   const proposal = { url: "https://hoaphat.com.vn/bt.pdf", values: { "Thép XD": [{ value: "412300", page: 1, text: "…" }, { value: "18", page: 1, text: "…" }],
     HRC: [{ value: "512000", page: 2, text: "…" }] }, missing: ["Tôn mạ"], warnings: [] };
   expect(applyProposal(proposal)).toEqual({ values: { "Thép XD": "412300", HRC: "512000" }, source: "https://hoaphat.com.vn/bt.pdf (trang 1, 2)" });
+});
+
+describe("windowed", () => {
+  it("keeps the latest periods, or every period for Tất cả", () => {
+    expect(windowed([1, 2, 3, 4], 2)).toEqual([3, 4]);
+    expect(windowed([1, 2, 3, 4], 0)).toEqual([1, 2, 3, 4]);
+    expect(windowed([1], 12)).toEqual([1]);
+  });
 });

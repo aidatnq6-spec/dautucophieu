@@ -11,7 +11,7 @@ from pathlib import Path
 
 from investment_agent.market.series import SeriesStore
 from investment_agent.operations.backup import BackupError
-from investment_agent.operations.restore import BackupCorrupt, personal_drill, restore_local
+from investment_agent.operations.restore import BackupCorrupt, personal_drill, read_personal_export, restore_local
 from investment_agent.repositories.personal import RepositoryUnavailable
 
 LOG_LINES = 4000
@@ -151,7 +151,7 @@ def backup_drill(backup_root: Path, data_dir: Path, *, now: datetime, repo=None,
     try:
         with tempfile.TemporaryDirectory(prefix="investment-drill-") as tmp:
             out["files"] = len(restore_local(newest, Path(tmp) / "restored"))
-        json.loads((newest / "personal-export.json").read_text(encoding="utf-8"))
+        read_personal_export(newest)
         if repo is not None:
             out["personal"] = personal_drill(newest, repo, owner)
             if not out["personal"]["ok"]:

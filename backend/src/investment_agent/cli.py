@@ -545,7 +545,7 @@ def run_backup(data_dir: Path, backup_dir: Path, kind: str) -> int:
     from datetime import datetime, timezone
 
     from investment_agent.api.auth import OwnerContext
-    from investment_agent.operations.backup import create_backup, due_backup_kind, export_personal, prune_backups
+    from investment_agent.operations.backup import BackupError, backup_key_from_env, create_backup, due_backup_kind, export_personal, prune_backups
     from investment_agent.repositories.firestore import personal_repository_from_env
     from investment_agent.repositories.personal import RepositoryUnavailable
 
@@ -555,6 +555,13 @@ def run_backup(data_dir: Path, backup_dir: Path, kind: str) -> int:
         if kind is None:
             print(json.dumps({"status": "skipped", "reason": "not_due"}))
             return 0
+    try:  # backups get copied off this machine: without a usable key, none is written
+        key = backup_key_from_env()
+    except BackupError:
+        key = None
+    if key is None:
+        print(json.dumps({"status": "not_configured", "reason": "backup_key_missing"}))
+        return 2
     try:
         repo = personal_repository_from_env()
         export = export_personal(repo, OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "backup"), now=now)
@@ -562,7 +569,7 @@ def run_backup(data_dir: Path, backup_dir: Path, kind: str) -> int:
         # A local-only copy is not a full backup: the personal source of truth is Firestore.
         print(json.dumps({"status": "not_configured", "reason": "personal_export_unavailable"}))
         return 2
-    manifest = create_backup(data_dir, backup_dir, personal_export=export, now=now, kind=kind)
+    manifest = create_backup(data_dir, backup_dir, personal_export=export, now=now, kind=kind, encryption_key=key)
     removed = prune_backups(backup_dir)
     print(json.dumps({"status": "ok", "backup": manifest.path.name, "files": len(manifest.files), "pruned": len(removed)}))
     return 0

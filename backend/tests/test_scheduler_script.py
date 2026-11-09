@@ -67,3 +67,9 @@ def test_fund_navs_are_synced_on_every_wake_up():
 
 def test_gold_prices_are_synced_on_every_wake_up():
     assert any("investment_agent.cli gold-price-sync" in l for l in lines())
+
+
+def test_accumulation_reminder_runs_on_every_wake_up():
+    ls = lines()
+    step = next(i for i, l in enumerate(ls) if "investment_agent.cli accumulation-remind" in l)
+    assert step < next(i for i, l in enumerate(ls) if "investment_agent.cli scheduled-run" in l)

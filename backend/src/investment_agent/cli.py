@@ -103,6 +103,8 @@ def main() -> int:
     loans.add_argument("--data-dir", type=Path, required=True)
     contrib = commands.add_parser("contribution-remind", help="Góp vốn đều: Telegram once a month from the contribution day until it is met")
     contrib.add_argument("--data-dir", type=Path, required=True)
+    accumulation = commands.add_parser("accumulation-remind", help="Kế hoạch tích sản: Telegram once per plan and month from its day until it is met")
+    accumulation.add_argument("--data-dir", type=Path, required=True)
     drawdown = commands.add_parser("drawdown-check", help="full price history for drawdowns; Telegram when a holding falls past the threshold")
     drawdown.add_argument("--data-dir", type=Path, required=True)
     journal = commands.add_parser("journal-review", help="Nhật ký: Telegram reminder when a price moved another threshold step")
@@ -182,6 +184,8 @@ def main() -> int:
         return loan_alerts_cli(args.data_dir)
     if args.command == "contribution-remind":
         return contribution_cli(args.data_dir)
+    if args.command == "accumulation-remind":
+        return accumulation_cli(args.data_dir)
     if args.command == "drawdown-check":
         return drawdown_cli(args.data_dir)
     if args.command == "journal-review":
@@ -617,6 +621,37 @@ def scheduled_run(calendar_path: Path, data_dir: Path) -> int:
     d = result.decision
     print(json.dumps({"status": "ok", "run": d.run, "reason": d.reason, "session": d.session_date.isoformat() if d.session_date else None,
                       "missed_sessions": d.missed_sessions, "reports": result.statuses, "delivered": len(result.delivered)}))
+    return 0
+
+
+def accumulation_cli(data_dir: Path) -> int:
+    """Remind once per plan and month, from the plan's day, while the month's purchases are below the plan."""
+    import os
+    import uuid
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    import httpx
+
+    from investment_agent.api.auth import OwnerContext
+    from investment_agent.notifications.telegram import TelegramSender
+    from investment_agent.repositories.firestore import personal_repository_from_env
+    from investment_agent.services.accumulation import remind_run
+    from investment_agent.services.records import notification_settings
+    from investment_agent.settings import Settings
+
+    settings = Settings.from_env()
+    repo = personal_repository_from_env()
+    owner = OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
+    chosen, _ = notification_settings(repo, owner)
+
+    def send(text):
+        if not (settings.telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):
+            return False
+        sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
+        return _part_sender(sender, chosen.chat_id, data_dir)(text)
+    out = remind_run(repo, owner, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date(), send=send, request_id=f"accumulation-{uuid.uuid4().hex[:16]}")
+    print(json.dumps(out))
     return 0
 
 

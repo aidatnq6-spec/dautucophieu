@@ -192,6 +192,7 @@ legend{font-weight:600;padding:0 6px}
 @media (max-width:600px){.jr-move{margin-left:0;flex-basis:100%}}
 .eb-form{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px}
 .eb-form .field{flex:1 1 240px;min-width:0}
+.ta-card{border-top:1px solid var(--line);padding-top:12px;margin-top:14px}.ta-card h3{margin:0 0 4px}
 .eb-result{display:grid;gap:6px;margin:14px 0 0}
 .eb-result>div{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;padding:6px 0;border-bottom:1px solid var(--line)}
 .eb-result dt{color:var(--muted)}.eb-result dd{margin:0;font-variant-numeric:tabular-nums}

@@ -84,6 +84,9 @@ $la = & $python -W ignore -m investment_agent.cli loan-alerts --data-dir $data 2
 # Gop von deu: once a month from the contribution day, while this month's deposits are below the plan.
 $contrib = & $python -W ignore -m investment_agent.cli contribution-remind --data-dir $data 2>$null
 "$(Get-Date -Format o) contribution-remind exit=$LASTEXITCODE $contrib" | Add-Content -LiteralPath $log -Encoding UTF8
+# Ke hoach tich san: once per plan and month from its day, while the month's purchases are below the plan.
+$accum = & $python -W ignore -m investment_agent.cli accumulation-remind --data-dir $data 2>$null
+"$(Get-Date -Format o) accumulation-remind exit=$LASTEXITCODE $accum" | Add-Content -LiteralPath $log -Encoding UTF8
 # Statements for the Định giá page: from the 20:00 slot, refresh the 8 stalest tickers (about 3 minutes, paced for Vnstock's limit).
 if ((Get-Date).Hour -ge 20) {
     $fund = & $python -W ignore -m investment_agent.cli fundamentals-sync --data-dir $data --limit 8 2>$null

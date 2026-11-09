@@ -111,5 +111,10 @@ $runExit = $LASTEXITCODE
 # At most one backup per day, after the evening slot (or as a catch-up); retention prunes old ones.
 $backup = & $python -W ignore -m investment_agent.cli backup --kind auto --data-dir $data --backup-dir (Join-Path $script:RepoRoot 'backups') 2>$null
 "$(Get-Date -Format o) backup exit=$LASTEXITCODE $backup" | Add-Content -LiteralPath $log -Encoding UTF8
+# Tinh trang he thong: restore the newest backup into a temporary folder once a week, then say what stopped working.
+$drill = & $python -W ignore -m investment_agent.cli backup-drill --data-dir $data 2>$null
+"$(Get-Date -Format o) backup-drill exit=$LASTEXITCODE $drill" | Add-Content -LiteralPath $log -Encoding UTF8
+$hc = & $python -W ignore -m investment_agent.cli health-check --data-dir $data 2>$null
+"$(Get-Date -Format o) health-check exit=$LASTEXITCODE $hc" | Add-Content -LiteralPath $log -Encoding UTF8
 "$(Get-Date -Format o) finish exit=$runExit pid=$PID" | Add-Content -LiteralPath $log -Encoding UTF8
 exit $runExit

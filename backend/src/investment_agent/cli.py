@@ -60,6 +60,10 @@ def main() -> int:
     tc.add_argument("--data-dir", type=Path, required=True)
     tc.add_argument("--calendar", type=Path, required=True)
     tc.add_argument("--scope", choices=("price", "data"), required=True)
+    hc = commands.add_parser("health-check", help="Telegram once for each new problem with the unattended work, and when it recovers")
+    hc.add_argument("--data-dir", type=Path, required=True)
+    bd = commands.add_parser("backup-drill", help="restore the newest backup into a temporary folder, once a week")
+    bd.add_argument("--data-dir", type=Path, required=True)
     qa = commands.add_parser("quarter-alerts", help="Telegram note when a watched ticker's new quarter first appears in the statements")
     qa.add_argument("--data-dir", type=Path, required=True)
     frs = commands.add_parser("financial-ratios-sync", help="quarterly bank, securities and insurance ratios (VNDirect) into data/financial-ratios")
@@ -135,6 +139,10 @@ def main() -> int:
         return fund_nav_sync_cli(args.data_dir)
     if args.command == "gold-price-sync":
         return gold_price_sync_cli(args.data_dir)
+    if args.command == "health-check":
+        return health_check_cli(args.data_dir)
+    if args.command == "backup-drill":
+        return backup_drill_cli(args.data_dir)
     if args.command == "quarter-alerts":
         return quarter_alerts_cli(args.data_dir)
     if args.command == "weekly-brief":
@@ -751,6 +759,37 @@ def _part_sender(sender, chat_id: str, data_dir: Path):
     """Send a note in parts that are never sent twice: parts left after a failure go out first next time (see PartSender)."""
     from investment_agent.notifications.part_sender import PartSender
     return PartSender(lambda part: sender.send(chat_id, part).status == "sent", Path(data_dir) / "alerts" / "telegram_pending.json")
+
+
+def health_check_cli(data_dir: Path, telegram=None) -> int:
+    """Compares the report with what was announced; Firestore and Telegram are touched only when something changed. Exit 0 either way:
+    a problem found is the check working."""
+    from datetime import datetime, timezone
+
+    from investment_agent.services.system_health import alert_changes, health_report, render_changes
+    report = health_report(data_dir, now=datetime.now(timezone.utc))
+    new, recovered = alert_changes(report["problems"], data_dir, save=False)
+    if not new and not recovered:
+        print(json.dumps({"status": "ok", "problems": len(report["problems"]), "sent": False}))
+        return 0
+    chosen = telegram(data_dir) if telegram else _scheduled_telegram(data_dir)
+    if chosen is None:
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off", "problems": len(report["problems"])}))
+        return 0
+    sent = bool(chosen[0](render_changes(new, recovered)))
+    if sent:
+        alert_changes(report["problems"], data_dir, save=True)
+    print(json.dumps({"status": "ok", "problems": len(report["problems"]), "new": len(new), "recovered": len(recovered), "sent": sent}))
+    return 0
+
+
+def backup_drill_cli(data_dir: Path) -> int:
+    from datetime import datetime, timezone
+
+    from investment_agent.services.system_health import backup_drill
+    out = backup_drill(Path(data_dir).parent / "backups", data_dir, now=datetime.now(timezone.utc))
+    print(json.dumps({k: out[k] for k in ("status", "ok", "files", "error") if k in out}))
+    return 0 if out.get("ok", True) else 1
 
 
 def _scheduled_telegram(data_dir: Path):

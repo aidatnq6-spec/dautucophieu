@@ -1,6 +1,6 @@
 """Báo cáo quý mới: a Telegram note when a watched ticker's latest quarter first appears in the stored statements — the
 quarter's parent profit against the same quarter a year before, the report-quality level when there is one, and for a bank
-its NPL against the previous quarter and a reminder to enter loan groups, CASA and CAR.
+its NPL against the previous quarter and a reminder that the quarterly CAR is still entered by hand.
 
 Which quarter was announced for which ticker is kept in data/alerts/quarters.json (public figures only). The first run
 records what is already there without sending, so a full refresh never floods the chat; a quarter is marked sent only after
@@ -66,7 +66,7 @@ def _line(symbol: str, quarter: str, record: dict, sector: str | None, ratios: d
         parts.append(f"{f.get('title') or 'F-Score'} {f['score']}/{f['evaluated']} ({LEVEL[f['level']]})")
     text = " · ".join(parts)
     if sector == "Ngân hàng":
-        text += f"\n  → nhập nợ nhóm 1–5, CASA, CAR trên trang mã {symbol} (Số liệu ngân hàng)"
+        text += f"\n  → nợ nhóm 2, CASA tự cập nhật; muốn có CAR quý thì nhập ở trang mã {symbol} (Số liệu ngân hàng)"
     return text
 
 

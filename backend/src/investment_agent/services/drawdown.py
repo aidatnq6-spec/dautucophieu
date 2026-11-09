@@ -1,7 +1,9 @@
 """Kế hoạch sụt giảm: deepest falls over the full stored history for VN-Index and held tickers, and a one-time Telegram reminder
 when a held ticker falls past the owner's threshold below its average cost. Personal data; never sent to a model."""
 
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
+import json
 from pathlib import Path
 
 from investment_agent.domain.drawdown import current_drawdown, max_drawdown, threshold_alerts
@@ -17,6 +19,9 @@ INDEX = "VNINDEX"
 INDICES = (INDEX, "VN30")
 BACKFILL_PER_RUN = 15  # series per scheduler run (~2–3 Vnstock calls each); the 50 watched tickers fill in over a few runs
 ALERTS = ("settings", "drawdown_alerts")
+OLD_PRICES_PER_RUN = 5  # tickers per run that appear only in the imported journal
+OLD_FRESH_DAYS, OLD_RETRY_DAYS, OLD_FIRST_DAYS = 7, 30, 2920  # about eight years, one Vnstock window
+NO_PRICES = "_no_prices.json"
 
 
 def held_costs(repo, owner) -> dict[str, str]:
@@ -77,13 +82,51 @@ def render_alerts(alerts: list[dict], *, threshold: Decimal, reasons: dict[str, 
     return "\n".join(lines)
 
 
-def drawdown_run(repo, owner, data_dir: Path, *, fetch, send, request_id: str, backfill_limit: int = BACKFILL_PER_RUN) -> dict:
+def _old_tickers(repo, owner) -> list[str]:
+    """Share tickers bought or sold in the imported older journal, for Hậu kiểm."""
+    return sorted({e.symbol for e in read_journal(repo, owner)[0] if e.imported and e.imported.get("asset") == "Cổ phiếu" and e.kind in ("buy", "sell")})
+
+
+def _fill_old_tickers(symbols: list[str], series: SeriesStore, root: Path, fetch, today: date, limit: int) -> int:
+    """Daily closes for tickers no other feature keeps: first the recent years, then brought up to date weekly. A ticker the source does
+    not answer for (often delisted) is left for a month; one failure never stops the others. Public prices only."""
+    path = root / NO_PRICES
+    waiting = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    called = 0
+    for symbol in symbols:
+        if called >= limit:
+            break
+        key = f"{symbol}-1d"
+        points = series.read(key)
+        last = points[-1][0].date() if points else None
+        if (last and (today - last).days <= OLD_FRESH_DAYS) or (symbol in waiting and (today - date.fromisoformat(waiting[symbol])).days < OLD_RETRY_DAYS):
+            continue
+        called += 1
+        try:
+            closes = [p for p in fetch(symbol, last + timedelta(days=1) if last else today - timedelta(days=OLD_FIRST_DAYS), today) if float(p[1]) > 0]
+        except Exception:
+            closes = []
+        if closes:
+            series.upsert(key, closes)
+            waiting.pop(symbol, None)
+        else:
+            waiting[symbol] = today.isoformat()
+    root.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(waiting, sort_keys=True), encoding="utf-8")
+    return called
+
+
+def drawdown_run(repo, owner, data_dir: Path, *, fetch, send, request_id: str, backfill_limit: int = BACKFILL_PER_RUN, today: date | None = None,
+                 old_price_limit: int = OLD_PRICES_PER_RUN) -> dict:
     """fetch(symbol, start, end) -> daily closes. Fills full history (once per series, a few series per run: indices and holdings
     first, then watched tickers), then reminds once per crossing."""
     series_root = Path(data_dir) / "trend-sources"
     series = SeriesStore(series_root)
     costs = held_costs(repo, owner)
-    order = [*INDICES, *sorted(costs), *watched(data_dir, costs)]
+    known = watched(data_dir, costs)
+    old = [s for s in _old_tickers(repo, owner) if s not in costs and s not in known and s not in INDICES]
+    old_prices = _fill_old_tickers(old, series, series_root, fetch, today or datetime.now(timezone(timedelta(hours=7))).date(), old_price_limit)
+    order = [*INDICES, *sorted(costs), *known, *old]
     pending = [s for s in order if not history_complete(series_root, f"{s}-1d") and series.read(f"{s}-1d")][:backfill_limit]
     history = {}
     for symbol in pending:
@@ -103,4 +146,4 @@ def drawdown_run(repo, owner, data_dir: Path, *, fetch, send, request_id: str, b
             alerted -= {a["symbol"] for a in alerts}  # not delivered: try again next run
     if alerted != before:
         repo.write(owner, *ALERTS, {"alerted": sorted(alerted)}, expected_version=record.version if record else 0, request_id=request_id)
-    return {"alerts": len(alerts), "sent": sent, "history": history}
+    return {"alerts": len(alerts), "sent": sent, "history": {s: n for s, n in history.items() if s not in old}, **({"old_prices": old_prices} if old else {})}

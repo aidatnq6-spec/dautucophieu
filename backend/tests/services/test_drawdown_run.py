@@ -80,3 +80,69 @@ def test_the_alert_quotes_the_latest_decision_by_its_date_not_an_old_entry_impor
     sent = []
     drawdown_run(repo, OWNER, tmp_path, fetch=lambda *a: [], send=lambda t: sent.append(t) or True, request_id="r1")
     assert "Lý do mới" in sent[0] and "Lý do từ 2020" not in sent[0]
+
+
+def _old(symbol, asset="Cổ phiếu", kind="buy"):
+    from investment_agent.domain.journal import JournalEntry
+    return JournalEntry(entry_id=f"imp-{symbol}-{kind}", symbol=symbol, kind=kind, created_on=date(2021, 1, 4), reason="",
+                        imported={"asset": asset, "ticker": symbol, "qty": "1", "price": "1", "total": "1", "pnl": None})
+
+
+def _run_old(repo, tmp_path, fetch, today=date(2026, 11, 9), limit=5):
+    return drawdown_run(repo, OWNER, tmp_path, fetch=fetch, send=lambda t: True, request_id="r", today=today, old_price_limit=limit)
+
+
+def test_prices_are_fetched_for_tickers_only_in_the_imported_journal_a_few_each_run(tmp_path):
+    from investment_agent.services.journal import import_entries
+    repo = repo_holding_kdh()
+    import_entries(repo, OWNER, [_old("AAA"), _old("BBB", kind="sell"), _old("CCC"), _old("VANG", asset="Vàng"), _old("KDH")], request_id="j1")
+    asked = []
+
+    def fetch(symbol, start, end):
+        asked.append(symbol)
+        return [(datetime(2026, 11, 6), "20")] if end >= date(2026, 11, 6) and start <= date(2026, 11, 6) else []
+    out = _run_old(repo, tmp_path, fetch, limit=2)
+    series = SeriesStore(tmp_path / "trend-sources")
+    assert out["old_prices"] == 2 and series.read("AAA-1d") and series.read("BBB-1d") and not series.read("CCC-1d")
+    assert "VANG" not in asked  # gold is no ticker; KDH is held and filled as before
+    _run_old(repo, tmp_path, fetch, limit=2)
+    assert series.read("CCC-1d")
+
+
+def test_a_ticker_with_no_prices_or_a_failing_call_does_not_stop_the_others_and_waits_a_month(tmp_path):
+    from investment_agent.services.journal import import_entries
+    repo = repo_holding_kdh()
+    import_entries(repo, OWNER, [_old("AAA"), _old("BBB")], request_id="j1")
+    asked = []
+
+    def fetch(symbol, start, end):
+        asked.append(symbol)
+        if symbol == "AAA":
+            raise RuntimeError("delisted")
+        return [(datetime(2026, 11, 6), "20")] if symbol == "BBB" and start <= date(2026, 11, 6) else []
+    _run_old(repo, tmp_path, fetch)
+    assert SeriesStore(tmp_path / "trend-sources").read("BBB-1d")
+    asked.clear()
+    _run_old(repo, tmp_path, fetch, today=date(2026, 11, 20))
+    assert "AAA" not in asked
+    _run_old(repo, tmp_path, fetch, today=date(2026, 12, 15))
+    assert "AAA" in asked
+
+
+def test_an_old_tickers_prices_are_brought_up_to_date_after_a_week(tmp_path):
+    from investment_agent.services.journal import import_entries
+    repo = repo_holding_kdh()
+    import_entries(repo, OWNER, [_old("AAA")], request_id="j1")
+    series = SeriesStore(tmp_path / "trend-sources")
+    series.upsert("AAA-1d", [(datetime(2026, 11, 2), "10")])
+    starts = []
+
+    def fetch(symbol, start, end):
+        if symbol == "AAA":
+            starts.append(start)
+            return [(datetime(2026, 11, 20), "12")] if end >= date(2026, 11, 20) else []
+        return []
+    _run_old(repo, tmp_path, fetch, today=date(2026, 11, 5))
+    assert not [s for s in starts if s > date(2026, 1, 1)]  # still fresh: nothing newer asked for (the walk back to older years goes on)
+    _run_old(repo, tmp_path, fetch, today=date(2026, 11, 21))
+    assert date(2026, 11, 3) in starts and series.read("AAA-1d")[-1][0] == datetime(2026, 11, 20)

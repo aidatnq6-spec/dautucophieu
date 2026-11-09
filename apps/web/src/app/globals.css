@@ -305,6 +305,7 @@ main h2{scroll-margin-top:16px}
 .ln-amount{font-size:17px;font-weight:700;margin:2px 0 0;font-variant-numeric:tabular-nums;white-space:nowrap}
 .ln-rise{font-size:13px;font-weight:600;margin:0 0 6px}.ln-share{font-size:12px;font-weight:400;color:var(--muted);margin-left:4px}
 .ln-actions{justify-content:center;margin-top:14px}
+.pv-note{margin:12px 0 0}.pv-form{margin:10px 0}
 .ln-custom{max-width:220px;margin-top:12px}.ln-flow-empty{margin:14px 0 0}.ln-flow-note{margin:14px 0 0}
 .ln-flow{margin:14px 0 8px}.ln-flow>div{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 16px;padding:7px 0;border-bottom:1px solid var(--line)}.ln-flow dt{color:var(--muted)}.ln-flow dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums}
 .ln-result{position:sticky;top:12px;text-align:center}.ln-first{font-size:28px;font-weight:700;margin:2px 0}

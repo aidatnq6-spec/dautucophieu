@@ -6,7 +6,7 @@ import { signInternalRequest } from "./python-client";
 import { apiError } from "./session-handlers";
 
 // Only business areas reach Python; identity and health stay on their own routes.
-const AREAS = new Set(["profile", "risk", "ledger", "universe", "valuation", "overview", "research", "jobs", "reports", "notifications", "settings", "watchlist", "market", "macro", "trend", "fairvalue", "insights", "concentration", "performance", "events", "journal", "equity-budget", "deposit-book", "glance", "drawdown", "buy-check", "wealth-check", "contributions", "passive-income", "intangibles", "stock", "bank-figures", "annual-plans", "quarter-forecast", "operating", "theses", "hindsight", "screener", "stress", "system-health", "lights"]);
+const AREAS = new Set(["profile", "risk", "ledger", "universe", "valuation", "overview", "research", "jobs", "reports", "notifications", "settings", "watchlist", "market", "macro", "trend", "fairvalue", "insights", "concentration", "performance", "events", "journal", "equity-budget", "deposit-book", "property-book", "glance", "drawdown", "buy-check", "wealth-check", "contributions", "passive-income", "intangibles", "stock", "bank-figures", "annual-plans", "quarter-forecast", "operating", "theses", "hindsight", "screener", "stress", "system-health", "lights"]);
 const SEGMENT = /^[A-Za-z0-9_-][A-Za-z0-9_.-]{0,127}$/;
 const MAX_BODY = 1_048_576;
 // Reading a PDF downloads it (up to 60 s) and may OCR scanned pages on this machine (about a minute for 60 pages).

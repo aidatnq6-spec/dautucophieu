@@ -73,3 +73,25 @@ def restore_personal(path: Path, repo, owner, *, confirm: bool) -> RestorePrevie
         raise BackupError("existing records differ from the backup; resolve manually before restoring")
     export = _export(path, repo)
     return RestorePreview(*repo.import_documents(owner, export["documents"], dry_run=False))
+
+
+def personal_drill(path: Path, live, owner) -> dict:
+    """Restore a backup's personal export into an empty store in memory and compare it with the live one; nothing is written to the live store and only
+    counts come back. Records are append-only, so anything the backup holds must still be there unchanged; only a record's head may have moved on.
+    missing, differ and behind are faults, as is broken_heads: a head in the backup with no revision for it."""
+    from investment_agent.repositories.personal import MemoryDocumentStore, PersonalRepository
+
+    restored_repo = PersonalRepository(live.owner_uid, MemoryDocumentStore())
+    restore_personal(path, restored_repo, owner, confirm=True)
+    restored, current = restored_repo.export(owner), live.export(owner)
+    heads = {p: d for p, d in restored.items() if p.startswith("record_heads/")}
+    missing = sum(1 for p in restored if p not in current)
+    differ = sum(1 for p, d in restored.items() if p in current and p not in heads and current[p] != d)
+    behind = sum(1 for p, d in heads.items() if p in current and current[p]["version"] < d["version"])
+    heads_newer = sum(1 for p, d in heads.items() if p in current and current[p]["version"] > d["version"])
+    identical = sum(1 for p, d in restored.items() if current.get(p) == d)
+    suffixes = {p.rsplit("/", 1)[-1] for p in restored if not p.startswith("record_heads/")}
+    broken = sum(1 for p, d in heads.items() if f"{p.rsplit('/', 1)[-1]}-v{d['version']}" not in suffixes)
+    return {"ok": not (missing or differ or behind or broken), "restored": len(restored), "identical": identical, "new_since": sum(1 for p in current if p not in restored),
+            "heads_newer": heads_newer, "missing": missing, "differ": differ, "behind": behind, "broken_heads": broken}
+

@@ -27,7 +27,7 @@ test("layers add up to the total, build the pyramid and give the money for stock
   await seedOwner(page);
   await page.goto("/portfolio");
   await expect(page.getByText("Chưa nhập tổng tài sản tài chính")).toBeVisible();
-  await page.goto("/profile");
+  await page.goto("/profile?tab=tai-san");
   const box = page.getByRole("region", { name: "Tháp tài sản" });
   await enterLayers(box, { deposit: "300000000", gold: "100000000" });
   await expect(box.getByLabel("Tiền gửi (đ)")).toHaveValue("300.000.000");
@@ -49,7 +49,7 @@ test("layers add up to the total, build the pyramid and give the money for stock
 
 test("a lower layer short while a higher one is over says to build from the bottom", async ({ page }) => {
   await seedOwner(page);
-  await page.goto("/profile");
+  await page.goto("/profile?tab=tai-san");
   const box = page.getByRole("region", { name: "Tháp tài sản" });
   await enterLayers(box, { deposit: "0", gold: "0", crypto: "100000000000" });  // crypto far above 5% whatever the shared ledger holds; gold below 10%
   await expect(box.getByTestId("layer-gold")).toContainText("thiếu");
@@ -59,7 +59,7 @@ test("a lower layer short while a higher one is over says to build from the bott
 
 test("money for more stocks comes from layers above their ceiling, after filling the layers below their minimum", async ({ page }) => {
   await seedOwner(page);
-  await page.goto("/profile");
+  await page.goto("/profile?tab=tai-san");
   const box = page.getByRole("region", { name: "Tháp tài sản" });
   await enterLayers(box, { deposit: "100000000000", gold: "0" });  // deposits far above their ceiling; gold below its 10% minimum
   const funding = box.getByRole("region", { name: "Nguồn tiền để mua thêm cổ phiếu" });
@@ -78,7 +78,7 @@ test("money for more stocks comes from layers above their ceiling, after filling
 
 test("the reserve can be entered by hand, and cleared to use the profile again", async ({ page }) => {
   await seedOwner(page);
-  await page.goto("/profile");
+  await page.goto("/profile?tab=tai-san");
   const box = page.getByRole("region", { name: "Tháp tài sản" });
   await enterLayers(box, { deposit: "100000000000", reserve: "500000000" });
   await expect(box.getByLabel("Quỹ dự phòng và khoản chi 12 tháng (đ)")).toHaveValue("500.000.000");
@@ -91,7 +91,7 @@ test("the reserve can be entered by hand, and cleared to use the profile again",
 
 test("no horizontal scroll on the profile page at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 900 });
-  await page.goto("/profile");
+  await page.goto("/profile?tab=tai-san");
   await expect(page.getByRole("region", { name: "Tháp tài sản" })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);

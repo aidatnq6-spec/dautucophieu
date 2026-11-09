@@ -42,9 +42,9 @@ def attention_items(repo, owner, data_dir: Path, *, now: datetime) -> list[dict]
     costs = held_costs(repo, owner)
     alerts, _ = threshold_alerts({s: {"price": last_close(series, s), "cost": c} for s, c in costs.items()}, threshold=str(portfolio_settings(repo, owner)[0].drawdown_threshold), alerted=set())
     items += [{"level": "high", "kind": "drawdown", "symbol": a["symbol"], "text": f"{a['symbol']}: đang {_pct(a['change'])} so với giá vốn, quá ngưỡng sụt giảm", "href": "/portfolio"} for a in alerts]
-    items += [{"level": "high", "kind": "loan_promo", "symbol": None, "text": line, "href": "/profile"}
+    items += [{"level": "high", "kind": "loan_promo", "symbol": None, "text": line, "href": "/profile?tab=tai-san"}
               for line in promo_lines(read_property_book(repo, owner), now.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date())]
-    items += [{"level": "low", "kind": "accumulation", "symbol": None, "text": line, "href": "/profile"}
+    items += [{"level": "low", "kind": "accumulation", "symbol": None, "text": line, "href": "/profile?tab=ke-hoach"}
               for line in due_lines(repo, owner, today=now.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date())]
     since = (now.date() - timedelta(days=NEW_QUARTER_DAYS)).isoformat()
     store = FundamentalsStore(data_dir / "fundamentals")

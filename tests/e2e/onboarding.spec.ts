@@ -69,8 +69,9 @@ test("onboarding confirms the reviewed capital breakdown and the 13-question sur
   await page.goto("/profile");
   await expect(page.getByText("Cân bằng · 39 điểm")).toBeVisible();
   // a current profile needs no attention: the capital section is hidden (it shows only when the profile is due or must be reconfirmed)
-  await expect(page.getByRole("region", { name: "Tháp tài sản" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Vốn có thể đầu tư" })).toHaveCount(0);
+  await page.getByRole("tab", { name: "Tài sản" }).click();
+  await expect(page.getByRole("region", { name: "Tháp tài sản" })).toBeVisible();
 });
 
 test("trades show moving-average cost and realised gain; a correction replays the ledger", async ({ page }) => {

@@ -9,7 +9,7 @@ test("a property and a loan are entered, and the loan's monthly payment is worke
   await seedOwner(page);
   const { version } = await (await call(page, "GET", "property-book")).json();  // the suite shares one store: start from an empty book, also on a retry
   await call(page, "PUT", "property-book", { properties: [], loans: [], ceiling: "70", expected_version: version, request_id: `pb-reset-${Date.now()}` });
-  await page.goto("/profile");
+  await page.goto("/profile?tab=tai-san");
   const box = region(page);
   await expect(box.getByRole("button", { name: "Thêm bất động sản" })).toBeEnabled();
   await box.getByRole("button", { name: "Thêm bất động sản" }).click();
@@ -36,7 +36,7 @@ test("a property and a loan are entered, and the loan's monthly payment is worke
 
 test("the section adds no sideways scroll at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 800 });
-  await page.goto("/profile");
+  await page.goto("/profile?tab=tai-san");
   await expect(region(page).getByRole("button", { name: "Thêm bất động sản" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });
@@ -47,7 +47,7 @@ test("the yield of a let flat and the split of what is lived in and invested", a
   const row = { kind: "apartment", legal: "certificate", valued_on: "2026-10-01" };
   await call(page, "PUT", "property-book", { properties: [{ ...row, id: "y", name: "Căn thuê", purpose: "rent", value: "2000000000", rent_monthly: "10000000" }, { ...row, id: "z", name: "Nhà ở", purpose: "live", value: "3000000000" }],
     loans: [], ceiling: "70", expected_version: version, request_id: `pb-y-${Date.now()}` });
-  await page.goto("/profile");
+  await page.goto("/profile?tab=tai-san");
   await expect(region(page).getByRole("table", { name: "Bất động sản" })).toContainText("6,00%/năm");
   await expect(region(page).getByRole("region", { name: "Cấu trúc tài sản" }).or(page.getByTestId("nw-reason")).first()).toBeVisible();
 });

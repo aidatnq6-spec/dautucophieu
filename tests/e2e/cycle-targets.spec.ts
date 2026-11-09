@@ -6,7 +6,7 @@ const region = (page: import("@playwright/test").Page) => page.getByRole("region
 
 test("a mix must add up to 100%, and a saved one stays after a reload", async ({ page }) => {
   await seedOwner(page);
-  await page.goto("/profile");
+  await page.goto("/profile?tab=ke-hoach");
   const box = region(page);
   const cell = (phase: string, layer: string) => box.getByLabel(`${phase}: ${layer} (%)`);
   await expect(cell("Lãi suất giảm", "Cổ phiếu")).toBeEnabled();
@@ -23,7 +23,7 @@ test("a mix must add up to 100%, and a saved one stays after a reload", async ({
 
 test("the section adds no sideways scroll at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 800 });
-  await page.goto("/profile");
+  await page.goto("/profile?tab=ke-hoach");
   await expect(region(page).getByRole("button", { name: "Lưu mục tiêu" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });

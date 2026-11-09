@@ -9,14 +9,14 @@ test("the lifestyle check waits for six months of figures and says when", async 
   await seedOwner(page);
   const wc = await (await call(page, "GET", "wealth-check")).json();
   await call(page, "PUT", "wealth-check", { income: "30000000", expenses: "20000000", birth_year: 1989, expected_version: wc.version, request_id: `ls-${Date.now()}` });
-  await page.goto("/profile");
+  await page.goto("/profile?tab=dong-tien");
   const box = page.getByRole("region", { name: "Lạm phát lối sống" });
   await expect(box).toContainText("cần ít nhất 6 tháng số liệu");
   await expect(box.getByRole("table", { name: "Thu nhập và chi tiêu theo tháng" })).toContainText("20.000.000");
 });
 
 test("money put into oneself is logged, summed for the year and shown at the base of the pyramid", async ({ page }) => {
-  await page.goto("/profile");
+  await page.goto("/profile?tab=tai-san");
   const box = page.getByRole("region", { name: "Tài sản vô hình" });
   await expect(box.getByLabel("Nội dung")).toBeEnabled();
   const title = `Khóa AI ${Date.now()}`;
@@ -31,7 +31,7 @@ test("money put into oneself is logged, summed for the year and shown at the bas
 });
 
 test("a line of the intangibles log can be edited in place and deleted", async ({ page }) => {
-  await page.goto("/profile");
+  await page.goto("/profile?tab=tai-san");
   const box = page.getByRole("region", { name: "Tài sản vô hình" });
   await expect(box.getByLabel("Nội dung")).toBeEnabled();
   const title = `Sách định giá ${Date.now()}`;
@@ -56,7 +56,7 @@ test("a line of the intangibles log can be edited in place and deleted", async (
 
 test("no horizontal scroll on the profile page at 375px with both blocks", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 900 });
-  await page.goto("/profile");
+  await page.goto("/profile?tab=tai-san");
   await expect(page.getByRole("region", { name: "Tài sản vô hình" })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);

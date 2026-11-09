@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 const MIN_SECTIONS = 3;
 
 function headings(main: HTMLElement): HTMLHeadingElement[] {
-  return Array.from(main.querySelectorAll<HTMLHeadingElement>("h2")).filter((h) => !h.closest(".page-jumps") && h.textContent?.trim());
+  return Array.from(main.querySelectorAll<HTMLHeadingElement>("h2")).filter((h) => !h.closest(".page-jumps") && h.textContent?.trim() && h.offsetParent !== null);  // not the parts of a page that are hidden
 }
 
 /**
@@ -30,7 +30,7 @@ export function PageJumps() {
       window.clearTimeout(timer);
       timer = window.setTimeout(scan, 150);
     });
-    observer.observe(main, { childList: true, subtree: true, characterData: true });
+    observer.observe(main, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["hidden"] });
     return () => { observer.disconnect(); window.clearTimeout(timer); };
   }, [path]);
   if (titles.length < MIN_SECTIONS) return null;

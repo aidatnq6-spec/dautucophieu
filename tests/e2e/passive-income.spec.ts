@@ -7,7 +7,7 @@ test.beforeEach(async ({ context }) => signIn(context));
 
 test("a monthly income goal shows the capital needed and the estimate, in today's money", async ({ page }) => {
   await seedOwner(page);
-  await page.goto("/profile");
+  await page.goto("/profile?tab=dong-tien");
   const box = page.getByRole("region", { name: "Mục tiêu dòng tiền thụ động" });
   await expect(box.getByLabel("Dòng tiền mong muốn mỗi tháng (đ)")).toBeEnabled();
   await box.getByLabel("Dòng tiền mong muốn mỗi tháng (đ)").fill("");
@@ -21,7 +21,7 @@ test("a monthly income goal shows the capital needed and the estimate, in today'
 
 test("no horizontal scroll on the profile page at 375px with the goal", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 900 });
-  await page.goto("/profile");
+  await page.goto("/profile?tab=dong-tien");
   await expect(page.getByRole("region", { name: "Mục tiêu dòng tiền thụ động" })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
@@ -34,7 +34,7 @@ test("income today is counted layer by layer: deposits, bonds at their coupon, l
   const current = await (await call(page, "GET", "equity-budget")).json();
   await call(page, "PUT", "equity-budget", { layers: { deposit: "600000000", bond: "120000000", gold: "50000000", crypto: "0" }, reserve: "0",
     expected_version: current.version, request_id: `pi-eb-${Date.now()}` });
-  await page.goto("/profile");
+  await page.goto("/profile?tab=dong-tien");
   const box = page.getByRole("region", { name: "Mục tiêu dòng tiền thụ động" });
   await expect(box.getByLabel("Lãi suất trái phiếu (%/năm)")).toBeEnabled();
   await box.getByLabel("Lãi suất trái phiếu (%/năm)").fill("7");
@@ -65,7 +65,7 @@ test("income today is counted layer by layer: deposits, bonds at their coupon, l
 });
 
 test("a stock yield entered by hand replaces last year's dividends", async ({ page }) => {
-  await page.goto("/profile");
+  await page.goto("/profile?tab=dong-tien");
   const box = page.getByRole("region", { name: "Mục tiêu dòng tiền thụ động" });
   await expect(box.getByLabel("Lợi suất cổ phiếu (%/năm)")).toBeEnabled();
   await box.getByLabel("Lợi suất cổ phiếu (%/năm)").fill("12");
@@ -79,7 +79,7 @@ test("a stock yield entered by hand replaces last year's dividends", async ({ pa
 });
 
 test("the two higher levels of spending are kept with the goal", async ({ page }) => {
-  await page.goto("/profile");
+  await page.goto("/profile?tab=dong-tien");
   const box = page.getByRole("region", { name: "Mục tiêu dòng tiền thụ động" });
   await expect(box.getByLabel("Mức tự do: chi tiêu mỗi tháng (đ)")).toBeEnabled();
   await box.getByLabel("Dòng tiền mong muốn mỗi tháng (đ)").fill("10000000");
@@ -94,7 +94,7 @@ test("the two higher levels of spending are kept with the goal", async ({ page }
 
 test("the growth chart keeps its text at reading size, tells when the goal is reached, and shows a year under the pointer", async ({ page }) => {
   await seedOwner(page);
-  await page.goto("/profile");
+  await page.goto("/profile?tab=dong-tien");
   const box = page.getByRole("region", { name: "Mục tiêu dòng tiền thụ động" });
   await expect(box.getByLabel("Dòng tiền mong muốn mỗi tháng (đ)")).toBeEnabled();
   await box.getByLabel("Dòng tiền mong muốn mỗi tháng (đ)").fill("10000000");
@@ -120,7 +120,7 @@ test("the growth chart keeps its text at reading size, tells when the goal is re
 
 test("the three levels follow a new spending figure without a reload", async ({ page }) => {
   await seedOwner(page);
-  await page.goto("/profile");
+  await page.goto("/profile?tab=dong-tien");
   const levels = page.getByRole("region", { name: "Ba mức tự do tài chính" });
   await expect(levels).toBeVisible();
   const health = page.getByRole("region", { name: "Sức khỏe tài chính" });
@@ -138,17 +138,21 @@ test("saving the asset book keeps what is being typed in the sections that recom
     if (route.request().method() !== "PUT") return route.continue();
     await route.fulfill({ json: await (await call(page, "GET", "deposit-book")).json() });
   });
-  await page.goto("/profile");
+  await page.goto("/profile?tab=tai-san");
+  const tabs = page.getByRole("tablist", { name: "Các phần của hồ sơ" });
   const tower = page.getByRole("region", { name: "Tháp tài sản" });
   const goal = page.getByRole("region", { name: "Mục tiêu dòng tiền thụ động" });
   await expect(tower.getByLabel("Vàng (đ)")).toBeEnabled();
-  await expect(goal.getByLabel("Mức độc lập: chi tiêu mỗi tháng (đ)")).toBeEnabled();
   await tower.getByLabel("Vàng (đ)").fill("123456");
+  await tabs.getByRole("tab", { name: "Dòng tiền & mục tiêu" }).click();
+  await expect(goal.getByLabel("Mức độc lập: chi tiêu mỗi tháng (đ)")).toBeEnabled();
   await goal.getByLabel("Mức độc lập: chi tiêu mỗi tháng (đ)").fill("654321");
+  await tabs.getByRole("tab", { name: "Tài sản" }).click();
   const saved = page.waitForResponse((r) => r.url().endsWith("/deposit-book") && r.request().method() === "PUT");
   await page.getByLabel("Cộng thêm tiền mặt trong tài khoản chứng khoán tính từ sổ giao dịch").click();
   await saved;
   await page.waitForTimeout(800);
   await expect(tower.getByLabel("Vàng (đ)")).toHaveValue("123.456");
+  await tabs.getByRole("tab", { name: "Dòng tiền & mục tiêu" }).click();
   await expect(goal.getByLabel("Mức độc lập: chi tiêu mỗi tháng (đ)")).toHaveValue("654.321");
 });

@@ -10,7 +10,7 @@ test("new money is placed from the bottom of the tower, every đồng of it", as
   if (now.budget.status === "no_total") {
     await call(page, "PUT", "equity-budget", { layers: { deposit: "300000000", bond: "0", gold: "100000000", crypto: "0" }, reserve: "100000000", expected_version: now.version, request_id: `nm-${Date.now()}` });
   }
-  await page.goto("/profile");
+  await page.goto("/profile?tab=ke-hoach");
   const box = page.getByRole("region", { name: "Tiền mới tháng này đi đâu" });
   await box.getByLabel("Số tiền mới (đ)").fill("100000000");
   await expect(box.getByLabel("Số tiền mới (đ)")).toHaveValue("100.000.000");

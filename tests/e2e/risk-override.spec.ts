@@ -7,7 +7,7 @@ test.beforeEach(async ({ context }) => signIn(context));
 
 test("a risk group chosen by hand shows its score range and equity share, and can be undone", async ({ page }) => {
   await seedOwner(page);
-  await page.goto("/profile");
+  await page.goto("/profile?tab=rui-ro");
   const risk = page.getByRole("region", { name: "Khảo sát rủi ro" });
   await expect(risk.getByTestId("risk-effective")).toHaveText("Cân bằng · 39 điểm · cổ phiếu 35%");
   await risk.getByLabel("Chọn nhóm thủ công").selectOption("strong_growth");

@@ -1,6 +1,7 @@
 """Vốn dành cho cổ phiếu on the Hồ sơ & rủi ro page: one total entered by the owner, computed against their risk group."""
 
 from decimal import Decimal, InvalidOperation
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Request
 from pydantic import Field
@@ -8,10 +9,10 @@ from pydantic import Field
 from investment_agent.domain.models import ContractModel
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.deposit_book import book_quotes
-from investment_agent.services.equity_budget import RECORD, budget_view
+from investment_agent.services.equity_budget import RECORD, budget_view, new_money_view
 
 from ..auth import require_owner
-from .common import WRITE_ERRORS, error, unavailable, write_error
+from .common import WRITE_ERRORS, error, now, unavailable, write_error
 
 router = APIRouter(prefix="/internal")
 
@@ -29,6 +30,22 @@ class BudgetRequest(ContractModel):
     reserve: str | None = Field(default=None, max_length=24)  # None = use the profile's emergency reserve and 12-month needs
     expected_version: int = Field(strict=True, ge=0)
     request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
+
+
+class NewMoneyRequest(ContractModel):
+    amount: str = Field(pattern=r"^[1-9][0-9]{0,15}$")
+
+
+@router.post("/equity-budget/new-money")
+def post_new_money(request: Request, body: NewMoneyRequest):
+    """Where new money would go; reads only, nothing is saved."""
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None:
+        return unavailable()
+    try:
+        return new_money_view(repo, owner, amount=Decimal(body.amount), quotes=book_quotes(request.app.state.data_dir), today=now(request).astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date())
+    except RepositoryUnavailable:
+        return unavailable()
 
 
 @router.get("/equity-budget")

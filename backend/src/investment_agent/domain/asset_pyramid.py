@@ -79,3 +79,30 @@ def _funding(layers: list[dict], *, cash: Decimal, stock_room: Decimal) -> dict:
     return {"sources": [{"id": i, "surplus": format(surplus[i], "f")} for i in SOURCES], "pool": format(pool, "f"), "fills": fills,
             "left_for_stocks": format(left, "f"), "stock_room": format(room, "f"), "buyable": format(buyable, "f"),
             "from_cash": format(from_cash, "f"), "to_raise": format(buyable - from_cash, "f")}
+
+
+def new_money(amounts: dict[str, Decimal], *, deductions: Decimal, stock_ratio: Decimal, amount: Decimal, reserve_short: Decimal = Decimal(0)) -> dict:
+    """New money from the bottom up (the owner's rule, 09/11/2026), against targets on the base with this money in it: first what the reserve lacks in cash
+    that can be withdrawn now; then each layer below its minimum, lowest first; then stocks up to their ceiling; deposits take the rest, as in the targets.
+    Every đồng is placed. A calculation on the owner's figures: it names no ticker."""
+    held = {k: amounts.get(k, Decimal(0)) for k in ORDER}
+    base = max(sum(held.values(), Decimal(0)) + amount - deductions, Decimal(0))
+    ranges = targets(stock_ratio)
+    steps, left = [], amount
+
+    def place(layer: str, need: Decimal, why: str, into: str | None = None) -> None:
+        nonlocal left
+        take = min(need.quantize(Decimal(1), ROUND_HALF_UP), left)
+        if take > 0:
+            steps.append({"id": layer, "amount": format(take, "f"), "why": why})
+            held[into or layer] += take
+            left -= take
+
+    place("reserve", reserve_short, "reserve", into="cash")  # money that can be withdrawn now, so it sits in cash, not in the fixed layer
+    for layer in ("deposit", "bond", "gold", "stocks", "crypto"):
+        have = held[layer] + (held["cash"] if layer == "deposit" else 0)  # deposits are judged together with cash
+        place(layer, ranges[layer][0] * base - have, "short")
+    place("stocks", ranges["stocks"][1] * base - held["stocks"], "room")
+    place("deposit", left, "rest")
+    after = asset_pyramid(held, deductions=deductions, stock_ratio=stock_ratio)["layers"]
+    return {"amount": format(amount, "f"), "allocated": format(amount - left, "f"), "steps": steps, "after": after}

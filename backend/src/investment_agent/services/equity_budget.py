@@ -4,13 +4,13 @@ needs due within 12 months from the confirmed profile, times the equity ratio of
 from decimal import Decimal
 
 from investment_agent.domain.allocation import load_allocation_policy
-from investment_agent.domain.asset_pyramid import asset_pyramid
-from investment_agent.domain.deposit_book import totals
+from investment_agent.domain.asset_pyramid import asset_pyramid, new_money
+from investment_agent.domain.deposit_book import liquidity, totals
 from investment_agent.domain.equity_budget import equity_budget
 from investment_agent.domain.ledger import replay
 from investment_agent.domain.profile import ConfirmedProfile
 from investment_agent.repositories.personal import prefetch
-from investment_agent.services.deposit_book import RECORD as BOOK_RECORD, read_book
+from investment_agent.services.deposit_book import RECORD as BOOK_RECORD, ledger_cash, read_book
 from investment_agent.services.records import LedgerBook, StoredRisk, effective_risk, read_current, read_version
 
 RECORD = ("settings", "equity_budget")
@@ -67,3 +67,17 @@ def budget_view(repo, owner, *, quotes: dict) -> tuple[dict, int]:
                   "reserve": manual, "layers": layers, "pyramid": pyramid, "deposit_source": sources["deposit"],
                   "layer_sources": sources, "cash_source": cash_source, "pyramid_source": "book" if book is not None else "manual"}
     return budget, stored.version if stored else 0
+
+
+def new_money_view(repo, owner, *, amount: Decimal, quotes: dict, today) -> dict:
+    """Tiền mới tháng này đi đâu, on the layers Tháp tài sản shows now. {"status": why} when there are no layers to place it on. Nothing is saved."""
+    budget, _ = budget_view(repo, owner, quotes=quotes)
+    pyramid = budget.get("pyramid")
+    if pyramid is None:
+        return {"status": "no_layers" if budget["status"] == "ok" else budget["status"]}
+    deductions = Decimal(budget["deductions"])
+    book, _ = read_book(repo, owner)
+    short = liquidity(book, ledger_cash=ledger_cash(repo, owner), reserve=deductions, today=today)["short"] if book is not None else None
+    plan = new_money({l["id"]: Decimal(l["amount"]) for l in pyramid["layers"]}, deductions=deductions, stock_ratio=Decimal(budget["ratio"]), amount=amount, reserve_short=Decimal(short or 0))
+    return {"status": "ok", "reserve_checked": book is not None, **plan}
+

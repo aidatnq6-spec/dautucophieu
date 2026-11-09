@@ -12,6 +12,7 @@ import { StressView } from "./stress-view";
 import { PerformanceView } from "./performance-view";
 import { ThesisView } from "./thesis-view";
 import { TcbsImport } from "./tcbs-import";
+import { TradeBehaviour } from "./trade-behaviour";
 import { download, filterLedger, spreadsheet, type LedgerFilter } from "./journal-tools";
 import { CorporateView } from "./corporate-view";
 
@@ -118,6 +119,7 @@ export function PortfolioView() {
         {(adding || editing) && <div className="surface"><TransactionForm key={editing?.event_id ?? "new"} ledgerVersion={ledger.version} events={ledger.events}
           editing={editing} onSaved={saved} onCancel={() => { setAdding(false); setEditing(null); }} /></div>}
         <TcbsImport onDone={() => void load()} />
+        <TradeBehaviour />
         <div className="formgrid" aria-label="Tra cứu giao dịch">
           <label className="field">Tìm mã<input value={filter.symbol} maxLength={12} onChange={setField("symbol")} /></label>
           <label className="field">Loại<select value={filter.type} onChange={setField("type")}><option value="">Tất cả</option>

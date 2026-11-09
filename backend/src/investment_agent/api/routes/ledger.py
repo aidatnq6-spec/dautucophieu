@@ -9,6 +9,7 @@ from investment_agent.domain.ledger_import import plan_import
 from investment_agent.domain.models import ContractModel
 from investment_agent.domain.reconciliation import Amendment, Change
 from investment_agent.domain.tcbs_statement import StatementFileError, parse_tcbs_xlsx
+from investment_agent.domain.trade_behaviour import merge_files, trade_behaviour
 from investment_agent.services.records import LedgerBook
 from investment_agent.repositories.personal import InvalidRecord, RepositoryUnavailable, VersionConflict
 
@@ -37,6 +38,15 @@ class AmendRequest(_Mutation):
 class TcbsImportRequest(_Mutation):
     content_base64: str = Field(min_length=1, max_length=1_000_000)
     commit: bool = False
+
+
+class BehaviourFile(ContractModel):
+    name: str = Field(min_length=1, max_length=120)
+    content_base64: str = Field(min_length=1, max_length=1_000_000)
+
+
+class BehaviourRequest(ContractModel):
+    files: tuple[BehaviourFile, ...] = Field(min_length=1, max_length=12)
 
 
 def _view(version, book, *, stale=False):
@@ -107,6 +117,22 @@ def append(request: Request, body: AppendRequest):
         book.events.append(body.event)
         return body.event.effective_at
     return _mutate(request, body, change)
+
+
+@router.post("/trade-behaviour")
+def post_trade_behaviour(request: Request, body: BehaviourRequest):
+    """Soi hành vi giao dịch: figures by year from TCInvest order histories. The files are read for this answer and not kept; the ledger is not touched."""
+    require_owner(request)
+    parsed, problems = [], []
+    for f in body.files:
+        try:
+            orders, bad = parse_tcbs_xlsx(base64.b64decode(f.content_base64, validate=True), today=now(request).date())
+        except (StatementFileError, binascii.Error, ValueError) as exc:
+            return error(422, "invalid_file", f"{f.name}: {exc if isinstance(exc, StatementFileError) else 'Không đọc được file.'}")
+        parsed.append(orders)
+        problems += [{"file": f.name, **p} for p in bad]
+    merged, duplicates = merge_files(parsed)
+    return {**trade_behaviour(merged), "duplicates": duplicates, "problems": problems}
 
 
 @router.post("/import-tcbs")

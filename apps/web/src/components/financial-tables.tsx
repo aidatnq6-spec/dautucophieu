@@ -10,7 +10,7 @@ type Part = { periods: string[]; rows: Row[] };
 type Check = { period: string; check: string; label: string; a: string | null; b: string | null };
 type Conflict = { period: string; line: string; values: string[] };
 type Summary = { period: string; close_date: string | null; market_cap: string | null; npat_ttm: string | null; ebitda_ttm: string | null;
-  ev: string | null; pe: string | null; pb: string | null; ev_ebitda: string | null; roe: string | null; quarters: string[] };
+  ev: string | null; pe: string | null; pb: string | null; ev_ebitda: string | null; roe: string | null; roic?: string | null; quarters: string[] };
 type Tables = { symbol: string; kind?: "bank" | "securities" | "insurance" | null; reason: string | null; source?: string; fetched_at?: string; quarters: Part; years: Part; summary: Summary | null;
   checks: Check[]; conflicts: Conflict[] };
 
@@ -136,6 +136,8 @@ export function FinancialTables({ symbol }: { symbol: string }) {
         <div><span className="caption">LNST công ty mẹ 4 quý ({s.quarters.map(periodLabel).join(", ")})</span><strong>{ty(s.npat_ttm)}</strong></div>
         <div><span className="caption">EBITDA 4 quý</span><strong>{ty(s.ebitda_ttm)}</strong></div>
         <div><span className="caption">ROE 4 quý</span><strong>{cell(s.roe, "pct", null)}</strong></div>
+        <div title="LN HĐKD lõi 4 quý × (1 − thuế thực tế) ÷ vốn đầu tư bình quân (vốn chủ gồm cổ đông thiểu số + vay − tiền và đầu tư ngắn hạn), đầu và cuối 4 quý">
+          <span className="caption">ROIC vận hành 4 quý</span><strong>{cell(s.roic ?? null, "pct", null)}</strong></div>
         <div><span className="caption">P/E · P/B · EV/EBITDA {s.close_date ? `(giá ${s.close_date.split("-").reverse().join("/")})` : ""}</span>
           <strong>{cell(s.pe, "x", null)} · {cell(s.pb, "x", null)} · {cell(s.ev_ebitda, "x", null)}</strong></div>
       </div>}

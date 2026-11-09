@@ -66,6 +66,7 @@ def main() -> int:
     hc.add_argument("--data-dir", type=Path, required=True)
     bd = commands.add_parser("backup-drill", help="restore the newest backup into a temporary folder, once a week")
     bd.add_argument("--data-dir", type=Path, required=True)
+    bd.add_argument("--force", action="store_true", help="run now even if the last drill is under a week old")
     qa = commands.add_parser("quarter-alerts", help="Telegram note when a watched ticker's new quarter first appears in the statements")
     qa.add_argument("--data-dir", type=Path, required=True)
     frs = commands.add_parser("financial-ratios-sync", help="quarterly bank, securities and insurance ratios (VNDirect) into data/financial-ratios")
@@ -150,7 +151,7 @@ def main() -> int:
     if args.command == "health-check":
         return health_check_cli(args.data_dir)
     if args.command == "backup-drill":
-        return backup_drill_cli(args.data_dir)
+        return backup_drill_cli(args.data_dir, force=args.force)
     if args.command == "quarter-alerts":
         return quarter_alerts_cli(args.data_dir)
     if args.command == "weekly-brief":
@@ -830,12 +831,20 @@ def health_check_cli(data_dir: Path, telegram=None) -> int:
     return 0
 
 
-def backup_drill_cli(data_dir: Path) -> int:
+def backup_drill_cli(data_dir: Path, *, force: bool = False) -> int:
     from datetime import datetime, timezone
+    import os
 
+    from investment_agent.api.auth import OwnerContext
+    from investment_agent.repositories.firestore import personal_repository_from_env
+    from investment_agent.repositories.personal import RepositoryUnavailable
     from investment_agent.services.system_health import backup_drill
-    out = backup_drill(Path(data_dir).parent / "backups", data_dir, now=datetime.now(timezone.utc))
-    print(json.dumps({k: out[k] for k in ("status", "ok", "files", "error") if k in out}))
+    try:
+        repo, owner = personal_repository_from_env(), OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
+    except (RepositoryUnavailable, KeyError):
+        repo, owner = None, None
+    out = backup_drill(Path(data_dir).parent / "backups", data_dir, now=datetime.now(timezone.utc), repo=repo, owner=owner, force=force)
+    print(json.dumps({k: out[k] for k in ("status", "ok", "files", "error", "personal") if k in out}))  # counts only
     return 0 if out.get("ok", True) else 1
 
 

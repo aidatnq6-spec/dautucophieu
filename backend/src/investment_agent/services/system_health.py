@@ -10,7 +10,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from investment_agent.market.series import SeriesStore
-from investment_agent.operations.restore import BackupCorrupt, restore_local
+from investment_agent.operations.backup import BackupError
+from investment_agent.operations.restore import BackupCorrupt, personal_drill, restore_local
+from investment_agent.repositories.personal import RepositoryUnavailable
 
 LOG_LINES = 4000
 FAILS_BEFORE_ALERT = 2
@@ -135,10 +137,11 @@ def render_changes(new: list[dict], recovered: list[str]) -> str:
     return "\n".join(lines)
 
 
-def backup_drill(backup_root: Path, data_dir: Path, *, now: datetime) -> dict:
-    """Restore the newest backup into a temporary folder, then remove it, once a week. Only counts and the error type are kept."""
+def backup_drill(backup_root: Path, data_dir: Path, *, now: datetime, repo=None, owner=None, force: bool = False) -> dict:
+    """Restore the newest backup into a temporary folder, then remove it, once a week; with a repository, also its personal records into memory, compared
+    with the live store (operations.restore.personal_drill). Only counts and the error type are kept. Firestore out of reach says nothing about the backup."""
     last = _read_drill(Path(data_dir))
-    if last and now - _when(last["at"]) < timedelta(days=DRILL_EVERY_DAYS):
+    if not force and last and now - _when(last["at"]) < timedelta(days=DRILL_EVERY_DAYS):
         return {"status": "not_due"}
     backups = sorted(p for p in Path(backup_root).iterdir() if (p / "manifest.json").is_file()) if Path(backup_root).is_dir() else []
     if not backups:
@@ -149,7 +152,13 @@ def backup_drill(backup_root: Path, data_dir: Path, *, now: datetime) -> dict:
         with tempfile.TemporaryDirectory(prefix="investment-drill-") as tmp:
             out["files"] = len(restore_local(newest, Path(tmp) / "restored"))
         json.loads((newest / "personal-export.json").read_text(encoding="utf-8"))
-    except (BackupCorrupt, OSError, ValueError, KeyError) as exc:
+        if repo is not None:
+            out["personal"] = personal_drill(newest, repo, owner)
+            if not out["personal"]["ok"]:
+                out.update(ok=False, error="PersonalMismatch")
+    except RepositoryUnavailable:
+        out["personal"] = "unavailable"
+    except (BackupError, OSError, ValueError, KeyError) as exc:
         out.update(ok=False, error=type(exc).__name__)
     _write(Path(data_dir).joinpath(*DRILL_FILE), out)
     return out

@@ -33,7 +33,9 @@ Giữ lại 7 bản `daily` và 4 bản `weekly` mới nhất; bản `manual` kh
 
 Từ 09/11/2026, lệnh `backup-drill` chạy trong lịch sau phiên và tự bỏ qua nếu lần trước chưa đủ 7 ngày. Lệnh khôi phục bản sao lưu mới nhất vào thư mục tạm (so checksum), đọc thử `personal-export.json`, rồi xóa thư mục tạm. Kết quả ở `data\alerts\restore-drill.json`, chỉ gồm thời điểm, tên bản sao lưu, số tệp và loại lỗi.
 
-Phạm vi: diễn tập này kiểm tra dữ liệu cục bộ và việc đọc được bản xuất. Nó **không** ghi vào Firestore, nên chưa phải phép thử khôi phục Firestore thật. Khi diễn tập hỏng hoặc quá 14 ngày chưa chạy, `health-check` sẽ báo (xem `windows.md`).
+Lệnh còn khôi phục dữ liệu cá nhân của bản sao lưu vào một kho tạm trong bộ nhớ rồi so với Firestore đang dùng, chỉ giữ lại số đếm. Mọi bản ghi trong bản sao lưu phải còn nguyên; chỉ phiên bản hiện hành của một bản ghi được phép mới hơn. Thiếu, khác nội dung, lùi phiên bản hoặc con trỏ không có bản ghi thì diễn tập thất bại (`PersonalMismatch`). Không kết nối được Firestore thì ghi `unavailable`, không kết luận bản sao lưu hỏng. Chạy ngay ngoài lịch: `python -m investment_agent.cli backup-drill --data-dir data --force`.
+
+Phạm vi: diễn tập **không** ghi vào Firestore, nên chưa thử bước ghi ngược lên Firestore thật; muốn thử cần một dự án Firebase riêng. Khi diễn tập hỏng hoặc quá 14 ngày chưa chạy, `health-check` sẽ báo (xem `windows.md`).
 
 ## Nhật ký tác vụ
 

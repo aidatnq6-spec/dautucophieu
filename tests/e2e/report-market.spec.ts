@@ -52,7 +52,7 @@ for (const width of [1280, 375]) {
     for (const cell of await table.locator("td.gain").all()) await expect(cell).not.toHaveText(/Lãi|Lỗ/);
     // Polled: under a parallel run other blocks of the page may still be laying out when the table first shows (seen 07/11/2026).
     await expect.poll(() => page.evaluate(() => [...document.querySelectorAll("main *")]
-      .filter((el) => el.scrollWidth > el.clientWidth + 1 && ["auto", "scroll"].includes(getComputedStyle(el).overflowX)).length),
+      .filter((el) => !el.closest(".page-jumps") && el.scrollWidth > el.clientWidth + 1 && ["auto", "scroll"].includes(getComputedStyle(el).overflowX)).length),  // the jump strip scrolls by design
     { timeout: 10_000 }).toBe(0);
   });
 }

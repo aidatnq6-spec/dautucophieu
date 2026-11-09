@@ -111,6 +111,20 @@ test("no horizontal scroll on the valuation page at 375px", async ({ page }) => 
   expect(scrollers).toBe(0);
 });
 
+for (const width of [720, 1024, 1051, 1280, 1440]) {
+  test(`the valuation tables stay inside their frame at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await openPage(page);
+    await expect(page.getByRole("table", { name: "Định giá tham khảo" })).toBeVisible();
+    const beyond = await page.evaluate(() => Math.max(...[...document.querySelectorAll("main .fv-table")].flatMap((table) => {
+      const frame = table.closest(".surface") as HTMLElement;
+      const edge = frame.getBoundingClientRect().right - parseFloat(getComputedStyle(frame).paddingRight);
+      return [...table.querySelectorAll("td, th, button")].map((el) => el.getBoundingClientRect().right - edge);
+    })));
+    expect(beyond).toBeLessThanOrEqual(1);
+  });
+}
+
 test("VNINDEX and VN30 are valued from their P/E and P/B against a five-year median", async ({ page }) => {
   await openPage(page);
   const table = page.getByRole("table", { name: "Định giá chỉ số" });

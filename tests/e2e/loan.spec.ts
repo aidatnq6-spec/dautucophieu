@@ -44,6 +44,26 @@ test("Tính khoản vay gives the first payment, totals, schedule, grace and ear
   await expect(result.getByRole("alert")).toContainText("không dài hơn thời hạn vay");
 });
 
+test("the printout uses the whole page width, states the loan and leaves out the controls", async ({ page }, info) => {
+  await page.setViewportSize({ width: 794, height: 1123 });  // A4 at 96 dpi
+  await page.goto("/loan");
+  await expect(page.getByRole("complementary", { name: "Kết quả khoản vay" }).getByTestId("ln-first")).toHaveText("19.166.667 đ");
+  await page.getByRole("button", { name: "Thanh toán từng tháng" }).click();
+  await page.emulateMedia({ media: "print" });
+  const main = await page.locator("main.content").boundingBox();
+  expect(main!.width).toBeGreaterThan(700);
+  const facts = page.locator(".ln-print");
+  await expect(facts).toBeVisible();
+  await expect(facts).toContainText("Giá trị khoản vay");
+  await expect(facts).toContainText("7,5%/năm trong 1 năm");
+  await expect(facts).toContainText("Dư nợ giảm dần");
+  for (const hidden of [".side", ".page-jumps", ".ln-controls", ".to-top"]) await expect(page.locator(hidden)).toBeHidden();
+  await expect(page.getByRole("table", { name: "Lịch thanh toán" })).toBeVisible();
+  await page.screenshot({ path: info.outputPath("in-khoan-vay.png"), fullPage: false });
+  const pdf = await page.pdf({ format: "A4", path: info.outputPath("in-khoan-vay.pdf") });
+  expect(pdf.length).toBeGreaterThan(0);
+});
+
 test("no horizontal page scroll on Tính khoản vay at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 800 });
   await page.goto("/loan");

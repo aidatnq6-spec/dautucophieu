@@ -79,8 +79,17 @@ export function LoanTool() {
       ok.loan.rows.map((r) => [r.period, Math.round(r.opening), Math.round(r.principal), Math.round(r.interest), Math.round(r.fee), Math.round(r.payment), Math.round(r.closing), r.rate])), "lich-tra-no.xls");
   }
   const parts = ok ? [{ label: "Cần trả trước", value: ok.upfront, color: INK }, { label: "Gốc cần trả", value: ok.principal, color: BLUE }, { label: "Lãi cần trả", value: ok.loan.interest + ok.loan.fee, color: AMBER }] : [];
+  const facts: [string, string][] = ok ? [
+    ...(f.mode === "property" ? [["Giá trị bất động sản", vnd(ok.principal + ok.upfront)] as [string, string], ["Tỉ lệ vay", `${String(ok.ratio).replace(".", ",")}%`] as [string, string]] : []),
+    ["Giá trị khoản vay", vnd(ok.principal)], ["Thời hạn vay", spanText(ok.months)],
+    ["Lãi suất ưu đãi", `${f.promoRate}%/năm trong ${f.promo} ${f.promoUnit === "year" ? "năm" : "tháng"}`], ["Lãi suất sau ưu đãi", `${f.afterRate}%/năm`],
+    ["Phương thức", f.method === "declining" ? "Dư nợ giảm dần" : "Trả đều hàng tháng"],
+    ...(Number(f.grace) > 0 ? [["Ân hạn nợ gốc", `${f.grace} tháng`] as [string, string]] : []),
+    ...(f.prepayOn ? [["Trả hết trước hạn", `cuối tháng thứ ${f.prepayMonth}, phí ${f.prepayFee}%`] as [string, string]] : []),
+  ] : [];
   return (
     <div className="ln">
+      <dl className="ln-print" aria-label="Thông tin khoản vay khi in">{facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
       <div className="ln-grid">
         <section className="surface ln-controls" aria-label="Thông tin khoản vay">
           <h2>Khoản vay</h2>

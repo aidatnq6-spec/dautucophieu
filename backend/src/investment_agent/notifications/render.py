@@ -122,7 +122,7 @@ def render_market_brief(report: dict, market: dict) -> str:
     lines.append(_missing("Tự doanh", market.get("proprietary")))
     if board.get("status") == "ok" and board["sectors"]:
         lines += ["", "NGÀNH"] + [f"- {s['sector']} {_pct(s['pct'])} ({s['count']} mã)" for s in board["sectors"]]
-    held = [t for t in market.get("tickers", []) if t["held"]][:3]
+    held = [t for t in market.get("tickers", []) if t["held"]]
     if held:
         lines += ["", "MÃ ĐANG NẮM"] + [f"- {t['symbol']} {_num(t['price'], 0)} ({_pct(t['pct'])})" if t["pct"] is not None
                                         else f"- {t['symbol']}: chưa giao dịch phiên này" if t.get("state") == "no_trade"

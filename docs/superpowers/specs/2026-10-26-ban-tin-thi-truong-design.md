@@ -58,7 +58,7 @@ Chủ sở hữu đọc bản tin sau phiên để biết nhanh phiên vừa r�
 
 ### D. Telegram (bản rút gọn)
 - Gồm các mục A1 đến A6.
-- Tối đa 3 mã đang nắm (giá, ± %).
+- Mọi mã đang nắm (giá, ± %); chủ sở ữu bỏ giới hạn 3 mã ngày 09/11/2026.
 - Tối đa 5 tin nóng.
 - Dòng cuối: "Xem bản đầy đủ trong ứng dụng, mục Bản tin sau phiên" (không gửi link, xem quyết định 11).
 - Vẫn theo cài đặt "Gửi tự động theo lịch" hiện có.

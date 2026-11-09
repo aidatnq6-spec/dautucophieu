@@ -12,4 +12,6 @@ Chủ sở hữu duyệt ngày 09/11/2026. Ở Hồ sơ & rủi ro. Dữ liệu 
 - Mỗi tháng từ tháng bắt đầu là đã mua, thiếu, chưa mua, hoặc đang chờ (tháng hiện tại trước ngày mua); có chuỗi tháng liên tục.
 - Giá vốn bình quân = tổng tiền ÷ tổng số lượng các lần đã ghi. Giá trị hiện tại theo giá mua vào công khai hoặc NAV mới nhất; không có giá thì không tính và nói rõ vì sao.
 - Nhắc: Telegram tối đa một lần mỗi kế hoạch mỗi tháng, từ ngày mua trong tháng khi tháng đó chưa đủ, theo lượt chạy lịch; đồng thời hiện ở Việc cần xem. Không nói nên mua hay không.
-- Lần mua không tự cộng vào Sổ tài sản: chủ sở hữu vẫn cập nhật số chỉ, số đơn vị ở đó nếu muốn Tháp tài sản thay đổi.
+- Lần mua không tự cộng vào Sổ tài sản. **Cộng vào Sổ tài sản** (chủ sở hữu duyệt 09/11/2026): nút ở từng lần mua, hỏi xác nhận rồi cộng tiền vào vốn đã mua và số chỉ, số đơn vị vào số lượng của dòng được chọn, hoặc tạo dòng mới mang tên kế hoạch; Tháp tài sản tính lại theo Sổ.
+  - Chỉ chọn được dòng cùng loại giá vàng hoặc cùng mã quỹ. Sổ và dấu "đã cộng" ghi trong một giao dịch nên mỗi lần mua chỉ cộng được một lần.
+  - Sổ chưa có dữ liệu thì không cộng, vì tạo Sổ lần đầu sẽ làm các lớp khác của Tháp về 0. Số lượng quá 2 chữ số thập phân thì từ chối, không làm tròn. Xóa lần mua đã cộng không tự trừ ở Sổ, có báo khi xóa.

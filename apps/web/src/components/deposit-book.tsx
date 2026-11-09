@@ -271,13 +271,13 @@ const monthLabel = (m: string) => `${m.slice(5)}/${m.slice(0, 4)}`;
 /** Sổ tài sản: cash accounts, term deposits, bonds, gold and crypto; the months deposits come back, and cash now against the reserve.
  * A sổ not yet due is never cash now; one past its date is overdue, not guessed as rolled over or closed. Each Lưu or Xóa saves the
  * whole book at once, so Tháp tài sản recomputes. */
-export function DepositBook({ onSaved }: { onSaved?: () => void }) {
+export function DepositBook({ onSaved, refresh }: { onSaved?: () => void; refresh?: number }) {
   const [view, setView] = useState<View | null>(null);
   const [editing, setEditing] = useState<Editing>(null);
   const [reserveDraft, setReserveDraft] = useState<string | null>(null);  // null = not editing the reserve
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  useEffect(() => { api<View>("deposit-book").then(setView, (e) => setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
+  useEffect(() => { api<View>("deposit-book").then(setView, (e) => setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, [refresh]);
   const saved = view ? toDrafts(view.book) : null;
 
   async function put(drafts: Drafts, countLedger: boolean, reserve: string | null): Promise<boolean> {

@@ -9,7 +9,7 @@ from typing import Literal
 from pydantic import Field, field_validator, model_validator
 
 from .contributions import _months
-from .deposit_book import GOLD_STALE_DAYS, NAV_STALE_DAYS, _whole
+from .deposit_book import GOLD_STALE_DAYS, MAX_HOLDING_ROWS, NAV_STALE_DAYS, DepositBook, _whole
 from .models import ContractModel, UnsignedAmount
 
 _ID = r"^[A-Za-z0-9_-]{1,64}$"
@@ -43,6 +43,7 @@ class Buy(ContractModel):
     on: date
     amount: UnsignedAmount  # what was paid
     quantity: Decimal = _Quantity  # chỉ or fund units
+    book_row: str | None = Field(default=None, pattern=_ID)  # the row of Sổ tài sản it was added to, once the owner has done so
 
     _whole_amount = field_validator("amount")(_whole)
 
@@ -115,6 +116,44 @@ def plan_status(plan: Plan, buys: tuple[Buy, ...], quotes: dict, *, today: date)
 
 def _s(value: Decimal) -> str:
     return format(value, "f")
+
+
+class PostRefused(ValueError):
+    """Why this purchase cannot go into Sổ tài sản, in the owner's language."""
+
+
+def book_targets(book: DepositBook, plan: Plan) -> list[dict]:
+    """The rows of the book that can take this plan's purchases: priced the same way, so what is added is valued as it was bought."""
+    if plan.asset == "gold":
+        return [{"id": r.id, "name": r.name} for r in book.gold if r.kind == plan.kind]
+    return [{"id": r.id, "name": r.name} for r in book.bonds if r.fund == plan.fund]
+
+
+def post_to_book(book: DepositBook, plan: Plan, buy: Buy, row_id: str | None, *, new_id: str) -> tuple[DepositBook, str]:
+    """The book with this purchase added: money to what the row cost and, for a row that counts them, chỉ or units to its quantity. row_id None: a new row named after the plan."""
+    gold = plan.asset == "gold"
+    field, list_name, code_field, code = ("chi", "gold", "kind", plan.kind) if gold else ("units", "bonds", "fund", plan.fund)
+    data = book.model_dump(mode="json")
+    rows = list(data[list_name])
+    def checked() -> None:
+        if buy.quantity != buy.quantity.quantize(Decimal("0.01")):
+            raise PostRefused("Sổ tài sản chỉ nhận số lượng tối đa 2 chữ số thập phân; lần mua này có nhiều hơn.")
+    if row_id is None:
+        if len(rows) >= MAX_HOLDING_ROWS:
+            raise PostRefused("Danh sách này trong Sổ tài sản đã đầy; hãy chọn một dòng có sẵn.")
+        if code is not None:
+            checked()
+        rows.append({"id": new_id, "name": plan.name, "amount": _s(buy.amount), code_field: code, field: _s(buy.quantity) if code is not None else None, **({} if gold else {"rate": None})})
+        row_id = new_id
+    else:
+        if row_id not in {r["id"] for r in book_targets(book, plan)}:
+            raise PostRefused("Dòng này không dùng được: cần cùng loại giá vàng hoặc cùng mã quỹ với kế hoạch.")
+        for i, row in enumerate(rows):
+            if row["id"] == row_id:
+                if row[field] is not None:
+                    checked()
+                rows[i] = {**row, "amount": _s(Decimal(row["amount"]) + buy.amount), field: _s(Decimal(row[field]) + buy.quantity) if row[field] is not None else None}
+    return DepositBook.model_validate({**data, list_name: rows}), row_id
 
 
 def due_plans(data: Accumulation, quotes: dict, *, today: date) -> list[tuple[Plan, dict]]:

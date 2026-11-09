@@ -71,6 +71,8 @@ def main() -> int:
     bns = commands.add_parser("bank-notes-sync", help="loans by group and deposits by kind of watched banks (Vietcap notes, 10 s apart, weekly) into data/bank-notes")
     bns.add_argument("--data-dir", type=Path, required=True)
     bns.add_argument("--force", action="store_true", help="refresh every watched bank now, however recent its record")
+    vcs = commands.add_parser("valuation-check-sync", help="VNDirect's market value, P/E and P/B of each watched ticker, to compare with Bảng số tài chính")
+    vcs.add_argument("--data-dir", type=Path, required=True)
     ivs = commands.add_parser("index-valuation-sync", help="fetch daily P/E and P/B of VNINDEX and VN30 (VNDirect) into data/index-valuation")
     ivs.add_argument("--data-dir", type=Path, required=True)
     ihist = commands.add_parser("index-history", help="work out VN-Index P/E and P/B before VNDirect's series from today's HOSE tickers (one-off, ~15 min)")
@@ -157,6 +159,8 @@ def main() -> int:
         return thesis_check_cli(args.data_dir, args.calendar, args.scope)
     if args.command == "financial-ratios-sync":
         return financial_ratios_sync(args.data_dir)
+    if args.command == "valuation-check-sync":
+        return valuation_check_sync(args.data_dir)
     if args.command == "bank-notes-sync":
         return bank_notes_sync(args.data_dir, force=args.force)
     if args.command == "industries":
@@ -407,6 +411,27 @@ def financial_ratios_sync(data_dir: Path, get=None, today=None) -> int:
                                      today=today or datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
     failed = {k: v for k, v in results.items() if v != "ok"}
     print(json.dumps({"status": "ok" if not failed else "partial", "results": results}))
+    return 0 if not failed else 1
+
+
+def valuation_check_sync(data_dir: Path, get=None, today=None) -> int:
+    """Exit 0 when every watched ticker was read, 1 when some failed (each is reported)."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from investment_agent.market.valuation_check import ValuationCheckStore, fetch_checks
+    from investment_agent.market.watchlist import load_watchlist
+    if get is None:
+        import httpx
+
+        def get(url):
+            response = httpx.get(url, timeout=60, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+            response.raise_for_status()
+            return response.text
+    results = fetch_checks(ValuationCheckStore(data_dir / "valuation-check"), list(load_watchlist(data_dir).symbols), get=get,
+                           today=today or datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
+    failed = {k: v for k, v in results.items() if v != "ok"}
+    print(json.dumps({"status": "ok" if not failed else "partial", "read": len(results) - len(failed), "failed": failed}))
     return 0 if not failed else 1
 
 

@@ -222,14 +222,14 @@ def test_every_kind_gets_its_multiples_at_the_latest_close_from_the_quarter_end_
     # 500,000 shares × 30,000 đ = 15 tỷ at the quarter's end; the price has since fallen by a third: 10 tỷ, on 8 tỷ profit and 50 tỷ equity.
     closes = [(datetime(2026, 9, 30), 30.0), (datetime(2026, 11, 6), 20.0)]
     t = statement_table(record, closes=closes, vnstock=None, kind="bank")
-    assert t["current"] == {"pe": "1.25", "pb": "0.20", "close_date": "2026-11-06"} and t["summary"] is None
+    assert t["current"] == {"pe": "1.25", "pb": "0.20", "market_cap": "10000000000", "close_date": "2026-11-06"} and t["summary"] is None
     # A bonus issue after the quarter: the adjusted series has the quarter's close at half, so the market value has not moved.
     t = statement_table(record, closes=[(datetime(2026, 9, 30), 15.0), (datetime(2026, 11, 6), 15.0)], vnstock=None, kind="bank")
     assert t["current"]["pb"] == "0.30"
     # No close on the quarter's last session: left blank, not worked out some other way.
     t = statement_table(record, closes=[(datetime(2026, 11, 6), 20.0)], vnstock=None, kind="bank")
-    assert t["current"] == {"pe": None, "pb": None, "close_date": "2026-11-06"}
-    assert statement_table(record, closes=[], vnstock=None, kind="bank")["current"] == {"pe": None, "pb": None, "close_date": None}
+    assert t["current"] == {"pe": None, "pb": None, "market_cap": None, "close_date": "2026-11-06"}
+    assert statement_table(record, closes=[], vnstock=None, kind="bank")["current"] == {"pe": None, "pb": None, "market_cap": None, "close_date": None}
 
 
 def test_roic_is_core_profit_after_the_effective_tax_over_average_invested_capital():

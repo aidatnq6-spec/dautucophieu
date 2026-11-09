@@ -1,0 +1,88 @@
+"""Đối chiếu định giá: VNDirect's own market value, P/E and P/B for each watched ticker, beside what Bảng số tài chính works out. The two
+differ a little by design (share counts, earnings per share); more than a tenth apart is worth a look. Nothing is adjusted to fit."""
+
+import json
+import os
+import re
+import time
+from datetime import date, datetime, timedelta, timezone
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from pathlib import Path
+from typing import Callable
+
+from .leading import _get_with_retry
+
+URL = "https://api-finfo.vndirect.com.vn/v4/ratios?q=code:{symbol}~ratioCode:MARKETCAP,PRICE_TO_EARNINGS,PRICE_TO_BOOK~reportDate:gte:{start}&sort=reportDate:desc&size=60"
+CODES = {"MARKETCAP": "market_cap", "PRICE_TO_EARNINGS": "pe", "PRICE_TO_BOOK": "pb"}
+LABELS = {"market_cap": "Vốn hoá", "pe": "P/E", "pb": "P/B"}
+LOOKBACK_DAYS = 14
+OFF = Decimal("0.10")
+_SYMBOL = re.compile(r"^[A-Z0-9]{1,10}$")
+
+
+class ValuationCheckStore:
+    def __init__(self, root: Path):
+        self.root = Path(root)
+
+    def _path(self, symbol: str) -> Path:
+        if not _SYMBOL.fullmatch(symbol.upper()):
+            raise ValueError("invalid symbol")
+        return self.root / f"{symbol.upper()}.json"
+
+    def read(self, symbol: str) -> dict | None:
+        path = self._path(symbol)
+        return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+
+    def save(self, symbol: str, record: dict) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        path = self._path(symbol)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(record), encoding="utf-8")
+        os.replace(tmp, path)
+
+
+def _plain(value) -> str | None:
+    try:
+        d = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+    return format(d.normalize(), "f") if d.is_finite() else None
+
+
+def parse_latest(text: str, *, today: date) -> dict:
+    """{date, market_cap, pe, pb}: each code's newest row dated up to today; a row dated later (VNDirect keeps some at the year's end) is skipped."""
+    best: dict[str, tuple[str, str]] = {}
+    for row in json.loads(text).get("data") or []:
+        key, day, value = CODES.get(row.get("ratioCode")), str(row.get("reportDate", ""))[:10], _plain(row.get("value"))
+        if key and value is not None and day <= today.isoformat() and (key not in best or day > best[key][0]):
+            best[key] = (day, value)
+    return {"date": max((d for d, _ in best.values()), default=None), **{k: best[k][1] if k in best else None for k in LABELS}}
+
+
+def fetch_checks(store: ValuationCheckStore, symbols: list[str], *, get: Callable[[str], str], today: date, sleep: Callable[[float], None] = time.sleep) -> dict[str, str]:
+    results = {}
+    start = (today - timedelta(days=LOOKBACK_DAYS)).isoformat()
+    for symbol in symbols:
+        try:
+            got = parse_latest(_get_with_retry(get, URL.format(symbol=symbol, start=start), sleep), today=today)
+            if got["date"] is None:
+                results[symbol] = "error:no_observations"
+                continue
+            store.save(symbol, {"fetched_at": datetime.now(timezone.utc).isoformat(), **got})
+            results[symbol] = "ok"
+        except Exception as exc:
+            results[symbol] = f"error:{type(exc).__name__}"
+    return results
+
+
+def compare(ours: dict, theirs: dict | None) -> dict | None:
+    """Each figure beside VNDirect's and how far apart, as a share of VNDirect's; only a figure both sides have can be flagged."""
+    if not theirs:
+        return None
+    rows = []
+    for key, label in LABELS.items():
+        a, b = ours.get(key), theirs.get(key)
+        diff = None if a is None or b is None or Decimal(b) == 0 else Decimal(a) / Decimal(b) - 1
+        rows.append({"key": key, "label": label, "ours": a, "theirs": b, "diff": None if diff is None else str(diff.quantize(Decimal("0.0001"), ROUND_HALF_UP)),
+                     "off": diff is not None and abs(diff) > OFF})
+    return {"date": theirs.get("date"), "ours_date": ours.get("close_date"), "rows": rows, "flagged": sum(r["off"] for r in rows)}

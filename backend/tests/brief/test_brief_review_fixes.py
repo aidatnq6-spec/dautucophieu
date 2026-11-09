@@ -108,3 +108,10 @@ def test_newest_first_compares_instants_across_offsets():
     assert a[0]["published"].endswith("+07:00")
     picked = pick_news([{**b[0]}, {**a[0], "title": "A lãi suất"}, {**b[0], "title": "B lãi suất"}], watched=[], held=set(), sector_names=set(), limit=1)
     assert picked[0]["title"] == "A lãi suất"
+
+
+def test_every_held_ticker_is_in_the_message_however_many_there_are():
+    tickers = [{"symbol": f"AA{c}", "price": "10", "change": "0.1", "pct": "1", "held": True, "sector": "X", "state": "traded"} for c in "ABCDE"]
+    text = render_report(REPORT, {**market(0), "tickers": [*tickers, {**tickers[0], "symbol": "ZZZ", "held": False}]})
+    assert all(f"- AA{c} " in text for c in "ABCDE") and "- ZZZ " not in text
+

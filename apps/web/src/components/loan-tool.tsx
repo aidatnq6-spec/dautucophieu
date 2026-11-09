@@ -1,10 +1,11 @@
 "use client";
-import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Download, Printer, RotateCcw, TableProperties } from "lucide-react";
+import { api } from "../lib/api";
 import { formatVnd } from "../lib/format";
 import { download, spreadsheet } from "./journal-tools";
 import { LoanStress, STRESS_DEFAULTS } from "./loan-stress";
-import { loanSchedule, parseAmount, paymentStep, savedByPrepaying, shareText, type Loan, type LoanInput, type Method } from "./loan-calc";
+import { loanFromBook, loanSchedule, parseAmount, paymentStep, savedByPrepaying, shareText, type BookLoan, type Loan, type LoanInput, type Method } from "./loan-calc";
 
 type Unit = "ty" | "trieu";
 type Span = "year" | "month";
@@ -57,6 +58,19 @@ function Donut({ parts, total, center }: { parts: { label: string; value: number
 export function LoanTool() {
   const [f, setF] = useState<Form>(DEFAULTS);
   const [open, setOpen] = useState(false);
+  const [fromBook, setFromBook] = useState<string | null>(null);
+  // /loan?loan=<id> from Bất động sản và khoản vay: only the id is in the address, the figures come from the book.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("loan");
+    if (!id) return;
+    api<{ book: { loans: (BookLoan & { id: string })[] } }>("property-book").then((view) => {
+      const row = view.book.loans.find((x) => x.id === id);
+      const filled = row ? loanFromBook(row, new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" })) : null;
+      if (!row || !filled) { setFromBook("Không mở được khoản vay này: không tìm thấy hoặc chưa đủ dư nợ, lãi và số tháng còn lại."); return; }
+      setF((old) => ({ ...old, ...filled.fields }));
+      setFromBook(`Đang xem "${row.name}" từ sổ khoản vay, theo dư nợ hiện tại. Thay đổi ở đây không ghi lại vào sổ.${filled.noAfterRate ? " Chưa nhập lãi sau ưu đãi nên tạm dùng lãi hiện tại." : ""}`);
+    }, () => setFromBook("Không đọc được sổ khoản vay."));
+  }, []);
   const set = <K extends keyof Form>(key: K) => (value: Form[K]) => setF((old) => ({ ...old, [key]: value }));
   const result = useMemo<Blocked | Ready>(() => {
     const value = parseAmount(f.property, f.propertyUnit), ltv = num(f.ltv);
@@ -97,6 +111,7 @@ export function LoanTool() {
   ] : [];
   return (
     <div className="ln">
+      {fromBook && <p className="notice" data-testid="ln-from-book">{fromBook}</p>}
       <dl className="ln-print" aria-label="Thông tin khoản vay khi in">{facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
       <div className="ln-grid">
         <section className="surface ln-controls" aria-label="Thông tin khoản vay">
@@ -144,7 +159,7 @@ export function LoanTool() {
             {f.prepayOn && <div className="ln-row"><Slider label="Trả hết vào cuối tháng thứ" value={f.prepayMonth} onChange={set("prepayMonth")} min={1} max={Math.max(ok ? ok.months - 1 : 420, 1)} step={1} />
               <label className="field">Phí trả trước hạn (%)<input inputMode="decimal" value={f.prepayFee} onChange={(e) => set("prepayFee")(e.target.value)} /></label></div>}
           </div>
-          <button type="button" className="btn text ln-reset" onClick={() => { setF(DEFAULTS); setOpen(false); }}><RotateCcw size={14} aria-hidden="true" />Đặt lại</button>
+          <button type="button" className="btn text ln-reset" onClick={() => { setF(DEFAULTS); setOpen(false); setFromBook(null); }}><RotateCcw size={14} aria-hidden="true" />Đặt lại</button>
         </section>
         <aside className="surface ln-result" aria-label="Kết quả khoản vay">
           {result.errors.length > 0 && <ul className="errors" role="alert">{result.errors.map((e) => <li key={e}>{e}</li>)}</ul>}

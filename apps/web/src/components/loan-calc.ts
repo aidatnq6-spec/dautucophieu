@@ -117,6 +117,23 @@ export function caretAfterDigits(text: string, digits: number): number {
   return text.length;
 }
 
+export type BookLoan = { name: string; balance: string | null; rate: string | null; promo_ends: string | null; after_rate: string | null; months_left: number | null; method: string };
+
+/** The Tính khoản vay fields for a loan in the book, from today on. A part month of promotion counts as a month. noAfterRate: a promotion is running but
+ * the rate after it was not entered, so the current rate stands in and the page says so. null without the balance, the rate or the months left. */
+export function loanFromBook(loan: BookLoan, today: string) {
+  if (loan.balance === null || loan.rate === null || loan.months_left === null) return null;
+  const comma = (v: string | number) => String(v).replace(".", ",");
+  let months = 0;
+  if (loan.promo_ends && loan.promo_ends > today) {
+    const [y1, m1, d1] = today.split("-").map(Number), [y2, m2, d2] = loan.promo_ends.split("-").map(Number);
+    months = Math.min((y2 - y1) * 12 + m2 - m1 + (d2 > d1 ? 1 : 0), loan.months_left);
+  }
+  const noAfterRate = months > 0 && loan.after_rate === null;
+  return { noAfterRate, fields: { mode: "loan" as const, loan: comma(Number(loan.balance) / 1e6), loanUnit: "trieu" as const, term: String(loan.months_left), termUnit: "month" as const, promoRate: comma(loan.rate),
+    promo: String(months), promoUnit: "month" as const, afterRate: comma(months > 0 && loan.after_rate !== null ? loan.after_rate : loan.rate), method: loan.method as Method, grace: "0", prepayOn: false } };
+}
+
 export const shareText = (part: number, whole: number) => `${((part / whole) * 100).toFixed(1).replace(".", ",")}%`;
 
 export const savedByPrepaying = (full: Loan, early: Loan) => full.interest - early.interest - early.fee;

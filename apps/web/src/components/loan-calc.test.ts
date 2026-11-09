@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { caretAfterDigits, cashflowAfterLoan, groupDigits, loanSchedule, parseDong, parseAmount, paymentStep, savedByPrepaying, shareText, stressLoan } from "./loan-calc";
+import { caretAfterDigits, cashflowAfterLoan, groupDigits, loanFromBook, loanSchedule, parseDong, parseAmount, paymentStep, savedByPrepaying, shareText, stressLoan } from "./loan-calc";
 
 const BASE = { principal: 2_000_000_000, months: 300, promoMonths: 12, promoRate: 7.5, afterRate: 11, method: "declining" as const };
 
@@ -177,6 +177,33 @@ describe("whole đồng typed with thousands marks", () => {
     expect(caretAfterDigits("1.234.567", 4)).toBe(5);
     expect(caretAfterDigits("1.234.567", 7)).toBe(9);
     expect(caretAfterDigits("1.234.567", 0)).toBe(0);
+  });
+});
+
+describe("opening a loan from the book", () => {
+  const LOAN = { name: "Vay nhà", balance: "1234567000", rate: "7.5", promo_ends: "2027-02-09", after_rate: "11", months_left: 120, method: "annuity" };
+  it("fills the months left, the balance in triệu and the months of promotion left", () => {
+    const r = loanFromBook(LOAN, "2026-11-09")!;
+    expect(r.fields).toEqual({ mode: "loan", loan: "1234,567", loanUnit: "trieu", term: "120", termUnit: "month", promoRate: "7,5", promo: "3", promoUnit: "month", afterRate: "11", method: "annuity", grace: "0", prepayOn: false });
+    expect(r.noAfterRate).toBe(false);
+    expect(parseAmount(r.fields.loan, "trieu")).toBe(1_234_567_000);
+  });
+  it("counts a part month as a month, and never more than the months left", () => {
+    expect(loanFromBook({ ...LOAN, promo_ends: "2027-02-10" }, "2026-11-09")!.fields.promo).toBe("4");
+    expect(loanFromBook({ ...LOAN, months_left: 2 }, "2026-11-09")!.fields.promo).toBe("2");
+  });
+  it("has no promotion once its date has passed or when none was entered, the current rate running to the end", () => {
+    for (const promo_ends of ["2026-11-01", null]) {
+      const r = loanFromBook({ ...LOAN, promo_ends, after_rate: "11" }, "2026-11-09")!;
+      expect([r.fields.promo, r.fields.afterRate, r.noAfterRate]).toEqual(["0", "7,5", false]);
+    }
+  });
+  it("says so when the rate after a running promotion was not entered", () => {
+    const r = loanFromBook({ ...LOAN, after_rate: null }, "2026-11-09")!;
+    expect([r.fields.afterRate, r.noAfterRate]).toEqual(["7,5", true]);
+  });
+  it("cannot be opened without its balance, rate or months", () => {
+    for (const gap of [{ balance: null }, { rate: null }, { months_left: null }]) expect(loanFromBook({ ...LOAN, ...gap }, "2026-11-09")).toBeNull();
   });
 });
 

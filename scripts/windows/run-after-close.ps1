@@ -78,6 +78,9 @@ $drawdown = & $python -W ignore -m investment_agent.cli drawdown-check --data-di
 # Nhac so tiet kiem dao han: one Telegram note per deposit from the day before it matures (only when scheduled delivery is on).
 $da = & $python -W ignore -m investment_agent.cli deposit-alerts --data-dir $data 2>$null
 "$(Get-Date -Format o) deposit-alerts exit=$LASTEXITCODE $da" | Add-Content -LiteralPath $log -Encoding UTF8
+# Nhac het lai uu dai: one Telegram note per loan 90 days before its promotion ends (only when scheduled delivery is on).
+$la = & $python -W ignore -m investment_agent.cli loan-alerts --data-dir $data 2>$null
+"$(Get-Date -Format o) loan-alerts exit=$LASTEXITCODE $la" | Add-Content -LiteralPath $log -Encoding UTF8
 # Gop von deu: once a month from the contribution day, while this month's deposits are below the plan.
 $contrib = & $python -W ignore -m investment_agent.cli contribution-remind --data-dir $data 2>$null
 "$(Get-Date -Format o) contribution-remind exit=$LASTEXITCODE $contrib" | Add-Content -LiteralPath $log -Encoding UTF8

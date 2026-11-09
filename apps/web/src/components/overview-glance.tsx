@@ -77,7 +77,7 @@ export function WorthALook({ g }: { g: Glance }) {
     <section className="surface" aria-label="Cần để ý">
       <h2>Cần để ý</h2>
       {empty ? <p className="muted">Không có gì cần để ý hôm nay.</p> : <ul className="watch-list">
-        {items.filter((i) => i.level === "high").map((i) => <li key={i.text}><span className="pill bad">Cần quyết định</span> <Link href={i.href}>{i.text}</Link></li>)}
+        {items.filter((i) => i.level === "high").map((i) => <li key={i.text}>{i.kind === "system" ? <span className="pill warn">Hệ thống</span> : <span className="pill bad">Cần quyết định</span>} <Link href={i.href}>{i.text.replace(/^Hệ thống · /, "")}</Link></li>)}
         {a.events.map((e) => <li key={`${e.symbol}-${e.key_date}-${e.kind}`}>
           <span className="pill">Sự kiện</span> <strong>{e.symbol}</strong> {KIND[e.kind] ?? e.kind} ngày {day(e.key_date)}: {e.title} · <Link href="/events">Lịch sự kiện</Link></li>)}
         {a.over_limit.map((o) => <li key={o.name}>

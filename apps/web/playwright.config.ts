@@ -26,6 +26,10 @@ const env = {
 export default defineConfig({
   testDir: "../../tests/e2e",
   timeout: 60_000,
+  // The run is served by `next dev`, which slows as it goes: a page's script has been seen to start only after 5 s while every API answered in
+  // under 20 ms (09/11/2026). One retry covers Windows' passing ERR_NO_BUFFER_SPACE; Playwright still reports such a test as flaky.
+  expect: { timeout: 15_000 },
+  retries: 1,
   workers: 1,
   // Failing tests keep a trace (test-results/, not in Git) so an occasional failure can be replayed.
   use: { baseURL: env.APP_ORIGIN, trace: "retain-on-failure", screenshot: "only-on-failure" },

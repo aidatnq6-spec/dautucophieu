@@ -48,3 +48,20 @@ def test_a_stock_rate_entered_by_hand_replaces_the_dividends():
     lines = income_by_layer(deposit=Decimal(0), deposit_rate=Decimal("5.63"), bond=Decimal(0), bond_rate=Decimal("7"), dividends_12m=Decimal(12_000_000),
                             stocks=Decimal(802_743_828), stock_rate=Decimal("12"))
     assert lines["stocks"] == "8027438" and lines["dividends"] == "0" and lines["total"] == "8027438"  # 802,7 tr × 12% / 12
+
+
+def test_each_level_of_spending_is_covered_with_and_without_rent():
+    from investment_agent.domain.passive_income import freedom_levels
+    out = freedom_levels(income=Decimal("3000000"), rent=Decimal("3000000"), safe=Decimal("6000000"), independent=Decimal("12000000"), freedom=None)
+    assert out["rent"] == "3000000"
+    assert [r["id"] for r in out["rows"]] == ["safe", "independent", "freedom"]
+    assert (out["rows"][0]["spending"], out["rows"][0]["without_rent"], out["rows"][0]["with_rent"]) == ("6000000", "0.5000", "1.0000")
+    assert (out["rows"][1]["without_rent"], out["rows"][1]["with_rent"]) == ("0.2500", "0.5000")
+    assert out["rows"][2] == {"id": "freedom", "spending": None, "without_rent": None, "with_rent": None}
+
+
+def test_cover_may_pass_one_hundred_percent_and_no_spending_gives_no_cover():
+    from investment_agent.domain.passive_income import freedom_levels
+    out = freedom_levels(income=Decimal("9000000"), rent=Decimal(0), safe=Decimal("6000000"), independent=None, freedom=None)
+    assert out["rows"][0]["without_rent"] == "1.5000"
+    assert freedom_levels(income=Decimal(1), rent=Decimal(0), safe=Decimal(0), independent=None, freedom=None)["rows"][0]["with_rent"] is None

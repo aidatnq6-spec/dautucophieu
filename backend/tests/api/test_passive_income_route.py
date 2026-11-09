@@ -25,7 +25,7 @@ def client(tmp_path):
 def test_no_goal_yet_offers_the_deposit_rate_as_the_default(tmp_path):
     c, clock = client(tmp_path)
     body = call(c, clock, "GET", "/internal/passive-income").json()
-    assert body == {"version": 0, "goal": None, "default_rate": "6", "default_bond_rate": "7", "income": None, "result": None, "capital": None,
+    assert body == {"version": 0, "goal": None, "default_rate": "6", "default_bond_rate": "7", "income": None, "levels": None, "result": None, "capital": None,
                     "contribution": "0"}
 
 
@@ -71,3 +71,25 @@ def test_the_stock_rate_is_stored_and_used(tmp_path):
     assert body["goal"]["stock_rate"] == "12" and body["income"]["stocks"] == "50000" and body["income"]["dividends"] == "0"  # 5 tr at cost × 12% / 12
     bad = call(c, clock, "PUT", "/internal/passive-income", {"target": "10000000", "rate": None, "stock_rate": "90", "expected_version": 1, "request_id": "pi2"})
     assert bad.status_code == 422
+
+
+def test_the_three_levels_start_from_the_spending_in_suc_khoe_and_are_shown_with_and_without_rent(tmp_path):
+    c, clock = client(tmp_path)  # deposit rate 6%
+    call(c, clock, "PUT", "/internal/equity-budget", {"layers": {"deposit": "600000000", "bond": "0", "gold": "0", "crypto": "0"}, "reserve": "0", "expected_version": 0, "request_id": "eb1"})
+    call(c, clock, "PUT", "/internal/wealth-check", {"income": "20000000", "expenses": "6000000", "birth_year": 1985, "expected_version": 0, "request_id": "wc1"})
+    rented = {"kind": "apartment", "purpose": "rent", "legal": "certificate"}
+    call(c, clock, "PUT", "/internal/property-book", {"properties": [{**rented, "id": "a", "name": "Căn A", "rent_monthly": "3000000"}, {**rented, "id": "b", "name": "Căn B"}], "loans": [], "ceiling": "70",
+                                                     "expected_version": 0, "request_id": "pb1"})
+    r = call(c, clock, "PUT", "/internal/passive-income", {"target": "10000000", "rate": None, "independent": "12000000", "freedom": "30000000", "expected_version": 0, "request_id": "pi1"})
+    assert r.status_code == 200
+    levels = r.json()["levels"]
+    assert levels["rent"] == "3000000" and levels["rent_missing"] == ["Căn B"]  # a let flat with no rent entered is named, not counted as 0
+    assert [(x["id"], x["spending"], x["without_rent"], x["with_rent"]) for x in levels["rows"]] == [
+        ("safe", "6000000", "0.5000", "1.0000"), ("independent", "12000000", "0.2500", "0.5000"), ("freedom", "30000000", "0.1000", "0.2000")]
+    assert r.json()["goal"]["independent"] == "12000000" and r.json()["goal"]["freedom"] == "30000000"
+
+
+def test_a_level_must_be_a_whole_amount_above_zero(tmp_path):
+    c, clock = client(tmp_path)
+    for bad in ("0", "abc", "1000.5"):
+        assert call(c, clock, "PUT", "/internal/passive-income", {"target": "1000000", "rate": None, "freedom": bad, "expected_version": 0, "request_id": "pi2"}).status_code == 422

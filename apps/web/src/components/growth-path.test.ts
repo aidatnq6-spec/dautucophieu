@@ -35,3 +35,16 @@ describe("shortTy", () => {
     expect(shortTy(0)).toBe("0");
   });
 });
+
+
+describe("growthPath with a yearly raise in the contribution", () => {
+  it("raises the monthly amount each year after the first", () => {
+    const p = growthPath({ capital: 0, monthly: 10, rate: 0, years: 2, raise: 10 });
+    expect(p.value[1]).toBeCloseTo(120, 6);
+    expect(p.value[2]).toBeCloseTo(252, 6);
+    expect(p.paid[2]).toBeCloseTo(252, 6);
+  });
+  it("keeps the contribution level without one", () => {
+    expect(growthPath({ capital: 0, monthly: 10, rate: 0, years: 2 }).paid[2]).toBe(240);
+  });
+});

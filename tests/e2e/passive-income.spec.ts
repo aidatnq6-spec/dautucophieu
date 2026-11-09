@@ -77,3 +77,16 @@ test("a stock yield entered by hand replaces last year's dividends", async ({ pa
   await box.getByRole("button", { name: "Tính mục tiêu" }).click();
   await expect(lines).toContainText("Cổ tức tiền mặt 12 tháng");
 });
+
+test("the two higher levels of spending are kept with the goal", async ({ page }) => {
+  await page.goto("/profile");
+  const box = page.getByRole("region", { name: "Mục tiêu dòng tiền thụ động" });
+  await expect(box.getByLabel("Mức tự do: chi tiêu mỗi tháng (đ)")).toBeEnabled();
+  await box.getByLabel("Dòng tiền mong muốn mỗi tháng (đ)").fill("10000000");
+  await box.getByLabel("Tỷ suất dòng tiền giả định (%/năm)").fill("6");
+  await box.getByLabel("Mức tự do: chi tiêu mỗi tháng (đ)").fill("30000000");
+  await box.getByRole("button", { name: "Tính mục tiêu" }).click();
+  await expect(box.getByTestId("pi-required")).toBeVisible();
+  await page.reload();
+  await expect(box.getByLabel("Mức tự do: chi tiêu mỗi tháng (đ)")).toHaveValue("30.000.000");
+});

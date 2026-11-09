@@ -96,6 +96,27 @@ export function cashflowAfterLoan(loan: Loan, money: { income: number; expense: 
   return { ...base, firstLeft: left[0], worstLeft: Math.min(...left), firstNegative: firstIndex >= 0 ? loan.rows[firstIndex].period : null, reserve: result };
 }
 
+/** A whole number of đồng with a point every three digits. Anything else is left exactly as typed, for the page to say it cannot be read. */
+export function groupDigits(raw: string): string {
+  const digits = raw.replace(/[.\s]/g, "");
+  if (!/^\d*$/.test(digits)) return raw;
+  return digits.replace(/^0+(?=\d)/, "").replace(/\B(?=(\d{3})+$)/g, ".");
+}
+
+/** Whole đồng, with or without the points; null when blank or unreadable. */
+export function parseDong(raw: string): number | null {
+  const digits = raw.replace(/[.\s]/g, "");
+  return /^\d+$/.test(digits) ? Number(digits) : null;
+}
+
+/** Where the caret goes in formatted text so that it still follows the same digit. */
+export function caretAfterDigits(text: string, digits: number): number {
+  if (digits <= 0) return 0;
+  let seen = 0;
+  for (let i = 0; i < text.length; i++) if (/\d/.test(text[i]) && ++seen === digits) return i + 1;
+  return text.length;
+}
+
 export const shareText = (part: number, whole: number) => `${((part / whole) * 100).toFixed(1).replace(".", ",")}%`;
 
 export const savedByPrepaying = (full: Loan, early: Loan) => full.interest - early.interest - early.fee;

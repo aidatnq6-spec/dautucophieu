@@ -42,8 +42,12 @@ const num = (v: string | number) => Number(v).toLocaleString("vi-VN", { maximumF
 const pct = (v: string) => `${Number(v) > 0 ? "+" : ""}${(Number(v) * 100).toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 const label = (p: string) => (p.includes("-Q") ? `Q${p.slice(-1)}/${p.slice(2, 4)}` : p.length === 7 ? `${p.slice(5)}/${p.slice(2, 4)}` : p);
 
-function Chart({ g }: { g: Group }) {
-  const rows = g.rows.slice(-SHOWN);
+/** The last n periods, or all of them when n is 0. */
+export function windowed<T>(rows: T[], n: number): T[] {
+  return n === 0 ? rows : rows.slice(-n);
+}
+
+function Chart({ g, rows }: { g: Group; rows: Group["rows"] }) {
   const top = stackTop(rows, g.chart) * 1.1 || 1;
   const W = 640, H = 220, L = 48, B = 24, T = 10;
   const step = (W - L - 8) / Math.max(rows.length, 1);
@@ -99,16 +103,19 @@ function GroupBlock({ g, symbol, version, onView, onError }: { g: Group; symbol:
       return false;
     }
   };
+  const [count, setCount] = useState(SHOWN);
   const save = async (e: FormEvent) => {
     e.preventDefault();
     if (await call(`/values/${period.trim()}`, "PUT", { values, source })) { setValues({}); setPeriod(""); setProposal(null); }
   };
-  const rows = g.rows.slice(-SHOWN);
+  const rows = windowed(g.rows, count);
   return (
     <div className="op-group" role="group" aria-label={g.name}>
       <h3>{g.name} <span className="caption">— {g.unit} · theo {KIND[g.period][0]} · {g.chart === "stack" ? "cột chồng" : "đường"}</span></h3>
+      {g.rows.length > 8 && <div className="pb-toggle" role="radiogroup" aria-label={`Số kỳ của ${g.name}`}>{[8, 12, 20, 0].map((n) =>
+        <button key={n} type="button" role="radio" aria-checked={count === n} className={`btn ${count === n ? "primary" : ""}`} onClick={() => setCount(n)}>{n === 0 ? "Tất cả" : `${n} kỳ`}</button>)}</div>}
       {rows.length > 0 ? <>
-        <Chart g={g} />
+        <Chart g={g} rows={rows} />
         <p className="pb-legend">{g.series.map((s, k) => <span key={s}><i style={{ background: COLORS[k % COLORS.length] }} />{s}</span>)}</p>
         <div className="pb-scroll"><table className="pb-table">
           <thead><tr><th>Kỳ</th>{g.series.map((s) => <th key={s} className="num">{s}</th>)}{g.chart === "stack" && <><th className="num">Tổng</th><th className="num">So cùng kỳ</th></>}

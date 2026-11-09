@@ -35,3 +35,6 @@ nghĩa và nhập, theo khuôn Số liệu ngân hàng. Không gọi AI, không 
     "Chữ ở trang … bị lỗi phông hoặc nhận dạng kém: không lấy số từ các trang này, hãy nhập tay."
   - Kiểm trên dữ liệu thật: 6 PDF của HPG (2 chỉ có ảnh, 4 có chữ lỗi, đều báo đúng); 77 trang của 4 báo cáo ACBS có chữ sạch, không trang nào bị
     coi là lỗi.
+
+## Chọn số kỳ (09/11/2026, chủ sở hữu duyệt)
+Nhóm có hơn 8 kỳ có nút 8 · 12 · 20 kỳ · Tất cả, áp dụng cho biểu đồ và bảng của nhóm đó; mặc định 12 kỳ như trước.

@@ -98,6 +98,8 @@ legend{font-weight:600;padding:0 6px}
 .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .fv-table{width:100%;border-collapse:collapse;font-size:14px}
 .fv-table th,.fv-table td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+/* Text columns may wrap so that the row fits its frame; figures and buttons stay on one line. */
+.fv-table td:not(.num){white-space:normal}.fv-table .btn{white-space:nowrap}
 .fv-detail td{white-space:normal}.fv-detail ul{margin:6px 0;padding-left:18px}.fv-detail li{margin:4px 0}
 .fv-detail ul.quality-list,ul.quality-list{list-style:none;padding-left:0;margin:6px 0}.quality-list li{margin:4px 0;overflow-wrap:anywhere}.quality-list svg{vertical-align:-2px}
 .fv-search{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin:12px 0}.fv-search .field{flex:1 1 180px;min-width:0}.fv-search p{margin:0 0 8px}
@@ -143,7 +145,8 @@ legend{font-weight:600;padding:0 6px}
 .ins-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px;margin-bottom:16px}
 .ins-card h2{margin-top:0}.ins-reasons,.ins-list{margin:6px 0;padding-left:18px}.ins-reasons li,.ins-list li{margin:6px 0;overflow-wrap:anywhere}
 .ins-table td{white-space:normal}.ins-claim{margin:0 0 6px;overflow-wrap:anywhere}.ins-ticker{display:inline-block;margin:0 10px 6px 0;white-space:nowrap}
-@media (max-width:700px){
+/* Below this the nine columns of the Định giá board do not fit beside the menu: each row becomes a card. */
+@media (max-width:1050px){
   .fv-table thead{display:none}
   .fv-table,.fv-table tbody,.fv-table tr,.fv-table td{display:block;width:100%}
   .fv-table tr{border:1px solid var(--line);border-radius:8px;margin:0 0 10px;padding:6px 10px}
@@ -170,7 +173,7 @@ legend{font-weight:600;padding:0 6px}
 .bm-sectors,.bm-tickers{list-style:none;margin:4px 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:4px 16px}
 .bm-tickers .pill{margin-left:6px}
 .brief-holdings td,.brief-holdings th{white-space:normal}
-@media (min-width:701px){.brief-holdings .num{text-align:right}}
+@media (min-width:1051px){.brief-holdings .num{text-align:right}}
 .cc-table td,.cc-table th{white-space:normal}.cc-table{margin-bottom:14px}.cc-over td{background:color-mix(in srgb,var(--bad) 7%,transparent)}
 .cc-bar{position:relative;display:inline-block;width:120px;max-width:40%;height:8px;border-radius:4px;background:var(--line);vertical-align:middle;margin-right:6px}
 .cc-fill{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--brand)}.cc-fill.over{background:var(--bad)}

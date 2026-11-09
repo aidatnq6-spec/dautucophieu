@@ -4,8 +4,10 @@ Personal data; never sent to a model."""
 from datetime import date
 from decimal import Decimal
 
-from investment_agent.domain.accumulation import Accumulation, Plan, due_plans, plan_status
+from investment_agent.domain.accumulation import Accumulation, Plan, book_targets, due_plans, plan_status
+from investment_agent.domain.deposit_book import DepositBook
 from investment_agent.notifications.render import vnd
+from investment_agent.services.deposit_book import read_book
 from investment_agent.services.records import read_version
 
 RECORD = ("settings", "accumulation")
@@ -20,7 +22,9 @@ def read_data(repo, owner) -> tuple[Accumulation, int]:
 
 def accumulation_view(repo, owner, *, quotes: dict, today: date) -> dict:
     data, version = read_data(repo, owner)
-    return {"version": version, "data": data.model_dump(mode="json"), "plans": [plan_status(p, data.buys, quotes, today=today) for p in data.plans],
+    book = read_book(repo, owner)[0]
+    return {"version": version, "data": data.model_dump(mode="json"), "book_exists": book is not None,
+            "plans": [{**plan_status(p, data.buys, quotes, today=today), "book_rows": book_targets(book or DepositBook(), p)} for p in data.plans],
             "gold_kinds": list((quotes["gold"].get("kinds") or {})), "gold_source": quotes["gold"].get("source"), "nav_source": "Fmarket" if quotes["funds"] else None}
 
 

@@ -258,6 +258,48 @@ class PersonalRepository:
             if (reads := _REQUEST_READS.get()) is not None:
                 reads.clear()  # anything read earlier in this request may now be stale (also after an ambiguous failure)
 
+    def write_many(self, context, writes: list[tuple[str, str, dict, int]], *, request_id: str) -> list[int]:
+        """(collection, record id, payload, expected version) for each record, all written or none. The new versions; a retry of the same request changes nothing."""
+        self.authorize(context)
+        if not writes or not isinstance(request_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", request_id):
+            raise InvalidRecord("Invalid writes or request ID")
+        items = []
+        for collection, record_id, payload, expected_version in writes:
+            if type(expected_version) is not int or expected_version < 0 or type(payload) is not dict:
+                raise InvalidRecord("Invalid expected version or payload")
+            validate_payload(payload)
+            if len(canonical(payload).encode()) > 524288:
+                raise InvalidRecord("Payload too large")
+            items.append((collection, record_id, self.key(collection, record_id), deepcopy(payload), expected_version))
+        fingerprint = digest(["many", [[c, r, v, p] for c, r, _, p, v in items]])
+        root = f"owners/{self.owner_uid}"
+        request_path = f"{root}/mutation_requests/{request_id}"
+        created_at = self.clock().astimezone(timezone.utc).isoformat()
+
+        def operation(tx):
+            previous = tx.read(request_path)
+            if previous:
+                if previous["fingerprint"] != fingerprint:
+                    raise IdempotencyConflict("Request ID has different content")
+                return previous["versions"]
+            for _, _, key, _, expected in items:  # every read before any write, as a Firestore transaction requires
+                head = tx.read(f"{root}/record_heads/{key}")
+                if (head["version"] if head else 0) != expected:
+                    raise VersionConflict("Expected version is no longer current")
+            versions = []
+            for collection, record_id, key, payload, expected in items:
+                record = PersonalRecord(self.owner_uid, collection, record_id, expected + 1, payload, created_at, request_id)
+                tx.create(f"{root}/{collection}/{key}-v{record.version}", asdict(record))
+                tx.put(f"{root}/record_heads/{key}", {"version": record.version})
+                versions.append(record.version)
+            tx.create(request_path, {"fingerprint": fingerprint, "version": versions[0], "versions": versions})
+            return versions
+        try:
+            return self.store.atomic(operation)
+        finally:
+            if (reads := _REQUEST_READS.get()) is not None:
+                reads.clear()
+
     def export(self, context) -> dict[str, dict]:
         """Every document under this owner's namespace, keyed by path relative to owners/{uid}/."""
         self.authorize(context)

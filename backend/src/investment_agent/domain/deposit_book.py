@@ -13,6 +13,7 @@ from .models import ContractModel, UnsignedAmount
 
 DUE_SOON_DAYS, MATURING_DAYS = 30, 90
 NAV_STALE_DAYS, GOLD_STALE_DAYS = 14, 3
+MAX_HOLDING_ROWS = 30
 
 
 def _whole(value: Decimal | None) -> Decimal | None:

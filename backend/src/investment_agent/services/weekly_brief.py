@@ -137,7 +137,7 @@ def _theses(theses: list[dict], closes: dict, costs: dict[str, str], shares: dic
 
 def compose(*, series, index, briefs, closes, insider, events, alerts, held: set[str], watched: set[str], today: date,
             sessions: list[date] | None = None, theses: list[dict] | None = None, costs: dict[str, str] | None = None,
-            shares: dict[str, int] | None = None) -> str:
+            shares: dict[str, int] | None = None, todo: list[str] | None = None) -> str:
     start, end = week_of(today)
     sessions = sessions if sessions is not None else [start + timedelta(days=i) for i in range(5)]
     lines = [f"BẢN TIN TUẦN {_dm(start)}–{_dm(end)}/{end.year}", "",
@@ -169,6 +169,8 @@ def compose(*, series, index, briefs, closes, insider, events, alerts, held: set
                      f"{_dm(datetime.fromisoformat(a['triggered_at']).astimezone(VN).date())} ở {_num(Decimal(a['triggered_price']))}")
     waiting = sum(1 for a in alerts if not a.get("triggered_at"))
     lines.append(f"{'Không có cảnh báo nào kích hoạt trong tuần. ' if not fired else ''}{waiting} cảnh báo đang chờ.")
+    if todo:
+        lines += ["", "VIỆC CẦN XEM", *[f"- {t}" for t in todo]]
     lines += ["", "Nguồn: dữ liệu phần mềm đã lưu (Vnstock, VNDirect). Chỉ để theo dõi. Không phải khuyến nghị."]
     return "\n".join(lines)
 

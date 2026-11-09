@@ -20,6 +20,7 @@ from investment_agent.market.series import SeriesStore
 from investment_agent.repositories.personal import RepositoryUnavailable, prefetch
 from investment_agent.services.deposit_book import book_quotes
 from investment_agent.services.equity_budget import budget_view
+from investment_agent.services.attention import attention_items
 from investment_agent.services.journal import read_journal
 from investment_agent.services.overview import OVERVIEW_RECORDS, compose_overview
 from investment_agent.services.records import LedgerBook, portfolio_settings, read_version
@@ -112,7 +113,11 @@ def glance(request: Request):
             prices[e.symbol] = point.price
     reviews = [{"entry_id": d["entry"].entry_id, "symbol": d["entry"].symbol, "kind": d["entry"].kind, "change": d["change"]}
                for d in due_reviews(entries, prices=prices, threshold=threshold)]
+    try:
+        items = attention_items(repo, owner, Path(data_dir), now=now(request)) if data_dir is not None else []
+    except (OSError, ValueError, KeyError):
+        items = []  # one list failing to gather must not take the overview down
     return {"session_date": session.isoformat() if session else None, "kpis": kpis,
-            "attention": {"events": upcoming, "over_limit": over, "journal_reviews": reviews,
+            "attention": {"items": items, "events": upcoming, "over_limit": over, "journal_reviews": reviews,
                           "latest_report": {"report_id": latest["report_id"], "session_date": latest["session_date"]} if latest else None}}
 

@@ -99,3 +99,10 @@ def test_inputs_are_gathered_from_stored_data_without_touching_the_network(tmp_p
     got = weekly_inputs(tmp_path, ledger_events=[], held={"HPG"}, alerts=[], insider=lambda s: [], today=SAT)
     assert set(got["briefs"]) == {"2026-10-30"} and got["closes"]["HPG"] == [(date(2026, 10, 30), 21.0)] and got["index"] == []
     assert got["watched"] == {"HPG", "FPT"} and got["series"] == [] and got["insider"] == {"HPG": []}
+
+
+def test_the_note_ends_with_what_needs_looking_at_and_says_nothing_when_there_is_none():
+    text = compose(series=[], index=[], briefs={}, closes={}, insider={}, events=[], alerts=[], held=set(), watched=set(), today=SAT, todo=["KDH: đang -50,0% so với giá vốn"])
+    assert "VIỆC CẦN XEM\n- KDH: đang -50,0% so với giá vốn" in text
+    assert "VIỆC CẦN XEM" not in compose(series=[], index=[], briefs={}, closes={}, insider={}, events=[], alerts=[], held=set(), watched=set(), today=SAT, todo=[])
+

@@ -8,7 +8,7 @@ type Plan = { id: string; name: string; asset: "gold" | "fund"; day: number; sta
 type Buy = { id: string; plan: string; on: string; amount: string; quantity: string; book_row?: string | null };
 type Month = { month: string; got: string; status: "met" | "short" | "none" | "pending"; short_by: string | null };
 type Status = { id: string; months: Month[]; streak: number; cost: string; quantity: string; average: string | null; price: string | null; price_on: string | null; stale: boolean; value: string | null; change: string | null;
-  price_reason: "no_buys" | "no_kind" | "no_price" | null; book_rows: { id: string; name: string }[] };
+  price_reason: "no_buys" | "no_kind" | "no_price" | null; before_start: number; book_rows: { id: string; name: string }[] };
 type View = { version: number; book_exists: boolean; data: { plans: Plan[]; buys: Buy[] }; plans: Status[]; gold_kinds: string[]; gold_source: string | null; nav_source: string | null };
 type Draft = { id: string | null; name: string; asset: "gold" | "fund"; day: string; start: string; size: string; kind: string; fund: string };
 
@@ -59,8 +59,9 @@ function PlanCard({ plan, status, buys, busy, onBuy, onDelete, onEdit, onRemove,
         {status.value !== null && <div><dt>Giá trị hiện tại</dt><dd>{formatVnd(status.value)} <span className={change! >= 0 ? "positive" : "negative"}>{change! >= 0 ? "+" : "−"}{formatVnd(String(Math.abs(change!)))}</span></dd></div>}
       </dl>
       {status.price_reason && status.price_reason !== "no_buys" && <p className="caption">{why[status.price_reason]}</p>}
+      {status.before_start > 0 && <p className="caption">{status.before_start} lần mua trước tháng bắt đầu: có tính vào giá vốn, không hiện ở tháng nào.</p>}
       <form className="eb-form" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
-        <label className="field">Ngày mua<input type="date" value={on} disabled={busy} onChange={(e) => setOn(e.target.value)} /></label>
+        <label className="field">Ngày mua<input type="date" max={hanoiDate()} value={on} disabled={busy} onChange={(e) => setOn(e.target.value)} /></label>
         <label className="field">Tiền bỏ ra (đ)<input inputMode="numeric" value={amount} disabled={busy} onChange={(e) => setAmount(groupDigitsInput(e.target.value))} /></label>
         <label className="field">{gold ? "Số chỉ mua" : "Số đơn vị mua"}<input inputMode="decimal" value={count} disabled={busy} onChange={(e) => setCount(e.target.value)} /></label>
         <button type="submit" className="btn" disabled={busy}><Plus size={14} aria-hidden="true" />Ghi lần mua</button>

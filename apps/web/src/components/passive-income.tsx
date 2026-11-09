@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Target } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatRatio, formatVnd, groupDigitsInput, parseMoneyInput } from "../lib/format";
@@ -27,7 +27,7 @@ const LEVEL: Record<Level["id"], [string, string]> = { safe: ["An toàn", "chưa
 const cover = (v: string | null) => (v === null ? "—" : formatRatio(v, 1).replace(",0%", "%"));
 
 /** Capital needed for a monthly income at an assumed rate, the income today's capital would pay, and time to the goal. An estimate. */
-export function PassiveIncome() {
+export function PassiveIncome({ refresh }: { refresh?: string } = {}) {
   const [view, setView] = useState<View | null>(null);
   const [target, setTarget] = useState("");
   const [yieldRate, setYieldRate] = useState("");
@@ -36,16 +36,21 @@ export function PassiveIncome() {
   const [independent, setIndependent] = useState("");
   const [freedom, setFreedom] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const typed = useRef(false);  // a reload refreshes the figures; what is being typed stays
   useEffect(() => {
+    let live = true;
     api<View>("passive-income").then((v) => {
+      if (!live) return;
       setView(v);
+      if (typed.current) return;
       if (v.goal) { setTarget(formatVnd(v.goal.target, { unit: false })); if (v.goal.rate) setYieldRate(v.goal.rate.replace(".", ",")); }
       setBondRate((v.goal?.bond_rate ?? v.default_bond_rate).replace(".", ","));
       if (v.goal?.stock_rate) setStockRate(v.goal.stock_rate.replace(".", ","));
       if (v.goal?.independent) setIndependent(formatVnd(v.goal.independent, { unit: false }));
       if (v.goal?.freedom) setFreedom(formatVnd(v.goal.freedom, { unit: false }));
-    }, (e) => setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải."));
-  }, []);
+    }, (e) => { if (live) setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải."); });
+    return () => { live = false; };
+  }, [refresh]);
   async function save() {
     if (!view) return;
     const t = parseMoneyInput(target);
@@ -58,6 +63,7 @@ export function PassiveIncome() {
     try {
       setView(await api<View>("passive-income", { method: "PUT", body: { target: t, rate: r, bond_rate: b, stock_rate: s, independent: ind, freedom: free, expected_version: view.version, request_id: requestId() } }));
       setMessage(null);
+      typed.current = false;
     } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); }
   }
   const r = view?.result;
@@ -67,7 +73,7 @@ export function PassiveIncome() {
       <p className="caption">Cần bao nhiêu vốn để tài sản tạo ra dòng tiền mỗi tháng như mong muốn, và với vốn hiện có (Tháp tài sản, trừ quỹ dự phòng) cộng
         góp đều mỗi tháng (Góp vốn đều), tái đầu tư ở cùng tỷ suất, thì khoảng bao lâu đạt. Dòng tiền hiện tại tính theo tài sản thực trả (tiền gửi, trái phiếu, cổ tức); vốn cần có và thời gian đạt dùng tỷ suất giả định. Ước tính đơn giản, theo tiền hôm nay, chưa tính lạm phát;
         không phải khuyến nghị.</p>
-      <form className="eb-form" onSubmit={(e) => { e.preventDefault(); void save(); }}>
+      <form className="eb-form" onInput={() => { typed.current = true; }} onSubmit={(e) => { e.preventDefault(); void save(); }}>
         <label className="field">Dòng tiền mong muốn mỗi tháng (đ)<input inputMode="numeric" value={target} disabled={!view} onChange={(e) => setTarget(groupDigitsInput(e.target.value))} /></label>
         <label className="field">Tỷ suất dòng tiền giả định (%/năm)<input inputMode="decimal" value={yieldRate} disabled={!view} onChange={(e) => setYieldRate(e.target.value)}
           placeholder={view?.default_rate ? `để trống = lãi tiền gửi 12 tháng (${rate(view.default_rate)}%)` : "ví dụ 6"} /></label>

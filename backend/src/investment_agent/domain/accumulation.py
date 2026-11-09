@@ -104,7 +104,7 @@ def plan_status(plan: Plan, buys: tuple[Buy, ...], quotes: dict, *, today: date)
         streak += 1
     cost, quantity = sum((b.amount for b in mine), Decimal(0)), sum((b.quantity for b in mine), Decimal(0))
     out = {"id": plan.id, "months": months, "streak": streak, "cost": _n(cost), "quantity": _n(quantity), "average": _vnd(cost / quantity) if quantity else None,
-           "price": None, "price_on": None, "stale": False, "value": None, "change": None, "price_reason": "no_buys"}
+           "before_start": sum(1 for b in mine if b.on.strftime("%Y-%m") < plan.start), "price": None, "price_on": None, "stale": False, "value": None, "change": None, "price_reason": "no_buys"}
     if quantity:
         quote, reason = _quote(plan, quotes)
         out["price_reason"] = reason

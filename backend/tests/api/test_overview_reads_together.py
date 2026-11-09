@@ -22,3 +22,12 @@ def test_the_overview_fetches_the_asset_book_with_the_rest(tmp_path, monkeypatch
     monkeypatch.setattr(glance_route, "prefetch", lambda repo, owner, records: (fetched.append(set(records)), real(repo, owner, records))[1])
     assert call(c, clock, "GET", "/internal/glance").status_code == 200
     assert ("settings", "deposit_book") in fetched[0]
+
+
+def test_the_overview_fetches_the_accumulation_plans_with_the_rest(tmp_path, monkeypatch):
+    c, clock = client(tmp_path)
+    fetched = []
+    real = glance_route.prefetch
+    monkeypatch.setattr(glance_route, "prefetch", lambda repo, owner, records: (fetched.append(set(records)), real(repo, owner, records))[1])
+    assert call(c, clock, "GET", "/internal/glance").status_code == 200
+    assert ("settings", "accumulation") in fetched[0]

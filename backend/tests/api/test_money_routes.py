@@ -93,3 +93,9 @@ def test_an_unknown_buy_a_wrong_row_and_a_stale_version_are_refused(tmp_path):
     assert post(c, clock, 1, "acpost2", row="nope").status_code == 422
     assert post(c, clock, 0, "acpost3").status_code == 409
     assert call(c, clock, "GET", "/internal/deposit-book").json()["version"] == 1
+
+
+def test_a_buy_dated_in_the_future_is_refused(tmp_path):
+    c, clock = client(tmp_path)
+    r = call(c, clock, "PUT", "/internal/accumulation", {"plans": [GOLD_PLAN], "buys": [{**GOLD_BUY, "on": "2099-01-01"}], "expected_version": 0, "request_id": "ac-future"})
+    assert r.status_code == 422 and r.json()["code"] == "future_buy"

@@ -100,25 +100,27 @@ function FundingView({ f }: { f: Funding }) {
 }
 
 /** Layers of financial assets → total → money for stocks by risk group. Holdings at cost; an excess is shown, never a sell. */
-export function EquityBudget() {
+export function EquityBudget({ refresh }: { refresh?: string } = {}) {
   const [view, setView] = useState<View | null>(null);
   const [values, setValues] = useState<Layers>({ deposit: "", bond: "", gold: "", crypto: "" });
   const [reserve, setReserve] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [intangibles, setIntangibles] = useState<IntangiblesView["year"] | null>(null);
-  const filled = useRef(false);  // saved figures fill the inputs once; a later load must not overwrite what is being typed
-  useEffect(() => { api<IntangiblesView>("intangibles").then((v) => setIntangibles(v.year), () => setIntangibles(null)); }, []);
+  const typed = useRef(false);  // a reload refreshes the figures; what is being typed stays
+  useEffect(() => { api<IntangiblesView>("intangibles").then((v) => setIntangibles(v.year), () => setIntangibles(null)); }, [refresh]);
   useEffect(() => {
+    let live = true;
     api<View>("equity-budget").then((v) => {
+      if (!live) return;
       setView(v);
-      if (filled.current) return;
-      filled.current = true;
+      if (typed.current) return;
       const l = v.budget.layers;
       if (l) setValues({ deposit: formatVnd(l.deposit, { unit: false }), bond: formatVnd(l.bond, { unit: false }), gold: formatVnd(l.gold, { unit: false }),
         crypto: formatVnd(l.crypto, { unit: false }) });
       if (v.budget.reserve) setReserve(formatVnd(v.budget.reserve, { unit: false }));
-    }, (e) => setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải."));
-  }, []);
+    }, (e) => { if (live) setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải."); });
+    return () => { live = false; };
+  }, [refresh]);
   async function save() {
     if (!view) return;
     const layers = Object.fromEntries(INPUTS.map(([k]) => [k, values[k].trim() ? parseMoneyInput(values[k]) : "0"])) as Record<keyof Layers, string | null>;
@@ -128,6 +130,7 @@ export function EquityBudget() {
     try {
       setView(await api<View>("equity-budget", { method: "PUT", body: { layers, reserve: manual, expected_version: view.version, request_id: requestId() } }));
       setMessage(null);
+      typed.current = false;
     } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); }
   }
   const b = view?.budget;
@@ -143,7 +146,7 @@ export function EquityBudget() {
         (tiền mặt tính chung mục tiêu với tiền gửi).
         Tổng tài sản là tổng các lớp. Mục tiêu tính trên phần còn lại sau quỹ dự phòng: vàng 10–15%, trái phiếu tối đa 10%, cổ phiếu theo khẩu vị,
         tiền số tối đa 5%, tiền gửi là phần còn lại. Xây từ dưới lên. Trang Danh mục tính tỷ trọng từng mã trên vốn dành cho cổ phiếu.</p>
-      <form className="eb-form" onSubmit={(e) => { e.preventDefault(); void save(); }}>
+      <form className="eb-form" onInput={() => { typed.current = true; }} onSubmit={(e) => { e.preventDefault(); void save(); }}>
         {INPUTS.map(([k, label]) => <label key={k} className="field">{label}<input inputMode="numeric" value={values[k]} disabled={!view || fromBook(k)}
           title={fromBook(k) ? "Lấy tổng từ Sổ tài sản" : undefined}
           onChange={(e) => setValues({ ...values, [k]: groupDigitsInput(e.target.value) })} /></label>)}

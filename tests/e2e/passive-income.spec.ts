@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { seedOwner, signIn } from "./helpers";
+import { call, seedOwner, signIn } from "./helpers";
 
 // Capital needed for a monthly income at an assumed rate, income today, and time to the goal with monthly contributions.
 test.describe.configure({ mode: "serial" });
@@ -115,4 +115,40 @@ test("the growth chart keeps its text at reading size, tells when the goal is re
   await expect(path.getByTestId("gp-tip")).toContainText("Cơ sở");
   await page.mouse.move(0, 0);
   await expect(path.getByTestId("gp-tip")).toHaveCount(0);
+});
+
+
+test("the three levels follow a new spending figure without a reload", async ({ page }) => {
+  await seedOwner(page);
+  await page.goto("/profile");
+  const levels = page.getByRole("region", { name: "Ba mức tự do tài chính" });
+  await expect(levels).toBeVisible();
+  const health = page.getByRole("region", { name: "Sức khỏe tài chính" });
+  await health.getByLabel("Thu nhập hằng tháng (đ)").fill("20000000");
+  await health.getByLabel("Chi tiêu hằng tháng (đ)").fill("7654321");
+  await health.getByLabel("Năm sinh").fill("1985");
+  await health.getByRole("button", { name: "Kiểm tra" }).click();
+  await expect(levels).toContainText("7.654.321 đ");
+});
+
+test("saving the asset book keeps what is being typed in the sections that recompute", async ({ page }) => {
+  await seedOwner(page);
+  // answered here: the suite shares one store and other specs need it to have no Sổ tài sản
+  await page.route("**/api/internal/deposit-book", async (route) => {
+    if (route.request().method() !== "PUT") return route.continue();
+    await route.fulfill({ json: await (await call(page, "GET", "deposit-book")).json() });
+  });
+  await page.goto("/profile");
+  const tower = page.getByRole("region", { name: "Tháp tài sản" });
+  const goal = page.getByRole("region", { name: "Mục tiêu dòng tiền thụ động" });
+  await expect(tower.getByLabel("Vàng (đ)")).toBeEnabled();
+  await expect(goal.getByLabel("Mức độc lập: chi tiêu mỗi tháng (đ)")).toBeEnabled();
+  await tower.getByLabel("Vàng (đ)").fill("123456");
+  await goal.getByLabel("Mức độc lập: chi tiêu mỗi tháng (đ)").fill("654321");
+  const saved = page.waitForResponse((r) => r.url().endsWith("/deposit-book") && r.request().method() === "PUT");
+  await page.getByLabel("Cộng thêm tiền mặt trong tài khoản chứng khoán tính từ sổ giao dịch").click();
+  await saved;
+  await page.waitForTimeout(800);
+  await expect(tower.getByLabel("Vàng (đ)")).toHaveValue("123.456");
+  await expect(goal.getByLabel("Mức độc lập: chi tiêu mỗi tháng (đ)")).toHaveValue("654.321");
 });

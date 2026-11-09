@@ -90,3 +90,29 @@ test("the two higher levels of spending are kept with the goal", async ({ page }
   await page.reload();
   await expect(box.getByLabel("Mức tự do: chi tiêu mỗi tháng (đ)")).toHaveValue("30.000.000");
 });
+
+
+test("the growth chart keeps its text at reading size, tells when the goal is reached, and shows a year under the pointer", async ({ page }) => {
+  await seedOwner(page);
+  await page.goto("/profile");
+  const box = page.getByRole("region", { name: "Mục tiêu dòng tiền thụ động" });
+  await expect(box.getByLabel("Dòng tiền mong muốn mỗi tháng (đ)")).toBeEnabled();
+  await box.getByLabel("Dòng tiền mong muốn mỗi tháng (đ)").fill("10000000");
+  await box.getByLabel("Tỷ suất dòng tiền giả định (%/năm)").fill("6");
+  await box.getByRole("button", { name: "Tính mục tiêu" }).click();
+  const path = box.getByRole("region", { name: "Đường tăng trưởng tài sản" });
+  for (const width of [1440, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    const chart = path.getByRole("img");
+    await expect(chart).toBeVisible();
+    await expect.poll(() => chart.evaluate((el) => Math.abs(el.getBoundingClientRect().width - Number(el.getAttribute("viewBox")!.split(" ")[2])))).toBeLessThan(2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(path.getByTestId("gp-card-1")).toContainText(/vốn cần có/i);
+  const chart = path.getByRole("img");
+  await chart.hover();  // scrolls to it: the page is long
+  await expect(path.getByTestId("gp-tip")).toContainText("Cơ sở");
+  await page.mouse.move(0, 0);
+  await expect(path.getByTestId("gp-tip")).toHaveCount(0);
+});

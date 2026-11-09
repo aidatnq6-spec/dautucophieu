@@ -281,9 +281,12 @@ main h2{scroll-margin-top:16px}
 .peer-bar{display:block;height:100%;background:var(--brand)}.peer-bar.neg{background:var(--bad)}
 /* Đường tăng trưởng tài sản */
 .gp{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}.gp h3{margin:0 0 4px;font-size:15px}
-.gp-chart{width:100%;height:auto;margin-top:10px}.gp-tick{font-size:11px;fill:var(--muted)}
-.gp-legend{list-style:none;margin:8px 0;padding:0;display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px}
-.gp-swatch{display:inline-block;width:14px;height:3px;margin-right:6px;vertical-align:middle}.gp-dash{background:repeating-linear-gradient(90deg,var(--ink) 0 4px,transparent 4px 7px)}
+.gp-plot{position:relative;margin-top:12px;min-width:0}.gp-chart{display:block;touch-action:pan-y}.gp-tick{font-size:12px;fill:var(--muted)}.gp-end{font-size:12px;font-weight:600}
+.gp-inputs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;align-items:end;margin-top:10px}.gp-inputs input{width:100%}
+.gp-cards{margin-top:14px}.gp-swatch{display:inline-block;width:14px;height:3px;margin-right:6px;vertical-align:middle}
+.gp-tip{position:absolute;top:6px;z-index:2;width:174px;padding:8px 10px;background:var(--paper);border:1px solid var(--line);border-radius:8px;font-size:12px;pointer-events:none}.gp-tip>div{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+@media(max-width:900px){.gp-inputs{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:650px){.gp-inputs{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* Tính khoản vay */
 .ln-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:16px;align-items:start}
 .ln-controls h2{font-size:14px;margin:14px 0 8px}.ln-controls h2:first-child{margin-top:0}

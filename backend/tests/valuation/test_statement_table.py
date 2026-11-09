@@ -259,3 +259,8 @@ def test_vndirects_current_shares_replace_the_quarter_end_count_only_when_the_ma
                               closes=CLOSES, vnstock=None, check={"market_cap": str(500 * B), "shares": "20000000"})
     assert general["summary"]["market_cap"] == "500000000000" and general["summary"]["shares_from_vndirect"] is True  # the cards follow: 20 million × 25,000 đ
 
+
+def test_the_table_gives_four_quarter_parent_profit_at_each_of_the_latest_quarters():
+    t = statement_table(RECORD, closes=CLOSES, vnstock=None)
+    assert t["ttm_parent"]["2025-Q4"] == "170000000000" and t["ttm_parent"]["2025-Q3"] == str(int((24 + 41 + 42 + 43) * B))
+

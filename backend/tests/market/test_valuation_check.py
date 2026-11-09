@@ -35,3 +35,33 @@ def test_a_figure_more_than_a_tenth_away_is_flagged_and_a_missing_side_is_only_s
     assert rows["pe"]["off"] is True and rows["pe"]["diff"] == "0.2000" and rows["pb"]["off"] is False and rows["pb"]["diff"] is None
     assert out["flagged"] == 1
     assert compare(ours, None) is None
+
+
+def test_when_vndirect_has_not_taken_in_the_latest_quarter_its_pe_is_compared_on_the_same_four_quarters():
+    ours = {"market_cap": "11133000000000", "pe": "23.39", "pb": "1.0", "close_date": "2026-11-06"}
+    theirs = {"date": "2026-11-06", "market_cap": "11133000000000", "pe": "18.04", "pb": "1.0", "profit_quarter": "2026-Q2"}
+    ttm = {"2026-Q2": "617100000000", "2026-Q3": "476000000000"}
+    out = compare(ours, theirs, ttm=ttm)
+    pe = {r["key"]: r for r in out["rows"]}["pe"]
+    assert pe["off"] is False and pe["diff"] == "0.0000" and out["flagged"] == 0
+    assert "Q2/2026" in pe["note"] and "Q3/2026" in pe["note"] and "18,04x" in pe["note"]
+
+
+def test_a_real_gap_on_the_same_four_quarters_is_still_flagged_and_an_up_to_date_source_is_compared_as_it_stands():
+    ours = {"market_cap": "1000", "pe": "20", "pb": "1", "close_date": "2026-11-06"}
+    behind = compare(ours, {"date": "d", "market_cap": "1000", "pe": "10", "pb": "1", "profit_quarter": "2026-Q2"}, ttm={"2026-Q2": "50", "2026-Q3": "50"})
+    assert {r["key"]: r for r in behind["rows"]}["pe"]["off"] is True  # 1000 / 50 = 20x on their own quarters, against 10x
+    level = compare(ours, {"date": "d", "market_cap": "1000", "pe": "20", "pb": "1", "profit_quarter": "2026-Q3"}, ttm={"2026-Q2": "50", "2026-Q3": "50"})
+    assert {r["key"]: r for r in level["rows"]}["pe"]["note"] is None
+
+
+def test_the_quarter_vndirects_profit_runs_to_is_read_with_the_figures(tmp_path):
+    store = ValuationCheckStore(tmp_path)
+
+    def get(url):
+        if "NET_PROFIT_TR" in url:
+            return json.dumps({"data": [{"ratioCode": "NET_PROFIT_TR", "reportDate": "2026-06-30", "value": 6e11}, {"ratioCode": "NET_PROFIT_TR", "reportDate": "2026-03-31", "value": 5e11}]})
+        return page(("MARKETCAP", "2026-11-06", 1e12))
+    assert fetch_checks(store, ["AAA"], get=get, today=TODAY, sleep=lambda s: None) == {"AAA": "ok"}
+    assert store.read("AAA")["profit_quarter"] == "2026-Q2"
+

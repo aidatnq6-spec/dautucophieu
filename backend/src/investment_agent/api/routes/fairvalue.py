@@ -20,6 +20,8 @@ from investment_agent.market.leading import MacroStore
 from investment_agent.market.sectors import load_sectors
 from investment_agent.market.series import SeriesStore
 from investment_agent.market.statements import StatementStore
+from investment_agent.market.valuation_check import ValuationCheckStore
+from investment_agent.market.valuation_check import compare as compare_valuation
 from investment_agent.market.watchlist import load_watchlist
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.holdings_view import fair_value_board
@@ -159,7 +161,8 @@ def statements(symbol: str, request: Request):
     table = _table_of(data_dir, symbol, kind)
     if table is None:
         return {**empty, "reason": "Chưa có số liệu VNDirect cho mã này (đồng bộ lúc 20:00, mỗi lượt vài mã)"}
-    return {**table, "kind": kind, "reason": None}
+    theirs = ValuationCheckStore(data_dir / "valuation-check").read(symbol)
+    return {**table, "kind": kind, "reason": None, "valuation_check": compare_valuation(table.get("current") or {}, theirs)}
 
 
 def _table_of(data_dir: Path, symbol: str, kind: str | None) -> dict | None:

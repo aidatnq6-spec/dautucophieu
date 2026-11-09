@@ -26,6 +26,7 @@ SOURCES = ({"id": "prices", "label": "Giá VN-Index", "dir": None, "max_days": 6
            {"id": "fundamentals", "label": "Báo cáo Vnstock", "dir": "fundamentals", "max_days": 4},
            {"id": "statements", "label": "Báo cáo VNDirect", "dir": "statements", "max_days": 4},
            {"id": "financial-ratios", "label": "Chỉ số ngành", "dir": "financial-ratios", "max_days": 4},
+           {"id": "valuation-check", "label": "Đối chiếu định giá (VNDirect)", "dir": "valuation-check", "max_days": 4},
            {"id": "bank-notes", "label": "Thuyết minh ngân hàng (Vietcap)", "dir": "bank-notes", "max_days": 10})
 _NAMED = re.compile(r"^(\S+) (.+?) exit=(\d+)(?:\s|$)")
 _BARE = re.compile(r"^(\S+) exit=(\d+)(?:\s|$)")

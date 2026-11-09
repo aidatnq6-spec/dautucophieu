@@ -358,9 +358,9 @@ def _current(record: dict, closes) -> dict:
     close_date = closes[-1][0].date().isoformat() if closes else None
     cap, last = _market_value_now(record, closes)
     if cap is None:
-        return {"pe": None, "pb": None, "close_date": close_date}
+        return {"pe": None, "pb": None, "market_cap": None, "close_date": close_date}
     npat = _four(quarters, last, ("npat_parent",))["npat_parent"]
-    return {"pe": _ratio(cap, npat, _Q2, positive=True), "pb": _ratio(cap, _parent_equity(quarters[last]), _Q2, positive=True), "close_date": close_date}
+    return {"pe": _ratio(cap, npat, _Q2, positive=True), "pb": _ratio(cap, _parent_equity(quarters[last]), _Q2, positive=True), "market_cap": _money(cap), "close_date": close_date}
 
 
 def statement_table(record: dict, *, closes, vnstock: dict | None, kind: str | None = None) -> dict:

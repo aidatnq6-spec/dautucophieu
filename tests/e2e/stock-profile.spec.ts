@@ -326,3 +326,24 @@ test("a public PDF bulletin proposes each line's figure with its page and text, 
   await expect(group.getByRole("row", { name: /^Q3\/26/ })).toContainText("412.300");
   await group.getByRole("button", { name: "Xóa nhóm" }).click();
 });
+
+test("Bảng đèn chỉ báo sớm colours an indicator against thresholds the owner sets, in either direction", async ({ page }) => {
+  await page.goto("/research/ACB");
+  const box = page.getByRole("region", { name: "Bảng đèn chỉ báo sớm" });
+  const form = box.getByRole("form", { name: "Thêm chỉ báo" });
+  await form.getByLabel("Chỉ báo").selectOption("macro:wti");  // the fixture's oil ends at 66
+  await form.getByLabel("Ngưỡng Xấu").fill("55");
+  await form.getByLabel("Ngưỡng Tốt").fill("75");
+  await form.getByRole("button", { name: "Thêm" }).click();
+  const row = box.getByRole("row", { name: /Giá dầu WTI/ });
+  await expect(row).toContainText("Theo dõi");
+  await expect(row).toContainText("≥ 75");
+  await form.getByLabel("Chỉ báo").selectOption("stock:BAD_LOANS_RATIO_AQ");  // ACB's NPL: 1,20%
+  await form.getByLabel("Ngưỡng Xấu").fill("3");
+  await form.getByLabel("Ngưỡng Tốt").fill("2");
+  await form.getByRole("button", { name: "Thêm" }).click();
+  await expect(box.getByRole("row", { name: /NPL/ })).toContainText("Tốt");
+  await box.getByRole("button", { name: "Bỏ Giá dầu WTI" }).click();
+  await expect(box.getByRole("row", { name: /Giá dầu WTI/ })).toHaveCount(0);
+  await box.getByRole("button", { name: "Bỏ NPL" }).click();
+});

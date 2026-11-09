@@ -144,7 +144,7 @@ def test_a_tcbs_statement_is_previewed_then_imported_once(client, clock):
     content = _statement(line("FPT", "05/01/2027", "Mua", 100, 20000, 300, 0, order="111"), line("FPT", "06/01/2027", "Bán", 40, 25000, 100, 1000, order="222"), line("FPT", "31/02/2026", order="333"))
     url = "/internal/ledger/import-tcbs"
     preview = call(client, clock, "POST", url, {"content_base64": content, "expected_version": 1, "request_id": "p1"}).json()
-    assert preview["counts"]["new"] == 2 and preview["blocked"] is None and preview["problems"][0]["line"] == 6 and preview["version"] == 1
+    assert preview["counts"]["new"] == 2 and preview["blocked"] is None and preview["problems"][0]["line"] == 8 and preview["version"] == 1
     assert len(call(client, clock, "GET", "/internal/ledger").json()["events"]) == 1  # a preview writes nothing
     done = call(client, clock, "POST", url, {"content_base64": content, "commit": True, "expected_version": 1, "request_id": "c1"}).json()
     assert [e["event_id"] for e in done["events"]][-2:] == ["tcbs-111", "tcbs-222"] and done["state"]["fees_paid"] == "400" and done["state"]["taxes_paid"] == "1000"

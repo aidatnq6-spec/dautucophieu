@@ -70,7 +70,8 @@ def _plain(d: Decimal) -> str:
 def parse_tcbs_xlsx(data: bytes, *, today: date) -> tuple[list[dict], list[dict]]:
     """(orders, problems): {line, symbol, type, date, quantity, price, fee, tax, order_no} for each matched order, {line, message} for each left out."""
     rows = _rows(data)
-    head = next((i for i, (_, cells) in enumerate(rows) if any(_fold(v).startswith("ma cp") for v in cells.values())), None)
+    # The letterhead repeats the filters ("Mã CP (Ticker)": all), so the table's own header is the row with both these columns.
+    head = next((i for i, (_, cells) in enumerate(rows) if {"ma cp", "ngay gd"} <= {_fold(v.split(chr(10))[0]).strip() for v in cells.values()}), None)
     if head is None:
         raise StatementFileError("Thiếu các cột của sao kê TCBS (không thấy cột Mã CP).")
     titles = {col: _fold(v.split("\n")[0]).strip() for col, v in rows[head][1].items()}

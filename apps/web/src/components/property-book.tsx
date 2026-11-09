@@ -1,6 +1,7 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Calculator, Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatRatio, formatVnd, groupDigitsInput, parseMoneyInput } from "../lib/format";
 
@@ -119,6 +120,7 @@ export function PropertyBook() {
   const locked = !view || busy || editing !== null;
   const p = view?.picture;
   const actions = (list: List, row: Row) => <td className="db-actions">
+    {list === "loans" && p?.loans[row.id] && <Link className="btn" aria-label={`Mở ${row.name} ở Tính khoản vay`} href={`/loan?loan=${row.id}`}><Calculator size={14} aria-hidden="true" />Tính</Link>}
     <button type="button" className="btn" disabled={locked} aria-label={`Sửa ${row.name}`} onClick={() => start(list, row)}><Pencil size={14} aria-hidden="true" />Sửa</button>
     <button type="button" className="btn" disabled={locked} aria-label={`Xóa ${row.name}`} onClick={() => void remove(list, row)}><Trash2 size={14} aria-hidden="true" />Xóa</button></td>;
   const form = (list: List) => editing?.list === list && <RowForm fields={fieldsOf(list)} draft={editing.draft} busy={busy} error={message}
@@ -163,7 +165,7 @@ export function PropertyBook() {
       {view && view.book.loans.length > 0 && <table className="fv-table" aria-label="Khoản vay">
         <thead><tr><th>Tên</th><th className="num">Dư nợ</th><th className="num">Lãi hiện tại</th><th className="num">Tháng còn lại</th><th>Cách trả</th><th className="num">Khoản trả tháng này</th><th /></tr></thead>
         <tbody>{view.book.loans.map((r) => <tr key={r.id}><td data-label="Tên">{r.name}{r.bank ? <div className="caption">{r.bank}</div> : null}</td><td data-label="Dư nợ" className="num">{money(r.balance)}</td>
-          <td data-label="Lãi hiện tại" className="num">{r.rate === null ? "Chưa nhập" : `${String(r.rate).replace(".", ",")}%`}</td><td data-label="Tháng còn lại" className="num">{r.months_left ?? "Chưa nhập"}</td><td data-label="Cách trả">{label(METHOD, r.method)}</td>
+          <td data-label="Lãi hiện tại" className="num">{r.rate === null ? "Chưa nhập" : `${String(r.rate).replace(".", ",")}%`}{r.promo_ends ? <div className="caption">hết ưu đãi {r.promo_ends}</div> : null}</td><td data-label="Tháng còn lại" className="num">{r.months_left ?? "Chưa nhập"}</td><td data-label="Cách trả">{label(METHOD, r.method)}</td>
           <td data-label="Khoản trả" className="num">{p?.loans[r.id] ? formatVnd(p.loans[r.id]!) : "Chưa đủ số"}</td>{actions("loans", r)}</tr>)}</tbody>
       </table>}
       {form("loans")}

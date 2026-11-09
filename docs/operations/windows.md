@@ -33,6 +33,7 @@ Mỗi bước ghi một dòng `<thời điểm> <tên bước> exit=<mã>` vào 
 | `valuation-check-sync` | Từ lượt 20:00 | Đọc vốn hoá, P/E, P/B, số cổ phiếu của các mã theo dõi từ VNDirect để đối chiếu | `data\valuation-check\` |
 | `bank-notes-sync` | Từ lượt 20:00, mỗi ngân hàng một lần một tuần | Đọc thuyết minh Vietcap (nợ theo nhóm, tiền gửi theo loại, CAR), mỗi lượt gọi cách nhau 10 giây; nguồn từ chối thì dừng, không thử lại | `data\bank-notes\` |
 | `drawdown-check` | Mỗi lượt | Lấy toàn bộ lịch sử giá một lần cho mỗi mã, cả mã cũ; nhắc khi mã đang nắm giảm quá ngưỡng so với giá vốn | `data\trend-sources\`, mã không có giá ghi ở `_no_prices.json` |
+| `loan-alerts` | Mỗi lượt | Báo Telegram một lần cho mỗi khoản vay khi còn 90 ngày hoặc ít hơn là hết ưu đãi, kèm khoản trả trước và sau theo dư nợ hiện tại | `data\alerts\loans.json` (chỉ mã khoản vay và ngày) |
 | `lights-check` | Mỗi lượt | Báo Telegram khi một chỉ báo của Bảng đèn đổi màu; màu thấy lần đầu chỉ được ghi nhớ | `data\alerts\lights.json` |
 | `backup-drill` | Mỗi lượt, tự bỏ qua nếu chưa đủ 7 ngày | Khôi phục bản sao lưu mới nhất vào thư mục tạm rồi xóa | `data\alerts\restore-drill.json` |
 | `health-check` | Mỗi lượt và trong tác vụ `InvestmentAgent-Alerts` | Xem mục Tình trạng hệ thống bên dưới | `data\alerts\system-health.json` |

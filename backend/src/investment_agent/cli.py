@@ -98,6 +98,8 @@ def main() -> int:
     sectors.add_argument("--output", type=Path, required=True)
     deposits = commands.add_parser("deposit-alerts", help="Sổ tiết kiệm: Telegram once per sổ from the day before it matures")
     deposits.add_argument("--data-dir", type=Path, required=True)
+    loans = commands.add_parser("loan-alerts", help="Khoản vay: Telegram once per loan 90 days before its promotion ends")
+    loans.add_argument("--data-dir", type=Path, required=True)
     contrib = commands.add_parser("contribution-remind", help="Góp vốn đều: Telegram once a month from the contribution day until it is met")
     contrib.add_argument("--data-dir", type=Path, required=True)
     drawdown = commands.add_parser("drawdown-check", help="full price history for drawdowns; Telegram when a holding falls past the threshold")
@@ -175,6 +177,8 @@ def main() -> int:
         return scheduled_run(args.calendar, args.data_dir)
     if args.command == "deposit-alerts":
         return deposit_alerts_cli(args.data_dir)
+    if args.command == "loan-alerts":
+        return loan_alerts_cli(args.data_dir)
     if args.command == "contribution-remind":
         return contribution_cli(args.data_dir)
     if args.command == "drawdown-check":
@@ -879,6 +883,23 @@ def deposit_alerts_cli(data_dir: Path) -> int:
     send, repo, owner = telegram
     book, _ = read_book(repo, owner)
     out = deposit_alerts_run(data_dir, book=book, send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
+    print(json.dumps(out))  # counts only, never the book
+    return 0
+
+
+def loan_alerts_cli(data_dir: Path) -> int:
+    """Nhắc hết lãi ưu đãi over Telegram; skipped (the book is not read) while scheduled delivery is off."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from investment_agent.services.loan_alerts import loan_alerts_run, read_property_book
+
+    telegram = _scheduled_telegram(data_dir)
+    if telegram is None:
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
+        return 0
+    send, repo, owner = telegram
+    out = loan_alerts_run(data_dir, book=read_property_book(repo, owner), send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
     print(json.dumps(out))  # counts only, never the book
     return 0
 

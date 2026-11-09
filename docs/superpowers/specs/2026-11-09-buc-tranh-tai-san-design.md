@@ -9,4 +9,4 @@ Chủ sở hữu duyệt ngày 09/11/2026. Ở Hồ sơ & rủi ro, dưới Sổ
 - **Khoản trả tháng này** theo lãi hiện tại: dư nợ ÷ số tháng + lãi tháng (giảm dần), hoặc khoản trả đều.
 - **Cảnh báo:** bất động sản vượt ngưỡng (mặc định 70% tổng tài sản, chủ sở hữu tự đặt); giá trị quá 180 ngày hoặc chưa có ngày.
 - **Tách biệt:** không ảnh hưởng Tháp tài sản hay số tiền dành cho cổ phiếu; không đọc loại "Bất động sản" trong Hồ sơ.
-- **Đợt 2 (chưa làm):** nhắc trước khi hết ưu đãi trong Việc cần xem và Telegram; mở khoản vay sang Tính khoản vay.
+- **Đợt 2 (chủ sở hữu duyệt 09/11/2026):** từ 90 ngày trước ngày hết ưu đãi, khoản vay hiện trong Việc cần xem và được báo Telegram một lần cho mỗi khoản và ngày. Khoản trả trước và sau ưu đãi tính theo dư nợ hiện tại; thiếu số thì ghi rõ. Nút mở khoản vay sang Tính khoản vay chỉ truyền mã khoản vay trên đường dẫn, không truyền số tiền; thay đổi ở trang đó không ghi lại vào sổ.

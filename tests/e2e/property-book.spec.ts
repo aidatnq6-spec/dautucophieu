@@ -27,6 +27,11 @@ test("a property and a loan are entered, and the loan's monthly payment is worke
   await box.getByRole("button", { name: "Lưu" }).click();
   await expect(box.getByRole("table", { name: "Khoản vay" })).toContainText("22.000.000 đ");
   await expect(box.getByTestId("nw-debt")).toHaveText("1.200.000.000 đ");
+  await box.getByRole("link", { name: "Mở Vay thử ở Tính khoản vay" }).click();
+  await expect(page).toHaveURL(/\/loan\?loan=/);
+  const result = page.getByRole("complementary", { name: "Kết quả khoản vay" });
+  await expect(result.getByTestId("ln-first")).toHaveText("22.000.000 đ");
+  await expect(page.getByTestId("ln-from-book")).toContainText("Vay thử");
 });
 
 test("the section adds no sideways scroll at 375px", async ({ page }) => {

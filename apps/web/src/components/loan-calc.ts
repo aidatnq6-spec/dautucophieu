@@ -45,6 +45,18 @@ export function loanSchedule(input: LoanInput): Loan {
   return { rows, interest, fee, total: principal + interest + fee };
 }
 
+/** The first monthly payment once the rate has changed and the principal has started, against the month before; null when no such comparison exists:
+ * no promotion, the same rate after it, or that month being the loan's last (when repaying early, its payment is the whole balance). */
+export function paymentStep(loan: Loan, promoMonths: number, graceMonths = 0): { first: number; after: number; period: number; rise: number } | null {
+  if (promoMonths <= 0) return null;
+  const index = Math.max(promoMonths, graceMonths);
+  const after = loan.rows[index];
+  if (!after || index === loan.rows.length - 1 || after.rate === loan.rows[promoMonths - 1].rate) return null;
+  return { first: loan.rows[0].payment, after: after.payment, period: after.period, rise: after.payment - loan.rows[index - 1].payment };
+}
+
+export const shareText = (part: number, whole: number) => `${((part / whole) * 100).toFixed(1).replace(".", ",")}%`;
+
 export const savedByPrepaying = (full: Loan, early: Loan) => full.interest - early.interest - early.fee;
 
 /** An amount typed in tỷ (1.5 and 1,5 are both one and a half) or in triệu (1.000 is a thousand); null when unreadable or negative. */

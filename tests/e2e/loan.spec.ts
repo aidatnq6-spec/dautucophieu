@@ -44,6 +44,30 @@ test("Tính khoản vay gives the first payment, totals, schedule, grace and ear
   await expect(result.getByRole("alert")).toContainText("không dài hơn thời hạn vay");
 });
 
+test("the payment after the promotion and each part's share are shown beside the first payment", async ({ page }) => {
+  await page.goto("/loan");
+  const result = page.getByRole("complementary", { name: "Kết quả khoản vay" });
+  await expect(result.getByTestId("ln-after")).toHaveText("24.266.667 đ");
+  await expect(result).toContainText("Sau ưu đãi · tháng 13");
+  await expect(result.getByTestId("ln-rise")).toHaveText("Tăng 5.558.333 đ (+29,7%) so với tháng liền trước");
+  await expect(result).toContainText("42,6%");
+  await expect(result).toContainText("57,4%");
+  await expect(result).not.toContainText("Cần trả trước");  // nothing to show when the whole amount is borrowed
+  await page.getByRole("textbox", { name: "Thời gian ưu đãi" }).fill("0");
+  await expect(result.getByTestId("ln-after")).toHaveCount(0);
+  await expect(result).toContainText("Thanh toán tháng đầu");
+  await page.getByLabel("Giá trị bất động sản").first().check();
+  await expect(result).toContainText("Cần trả trước");
+});
+
+test("the page's actions sit where they act: schedule and print by the result, reset in the form", async ({ page }) => {
+  await page.goto("/loan");
+  const result = page.getByRole("complementary", { name: "Kết quả khoản vay" });
+  await expect(result.getByRole("button", { name: "Thanh toán từng tháng" })).toBeVisible();
+  await expect(result.getByRole("button", { name: "In" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Thông tin khoản vay" }).getByRole("button", { name: "Đặt lại" })).toBeVisible();
+});
+
 test("the printout uses the whole page width, states the loan and leaves out the controls", async ({ page }, info) => {
   await page.setViewportSize({ width: 794, height: 1123 });  // A4 at 96 dpi
   await page.goto("/loan");

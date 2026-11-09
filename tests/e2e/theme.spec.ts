@@ -33,7 +33,7 @@ test("Theo máy follows the machine, and a choice overrides it", async ({ page }
 
 test("the theme buttons add no sideways scroll at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 800 });
-  await page.goto("/loan");
+  await page.goto("/settings");
   await expect(page.getByRole("group", { name: "Giao diện" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });

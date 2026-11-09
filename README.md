@@ -38,7 +38,7 @@ Không có thì file scan báo "chưa cài Tesseract" và nhập tay như cũ.
 
 ```powershell
 winget install -e --id UB-Mannheim.TesseractOCR
-curl.exe -L -o "C:\Program Files\Tesseract-OCR	essdataie.traineddata" https://github.com/tesseract-ocr/tessdata_best/raw/main/vie.traineddata
+curl.exe -L -o "C:\Program Files\Tesseract-OCR\tessdata\vie.traineddata" https://github.com/tesseract-ocr/tessdata_best/raw/main/vie.traineddata
 ```
 
 ## Kiểm tra

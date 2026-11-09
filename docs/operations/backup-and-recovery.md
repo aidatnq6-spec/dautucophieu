@@ -27,7 +27,13 @@ Giữ lại 7 bản `daily` và 4 bản `weekly` mới nhất; bản `manual` kh
 
 ## Diễn tập
 
-`backend/tests/operations/test_recovery.py` diễn tập trên dữ liệu tổng hợp: sao lưu khi có giao dịch SQLite chưa commit, loại bí mật/log, từ chối bản bị sửa, khôi phục vào thư mục mới, khôi phục Firestore vào kho rỗng khớp dữ liệu gốc, từ chối ghi đè dữ liệu mới, giới hạn giữ bản. Diễn tập với Firestore thật **chưa chạy** (chưa cấu hình khóa); `FirestoreDocumentStore.dump` chưa được kiểm chứng trên dự án thật.
+`backend/tests/operations/test_recovery.py` diễn tập trên dữ liệu tổng hợp: sao lưu khi có giao dịch SQLite chưa commit, loại bí mật/log, từ chối bản bị sửa, khôi phục vào thư mục mới, khôi phục Firestore vào kho rỗng khớp dữ liệu gốc, từ chối ghi đè dữ liệu mới, giới hạn giữ bản. Khôi phục vào Firestore thật **chưa diễn tập**.
+
+### Diễn tập tự động
+
+Từ 09/11/2026, lệnh `backup-drill` chạy trong lịch sau phiên và tự bỏ qua nếu lần trước chưa đủ 7 ngày. Lệnh khôi phục bản sao lưu mới nhất vào thư mục tạm (so checksum), đọc thử `personal-export.json`, rồi xóa thư mục tạm. Kết quả ở `data\alerts\restore-drill.json`, chỉ gồm thời điểm, tên bản sao lưu, số tệp và loại lỗi.
+
+Phạm vi: diễn tập này kiểm tra dữ liệu cục bộ và việc đọc được bản xuất. Nó **không** ghi vào Firestore, nên chưa phải phép thử khôi phục Firestore thật. Khi diễn tập hỏng hoặc quá 14 ngày chưa chạy, `health-check` sẽ báo (xem `windows.md`).
 
 ## Nhật ký tác vụ
 

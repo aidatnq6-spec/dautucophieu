@@ -12,6 +12,7 @@ from investment_agent.market.index_valuation import INDICES, series_key
 from investment_agent.market.sectors import load_sectors
 from investment_agent.market.series import SeriesStore
 from investment_agent.market.watchlist import load_watchlist
+from investment_agent.repositories.personal import prefetch
 from investment_agent.valuation.sources import merged_fundamentals
 from investment_agent.services.records import LedgerBook, read_version, valuation_settings
 from investment_agent.valuation.index_reference import value_index
@@ -30,9 +31,10 @@ def _bank_figures(repo, owner, data_dir: Path, symbols, sectors) -> dict[str, di
     from investment_agent.market.bank_notes import BankNoteStore, bank_ratio_rows
     notes = BankNoteStore(Path(data_dir) / "bank-notes")
     out = {}
-    for s in symbols:
-        if sectors.get(s) != "Ngân hàng":
-            continue
+    banks = [s for s in symbols if sectors.get(s) == "Ngân hàng"]
+    if repo is not None:  # one Firestore transaction each: read one after another they were more than half of the board's time
+        prefetch(getattr(repo, "authoritative", repo), owner, [("settings", f"bank_figures_{s}") for s in banks])
+    for s in banks:
         record = read_version(repo, owner, "settings", f"bank_figures_{s}", None) if repo is not None else None
         entered = {q: v["values"] for q, v in record.payload.get("quarters", {}).items()} if record else {}
         if rows := bank_ratio_rows(entered, (notes.read(s) or {}).get("quarters") or {}):

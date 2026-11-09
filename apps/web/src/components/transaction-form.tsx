@@ -19,6 +19,7 @@ export const TYPE_LABEL: Record<string, string> = Object.fromEntries([...TYPES, 
 export const LEDGER_ERRORS: Record<string, string> = {
   ledger_oversell: "Số lượng bán vượt số cổ phiếu đang có.", ledger_cash_negative: "Tiền trong sổ sẽ âm: cần ghi nộp tiền trước.",
   ledger_ambiguous_order: "Đã có giao dịch cùng ngày và cùng thứ tự: đổi thứ tự trong ngày.", ledger_duplicate_event: "Mã giao dịch đã tồn tại.",
+  ledger_nothing_to_import: "Không có lệnh mới để thêm.",
   version_conflict: "Sổ đã thay đổi ở nơi khác: tải lại trang rồi nhập lại.",
   ledger_eligible_exceeds_holding: "Số cổ phiếu hưởng quyền lớn hơn số đang có trong sổ vào ngày này: kiểm tra ngày và thứ tự so với lệnh bán cùng ngày.",
   ledger_duplicate_action: "Sự kiện này đã được ghi quyền trong sổ.", ledger_action_already_settled: "Sự kiện này đã được ghi nhận tiền/cổ phiếu về.",

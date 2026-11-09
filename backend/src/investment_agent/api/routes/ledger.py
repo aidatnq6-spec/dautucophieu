@@ -1,14 +1,19 @@
+import base64
+import binascii
+
 from fastapi import APIRouter, Request
 from pydantic import Field
 
-from investment_agent.domain.ledger import LedgerError, LedgerEvent, replay
+from investment_agent.domain.ledger import LedgerError, LedgerEvent, parse_events, replay
+from investment_agent.domain.ledger_import import plan_import
 from investment_agent.domain.models import ContractModel
 from investment_agent.domain.reconciliation import Amendment, Change
+from investment_agent.domain.tcbs_statement import StatementFileError, parse_tcbs_xlsx
 from investment_agent.services.records import LedgerBook
 from investment_agent.repositories.personal import InvalidRecord, RepositoryUnavailable, VersionConflict
 
 from ..auth import require_owner
-from .common import WRITE_ERRORS, error, read_current, read_version, unavailable, write_error
+from .common import WRITE_ERRORS, error, now, read_current, read_version, unavailable, write_error
 
 router = APIRouter(prefix="/internal/ledger")
 # One aggregate record: its version covers the whole ledger, so order and inventory
@@ -27,6 +32,11 @@ class AppendRequest(_Mutation):
 
 class AmendRequest(_Mutation):
     amendment: Amendment
+
+
+class TcbsImportRequest(_Mutation):
+    content_base64: str = Field(min_length=1, max_length=1_000_000)
+    commit: bool = False
 
 
 def _view(version, book, *, stale=False):
@@ -97,6 +107,36 @@ def append(request: Request, body: AppendRequest):
         book.events.append(body.event)
         return body.event.effective_at
     return _mutate(request, body, change)
+
+
+@router.post("/import-tcbs")
+def import_tcbs(request: Request, body: TcbsImportRequest):
+    """A TCInvest order history (.xlsx): with commit false what it would add, line by line; with commit true the new orders, all or none."""
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None:
+        return unavailable()
+    try:
+        orders, problems = parse_tcbs_xlsx(base64.b64decode(body.content_base64, validate=True), today=now(request).date())
+    except (StatementFileError, binascii.Error, ValueError) as exc:
+        return error(422, "invalid_file", str(exc) if isinstance(exc, StatementFileError) else "Không đọc được file.")
+    if body.commit:
+        def change(book):
+            plan = plan_import(book.events, list(book.effective().events), orders)
+            if plan["blocked"]:
+                raise LedgerError(plan["blocked"]["code"])
+            if not plan["events"]:
+                raise LedgerError("nothing_to_import")
+            added = parse_events(plan["events"])
+            book.events.extend(added)
+            return min(e.effective_at for e in added)
+        return _mutate(request, body, change)
+    try:
+        record, _ = read_current(repo, owner, COLLECTION, RECORD)
+    except RepositoryUnavailable:
+        return unavailable()
+    book = LedgerBook(record)
+    plan = plan_import(book.events, list(book.effective().events), orders)
+    return {"version": record.version if record else 0, "rows": plan["rows"], "counts": plan["counts"], "blocked": plan["blocked"], "problems": problems}
 
 
 @router.post("/amendments")

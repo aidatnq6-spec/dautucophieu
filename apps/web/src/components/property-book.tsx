@@ -9,7 +9,8 @@ type Row = Record<string, string | number | null> & { id: string; name: string }
 type Book = { properties: Row[]; loans: Row[]; ceiling: string };
 type Picture = { financial: string | null; property_total: string; property_missing: string[]; stale: string[]; debt: string; debt_missing: string[]; payments: string; payments_missing: string[];
   rent: string; rent_less_payments: string | null; loans: Record<string, string | null>; ceiling: string; complete: boolean; total_assets: string | null; net_worth: string | null;
-  liquid_share: string | null; clear_share: string | null; unclear_share: string | null; property_share: string | null; debt_ratio: string | null; over: boolean };
+  liquid_share: string | null; clear_share: string | null; unclear_share: string | null; property_share: string | null; debt_ratio: string | null; over: boolean; yields: Record<string, string | null>; live_total: string | null; invest_total: string | null; invest_property_total: string | null;
+  live_share: string | null; invest_share: string | null; invest_property_of_invest: string | null; financial_of_invest: string | null };
 type View = { version: number; book: Book; picture: Picture; financial_reason: string | null; unpriced: string[] };
 type List = "properties" | "loans";
 type Draft = Record<string, string>;
@@ -144,6 +145,14 @@ export function PropertyBook() {
           <div><dt>Bất động sản chưa rõ pháp lý</dt><dd>{share(p.unclear_share)}</dd></div>
           {p.rent_less_payments !== null && <div><dt>Tiền thuê trừ khoản trả</dt><dd className={Number(p.rent_less_payments) < 0 ? "negative" : undefined}>{formatVnd(p.rent_less_payments)}</dd></div>}
         </dl>}
+        {p.live_total !== null && p.total_assets !== "0" && <section aria-label="Cấu trúc tài sản">
+          <h3>Cấu trúc tài sản</h3>
+          <dl className="ln-flow">
+            <div><dt>Để ở (không tạo ra tiền)</dt><dd data-testid="nw-live">{formatVnd(p.live_total)} · {share(p.live_share)}</dd></div>
+            <div><dt>Đầu tư (tài chính, bất động sản cho thuê và đầu tư)</dt><dd data-testid="nw-invest">{formatVnd(p.invest_total!)} · {share(p.invest_share)}</dd></div>
+            {p.invest_property_of_invest !== null && <div><dt>Trong phần đầu tư: bất động sản / tài chính</dt><dd data-testid="nw-mix">{share(p.invest_property_of_invest)} / {share(p.financial_of_invest)}</dd></div>}
+          </dl>
+        </section>}
         {view.financial_reason && <p className="notice pv-note" data-testid="nw-reason">{view.financial_reason}</p>}
         {p.over && <p className="notice pv-note" data-testid="nw-over">Bất động sản chiếm {share(p.property_share)} tổng tài sản, vượt ngưỡng {String(p.ceiling).replace(".", ",")}% bạn đặt.</p>}
         {p.property_missing.length > 0 && <p className="notice pv-note">Chưa có giá trị: {p.property_missing.join(", ")}. Chưa tính được tài sản ròng.</p>}
@@ -154,10 +163,11 @@ export function PropertyBook() {
       </>}
       <h3>Bất động sản</h3>
       {view && view.book.properties.length > 0 && <table className="fv-table" aria-label="Bất động sản">
-        <thead><tr><th>Tên</th><th>Loại</th><th>Mục đích</th><th className="num">Giá trị tự ước tính</th><th>Ngày ước tính</th><th>Pháp lý</th><th className="num">Tiền thuê/tháng</th><th /></tr></thead>
+        <thead><tr><th>Tên</th><th>Loại</th><th>Mục đích</th><th className="num">Giá trị tự ước tính</th><th>Ngày ước tính</th><th>Pháp lý</th><th className="num">Tiền thuê/tháng</th><th className="num">Lợi suất cho thuê</th><th /></tr></thead>
         <tbody>{view.book.properties.map((r) => <tr key={r.id}><td data-label="Tên">{r.name}</td><td data-label="Loại">{label(KIND, r.kind)}</td><td data-label="Mục đích">{label(PURPOSE, r.purpose)}</td>
           <td data-label="Giá trị" className="num">{money(r.value)}</td><td data-label="Ngày ước tính">{r.valued_on ?? "Chưa nhập"}</td><td data-label="Pháp lý">{label(LEGAL, r.legal)}</td>
-          <td data-label="Tiền thuê" className="num">{r.rent_monthly === null ? "—" : money(r.rent_monthly)}</td>{actions("properties", r)}</tr>)}</tbody>
+          <td data-label="Tiền thuê" className="num">{r.rent_monthly === null ? "—" : money(r.rent_monthly)}</td>
+          <td data-label="Lợi suất cho thuê" className="num">{p?.yields[r.id] ? `${formatRatio(p.yields[r.id]!, 2)}/năm` : "—"}</td>{actions("properties", r)}</tr>)}</tbody>
       </table>}
       {form("properties")}
       <button type="button" className="btn" disabled={locked} onClick={() => start("properties")}><Plus size={14} aria-hidden="true" />Thêm bất động sản</button>

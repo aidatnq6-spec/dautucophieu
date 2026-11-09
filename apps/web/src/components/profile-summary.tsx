@@ -59,7 +59,7 @@ export function ProfileSummary() {
       <PropertyBook key={`property-${riskChanges}-${bookSaves}`} />
       <EquityBudget key={`${riskChanges}-${intangibleChanges}-${bookSaves}`} />
       <NewMoney />
-      <CycleTargets key={`cycle-${riskChanges}-${bookSaves}`} />
+      <CycleTargets refresh={`${riskChanges}-${bookSaves}`} />
     </>
   );
 }

@@ -31,6 +31,16 @@ def income_by_layer(*, deposit: Decimal, deposit_rate: Decimal, bond: Decimal, b
     return {**{k: _vnd(v) for k, v in lines.items()}, "total": _vnd(sum(lines.values(), Decimal(0)))}
 
 
+def freedom_levels(*, income: Decimal, rent: Decimal, safe: Decimal | None, independent: Decimal | None, freedom: Decimal | None) -> dict:
+    """Ba mức tự do tài chính: per level of monthly spending, how much of it today's income covers, without and with rent. Rent is shown apart
+    because it may not come in every month. Not capped at 100%; a level with no spending has no cover."""
+    def cover(amount: Decimal, spending: Decimal | None) -> str | None:
+        return format((amount / spending).quantize(Decimal("0.0001"), ROUND_HALF_UP), "f") if spending else None
+    rows = [{"id": name, "spending": _vnd(spending) if spending is not None else None, "without_rent": cover(income, spending), "with_rent": cover(income + rent, spending)}
+            for name, spending in (("safe", safe), ("independent", independent), ("freedom", freedom))]
+    return {"rent": _vnd(rent), "rows": rows}
+
+
 def passive_income(*, target: Decimal, rate: Decimal, capital: Decimal | None, contribution: Decimal, today: date,
                    income_now: Decimal | None = None) -> dict:
     """target: đồng per month; rate: percent per year (> 0) for the capital needed and the projection; capital: investable assets now

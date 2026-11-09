@@ -12,13 +12,15 @@ from pydantic import Field
 from investment_agent.domain.deposit_book import bond_income, deposit_income
 from investment_agent.domain.models import ContractModel
 from investment_agent.domain.ledger import replay
-from investment_agent.domain.passive_income import income_by_layer, passive_income
+from investment_agent.domain.passive_income import freedom_levels, income_by_layer, passive_income
+from investment_agent.domain.property_book import PropertyBook, rent_now
 from investment_agent.market.corporate_events import EventStore
 from investment_agent.market.leading import MacroStore
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.contributions import PLAN as CONTRIBUTION_PLAN
 from investment_agent.services.deposit_book import book_quotes, read_book
 from investment_agent.services.equity_budget import budget_view
+from investment_agent.services.property_book import RECORD as PROPERTY_BOOK
 from investment_agent.services.records import LedgerBook, read_version
 
 from ..auth import require_owner
@@ -27,6 +29,7 @@ from .common import WRITE_ERRORS, error, now, unavailable, write_error
 router = APIRouter(prefix="/internal")
 RECORD = ("settings", "passive_income")
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
+WEALTH_CHECK = ("settings", "wealth_check")
 BOND_RATE = "7"  # the owner's bonds pay 7%/năm (owner, 27/10/2026); editable with the goal
 
 
@@ -35,6 +38,8 @@ class GoalRequest(ContractModel):
     rate: str | None = Field(default=None, max_length=8)  # percent per year; None = the 12-month deposit rate
     bond_rate: str | None = Field(default=None, max_length=8)  # coupon of the bonds held, percent per year; None = 7
     stock_rate: str | None = Field(default=None, max_length=8)  # yearly yield the owner expects from stocks; None = last year's cash dividends
+    independent: str | None = Field(default=None, max_length=24)  # monthly spending for the two higher levels of Ba mức tự do tài chính
+    freedom: str | None = Field(default=None, max_length=24)
     expected_version: int = Field(strict=True, ge=0)
     request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
 
@@ -51,6 +56,16 @@ def dividends_last_year(data_dir, repo, owner, today) -> Decimal:
         if e.get("kind") == "dividend_cash" and e.get("value_per_share") and e.get("exright") and since <= e["exright"] <= today.isoformat():
             total += Decimal(str(e["value_per_share"])) * shares[e["symbol"]]
     return total
+
+
+def _levels(repo, owner, income: dict, goal: dict) -> dict:
+    """Mức an toàn is the spending entered at Sức khỏe tài chính; the other two are the owner's own."""
+    wealth = read_version(repo, owner, *WEALTH_CHECK, None)
+    stored = read_version(repo, owner, *PROPERTY_BOOK, None)
+    rent, missing = rent_now(PropertyBook.model_validate(stored.payload) if stored else PropertyBook())
+    amount = lambda key: Decimal(goal[key]) if goal.get(key) else None  # noqa: E731
+    return {**freedom_levels(income=Decimal(income["total"]), rent=rent, safe=Decimal(wealth.payload["expenses"]) if wealth else None,
+                             independent=amount("independent"), freedom=amount("freedom")), "rent_missing": missing}
 
 
 def _view(request: Request, repo, owner) -> dict:
@@ -91,7 +106,7 @@ def _view(request: Request, repo, owner) -> dict:
                                        today=today, income_now=Decimal(income["total"]) if income else None), "rate": rate}
     goal = {**record.payload, "bond_rate": record.payload.get("bond_rate") or BOND_RATE} if record else None
     return {"version": record.version if record else 0, "goal": goal, "default_rate": default_rate, "default_bond_rate": BOND_RATE,
-            "income": income, "result": result, "capital": format(capital, "f") if capital is not None else None, "contribution": format(contribution, "f")}
+            "income": income, "levels": _levels(repo, owner, income, record.payload if record else {}) if income else None, "result": result, "capital": format(capital, "f") if capital is not None else None, "contribution": format(contribution, "f")}
 
 
 @router.get("/passive-income")
@@ -117,6 +132,13 @@ def put_passive_income(request: Request, body: GoalRequest):
         stock_rate = Decimal(body.stock_rate) if body.stock_rate is not None else None
     except InvalidOperation:
         return error(422, "invalid_goal", "Mục tiêu và tỷ suất phải là số.")
+    for level in (body.independent, body.freedom):
+        try:
+            whole = level is None or (Decimal(level).is_finite() and Decimal(level) > 0 and Decimal(level) == Decimal(level).to_integral_value())
+        except InvalidOperation:
+            whole = False
+        if not whole:
+            return error(422, "invalid_goal", "Mức chi tiêu phải là số đồng lớn hơn 0.")
     if not target.is_finite() or target <= 0 or target != target.to_integral_value():
         return error(422, "invalid_goal", "Dòng tiền mong muốn phải là số đồng lớn hơn 0.")
     if rate is not None and not (rate.is_finite() and Decimal("0.1") <= rate <= Decimal(30)):
@@ -127,7 +149,9 @@ def put_passive_income(request: Request, body: GoalRequest):
         return error(422, "invalid_rate", "Lợi suất cổ phiếu từ 0% đến 50%/năm.")
     payload = {"target": format(target, "f"), "rate": format(rate, "f") if rate is not None else None,
                "bond_rate": format(bond_rate, "f") if bond_rate is not None else None,
-               "stock_rate": format(stock_rate, "f") if stock_rate is not None else None}
+               "stock_rate": format(stock_rate, "f") if stock_rate is not None else None,
+               "independent": format(Decimal(body.independent), "f") if body.independent is not None else None,
+               "freedom": format(Decimal(body.freedom), "f") if body.freedom is not None else None}
     try:
         repo.write(owner, *RECORD, payload, expected_version=body.expected_version, request_id=body.request_id)
         return _view(request, repo, owner)

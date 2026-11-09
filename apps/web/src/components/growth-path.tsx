@@ -5,12 +5,14 @@ import { formatVnd, parseMoneyInput } from "../lib/format";
 export type Path = { paid: number[]; value: number[]; real: number[] | null };
 
 /** Value at each year end: compounded monthly, the contribution added at each month's end, as the goal's own estimate does. */
-export function growthPath({ capital, monthly, rate, years, inflation }: { capital: number; monthly: number; rate: number; years: number; inflation?: number | null }): Path {
+export function growthPath({ capital, monthly, rate, years, inflation, raise }: { capital: number; monthly: number; rate: number; years: number; inflation?: number | null; raise?: number | null }): Path {
   const paid = [capital], value = [capital];
-  let v = capital;
+  let v = capital, total = capital;
   for (let y = 1; y <= years; y++) {
-    for (let m = 0; m < 12; m++) v = v * (1 + rate / 100 / 12) + monthly;
-    paid.push(capital + monthly * 12 * y);
+    const amount = monthly * (1 + (raise ?? 0) / 100) ** (y - 1);  // the contribution steps up once a year, from the second
+    for (let m = 0; m < 12; m++) v = v * (1 + rate / 100 / 12) + amount;
+    total += amount * 12;
+    paid.push(total);
     value.push(v);
   }
   return { paid, value, real: inflation ? value.map((x, y) => x / (1 + inflation / 100) ** y) : null };
@@ -29,11 +31,14 @@ export function GrowthPath({ capital, monthly, rate, required }: { capital: numb
   const [years, setYears] = useState("20");
   const [rates, setRates] = useState(() => scenarioRates(rate).map(toText));
   const [inflation, setInflation] = useState("");
+  const [raise, setRaise] = useState("");
   const n = Math.min(Math.max(Math.round(Number(years) || 0), 1), 50);
   const parsed = rates.map((r) => { const p = parseMoneyInput(r); return p === null ? null : Number(p); });
   const infl = inflation.trim() ? parseMoneyInput(inflation) : null;
-  const invalid = parsed.some((r) => r === null || r < 0 || r > 100);
-  const paths = invalid ? [] : parsed.map((r, i) => growthPath({ capital, monthly, rate: r!, years: n, inflation: i === 1 && infl ? Number(infl) : null }));
+  const raised = raise.trim() ? parseMoneyInput(raise) : null;
+  const badRaise = raise.trim() !== "" && (raised === null || Number(raised) > 100);
+  const invalid = parsed.some((r) => r === null || r < 0 || r > 100) || badRaise;
+  const paths = invalid ? [] : parsed.map((r, i) => growthPath({ capital, monthly, rate: r!, years: n, inflation: i === 1 && infl ? Number(infl) : null, raise: raised === null ? null : Number(raised) }));
   const base = paths[1];
   const top = Math.max(1, required, ...paths.flatMap((p) => p.value));
   const x = (y: number) => L + ((W - L - R) * y) / n;
@@ -43,14 +48,15 @@ export function GrowthPath({ capital, monthly, rate, required }: { capital: numb
   return (
     <section className="gp" aria-label="Đường tăng trưởng tài sản">
       <h3>Đường tăng trưởng tài sản</h3>
-      <p className="caption">Vốn hiện có {money(capital)}, góp đều {money(monthly)}/tháng. Ba mức lợi suất do bạn đặt là <strong>giả định</strong>, giữ nguyên suốt thời gian: thực tế lên xuống hằng năm và có thể lỗ. Không phải dự báo.</p>
+      <p className="caption">Vốn hiện có {money(capital)}, góp đều {money(monthly)}/tháng. Ba mức lợi suất do bạn đặt là <strong>giả định</strong>, giữ nguyên suốt thời gian: thực tế lên xuống hằng năm và có thể lỗ. Không phải dự báo. Mức tăng tiền góp chỉ áp dụng cho biểu đồ này, không đổi thời gian đạt mục tiêu ở trên.</p>
       <div className="eb-form">
         <label className="field">Số năm<input type="number" min={1} max={50} value={years} onChange={(e) => setYears(e.target.value)} /></label>
         {names.map((name, i) => <label key={name} className="field">Lợi suất {name.toLowerCase()} (%/năm)
           <input inputMode="decimal" value={rates[i]} onChange={(e) => setRates((r) => r.map((v, k) => (k === i ? e.target.value : v)))} /></label>)}
         <label className="field">Lạm phát giả định (%/năm)<input inputMode="decimal" value={inflation} placeholder="để trống = không tính" onChange={(e) => setInflation(e.target.value)} /></label>
+        <label className="field">Tăng tiền góp mỗi năm (%)<input inputMode="decimal" value={raise} placeholder="để trống = giữ nguyên" onChange={(e) => setRaise(e.target.value)} /></label>
       </div>
-      {invalid ? <p className="errors" role="alert">Lợi suất phải là số từ 0 đến 100.</p> : <>
+      {invalid ? <p className="errors" role="alert">{badRaise ? "Mức tăng tiền góp phải là số từ 0 đến 100." : "Lợi suất phải là số từ 0 đến 100."}</p> : <>
         <svg viewBox={`0 0 ${W} ${H}`} role="img" className="gp-chart" aria-label={`Sau ${n} năm: ${names.map((name, i) => `${name} ${money(paths[i].value[n])}`).join(", ")}; đã góp ${money(base.paid[n])}`}>
           {[0, 0.25, 0.5, 0.75, 1].map((f) => <g key={f}><line x1={L} x2={W - R} y1={yOf(top * f)} y2={yOf(top * f)} stroke="var(--line)" />
             <text x={L - 6} y={yOf(top * f) + 4} textAnchor="end" className="gp-tick">{shortTy(top * f)}</text></g>)}

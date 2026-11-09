@@ -92,3 +92,27 @@ def test_the_book_refuses_what_cannot_be_right(bad):
 
 def test_a_property_needs_only_its_name_and_choices():
     assert Property.model_validate({"id": "z", "name": "Nhà", "kind": "other", "purpose": "live", "legal": "unknown"}).value is None
+
+
+LIVE = {"id": "c", "name": "Nhà ở", "kind": "home", "purpose": "live", "value": "4000000000", "valued_on": "2026-10-01", "legal": "certificate"}
+
+
+def test_assets_are_split_into_what_is_lived_in_and_what_is_invested():
+    p = picture(book(properties=(HOME, LAND, LIVE), loans=()), financial=Decimal("2000000000"), today=TODAY)
+    assert (p["live_total"], p["invest_total"], p["invest_property_total"]) == ("4000000000", "8000000000", "6000000000")
+    assert (p["live_share"], p["invest_share"], p["invest_property_of_invest"], p["financial_of_invest"]) == ("0.3333", "0.6667", "0.7500", "0.2500")
+
+
+def test_the_split_waits_for_every_value():
+    p = picture(book(properties=(HOME, {**LIVE, "value": None}), loans=()), financial=Decimal("2000000000"), today=TODAY)
+    assert p["live_total"] is None and p["invest_total"] is None and p["live_share"] is None
+
+
+def test_rental_yield_is_given_per_property_only_with_both_figures():
+    p = picture(book(properties=(HOME, LAND, {**LIVE, "value": None, "rent_monthly": "1000000"}), loans=()), financial=None, today=TODAY)
+    assert p["yields"] == {"a": "0.0240", "b": None, "c": None}  # 10 tr × 12 / 5 tỷ
+
+
+def test_rent_counts_what_is_entered_and_names_a_let_property_without_one():
+    from investment_agent.domain.property_book import rent_now
+    assert rent_now(book(properties=(HOME, {**HOME, "id": "z", "name": "Căn Z", "rent_monthly": None}, LIVE), loans=())) == (Decimal("10000000"), ["Căn Z"])

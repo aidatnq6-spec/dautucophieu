@@ -85,6 +85,12 @@ def loan_payment(loan: Loan) -> Decimal | None:
     return payment.quantize(Decimal(1), ROUND_HALF_UP)
 
 
+def rent_now(book: PropertyBook) -> tuple[Decimal, list[str]]:
+    """Monthly rent entered, and the properties let out with none entered: those are named, never taken as 0."""
+    return (sum((p.rent_monthly for p in book.properties if p.rent_monthly is not None), Decimal(0)),
+            [p.name for p in book.properties if p.purpose == "rent" and p.rent_monthly is None])
+
+
 def picture(book: PropertyBook, *, financial: Decimal | None, today: date) -> dict:
     """financial: Tháp tài sản's layers with stocks at market price, None when not known. Totals and shares are given only when every value and
     balance is there (complete); what is missing is named."""
@@ -104,9 +110,15 @@ def picture(book: PropertyBook, *, financial: Decimal | None, today: date) -> di
            "stale": [p.name for p in book.properties if p.valued_on is None or p.valued_on < limit], "debt": _s(debt), "debt_missing": debt_missing,
            "payments": _s(paid), "payments_missing": payments_missing, "rent": _s(rent), "rent_less_payments": _s(rent - paid) if not payments_missing else None,
            "loans": {k: (_s(v) if v is not None else None) for k, v in payments.items()}, "ceiling": _s(book.ceiling), "complete": complete,
+           "yields": {p.id: _ratio(p.rent_monthly * 12, p.value) if p.rent_monthly is not None and p.value else None for p in book.properties},
+           "live_total": None, "invest_total": None, "invest_property_total": None, "live_share": None, "invest_share": None, "invest_property_of_invest": None, "financial_of_invest": None,
            "total_assets": None, "net_worth": None, "liquid_share": None, "clear_share": None, "unclear_share": None, "property_share": None, "debt_ratio": None, "over": False}
     if complete:
         total = financial + property_total
+        live = sum((p.value for p in valued if p.purpose == "live"), Decimal(0))
+        invest = total - live
+        out |= {"live_total": _s(live), "invest_total": _s(invest), "invest_property_total": _s(property_total - live), "live_share": _ratio(live, total), "invest_share": _ratio(invest, total),
+                "invest_property_of_invest": _ratio(property_total - live, invest), "financial_of_invest": _ratio(financial, invest)}
         out |= {"total_assets": _s(total), "net_worth": _s(total - debt), "liquid_share": _ratio(financial, total), "clear_share": _ratio(property_total - unclear, total),
                 "unclear_share": _ratio(unclear, total), "property_share": _ratio(property_total, total), "debt_ratio": _ratio(debt, total),
                 "over": bool(total) and property_total / total * 100 > book.ceiling}

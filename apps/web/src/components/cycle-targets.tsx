@@ -38,14 +38,15 @@ export function gridPayload(grid: Grid): { ok: Record<Phase, Mix | null> } | { e
 }
 
 /** Phân bổ mục tiêu theo chu kỳ: the owner's own mix for each phase of rates, and how far the layers held now are from the current phase's. Suggests nothing. */
-export function CycleTargets() {
+export function CycleTargets({ refresh }: { refresh?: string } = {}) {
   const [view, setView] = useState<View | null>(null);
   const [grid, setGrid] = useState<Grid | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const fail = (e: unknown, fallback: string) => setError(e instanceof ApiError ? e.failure.message : fallback);
-  useEffect(() => { api<View>("cycle-targets").then((v) => { setView(v); setGrid(toGrid(v.targets)); }, (e) => fail(e, "Lỗi tải.")); }, []);
+  // A change elsewhere on the page reloads the comparison; what is being typed in the grid stays.
+  useEffect(() => { api<View>("cycle-targets").then((v) => { setView(v); setGrid((current) => current ?? toGrid(v.targets)); }, (e) => fail(e, "Lỗi tải.")); }, [refresh]);
   async function save() {
     if (!view || !grid) return;
     setSaved(false);

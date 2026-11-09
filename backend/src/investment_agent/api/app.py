@@ -47,6 +47,7 @@ from .routes.stress import router as stress_router
 from .routes.theses import router as theses_router
 from .routes.value_chains import router as value_chains_router
 from .routes.universe import router as universe_router
+from .routes.early_lights import router as early_lights_router
 from .routes.system_health import router as system_health_router
 from .routes.valuation_assumptions import router as valuation_router
 from .routes.watchlist import router as watchlist_router
@@ -122,6 +123,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(intangibles_router)
     app.include_router(bank_figures_router)
     app.include_router(system_health_router)
+    app.include_router(early_lights_router)
     app.include_router(annual_plans_router)
     app.include_router(quarter_forecast_router)
     app.include_router(operating_router)

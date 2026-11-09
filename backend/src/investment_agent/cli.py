@@ -60,6 +60,8 @@ def main() -> int:
     tc.add_argument("--data-dir", type=Path, required=True)
     tc.add_argument("--calendar", type=Path, required=True)
     tc.add_argument("--scope", choices=("price", "data"), required=True)
+    lc = commands.add_parser("lights-check", help="Telegram when a colour on Bảng đèn chỉ báo sớm changes")
+    lc.add_argument("--data-dir", type=Path, required=True)
     hc = commands.add_parser("health-check", help="Telegram once for each new problem with the unattended work, and when it recovers")
     hc.add_argument("--data-dir", type=Path, required=True)
     bd = commands.add_parser("backup-drill", help="restore the newest backup into a temporary folder, once a week")
@@ -141,6 +143,8 @@ def main() -> int:
         return fund_nav_sync_cli(args.data_dir)
     if args.command == "gold-price-sync":
         return gold_price_sync_cli(args.data_dir)
+    if args.command == "lights-check":
+        return lights_check_cli(args.data_dir)
     if args.command == "health-check":
         return health_check_cli(args.data_dir)
     if args.command == "backup-drill":
@@ -784,6 +788,20 @@ def _part_sender(sender, chat_id: str, data_dir: Path):
     """Send a note in parts that are never sent twice: parts left after a failure go out first next time (see PartSender)."""
     from investment_agent.notifications.part_sender import PartSender
     return PartSender(lambda part: sender.send(chat_id, part).status == "sent", Path(data_dir) / "alerts" / "telegram_pending.json")
+
+
+def lights_check_cli(data_dir: Path) -> int:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from investment_agent.services.early_lights import lights_check
+    telegram = _scheduled_telegram(data_dir)
+    if telegram is None:
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
+        return 0
+    send, repo, owner = telegram
+    print(json.dumps(lights_check(repo, owner, data_dir, send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())))
+    return 0
 
 
 def health_check_cli(data_dir: Path, telegram=None) -> int:

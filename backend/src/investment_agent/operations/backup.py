@@ -17,7 +17,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ALLOWED = (re.compile(r"^prices/[^/]+/(manifest\.json|[^/]+\.parquet)$"), re.compile(r"^documents/.+\.(pdf|html|json)$"),
-           re.compile(r"^macro/[a-z0-9_]+\.json$"))  # macro values, including the owner's manual entries
+           re.compile(r"^macro/[a-z0-9_]+\.json$"),  # macro values, including the owner's manual entries
+           re.compile(r"^market-symbols\.txt$"))  # the owner's watchlist: edited by hand, nothing can fetch it again
 NAME = re.compile(r"^\d{8}T\d{6}Z-(daily|weekly|manual)$")
 
 

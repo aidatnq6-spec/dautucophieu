@@ -9,6 +9,8 @@
 - `personal-export.json`: toàn bộ bản ghi cá nhân trong Firestore dưới `owners/{uid}` (hồ sơ, khảo sát, sổ, phê duyệt, giả định, bản tin, cài đặt, bản ghi idempotency) kèm `owner_uid`, `schema`, `export_version`, thời điểm xuất.
 - `manifest.json`: SHA-256 và kích thước từng tệp.
 
+Danh sách theo dõi `market-symbols.txt` được sao lưu (từ 09/11/2026) vì sửa tay và không tải lại được.
+
 Không bao giờ chép: `.env*`, log, khóa, tệp ngoài allowlist. Thiếu kết nối Firestore thì lệnh dừng (mã 2): chỉ sao chép cache cục bộ không được coi là sao lưu đầy đủ. Bản sao lưu chứa dữ liệu tài chính cá nhân: giữ trong `backups\` (Git bỏ qua), giới hạn quyền tài khoản Windows; ứng dụng không tự tải lên nơi khác.
 
 ## Sao lưu tự động

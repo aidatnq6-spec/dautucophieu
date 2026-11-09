@@ -107,6 +107,7 @@ class PriceStore:
 
     def __init__(self, root: Path):
         self.root = Path(root) / "prices"
+        self._views: dict[tuple, dict] = {}  # entity's merged revisions, valid while its manifest and files are exactly as they were
 
     def _dir(self, entity_id: str) -> Path:
         return self.root / entity_id
@@ -156,14 +157,30 @@ class PriceStore:
             raise PriceError("checksum_mismatch", f"{entity_id} {entry['revision_id']}")
         return [PriceBar.model_validate(r) for r in rows]
 
+    def _stamp(self, entity_id: str, manifest: list[dict]) -> tuple | None:
+        """What the merged view depends on; None if a file cannot be looked at, so the read reports it."""
+        try:
+            return tuple((e["revision_id"], e["digest"], (s := (self._dir(entity_id) / e["file"]).stat()).st_mtime_ns, s.st_size) for e in manifest)
+        except OSError:
+            return None
+
     def latest(self, entity_id: str, *, revision: str | None = None) -> dict[date, tuple[PriceBar, str]]:
+        """Every session's bar from the newest revision holding it. Re-reading a ticker's revisions is most of a board's time, so the merged
+        view is kept until the manifest or any file changes; a changed file is read again and its checksum checked."""
+        manifest = self._manifest(entity_id)
+        stamp = self._stamp(entity_id, manifest)
+        kept = self._views.get((entity_id, revision))
+        if stamp is not None and kept is not None and kept[0] == stamp:
+            return dict(kept[1])
         view = {}
-        for entry in self._manifest(entity_id):
+        for entry in manifest:
             for b in self.read_revision(entity_id, entry):
                 view[b.session_date] = (b, entry["revision_id"])
             if entry["revision_id"] == revision:
                 break
-        return view
+        if stamp is not None:
+            self._views[(entity_id, revision)] = (stamp, view)
+        return dict(view)
 
 
 def ingest(store: PriceStore, cal: TradingCalendar, bars: list[PriceBar], *, revision_id: str) -> dict[str, dict]:

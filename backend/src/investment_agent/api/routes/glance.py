@@ -24,6 +24,7 @@ from investment_agent.services.attention import attention_items
 from investment_agent.services.journal import read_journal
 from investment_agent.services.overview import OVERVIEW_RECORDS, compose_overview
 from investment_agent.services.records import LedgerBook, portfolio_settings, read_version
+from investment_agent.services import theses
 
 from ..auth import require_owner
 from .common import now, unavailable
@@ -48,7 +49,7 @@ def glance(request: Request):
     today = now(request).astimezone(VN).date()
     # Everything this page reads, fetched together; later reads in this request reuse them.
     prefetch(getattr(repo, "authoritative", repo), owner, [*OVERVIEW_RECORDS, ("settings", "equity_budget"), ("settings", "portfolio"),
-                                                          ("journal", "main"), ("reports", "index")])
+                                                          ("journal", "main"), ("reports", "index"), (theses.COLLECTION, theses.RECORD)])
     try:
         view = compose_overview(repo, owner, market, now(request))
         events = list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)

@@ -894,6 +894,7 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
     from investment_agent.services.records import LedgerBook, read_version
     from investment_agent.services.drawdown import held_costs
     from investment_agent.services.theses import position_shares, read_theses
+    from investment_agent.services.attention import attention_items
     from investment_agent.services.weekly_brief import VN, week_of, weekly_brief_run
 
     now = datetime.now(timezone.utc)
@@ -921,7 +922,7 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
         got = weekly_inputs(data_dir, ledger_events=events, held=held_from_repo(repo, owner), alerts=read_alerts(repo, owner)[0],
                             insider=insider, today=today)
         return {**got, "sessions": sessions, "theses": read_theses(repo, owner)[0], "costs": held_costs(repo, owner),
-                "shares": position_shares(repo, owner)}
+                "shares": position_shares(repo, owner), "todo": [i["text"] for i in attention_items(repo, owner, Path(data_dir), now=now)]}
     print(json.dumps(weekly_brief_run(data_dir, inputs=inputs, send=send, now=now)))
     return 0
 

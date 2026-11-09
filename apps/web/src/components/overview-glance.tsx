@@ -7,7 +7,7 @@ export type Glance = {
   kpis: { market_value: string; unrealized_gain: string; day_change: string | null; day_change_ratio: string | null; vnindex: string | null;
     vnindex_change_ratio: string | null; performance: { portfolio: string; vnindex: string; since: string } | null; room: string | null; over_budget: string | null;
     held_count: number; unpriced: string[]; no_prior_close: string[]; price_dates: string[] };
-  attention: { events: { symbol: string; kind: string; title: string; key_date: string }[]; over_limit: { name: string; kind: string; weight: string }[];
+  attention: { items?: { level: "high" | "low"; kind: string; symbol: string | null; text: string; href: string }[]; events: { symbol: string; kind: string; title: string; key_date: string }[]; over_limit: { name: string; kind: string; weight: string }[];
     journal_reviews: { entry_id: string; symbol: string; kind: string; change: string }[]; latest_report: { report_id: string; session_date: string } | null };
 };
 
@@ -71,17 +71,20 @@ const JOURNAL_KIND: Record<string, string> = { buy: "mua", sell: "bán", hold: "
 /** One list of what deserves a look today, gathered from Lịch sự kiện, Phân bổ and Nhật ký; nothing here is a recommendation. */
 export function WorthALook({ g }: { g: Glance }) {
   const a = g.attention;
-  const empty = !a.events.length && !a.over_limit.length && !a.journal_reviews.length;
+  const items = a.items ?? [];
+  const empty = !items.length && !a.events.length && !a.over_limit.length && !a.journal_reviews.length;
   return (
     <section className="surface" aria-label="Cần để ý">
       <h2>Cần để ý</h2>
       {empty ? <p className="muted">Không có gì cần để ý hôm nay.</p> : <ul className="watch-list">
+        {items.filter((i) => i.level === "high").map((i) => <li key={i.text}><span className="pill bad">Cần quyết định</span> <Link href={i.href}>{i.text}</Link></li>)}
         {a.events.map((e) => <li key={`${e.symbol}-${e.key_date}-${e.kind}`}>
           <span className="pill">Sự kiện</span> <strong>{e.symbol}</strong> {KIND[e.kind] ?? e.kind} ngày {day(e.key_date)}: {e.title} · <Link href="/events">Lịch sự kiện</Link></li>)}
         {a.over_limit.map((o) => <li key={o.name}>
           <span className="pill bad">Vượt ngưỡng</span> {o.kind === "sector" ? "Ngành " : ""}<strong>{o.name}</strong> chiếm {formatRatio(o.weight, 1)} · <Link href="/portfolio">Phân bổ</Link></li>)}
         {a.journal_reviews.map((j) => <li key={j.entry_id}>
           <span className="pill warn">Nhật ký</span> <strong>{j.symbol}</strong> (lúc {JOURNAL_KIND[j.kind] ?? j.kind}) đã đi <Signed ratio={j.change} /> so với lúc ghi · <Link href="/journal">xem lại lý do</Link></li>)}
+        {items.filter((i) => i.level === "low").map((i) => <li key={i.text}><span className="pill">Mới</span> <Link href={i.href}>{i.text}</Link></li>)}
       </ul>}
       {a.latest_report && <p className="caption">Bản tin mới nhất: <Link href={`/reports/${a.latest_report.report_id}`}>phiên {day(a.latest_report.session_date)}</Link></p>}
     </section>

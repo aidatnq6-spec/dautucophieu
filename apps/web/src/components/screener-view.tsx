@@ -2,9 +2,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Save, Trash2 } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
+import { SignalMatrix } from "./signal-matrix";
 
 type Value = string | string[] | null;
-type Row = { symbol: string; values: Record<string, Value>; missing: Record<string, string>; foreign20_bn?: string | null };
+type Row = { symbol: string; sector?: string | null; values: Record<string, Value>; missing: Record<string, string>; foreign20_bn?: string | null };
 type Criterion = { label: string; values: Record<string, string> };
 type Screen = { id: string; name: string; criteria: Record<string, string[]>; notify: boolean };
 type Data = { version: number; screens: Screen[]; rows: Row[]; criteria: Record<string, Criterion>; as_of: { trend: string | null; foreign: string | null } };
@@ -118,6 +119,7 @@ export function ScreenerView() {
             .then((next) => { if (next) { setLoaded(null); setName(""); setNotify(false); } }); }}><Trash2 size={15} aria-hidden="true" />Xóa</button>}
           {loaded && <button className="btn" type="button" onClick={() => { setLoaded(null); setName(""); setNotify(false); }}>Bộ lọc mới</button>}
         </form>
+        <SignalMatrix rows={data.rows} criteria={data.criteria} />
       </>}
     </section>
   );

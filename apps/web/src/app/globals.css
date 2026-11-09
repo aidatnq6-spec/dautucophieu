@@ -293,3 +293,5 @@ main h2{scroll-margin-top:16px}
 @media print{.side,.page-jumps,.to-top,.ln-controls,.btn{display:none!important}.shell{display:block;min-height:0}main.content{padding:0;max-width:none}
 .ln-grid{display:block}.ln-result{position:static;break-inside:avoid;box-shadow:none}.tablewrap{overflow:visible}
 .ln-print{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;margin:0 0 12px;font-size:13px}.ln-print>div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding:3px 0}.ln-print dd{margin:0;font-weight:600}}
+/* Ma trận tín hiệu */
+.sm{margin-top:18px;border-top:1px solid var(--line);padding-top:12px}.sm h3{margin:0 0 8px;font-size:15px}.sm-filters{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:flex-end;margin-bottom:8px}.sm-filters [role=radiogroup]{display:flex;flex-wrap:wrap;gap:6px 16px}.sm-table th.sm-group{text-align:center;border-left:1px solid var(--line)}.sm-table td{white-space:nowrap}

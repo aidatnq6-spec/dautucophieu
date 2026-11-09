@@ -34,3 +34,17 @@ test("the screener has no horizontal page scroll at 375px", async ({ page }) => 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test("Ma trận tín hiệu sets every watched ticker against the groups of signals and adds up no score", async ({ page }) => {
+  await page.goto("/watchlist");
+  const box = page.getByRole("region", { name: "Ma trận tín hiệu" });
+  const table = box.getByRole("table", { name: "Ma trận tín hiệu các mã theo dõi" });
+  await expect(table.getByRole("row", { name: /FPT/ })).toBeVisible();
+  await expect(table.getByRole("row", { name: /ACB/ })).toContainText("Ngân hàng");
+  await expect(box).toContainText("Không cộng thành điểm");
+  await box.getByLabel("Ngành").selectOption("Ngân hàng");
+  await expect(table.getByRole("row", { name: /FPT/ })).toHaveCount(0);
+  await expect(table.getByRole("row", { name: /VCB/ })).toBeVisible();
+  await box.getByLabel("Cả 3 nhóm").check();
+  await expect(box.getByRole("status")).toContainText("/3 mã");
+});

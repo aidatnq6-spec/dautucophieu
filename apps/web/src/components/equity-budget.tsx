@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Calculator } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatRatio, formatVnd, groupDigitsInput, parseMoneyInput } from "../lib/format";
@@ -106,10 +106,13 @@ export function EquityBudget() {
   const [reserve, setReserve] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [intangibles, setIntangibles] = useState<IntangiblesView["year"] | null>(null);
+  const filled = useRef(false);  // saved figures fill the inputs once; a later load must not overwrite what is being typed
   useEffect(() => { api<IntangiblesView>("intangibles").then((v) => setIntangibles(v.year), () => setIntangibles(null)); }, []);
   useEffect(() => {
     api<View>("equity-budget").then((v) => {
       setView(v);
+      if (filled.current) return;
+      filled.current = true;
       const l = v.budget.layers;
       if (l) setValues({ deposit: formatVnd(l.deposit, { unit: false }), bond: formatVnd(l.bond, { unit: false }), gold: formatVnd(l.gold, { unit: false }),
         crypto: formatVnd(l.crypto, { unit: false }) });

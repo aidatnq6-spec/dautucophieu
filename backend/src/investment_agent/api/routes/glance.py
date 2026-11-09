@@ -49,7 +49,7 @@ def glance(request: Request):
     today = now(request).astimezone(VN).date()
     # Everything this page reads, fetched together; later reads in this request reuse them.
     prefetch(getattr(repo, "authoritative", repo), owner, [*OVERVIEW_RECORDS, ("settings", "equity_budget"), ("settings", "portfolio"),
-                                                          ("journal", "main"), ("reports", "index"), (theses.COLLECTION, theses.RECORD), ("settings", "property_book"), ("settings", "deposit_book")])
+                                                          ("journal", "main"), ("reports", "index"), (theses.COLLECTION, theses.RECORD), ("settings", "property_book"), ("settings", "deposit_book"), ("settings", "accumulation")])
     try:
         view = compose_overview(repo, owner, market, now(request))
         events = list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)

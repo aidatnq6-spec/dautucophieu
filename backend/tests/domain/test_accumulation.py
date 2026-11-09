@@ -64,3 +64,10 @@ def test_only_the_current_month_past_its_day_and_short_is_due():
 def test_bad_plans_and_buys_are_refused(bad):
     with pytest.raises(ValidationError):
         Accumulation.model_validate(bad)
+
+
+def test_a_buy_before_the_plan_starts_counts_in_the_cost_and_is_counted_apart():
+    early = {"id": "9", "plan": "g", "on": "2026-08-20", "amount": "10000000", "quantity": "1"}
+    s = status(d=data(plans=(GOLD,), buys=(*BUYS[:2], early)))
+    assert s["before_start"] == 1 and s["quantity"] == "2.5" and [m["month"] for m in s["months"]][0] == "2026-09"
+    assert status()["before_start"] == 0

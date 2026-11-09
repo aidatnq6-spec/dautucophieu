@@ -78,13 +78,17 @@ function RowForm({ fields, draft, onDraft, onSave, onCancel, busy, error }: { fi
 }
 
 /** Bất động sản và khoản vay, and what the owner has and owes altogether. Values are the owner's estimates; nothing here reaches Tháp tài sản. */
-export function PropertyBook() {
+export function PropertyBook({ refresh, onSaved }: { refresh?: string; onSaved?: () => void } = {}) {
   const [view, setView] = useState<View | null>(null);
   const [editing, setEditing] = useState<Editing>(null);
   const [ceiling, setCeiling] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  useEffect(() => { api<View>("property-book").then(setView, (e) => setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
+  useEffect(() => {
+    let live = true;
+    api<View>("property-book").then((v) => { if (live) setView(v); }, (e) => { if (live) setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải."); });
+    return () => { live = false; };
+  }, [refresh]);
 
   async function put(book: Book): Promise<boolean> {
     if (!view) return false;
@@ -92,6 +96,7 @@ export function PropertyBook() {
     try {
       setView(await api<View>("property-book", { method: "PUT", body: { ...book, expected_version: view.version, request_id: requestId() } }));
       setMessage(null);
+      onSaved?.();
       return true;
     } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); return false; }
     finally { setBusy(false); }

@@ -51,7 +51,10 @@ def put_accumulation(request: Request, body: AccumulationRequest):
     owner, repo = require_owner(request), request.app.state.personal_repository
     if repo is None or request.app.state.data_dir is None:
         return unavailable()
-    payload = Accumulation.model_validate(body.model_dump(exclude={"expected_version", "request_id"})).model_dump(mode="json")
+    data = Accumulation.model_validate(body.model_dump(exclude={"expected_version", "request_id"}))
+    if any(b.on > now(request).astimezone(VN).date() for b in data.buys):
+        return error(422, "future_buy", "Ngày mua không được sau hôm nay.")
+    payload = data.model_dump(mode="json")
     try:
         repo.write(owner, *RECORD, payload, expected_version=body.expected_version, request_id=body.request_id)
         return _view(request, repo, owner)

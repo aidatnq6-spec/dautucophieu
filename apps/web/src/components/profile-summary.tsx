@@ -40,6 +40,7 @@ export function ProfileSummary() {
   const [intangibleChanges, setIntangibleChanges] = useState(0);
   const [bookSaves, setBookSaves] = useState(0);
   const [bookPosts, setBookPosts] = useState(0);
+  const [propertySaves, setPropertySaves] = useState(0);
   if (profile.error) return <p className="errors" role="alert">{profile.error}</p>;
   if (profile.value === undefined) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   const p = profile.value;
@@ -57,12 +58,12 @@ export function ProfileSummary() {
       <LifestyleInflation refresh={wealthSaves} />
       <Contributions />
       <Accumulation onPosted={() => { setBookPosts((n) => n + 1); setBookSaves((n) => n + 1); }} />
-      <PassiveIncome key={bookSaves} />
+      <PassiveIncome refresh={`${riskChanges}-${bookSaves}-${wealthSaves}-${propertySaves}`} />
       <Intangibles onChanged={() => setIntangibleChanges((n) => n + 1)} />
       <DepositBook refresh={bookPosts} onSaved={() => setBookSaves((n) => n + 1)} />
       <MoneyPurposes refresh={bookSaves} />
-      <PropertyBook key={`property-${riskChanges}-${bookSaves}`} />
-      <EquityBudget key={`${riskChanges}-${intangibleChanges}-${bookSaves}`} />
+      <PropertyBook refresh={`${riskChanges}-${bookSaves}`} onSaved={() => setPropertySaves((n) => n + 1)} />
+      <EquityBudget refresh={`${riskChanges}-${intangibleChanges}-${bookSaves}`} />
       <NewMoney />
       <CycleTargets refresh={`${riskChanges}-${bookSaves}`} />
     </>

@@ -61,6 +61,16 @@ def test_backup_excludes_secrets_and_logs(data, tmp_path):
             assert SECRET.encode() not in path.read_bytes()
 
 
+def test_the_watchlist_is_backed_up_and_restored(data, tmp_path):
+    d, _ = data
+    (d / "market-symbols.txt").write_text("AAA\nBBB\n", encoding="utf-8")
+    manifest = create_backup(d, tmp_path / "backups", personal_export=None, now=NOW, kind="daily")
+    assert "data/market-symbols.txt" in [f["path"] for f in manifest.files]
+    target = tmp_path / "restored"
+    restore_local(manifest.path, target)
+    assert (target / "market-symbols.txt").read_text(encoding="utf-8") == "AAA\nBBB\n"
+
+
 def test_corrupted_backup_is_not_restored(data, tmp_path):
     d, _ = data
     manifest = create_backup(d, tmp_path / "backups", personal_export=None, now=NOW, kind="daily")

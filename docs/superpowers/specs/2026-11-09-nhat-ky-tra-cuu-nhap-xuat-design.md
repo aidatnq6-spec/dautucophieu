@@ -28,3 +28,5 @@ thành 0), mua đuổi và các lần mua khác; nhóm dưới 5 quan sát khôn
 Mã không có chuỗi giá đã lưu được liệt kê, không ước lượng.
 
 Cảnh báo sụt giảm dẫn lý do của quyết định mới nhất theo ngày, không theo thứ tự lưu.
+
+Giá cho lệnh cũ (09/11/2026): mã chỉ có trong nhật ký đã nhập được tải giá dần trong lượt `drawdown-check` (5 mã mỗi lượt, khoảng 8 năm rồi lùi tiếp, cập nhật hằng tuần). Mã nguồn không trả số (thường đã hủy niêm yết) chờ 30 ngày mới thử lại. Chỉ dùng cho Hậu kiểm, không thêm vào danh sách theo dõi.

@@ -36,7 +36,7 @@ def test_the_first_run_records_what_is_there_without_sending_then_new_quarters_a
     assert "Báo cáo quý mới" in text
     assert "FPT · Q3/2026: LNST quý 2.500 tỷ (+25,0% so với cùng kỳ)" in text
     assert "TCB · Q3/2026: LNST quý 6.371 tỷ (+6,2% so với cùng kỳ) · NPL 1,36% (quý trước 1,15%)" in text
-    assert "nhập nợ nhóm 1–5, CASA, CAR trên trang mã TCB" in text
+    assert "CAR quý" in text and "nhập nợ nhóm" not in text  # loan groups and CASA now come from Vietcap's notes by themselves
     assert quarter_alerts_run(tmp_path, send=lambda t: sent_texts.append(t) or True)["alerts"] == 0  # once only
 
 

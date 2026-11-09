@@ -13,6 +13,15 @@ Danh sách theo dõi `market-symbols.txt` được sao lưu (từ 09/11/2026) v�
 
 Không bao giờ chép: `.env*`, log, khóa, tệp ngoài allowlist. Thiếu kết nối Firestore thì lệnh dừng (mã 2): chỉ sao chép cache cục bộ không được coi là sao lưu đầy đủ. Bản sao lưu chứa dữ liệu tài chính cá nhân: giữ trong `backups\` (Git bỏ qua), giới hạn quyền tài khoản Windows; ứng dụng không tự tải lên nơi khác.
 
+## Mã hóa
+
+Từ 09/11/2026, vì bản sao lưu được chép lên đám mây hoặc ổ ngoài, `personal-export.json`, các tệp SQLite và `market-symbols.txt` chỉ được ghi dưới dạng `.enc` (AES-256-GCM, mỗi tệp gắn với vị trí của nó). Giá thị trường, tài liệu công khai và `manifest.json` không mã hóa. Kiểm tra checksum không cần khóa.
+
+- Khóa là `BACKUP_ENCRYPTION_KEY` trong `.env.local`, không bao giờ nằm trong bản sao lưu. **Mất khóa thì không mở được các bản đã mã hóa**: giữ một bản ở trình quản lý mật khẩu, tách khỏi nơi chứa bản sao lưu.
+- Thiếu khóa hoặc khóa sai định dạng: lệnh `backup` dừng (mã 2, `backup_key_missing`), không ghi bản rõ.
+- Tạo khóa mới: `python -c "from investment_agent.operations.backup import generate_key; print(generate_key())"`. Khóa mới không mở được bản cũ.
+- Bản cũ chưa mã hóa vẫn khôi phục được bình thường.
+
 ## Sao lưu tự động
 
 Tác vụ lịch `InvestmentAgent-AfterClose` gọi `backup --kind auto` sau mỗi lần chạy. Lệnh tự quyết định có cần sao lưu không: tối đa một bản mỗi ngày (giờ Việt Nam), từ 20:00 để có bản tin của ngày; nếu máy tắt lúc 20:00 thì lần chạy kế tiếp sao lưu bù khi bản gần nhất đã quá 24 giờ. Bản đầu tiên và mỗi 7 ngày một lần là `weekly`, còn lại `daily`; bản `manual` không được tính. Không đến hạn thì ghi `skipped` vào `logs\scheduler.log` và không đọc Firestore.

@@ -7,7 +7,7 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from .backup import BackupError, _sha
+from .backup import SUFFIX, BackupError, _sha, backup_key_from_env, unseal
 
 
 class BackupCorrupt(BackupError):
@@ -34,7 +34,24 @@ def verify_backup(path: Path) -> dict:
     return manifest
 
 
-def restore_local(path: Path, target: Path) -> list[str]:
+def _key(key: bytes | None) -> bytes:
+    key = key or backup_key_from_env()
+    if key is None:
+        raise BackupError("backup key is missing")
+    return key
+
+
+def read_personal_export(path: Path, *, key: bytes | None = None) -> dict:
+    """The personal export after checksum verification, decrypted when the backup is encrypted (key: given, or from the environment)."""
+    manifest = verify_backup(path)
+    if not manifest.get("personal_export"):
+        raise BackupError("backup has no personal export")
+    if manifest.get("encryption"):
+        return json.loads(unseal((Path(path) / f"personal-export.json{SUFFIX}").read_bytes(), _key(key), "personal-export.json"))
+    return json.loads((Path(path) / "personal-export.json").read_text(encoding="utf-8"))
+
+
+def restore_local(path: Path, target: Path, *, key: bytes | None = None) -> list[str]:
     manifest = verify_backup(path)
     target = Path(target)
     if target.exists() and any(target.iterdir()):
@@ -43,18 +60,20 @@ def restore_local(path: Path, target: Path) -> list[str]:
     for f in manifest["files"]:
         if not f["path"].startswith("data/"):
             continue
-        dest = target / f["path"][len("data/"):]
+        sealed = bool(manifest.get("encryption")) and f["path"].endswith(SUFFIX)
+        name = f["path"][:-len(SUFFIX)] if sealed else f["path"]
+        dest = target / name[len("data/"):]
         dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(Path(path) / f["path"], dest)
-        restored.append(f["path"])
+        if sealed:
+            dest.write_bytes(unseal((Path(path) / f["path"]).read_bytes(), _key(key), name))
+        else:
+            shutil.copy2(Path(path) / f["path"], dest)
+        restored.append(name)
     return restored
 
 
 def _export(path: Path, repo) -> dict:
-    manifest = verify_backup(path)
-    if not manifest.get("personal_export"):
-        raise BackupError("backup has no personal export")
-    export = json.loads((Path(path) / "personal-export.json").read_text(encoding="utf-8"))
+    export = read_personal_export(path)
     if export.get("schema") != "personal-export-1" or export.get("owner_uid") != repo.owner_uid:
         raise BackupError("export belongs to another owner or schema")
     return export

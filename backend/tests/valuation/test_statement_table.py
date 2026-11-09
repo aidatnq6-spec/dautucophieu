@@ -222,14 +222,14 @@ def test_every_kind_gets_its_multiples_at_the_latest_close_from_the_quarter_end_
     # 500,000 shares × 30,000 đ = 15 tỷ at the quarter's end; the price has since fallen by a third: 10 tỷ, on 8 tỷ profit and 50 tỷ equity.
     closes = [(datetime(2026, 9, 30), 30.0), (datetime(2026, 11, 6), 20.0)]
     t = statement_table(record, closes=closes, vnstock=None, kind="bank")
-    assert t["current"] == {"pe": "1.25", "pb": "0.20", "market_cap": "10000000000", "close_date": "2026-11-06"} and t["summary"] is None
+    assert t["current"] == {"pe": "1.25", "pb": "0.20", "market_cap": "10000000000", "close_date": "2026-11-06", "shares_from_vndirect": False} and t["summary"] is None
     # A bonus issue after the quarter: the adjusted series has the quarter's close at half, so the market value has not moved.
     t = statement_table(record, closes=[(datetime(2026, 9, 30), 15.0), (datetime(2026, 11, 6), 15.0)], vnstock=None, kind="bank")
     assert t["current"]["pb"] == "0.30"
     # No close on the quarter's last session: left blank, not worked out some other way.
     t = statement_table(record, closes=[(datetime(2026, 11, 6), 20.0)], vnstock=None, kind="bank")
-    assert t["current"] == {"pe": None, "pb": None, "market_cap": None, "close_date": "2026-11-06"}
-    assert statement_table(record, closes=[], vnstock=None, kind="bank")["current"] == {"pe": None, "pb": None, "market_cap": None, "close_date": None}
+    assert t["current"] == {"pe": None, "pb": None, "market_cap": None, "close_date": "2026-11-06", "shares_from_vndirect": False}
+    assert statement_table(record, closes=[], vnstock=None, kind="bank")["current"] == {"pe": None, "pb": None, "market_cap": None, "close_date": None, "shares_from_vndirect": False}
 
 
 def test_roic_is_core_profit_after_the_effective_tax_over_average_invested_capital():
@@ -243,3 +243,19 @@ def test_roic_is_core_profit_after_the_effective_tax_over_average_invested_capit
     assert statement_table({**RECORD, "quarters": odd}, closes=CLOSES, vnstock=None)["summary"]["roic"] is None
     loss = {p: {**f, "pbt": str(-1 * B)} for p, f in QUARTERS.items()}  # no effective tax rate from a loss
     assert statement_table({**RECORD, "quarters": loss}, closes=CLOSES, vnstock=None)["summary"]["roic"] is None
+
+
+def test_vndirects_current_shares_replace_the_quarter_end_count_only_when_the_market_value_is_more_than_a_tenth_away():
+    quarters = {p: {"npat_parent": str(2 * B), "equity": str(50 * B), "charter_capital": str(5 * B)} for p in ("2025-Q4", "2026-Q1", "2026-Q2", "2026-Q3")}
+    record = {**RECORD, "quarters": quarters, "years": {}, "year_end_close": {}, "quarter_end_close": {"2026-Q3": {"date": "2026-09-30", "close": "20"}}}
+    closes = [(datetime(2026, 9, 30), 20.0), (datetime(2026, 11, 6), 20.0)]  # 500,000 shares at 20,000 đ = 10 tỷ; shares issued later left the adjusted series alone
+    t = statement_table(record, closes=closes, vnstock=None, kind="bank", check={"market_cap": str(18 * B), "shares": "900000"})
+    assert t["current"] == {"pe": "2.25", "pb": "0.36", "market_cap": "18000000000", "close_date": "2026-11-06", "shares_from_vndirect": True}  # 900,000 × 20,000 đ
+    near = statement_table(record, closes=closes, vnstock=None, kind="bank", check={"market_cap": str(10.5 * B), "shares": "900000"})["current"]
+    assert near["market_cap"] == "10000000000" and near["shares_from_vndirect"] is False  # within a tenth: the differences are expected
+    none = statement_table(record, closes=closes, vnstock=None, kind="bank", check={"market_cap": str(18 * B), "shares": None})["current"]
+    assert none["market_cap"] == "10000000000" and none["shares_from_vndirect"] is False  # nothing to use instead: left as worked out, and the comparison shows it
+    general = statement_table({**RECORD, "quarters": {p: {**f, "charter_capital": str(100 * B)} for p, f in QUARTERS.items()}, "quarter_end_close": {"2025-Q4": {"date": "2025-12-31", "close": "30"}}},
+                              closes=CLOSES, vnstock=None, check={"market_cap": str(500 * B), "shares": "20000000"})
+    assert general["summary"]["market_cap"] == "500000000000" and general["summary"]["shares_from_vndirect"] is True  # the cards follow: 20 million × 25,000 đ
+

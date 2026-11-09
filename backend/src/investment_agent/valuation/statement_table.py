@@ -265,6 +265,9 @@ def _ins_checks(periods: dict) -> list[dict]:
     return out
 
 
+CAP_GAP = Decimal("0.10")
+
+
 def _invested(f: dict) -> Decimal | None:
     """Equity with minority interests + borrowings - cash and short-term investments, at a period's end."""
     d, parent = _derived(f), _parent_equity(f)
@@ -281,23 +284,30 @@ def _roic(figures: list[dict], now: Decimal | None, before: Decimal | None) -> s
     return None if not 0 <= rate <= 1 else _ratio(core * (1 - rate), (now + before) / 2)  # the same limits as FCFF's tax rate
 
 
-def _market_value_now(record: dict, closes) -> tuple[Decimal | None, str | None]:
-    """Today's market value and the quarter it starts from: that quarter's unadjusted close × its shares (charter capital ÷ par), moved
-    by the adjusted series since that session, so a bonus issue or split after the quarter does not change it. Shares derived from
-    profit and EPS are not used, they miss by up to double. None without that session in the series."""
+def _market_value_now(record: dict, closes, check: dict | None = None) -> tuple[Decimal | None, str | None, bool]:
+    """Today's market value, the quarter it starts from, and whether VNDirect's share count was used. It starts from that quarter's
+    unadjusted close × its shares (charter capital ÷ par), moved by the adjusted series since that session, so a bonus issue or split
+    after the quarter does not change it; shares derived from profit and EPS are not used. Shares issued after the quarter that the
+    adjusted series does not show leave it short: more than a tenth from VNDirect's value, the latest close × VNDirect's current shares
+    is used instead. None without that session in the series."""
     quarters, qclose = record.get("quarters", {}), record.get("quarter_end_close", {})
     based = [p for p in sorted(quarters) if p in qclose and _d(quarters[p].get("charter_capital"))]
     if not closes or not based:
-        return None, None
+        return None, None, False
     last = based[-1]
     then = next((Decimal(str(v)) for t, v in closes if t.date().isoformat() == qclose[last].get("date")), None)
     close = _d(qclose[last].get("close"))
     if not then or close is None:
-        return None, None
-    return close * 1000 * _d(quarters[last]["charter_capital"]) / PAR * Decimal(str(closes[-1][1])) / then, last
+        return None, None, False
+    latest = Decimal(str(closes[-1][1]))
+    cap = close * 1000 * _d(quarters[last]["charter_capital"]) / PAR * latest / then
+    theirs, shares = _d((check or {}).get("market_cap")), _d((check or {}).get("shares"))
+    if theirs and shares and shares > 0 and abs(cap / theirs - 1) > CAP_GAP:
+        return latest * 1000 * shares, last, True
+    return cap, last, False
 
 
-def _summary(record: dict, closes) -> dict | None:
+def _summary(record: dict, closes, check: dict | None = None) -> dict | None:
     quarters = record.get("quarters", {})
     have = [p for p in sorted(quarters) if _d(quarters[p].get("npat_parent")) is not None]
     if not have:
@@ -311,7 +321,7 @@ def _summary(record: dict, closes) -> dict | None:
     ebitda = _sum(*(f.get("ebitda") for f in figures))
     latest = quarters[last]
     d = _derived(latest)
-    cap = _market_value_now(record, closes)[0]
+    cap, _, replaced = _market_value_now(record, closes, check)
     debt, cash_like = _sum(d.get("st_debt"), d.get("lt_debt")), _sum(d.get("cash"), d.get("st_investments"))
     ev = None if cap is None or debt is None or cash_like is None else cap + debt - cash_like + _minority(latest)
     parent, before = _parent_equity(latest), _parent_equity(quarters.get(_prior(last), {}))
@@ -319,7 +329,7 @@ def _summary(record: dict, closes) -> dict | None:
             "ebitda_ttm": _money(ebitda), "ev": _money(ev), "pe": _ratio(cap, npat, _Q2, positive=True), "pb": _ratio(cap, parent, _Q2, positive=True),
             "ev_ebitda": _ratio(ev, ebitda, _Q2, positive=True),
             "roe": _ratio(npat, (parent + before) / 2) if npat is not None and parent is not None and before is not None and parent + before > 0 else None,
-            "roic": _roic(figures, _invested(latest), _invested(quarters[_prior(last)]) if _prior(last) in quarters else None),
+            "shares_from_vndirect": replaced, "roic": _roic(figures, _invested(latest), _invested(quarters[_prior(last)]) if _prior(last) in quarters else None),
             "quarters": list(reversed(window))}
 
 
@@ -352,20 +362,21 @@ def _checks(quarters: dict, years: dict, vnstock: dict | None) -> list[dict]:
     return sorted(out, key=lambda c: (c["period"], c["check"]))
 
 
-def _current(record: dict, closes) -> dict:
+def _current(record: dict, closes, check: dict | None = None) -> dict:
     """P/E and P/B at the latest close, on the quarter its market value starts from. Blank as _market_value_now is."""
     quarters = record.get("quarters", {})
     close_date = closes[-1][0].date().isoformat() if closes else None
-    cap, last = _market_value_now(record, closes)
+    cap, last, replaced = _market_value_now(record, closes, check)
     if cap is None:
-        return {"pe": None, "pb": None, "market_cap": None, "close_date": close_date}
+        return {"pe": None, "pb": None, "market_cap": None, "close_date": close_date, "shares_from_vndirect": False}
     npat = _four(quarters, last, ("npat_parent",))["npat_parent"]
-    return {"pe": _ratio(cap, npat, _Q2, positive=True), "pb": _ratio(cap, _parent_equity(quarters[last]), _Q2, positive=True), "market_cap": _money(cap), "close_date": close_date}
+    return {"pe": _ratio(cap, npat, _Q2, positive=True), "pb": _ratio(cap, _parent_equity(quarters[last]), _Q2, positive=True), "market_cap": _money(cap), "close_date": close_date,
+            "shares_from_vndirect": replaced}
 
 
-def statement_table(record: dict, *, closes, vnstock: dict | None, kind: str | None = None) -> dict:
+def statement_table(record: dict, *, closes, vnstock: dict | None, kind: str | None = None, check: dict | None = None) -> dict:
     if kind in FIN_SCALE:
-        return {**_fin_table(record, kind, vnstock), "current": _current(record, closes)}
+        return {**_fin_table(record, kind, vnstock), "current": _current(record, closes, check)}
     quarters, years = record.get("quarters", {}), record.get("years", {})
     year_part = _part(years, sorted(years), extra=_valuation(years, record.get("year_end_close", {})), spec=P_AND_L + SCALE)
     quarter_part = _part(quarters, sorted(quarters), extra=_quarter_valuation(quarters, record.get("quarter_end_close", {})), spec=P_AND_L + SCALE)
@@ -373,7 +384,7 @@ def statement_table(record: dict, *, closes, vnstock: dict | None, kind: str | N
         if row["kind"] == "money":
             row["values"] = [_money(v) if isinstance(v, Decimal) else v for v in row["values"]]
     return {"symbol": record.get("symbol"), "source": record.get("source"), "fetched_at": record.get("fetched_at"),
-            "quarters": quarter_part, "years": year_part, "summary": _summary(record, closes),
-            "current": _current(record, closes),
+            "quarters": quarter_part, "years": year_part, "summary": _summary(record, closes, check),
+            "current": _current(record, closes, check),
             "checks": _checks(quarters, years, vnstock),
             "conflicts": record.get("quarters_conflicts", []) + record.get("years_conflicts", [])}

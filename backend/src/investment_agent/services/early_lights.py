@@ -16,6 +16,7 @@ from investment_agent.market.leading import MacroStore, load_indicators
 from investment_agent.market.sectors import load_sectors
 from investment_agent.market.series import SeriesStore
 from investment_agent.market.statements import StatementStore
+from investment_agent.market.valuation_check import ValuationCheckStore
 from investment_agent.market.watchlist import load_watchlist
 from investment_agent.services.records import read_version
 from investment_agent.valuation.peer_compare import COLUMNS
@@ -70,7 +71,7 @@ def _stock_values(repo, owner, data_dir: Path, symbol: str, kind: str | None) ->
     record = StatementStore(data_dir / ("statements" if kind is None else "statements-financial")).read(symbol)
     if record:
         fundamentals = FundamentalsStore(data_dir / "fundamentals").read(symbol) or {}
-        table = statement_table(record, closes=SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"), vnstock=fundamentals.get("quarters"), kind=kind)
+        table = statement_table(record, closes=SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"), vnstock=fundamentals.get("quarters"), kind=kind, check=ValuationCheckStore(data_dir / "valuation-check").read(symbol))
         for row in table["quarters"]["rows"]:
             if row["key"]:
                 for period, value in zip(table["quarters"]["periods"], row["values"]):

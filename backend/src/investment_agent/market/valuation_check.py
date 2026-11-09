@@ -13,6 +13,7 @@ from typing import Callable
 from .leading import _get_with_retry
 
 URL = "https://api-finfo.vndirect.com.vn/v4/ratios?q=code:{symbol}~ratioCode:MARKETCAP,PRICE_TO_EARNINGS,PRICE_TO_BOOK,OUTSTANDING_SHARES~reportDate:gte:{start}&sort=reportDate:desc&size=60"
+PROFIT_URL = "https://api-finfo.vndirect.com.vn/v4/ratios?q=code:{symbol}~ratioCode:NET_PROFIT_TR&sort=reportDate:desc&size=1"
 CODES = {"MARKETCAP": "market_cap", "PRICE_TO_EARNINGS": "pe", "PRICE_TO_BOOK": "pb", "OUTSTANDING_SHARES": "shares"}
 LABELS = {"market_cap": "Vốn hoá", "pe": "P/E", "pb": "P/B"}
 LOOKBACK_DAYS = 14
@@ -60,6 +61,16 @@ def parse_latest(text: str, *, today: date) -> dict:
     return {"date": max((d for k, (d, _) in best.items() if k != "shares"), default=None), **{k: best[k][1] if k in best else None for k in CODES.values()}}
 
 
+def _quarter_of(day: str) -> str:
+    return f"{day[:4]}-Q{(int(day[5:7]) + 2) // 3}"
+
+
+def _profit_quarter(text: str) -> str | None:
+    """The last quarter in VNDirect's own four-quarter profit, which its P/E rests on."""
+    days = [str(r.get("reportDate", ""))[:10] for r in json.loads(text).get("data") or [] if r.get("ratioCode") == "NET_PROFIT_TR"]
+    return _quarter_of(max(days)) if days else None
+
+
 def fetch_checks(store: ValuationCheckStore, symbols: list[str], *, get: Callable[[str], str], today: date, sleep: Callable[[float], None] = time.sleep) -> dict[str, str]:
     results = {}
     start = (today - timedelta(days=LOOKBACK_DAYS)).isoformat()
@@ -69,6 +80,10 @@ def fetch_checks(store: ValuationCheckStore, symbols: list[str], *, get: Callabl
             if got["date"] is None:
                 results[symbol] = "error:no_observations"
                 continue
+            try:
+                got["profit_quarter"] = _profit_quarter(_get_with_retry(get, PROFIT_URL.format(symbol=symbol), sleep))
+            except Exception:
+                got["profit_quarter"] = None  # the comparison then stands as it is
             store.save(symbol, {"fetched_at": datetime.now(timezone.utc).isoformat(), **got})
             results[symbol] = "ok"
         except Exception as exc:
@@ -76,14 +91,26 @@ def fetch_checks(store: ValuationCheckStore, symbols: list[str], *, get: Callabl
     return results
 
 
-def compare(ours: dict, theirs: dict | None) -> dict | None:
-    """Each figure beside VNDirect's and how far apart, as a share of VNDirect's; only a figure both sides have can be flagged."""
+def _q(period: str) -> str:
+    return f"Q{period[-1]}/{period[:4]}"
+
+
+def compare(ours: dict, theirs: dict | None, *, ttm: dict | None = None) -> dict | None:
+    """Each figure beside VNDirect's and how far apart, as a share of VNDirect's; only a figure both sides have can be flagged. VNDirect's
+    P/E can rest on four quarters ending earlier than ours: it is then compared on those same quarters, and the note says so."""
     if not theirs:
         return None
     rows = []
+    ttm = ttm or {}
+    their_q, last_q = theirs.get("profit_quarter"), max(ttm, default=None)
     for key, label in LABELS.items():
-        a, b = ours.get(key), theirs.get(key)
+        a, b, note = ours.get(key), theirs.get(key), None
+        if key == "pe" and their_q and last_q and their_q < last_q and ttm.get(their_q) and ours.get("market_cap") and Decimal(ttm[their_q]) > 0:
+            same = (Decimal(ours["market_cap"]) / Decimal(ttm[their_q])).quantize(Decimal("0.01"), ROUND_HALF_UP)
+            note = f"VNDirect chưa cập nhật {_q(last_q)}, P/E của họ tính trên 4 quý tới {_q(their_q)}; cùng 4 quý đó phần mềm ra {str(same).replace('.', ',')}x."
+            a = str(same)
         diff = None if a is None or b is None or Decimal(b) == 0 else Decimal(a) / Decimal(b) - 1
-        rows.append({"key": key, "label": label, "ours": a, "theirs": b, "diff": None if diff is None else str(diff.quantize(Decimal("0.0001"), ROUND_HALF_UP)),
+        shown = ours.get(key)
+        rows.append({"key": key, "label": label, "note": note, "ours": shown, "theirs": b, "diff": None if diff is None else str(diff.quantize(Decimal("0.0001"), ROUND_HALF_UP)),
                      "off": diff is not None and abs(diff) > OFF})
     return {"date": theirs.get("date"), "ours_date": ours.get("close_date"), "rows": rows, "flagged": sum(r["off"] for r in rows), "shares_from_vndirect": bool(ours.get("shares_from_vndirect"))}

@@ -162,7 +162,7 @@ def statements(symbol: str, request: Request):
     if table is None:
         return {**empty, "reason": "Chưa có số liệu VNDirect cho mã này (đồng bộ lúc 20:00, mỗi lượt vài mã)"}
     theirs = ValuationCheckStore(data_dir / "valuation-check").read(symbol)
-    return {**table, "kind": kind, "reason": None, "valuation_check": compare_valuation(table.get("current") or {}, theirs)}
+    return {**table, "kind": kind, "reason": None, "valuation_check": compare_valuation(table.get("current") or {}, theirs, ttm=table.get("ttm_parent"))}
 
 
 def _table_of(data_dir: Path, symbol: str, kind: str | None) -> dict | None:

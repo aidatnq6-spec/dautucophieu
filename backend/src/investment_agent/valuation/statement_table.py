@@ -374,9 +374,19 @@ def _current(record: dict, closes, check: dict | None = None) -> dict:
             "shares_from_vndirect": replaced}
 
 
+def _ttm_parent(quarters: dict) -> dict[str, str]:
+    """Parent profit of the four quarters to each of the latest quarters, where all four are there."""
+    out = {}
+    for p in sorted(quarters)[-4:]:
+        total = _four(quarters, p, ("npat_parent",))["npat_parent"]
+        if total is not None:
+            out[p] = _money(total)
+    return out
+
+
 def statement_table(record: dict, *, closes, vnstock: dict | None, kind: str | None = None, check: dict | None = None) -> dict:
     if kind in FIN_SCALE:
-        return {**_fin_table(record, kind, vnstock), "current": _current(record, closes, check)}
+        return {**_fin_table(record, kind, vnstock), "current": _current(record, closes, check), "ttm_parent": _ttm_parent(record.get("quarters", {}))}
     quarters, years = record.get("quarters", {}), record.get("years", {})
     year_part = _part(years, sorted(years), extra=_valuation(years, record.get("year_end_close", {})), spec=P_AND_L + SCALE)
     quarter_part = _part(quarters, sorted(quarters), extra=_quarter_valuation(quarters, record.get("quarter_end_close", {})), spec=P_AND_L + SCALE)
@@ -385,6 +395,6 @@ def statement_table(record: dict, *, closes, vnstock: dict | None, kind: str | N
             row["values"] = [_money(v) if isinstance(v, Decimal) else v for v in row["values"]]
     return {"symbol": record.get("symbol"), "source": record.get("source"), "fetched_at": record.get("fetched_at"),
             "quarters": quarter_part, "years": year_part, "summary": _summary(record, closes, check),
-            "current": _current(record, closes, check),
+            "current": _current(record, closes, check), "ttm_parent": _ttm_parent(quarters),
             "checks": _checks(quarters, years, vnstock),
             "conflicts": record.get("quarters_conflicts", []) + record.get("years_conflicts", [])}

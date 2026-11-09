@@ -4,7 +4,7 @@ import type { Channels, T } from "./bar-channels";
 export type Segment = { key: string; color: string; width: 1 | 2 | 3; style: 0 | 1 | 2; points: { t: T; p: number }[] };
 export type Marker = { time: T; position: "belowBar" | "aboveBar"; shape: "arrowUp" | "arrowDown"; color: string; text: string };
 
-export const OVERLAY = { channel: "#0f6b3a", zone: "#b45309", broken: "#b14249" };
+export const OVERLAY = { channel: "var(--overlay-channel)", zone: "var(--overlay-zone)", broken: "var(--overlay-broken)" };
 
 /** Lines up to the last finished bar only: channels from their first joining point, zones at their low. Never into the future. */
 export function channelSegments(d: Channels): Segment[] {

@@ -41,12 +41,12 @@ function ItemDetail({ item }: { item: Item }) {
 
 export function DecisionSummary({ decision, items }: { decision: Decision; items: Item[] }) {
   return (
-    <section className="surface" aria-labelledby="decision-title" style={{ background: "#163b55", color: "#fff", border: 0 }}>
+    <section className="surface" aria-labelledby="decision-title" style={{ background: "var(--hero-bg)", color: "var(--hero-ink)", border: 0 }}>
       <span className="pill good">{label(ACTION_LABEL, decision.action)}</span>
       <h2 id="decision-title" style={{ fontSize: 24, margin: "12px 0" }}>{decision.headline}</h2>
       <ul>{decision.reasons.map((r) => <li key={r}>{label(REASON_TEXT, r)}</li>)}</ul>
       <div style={{ color: "var(--ink)" }}>{items.map((i) => <ItemDetail key={i.entity_id} item={i} />)}</div>
-      <p className="caption" style={{ color: "#c7d8e5" }}>Khuyến nghị không tự tạo giao dịch; mọi lệnh do bạn tự đặt và ghi vào sổ.</p>
+      <p className="caption" style={{ color: "var(--hero-note)" }}>Khuyến nghị không tự tạo giao dịch; mọi lệnh do bạn tự đặt và ghi vào sổ.</p>
     </section>
   );
 }

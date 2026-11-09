@@ -20,7 +20,7 @@ export function applyProposal(p: Proposal): { values: Record<string, string>; so
   return { values, source: pages.size ? `${p.url} (trang ${[...pages].sort((a, b) => a - b).join(", ")})` : p.url };
 }
 
-const COLORS = ["#1f2a5c", "#3b82f6", "#15803d", "#a16207", "#7c3aed", "#b14249", "#0891b2", "#57534e"];
+const COLORS = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `var(--op${n})`);
 const KIND: Record<Group["period"], [string, string]> = { month: ["tháng", "2026-09"], quarter: ["quý", "2026-Q3"], year: ["năm", "2026"] };
 const SHOWN = 12;
 

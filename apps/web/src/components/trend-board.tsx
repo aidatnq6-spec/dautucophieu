@@ -4,6 +4,7 @@ import type { IChartApi, IPriceLine, ISeriesApi, ISeriesMarkersPluginApi, Series
 import { ApiError, api } from "../lib/api";
 import { formatDecimal, formatRatio, formatVnd } from "../lib/format";
 import { type Marker, type Segment, channelMarkers, channelSegments } from "./channel-overlay";
+import { alpha, resolveColor, useTheme } from "../lib/theme";
 import { type Add, type At, type Drawing, DrawingList, DrawingToolbar, type Interval, type Tool, dragResult, useChartDrawings } from "./chart-drawings";
 import { PriceAlerts } from "./price-alerts";
 import { type Channels, type Frame, LOOKBACK, fmtT } from "./bar-channels";
@@ -48,7 +49,11 @@ const SHOWN: Record<Interval, number> = { "1H": 120, "1D": 180, "1W": 104, "1M":
 const POLL = 20_000;
 const RELOAD_GAP = 120_000;
 const HOUR = 3600;
-const C = { up: "#137556", down: "#b14249", ink: "#183247", line: "#dce4eb", muted: "#576777", macd: "#245edb", signal: "#d97706", rsi: "#7c3aed", draw: "#c2410c" };
+/** The chart library draws on canvas and takes only real colours, read from the current theme whenever a chart is built. */
+const palette = () => {
+  const v = (name: string) => resolveColor(`var(--${name})`);
+  return { up: v("good"), down: v("bad"), ink: v("ink"), line: v("line"), muted: v("muted"), macd: v("brand"), signal: v("signal"), rsi: v("rsi"), draw: v("draw"), bg: v("paper"), grid: v("chart-grid") };
+};
 
 /** Exchange colours: ceiling purple, floor cyan, reference yellow, then up green and down red. */
 function tone(r: Row): string {
@@ -117,6 +122,7 @@ type ChartProps = { data: Chart; liveT: string | number | null; livePrice: numbe
 
 function CandleChart({ data, liveT, livePrice, drawings, tool, onDrawn, overlay }: ChartProps) {
   const box = useRef<HTMLDivElement>(null);
+  const theme = useTheme();
   const chartRef = useRef<IChartApi | null>(null);
   const LineRef = useRef<typeof import("lightweight-charts").LineSeries | null>(null);
   const MarkersRef = useRef<typeof import("lightweight-charts").createSeriesMarkers | null>(null);
@@ -133,9 +139,10 @@ function CandleChart({ data, liveT, livePrice, drawings, tool, onDrawn, overlay 
     let unlisten = () => {};
     void import("lightweight-charts").then(({ createChart, CandlestickSeries, HistogramSeries, LineSeries, createSeriesMarkers }) => {
       if (cancelled || !box.current) return;
+      const C = palette();
       chart = createChart(box.current, {
-        autoSize: true, layout: { background: { color: "#fff" }, textColor: C.ink, panes: { separatorColor: C.line } },
-        grid: { vertLines: { color: "#f0f3f6" }, horzLines: { color: "#f0f3f6" } }, localization: { locale: "vi-VN" },
+        autoSize: true, layout: { background: { color: C.bg }, textColor: C.ink, panes: { separatorColor: C.line } },
+        grid: { vertLines: { color: C.grid }, horzLines: { color: C.grid } }, localization: { locale: "vi-VN" },
         timeScale: { timeVisible: data.interval === "1H", secondsVisible: false, borderColor: C.line }, rightPriceScale: { borderColor: C.line },
       });
       const t = (v: string | number) => v as Time;
@@ -149,10 +156,10 @@ function CandleChart({ data, liveT, livePrice, drawings, tool, onDrawn, overlay 
         price.current = candles;
         const volume = chart.addSeries(HistogramSeries, { priceFormat: { type: "volume" }, priceScaleId: "vol", lastValueVisible: false, priceLineVisible: false });
         chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
-        volume.setData(data.bars.map((b) => ({ time: t(b.t), value: b.v ?? 0, color: Number(b.c) >= Number(b.o) ? "rgba(19,117,86,.35)" : "rgba(177,66,73,.35)" })));
+        volume.setData(data.bars.map((b) => ({ time: t(b.t), value: b.v ?? 0, color: alpha(Number(b.c) >= Number(b.o) ? C.up : C.down, 0.35) })));
       }
       const hist = chart.addSeries(HistogramSeries, { lastValueVisible: false, priceLineVisible: false }, 1);
-      hist.setData(data.macd.map((m) => ({ time: t(m.t), value: m.hist, color: m.hist >= 0 ? "rgba(19,117,86,.5)" : "rgba(177,66,73,.5)" })));
+      hist.setData(data.macd.map((m) => ({ time: t(m.t), value: m.hist, color: alpha(m.hist >= 0 ? C.up : C.down, 0.5) })));
       chart.addSeries(LineSeries, { color: C.macd, lineWidth: 1, priceLineVisible: false }, 1).setData(data.macd.map((m) => ({ time: t(m.t), value: m.macd })));
       chart.addSeries(LineSeries, { color: C.signal, lineWidth: 1, priceLineVisible: false }, 1).setData(data.macd.map((m) => ({ time: t(m.t), value: m.signal })));
       const rsi = chart.addSeries(LineSeries, { color: C.rsi, lineWidth: 1, priceLineVisible: false }, 2);
@@ -227,10 +234,11 @@ function CandleChart({ data, liveT, livePrice, drawings, tool, onDrawn, overlay 
       setBuilt((n) => n + 1);
     });
     return () => { cancelled = true; unlisten(); price.current = null; last.current = null; chartRef.current = null; chart?.remove(); };
-  }, [data]);
+  }, [data, theme]);
   useEffect(() => {
     const chart = chartRef.current, series = price.current, Line = LineRef.current;
     if (!chart || !series || !Line) return;
+    const C = palette();
     const lines: IPriceLine[] = [];
     const trends: ISeriesApi<"Line">[] = [];
     for (const d of drawings) {
@@ -259,12 +267,12 @@ function CandleChart({ data, liveT, livePrice, drawings, tool, onDrawn, overlay 
     }
     const added: ISeriesApi<"Line">[] = [];
     for (const seg of overlay.segments) {
-      const line = chart.addSeries(Line, { color: seg.color, lineWidth: seg.width, lineStyle: seg.style, lastValueVisible: false, priceLineVisible: false,
+      const line = chart.addSeries(Line, { color: resolveColor(seg.color), lineWidth: seg.width, lineStyle: seg.style, lastValueVisible: false, priceLineVisible: false,
         crosshairMarkerVisible: false, autoscaleInfoProvider: () => null });
       line.setData(seg.points.map((pt) => ({ time: pt.t as Time, value: pt.p })));
       added.push(line);
     }
-    const markers: ISeriesMarkersPluginApi<Time> = makeMarkers(series, overlay.markers.map((m) => ({ ...m, time: m.time as Time })));
+    const markers: ISeriesMarkersPluginApi<Time> = makeMarkers(series, overlay.markers.map((m) => ({ ...m, color: resolveColor(m.color), time: m.time as Time })));
     if (box.current) box.current.dataset.overlay = String(overlay.segments.length);
     return () => {
       if (chartRef.current !== chart) return;

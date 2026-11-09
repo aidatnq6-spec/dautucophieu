@@ -46,7 +46,7 @@ function Refs({ refs, sources }: { refs: Ref[]; sources: Record<string, Source> 
 }
 
 function Bar({ score }: { score: Chain["score"] }) {
-  const parts: [Status, string][] = [["good", "var(--good)"], ["neutral", "#9aa8b5"], ["unknown", "#d5dce3"], ["bad", "var(--bad)"]];
+  const parts: [Status, string][] = [["good", "var(--good)"], ["neutral", "var(--vc-neutral)"], ["unknown", "var(--vc-unknown)"], ["bad", "var(--bad)"]];
   return (
     <>
       <div className="vc-bar" aria-hidden="true">{parts.map(([k, c]) => <span key={k} style={{ width: pct(score[k]), background: c }} />)}</div>

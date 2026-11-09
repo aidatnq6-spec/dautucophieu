@@ -9,7 +9,8 @@ from investment_agent.domain.deposit_book import totals
 from investment_agent.domain.equity_budget import equity_budget
 from investment_agent.domain.ledger import replay
 from investment_agent.domain.profile import ConfirmedProfile
-from investment_agent.services.deposit_book import read_book
+from investment_agent.repositories.personal import prefetch
+from investment_agent.services.deposit_book import RECORD as BOOK_RECORD, read_book
 from investment_agent.services.records import LedgerBook, StoredRisk, effective_risk, read_current, read_version
 
 RECORD = ("settings", "equity_budget")
@@ -35,6 +36,8 @@ def protected_deductions(repo, owner) -> tuple[Decimal, Decimal, str | None]:
 
 def budget_view(repo, owner, *, quotes: dict) -> tuple[dict, int]:
     """(budget, version of the stored total); quotes: services.deposit_book.book_quotes, for fund and gold rows. Raises RepositoryUnavailable."""
+    # One Firestore transaction each, about 0,4 s: read one after another they were the whole of this call's time.
+    prefetch(getattr(repo, "authoritative", repo), owner, [RECORD, BOOK_RECORD, ("risk_versions", "main"), ("profile_versions", "main"), ("settings", "risk_override"), ("ledger_events", "main")])
     stored = read_version(repo, owner, *RECORD, None)
     book, _ = read_book(repo, owner)
     if stored is None and book is None:

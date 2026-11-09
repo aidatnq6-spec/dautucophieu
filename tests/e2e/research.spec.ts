@@ -83,9 +83,14 @@ for (const width of [1280, 800]) {
   });
 }
 
-test("the app is named Đầu tư Cổ phiếu in the sidebar and the browser tab", async ({ page }) => {
+test("the app is named Quản lý Gia Sản in the sidebar and the browser tab, and the name fits at 375px", async ({ page }) => {
   await page.goto("/watchlist");
-  await expect(page.locator(".brand")).toHaveText("Đầu tư Cổ phiếu");
-  await expect(page).toHaveTitle("Đầu tư Cổ phiếu");
+  await expect(page.locator(".brand")).toContainText("Quản lý Gia Sản");
+  await expect(page.locator(".brand-sub")).toHaveText("Cổ phiếu và toàn bộ tài sản");
+  await expect(page).toHaveTitle("Quản lý Gia Sản");
+  for (const width of [1440, 375]) {
+    await page.setViewportSize({ width, height: 800 });
+    expect(await page.locator(".brand").evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+  }
   await expect(page.getByRole("navigation", { name: "Điều hướng chính" }).getByRole("link", { name: "Danh mục & Giao dịch", exact: true })).toBeVisible();
 });

@@ -11,6 +11,8 @@
 
 Dữ liệu cục bộ (`data\jobs.sqlite`, `data\deliveries.sqlite`, cache) nằm trong `data\`, Git bỏ qua. Firestore vẫn là nguồn sự thật của dữ liệu cá nhân.
 
+Tùy chọn: cài Tesseract kèm dữ liệu tiếng Việt để đọc báo cáo ngân hàng dạng scan (xem README). `doctor.ps1` báo có hay chưa; không có thì file scan được báo "chưa cài Tesseract" và nhập tay.
+
 ## Lịch sau phiên
 
 `scripts\windows\run-after-close.ps1` gọi `python -m investment_agent.cli scheduled-run` một lần:
@@ -21,6 +23,30 @@ Dữ liệu cục bộ (`data\jobs.sqlite`, `data\deliveries.sqlite`, cache) n�
 - Máy bật lại sau khi bỏ lỡ: chỉ chạy bù phiên gần nhất chưa có bản tin, đếm số phiên cũ bị bỏ lỡ; không gửi hàng loạt bản tin cũ.
 - Khóa lease trong `data\jobs.sqlite` chặn hai tiến trình chạy cùng lúc.
 - Telegram chỉ gửi tự động khi trong Cài đặt đã bật cả "Cho phép gửi" và "Gửi tự động theo lịch".
+
+### Các bước tự động khác
+
+Mỗi bước ghi một dòng `<thời điểm> <tên bước> exit=<mã>` vào `logs\scheduler.log`. Một bước lỗi không chặn các bước sau. Các bước mới nhất:
+
+| Lệnh | Khi nào | Làm gì | Dữ liệu |
+|---|---|---|---|
+| `valuation-check-sync` | Từ lượt 20:00 | Đọc vốn hoá, P/E, P/B, số cổ phiếu của các mã theo dõi từ VNDirect để đối chiếu | `data\valuation-check\` |
+| `bank-notes-sync` | Từ lượt 20:00, mỗi ngân hàng một lần một tuần | Đọc thuyết minh Vietcap (nợ theo nhóm, tiền gửi theo loại, CAR), mỗi lượt gọi cách nhau 10 giây; nguồn từ chối thì dừng, không thử lại | `data\bank-notes\` |
+| `drawdown-check` | Mỗi lượt | Lấy toàn bộ lịch sử giá một lần cho mỗi mã, cả mã cũ; nhắc khi mã đang nắm giảm quá ngưỡng so với giá vốn | `data\trend-sources\`, mã không có giá ghi ở `_no_prices.json` |
+| `lights-check` | Mỗi lượt | Báo Telegram khi một chỉ báo của Bảng đèn đổi màu; màu thấy lần đầu chỉ được ghi nhớ | `data\alerts\lights.json` |
+| `backup-drill` | Mỗi lượt, tự bỏ qua nếu chưa đủ 7 ngày | Khôi phục bản sao lưu mới nhất vào thư mục tạm rồi xóa | `data\alerts\restore-drill.json` |
+| `health-check` | Mỗi lượt và trong tác vụ `InvestmentAgent-Alerts` | Xem mục Tình trạng hệ thống bên dưới | `data\alerts\system-health.json` |
+
+### Tình trạng hệ thống
+
+`health-check` chỉ đọc tên bước và mã thoát trong nhật ký, không đọc nội dung bước in ra. Xem kết quả ở trang Cài đặt. Mỗi vấn đề được báo Telegram một lần và báo lại khi hồi phục. Các trường hợp bị coi là vấn đề:
+
+- Một bước lỗi từ 2 lần liên tiếp.
+- Lượt sau phiên gần nhất đã xong quá 2 ngày, hoặc nhật ký chưa có lượt nào.
+- Dữ liệu cũ hơn hạn: giá VN-Index, Xu hướng 6 ngày; Vĩ mô, Lịch sự kiện 3 ngày; báo cáo Vnstock, báo cáo VNDirect, chỉ số ngành, đối chiếu định giá 4 ngày; thuyết minh ngân hàng 10 ngày.
+- Diễn tập khôi phục thất bại, chưa chạy lần nào, hoặc lần gần nhất quá 14 ngày.
+
+`health-check` cũng chạy trong `InvestmentAgent-Alerts` (09:00, 5 phút một lần, trong 6 giờ 5 phút, cùng `price-alerts` và `thesis-check --scope price`), nên vẫn phát hiện được khi lịch sau phiên ngừng chạy.
 
 ### Lịch giao dịch
 

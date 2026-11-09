@@ -289,4 +289,7 @@ main h2{scroll-margin-top:16px}
 .ln-lines{margin:8px 0 0;text-align:left;font-size:14px}.ln-lines>div{display:flex;justify-content:space-between;gap:10px;padding:5px 0}.ln-lines dd{margin:0;font-weight:600;white-space:nowrap}
 .ln-dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:8px}
 @media (max-width:860px){.ln-grid{grid-template-columns:minmax(0,1fr)}.ln-result{position:static}}
-@media print{.side,.ln-controls,.btn{display:none!important}.ln-grid{display:block}.ln-result{position:static}}
+.ln-print{display:none}
+@media print{.side,.page-jumps,.to-top,.ln-controls,.btn{display:none!important}.shell{display:block;min-height:0}main.content{padding:0;max-width:none}
+.ln-grid{display:block}.ln-result{position:static;break-inside:avoid;box-shadow:none}.tablewrap{overflow:visible}
+.ln-print{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;margin:0 0 12px;font-size:13px}.ln-print>div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding:3px 0}.ln-print dd{margin:0;font-weight:600}}

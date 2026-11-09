@@ -172,7 +172,7 @@ def _table_of(data_dir: Path, symbol: str, kind: str | None) -> dict | None:
         return None
     fundamentals = FundamentalsStore(data_dir / "fundamentals").read(symbol)
     return statement_table(record, closes=SeriesStore(data_dir / "trend-sources").read(f"{symbol}-1d"),
-                           vnstock=(fundamentals or {}).get("quarters"), kind=kind)
+                           vnstock=(fundamentals or {}).get("quarters"), kind=kind, check=ValuationCheckStore(data_dir / "valuation-check").read(symbol))
 
 
 def _period_of(day: str) -> str:

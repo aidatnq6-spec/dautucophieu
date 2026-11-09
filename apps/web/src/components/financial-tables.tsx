@@ -13,7 +13,7 @@ type Summary = { period: string; close_date: string | null; market_cap: string |
   ev: string | null; pe: string | null; pb: string | null; ev_ebitda: string | null; roe: string | null; roic?: string | null; quarters: string[] };
 type Tables = { symbol: string; kind?: "bank" | "securities" | "insurance" | null; reason: string | null; source?: string; fetched_at?: string; quarters: Part; years: Part; summary: Summary | null;
   checks: Check[]; conflicts: Conflict[];
-  valuation_check?: { date: string | null; ours_date: string | null; flagged: number; rows: { key: string; label: string; ours: string | null; theirs: string | null; diff: string | null; off: boolean }[] } | null };
+  valuation_check?: { shares_from_vndirect?: boolean; date: string | null; ours_date: string | null; flagged: number; rows: { key: string; label: string; ours: string | null; theirs: string | null; diff: string | null; off: boolean }[] } | null };
 
 type Kind = "bank" | "securities" | "insurance";
 type Ratios = { kind: Kind; quarters: { date: string; label: string }[];
@@ -169,7 +169,7 @@ export function FinancialTables({ symbol }: { symbol: string }) {
             <td className="num">{r.theirs === null ? "—" : r.key === "market_cap" ? ty(r.theirs) : cell(r.theirs, "x", null)}</td>
             <td className={`num ${r.off ? "negative" : ""}`}>{r.diff === null ? "—" : `${(Number(r.diff) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1, minimumFractionDigits: 1 })}%`}</td></tr>)}</tbody>
         </table></div>
-        <p className="caption">Phần mềm tính theo giá đóng cửa mới nhất đã lưu{data.valuation_check.ours_date ? ` (${data.valuation_check.ours_date.split("-").reverse().join("/")})` : ""}, VNDirect theo số của họ{data.valuation_check.date ? ` (${data.valuation_check.date.split("-").reverse().join("/")})` : ""}. Hai bên có thể khác cách tính lợi nhuận và số cổ phiếu; lệch hơn 10% thì nên xem lại, phần mềm không tự chỉnh số.</p>
+        <p className="caption">Phần mềm tính theo giá đóng cửa mới nhất đã lưu{data.valuation_check.ours_date ? ` (${data.valuation_check.ours_date.split("-").reverse().join("/")})` : ""}, VNDirect theo số của họ{data.valuation_check.date ? ` (${data.valuation_check.date.split("-").reverse().join("/")})` : ""}. Hai bên có thể khác cách tính lợi nhuận và số cổ phiếu; lệch hơn 10% thì nên xem lại, phần mềm không tự chỉnh số.{data.valuation_check.shares_from_vndirect && " Mã này: vốn hoá tính theo số cổ phiếu cuối quý lệch hơn 10%, nên phần mềm dùng số cổ phiếu hiện tại của VNDirect, vì vậy hai bên gần như trùng và không còn là phép kiểm tra độc lập."}</p>
       </details>}
       {(data.checks.length > 0 || data.conflicts.length > 0) && <details className="mc-table">
         <summary>Kiểm tra chéo: {data.checks.length} chỗ lệch hơn 0,5% ở {new Set(data.checks.map((c) => c.period)).size} kỳ{data.conflicts.length ? `, ${data.conflicts.length} dòng nguồn ghi hai số` : ""}</summary>

@@ -12,8 +12,8 @@ from typing import Callable
 
 from .leading import _get_with_retry
 
-URL = "https://api-finfo.vndirect.com.vn/v4/ratios?q=code:{symbol}~ratioCode:MARKETCAP,PRICE_TO_EARNINGS,PRICE_TO_BOOK~reportDate:gte:{start}&sort=reportDate:desc&size=60"
-CODES = {"MARKETCAP": "market_cap", "PRICE_TO_EARNINGS": "pe", "PRICE_TO_BOOK": "pb"}
+URL = "https://api-finfo.vndirect.com.vn/v4/ratios?q=code:{symbol}~ratioCode:MARKETCAP,PRICE_TO_EARNINGS,PRICE_TO_BOOK,OUTSTANDING_SHARES~reportDate:gte:{start}&sort=reportDate:desc&size=60"
+CODES = {"MARKETCAP": "market_cap", "PRICE_TO_EARNINGS": "pe", "PRICE_TO_BOOK": "pb", "OUTSTANDING_SHARES": "shares"}
 LABELS = {"market_cap": "Vốn hoá", "pe": "P/E", "pb": "P/B"}
 LOOKBACK_DAYS = 14
 OFF = Decimal("0.10")
@@ -54,9 +54,10 @@ def parse_latest(text: str, *, today: date) -> dict:
     best: dict[str, tuple[str, str]] = {}
     for row in json.loads(text).get("data") or []:
         key, day, value = CODES.get(row.get("ratioCode")), str(row.get("reportDate", ""))[:10], _plain(row.get("value"))
-        if key and value is not None and day <= today.isoformat() and (key not in best or day > best[key][0]):
+        # VNDirect keeps the current share count under the year's end: its date says nothing, the others' later rows are not yet real.
+        if key and value is not None and (key == "shares" or day <= today.isoformat()) and (key not in best or day > best[key][0]):
             best[key] = (day, value)
-    return {"date": max((d for d, _ in best.values()), default=None), **{k: best[k][1] if k in best else None for k in LABELS}}
+    return {"date": max((d for k, (d, _) in best.items() if k != "shares"), default=None), **{k: best[k][1] if k in best else None for k in CODES.values()}}
 
 
 def fetch_checks(store: ValuationCheckStore, symbols: list[str], *, get: Callable[[str], str], today: date, sleep: Callable[[float], None] = time.sleep) -> dict[str, str]:
@@ -85,4 +86,4 @@ def compare(ours: dict, theirs: dict | None) -> dict | None:
         diff = None if a is None or b is None or Decimal(b) == 0 else Decimal(a) / Decimal(b) - 1
         rows.append({"key": key, "label": label, "ours": a, "theirs": b, "diff": None if diff is None else str(diff.quantize(Decimal("0.0001"), ROUND_HALF_UP)),
                      "off": diff is not None and abs(diff) > OFF})
-    return {"date": theirs.get("date"), "ours_date": ours.get("close_date"), "rows": rows, "flagged": sum(r["off"] for r in rows)}
+    return {"date": theirs.get("date"), "ours_date": ours.get("close_date"), "rows": rows, "flagged": sum(r["off"] for r in rows), "shares_from_vndirect": bool(ours.get("shares_from_vndirect"))}

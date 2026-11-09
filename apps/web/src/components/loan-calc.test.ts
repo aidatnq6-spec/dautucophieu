@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loanSchedule, parseAmount, savedByPrepaying } from "./loan-calc";
+import { loanSchedule, parseAmount, paymentStep, savedByPrepaying, shareText } from "./loan-calc";
 
 const BASE = { principal: 2_000_000_000, months: 300, promoMonths: 12, promoRate: 7.5, afterRate: 11, method: "declining" as const };
 
@@ -66,6 +66,37 @@ describe("repaying early", () => {
     const full = loanSchedule(plan), early = loanSchedule({ ...plan, prepay: { month: 3, feePercent: 2 } });
     expect(savedByPrepaying(full, early)).toBeCloseTo(full.interest - early.interest - 18, 8);
   });
+});
+
+describe("the payment when the promotion ends", () => {
+  it("compares the first month after it with the month before: 18.708.333 đ then 24.266.667 đ on 2 tỷ, 25 years, 7,5% then 11%", () => {
+    const step = paymentStep(loanSchedule(BASE), 12)!;
+    expect(step.period).toBe(13);
+    expect(Math.round(step.first)).toBe(19_166_667);
+    expect(Math.round(step.after)).toBe(24_266_667);
+    expect(Math.round(step.rise)).toBe(5_558_333);
+    expect(shareText(step.rise, step.after - step.rise)).toBe("29,7%");
+  });
+  it("waits for the principal to start when the grace outlasts the promotion", () => {
+    const s = loanSchedule({ ...BASE, graceMonths: 18 });
+    expect(paymentStep(s, 12, 18)!.period).toBe(19);
+  });
+  it("shows a fall as a negative rise", () => {
+    expect(paymentStep(loanSchedule({ ...BASE, promoRate: 12, afterRate: 6 }), 12)!.rise).toBeLessThan(0);
+  });
+  it("is absent when there is no second rate to compare", () => {
+    expect(paymentStep(loanSchedule({ ...BASE, promoMonths: 0 }), 0)).toBeNull();
+    expect(paymentStep(loanSchedule({ ...BASE, afterRate: 7.5 }), 12)).toBeNull();
+    expect(paymentStep(loanSchedule({ ...BASE, promoMonths: 300 }), 300)).toBeNull();
+  });
+  it("is absent when that month is the one the loan is cleared in, whose payment is not a monthly one", () => {
+    expect(paymentStep(loanSchedule({ ...BASE, prepay: { month: 13, feePercent: 2 } }), 12)).toBeNull();
+  });
+});
+
+it("gives a share of a total to one decimal, with a comma", () => {
+  expect(shareText(2_000_000_000, 4_690_450_000)).toBe("42,6%");
+  expect(shareText(2_690_450_000, 4_690_450_000)).toBe("57,4%");
 });
 
 describe("parseAmount", () => {

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { signIn } from "./helpers";
+import { call, signIn } from "./helpers";
 
 // Synthetic fixture data only: FPT has statements, closes and sector insights; VCB has no statements.
 test.beforeEach(async ({ context }) => signIn(context));
@@ -346,4 +346,25 @@ test("Bảng đèn chỉ báo sớm colours an indicator against thresholds the 
   await box.getByRole("button", { name: "Bỏ Giá dầu WTI" }).click();
   await expect(box.getByRole("row", { name: /Giá dầu WTI/ })).toHaveCount(0);
   await box.getByRole("button", { name: "Bỏ NPL" }).click();
+});
+
+
+test("a bank's asset quality names the warning signs of its latest quarter", async ({ page }) => {
+  const before = await (await call(page, "GET", "bank-figures/VCB")).json();
+  const row = (g2: string, g5: string, reserve: string, accrued: string) => ({ group1: "1000", group2: g2, group3: "5", group4: "5", group5: g5, demand_deposits: null, margin_deposits: null,
+    customer_deposits: null, car: null, reserve, accrued_interest: accrued, real_estate_loans: null, discounted_documents: null });
+  let version = before.version;
+  for (const [quarter, values] of [["2025-Q2", row("10", "10", "20", "50")], ["2025-Q3", row("17", "7", "18", "70")]] as const) {
+    const r = await (await call(page, "PUT", `bank-figures/VCB/${quarter}`, { values, source: { kind: "manual" }, expected_version: version, request_id: `bq-${quarter}-${Date.now()}` })).json();
+    version = r.version;
+  }
+  await page.goto("/research/VCB");
+  const quality = page.getByRole("region", { name: "Số liệu ngân hàng" }).getByTestId("bank-quality");
+  await expect(quality).toContainText("Nợ nhóm 2 tăng 70,0%");
+  await expect(quality).toContainText("có thể đã dùng dự phòng để xử lý (xóa) nợ");
+  await expect(quality).toContainText("Lãi và phí phải thu tăng 40,0%");
+  for (const q of ["2025-Q2", "2025-Q3"]) {
+    const now = await (await call(page, "GET", "bank-figures/VCB")).json();
+    await call(page, "POST", `bank-figures/VCB/${q}/delete`, { expected_version: now.version, request_id: `bq-del-${q}-${Date.now()}` });
+  }
 });

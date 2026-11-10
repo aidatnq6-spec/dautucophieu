@@ -11,8 +11,10 @@ test("a purpose is added and a row's tag stays after a reload", async ({ page })
   const stored = await (await call(page, "GET", "money-purposes")).json();
   await call(page, "PUT", "money-purposes", { purposes: [], tags: {}, expected_version: stored.version, request_id: `mp-r-${Date.now()}` });
   await page.route("**/api/internal/money-purposes", async (route) => {
-    const response = await route.fetch();
-    await route.fulfill({ response, json: { ...(await response.json()), rows: [{ id: "mp-a", kind: "account", name: "TK cho con", value: "100000000", at_cost: false }] } });
+    try {
+      const response = await route.fetch();
+      await route.fulfill({ response, json: { ...(await response.json()), rows: [{ id: "mp-a", kind: "account", name: "TK cho con", value: "100000000", at_cost: false }] } });
+    } catch { /* the page moved on before the answer came back */ }
   });
   await page.goto("/profile?tab=tai-san");
   const box = region(page);

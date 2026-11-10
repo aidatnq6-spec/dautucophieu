@@ -285,6 +285,7 @@ main h2{scroll-margin-top:16px}
 .gp-plot{position:relative;margin-top:12px;min-width:0}.gp-chart{display:block;touch-action:pan-y}.gp-tick{font-size:12px;fill:var(--muted)}.gp-end{font-size:12px;font-weight:600}
 .gp-inputs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;align-items:end;margin-top:10px}.gp-inputs input{width:100%}
 .gp-cards{margin-top:14px}
+.bf-quality{margin:14px 0}.bf-quality h3{margin:0 0 6px}.bf-flags{margin:6px 0;padding-left:20px}.bf-flags li{margin:3px 0}
 .mp-suggest{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0}.mp-bulk{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:14px 0 6px}.mp-bulk .field{min-width:220px}
 .cf-bars{display:flex;align-items:flex-end;gap:6px;height:180px;margin:16px 0 4px;padding:0 2px;border-bottom:1px solid var(--line)}
 .cf-col{flex:1 1 0;min-width:0;height:100%;display:flex;flex-direction:column;align-items:center}.cf-stack{position:relative;flex:1;width:100%;max-width:38px;display:flex;flex-direction:column;justify-content:flex-end}

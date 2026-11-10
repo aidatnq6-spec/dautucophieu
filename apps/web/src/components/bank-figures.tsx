@@ -4,18 +4,35 @@ import { FileSearch, Pencil, Save, Trash2 } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatRatio } from "../lib/format";
 
-const FIELDS = ["group1", "group2", "group3", "group4", "group5", "demand_deposits", "margin_deposits", "customer_deposits", "car"] as const;
+const FIELDS = ["group1", "group2", "group3", "group4", "group5", "demand_deposits", "margin_deposits", "customer_deposits", "car", "reserve", "accrued_interest",
+  "real_estate_loans", "discounted_documents"] as const;
 type Field = (typeof FIELDS)[number];
 // A quarter's figures can come from two files (statements, and the separate CAR report): each field keeps its file and page.
 type Source = { kind: "manual" } | { kind: "pdf"; url: string | null; pages: Partial<Record<Field, number>>; urls?: Partial<Record<Field, string>> };
 type Quarter = { quarter: string; values: Record<Field, string | null>; source: Source;
-  derived: { npl: string | null; group2_ratio: string | null; casa: string | null; car: string | null } };
+  derived: { npl: string | null; group2_ratio: string | null; casa: string | null; car: string | null; llr?: string | null; real_estate_share?: string | null }; trend?: Trend };
+type Trend = { llr: string | null; llr_prev: string | null; llr_year_ago: string | null; llr_start: string | null; group2_growth_qoq: string | null; loans_growth_qoq: string | null;
+  loans_growth_ytd: string | null; accrued_growth_qoq: string | null; documents_growth_qoq: string | null; real_estate_growth_ytd: string | null; flags: string[] };
 type View = { symbol: string; version: number; quarters: Quarter[]; labels: Record<Field, string> };
 // `ocr`: read from a scanned page by OCR on this machine, already checked against the printed total where there is one.
 type Read = { url: string; fields: Partial<Record<Field, { value: string; page: number; ocr?: boolean }>>; missing: Field[]; warnings: string[];
   ocr_pages?: number[] };
 
-const pct = (v: string | null) => (v ? formatRatio(v, 2) : "—");
+const pct = (v: string | null | undefined) => (v ? formatRatio(v, 2) : "—");
+const pct1 = (v: string | null | undefined) => (v ? formatRatio(v, 1) : "—");
+/** The warning signs of the latest quarter, each with the figures behind it. */
+export function flagText(code: string, t: Trend): string {
+  switch (code) {
+    case "llr_falling": return `Bao phủ nợ xấu giảm còn ${pct1(t.llr)} (quý trước ${pct1(t.llr_prev)}, đầu năm ${pct1(t.llr_start)}, cùng kỳ ${pct1(t.llr_year_ago)}).`;
+    case "group2_jump": return `Nợ nhóm 2 tăng ${pct1(t.group2_growth_qoq)} so với quý trước: ứng viên chuyển thành nợ xấu.`;
+    case "reserve_lagging": return "Nợ xấu tăng nhưng số dư dự phòng giảm so với quý trước: dự phòng chưa theo kịp.";
+    case "write_off": return "Nợ nhóm 5 và dự phòng cùng giảm: có thể đã dùng dự phòng để xử lý (xóa) nợ.";
+    case "accrued_jump": return `Lãi và phí phải thu tăng ${pct1(t.accrued_growth_qoq)} so với quý trước: phần lợi nhuận chưa thu bằng tiền tăng.`;
+    case "real_estate_fast": return `Dư nợ bất động sản tăng ${pct1(t.real_estate_growth_ytd)} từ đầu năm, nhanh hơn tổng dư nợ (${pct1(t.loans_growth_ytd)}).`;
+    case "documents_jump": return `Chiết khấu bộ chứng từ, phải thu ngoài cho vay tăng ${pct1(t.documents_growth_qoq)} so với quý trước: cấp vốn nằm ngoài chỉ tiêu tín dụng.`;
+    default: return code;
+  }
+}
 const blank = () => Object.fromEntries(FIELDS.map((f) => [f, ""])) as Record<Field, string>;
 const toInput = (v: string | null) => (v ?? "").replace(".", ",");
 /** Typed number to a plain decimal: "537.304,578" (Vietnamese), "537.304" (thousands) and "537304.578" (decimal point) all read right. */
@@ -97,22 +114,31 @@ export function BankFigures({ symbol }: { symbol: string }) {
   return (
     <section className="surface" aria-label="Số liệu ngân hàng">
       <h2>Số liệu ngân hàng (nhập tay)</h2>
-      <p className="caption">Nợ nhóm 1–5, tiền gửi và CAR không có ở nguồn miễn phí: nhập từ thuyết minh báo cáo tài chính quý (tỷ đồng), hoặc dán đường dẫn PDF
+      <p className="caption">Nợ nhóm 1–5, tiền gửi, CAR và các số về chất lượng tài sản không có ở nguồn miễn phí: nhập từ thuyết minh báo cáo tài chính quý (tỷ đồng), hoặc dán đường dẫn PDF
         công khai để phần mềm đọc và điền sẵn — kiểm tra lại rồi mới lưu. File scan dạng ảnh được nhận dạng chữ (OCR) ngay trên máy, mất khoảng 1–2 phút;
         số đọc từ ảnh được cộng thử với dòng tổng, ô nào không khớp thì để trống. CASA = (không kỳ hạn + ký quỹ) / tiền gửi khách hàng. Nợ nhóm 2 và CASA
         đã tự lấy từ thuyết minh trên Vietcap (Điểm sức khỏe dùng cho tiêu chí CASA tăng, nợ nhóm 2 giảm); quý nhập ở đây được dùng thay số Vietcap.</p>
       {view && view.quarters.length > 0 && <table className="fv-table" aria-label={`Số liệu ngân hàng ${symbol}`}>
-        <thead><tr><th>Quý</th><th className="num">NPL</th><th className="num">Nợ nhóm 2</th><th className="num">CASA</th><th className="num">CAR</th><th>Nguồn</th><th /></tr></thead>
+        <thead><tr><th>Quý</th><th className="num">NPL</th><th className="num">Nợ nhóm 2</th><th className="num">CASA</th><th className="num">CAR</th><th className="num">Bao phủ nợ xấu</th><th>Nguồn</th><th /></tr></thead>
         <tbody>{view.quarters.map((q) => <tr key={q.quarter}>
           <td data-label="Quý">{q.quarter}</td><td data-label="NPL" className="num">{pct(q.derived.npl)}</td>
           <td data-label="Nợ nhóm 2" className="num">{pct(q.derived.group2_ratio)}</td><td data-label="CASA" className="num">{pct(q.derived.casa)}</td>
           <td data-label="CAR" className="num">{pct(q.derived.car)}</td>
+          <td data-label="Bao phủ nợ xấu" className="num">{pct1(q.derived.llr)}</td>
           <td data-label="Nguồn">{q.source.kind === "pdf" ? sourceFiles(q.source).map((u, i) => <a key={u} href={u} target="_blank" rel="noreferrer">
             {i ? " · " : ""}PDF {i + 1}</a>) : "Nhập tay"}</td>
           <td className="actions"><button type="button" className="btn" aria-label={`Sửa ${q.quarter}`} onClick={() => edit(q)}><Pencil size={14} aria-hidden="true" />Sửa</button>
             <button type="button" className="btn" aria-label={`Xóa ${q.quarter}`} onClick={() => void remove(q.quarter)}><Trash2 size={14} aria-hidden="true" />Xóa</button></td>
         </tr>)}</tbody>
       </table>}
+      {view && view.quarters[0]?.trend && <div className="bf-quality" data-testid="bank-quality">
+        <h3>Chất lượng tài sản {view.quarters[0].quarter}</h3>
+        {view.quarters[0].trend.flags.length === 0
+          ? <p className="caption">Chưa thấy dấu hiệu cần xem kỹ theo các ngưỡng bên dưới{view.quarters.length < 2 ? " (cần ít nhất hai quý liền nhau để so)" : ""}.</p>
+          : <ul className="bf-flags">{view.quarters[0].trend.flags.map((f) => <li key={f}>{flagText(f, view.quarters[0].trend!)}</li>)}</ul>}
+        <p className="caption">So với quý trước, cùng kỳ năm trước và cuối năm trước. Ngưỡng do phần mềm đặt: bao phủ nợ xấu giảm từ 10 điểm %, nợ nhóm 2 tăng từ 30%, lãi phải thu tăng từ 20%,
+          chứng từ tăng từ 30%, dư nợ bất động sản tăng từ 10% và nhanh gấp 1,5 lần tổng dư nợ. Là dấu hiệu để đọc kỹ thuyết minh, không phải kết luận hay khuyến nghị. Ô để trống thì không so.</p>
+      </div>}
       <div className="fv-search">
         <label className="field">Đường dẫn PDF báo cáo (https)<input type="url" value={url} placeholder="https://…/bctc-quy-3-2026.pdf" disabled={!view}
           onChange={(e) => setUrl(e.target.value)} /></label>
@@ -124,7 +150,7 @@ export function BankFigures({ symbol }: { symbol: string }) {
         {read.warnings.map((w) => <div key={w}>{w}</div>)}</div>}
       <form className="eb-form" onSubmit={(e) => { e.preventDefault(); void save(); }}>
         <label className="field">Quý<input value={quarter} placeholder="2026-Q3" maxLength={7} disabled={!view} onChange={(e) => setQuarter(e.target.value)} /></label>
-        {FIELDS.map((f) => <label key={f} className="field">{view?.labels[f] ?? f}{f === "car" ? "" : " (tỷ đồng)"}
+        {FIELDS.map((f) => <label key={f} className="field">{view?.labels[f] ?? f}{f === "car" ? "" : " (tỷ đồng)"}{f === "real_estate_loans" || f === "discounted_documents" ? " · nhập tay" : ""}
           <input inputMode="decimal" value={values[f]} disabled={!view} onChange={(e) => setValues({ ...values, [f]: e.target.value })} />
           {pages[f] && <span className="caption">{pageNote(pages[f], fileName(source.kind === "pdf" ? source.urls?.[f] ?? source.url : null), fromImage.has(f))}</span>}</label>)}
         <button type="submit" className="btn primary" disabled={!view}><Save size={16} aria-hidden="true" />Lưu quý này</button>

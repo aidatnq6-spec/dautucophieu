@@ -8,8 +8,8 @@ ACB_2024 = {"group1": "447734", "group2": "7808", "group3": "1517", "group4": "1
 
 def test_derived_ratios_follow_the_owner_spreadsheet_formulas():
     d = derive(ACB_2024)
-    assert d == {"npl": "0.0109", "group2_ratio": "0.0170", "casa": "0.3300", "car": "0.1150"}  # NPL 1,09%, CASA 33% as in the Excel
-    assert derive({"group1": "100", "group2": "5"}) == {"npl": None, "group2_ratio": None, "casa": None, "car": None}  # groups 3–5 missing
+    assert {k: d[k] for k in ("npl", "group2_ratio", "casa", "car")} == {"npl": "0.0109", "group2_ratio": "0.0170", "casa": "0.3300", "car": "0.1150"}  # NPL 1,09%, CASA 33% as in the Excel
+    assert set(derive({"group1": "100", "group2": "5"}).values()) == {None}  # groups 3–5 missing
 
 
 # Text as pypdf gives it for a bank's quarterly notes: amounts in triệu đồng, this period first, prior period second.

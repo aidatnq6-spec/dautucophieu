@@ -69,3 +69,17 @@ def test_a_short_day_of_the_month_uses_the_last_day():
 def test_bad_rows_are_refused(bad):
     with pytest.raises(ValidationError):
         RentalBook.model_validate(bad)
+
+
+def test_months_before_the_book_began_tracking_are_not_owed():
+    """Rent received before the room was entered here sits in the owner's spreadsheet: an unrecorded month is not an unpaid one."""
+    tracked = {**U301, "track_from": "2026-11"}
+    u = units(book(units=(tracked,), payments=()))["u1"]
+    assert [(m["month"], m["status"]) for m in u["months"]] == [("2026-11", "unpaid")] and u["owed"] == "7000000"
+    later = {**U301, "start": "2026-11-05", "track_from": "2026-09"}  # the lease starts later than tracking: the lease wins
+    assert [m["month"] for m in units(book(units=(later,), payments=()))["u1"]["months"]] == ["2026-11"]
+
+
+def test_a_bad_tracking_month_is_refused():
+    with pytest.raises(ValidationError):
+        RentalBook.model_validate({"units": [{**U301, "track_from": "2026-13"}], "payments": []})

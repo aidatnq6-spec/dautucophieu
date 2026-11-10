@@ -349,7 +349,7 @@ def test_fetch_auto_does_not_retry_a_permanent_answer(tmp_path):
         calls.append(url)
         raise _status_error(url, 404)
     assert fetch_auto(wanted, MacroStore(tmp_path), get=get, today=date(2026, 10, 30), sleep=waits.append) == {"wti": "error:HTTPStatusError"}
-    assert len(calls) == 1 and waits == []
+    assert len(calls) == 2 and waits == []  # oilprice, then its fallback FRED: each asked once
 
 
 def test_fetch_auto_skips_the_rest_of_a_host_that_stays_down(tmp_path):
@@ -425,4 +425,77 @@ def test_macro_sync_tries_timed_out_indicators_again_with_a_longer_wait(tmp_path
     results = json.loads(capsys.readouterr().out.strip().splitlines()[-1])["results"]
     assert results["vn10y"] == results["vn_interbank_on"] == results["m2_vn"] == "ok"
     assert MacroStore(tmp_path).read("vn10y")[-1]["value"] == "4.49"
-    assert all("stockbiz.vn" in u for u in slow_calls) and 30 in waits
+    assert all("stockbiz.vn" in u or "sbv.gov.vn" in u for u in slow_calls) and 30 in waits  # only the timed-out ones, SBV first
+
+
+# --- Nguồn vĩ mô sớm hơn: oilprice.com (WTI), SBV (liên ngân hàng), treasury.gov (lợi suất Mỹ); M2 đọc đúng hàng nghìn ---
+
+OILPRICE = ("<tr class='stripe show_graph update_on_load'  data-name='WTI-Crude' data-id='45' data-spreadsheet='Crude Oil WTI'>"
+            "<td><span class=\"blend_name_span\">WTI Crude</span></td><td class='last_price' data-price='85.72'>85.72</td>"
+            "<td class='last_updated' data-stamp='1794323403'>(10-Minute Delay)</td></tr>"
+            "<tr class='stripe' data-name='Brent-Crude'><td class='last_price' data-price='90.94'>90.94</td><td class='last_updated' data-stamp='1794323403'></td></tr>")
+
+
+def test_oilprice_wti_is_read_from_its_row_and_dated_on_new_york_time():
+    from investment_agent.market.leading import parse_oilprice
+    # 1794323403 = 2026-11-10 05:10 UTC = 2026-11-10 00:10 in New York
+    assert parse_oilprice(OILPRICE, blend="WTI-Crude") == [(date(2026, 11, 10), "85.72")]
+    with pytest.raises(MacroError):
+        parse_oilprice("<html>maintenance</html>", blend="WTI-Crude")
+
+
+def _sbv_item(day_utc: str, rate: str) -> dict:
+    return {"title": "Doanh số và lãi suất giao dịch", "contentFields": [
+        {"label": "Ngày áp dụng", "contentFieldValue": {"data": day_utc}},
+        {"label": "Lãi suất thị trường liên ngân hàng Field Set", "nestedContentFields": [
+            {"label": "Thời hạn", "contentFieldValue": {"data": "Qua đêm"}},
+            {"label": "Lãi suất BQ liên Ngân hàng (% năm)", "contentFieldValue": {"data": rate}}]},
+        {"label": "Lãi suất thị trường liên ngân hàng Field Set", "nestedContentFields": [
+            {"label": "Thời hạn", "contentFieldValue": {"data": "1 Tuần"}},
+            {"label": "Lãi suất BQ liên Ngân hàng (% năm)", "contentFieldValue": {"data": "4,93"}}]}]}
+
+
+def test_sbv_interbank_rates_are_read_per_vietnam_day_and_term():
+    from investment_agent.market.leading import parse_sbv_interbank
+    body = json.dumps({"items": [_sbv_item("2026-11-08T17:00:00Z", "4,65"), _sbv_item("2026-11-05T17:00:00Z", "6,07"),
+                                 {"title": "khác", "contentFields": [{"label": "Ngày áp dụng", "contentFieldValue": {"data": "2026-11-04T17:00:00Z"}}]}]})
+    assert parse_sbv_interbank(body, term="Qua đêm") == [(date(2026, 11, 6), "6.07"), (date(2026, 11, 9), "4.65")]
+    assert parse_sbv_interbank(body, term="1 Tuần")[-1] == (date(2026, 11, 9), "4.93")
+    with pytest.raises(MacroError):
+        parse_sbv_interbank('{"items": []}', term="Qua đêm")
+
+
+TREASURY = ('Date,"1 Mo","3 Mo","2 Yr","10 Yr","30 Yr"\n'
+            "11/09/2026,4.04,4.24,4.56,4.88,5.26\n11/06/2026,4.02,4.19,4.51,4.86,5.26\n11/05/2026,4.01,4.18,4.50,N/A,5.25\n")
+
+
+def test_treasury_yields_are_read_by_column():
+    from investment_agent.market.leading import parse_treasury_csv
+    assert parse_treasury_csv(TREASURY, column="10 Yr") == [(date(2026, 11, 6), "4.86"), (date(2026, 11, 9), "4.88")]
+    with pytest.raises(MacroError):
+        parse_treasury_csv(TREASURY, column="7 Yr")
+
+
+def test_stockbiz_monthly_figures_with_comma_thousands_keep_their_size():
+    english = "Recent readings Period Money Supply M2 8/2026 20,775 VND trillion 7/2026 20,456 VND trillion Source: State Bank of Vietnam"
+    assert parse_stockbiz_series(english, monthly=True, scale="1000") == [(date(2026, 7, 31), "20456000"), (date(2026, 8, 31), "20775000")]
+    assert parse_stockbiz_series("Recent readings 8/2026 | 1,5 %", monthly=True) == [(date(2026, 8, 31), "1.5")]  # a decimal comma stays one
+
+
+def test_a_source_that_fails_falls_back_to_the_next_one(tmp_path):
+    indicators = [{"id": "us10y", "label": "x", "unit": "%", "rule": "up", "max_age_days": 7,
+                   "source": {"kind": "treasury", "column": "10 Yr", "fallback": {"kind": "fred", "series": "DGS10"}}}]
+
+    def get(url):
+        if "treasury.gov" in url:
+            raise _status_error(url, 404)
+        return FRED_10Y
+    assert fetch_auto(indicators, MacroStore(tmp_path), get=get, today=date(2026, 11, 10), sleep=lambda s: None) == {"us10y": "ok"}
+    assert MacroStore(tmp_path).read("us10y")[-1]["value"] == "4.96"
+
+
+def test_the_configured_sources_for_wti_interbank_and_us10y_are_the_early_ones_with_a_fallback():
+    by_id = {i["id"]: i["source"] for i in load_indicators()}
+    assert by_id["wti"]["kind"] == "oilprice" and by_id["wti"]["fallback"]["kind"] == "fred"
+    assert by_id["vn_interbank_on"]["kind"] == "sbv_interbank" and by_id["vn_interbank_on"]["fallback"]["kind"] == "stockbiz"
+    assert by_id["us10y"]["kind"] == "treasury" and by_id["us10y"]["fallback"]["kind"] == "fred"

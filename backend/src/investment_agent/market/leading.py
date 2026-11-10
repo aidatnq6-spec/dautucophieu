@@ -35,6 +35,12 @@ VCB_XML = "https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.as
 TOPI_PAGE = "https://online.topi.vn/market/{page}"
 STOCKBIZ_PAGE = "https://stockbiz.vn/en/macro/data/{page}"
 TE_PAGE = "https://tradingeconomics.com/{country}/manufacturing-pmi"
+# Earlier sources (robots.txt allows each): WTI front-month futures 10 minutes late; the State Bank's own interbank rates, out about 05:30
+# the next morning; the US Treasury's daily yield curve, out the same US afternoon. Each keeps its older source as a fallback.
+OILPRICE_PAGE = "https://oilprice.com/oil-price-charts/"
+SBV_INTERBANK = "https://sbv.gov.vn/o/headless-delivery/v1.0/content-structures/3450260/structured-contents?pageSize=30&sort=datePublished:desc"
+TREASURY_CSV = ("https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/{year}/all"
+                "?type=daily_treasury_yield_curve&field_tdr_date_value={year}&page&_format=csv")
 # ECB euro reference rates, last 90 days (public, robots.txt allows); DXY is computed from them with ICE's published formula.
 ECB_90D = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
 DXY_WEIGHTS = {"EUR": -0.576, "JPY": 0.136, "GBP": -0.119, "CAD": 0.091, "SEK": 0.042, "CHF": 0.036}
@@ -132,6 +138,66 @@ def parse_topi_rate(page: str, *, term: str, column: str) -> str:
     return _plain(Decimal(m.group(names.index(column) + 1).replace(",", ".")))
 
 
+def _grouped(raw: str) -> str:
+    """A number whose separators all group thousands ("20,775", "20.456", "1,234,567") loses them; otherwise a comma is the decimal point."""
+    raw = raw.strip(".,")
+    if re.fullmatch(r"\d{1,3}(?:[.,]\d{3})+", raw):
+        return re.sub(r"[.,]", "", raw)
+    return raw.replace(".", "").replace(",", ".") if raw.count(",") == 1 else raw
+
+
+def parse_oilprice(page: str, *, blend: str) -> list[tuple[date, str]]:
+    """oilprice.com's price table: the blend's last price, dated on New York time when it was taken (10 minutes late)."""
+    from zoneinfo import ZoneInfo
+    row = re.search(r"<tr[^>]*data-name=['\"]" + re.escape(blend) + r"['\"][^>]*>(.*?)</tr>", page, re.S)
+    price = re.search(r"data-price=['\"]([\d.]+)['\"]", row[1]) if row else None
+    stamp = re.search(r"data-stamp=['\"](\d{9,11})['\"]", row[1]) if row else None
+    if not price or not stamp:
+        raise MacroError("oilprice_unreadable")
+    day = datetime.fromtimestamp(int(stamp[1]), timezone.utc).astimezone(ZoneInfo("America/New_York")).date()
+    return [(day, _plain(Decimal(price[1])))]
+
+
+def parse_sbv_interbank(text: str, *, term: str) -> list[tuple[date, str]]:
+    """The State Bank's average interbank rates (% a year) for one term ("Qua đêm", "1 Tuần", ...), by the Vietnam day they apply to."""
+    points = {}
+    for item in json.loads(text).get("items", []):
+        fields = item.get("contentFields", [])
+        applied = next((f.get("contentFieldValue", {}).get("data") for f in fields if f.get("label") == "Ngày áp dụng"), None)
+        if not applied:
+            continue
+        day = datetime.fromisoformat(applied.replace("Z", "+00:00")).astimezone(VN).date()
+        for f in fields:
+            kids = {c.get("label"): c.get("contentFieldValue", {}).get("data") for c in f.get("nestedContentFields", [])}
+            rate = kids.get("Lãi suất BQ liên Ngân hàng (% năm)")
+            if kids.get("Thời hạn") == term and rate:
+                try:
+                    points[day] = _plain(Decimal(str(rate).replace(",", ".")))
+                except InvalidOperation:
+                    continue
+    if not points:
+        raise MacroError("sbv_unreadable")
+    return sorted(points.items())
+
+
+def parse_treasury_csv(text: str, *, column: str) -> list[tuple[date, str]]:
+    """The US Treasury's daily par yield curve CSV: one column (e.g. "10 Yr"), days without a value left out."""
+    import csv
+    import io
+    rows = list(csv.DictReader(io.StringIO(text)))
+    if not rows or column not in rows[0]:
+        raise MacroError("treasury_unreadable")
+    points = []
+    for r in rows:
+        try:
+            points.append((datetime.strptime(r["Date"], "%m/%d/%Y").date(), _plain(Decimal(r[column]))))
+        except (ValueError, InvalidOperation, KeyError):
+            continue
+    if not points:
+        raise MacroError("treasury_unreadable")
+    return sorted(points)
+
+
 def parse_stockbiz_series(page: str, *, monthly: bool = False, scale: str = "1") -> list[tuple[date, str]]:
     """Parse Stockbiz recent readings; monthly observations use the actual period end, never fetch day."""
     text = _page_text(page)
@@ -145,7 +211,7 @@ def parse_stockbiz_series(page: str, *, monthly: bool = False, scale: str = "1")
             else:
                 month, dom, year, raw = int(match[1]), int(match[2]), int(match[3]), match[4]
                 day = date(year, month, dom)
-            normalized = raw.replace(".", "").replace(",", ".") if monthly else raw.replace(",", "")
+            normalized = _grouped(raw) if monthly else raw.replace(",", "")
             points[day] = _plain(Decimal(normalized) * Decimal(scale))
         except (ValueError, InvalidOperation):
             continue
@@ -336,50 +402,69 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
                     down[host] = exc
                 raise
         return pages[url]
+    def read(src: dict):
+        """The source's points; None when it has nothing new today (not a failure), False for a manual source; raises when it fails."""
+        if src["kind"] == "oilprice":
+            points = parse_oilprice(page(OILPRICE_PAGE), blend=src["blend"])
+        elif src["kind"] == "sbv_interbank":
+            points = parse_sbv_interbank(page(SBV_INTERBANK), term=src["term"])
+        elif src["kind"] == "treasury":
+            points = parse_treasury_csv(page(TREASURY_CSV.format(year=today.year)), column=src["column"])
+        elif src["kind"] == "fred":
+            points = parse_fred_csv(page(FRED_CSV.format(series=src["series"])), transform=src.get("transform"))
+        elif src["kind"] == "vcb":
+            points = [parse_vcb_xml(page(VCB_XML), currency=src["currency"], field=src["field"])]
+        elif src["kind"] == "topi" and "row" in src:
+            points = [(today, parse_topi_fx(page(TOPI_PAGE.format(page=src["page"])), row=src["row"]))]
+        elif src["kind"] == "hose":
+            days = [today - timedelta(days=i) for i in range(HOSE_DAYS - 1, -1, -1)]
+            parsed = [(d, parse_hose_foreign(page(HOSE_FOREIGN.format(day=d.isoformat())))) for d in days]
+            points = [(d, p[src["field"]]) for d, p in parsed if p is not None]
+        elif src["kind"] == "topi":
+            points = [(today, parse_topi_rate(page(TOPI_PAGE.format(page=src["page"])), term=src["term"], column=src["column"]))]
+        elif src["kind"] == "stockbiz":
+            points = parse_stockbiz_series(page(STOCKBIZ_PAGE.format(page=src["page"])), monthly=src.get("monthly", False), scale=src.get("scale", "1"))
+        elif src["kind"] == "tradingeconomics_pmi":
+            points = parse_te_pmi(page(TE_PAGE.format(country=src["country"])), year=today.year)
+        elif src["kind"] == "ecb_dxy":
+            points = parse_ecb_dxy(page(ECB_90D))
+        elif src["kind"] in ("news_pmi", "news_cpi"):
+            from investment_agent.brief.news import FEEDS, parse_rss
+            items, failed = [], 0
+            for source, url in FEEDS:  # page() caches by URL, so PMI and CPI share one read of each feed
+                try:
+                    items += parse_rss(page(url), source)
+                except Exception:
+                    failed += 1
+            if failed == len(FEEDS):
+                raise MacroError("news_unreachable")
+            points = (parse_news_pmi if src["kind"] == "news_pmi" else parse_news_cpi)(items)
+            if not points:  # no such headline in today's feeds: nothing new, not a failure
+                return None
+        else:
+            return False
+        if not points:
+            raise MacroError("no_observations")
+        return points
+
     results = {}
     for ind in indicators:
-        src = ind["source"]
-        try:
-            if src["kind"] == "fred":
-                points = parse_fred_csv(page(FRED_CSV.format(series=src["series"])), transform=src.get("transform"))
-            elif src["kind"] == "vcb":
-                points = [parse_vcb_xml(page(VCB_XML), currency=src["currency"], field=src["field"])]
-            elif src["kind"] == "topi" and "row" in src:
-                points = [(today, parse_topi_fx(page(TOPI_PAGE.format(page=src["page"])), row=src["row"]))]
-            elif src["kind"] == "hose":
-                days = [today - timedelta(days=i) for i in range(HOSE_DAYS - 1, -1, -1)]
-                parsed = [(d, parse_hose_foreign(page(HOSE_FOREIGN.format(day=d.isoformat())))) for d in days]
-                points = [(d, p[src["field"]]) for d, p in parsed if p is not None]
-            elif src["kind"] == "topi":
-                points = [(today, parse_topi_rate(page(TOPI_PAGE.format(page=src["page"])), term=src["term"], column=src["column"]))]
-            elif src["kind"] == "stockbiz":
-                points = parse_stockbiz_series(page(STOCKBIZ_PAGE.format(page=src["page"])), monthly=src.get("monthly", False), scale=src.get("scale", "1"))
-            elif src["kind"] == "tradingeconomics_pmi":
-                points = parse_te_pmi(page(TE_PAGE.format(country=src["country"])), year=today.year)
-            elif src["kind"] == "ecb_dxy":
-                points = parse_ecb_dxy(page(ECB_90D))
-            elif src["kind"] in ("news_pmi", "news_cpi"):
-                from investment_agent.brief.news import FEEDS, parse_rss
-                items, failed = [], 0
-                for source, url in FEEDS:  # page() caches by URL, so PMI and CPI share one read of each feed
-                    try:
-                        items += parse_rss(page(url), source)
-                    except Exception:
-                        failed += 1
-                if failed == len(FEEDS):
-                    raise MacroError("news_unreachable")
-                points = (parse_news_pmi if src["kind"] == "news_pmi" else parse_news_cpi)(items)
-                if not points:  # no such headline in today's feeds: nothing new, not a failure
-                    results[ind["id"]] = "ok"
-                    continue
-            else:
-                continue
-            if not points:
-                raise MacroError("no_observations")
-            store.upsert(ind["id"], points[-400:], entry="auto")
-            results[ind["id"]] = "ok"
-        except Exception as exc:  # network, parse or source change: reported per indicator
-            results[ind["id"]] = f"error:{type(exc).__name__}"
+        src, first_error = ind["source"], None
+        while src:
+            try:
+                points = read(src)
+                if points is False:  # manual: nothing to fetch
+                    break
+                if points:
+                    store.upsert(ind["id"], points[-400:], entry="auto")
+                results[ind["id"]] = "ok"
+                break
+            except Exception as exc:  # network, parse or source change: the fallback is tried; a timeout anywhere is the error
+                if first_error is None or ("Timeout" in type(exc).__name__ and "Timeout" not in type(first_error).__name__):
+                    first_error = exc  # reported, so a slow source gets its second, slower try in macro_sync
+                src = src.get("fallback")
+        if ind["id"] not in results and first_error is not None:
+            results[ind["id"]] = f"error:{type(first_error).__name__}"
     store.record_statuses(results)
     return results
 

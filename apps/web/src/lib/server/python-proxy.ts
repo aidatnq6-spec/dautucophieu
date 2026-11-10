@@ -6,9 +6,10 @@ import { signInternalRequest } from "./python-client";
 import { apiError } from "./session-handlers";
 
 // Only business areas reach Python; identity and health stay on their own routes.
-const AREAS = new Set(["profile", "risk", "ledger", "universe", "valuation", "overview", "research", "jobs", "reports", "notifications", "settings", "watchlist", "market", "macro", "trend", "fairvalue", "insights", "concentration", "performance", "events", "journal", "equity-budget", "deposit-book", "property-book", "cycle-targets", "money-purposes", "accumulation", "glance", "drawdown", "buy-check", "wealth-check", "contributions", "passive-income", "intangibles", "stock", "bank-figures", "annual-plans", "quarter-forecast", "operating", "theses", "hindsight", "screener", "stress", "system-health", "lights"]);
+const AREAS = new Set(["profile", "risk", "ledger", "universe", "valuation", "overview", "research", "jobs", "reports", "notifications", "settings", "watchlist", "market", "macro", "trend", "fairvalue", "insights", "concentration", "performance", "events", "journal", "equity-budget", "deposit-book", "property-book", "cycle-targets", "money-purposes", "accumulation", "cashflow", "glance", "drawdown", "buy-check", "wealth-check", "contributions", "passive-income", "intangibles", "stock", "bank-figures", "annual-plans", "quarter-forecast", "operating", "theses", "hindsight", "screener", "stress", "system-health", "lights"]);
 const SEGMENT = /^[A-Za-z0-9_-][A-Za-z0-9_.-]{0,127}$/;
 const MAX_BODY = 1_048_576;
+const UPLOAD_BODY = 9_000_000;  // Thu chi hằng tháng: a workbook with pictures, as base64
 // Reading a PDF downloads it (up to 60 s) and may OCR scanned pages on this machine (about a minute for 60 pages).
 const PDF_READ_MS = 300_000, DEFAULT_MS = 15_000;
 
@@ -33,7 +34,7 @@ export async function proxyInternal(request: NextRequest, segments: string[], au
       assertMutation(request, request.cookies.get(CSRF_COOKIE)?.value, config);
       if (request.headers.get("content-type")?.split(";")[0] !== "application/json") throw new SessionError(400, "invalid_request", "Yêu cầu không hợp lệ.");
       body = await request.text();
-      if (body.length > MAX_BODY) throw new SessionError(413, "request_too_large", "Yêu cầu quá lớn.");
+      if (body.length > (segments.join("/") === "cashflow/import" ? UPLOAD_BODY : MAX_BODY)) throw new SessionError(413, "request_too_large", "Yêu cầu quá lớn.");
     }
     const owner = await verifyOwnerSession(request.cookies.get(SESSION_COOKIE)?.value, auth, config);
     const target = "/internal/" + segments.join("/");

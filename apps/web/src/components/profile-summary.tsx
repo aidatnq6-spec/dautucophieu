@@ -12,6 +12,7 @@ import { WealthCheck } from "./wealth-check";
 import { LifestyleInflation } from "./lifestyle";
 import { Intangibles } from "./intangibles";
 import { Contributions } from "./contributions";
+import { Cashflow } from "./cashflow";
 import { Accumulation } from "./accumulation";
 import { MoneyPurposes } from "./money-purposes";
 import { PassiveIncome } from "./passive-income";
@@ -55,6 +56,7 @@ export function ProfileSummary() {
   const [bookSaves, setBookSaves] = useState(0);
   const [bookPosts, setBookPosts] = useState(0);
   const [propertySaves, setPropertySaves] = useState(0);
+  const [cashflowSaves, setCashflowSaves] = useState(0);
   if (profile.error) return <p className="errors" role="alert">{profile.error}</p>;
   if (profile.value === undefined) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   const p = profile.value;
@@ -82,8 +84,9 @@ export function ProfileSummary() {
       </div>
       <div role="tabpanel" id="panel-dong-tien" aria-labelledby="tab-dong-tien" hidden={tab !== "dong-tien"}>
         <WealthCheck onSaved={() => setWealthSaves((n) => n + 1)} />
-        <LifestyleInflation refresh={wealthSaves} />
-        <PassiveIncome refresh={`${riskChanges}-${bookSaves}-${wealthSaves}-${propertySaves}`} />
+        <LifestyleInflation refresh={wealthSaves + cashflowSaves} />
+        <Cashflow onSaved={() => setCashflowSaves((n) => n + 1)} />
+        <PassiveIncome refresh={`${riskChanges}-${bookSaves}-${wealthSaves}-${propertySaves}-${cashflowSaves}`} />
       </div>
       <div role="tabpanel" id="panel-ke-hoach" aria-labelledby="tab-ke-hoach" hidden={tab !== "ke-hoach"}>
         <Contributions />

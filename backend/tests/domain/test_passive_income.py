@@ -57,7 +57,7 @@ def test_each_level_of_spending_is_covered_with_and_without_rent():
     assert [r["id"] for r in out["rows"]] == ["safe", "independent", "freedom"]
     assert (out["rows"][0]["spending"], out["rows"][0]["without_rent"], out["rows"][0]["with_rent"]) == ("6000000", "0.5000", "1.0000")
     assert (out["rows"][1]["without_rent"], out["rows"][1]["with_rent"]) == ("0.2500", "0.5000")
-    assert out["rows"][2] == {"id": "freedom", "spending": None, "without_rent": None, "with_rent": None}
+    assert out["rows"][2] == {"id": "freedom", "spending": None, "without_rent": None, "with_rent": None, "actual": None}
 
 
 def test_cover_may_pass_one_hundred_percent_and_no_spending_gives_no_cover():

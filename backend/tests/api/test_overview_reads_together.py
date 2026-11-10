@@ -30,4 +30,4 @@ def test_the_overview_fetches_the_accumulation_plans_with_the_rest(tmp_path, mon
     real = glance_route.prefetch
     monkeypatch.setattr(glance_route, "prefetch", lambda repo, owner, records: (fetched.append(set(records)), real(repo, owner, records))[1])
     assert call(c, clock, "GET", "/internal/glance").status_code == 200
-    assert ("settings", "accumulation") in fetched[0]
+    assert ("settings", "accumulation") in fetched[0] and ("settings", "rental_book") in fetched[0]

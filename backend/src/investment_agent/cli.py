@@ -944,6 +944,7 @@ def loan_alerts_cli(data_dir: Path) -> int:
     from zoneinfo import ZoneInfo
 
     from investment_agent.services.insurance_alerts import insurance_alerts_run
+    from investment_agent.services.rental_alerts import read_rental_book, rental_alerts_run
     from investment_agent.services.loan_alerts import loan_alerts_run, read_property_book
 
     telegram = _scheduled_telegram(data_dir)
@@ -952,7 +953,8 @@ def loan_alerts_cli(data_dir: Path) -> int:
         return 0
     send, repo, owner = telegram
     book, today = read_property_book(repo, owner), datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date()
-    out = {**loan_alerts_run(data_dir, book=book, send=send, today=today), "insurance": insurance_alerts_run(data_dir, book=book, send=send, today=today)}
+    out = {**loan_alerts_run(data_dir, book=book, send=send, today=today), "insurance": insurance_alerts_run(data_dir, book=book, send=send, today=today),
+           "rental": rental_alerts_run(data_dir, book=read_rental_book(repo, owner), send=send, today=today)}
     print(json.dumps(out))  # counts only, never the book
     return 0
 

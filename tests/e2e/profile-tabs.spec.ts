@@ -11,7 +11,7 @@ test("the profile opens on Rủi ro and shows one part at a time", async ({ page
   await expect(tabs(page).getByRole("tab", { name: "Rủi ro" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("region", { name: "Khảo sát rủi ro" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Tháp tài sản" })).toHaveCount(0);
-  for (const [tab, region] of [["Tài sản", "Tháp tài sản"], ["Tài sản", "Sổ tài sản"], ["Tài sản", "Bất động sản và khoản vay"], ["Tài sản", "Mục đích từng khoản tiền"], ["Dòng tiền & mục tiêu", "Sức khỏe tài chính"], ["Dòng tiền & mục tiêu", "Mục tiêu dòng tiền thụ động"], ["Kế hoạch", "Góp vốn đều"], ["Kế hoạch", "Kế hoạch tích sản"], ["Kế hoạch", "Tiền mới tháng này đi đâu"]]) {
+  for (const [tab, region] of [["Tài sản", "Tháp tài sản"], ["Tài sản", "Sổ tài sản"], ["Tài sản", "Bất động sản, khoản vay và bảo hiểm"], ["Tài sản", "Mục đích từng khoản tiền"], ["Dòng tiền & mục tiêu", "Sức khỏe tài chính"], ["Dòng tiền & mục tiêu", "Mục tiêu dòng tiền thụ động"], ["Kế hoạch", "Góp vốn đều"], ["Kế hoạch", "Kế hoạch tích sản"], ["Kế hoạch", "Tiền mới tháng này đi đâu"]]) {
     await tabs(page).getByRole("tab", { name: tab, exact: true }).click();
     await expect(page.getByRole("region", { name: region, exact: true })).toBeVisible();
   }

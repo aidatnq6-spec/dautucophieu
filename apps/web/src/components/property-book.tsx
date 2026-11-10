@@ -6,13 +6,14 @@ import { ApiError, api, requestId } from "../lib/api";
 import { formatRatio, formatVnd, groupDigitsInput, parseMoneyInput } from "../lib/format";
 
 type Row = Record<string, string | number | null> & { id: string; name: string };
-type Book = { properties: Row[]; loans: Row[]; ceiling: string };
+type Book = { properties: Row[]; loans: Row[]; policies: Row[]; ceiling: string };
 type Picture = { financial: string | null; property_total: string; property_missing: string[]; stale: string[]; debt: string; debt_missing: string[]; payments: string; payments_missing: string[];
   rent: string; rent_less_payments: string | null; loans: Record<string, string | null>; ceiling: string; complete: boolean; total_assets: string | null; net_worth: string | null;
-  liquid_share: string | null; clear_share: string | null; unclear_share: string | null; property_share: string | null; debt_ratio: string | null; over: boolean; yields: Record<string, string | null>; live_total: string | null; invest_total: string | null; invest_property_total: string | null;
+  insurance: string; insurance_missing: string[]; insurance_at_account: string[]; insurance_stale: string[]; premiums_yearly: string; premiums_missing: string[];
+  policy_due: Record<string, string | null>; insurance_share: string | null; insurance_of_invest: string | null; liquid_share: string | null; clear_share: string | null; unclear_share: string | null; property_share: string | null; debt_ratio: string | null; over: boolean; yields: Record<string, string | null>; live_total: string | null; invest_total: string | null; invest_property_total: string | null;
   live_share: string | null; invest_share: string | null; invest_property_of_invest: string | null; financial_of_invest: string | null };
 type View = { version: number; book: Book; picture: Picture; financial_reason: string | null; unpriced: string[] };
-type List = "properties" | "loans";
+type List = "properties" | "loans" | "policies";
 type Draft = Record<string, string>;
 type Editing = { list: List; draft: Draft; isNew: boolean } | null;
 type Field = { key: string; label: string; type: "text" | "money" | "date" | "percent" | "int" | "select"; options?: [string, string][]; blank?: boolean };
@@ -34,7 +35,16 @@ const loanFields = (properties: Row[]): Field[] => [
   { key: "months_left", label: "Số tháng còn lại", type: "int" }, { key: "method", label: "Cách trả", type: "select", options: METHOD },
   { key: "collateral", label: "Thế chấp bằng", type: "select", blank: true, options: properties.map((p) => [p.id, p.name]) },
 ];
-const DEFAULTS: Record<List, Draft> = { properties: { kind: "home", purpose: "live", legal: "unknown" }, loans: { method: "declining" } };
+const COVER: [string, string][] = [["life", "Nhân thọ"], ["property", "Tài sản, nhà"], ["health", "Sức khỏe"], ["other", "Khác"]];
+const FREQUENCY: [string, string][] = [["year", "Hằng năm"], ["half", "Nửa năm"], ["quarter", "Hằng quý"], ["month", "Hằng tháng"]];
+const POLICY_FIELDS: Field[] = [
+  { key: "name", label: "Tên hợp đồng", type: "text" }, { key: "insurer", label: "Công ty bảo hiểm", type: "text" }, { key: "insured", label: "Người được bảo hiểm", type: "text" },
+  { key: "kind", label: "Loại bảo hiểm", type: "select", options: COVER }, { key: "premium", label: "Phí mỗi kỳ (đ)", type: "money" }, { key: "frequency", label: "Kỳ đóng phí", type: "select", options: FREQUENCY },
+  { key: "due_on", label: "Một ngày đóng phí (kỳ bất kỳ)", type: "date" }, { key: "matures", label: "Ngày đáo hạn hợp đồng", type: "date" }, { key: "sum_assured", label: "Số tiền bảo hiểm (đ)", type: "money" },
+  { key: "account_value", label: "Giá trị tài khoản (đ, nhân thọ)", type: "money" }, { key: "surrender_value", label: "Giá trị hoàn lại (đ, nhân thọ)", type: "money" }, { key: "valued_on", label: "Ngày cập nhật giá trị", type: "date" },
+];
+const DEFAULTS: Record<List, Draft> = { properties: { kind: "home", purpose: "live", legal: "unknown" }, loans: { method: "declining" }, policies: { kind: "life", frequency: "year" } };
+const day = (v: string | null | undefined) => (v ? `${v.slice(8)}/${v.slice(5, 7)}/${v.slice(0, 4)}` : "—");
 
 function toDraft(fields: Field[], row: Row): Draft {
   return Object.fromEntries(fields.map((f) => {
@@ -101,12 +111,13 @@ export function PropertyBook({ refresh, onSaved }: { refresh?: string; onSaved?:
     } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); return false; }
     finally { setBusy(false); }
   }
-  const fieldsOf = (list: List) => (list === "properties" ? PROPERTY_FIELDS : loanFields(view?.book.properties ?? []));
+  const fieldsOf = (list: List) => (list === "properties" ? PROPERTY_FIELDS : list === "policies" ? POLICY_FIELDS : loanFields(view?.book.properties ?? []));
   async function saveRow() {
     if (!view || !editing) return;
     const id = editing.draft.id || requestId();
     const r = toRow(fieldsOf(editing.list), editing.draft, id);
     if ("error" in r) { setMessage(r.error); return; }
+    if (editing.list === "policies" && r.ok.kind !== "life" && (r.ok.account_value !== null || r.ok.surrender_value !== null)) { setMessage("Chỉ bảo hiểm nhân thọ mới có giá trị tài khoản hay giá trị hoàn lại."); return; }
     const rows = view.book[editing.list];
     const next = editing.isNew ? [...rows, r.ok] : rows.map((x) => (x.id === id ? r.ok : x));
     if (await put({ ...view.book, [editing.list]: next })) setEditing(null);
@@ -132,15 +143,16 @@ export function PropertyBook({ refresh, onSaved }: { refresh?: string; onSaved?:
   const form = (list: List) => editing?.list === list && <RowForm fields={fieldsOf(list)} draft={editing.draft} busy={busy} error={message}
     onDraft={(draft) => setEditing({ ...editing, draft: { ...draft, ...(editing.draft.id ? { id: editing.draft.id } : {}) } })} onSave={() => void saveRow()} onCancel={() => { setEditing(null); setMessage(null); }} />;
   return (
-    <section className="surface db" aria-label="Bất động sản và khoản vay">
-      <h2>Bất động sản và khoản vay</h2>
-      <p className="caption wrap">Bức tranh gồm tài sản tài chính, bất động sản và các khoản nợ. Giá trị bất động sản do bạn tự ước tính, phần mềm không tự lấy giá nhà. Ô để trống là chưa nhập, không tính bằng 0. Phần này không ảnh hưởng Tháp tài sản hay số tiền dành cho cổ phiếu.</p>
+    <section className="surface db" aria-label="Bất động sản, khoản vay và bảo hiểm">
+      <h2>Bất động sản, khoản vay và bảo hiểm</h2>
+      <p className="caption wrap">Bức tranh gồm tài sản tài chính, bất động sản, giá trị tích lũy của bảo hiểm nhân thọ và các khoản nợ. Giá trị bất động sản do bạn tự ước tính, phần mềm không tự lấy giá nhà. Ô để trống là chưa nhập, không tính bằng 0. Phần này không ảnh hưởng Tháp tài sản hay số tiền dành cho cổ phiếu.</p>
       {message && !editing && <p className="errors" role="alert">{message}</p>}
       {p && <>
         <div className="kpi-row">
           <div><span className="kpi-label">Tài sản ròng</span><strong data-testid="nw-net">{p.net_worth === null ? "Chưa đủ số" : formatVnd(p.net_worth)}</strong></div>
           <div><span className="kpi-label">Tài sản tài chính</span><strong data-testid="nw-financial">{p.financial === null ? "Chưa có" : formatVnd(p.financial)}</strong><span className="kpi-note">Các lớp Tháp tài sản, cổ phiếu theo giá thị trường nên tổng khác Tháp (dùng giá vốn)</span></div>
           <div><span className="kpi-label">Bất động sản</span><strong>{formatVnd(p.property_total)}</strong><span className="kpi-note">Tự ước tính</span></div>
+          {view.book.policies.some((x) => x.kind === "life") && <div><span className="kpi-label">Bảo hiểm tích lũy</span><strong data-testid="nw-insurance">{formatVnd(p.insurance)}</strong><span className="kpi-note">Nhân thọ, khó rút nhanh; không thuộc Tháp tài sản</span></div>}
           <div><span className="kpi-label">Tổng dư nợ</span><strong data-testid="nw-debt">{formatVnd(p.debt)}</strong>{p.debt_ratio !== null && <span className="kpi-note">{share(p.debt_ratio)} tổng tài sản</span>}</div>
           <div><span className="kpi-label">Khoản trả tháng này</span><strong>{formatVnd(p.payments)}</strong><span className="kpi-note">Theo lãi hiện tại{p.rent_less_payments !== null && Number(p.rent) > 0 ? ` · thu thuê ${formatVnd(p.rent)}` : ""}</span></div>
         </div>
@@ -155,6 +167,7 @@ export function PropertyBook({ refresh, onSaved }: { refresh?: string; onSaved?:
           <dl className="ln-flow">
             <div><dt>Để ở (không tạo ra tiền)</dt><dd data-testid="nw-live">{formatVnd(p.live_total)} · {share(p.live_share)}</dd></div>
             <div><dt>Đầu tư (tài chính, bất động sản cho thuê và đầu tư)</dt><dd data-testid="nw-invest">{formatVnd(p.invest_total!)} · {share(p.invest_share)}</dd></div>
+            {p.insurance_of_invest !== null && Number(p.insurance) > 0 && <div><dt>Trong phần đầu tư: bảo hiểm tích lũy</dt><dd>{share(p.insurance_of_invest)}</dd></div>}
             {p.invest_property_of_invest !== null && <div><dt>Trong phần đầu tư: bất động sản / tài chính</dt><dd data-testid="nw-mix">{share(p.invest_property_of_invest)} / {share(p.financial_of_invest)}</dd></div>}
           </dl>
         </section>}
@@ -163,6 +176,9 @@ export function PropertyBook({ refresh, onSaved }: { refresh?: string; onSaved?:
         {p.property_missing.length > 0 && <p className="notice pv-note">Chưa có giá trị: {p.property_missing.join(", ")}. Chưa tính được tài sản ròng.</p>}
         {p.debt_missing.length > 0 && <p className="notice pv-note">Chưa có dư nợ: {p.debt_missing.join(", ")}. Chưa tính được tài sản ròng.</p>}
         {p.payments_missing.length > 0 && <p className="notice pv-note">Chưa tính được khoản trả, cần dư nợ, lãi và số tháng còn lại: {p.payments_missing.join(", ")}.</p>}
+        {p.insurance_missing.length > 0 && <p className="notice pv-note">Chưa có giá trị tài khoản hay giá trị hoàn lại: {p.insurance_missing.join(", ")}. Chưa tính được tài sản ròng.</p>}
+        {p.insurance_at_account.length > 0 && <p className="caption">Tính theo giá trị tài khoản, chưa trừ phí hủy (rút ra sẽ nhận ít hơn): {p.insurance_at_account.join(", ")}. Nhập giá trị hoàn lại nếu có để số sát hơn.</p>}
+        {p.insurance_stale.length > 0 && <p className="notice pv-note" data-testid="nw-insurance-stale">Giá trị bảo hiểm quá 6 tháng hoặc chưa có ngày cập nhật: {p.insurance_stale.join(", ")}.</p>}
         {p.stale.length > 0 && <p className="notice pv-note" data-testid="nw-stale">Giá trị quá 6 tháng hoặc chưa có ngày ước tính, nên cập nhật: {p.stale.join(", ")}.</p>}
         {view.unpriced.length > 0 && <p className="notice pv-note">Chưa có giá nên chưa tính vào tài sản tài chính: {view.unpriced.join(", ")}.</p>}
       </>}
@@ -185,6 +201,18 @@ export function PropertyBook({ refresh, onSaved }: { refresh?: string; onSaved?:
       </table>}
       {form("loans")}
       <button type="button" className="btn" disabled={locked} onClick={() => start("loans")}><Plus size={14} aria-hidden="true" />Thêm khoản vay</button>
+      <h3>Bảo hiểm</h3>
+      {view && view.book.policies.length > 0 && <table className="fv-table" aria-label="Bảo hiểm">
+        <thead><tr><th>Tên</th><th>Loại</th><th className="num">Phí mỗi kỳ</th><th>Kỳ đóng tới</th><th className="num">Giá trị tích lũy</th><th /></tr></thead>
+        <tbody>{view.book.policies.map((r) => <tr key={r.id}><td data-label="Tên">{r.name}{r.insurer || r.insured ? <div className="caption">{[r.insurer, r.insured].filter(Boolean).join(" · ")}</div> : null}</td>
+          <td data-label="Loại">{label(COVER, r.kind)}</td><td data-label="Phí mỗi kỳ" className="num">{r.premium === null ? "Chưa nhập" : `${money(r.premium)} · ${label(FREQUENCY, r.frequency).toLowerCase()}`}</td>
+          <td data-label="Kỳ đóng tới">{r.due_on === null ? "Chưa nhập" : day(p?.policy_due[r.id])}</td>
+          <td data-label="Giá trị tích lũy" className="num">{r.kind !== "life" ? "—" : r.surrender_value !== null ? <>{money(r.surrender_value)}<div className="caption">giá trị hoàn lại</div></>
+            : r.account_value !== null ? <>{money(r.account_value)}<div className="caption">tài khoản, chưa trừ phí hủy</div></> : "Chưa nhập"}</td>{actions("policies", r)}</tr>)}</tbody>
+      </table>}
+      {p && view.book.policies.length > 0 && <p className="caption">Phí bảo hiểm cả năm: <strong data-testid="nw-premiums">{formatVnd(p.premiums_yearly)}</strong>{p.premiums_missing.length > 0 ? ` (chưa tính ${p.premiums_missing.join(", ")}: chưa nhập phí)` : ""}. Ứng dụng nhắc qua Việc cần xem và Telegram từ 30 ngày trước mỗi kỳ đóng phí.</p>}
+      {form("policies")}
+      <button type="button" className="btn" disabled={locked} onClick={() => start("policies")}><Plus size={14} aria-hidden="true" />Thêm bảo hiểm</button>
       <h3>Ngưỡng cảnh báo</h3>
       {ceiling === null
         ? <div className="db-reserve"><span>Cảnh báo khi bất động sản vượt <strong data-testid="nw-ceiling">{view ? String(view.book.ceiling).replace(".", ",") : ""}%</strong> tổng tài sản. Mức bạn tự đặt, không phải chuẩn nào cả.</span>

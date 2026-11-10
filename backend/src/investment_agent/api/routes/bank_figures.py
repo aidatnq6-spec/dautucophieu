@@ -10,7 +10,7 @@ from typing import Literal
 from fastapi import APIRouter, Request
 from pydantic import Field
 
-from investment_agent.domain.bank_figures import FIELDS, LABELS, UnsafeUrl, check_public_https, derive, parse_report_pages
+from investment_agent.domain.bank_figures import FIELDS, LABELS, UnsafeUrl, check_public_https, derive, parse_report_pages, quality_trend
 from investment_agent.domain.models import ContractModel
 from investment_agent.market.sectors import load_sectors
 from investment_agent.market.watchlist import load_watchlist
@@ -64,7 +64,8 @@ def _watched_bank(request: Request, symbol: str) -> str | None:
 
 def bank_view(record, symbol: str) -> dict:
     quarters = (record.payload if record else {}).get("quarters", {})
-    rows = [{"quarter": q, "values": v["values"], "derived": derive(v["values"]), "source": v["source"]} for q, v in sorted(quarters.items(), reverse=True)]
+    trend = quality_trend({q: v["values"] for q, v in quarters.items()})
+    rows = [{"quarter": q, "values": v["values"], "derived": derive(v["values"]), "trend": trend[q], "source": v["source"]} for q, v in sorted(quarters.items(), reverse=True)]
     return {"symbol": symbol, "version": record.version if record else 0, "quarters": rows, "labels": LABELS}
 
 

@@ -17,8 +17,12 @@ from typing import Callable
 from urllib.parse import urlsplit
 
 GROUPS = ("group1", "group2", "group3", "group4", "group5")
-FIELDS = (*GROUPS, "demand_deposits", "margin_deposits", "customer_deposits", "car")
-LABELS = {"group1": "Nợ nhóm 1 (đủ tiêu chuẩn)", "group2": "Nợ nhóm 2 (cần chú ý)", "group3": "Nợ nhóm 3 (dưới tiêu chuẩn)",
+CORE = (*GROUPS, "demand_deposits", "margin_deposits", "customer_deposits", "car")
+# Chất lượng tài sản (10/11/2026): provisions and accrued interest are read from the balance sheet; property loans and discounted documents by hand.
+QUALITY = ("reserve", "accrued_interest", "real_estate_loans", "discounted_documents")
+FIELDS = (*CORE, *QUALITY)
+LABELS = {"reserve": "Dự phòng rủi ro cho vay khách hàng (số dư)", "accrued_interest": "Lãi và phí phải thu", "real_estate_loans": "Dư nợ kinh doanh bất động sản",
+          "discounted_documents": "Chiết khấu bộ chứng từ, phải thu ngoài cho vay", "group1": "Nợ nhóm 1 (đủ tiêu chuẩn)", "group2": "Nợ nhóm 2 (cần chú ý)", "group3": "Nợ nhóm 3 (dưới tiêu chuẩn)",
           "group4": "Nợ nhóm 4 (nghi ngờ)", "group5": "Nợ nhóm 5 (có khả năng mất vốn)", "demand_deposits": "Tiền gửi không kỳ hạn",
           "margin_deposits": "Tiền gửi ký quỹ", "customer_deposits": "Tiền gửi của khách hàng", "car": "CAR (%)"}
 _Q4 = Decimal("0.0001")
@@ -45,7 +49,71 @@ def derive(q: dict) -> dict:
     car = _d(q.get("car"))
     return {"npl": _ratio(bad, total) if total else None, "group2_ratio": _ratio(groups[1], total) if total else None,
             "casa": _ratio(demand + margin, _d(q.get("customer_deposits"))) if demand is not None and margin is not None else None,
-            "car": str((car / 100).quantize(_Q4, ROUND_HALF_UP)) if car is not None else None}
+            "car": str((car / 100).quantize(_Q4, ROUND_HALF_UP)) if car is not None else None,
+            "llr": _ratio(_d(q.get("reserve")), bad) if bad else None,  # tỷ lệ bao phủ nợ xấu: provisions over groups 3–5
+            "real_estate_share": _ratio(_d(q.get("real_estate_loans")), total) if total else None}
+
+
+# The application's own lines for a sign worth a closer look, stated on the page; not research cut-offs and not a finding.
+LLR_DROP, GROUP2_JUMP, ACCRUED_JUMP, DOCUMENTS_JUMP, REAL_ESTATE_PACE = Decimal("0.10"), Decimal("0.30"), Decimal("0.20"), Decimal("0.30"), Decimal("1.5")
+
+
+def _quarter_before(key: str, back: int) -> str:
+    y, n = int(key[:4]), int(key[-1]) - back
+    while n < 1:
+        y, n = y - 1, n + 4
+    return f"{y}-Q{n}"
+
+
+def quality_trend(quarters: dict[str, dict]) -> dict[str, dict]:
+    """Per quarter: cover against the quarter before, the same quarter a year before and the end of last year; growth of group 2, loans, accrued
+    interest, discounted documents and property loans; and the warning signs. A comparison missing a figure is None, never guessed."""
+    def num(values: dict | None, field: str) -> Decimal | None:
+        return _d(values.get(field)) if values else None
+
+    def total(values: dict | None) -> Decimal | None:
+        groups = [num(values, g) for g in GROUPS]
+        return sum(groups) if values and None not in groups else None
+
+    def bad(values: dict | None) -> Decimal | None:
+        groups = [num(values, g) for g in GROUPS[2:]]
+        return sum(groups) if values and None not in groups else None
+
+    def growth(new: Decimal | None, old: Decimal | None) -> Decimal | None:
+        return new / old - 1 if new is not None and old else None
+
+    def s(v: Decimal | None) -> str | None:
+        return str(v.quantize(_Q4, ROUND_HALF_UP)) if v is not None else None
+
+    out = {}
+    for key in sorted(quarters):
+        cur, prev = quarters[key], quarters.get(_quarter_before(key, 1))
+        year_ago, start = quarters.get(_quarter_before(key, 4)), quarters.get(f"{int(key[:4]) - 1}-Q4")
+        llr = {name: _d(derive(v)["llr"]) if v else None for name, v in (("cur", cur), ("prev", prev), ("year_ago", year_ago), ("start", start))}
+        g2 = growth(num(cur, "group2"), num(prev, "group2"))
+        loans_q, loans_y = growth(total(cur), total(prev)), growth(total(cur), total(start))
+        accrued, docs = growth(num(cur, "accrued_interest"), num(prev, "accrued_interest")), growth(num(cur, "discounted_documents"), num(prev, "discounted_documents"))
+        real_estate = growth(num(cur, "real_estate_loans"), num(start, "real_estate_loans"))
+        reserve_now, reserve_before = num(cur, "reserve"), num(prev, "reserve")
+        flags = []
+        if llr["cur"] is not None and any(llr[k] is not None and llr[k] - llr["cur"] >= LLR_DROP for k in ("prev", "start")):
+            flags.append("llr_falling")
+        if g2 is not None and g2 >= GROUP2_JUMP:
+            flags.append("group2_jump")
+        if None not in (bad(cur), bad(prev), reserve_now, reserve_before) and bad(cur) > bad(prev) and reserve_now < reserve_before:
+            flags.append("reserve_lagging")
+        if None not in (num(cur, "group5"), num(prev, "group5"), reserve_now, reserve_before) and num(cur, "group5") < num(prev, "group5") and reserve_now < reserve_before:
+            flags.append("write_off")
+        if accrued is not None and accrued >= ACCRUED_JUMP:
+            flags.append("accrued_jump")
+        if real_estate is not None and loans_y is not None and real_estate >= Decimal("0.10") and real_estate >= REAL_ESTATE_PACE * max(loans_y, Decimal(0)):
+            flags.append("real_estate_fast")
+        if docs is not None and docs >= DOCUMENTS_JUMP:
+            flags.append("documents_jump")
+        out[key] = {"llr": s(llr["cur"]), "llr_prev": s(llr["prev"]), "llr_year_ago": s(llr["year_ago"]), "llr_start": s(llr["start"]),
+                    "group2_growth_qoq": s(g2), "loans_growth_qoq": s(loans_q), "loans_growth_ytd": s(loans_y), "accrued_growth_qoq": s(accrued),
+                    "documents_growth_qoq": s(docs), "real_estate_growth_ytd": s(real_estate), "flags": flags}
+    return out
 
 
 # ---- reading a public PDF of the quarterly statements -------------------------------------------------------------
@@ -87,7 +155,8 @@ def _car(text: str) -> str | None:
     return _plain(value) if value is not None and Decimal(3) <= value <= Decimal(60) else None
 _LINE_LABELS = {"group1": r"no du tieu chuan", "group2": r"no can chu y", "group3": r"no duoi tieu chuan", "group4": r"no nghi ngo",
                 "group5": r"no co kha nang mat von", "demand_deposits": r"tien gui khong ky han", "margin_deposits": r"tien (?:gui )?ky quy",
-                "customer_deposits": r"(?:^|\s)tien gui cua khach hang"}
+                "customer_deposits": r"(?:^|\s)tien gui cua khach hang", "reserve": r"du phong rui ro cho vay khach hang",
+                "accrued_interest": r"cac khoan lai,? (?:va )?phi phai thu"}
 IMAGE_ONLY = "Không đọc được chữ trong file (có thể là bản scan dạng ảnh); hãy nhập tay."
 
 
@@ -142,7 +211,7 @@ def parse_report_pages(pages: list[str], *, ocr: frozenset[int] = frozenset()) -
     """Proposed values {field: {value (tỷ đồng, CAR in %), page (1-based), ocr when read from an image}}, the fields not
     found, and warnings. `ocr` holds the 0-based pages whose text came from OCR: their figures are checked against totals."""
     if not any(p.strip() for p in pages):
-        return {"fields": {}, "missing": list(FIELDS), "warnings": [IMAGE_ONLY]}
+        return {"fields": {}, "missing": list(CORE), "warnings": [IMAGE_ONLY]}
     # PDFs may store Vietnamese letters decomposed (y + ̉ for ỷ); Tesseract on Windows ends lines with \r\n, where "$" fails.
     pages = [unicodedata.normalize("NFC", p).replace("\r\n", "\n").replace("\r", "\n") for p in pages]
     fields, warnings, unit = {}, [], None
@@ -193,6 +262,10 @@ def parse_report_pages(pages: list[str], *, ocr: frozenset[int] = frozenset()) -
             if f not in fields:
                 take(f, [i], only=[ln], at=k)
     take("customer_deposits", everywhere)
+    for f in ("reserve", "accrued_interest"):  # balance-sheet lines; a provision is printed in brackets
+        take(f, everywhere)
+        if f in fields:
+            fields[f]["value"] = _plain(abs(Decimal(fields[f]["value"])))
     for i, text in enumerate(pages):
         if car := _car(text):
             fields["car"] = {"value": car, "page": i + 1}
@@ -205,7 +278,7 @@ def parse_report_pages(pages: list[str], *, ocr: frozenset[int] = frozenset()) -
         warnings.append('Không thấy mục "chất lượng nợ cho vay" (phân loại nợ nhóm 1–5).')
     if not note_lines:
         warnings.append('Không thấy mục thuyết minh có đánh số "Tiền gửi của khách hàng".')
-    return {"fields": fields, "missing": [f for f in FIELDS if f not in fields], "warnings": warnings}
+    return {"fields": fields, "missing": [f for f in CORE if f not in fields], "warnings": warnings}
 
 
 def _check_ocr(fields: dict, raw: dict, loan_lines: list, note_lines: list, ocr: frozenset[int]) -> list[str]:

@@ -120,3 +120,18 @@ test("picking rows without a purpose says what to do instead of greying the butt
   await button.click();
   await expect(box.getByLabel("Mục đích của TK cho con").locator("option:checked")).toHaveText("Quỹ dự phòng");
 });
+
+test("a row's purpose says it is saved, and picking rows that all have one is told calmly", async ({ page }) => {
+  await freshWithRows(page);
+  await page.goto("/profile?tab=tai-san");
+  const box = region(page);
+  await expect(box.getByRole("button", { name: "+ Quỹ dự phòng" })).toBeEnabled();
+  await box.getByRole("button", { name: "+ Quỹ dự phòng" }).click();
+  await expect(box.getByRole("table", { name: "Tổng theo mục đích" })).toContainText("Quỹ dự phòng");
+  for (const row of ["TK cho con", "Sổ thử, đáo hạn 01/01/2027"]) await box.getByLabel(`Mục đích của ${row}`).selectOption({ label: "Quỹ dự phòng" });
+  await expect(box.getByTestId("mp-saved")).toContainText("Đã lưu mục đích cho Sổ thử, đáo hạn 01/01/2027");
+  await box.getByLabel("Chọn tất cả").check();
+  await box.getByRole("button", { name: "Gắn cho 2 khoản" }).click();
+  await expect(box.getByTestId("mp-bulk-note")).toContainText("đều đã có mục đích và đã được lưu");
+  await expect(box.getByRole("alert")).toHaveCount(0);
+});

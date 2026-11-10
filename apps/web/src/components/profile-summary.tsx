@@ -4,6 +4,7 @@ import { type KeyboardEvent, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ApiError, api } from "../lib/api";
 import { PropertyBook } from "./property-book";
+import { RentalBook } from "./rental-book";
 import { CycleTargets } from "./cycle-targets";
 import { NewMoney } from "./new-money";
 import { DepositBook } from "./deposit-book";
@@ -79,6 +80,7 @@ export function ProfileSummary() {
         <DepositBook refresh={bookPosts} onSaved={() => setBookSaves((n) => n + 1)} />
         <MoneyPurposes refresh={bookSaves} />
         <PropertyBook refresh={`${riskChanges}-${bookSaves}`} onSaved={() => setPropertySaves((n) => n + 1)} />
+        <RentalBook />
         <EquityBudget refresh={`${riskChanges}-${intangibleChanges}-${bookSaves}`} />
         <Intangibles onChanged={() => setIntangibleChanges((n) => n + 1)} />
       </div>

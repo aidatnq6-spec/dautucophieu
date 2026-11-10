@@ -15,6 +15,8 @@ from investment_agent.services.drawdown import held_costs, last_close
 from investment_agent.services.accumulation import due_lines
 from investment_agent.services.insurance_alerts import due_items as payment_items
 from investment_agent.services.loan_alerts import promo_lines, read_property_book
+from investment_agent.domain.rental_book import due_items as rental_items
+from investment_agent.services.rental_alerts import read_rental_book
 from investment_agent.services.records import portfolio_settings
 from investment_agent.services.system_health import health_report
 from investment_agent.services.theses import read_theses
@@ -46,6 +48,7 @@ def attention_items(repo, owner, data_dir: Path, *, now: datetime) -> list[dict]
     property_book, vn_today = read_property_book(repo, owner), now.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date()
     items += [{"level": "high", "kind": "loan_promo", "symbol": None, "text": line, "href": "/profile?tab=tai-san"} for line in promo_lines(property_book, vn_today)]
     items += [{"level": "high", "kind": kind, "symbol": None, "text": line, "href": "/profile?tab=tai-san"} for kind, line in payment_items(property_book, vn_today)]
+    items += [{"level": "high", "kind": kind, "symbol": None, "text": line, "href": "/profile?tab=tai-san"} for kind, _, line in rental_items(read_rental_book(repo, owner), vn_today)]
     items += [{"level": "low", "kind": "accumulation", "symbol": None, "text": line, "href": "/profile?tab=ke-hoach"}
               for line in due_lines(repo, owner, today=now.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date())]
     since = (now.date() - timedelta(days=NEW_QUARTER_DAYS)).isoformat()

@@ -1,6 +1,7 @@
 """Sổ cho thuê căn hộ: each room, its tenant and lease, and every payment received; which months are paid, short or unpaid, what is owed, and
-reminders for rent past its day and a lease ending within 30 days. Months are counted from the current lease's start only, so a past tenant's months
-are not judged against today's rent. Personal data; never sent to a model."""
+reminders for rent past its day and a lease ending within 30 days. Months are counted from the current lease's start, and never before the month the
+book began tracking the room (track_from): rent received earlier sits in the owner's spreadsheet, so an unrecorded month is not an unpaid one.
+Personal data; never sent to a model."""
 
 import calendar
 from collections import Counter
@@ -30,6 +31,7 @@ class Unit(ContractModel):
     broker: str | None = Field(default=None, max_length=80)
     commission: UnsignedAmount | None = None
     note: str | None = Field(default=None, max_length=160)
+    track_from: str | None = Field(default=None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$")  # the first month whose rent is recorded here
 
     _whole_amounts = field_validator("rent", "deposit", "commission")(_whole)
 
@@ -83,6 +85,8 @@ def due_on(unit: Unit, month: str) -> date:
 
 def _months(unit: Unit, today: date) -> list[str]:
     first = unit.start or today.replace(day=1)
+    if unit.track_from:
+        first = max(first, date(int(unit.track_from[:4]), int(unit.track_from[5:]), 1))
     last = min(today, unit.ends) if unit.ends else today
     keys, y, m = [], first.year, first.month
     while (y, m) <= (last.year, last.month):

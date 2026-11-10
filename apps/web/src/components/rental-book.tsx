@@ -5,7 +5,7 @@ import { ApiError, api, requestId } from "../lib/api";
 import { formatVnd, groupDigitsInput, hanoiDate, parseMoneyInput } from "../lib/format";
 
 type Unit = { id: string; name: string; tenant: string | null; contact: string | null; rent: string | null; due_day: number | null; start: string | null; ends: string | null;
-  deposit: string | null; broker: string | null; commission: string | null; note: string | null };
+  deposit: string | null; broker: string | null; commission: string | null; note: string | null; track_from?: string | null };
 type Payment = { id: string; unit: string; month: string; amount: string; paid_on: string; note: string | null };
 type Month = { month: string; due_on: string; got: string; status: "paid" | "short" | "unpaid" | "pending"; owed: string };
 type UnitView = { id: string; vacant: boolean; months: Month[]; owed: string; lease_days_left: number | null };
@@ -13,15 +13,16 @@ type View = { version: number; book: { units: Unit[]; payments: Payment[] };
   view: { units: UnitView[]; totals: { rent_monthly: string; collected_year: string; owed: string; deposits: string; occupied: number; vacant: number } } };
 type Draft = Record<string, string>;
 
-const FIELDS: [keyof Unit, string, "text" | "money" | "int" | "date"][] = [
+const FIELDS: [keyof Unit, string, "text" | "money" | "int" | "date" | "month"][] = [
   ["name", "Tên phòng", "text"], ["tenant", "Khách thuê", "text"], ["contact", "Liên hệ khách", "text"], ["rent", "Giá thuê mỗi tháng (đ)", "money"],
   ["due_day", "Ngày thu hằng tháng", "int"], ["start", "Ngày bắt đầu hợp đồng", "date"], ["ends", "Ngày hết hợp đồng", "date"], ["deposit", "Tiền cọc (đ)", "money"],
-  ["broker", "Môi giới", "text"], ["commission", "Hoa hồng môi giới (đ)", "money"], ["note", "Ghi chú", "text"]];
+  ["broker", "Môi giới", "text"], ["commission", "Hoa hồng môi giới (đ)", "money"], ["note", "Ghi chú", "text"], ["track_from", "Theo dõi thu tiền từ tháng", "month"]];
 const day = (v: string | null | undefined) => (v ? `${v.slice(8, 10)}/${v.slice(5, 7)}/${v.slice(0, 4)}` : "—");
 const monthLabel = (m: string) => `${m.slice(5, 7)}/${m.slice(0, 4)}`;
 
 function draftOf(u?: Unit): Draft {
-  return Object.fromEntries(FIELDS.map(([k, , kind]) => { const v = u?.[k]; return [k, v === null || v === undefined ? "" : kind === "money" ? groupDigitsInput(String(v)) : String(v)]; }));
+  const d: Draft = Object.fromEntries(FIELDS.map(([k, , kind]) => { const v = u?.[k]; return [k, v === null || v === undefined ? "" : kind === "money" ? groupDigitsInput(String(v)) : String(v)]; }));
+  return u ? d : { ...d, track_from: hanoiDate().slice(0, 7) };  // a new room is tracked from this month: earlier rent is in the owner's spreadsheet
 }
 
 function MonthPill({ m }: { m: Month | undefined }) {
@@ -56,6 +57,7 @@ export function RentalBook() {
       const raw = (d[k] ?? "").trim();
       if (!raw) { if (k === "name") { setMessage("Nhập tên phòng."); return; } out[k] = null; continue; }
       if (kind === "money") { const v = parseMoneyInput(raw); if (v === null || v.includes(".")) { setMessage(`${label}: nhập số đồng.`); return; } out[k] = v; }
+      else if (kind === "month") { if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(raw)) { setMessage(`${label}: chọn tháng.`); return; } out[k] = raw; }
       else if (kind === "int") { const n = Number(raw); if (!Number.isInteger(n) || n < 1 || n > 31) { setMessage("Ngày thu từ 1 đến 31."); return; } out[k] = n; }
       else out[k] = raw;
     }
@@ -88,11 +90,11 @@ export function RentalBook() {
   return (
     <section className="surface db" aria-label="Sổ cho thuê căn hộ">
       <h2>Sổ cho thuê căn hộ</h2>
-      <p className="caption wrap">Mỗi phòng: khách, giá thuê, ngày thu và hợp đồng; mỗi lần thu tiền ghi một dòng. Tháng được tính từ ngày bắt đầu hợp đồng hiện tại. Phần mềm nhắc ở Việc cần xem và qua Telegram khi quá ngày thu mà chưa đủ tiền, và 30 ngày trước khi hợp đồng hết hạn. Tiền cọc để trống thì lấy bằng 1 tháng tiền thuê.</p>
+      <p className="caption wrap">Mỗi phòng: khách, giá thuê, ngày thu và hợp đồng; mỗi lần thu tiền ghi một dòng. Tháng được tính từ ngày bắt đầu hợp đồng hiện tại nhưng không trước tháng bắt đầu theo dõi: tiền thu trước đó nằm trong file Excel, nên tháng chưa ghi ở đây không bị coi là nợ. Phần mềm nhắc ở Việc cần xem và qua Telegram khi quá ngày thu mà chưa đủ tiền, và 30 ngày trước khi hợp đồng hết hạn. Tiền cọc để trống thì lấy bằng 1 tháng tiền thuê.</p>
       {message && !editing && !paying && <p className="errors" role="alert">{message}</p>}
       {t && view.book.units.length > 0 && <div className="kpi-row">
         <div><span className="kpi-label">Tiền thuê mỗi tháng</span><strong>{formatVnd(t.rent_monthly)}</strong><span className="kpi-note">{t.occupied} phòng có khách, {t.vacant} phòng trống</span></div>
-        <div><span className="kpi-label">Đã thu năm nay</span><strong data-testid="rb-collected">{formatVnd(t.collected_year)}</strong></div>
+        <div><span className="kpi-label">Đã thu năm nay (ghi trong sổ)</span><strong data-testid="rb-collected">{formatVnd(t.collected_year)}</strong><span className="kpi-note">Tiền thu trước khi theo dõi ở đây nằm trong file thu chi</span></div>
         <div><span className="kpi-label">Khách còn nợ</span><strong data-testid="rb-owed" className={Number(t.owed) > 0 ? "negative" : undefined}>{formatVnd(t.owed)}</strong></div>
         <div><span className="kpi-label">Tiền cọc đang giữ</span><strong>{formatVnd(t.deposits)}</strong><span className="kpi-note">Trả lại khách khi hết hợp đồng</span></div>
       </div>}
@@ -122,7 +124,7 @@ export function RentalBook() {
       </form>}
       {editing && <form className="pv-form" aria-label="Thông tin phòng" onSubmit={(e) => { e.preventDefault(); void saveUnit(); }}>
         <div className="formgrid">{FIELDS.map(([k, label, kind]) => <label key={k} className="field">{label}
-          <input type={kind === "date" ? "date" : "text"} inputMode={kind === "money" || kind === "int" ? "numeric" : undefined} value={editing.draft[k] ?? ""}
+          <input type={kind === "date" ? "date" : kind === "month" ? "month" : "text"} inputMode={kind === "money" || kind === "int" ? "numeric" : undefined} value={editing.draft[k] ?? ""}
             placeholder={k === "deposit" ? "trống = 1 tháng tiền thuê" : k === "tenant" ? "trống = phòng trống" : undefined}
             onChange={(e) => setEditing({ ...editing, draft: { ...editing.draft, [k]: kind === "money" ? groupDigitsInput(e.target.value) : e.target.value } })} /></label>)}</div>
         {message && <p className="errors" role="alert">{message}</p>}

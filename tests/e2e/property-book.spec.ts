@@ -75,3 +75,31 @@ test("an insurance policy is entered; life cover counts at its account value, sa
   await expect(box.getByTestId("nw-premiums")).toHaveText("12.000.000 đ");
   await expect(box).toContainText("chưa trừ phí hủy (rút ra sẽ nhận ít hơn)");
 });
+
+
+test("a share without papers counts at what was put in, and a holiday right is left out with its fee kept", async ({ page }) => {
+  await seedOwner(page);
+  const { version } = await (await call(page, "GET", "property-book")).json();
+  await call(page, "PUT", "property-book", { properties: [], loans: [], policies: [], ventures: [], ceiling: "70", expected_version: version, request_id: `pb-v-${Date.now()}` });
+  await page.goto("/profile?tab=tai-san");
+  const box = region(page);
+  await expect(box.getByRole("button", { name: "Thêm khoản góp vốn" })).toBeEnabled();
+  await box.getByRole("button", { name: "Thêm khoản góp vốn" }).click();
+  await box.getByLabel("Tên khoản đầu tư").fill("Góp vốn thử");
+  await box.getByLabel("Vốn đã góp (đ)").fill("50000000");
+  await box.getByRole("button", { name: "Lưu" }).click();
+  await expect(box.getByTestId("nw-ventures")).toHaveText("50.000.000 đ");
+  await expect(box.getByTestId("nw-unpapered")).toContainText("Góp vốn thử");
+  await box.getByRole("button", { name: "Thêm khoản góp vốn" }).click();
+  await box.getByLabel("Tên khoản đầu tư").fill("Kỳ nghỉ thử");
+  await box.getByLabel("Loại đầu tư").selectOption({ label: "Quyền nghỉ dưỡng" });
+  await box.getByLabel("Vốn đã góp (đ)").fill("80000000");
+  await box.getByLabel("Phí thường niên (đ)").fill("6000000");
+  await box.getByLabel("Một ngày đóng phí thường niên").fill("2026-03-01");
+  await box.getByRole("button", { name: "Lưu" }).click();
+  const table = box.getByRole("table", { name: "Góp vốn và đầu tư riêng" });
+  await expect(table).toContainText("Không tính");
+  await expect(table).toContainText("kỳ tới 01/03/2027");
+  await expect(box.getByTestId("nw-ventures")).toHaveText("50.000.000 đ");
+  await expect(box).toContainText("Phí thường niên cả năm: 6.000.000 đ");
+});

@@ -357,3 +357,40 @@ def test_candles_and_minute_closes_for_the_trend_board():
                      "close": "53.2", "volume": 100}]  # the no-trade placeholder row is dropped
     assert p.index_minutes("VNINDEX", date(2026, 10, 24), date(2026, 10, 30))[0][1] == "53.2"
     assert m.calls == [("FPT", "1H"), ("idx:VNINDEX", "1m")]
+
+
+class MinuteLimited(Exception):
+    code = "VNSTOCK_AUTH_MINUTE_LIMIT"
+
+
+def test_tickers_stopped_by_the_minute_limit_are_tried_again_after_a_minute(tmp_path, capsys):
+    import json as _json
+    from investment_agent.cli import market_sync
+    cal_path = tmp_path / "cal.json"
+    cal_path.write_text(_json.dumps({"version": "x", "source": "t", "holidays": [], "first": "2026-01-01", "last": "2026-12-31"}), encoding="utf-8")
+    real, refused, slept = provider(), {"FPT": 1}, []
+
+    class Limited:
+        def fetch_prices(self, symbol, start, end):
+            if refused.get(symbol):
+                refused[symbol] -= 1
+                raise MinuteLimited()
+            return real.fetch_prices(symbol, start, end)
+    assert market_sync(["FPT"], tmp_path, cal_path, 7, provider=Limited(), today=date(2026, 10, 23), sleep=slept.append) == 0
+    assert slept == [60] and PriceStore(tmp_path).latest("FPT")
+    assert _json.loads(capsys.readouterr().out.strip().splitlines()[-1])["failed"] == []
+
+
+def test_a_ticker_still_limited_after_the_wait_is_reported(tmp_path, capsys):
+    import json as _json
+    from investment_agent.cli import market_sync
+    cal_path = tmp_path / "cal.json"
+    cal_path.write_text(_json.dumps({"version": "x", "source": "t", "holidays": [], "first": "2026-01-01", "last": "2026-12-31"}), encoding="utf-8")
+    slept = []
+
+    class Limited:
+        def fetch_prices(self, symbol, start, end):
+            raise MinuteLimited()
+    assert market_sync(["FPT"], tmp_path, cal_path, 7, provider=Limited(), today=date(2026, 10, 23), sleep=slept.append) == 1
+    assert slept == [60]
+    assert _json.loads(capsys.readouterr().out.strip().splitlines()[-1])["failed"] == [{"symbol": "FPT", "error": "VNSTOCK_AUTH_MINUTE_LIMIT"}]

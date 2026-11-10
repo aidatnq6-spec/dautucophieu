@@ -75,16 +75,17 @@ def test_one_page_view_reads_each_personal_record_once(tmp_path):
 
     c, clock = client(tmp_path)
     store = c.app.state.personal_repository.store
-    trips = []
-    real_atomic = store.atomic
+    trips, batches = [], []
+    real_atomic, real_many = store.atomic, store.get_many
     store.atomic = lambda op: trips.append(1) or real_atomic(op)
+    store.get_many = lambda paths: batches.append(list(paths)) or real_many(paths)
     Repo.read = counting
     try:
         assert call(c, clock, "GET", "/internal/glance").status_code == 200
     finally:
         Repo.read = original
-    assert len(reads) > len(trips)  # the same records are asked for many times...
-    assert len(trips) == len(set(reads))  # ...but each one costs a single store round trip per request
+    assert len(reads) > len(set(reads))  # the same records are asked for many times...
+    assert trips == [] and len(batches) < len(set(reads)) / 2  # ...but most come together in batch reads, with no transaction
 
 
 def test_quick_numbers_say_what_they_cover(tmp_path):

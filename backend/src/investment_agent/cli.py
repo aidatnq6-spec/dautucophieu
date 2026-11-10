@@ -507,7 +507,12 @@ def industries(symbols: list[str], output: Path, provider=None, today=None) -> i
     return 0
 
 
-def market_sync(symbols: list[str], data_dir: Path, calendar_path: Path, days: int, provider=None, today=None, index: bool = False) -> int:
+MINUTE_LIMIT_WAIT = 60  # Vnstock Cộng đồng: 60 calls a minute; a ticker refused for it is tried once more after the minute has passed
+
+
+def market_sync(symbols: list[str], data_dir: Path, calendar_path: Path, days: int, provider=None, today=None, index: bool = False,
+                sleep=None) -> int:
+    import time
     from datetime import date, timedelta, timezone
     from investment_agent.market.prices import PriceStore, ingest
     from investment_agent.market.providers.vnstock_adapter import ProviderUnavailable, VnstockProvider
@@ -517,25 +522,40 @@ def market_sync(symbols: list[str], data_dir: Path, calendar_path: Path, days: i
     store = PriceStore(data_dir)
     start = max(today - timedelta(days=days), cal.first)
     loaded, failed = 0, []
-    for symbol in symbols:
-        try:
-            fetch = provider.fetch_index if index else provider.fetch_prices
-            bars = [b for b in fetch(symbol, start, today) if cal.first <= b.session_date <= cal.last and cal.is_session(b.session_date)]
-            if not bars:
-                continue
-            # The scheduler syncs several times a day: unchanged prices add nothing, restated ones
-            # become a new revision named by observation time rather than colliding with today's.
-            stored = store.latest(bars[0].entity_id)
-            if all(b.session_date in stored and _same_bar(b, stored[b.session_date][0]) for b in bars):
-                continue
-            observed = bars[0].observed_at.astimezone(timezone.utc)
-            ingest(store, cal, bars, revision_id=f"vnstock-{observed:%Y%m%dT%H%M%S}-{start:%Y%m%d}")
-            loaded += len(bars)
-        except ProviderUnavailable as exc:
-            print(json.dumps({"status": "not_configured", "reason": str(exc)}, ensure_ascii=False))
-            return 2
-        except Exception as exc:  # one failing symbol does not stop the others
-            failed.append({"symbol": symbol, "error": getattr(exc, "code", type(exc).__name__)})
+    sleep = sleep or time.sleep
+
+    def one(symbol: str) -> int:
+        fetch = provider.fetch_index if index else provider.fetch_prices
+        bars = [b for b in fetch(symbol, start, today) if cal.first <= b.session_date <= cal.last and cal.is_session(b.session_date)]
+        if not bars:
+            return 0
+        # The scheduler syncs several times a day: unchanged prices add nothing, restated ones
+        # become a new revision named by observation time rather than colliding with today's.
+        stored = store.latest(bars[0].entity_id)
+        if all(b.session_date in stored and _same_bar(b, stored[b.session_date][0]) for b in bars):
+            return 0
+        observed = bars[0].observed_at.astimezone(timezone.utc)
+        ingest(store, cal, bars, revision_id=f"vnstock-{observed:%Y%m%dT%H%M%S}-{start:%Y%m%d}")
+        return len(bars)
+
+    for attempt in (1, 2):
+        retry = []
+        for symbol in symbols:
+            try:
+                loaded += one(symbol)
+            except ProviderUnavailable as exc:
+                print(json.dumps({"status": "not_configured", "reason": str(exc)}, ensure_ascii=False))
+                return 2
+            except Exception as exc:  # one failing symbol does not stop the others
+                code = getattr(exc, "code", type(exc).__name__)
+                if attempt == 1 and "MINUTE_LIMIT" in str(code):
+                    retry.append(symbol)
+                else:
+                    failed.append({"symbol": symbol, "error": code})
+        if not retry:
+            break
+        sleep(MINUTE_LIMIT_WAIT)
+        symbols = retry
     print(json.dumps({"status": "ok" if not failed else "partial", "bars": loaded, "failed": failed}))
     return 0 if not failed else 1
 

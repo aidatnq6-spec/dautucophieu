@@ -12,6 +12,7 @@ from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.series import SeriesStore
 from investment_agent.market.watchlist import load_watchlist
 from investment_agent.services.drawdown import held_costs, last_close
+from investment_agent.services.earnings_season import review_lines
 from investment_agent.services.accumulation import due_lines
 from investment_agent.services.insurance_alerts import due_items as payment_items
 from investment_agent.services.loan_alerts import promo_lines, read_property_book
@@ -51,6 +52,7 @@ def attention_items(repo, owner, data_dir: Path, *, now: datetime) -> list[dict]
     items += [{"level": "high", "kind": kind, "symbol": None, "text": line, "href": "/profile?tab=tai-san"} for kind, _, line in rental_items(read_rental_book(repo, owner), vn_today)]
     items += [{"level": "low", "kind": "accumulation", "symbol": None, "text": line, "href": "/profile?tab=ke-hoach"}
               for line in due_lines(repo, owner, today=now.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date())]
+    items += [{"level": "high", "kind": "thesis_review", "symbol": s, "text": line, "href": "/earnings#ra-soat"} for s, line in review_lines(repo, owner, data_dir)]
     since = (now.date() - timedelta(days=NEW_QUARTER_DAYS)).isoformat()
     store = FundamentalsStore(data_dir / "fundamentals")
     for symbol in load_watchlist(data_dir).symbols:

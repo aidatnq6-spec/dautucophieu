@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BookOpenText, Briefcase, Calculator, CalendarDays, ChartLine, Eye, Globe, House, Newspaper, NotebookPen, Scale, Settings, UserRound } from "lucide-react";
+import { Activity, BookOpenText, ClipboardList, Briefcase, Calculator, CalendarDays, ChartLine, Eye, Globe, House, Newspaper, NotebookPen, Scale, Settings, UserRound } from "lucide-react";
 
 const GROUPS = [
   { title: null, links: [{ href: "/", label: "Tổng quan", icon: House }] },
@@ -14,6 +14,7 @@ const GROUPS = [
     { href: "/trend", label: "Xu hướng", icon: Activity },
     { href: "/watchlist", label: "Theo dõi", icon: Eye },
     { href: "/events", label: "Lịch sự kiện", icon: CalendarDays },
+    { href: "/earnings", label: "Mùa báo cáo", icon: ClipboardList },
     { href: "/insights", label: "Nhận định", icon: Newspaper },
     { href: "/reports", label: "Bản tin sau phiên", icon: BookOpenText }] },
   { title: "Công cụ", links: [

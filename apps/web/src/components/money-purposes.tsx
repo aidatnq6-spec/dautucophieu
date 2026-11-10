@@ -42,6 +42,7 @@ export function MoneyPurposes({ refresh, onChanged }: { refresh: number; onChang
   const [picked, setPicked] = useState<string[]>([]);
   const [bulk, setBulk] = useState("");
   const [bulkAsked, setBulkAsked] = useState(false);  // the button was pressed with no purpose chosen
+  const [savedNote, setSavedNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => { api<PurposesView>("money-purposes").then(setView, (e) => setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, [refresh]);
@@ -67,24 +68,26 @@ export function MoneyPurposes({ refresh, onChanged }: { refresh: number; onChang
     if (!view || !window.confirm(`Xóa mục đích "${p.name}"? Các khoản đã gắn sẽ về Chưa gắn.`)) return;
     void put(view.data.purposes.filter((x) => x.id !== p.id), Object.fromEntries(Object.entries(view.data.tags).filter(([, v]) => v !== p.id)));
   }
-  function tagAll(ids: string[], purpose: string, created?: Purpose) {
+  async function tagAll(ids: string[], purpose: string, created?: Purpose) {
     if (!view) return;
     const tags = { ...view.data.tags };
     for (const id of ids) { if (purpose) tags[id] = purpose; else delete tags[id]; }
-    void put(created ? [...view.data.purposes, created] : view.data.purposes, tags);
+    const one = ids.length === 1 ? view.rows.find((r) => r.id === ids[0])?.name : null;
+    if (await put(created ? [...view.data.purposes, created] : view.data.purposes, tags)) setSavedNote(one ? `Đã lưu mục đích cho ${one}.` : `Đã lưu mục đích cho ${ids.length} khoản.`);
   }
   async function tagPicked() {
     if (!view || !picked.length) return;
     if (!bulk) { setBulkAsked(true); return; }
     setBulkAsked(false);
     const ids = picked;
-    tagAll(ids, bulk);
+    await tagAll(ids, bulk);
     setPicked([]);
   }
   const v = view?.view;
   const purposes = view?.data.purposes ?? [];
   const suggestions = SUGGESTED.filter((s) => !has(s));
   const allPicked = !!view && view.rows.length > 0 && picked.length === view.rows.length;
+  const allTagged = !!view && picked.length > 0 && picked.every((id) => view.data.tags[id]);
   return (
     <section className="surface" aria-label="Mục đích từng khoản tiền">
       <h2>Mục đích từng khoản tiền</h2>
@@ -120,14 +123,17 @@ export function MoneyPurposes({ refresh, onChanged }: { refresh: number; onChang
             <select value={bulk} disabled={busy || purposes.length === 0} onChange={(e) => { setBulk(e.target.value); setBulkAsked(false); }}><option value="">Chọn mục đích</option>{purposes.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
           <button type="button" className="btn" disabled={busy || picked.length === 0} onClick={() => void tagPicked()}><Tags size={14} aria-hidden="true" />Gắn cho {picked.length} khoản</button>
         </div>
-        {picked.length > 0 && !bulk && <p className={bulkAsked ? "errors" : "caption"} role={bulkAsked ? "alert" : undefined} data-testid="mp-bulk-note">Chọn mục đích ở ô bên trái trước, rồi bấm Gắn cho {picked.length} khoản. Ô Mục đích ở từng dòng chỉ đổi riêng dòng đó.</p>}
+        {picked.length > 0 && !bulk && (bulkAsked || !allTagged) && <p className={bulkAsked ? "notice" : "caption"} role="status" data-testid="mp-bulk-note">{allTagged
+          ? "Các khoản đã chọn đều đã có mục đích và đã được lưu. Chỉ cần chọn mục đích ở ô bên trái nếu muốn đổi tất cả cùng lúc."
+          : `Chọn mục đích ở ô bên trái trước, rồi bấm Gắn cho ${picked.length} khoản. Ô Mục đích ở từng dòng chỉ đổi riêng dòng đó.`}</p>}
+        <p className="caption">Chọn ở cột Mục đích là lưu ngay, không cần bấm thêm nút nào.{savedNote && <> <span className="positive" role="status" data-testid="mp-saved">{savedNote}</span></>}</p>
         <table className="fv-table" aria-label="Gắn mục đích cho từng khoản">
           <thead><tr><th><input type="checkbox" aria-label="Chọn tất cả" checked={allPicked} onChange={(e) => setPicked(e.target.checked ? view.rows.map((r) => r.id) : [])} /></th><th>Khoản</th><th>Loại</th><th className="num">Giá trị</th><th>Mục đích</th></tr></thead>
           <tbody>{view.rows.map((r) => <tr key={r.id}>
             <td><input type="checkbox" aria-label={`Chọn ${r.name}`} checked={picked.includes(r.id)} onChange={(e) => setPicked((old) => (e.target.checked ? [...old, r.id] : old.filter((x) => x !== r.id)))} /></td>
             <td data-label="Khoản">{r.name}</td><td data-label="Loại">{KIND[r.kind]}</td>
             <td data-label="Giá trị" className="num">{formatVnd(r.value)}{r.at_cost && <div className="caption">theo vốn đã mua</div>}</td>
-            <td data-label="Mục đích"><PurposeSelect label={`Mục đích của ${r.name}`} value={view.data.tags[r.id] ?? ""} purposes={purposes} disabled={busy} onPick={(id, created) => tagAll([r.id], id, created)} /></td></tr>)}</tbody>
+            <td data-label="Mục đích"><PurposeSelect label={`Mục đích của ${r.name}`} value={view.data.tags[r.id] ?? ""} purposes={purposes} disabled={busy} onPick={(id, created) => void tagAll([r.id], id, created)} /></td></tr>)}</tbody>
         </table>
       </>)}
     </section>

@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatVnd, groupDigitsInput, parseMoneyInput } from "../lib/format";
+import { type Purpose, type PurposesView, PurposeSelect } from "./money-purposes";
 
 type Account = { id: string; name: string; amount: string; liquid: boolean };
 type Deposit = { id: string; bank: string; matures: string; principal: string; rate: string | null; interest: string | null;
@@ -196,8 +197,9 @@ function FieldInput({ f, value, label, options, onChange }: { f: Field; value: s
 }
 
 /** One list of Sổ tài sản: each saved row read-only with Sửa and Xóa; the row being edited (or added) as inputs with Lưu and Hủy. */
-function RowTable({ list, rows, editing, locked, status, extra, choices, onEdit, onDraft, onSave, onCancel, onDelete }: {
+function RowTable({ list, rows, editing, locked, status, extra, choices, purpose, onEdit, onDraft, onSave, onCancel, onDelete }: {
   list: ListKey; rows: AnyDraft[]; editing: Editing; locked: boolean; status: (id: string) => ReactNode; choices?: string[];
+  purpose?: (id: string, label: string, editing: boolean) => ReactNode;
   extra?: { label: string; cell: (id: string) => ReactNode };
   onEdit: (row: AnyDraft) => void; onDraft: (row: AnyDraft) => void; onSave: () => void; onCancel: () => void; onDelete: (row: AnyDraft, n: number) => void }) {
   const fields = FIELDS[list];
@@ -206,7 +208,7 @@ function RowTable({ list, rows, editing, locked, status, extra, choices, onEdit,
   if (!all.length) return <p className="caption">Chưa có dòng nào.</p>;
   return (
     <table className="fv-table db-table" aria-label={TABLE_NAME[list]}>
-      <thead><tr>{fields.map((f) => <th key={f.key}>{f.label}</th>)}{extra && <th>{extra.label}</th>}<th /></tr></thead>
+      <thead><tr>{fields.map((f) => <th key={f.key}>{f.label}</th>)}{extra && <th>{extra.label}</th>}{purpose && <th>Mục đích</th>}<th /></tr></thead>
       <tbody>{all.map((r, i) => {
         const draft = mine && mine.draft.id === r.id ? mine.draft : null;
         const label = `${ROW_NAME[list]} ${i + 1}`;
@@ -216,6 +218,7 @@ function RowTable({ list, rows, editing, locked, status, extra, choices, onEdit,
               {draft ? <FieldInput f={f} label={label} options={choices} value={field(draft, f.key)} onChange={(v) => onDraft({ ...draft, [f.key]: v } as AnyDraft)} />
                 : <>{shown(f, field(r, f.key))}{f.kind === "date" && status(r.id)}</>}</td>)}
             {extra && <td data-label={extra.label}>{draft ? null : extra.cell(r.id)}</td>}
+            {purpose && <td data-label="Mục đích">{purpose(r.id, label, draft !== null)}</td>}
             <td className="db-actions">{draft ? <>
               <button type="button" className="btn primary" disabled={locked} onClick={onSave}><Check size={14} aria-hidden="true" />Lưu</button>
               <button type="button" className="btn" disabled={locked} onClick={onCancel}><X size={14} aria-hidden="true" />Hủy</button>
@@ -272,6 +275,11 @@ const monthLabel = (m: string) => `${m.slice(5)}/${m.slice(0, 4)}`;
  * A sổ not yet due is never cash now; one past its date is overdue, not guessed as rolled over or closed. Each Lưu or Xóa saves the
  * whole book at once, so Tháp tài sản recomputes. */
 export function DepositBook({ onSaved, refresh }: { onSaved?: () => void; refresh?: number }) {
+  // Mục đích từng khoản tiền, chosen while editing a row; kept in its own record, so Tháp tài sản does not change.
+  const [purposes, setPurposes] = useState<PurposesView | null>(null);
+  const [purposeDraft, setPurposeDraft] = useState("");
+  const [newPurpose, setNewPurpose] = useState<Purpose | null>(null);
+  useEffect(() => { api<PurposesView>("money-purposes").then(setPurposes, () => setPurposes(null)); }, [refresh]);
   const [view, setView] = useState<View | null>(null);
   const [editing, setEditing] = useState<Editing>(null);
   const [reserveDraft, setReserveDraft] = useState<string | null>(null);  // null = not editing the reserve
@@ -297,8 +305,23 @@ export function DepositBook({ onSaved, refresh }: { onSaved?: () => void; refres
   async function saveRow() {
     if (!view || !saved || !editing) return;
     const next = { ...saved, [editing.list]: upsertRow(saved[editing.list] as AnyDraft[], editing.draft) } as Drafts;
-    if (await put(next, view.book.count_ledger_cash, view.book.reserve)) setEditing(null);
+    const id = editing.draft.id;
+    if (!(await put(next, view.book.count_ledger_cash, view.book.reserve))) return;
+    setEditing(null);
+    if (purposes && (purposeDraft !== (purposes.data.tags[id] ?? "") || newPurpose)) {
+      const { [id]: _old, ...rest } = purposes.data.tags;
+      try {
+        setPurposes(await api<PurposesView>("money-purposes", { method: "PUT", body: { purposes: newPurpose ? [...purposes.data.purposes, newPurpose] : purposes.data.purposes,
+          tags: purposeDraft ? { ...rest, [id]: purposeDraft } : rest, expected_version: purposes.version, request_id: requestId() } }));
+        onSaved?.();
+      } catch (e) { setMessage(e instanceof ApiError ? `Đã lưu dòng nhưng chưa lưu mục đích: ${e.failure.message}` : "Đã lưu dòng nhưng chưa lưu mục đích."); }
+    }
+    setNewPurpose(null);
   }
+  const purposeList = [...(purposes?.data.purposes ?? []), ...(newPurpose ? [newPurpose] : [])];
+  const purposeCell = (id: string, label: string, isEditing: boolean) => isEditing
+    ? <PurposeSelect label={`Mục đích ${label}`} value={purposeDraft} purposes={purposeList} disabled={!purposes} onPick={(pid, created) => { setPurposeDraft(pid); if (created) setNewPurpose(created); }} />
+    : purposes?.data.tags[id] ? (purposeList.find((p) => p.id === purposes.data.tags[id])?.name ?? <span className="muted">—</span>) : <span className="muted">—</span>;
   async function deleteRow(list: ListKey, row: AnyDraft, n: number) {
     if (!view || !saved || !window.confirm(`Xóa ${ROW_NAME[list]} ${n}? Sổ tài sản lưu ngay và Tháp tài sản tính lại.`)) return;
     await put({ ...saved, [list]: removeRow(saved[list] as AnyDraft[], row.id) } as Drafts, view.book.count_ledger_cash, view.book.reserve);
@@ -316,12 +339,13 @@ export function DepositBook({ onSaved, refresh }: { onSaved?: () => void; refres
   const alert = message && <p className="errors" role="alert">{message}</p>;
   const table = (list: ListKey, extra?: { label: string; cell: (id: string) => ReactNode }, choices?: string[]) => saved && <>
     <RowTable list={list} rows={saved[list] as AnyDraft[]} editing={editing} locked={locked} status={status} extra={extra} choices={choices}
-      onEdit={(row) => { setReserveDraft(null); setMessage(null); setEditing({ list, draft: row, isNew: false }); }}
+      purpose={purposes ? purposeCell : undefined}
+      onEdit={(row) => { setReserveDraft(null); setMessage(null); setPurposeDraft(purposes?.data.tags[row.id] ?? ""); setNewPurpose(null); setEditing({ list, draft: row, isNew: false }); }}
       onDraft={(draft) => setEditing({ list, draft, isNew: editing?.isNew ?? false })}
       onSave={() => void saveRow()} onCancel={cancel} onDelete={(row, n) => void deleteRow(list, row, n)} />
     {editing?.list === list && alert}
     <button type="button" className="btn" disabled={locked || editing !== null || saved[list].length >= MAX_ROWS[list]}
-      onClick={() => { setReserveDraft(null); setMessage(null); setEditing({ list, draft: EMPTY[list](), isNew: true }); }}>
+      onClick={() => { setReserveDraft(null); setMessage(null); setPurposeDraft(""); setNewPurpose(null); setEditing({ list, draft: EMPTY[list](), isNew: true }); }}>
       <Plus size={14} aria-hidden="true" />{ADD_LABEL[list]}</button>
   </>;
   const l = view?.liquidity;

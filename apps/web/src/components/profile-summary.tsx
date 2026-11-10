@@ -58,6 +58,7 @@ export function ProfileSummary() {
   const [bookPosts, setBookPosts] = useState(0);
   const [propertySaves, setPropertySaves] = useState(0);
   const [cashflowSaves, setCashflowSaves] = useState(0);
+  const [purposeSaves, setPurposeSaves] = useState(0);
   if (profile.error) return <p className="errors" role="alert">{profile.error}</p>;
   if (profile.value === undefined) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   const p = profile.value;
@@ -77,8 +78,8 @@ export function ProfileSummary() {
         <RiskSection onChanged={() => setRiskChanges((n) => n + 1)} />
       </div>
       <div role="tabpanel" id="panel-tai-san" aria-labelledby="tab-tai-san" hidden={tab !== "tai-san"}>
-        <DepositBook refresh={bookPosts} onSaved={() => setBookSaves((n) => n + 1)} />
-        <MoneyPurposes refresh={bookSaves} />
+        <DepositBook refresh={bookPosts + purposeSaves} onSaved={() => setBookSaves((n) => n + 1)} />
+        <MoneyPurposes refresh={bookSaves} onChanged={() => setPurposeSaves((n) => n + 1)} />
         <PropertyBook refresh={`${riskChanges}-${bookSaves}`} onSaved={() => setPropertySaves((n) => n + 1)} />
         <RentalBook />
         <EquityBudget refresh={`${riskChanges}-${intangibleChanges}-${bookSaves}`} />

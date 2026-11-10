@@ -101,3 +101,22 @@ test("a purpose is chosen while editing a row of Sổ tài sản", async ({ page
   await expect(deposits.getByRole("table", { name: "Tài khoản tiền mặt" })).toContainText("Quỹ mua nhà");
   await expect.poll(async () => (await (await call(page, "GET", "money-purposes")).json()).data.tags["db-a"]).toBe("p-house");
 });
+
+test("picking rows without a purpose says what to do instead of greying the button out", async ({ page }) => {
+  await freshWithRows(page);
+  await page.goto("/profile?tab=tai-san");
+  const box = region(page);
+  await expect(box.getByLabel("Chọn TK cho con")).toBeEnabled();
+  await box.getByRole("button", { name: "+ Quỹ dự phòng" }).click();
+  await expect(box.getByRole("table", { name: "Tổng theo mục đích" })).toContainText("Quỹ dự phòng");
+  await box.getByLabel("Chọn tất cả").check();
+  await expect(box.getByTestId("mp-bulk-note")).toContainText("Chọn mục đích ở ô bên trái");
+  const button = box.getByRole("button", { name: "Gắn cho 2 khoản" });
+  await expect(button).toBeEnabled();
+  await button.click();
+  await expect(box.getByTestId("mp-bulk-note")).toContainText("Chọn mục đích ở ô bên trái");
+  await box.getByLabel("Mục đích cho các khoản đã chọn").selectOption({ label: "Quỹ dự phòng" });
+  await expect(box.getByTestId("mp-bulk-note")).toHaveCount(0);
+  await button.click();
+  await expect(box.getByLabel("Mục đích của TK cho con").locator("option:checked")).toHaveText("Quỹ dự phòng");
+});

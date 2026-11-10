@@ -26,6 +26,18 @@ const TWO = new Set(["BAD_LOANS_RATIO_AQ", "GROUP2_RATIO", "CAR", "OVERDUE_LOANS
 const TITLE: Record<Kind, string> = { bank: "ngân hàng", securities: "công ty chứng khoán", insurance: "bảo hiểm" };
 const COUNTS = [8, 12, 20, 0] as const;
 
+export type PeContext = { quarter: string; year_ago: string; ttm: string; ttm_year_ago: string; change: string | null; kind: "earnings_drop" | "earnings_spike" | "loss" | null };
+const quarterText = (p: string) => `Q${p.slice(-1)}/${p.slice(0, 4)}`;
+const share = (v: string) => `${(Math.abs(Number(v)) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 0 })}%`;
+
+/** Bẫy P/E: why the P/E reads as it does when profit has moved a lot against a year before. Null when nothing needs saying. */
+export function peNote(c: PeContext | null): string | null {
+  if (!c || !c.kind) return null;
+  if (c.kind === "loss") return `Lợi nhuận 4 quý đến ${quarterText(c.quarter)} âm nên P/E không có ý nghĩa; xem P/B hoặc chờ lợi nhuận dương trở lại.`;
+  if (c.kind === "earnings_drop") return `P/E đang cao vì lợi nhuận 4 quý đến ${quarterText(c.quarter)} giảm ${share(c.change!)} so với cùng kỳ, không phải vì giá đắt. Xem lợi nhuận có hồi phục không trước khi so P/E.`;
+  return `P/E đang thấp vì lợi nhuận 4 quý đến ${quarterText(c.quarter)} tăng ${share(c.change!)} so với cùng kỳ. Nếu phần tăng đến từ khoản một lần hay đỉnh chu kỳ, P/E thấp có thể không bền.`;
+}
+
 export function cell(v: string | null, kind: Row["kind"], key: string | null): string {
   if (v === null) return "—";
   const n = Number(v);
@@ -130,9 +142,12 @@ export function FinancialTables({ symbol }: { symbol: string }) {
   const part = view === "quarters" && ratios ? withRatios(data.quarters, ratios) : data[view];
   const cols = view === "quarters" ? lastN(part.periods, count) : lastN(part.periods, 0);
   const s = data.summary;
+  const pe = (data as { pe_context?: PeContext | null }).pe_context ?? null;
+  const note = peNote(pe);
   const extra = view === "quarters" && forecast?.quarter && Object.keys(forecast.values).length ? { label: `${periodLabel(forecast.quarter)}F`, values: forecast.values } : null;
   return (
     <div className="ft">
+      {note && <p className="notice" data-testid="pe-context">{note}</p>}
       {s && <div className="pb-cards" aria-label="Bốn quý gần nhất">
         <div><span className="caption">LNST công ty mẹ 4 quý ({s.quarters.map(periodLabel).join(", ")})</span><strong>{ty(s.npat_ttm)}</strong></div>
         <div><span className="caption">EBITDA 4 quý</span><strong>{ty(s.ebitda_ttm)}</strong></div>

@@ -384,9 +384,36 @@ def _ttm_parent(quarters: dict) -> dict[str, str]:
     return out
 
 
+# Bẫy P/E (owner's request after the Q3/2026 review): P/E reads high when profit has fallen, low when it has jumped. The application's own lines.
+PE_DROP, PE_SPIKE = Decimal("-0.40"), Decimal("0.60")
+
+
+def _year_before(period: str) -> str:
+    year, n = period.split("-Q")
+    return f"{int(year) - 1}-Q{n}"
+
+
+def pe_context(quarters: dict) -> dict | None:
+    """Parent profit of the latest four quarters against the four to the same quarter a year before: kind "earnings_drop" (fell 40% or more:
+    P/E high because profit fell, not because the price is dear), "earnings_spike" (rose 60% or more: a low P/E may not last), "loss" (P/E means
+    nothing), or None. None overall when either window is incomplete; never filled in."""
+    latest = next((p for p in sorted(quarters, reverse=True) if _four(quarters, p, ("npat_parent",))["npat_parent"] is not None), None)
+    if latest is None:
+        return None
+    now = _four(quarters, latest, ("npat_parent",))["npat_parent"]
+    before = _four(quarters, _year_before(latest), ("npat_parent",))["npat_parent"]
+    if before is None:
+        return None
+    change = now / before - 1 if before > 0 else None
+    kind = "loss" if now <= 0 else "earnings_drop" if change is not None and change <= PE_DROP else "earnings_spike" if change is not None and change >= PE_SPIKE else None
+    return {"quarter": latest, "year_ago": _year_before(latest), "ttm": _money(now), "ttm_year_ago": _money(before),
+            "change": str(change.quantize(_Q4, ROUND_HALF_UP)) if change is not None else None, "kind": kind}
+
+
 def statement_table(record: dict, *, closes, vnstock: dict | None, kind: str | None = None, check: dict | None = None) -> dict:
     if kind in FIN_SCALE:
-        return {**_fin_table(record, kind, vnstock), "current": _current(record, closes, check), "ttm_parent": _ttm_parent(record.get("quarters", {}))}
+        return {**_fin_table(record, kind, vnstock), "current": _current(record, closes, check), "ttm_parent": _ttm_parent(record.get("quarters", {})),
+                "pe_context": pe_context(record.get("quarters", {}))}
     quarters, years = record.get("quarters", {}), record.get("years", {})
     year_part = _part(years, sorted(years), extra=_valuation(years, record.get("year_end_close", {})), spec=P_AND_L + SCALE)
     quarter_part = _part(quarters, sorted(quarters), extra=_quarter_valuation(quarters, record.get("quarter_end_close", {})), spec=P_AND_L + SCALE)
@@ -395,6 +422,6 @@ def statement_table(record: dict, *, closes, vnstock: dict | None, kind: str | N
             row["values"] = [_money(v) if isinstance(v, Decimal) else v for v in row["values"]]
     return {"symbol": record.get("symbol"), "source": record.get("source"), "fetched_at": record.get("fetched_at"),
             "quarters": quarter_part, "years": year_part, "summary": _summary(record, closes, check),
-            "current": _current(record, closes, check), "ttm_parent": _ttm_parent(quarters),
+            "current": _current(record, closes, check), "ttm_parent": _ttm_parent(quarters), "pe_context": pe_context(quarters),
             "checks": _checks(quarters, years, vnstock),
             "conflicts": record.get("quarters_conflicts", []) + record.get("years_conflicts", [])}

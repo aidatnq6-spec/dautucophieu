@@ -33,3 +33,71 @@ test("the section adds no sideways scroll at 375px", async ({ page }) => {
   await expect(region(page).getByLabel("Tên mục đích")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });
+
+const ROWS = [{ id: "mp-a", kind: "account", name: "TK cho con", value: "100000000", at_cost: false }, { id: "mp-b", kind: "deposit", name: "Sổ thử, đáo hạn 01/01/2027", value: "50000000", at_cost: false }];
+
+async function freshWithRows(page: import("@playwright/test").Page) {
+  await seedOwner(page);
+  const stored = await (await call(page, "GET", "money-purposes")).json();
+  await call(page, "PUT", "money-purposes", { purposes: [], tags: {}, expected_version: stored.version, request_id: `mp-r-${Date.now()}` });
+  await page.route("**/api/internal/money-purposes", async (route) => {
+    try {
+      const response = await route.fetch();
+      await route.fulfill({ response, json: { ...(await response.json()), rows: ROWS } });
+    } catch { /* the page moved on before the answer came back */ }
+  });
+}
+
+test("with no purpose yet the section says how to make one, and one is made from the row's own list", async ({ page }) => {
+  await freshWithRows(page);
+  await page.goto("/profile?tab=tai-san");
+  const box = region(page);
+  await expect(box.getByTestId("mp-empty")).toContainText("Chưa có mục đích nào");
+  page.once("dialog", (d) => d.accept("Quỹ du học thử"));
+  await box.getByLabel("Mục đích của TK cho con").selectOption({ label: "+ Tạo mục đích mới…" });
+  await expect(box.getByRole("table", { name: "Tổng theo mục đích" })).toContainText("Quỹ du học thử");
+  await expect(box.getByLabel("Mục đích của TK cho con").locator("option:checked")).toHaveText("Quỹ du học thử");
+});
+
+test("a suggested name is made with one click, several rows get it at once, and it can be counted as spent", async ({ page }) => {
+  await freshWithRows(page);
+  await page.goto("/profile?tab=tai-san");
+  const box = region(page);
+  await expect(box.getByRole("button", { name: "+ Quỹ dự phòng" })).toBeEnabled();
+  await box.getByRole("button", { name: "+ Quỹ dự phòng" }).click();
+  await expect(box.getByRole("button", { name: "+ Quỹ dự phòng" })).toHaveCount(0);
+  await box.getByLabel("Chọn TK cho con").check();
+  await box.getByLabel("Chọn Sổ thử, đáo hạn 01/01/2027").check();
+  await box.getByLabel("Mục đích cho các khoản đã chọn").selectOption({ label: "Quỹ dự phòng" });
+  await box.getByRole("button", { name: "Gắn cho 2 khoản" }).click();
+  await expect(box.getByLabel("Mục đích của Sổ thử, đáo hạn 01/01/2027").locator("option:checked")).toHaveText("Quỹ dự phòng");
+  await expect(box.getByLabel("Mục đích của TK cho con").locator("option:checked")).toHaveText("Quỹ dự phòng");
+  await box.getByLabel("Tính là đã chi: Quỹ dự phòng").click();  // saved first, then shown ticked
+  await expect(box.getByLabel("Tính là đã chi: Quỹ dự phòng")).toBeChecked();
+  await page.reload();
+  await expect(region(page).getByLabel("Tính là đã chi: Quỹ dự phòng")).toBeChecked();
+});
+
+test("a purpose is chosen while editing a row of Sổ tài sản", async ({ page }) => {
+  await freshWithRows(page);
+  const before = await (await call(page, "GET", "money-purposes")).json();
+  await call(page, "PUT", "money-purposes", { purposes: [{ id: "p-house", name: "Quỹ mua nhà", given: false }], tags: {}, expected_version: before.version, request_id: `mp-h-${Date.now()}` });
+  // the suite needs no Sổ tài sản: the book's answer is made up here and its save is answered too; the purpose itself is really saved
+  let book: Record<string, unknown> | null = null;
+  await page.route("**/api/internal/deposit-book", async (route) => {
+    if (route.request().method() === "PUT") return route.fulfill({ json: book });
+    const response = await route.fetch();
+    const body = await response.json();
+    book = { ...body, version: 1, book: { ...body.book, accounts: [{ id: "db-a", name: "TK thử", amount: "1000000", liquid: true }] } };
+    await route.fulfill({ json: book });
+  });
+  await page.goto("/profile?tab=tai-san");
+  const deposits = page.getByRole("region", { name: "Sổ tài sản" });
+  await deposits.getByRole("button", { name: "Sửa tài khoản 1" }).click();
+  await deposits.getByLabel("Mục đích tài khoản 1").selectOption({ label: "Quỹ mua nhà" });
+  await deposits.getByRole("button", { name: "Lưu" }).click();
+  await expect(deposits.getByRole("button", { name: "Sửa tài khoản 1" })).toBeVisible();  // the row is no longer being edited
+  await expect(deposits.getByRole("table", { name: "Tài khoản tiền mặt" }).getByRole("combobox")).toHaveCount(0);
+  await expect(deposits.getByRole("table", { name: "Tài khoản tiền mặt" })).toContainText("Quỹ mua nhà");
+  await expect.poll(async () => (await (await call(page, "GET", "money-purposes")).json()).data.tags["db-a"]).toBe("p-house");
+});

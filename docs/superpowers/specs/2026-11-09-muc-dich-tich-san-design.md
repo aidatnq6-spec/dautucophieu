@@ -7,6 +7,8 @@ Chủ sở hữu duyệt ngày 09/11/2026. Ở Hồ sơ & rủi ro. Dữ liệu 
 - Giá trị từng dòng lấy đúng như Sổ tài sản: sổ tiền gửi theo gốc, chứng chỉ quỹ theo NAV, vàng theo giá mua vào; dòng chưa có giá thì theo vốn đã mua và ghi rõ.
 - Hiện tổng theo mục đích, phần chưa gắn, tổng Sổ tài sản, phần xem như đã chi và phần còn lại là của mình. Chỉ tính các dòng trong Sổ tài sản; cổ phiếu và tiền trong tài khoản chứng khoán không thuộc phép tính này.
 
+- Dễ gắn hơn (chủ sở hữu duyệt 10/11/2026): ô Mục đích có “+ Tạo mục đích mới…”; chưa có mục đích thì hiện hướng dẫn; gợi ý tên bấm để tạo (Quỹ dự phòng, Quỹ mua nhà, Cho con, Đầu tư dài hạn), không tự tạo; mỗi bảng của Sổ tài sản có cột Mục đích, chọn khi sửa dòng; chọn nhiều dòng rồi gắn một lần; bật, tắt “tính là đã chi” ngay trên từng mục đích.
+
 ## Kế hoạch tích sản
 - Lưu ở `settings/accumulation`: các kế hoạch (vàng theo số chỉ mỗi tháng, chứng chỉ quỹ theo số tiền mỗi tháng; ngày 1 đến 28; tháng bắt đầu; loại giá vàng hoặc mã quỹ, không bắt buộc) và từng lần mua (ngày, tiền bỏ ra, số chỉ hoặc số đơn vị).
 - Mỗi tháng từ tháng bắt đầu là đã mua, thiếu, chưa mua, hoặc đang chờ (tháng hiện tại trước ngày mua); có chuỗi tháng liên tục.

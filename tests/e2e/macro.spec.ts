@@ -106,3 +106,14 @@ test("the rate cycle line says which rates it reads and waits for six months of 
   await expect(box).toContainText("chưa đủ 6 tháng dữ liệu Việt Nam");
   await expect(box).toContainText("không phải khuyến nghị");
 });
+
+test("the indicator table fits its box on a laptop screen and writes the day in full", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openMacro(page);
+  const table = page.getByRole("table", { name: "Chỉ số vĩ mô" });
+  const row = table.getByRole("row", { name: /Lợi suất trái phiếu 10 năm của Mỹ/ });
+  await expect(row).toContainText(/\d{2}\/\d{2}\/\d{4}/);
+  await expect(row).toContainText(/hôm nay|hôm qua|ngày trước/);
+  const [tableWidth, boxWidth] = await table.evaluate((t) => [t.scrollWidth, t.parentElement!.clientWidth]);
+  expect(tableWidth).toBeLessThanOrEqual(boxWidth);
+});

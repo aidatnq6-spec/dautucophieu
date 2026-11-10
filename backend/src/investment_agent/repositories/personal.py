@@ -17,8 +17,9 @@ from investment_agent.api.auth import OwnerContext
 COLLECTIONS = frozenset({"profile_versions", "risk_versions", "ledger_events", "approvals", "valuation_assumptions", "reports", "settings", "journal"})
 T = TypeVar("T")
 
-# Reads already made during the current request, keyed by (owner, collection, record id, version). Each Firestore read is a
-# transaction (~0.3 s), and one page view asks for the same records many times. Only active inside read_scope(); cleared by writes.
+# Reads already made during the current request, keyed by (owner, collection, record id, version). One page view asks for the same
+# records many times. Only active inside read_scope(); cleared by writes.
+REVISIONS_KEPT = 5000  # revisions never change once written: the ones seen are kept in memory and not fetched again
 _REQUEST_READS: ContextVar[dict | None] = ContextVar("personal_request_reads", default=None)
 
 
@@ -36,7 +37,18 @@ def prefetch(repo, context, records) -> None:
     """Read several records at once (in parallel) into the current request's reads; a no-op outside read_scope().
 
     Errors are left for the later, real read to raise where it is handled."""
-    if _REQUEST_READS.get() is None or not records:
+    reads = _REQUEST_READS.get()
+    if reads is None or not records:
+        return
+    if hasattr(repo, "read_many") and hasattr(getattr(repo, "store", None), "get_many"):
+        new = [(c, r) for c, r in records if (repo.owner_uid, c, r, None) not in reads]  # already read in this request
+        if not new:
+            return
+        try:
+            for (collection, record_id), record in repo.read_many(context, new).items():
+                reads[(repo.owner_uid, collection, record_id, None)] = deepcopy(record)
+        except Exception:  # noqa: BLE001 - the caller's own read reports it
+            pass
         return
 
     def one(record):
@@ -163,12 +175,21 @@ class MemoryDocumentStore:
                 raise RepositoryUnavailable("Personal repository unavailable")
             return {p: deepcopy(d) for p, d in self.documents.items() if p.startswith(prefix)}
 
+    def get_many(self, paths):
+        """Several documents in one round trip, outside a transaction; a missing one is None."""
+        with self._lock:
+            if not self.available:
+                raise RepositoryUnavailable("Personal repository unavailable")
+            return {p: deepcopy(self.documents.get(p)) for p in paths}
+
 
 class PersonalRepository:
     def __init__(self, owner_uid: str, store: DocumentStore, *, clock=utc_now):
         if not owner_uid or len(owner_uid) > 128 or "/" in owner_uid or any(ord(c) < 32 for c in owner_uid):
             raise InvalidRecord("Invalid configured owner")
         self.owner_uid, self.store, self.clock = owner_uid, store, clock
+        self._revisions: dict[str, dict] = {}
+        self._revisions_lock = RLock()
 
     def authorize(self, context: OwnerContext):
         if not isinstance(context, OwnerContext) or context.uid != self.owner_uid or context.role != "owner":
@@ -181,7 +202,9 @@ class PersonalRepository:
 
     def _record(self, tx, collection, record_id, version):
         path = f"owners/{self.owner_uid}/{collection}/{self.key(collection, record_id)}-v{version}"
-        data = tx.read(path)
+        return self._check(tx.read(path), collection, record_id, version)
+
+    def _check(self, data, collection, record_id, version):
         if not data:
             raise RepositoryUnavailable("Personal revision missing")
         record = PersonalRecord(**data)
@@ -189,11 +212,60 @@ class PersonalRepository:
             raise RepositoryUnavailable("Personal revision inconsistent")
         return record
 
+    def read_many(self, context, records, *, versions=None) -> dict:
+        """(collection, record_id) → the current record, or None. The heads come in one round trip and the revisions not seen before in
+        another; no transaction is needed, because a head only ever names a revision written with it and revisions never change.
+        versions: (collection, record_id) → an older version to read instead of the current one."""
+        self.authorize(context)
+        versions = versions or {}
+        wanted = list(dict.fromkeys((c, r) for c, r in records))
+        keys = {item: self.key(*item) for item in wanted}
+        for item, v in versions.items():
+            if type(v) is not int or v < 1:
+                raise InvalidRecord("Invalid revision")
+        heads = self.store.get_many([f"owners/{self.owner_uid}/record_heads/{keys[item]}" for item in wanted])
+        targets = {}
+        for item in wanted:
+            head = heads.get(f"owners/{self.owner_uid}/record_heads/{keys[item]}")
+            if head is None:
+                continue
+            current, asked = head["version"], versions.get(item)
+            if asked is not None and asked > current:
+                continue
+            targets[item] = (f"owners/{self.owner_uid}/{item[0]}/{keys[item]}-v{asked or current}", asked or current)
+        with self._revisions_lock:
+            known = {path: self._revisions[path] for path, _ in targets.values() if path in self._revisions}
+        missing = [path for path, _ in targets.values() if path not in known]
+        fetched = self.store.get_many(missing) if missing else {}
+        out = {}
+        for item in wanted:
+            if item not in targets:
+                out[item] = None
+                continue
+            path, version = targets[item]
+            data = known.get(path) or fetched.get(path)
+            out[item] = self._check(deepcopy(data), item[0], item[1], version)
+            if path not in known:
+                with self._revisions_lock:
+                    if len(self._revisions) >= REVISIONS_KEPT:
+                        self._revisions.pop(next(iter(self._revisions)))
+                    self._revisions[path] = deepcopy(data)
+        return out
+
     def read(self, context, collection, record_id, *, version=None):
         self.authorize(context)
         key = self.key(collection, record_id)
         if version is not None and (type(version) is not int or version < 1):
             raise InvalidRecord("Invalid revision")
+        reads = _REQUEST_READS.get()
+        memo = (self.owner_uid, collection, record_id, version)
+        if hasattr(self.store, "get_many"):
+            if reads is not None and memo in reads:
+                return deepcopy(reads[memo])
+            record = self.read_many(context, [(collection, record_id)], versions={(collection, record_id): version} if version else None)[(collection, record_id)]
+            if reads is not None:
+                reads[memo] = deepcopy(record)
+            return record
 
         def operation(tx):
             head = tx.read(f"owners/{self.owner_uid}/record_heads/{key}")

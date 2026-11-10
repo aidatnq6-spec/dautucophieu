@@ -46,6 +46,18 @@ class FirestoreDocumentStore:
             raise RepositoryUnavailable("Personal repository unavailable") from None
         return {p: d for p, d in out.items() if p.startswith(prefix)}
 
+    def get_many(self, paths):
+        """Several documents in one batch read, outside a transaction (heads and immutable revisions need none); a missing one is None."""
+        out = {path: None for path in paths}
+        try:
+            for start in range(0, len(paths), 300):
+                for snapshot in self.client.get_all([self.client.document(p) for p in paths[start:start + 300]], retry=None, timeout=10):
+                    if snapshot.exists:
+                        out[snapshot.reference.path] = snapshot.to_dict()
+        except (GoogleAPICallError, RetryError, GoogleAuthError):
+            raise RepositoryUnavailable("Personal repository unavailable") from None
+        return out
+
     def atomic(self, operation):
         @firestore.transactional
         def execute(transaction):

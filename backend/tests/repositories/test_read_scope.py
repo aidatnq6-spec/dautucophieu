@@ -5,7 +5,7 @@ OWNER = OwnerContext("owner-1", "owner", "test")
 
 
 class CountingStore(MemoryDocumentStore):
-    """Counts round trips: each atomic() is one Firestore transaction in production."""
+    """Counts round trips: a transaction or a batch read (heads, then revisions not seen before)."""
 
     def __init__(self):
         super().__init__()
@@ -14,6 +14,10 @@ class CountingStore(MemoryDocumentStore):
     def atomic(self, operation):
         self.trips += 1
         return super().atomic(operation)
+
+    def get_many(self, paths):
+        self.trips += 1
+        return super().get_many(paths)
 
 
 def repo_with(*records):
@@ -29,7 +33,7 @@ def test_outside_a_request_every_read_goes_to_the_store():
     repo, store = repo_with(("settings", "portfolio"))
     repo.read(OWNER, "settings", "portfolio")
     repo.read(OWNER, "settings", "portfolio")
-    assert store.trips == 2
+    assert store.trips == 3  # head and revision, then the head again: the revision never changes
 
 
 def test_within_a_request_a_record_is_read_once():
@@ -40,7 +44,7 @@ def test_within_a_request_a_record_is_read_once():
         repo.read(OWNER, "journal", "main")
         repo.read(OWNER, "settings", "missing")
         repo.read(OWNER, "settings", "missing")
-    assert store.trips == 3 and again.payload == first.payload
+    assert store.trips == 5 and again.payload == first.payload  # 2 + 2 + the missing head once
 
 
 def test_a_write_in_the_request_makes_the_next_read_fresh():
@@ -57,7 +61,7 @@ def test_reads_do_not_leak_between_requests():
         repo.read(OWNER, "settings", "portfolio")
     with read_scope():
         repo.read(OWNER, "settings", "portfolio")
-    assert store.trips == 2
+    assert store.trips == 3  # the second request asks for the head again
 
 
 def test_prefetch_loads_several_records_together_for_the_rest_of_the_request():
@@ -67,7 +71,7 @@ def test_prefetch_loads_several_records_together_for_the_rest_of_the_request():
         before = store.trips
         repo.read(OWNER, "journal", "main")
         repo.read(OWNER, "settings", "missing")
-    assert before == 4 and store.trips == 4
+    assert before == 2 and store.trips == 2
 
 
 def test_prefetch_outside_a_request_does_nothing():

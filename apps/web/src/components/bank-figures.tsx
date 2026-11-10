@@ -33,6 +33,19 @@ export function flagText(code: string, t: Trend): string {
     default: return code;
   }
 }
+/** The quarter to type next: the last one that has ended, or the latest earlier one not saved yet (up to two years back). */
+export function quarterToEnter(today: Date, saved: string[]): string {
+  let year = today.getFullYear(), q = Math.floor(today.getMonth() / 3);  // the quarter before the current one (0 = Q4 of last year)
+  if (q === 0) { year -= 1; q = 4; }
+  const first = `${year}-Q${q}`;
+  for (let i = 0; i < 8; i++) {
+    const label = `${year}-Q${q}`;
+    if (!saved.includes(label)) return label;
+    if (--q === 0) { year -= 1; q = 4; }
+  }
+  return first;
+}
+
 const blank = () => Object.fromEntries(FIELDS.map((f) => [f, ""])) as Record<Field, string>;
 const toInput = (v: string | null) => (v ?? "").replace(".", ",");
 /** Typed number to a plain decimal: "537.304,578" (Vietnamese), "537.304" (thousands) and "537304.578" (decimal point) all read right. */
@@ -61,7 +74,7 @@ export function BankFigures({ symbol }: { symbol: string }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => {
-    api<View>(`bank-figures/${encodeURIComponent(symbol)}`).then(setView, (e) => {
+    api<View>(`bank-figures/${encodeURIComponent(symbol)}`).then((v) => { setView(v); setQuarter(quarterToEnter(new Date(), v.quarters.map((q) => q.quarter))); }, (e) => {
       if (e instanceof ApiError && e.failure.code === "not_a_watched_bank") setHidden(true); else setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải.");
     });
   }, [symbol]);
@@ -97,10 +110,11 @@ export function BankFigures({ symbol }: { symbol: string }) {
     if (!view) return;
     if (!/^\d{4}-Q[1-4]$/.test(quarter.trim())) { setMessage("Nhập quý theo dạng 2026-Q3."); return; }
     try {
-      setView(await api<View>(`bank-figures/${encodeURIComponent(symbol)}/${quarter.trim()}`, { method: "PUT",
+      const next = await api<View>(`bank-figures/${encodeURIComponent(symbol)}/${quarter.trim()}`, { method: "PUT",
         body: { values: Object.fromEntries(FIELDS.map((f) => [f, values[f].trim() ? fromInput(values[f]) : null])), source,
-          expected_version: view.version, request_id: requestId() } }));
-      setQuarter(""); setValues(blank()); setSource({ kind: "manual" }); setRead(null); setFromImage(new Set()); setUrl(""); setMessage(null);
+          expected_version: view.version, request_id: requestId() } });
+      setView(next);
+      setQuarter(quarterToEnter(new Date(), next.quarters.map((q) => q.quarter))); setValues(blank()); setSource({ kind: "manual" }); setRead(null); setFromImage(new Set()); setUrl(""); setMessage(null);
     } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); }
   }
   async function remove(q: string) {
@@ -131,6 +145,11 @@ export function BankFigures({ symbol }: { symbol: string }) {
             <button type="button" className="btn" aria-label={`Xóa ${q.quarter}`} onClick={() => void remove(q.quarter)}><Trash2 size={14} aria-hidden="true" />Xóa</button></td>
         </tr>)}</tbody>
       </table>}
+      {view && view.quarters.length === 0 && <div className="bf-quality" data-testid="bank-quality">
+        <h3>Chất lượng tài sản</h3>
+        <p className="caption">Chưa có quý nào. Nhập và lưu quý gần nhất ở dưới (ô Quý đã điền sẵn) để xem tỷ lệ bao phủ nợ xấu; lưu thêm quý liền trước để phần mềm so và chỉ ra
+          dấu hiệu cần xem kỹ: bao phủ giảm, nợ nhóm 2 tăng vọt, dự phòng không theo kịp, lãi phải thu hay dư nợ bất động sản tăng nhanh.</p>
+      </div>}
       {view && view.quarters[0]?.trend && <div className="bf-quality" data-testid="bank-quality">
         <h3>Chất lượng tài sản {view.quarters[0].quarter}</h3>
         {view.quarters[0].trend.flags.length === 0

@@ -7,6 +7,7 @@ Firestore là nguồn sự thật; SQLite chỉ lưu bản sao có thể bỏ đ
 `PersonalRepository(owner_uid, store)` yêu cầu `OwnerContext` đã được middleware Task 6 xác minh; kiểm tra UID cấu hình và role owner trước mọi truy cập store/cache. Admin SDK bỏ qua Firestore Rules nên kiểm tra này là bắt buộc.
 
 - `read(context, collection, record_id, version=None)`: đọc phiên bản hiện tại hoặc revision lịch sử; không có record/version trả None.
+- `read_many(context, records)`: đọc nhiều record trong hai lượt gọi (các head, rồi các revision chưa có trong bộ nhớ), không cần transaction: head chỉ trỏ tới revision được ghi cùng transaction với nó và revision không bao giờ đổi. Revision đã đọc được giữ trong bộ nhớ tiến trình (tối đa 5.000); head luôn đọc lại nên không bỏ sót phiên bản mới. `read` và `prefetch` dùng cách này; ghi và `require_current` vẫn dùng transaction.
 - `write(..., expected_version, request_id)`: tạo revision bất biến. Lần đầu dùng expected_version=0. Sai phiên bản trả VersionConflict; request_id trùng với cùng nội dung trả revision đã commit, kể cả khi đã có revision mới hơn. Cùng request_id khác record/payload/expected_version trả IdempotencyConflict.
 - `require_current(context, versions)`: đọc các head trong cùng transaction và so sánh đúng phiên bản đầu vào. Không dùng cache. Đây là kiểm tra tại thời điểm đọc, **không phải khóa publish**; Task 26 phải kiểm tra phiên bản trong chính transaction publish để tránh thay đổi giữa kiểm tra và ghi báo cáo.
 

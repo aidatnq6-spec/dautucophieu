@@ -63,3 +63,32 @@ def test_production_factory_rejects_emulator_configuration(monkeypatch):
     monkeypatch.setenv("FIRESTORE_EMULATOR_HOST", "127.0.0.1:8080")
     with pytest.raises(RepositoryUnavailable, match="rejects emulator"):
         personal_repository_from_env()
+
+
+def test_get_many_reads_documents_in_one_batch_outside_a_transaction():
+    client = MagicMock()
+    stored = {"owners/o/a": {"v": 1}}
+
+    def document(path):
+        ref = MagicMock()
+        ref.path = path
+        return ref
+    client.document.side_effect = document
+
+    def get_all(refs, **kwargs):
+        for ref in refs:
+            snap = MagicMock()
+            snap.reference.path, snap.exists = ref.path, ref.path in stored
+            snap.to_dict.return_value = stored.get(ref.path)
+            yield snap
+    client.get_all.side_effect = get_all
+    assert FirestoreDocumentStore(client).get_many(["owners/o/a", "owners/o/b"]) == {"owners/o/a": {"v": 1}, "owners/o/b": None}
+    assert client.get_all.call_count == 1 and not client.transaction.called
+
+
+def test_get_many_failure_has_safe_message():
+    client = MagicMock()
+    client.get_all.side_effect = ServiceUnavailable("SECRET private payload")
+    with pytest.raises(RepositoryUnavailable, match="Personal repository unavailable") as error:
+        FirestoreDocumentStore(client).get_many(["owners/o/a"])
+    assert "SECRET" not in str(error.value)

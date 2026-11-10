@@ -368,3 +368,17 @@ test("a bank's asset quality names the warning signs of its latest quarter", asy
     await call(page, "POST", `bank-figures/VCB/${q}/delete`, { expected_version: now.version, request_id: `bq-del-${q}-${Date.now()}` });
   }
 });
+
+test("a bank with no saved quarter explains the asset quality block and fills in the quarter to enter", async ({ page }) => {
+  await page.route("**/api/internal/bank-figures/VCB", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    try {
+      const response = await route.fetch();
+      await route.fulfill({ response, json: { ...(await response.json()), quarters: [] } });  // the e2e store persists: shown as if none were saved
+    } catch { /* the page moved on */ }
+  });
+  await page.goto("/research/VCB");
+  const box = page.getByRole("region", { name: "Số liệu ngân hàng" });
+  await expect(box.getByTestId("bank-quality")).toContainText("Chưa có quý nào");
+  await expect(box.getByLabel("Quý")).toHaveValue(/^\d{4}-Q[1-4]$/);
+});

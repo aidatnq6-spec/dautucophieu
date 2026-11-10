@@ -15,6 +15,7 @@ from .routes.concentration import router as concentration_router
 from .routes.contributions import router as contributions_router
 from .routes.corporate import router as corporate_router
 from .routes.accumulation import router as accumulation_router
+from .routes.cashflow import router as cashflow_router
 from .routes.cycle_targets import router as cycle_targets_router
 from .routes.money_purposes import router as money_purposes_router
 from .routes.deposit_book import router as deposit_book_router
@@ -58,6 +59,9 @@ from .routes.watchlist import router as watchlist_router
 from .routes.wealth_check import router as wealth_check_router
 
 
+UPLOAD_PATH, UPLOAD_LIMIT = "/internal/cashflow/import", 9_000_000  # a spending workbook with pictures, sent as base64
+
+
 def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[[], float] = time.time, personal_repository=None,
                market=None, jobs=None, outbox=None, telegram=None, deliveries=None, data_dir=None) -> FastAPI:
     """personal_repository None keeps personal routes fail-closed (503)."""
@@ -82,7 +86,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
         try:
             if request.url.path != "/health" or request.method != "GET":
                 body = await request.body()
-                if len(body) > 1_048_576:
+                if len(body) > (UPLOAD_LIMIT if request.url.path == UPLOAD_PATH else 1_048_576):
                     return JSONResponse({"code": "request_too_large", "message": "Yêu cầu quá lớn."}, status_code=413, headers={"Cache-Control": "no-store"})
                 request.state.owner = authenticator.verify(request, body)
             with read_scope():  # each personal record is read from Firestore at most once per request
@@ -120,6 +124,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(deposit_book_router)
     app.include_router(cycle_targets_router)
     app.include_router(accumulation_router)
+    app.include_router(cashflow_router)
     app.include_router(money_purposes_router)
     app.include_router(property_book_router)
     app.include_router(glance_router)

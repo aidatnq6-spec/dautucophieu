@@ -13,6 +13,7 @@ from investment_agent.domain.models import ContractModel
 from investment_agent.domain.wealth_check import wealth_check
 from investment_agent.market.leading import MacroStore
 from investment_agent.repositories.personal import RepositoryUnavailable
+from investment_agent.services.cashflow import RECORD as CASHFLOW, lifestyle_history
 from investment_agent.services.records import read_version
 
 from ..auth import require_owner
@@ -37,12 +38,15 @@ def _cpi(request: Request) -> str | None:
     return points[-1]["value"] if points else None
 
 
-def _view(request: Request, record) -> dict:
+def _view(request: Request, record, imported=None) -> dict:
+    """imported: Thu chi hằng tháng; its months stand for Lạm phát lối sống over the ones typed here."""
+    history = {**((record.payload.get("history") or {}) if record else {}), **lifestyle_history(imported.payload if imported else None)}
+    today = now(request).astimezone(VN).date()
+    lifestyle = lifestyle_inflation(history, cpi=_cpi(request), today=today) if history else None
     if record is None:
-        return {"version": 0, "inputs": None, "check": None, "lifestyle": None}
-    p, today = record.payload, now(request).astimezone(VN).date()
+        return {"version": 0, "inputs": None, "check": None, "lifestyle": lifestyle}
+    p = record.payload
     check = wealth_check(income=Decimal(p["income"]), expenses=Decimal(p["expenses"]), birth_year=p["birth_year"], today=today)
-    lifestyle = lifestyle_inflation(p.get("history") or {}, cpi=_cpi(request), today=today)
     return {"version": record.version, "inputs": p, "check": check, "lifestyle": lifestyle}
 
 
@@ -52,7 +56,7 @@ def get_wealth_check(request: Request):
     if repo is None:
         return unavailable()
     try:
-        return _view(request, read_version(repo, owner, *RECORD, None))
+        return _view(request, read_version(repo, owner, *RECORD, None), read_version(repo, owner, *CASHFLOW, None))
     except RepositoryUnavailable:
         return unavailable()
 
@@ -84,4 +88,7 @@ def put_wealth_check(request: Request, body: WealthRequest):
         record = repo.write(owner, *RECORD, payload, expected_version=body.expected_version, request_id=body.request_id)
     except WRITE_ERRORS as exc:
         return write_error(exc)
-    return _view(request, record)
+    try:
+        return _view(request, record, read_version(repo, owner, *CASHFLOW, None))
+    except RepositoryUnavailable:
+        return _view(request, record)

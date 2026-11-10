@@ -8,8 +8,8 @@ import { GrowthPath } from "./growth-path";
 type Result = { required: string; income_now: string | null; progress: string | null; months: number | null; reached_on: string | null; rate: string };
 type Income = { deposit: string; bond: string; dividends: string; stocks?: string; total: string; deposit_market_rate_count?: number;
   bond_default_rate_count?: number };
-type Level = { id: "safe" | "independent" | "freedom"; spending: string | null; without_rent: string | null; with_rent: string | null };
-type Levels = { rent: string; rent_missing: string[]; rows: Level[] };
+type Level = { id: "safe" | "independent" | "freedom"; spending: string | null; without_rent: string | null; with_rent: string | null; actual?: string | null };
+type Levels = { rent: string; rent_missing: string[]; rows: Level[]; actual?: string | null; actual_months?: string[] };
 type View = { version: number; levels?: Levels | null; goal: { target: string; rate: string | null; bond_rate: string; stock_rate?: string | null; independent?: string | null; freedom?: string | null } | null; default_rate: string | null; default_bond_rate: string;
   income: Income | null; result: Result | null; capital: string | null; contribution: string };
 
@@ -111,10 +111,11 @@ export function PassiveIncome({ refresh }: { refresh?: string } = {}) {
         <h3>Ba mức tự do tài chính</h3>
         <p className="caption">Dòng tiền thụ động hiện tại đạt bao nhiêu % chi tiêu mỗi mức. Mức an toàn là chi tiêu ở Sức khỏe tài chính, hai mức còn lại do bạn đặt. Tách riêng tiền thuê vì khoản này có thể không đều; tiền thuê ({formatVnd(view.levels.rent)}/tháng) chưa trừ chi phí và trả nợ.</p>
         <table className="fv-table" aria-label="Mức chi tiêu và dòng tiền đạt được">
-          <thead><tr><th>Mức</th><th className="num">Chi tiêu/tháng</th><th className="num">Không tính tiền thuê</th><th className="num">Có tiền thuê</th></tr></thead>
+          <thead><tr><th>Mức</th><th className="num">Chi tiêu/tháng</th><th className="num">Không tính tiền thuê</th><th className="num">Có tiền thuê</th>{view.levels.actual && <th className="num">Thực nhận</th>}</tr></thead>
           <tbody>{view.levels.rows.map((x) => <tr key={x.id}><td data-label="Mức">{LEVEL[x.id][0]}</td><td data-label="Chi tiêu" className="num">{x.spending === null ? LEVEL[x.id][1] : formatVnd(x.spending)}</td>
-            <td data-label="Không tính tiền thuê" className="num">{cover(x.without_rent)}</td><td data-label="Có tiền thuê" className="num">{cover(x.with_rent)}</td></tr>)}</tbody>
+            <td data-label="Không tính tiền thuê" className="num">{cover(x.without_rent)}</td><td data-label="Có tiền thuê" className="num">{cover(x.with_rent)}</td>{view.levels!.actual && <td data-label="Thực nhận" className="num">{cover(x.actual ?? null)}</td>}</tr>)}</tbody>
         </table>
+        {view.levels.actual && <p className="caption" data-testid="pi-actual">Thực nhận: trung bình {formatVnd(view.levels.actual)}/tháng thu nhập trả đều (tiền thuê, lãi tiền gửi, trái phiếu) trong {view.levels.actual_months?.length} tháng gần nhất ở Thu chi hằng tháng.</p>}
         {view.levels.rent_missing.length > 0 && <p className="notice">Chưa nhập tiền thuê nên chưa tính: {view.levels.rent_missing.join(", ")}.</p>}
       </section> : <p className="caption">Ba mức tự do tài chính: cần Tháp tài sản và lãi tiền gửi 12 tháng để tính dòng tiền hiện tại.</p>)}
       {r && (view!.capital

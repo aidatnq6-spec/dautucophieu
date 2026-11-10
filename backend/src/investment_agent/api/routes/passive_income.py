@@ -17,6 +17,7 @@ from investment_agent.domain.property_book import PropertyBook, rent_now
 from investment_agent.market.corporate_events import EventStore
 from investment_agent.market.leading import MacroStore
 from investment_agent.repositories.personal import RepositoryUnavailable
+from investment_agent.services.cashflow import RECORD as CASHFLOW, closed_months, passive_actual
 from investment_agent.services.contributions import PLAN as CONTRIBUTION_PLAN
 from investment_agent.services.deposit_book import book_quotes, read_book
 from investment_agent.services.equity_budget import budget_view
@@ -58,14 +59,17 @@ def dividends_last_year(data_dir, repo, owner, today) -> Decimal:
     return total
 
 
-def _levels(repo, owner, income: dict, goal: dict) -> dict:
+def _levels(repo, owner, income: dict, goal: dict, today) -> dict:
     """Mức an toàn is the spending entered at Sức khỏe tài chính; the other two are the owner's own."""
     wealth = read_version(repo, owner, *WEALTH_CHECK, None)
     stored = read_version(repo, owner, *PROPERTY_BOOK, None)
     rent, missing = rent_now(PropertyBook.model_validate(stored.payload) if stored else PropertyBook())
     amount = lambda key: Decimal(goal[key]) if goal.get(key) else None  # noqa: E731
+    imported = read_version(repo, owner, *CASHFLOW, None)
+    actual = passive_actual(imported.payload if imported else None, today=today)  # paid regularly, as written in Thu chi hằng tháng
     return {**freedom_levels(income=Decimal(income["total"]), rent=rent, safe=Decimal(wealth.payload["expenses"]) if wealth else None,
-                             independent=amount("independent"), freedom=amount("freedom")), "rent_missing": missing}
+                             independent=amount("independent"), freedom=amount("freedom"), actual=Decimal(actual) if actual else None), "rent_missing": missing,
+            "actual": actual, "actual_months": closed_months(imported.payload, today) if imported and actual else []}
 
 
 def _view(request: Request, repo, owner) -> dict:
@@ -106,7 +110,7 @@ def _view(request: Request, repo, owner) -> dict:
                                        today=today, income_now=Decimal(income["total"]) if income else None), "rate": rate}
     goal = {**record.payload, "bond_rate": record.payload.get("bond_rate") or BOND_RATE} if record else None
     return {"version": record.version if record else 0, "goal": goal, "default_rate": default_rate, "default_bond_rate": BOND_RATE,
-            "income": income, "levels": _levels(repo, owner, income, record.payload if record else {}) if income else None, "result": result, "capital": format(capital, "f") if capital is not None else None, "contribution": format(contribution, "f")}
+            "income": income, "levels": _levels(repo, owner, income, record.payload if record else {}, today) if income else None, "result": result, "capital": format(capital, "f") if capital is not None else None, "contribution": format(contribution, "f")}
 
 
 @router.get("/passive-income")

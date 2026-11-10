@@ -41,6 +41,7 @@ export function MoneyPurposes({ refresh, onChanged }: { refresh: number; onChang
   const [given, setGiven] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const [bulk, setBulk] = useState("");
+  const [bulkAsked, setBulkAsked] = useState(false);  // the button was pressed with no purpose chosen
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => { api<PurposesView>("money-purposes").then(setView, (e) => setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, [refresh]);
@@ -73,7 +74,9 @@ export function MoneyPurposes({ refresh, onChanged }: { refresh: number; onChang
     void put(created ? [...view.data.purposes, created] : view.data.purposes, tags);
   }
   async function tagPicked() {
-    if (!view || !picked.length || !bulk) return;
+    if (!view || !picked.length) return;
+    if (!bulk) { setBulkAsked(true); return; }
+    setBulkAsked(false);
     const ids = picked;
     tagAll(ids, bulk);
     setPicked([]);
@@ -114,9 +117,10 @@ export function MoneyPurposes({ refresh, onChanged }: { refresh: number; onChang
       {view && (view.rows.length === 0 ? <p className="muted">Sổ tài sản chưa có dòng nào.</p> : <>
         <div className="mp-bulk">
           <label className="field">Mục đích cho các khoản đã chọn
-            <select value={bulk} disabled={busy || purposes.length === 0} onChange={(e) => setBulk(e.target.value)}><option value="">Chọn mục đích</option>{purposes.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-          <button type="button" className="btn" disabled={busy || !bulk || picked.length === 0} onClick={() => void tagPicked()}><Tags size={14} aria-hidden="true" />Gắn cho {picked.length} khoản</button>
+            <select value={bulk} disabled={busy || purposes.length === 0} onChange={(e) => { setBulk(e.target.value); setBulkAsked(false); }}><option value="">Chọn mục đích</option>{purposes.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+          <button type="button" className="btn" disabled={busy || picked.length === 0} onClick={() => void tagPicked()}><Tags size={14} aria-hidden="true" />Gắn cho {picked.length} khoản</button>
         </div>
+        {picked.length > 0 && !bulk && <p className={bulkAsked ? "errors" : "caption"} role={bulkAsked ? "alert" : undefined} data-testid="mp-bulk-note">Chọn mục đích ở ô bên trái trước, rồi bấm Gắn cho {picked.length} khoản. Ô Mục đích ở từng dòng chỉ đổi riêng dòng đó.</p>}
         <table className="fv-table" aria-label="Gắn mục đích cho từng khoản">
           <thead><tr><th><input type="checkbox" aria-label="Chọn tất cả" checked={allPicked} onChange={(e) => setPicked(e.target.checked ? view.rows.map((r) => r.id) : [])} /></th><th>Khoản</th><th>Loại</th><th className="num">Giá trị</th><th>Mục đích</th></tr></thead>
           <tbody>{view.rows.map((r) => <tr key={r.id}>

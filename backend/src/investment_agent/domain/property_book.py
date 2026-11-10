@@ -78,15 +78,40 @@ class Policy(ContractModel):
         return self
 
 
+class Venture(ContractModel):
+    """Góp vốn và đầu tư riêng: a share put into something with others, or a holiday right. contributed: what the owner put in; value: their own
+    estimate of their part today. A holiday right counts only when the owner values it, since it can rarely be sold."""
+    id: str = Field(pattern=_ID)
+    name: str = Field(min_length=1, max_length=80, pattern=r"\S")
+    kind: Literal["rent_share", "resort", "holiday_right", "other"]
+    partners: str | None = Field(default=None, max_length=80)
+    contributed: UnsignedAmount | None = None
+    contributed_on: date | None = None
+    share: Decimal | None = Field(default=None, gt=0, le=100, allow_inf_nan=False)  # percent owned, when known
+    value: UnsignedAmount | None = None
+    valued_on: date | None = None
+    papers: Literal["notarized", "handwritten", "none"]
+    term_note: str | None = Field(default=None, max_length=120)
+    annual_fee: UnsignedAmount | None = None
+    fee_due: date | None = None  # any one date the yearly fee is due
+    ends: date | None = None
+
+    _whole_amounts = field_validator("contributed", "value", "annual_fee")(_whole)
+
+
+PROPERTY_SHARES = ("rent_share", "resort")
+
+
 class PropertyBook(ContractModel):
     properties: tuple[Property, ...] = Field(default=(), max_length=30)
     loans: tuple[Loan, ...] = Field(default=(), max_length=30)
     policies: tuple[Policy, ...] = Field(default=(), max_length=30)
+    ventures: tuple[Venture, ...] = Field(default=(), max_length=30)
     ceiling: Decimal = Field(default=Decimal(70), gt=0, le=100, allow_inf_nan=False)  # percent of all assets; the owner's own warning line
 
     @model_validator(mode="after")
     def _consistent(self):
-        if any(n > 1 for n in Counter(x.id for x in (*self.properties, *self.loans, *self.policies)).values()):
+        if any(n > 1 for n in Counter(x.id for x in (*self.properties, *self.loans, *self.policies, *self.ventures)).values()):
             raise ValueError("row ids must be unique")
         known = {p.id for p in self.properties}
         if any(x.collateral is not None and x.collateral not in known for x in self.loans):
@@ -128,18 +153,26 @@ def _add_months(day: date, months: int) -> date:
     return date(year, month, min(day.day, calendar.monthrange(year, month)[1]))
 
 
+def _next_on(anchor: date | None, step: int, today: date, ends: date | None) -> date | None:
+    if anchor is None:
+        return None
+    k = ((today.year - anchor.year) * 12 + today.month - anchor.month) // step - 1
+    while _add_months(anchor, k * step) < today:
+        k += 1
+    while _add_months(anchor, (k - 1) * step) >= today:
+        k -= 1
+    due = _add_months(anchor, k * step)
+    return None if ends is not None and due > ends else due
+
+
 def next_due(policy: Policy, today: date) -> date | None:
     """The first premium date on or after today, counted from due_on in steps of the period; None without a date or once the policy has ended."""
-    if policy.due_on is None:
-        return None
-    step = FREQ_MONTHS[policy.frequency]
-    k = ((today.year - policy.due_on.year) * 12 + today.month - policy.due_on.month) // step - 1
-    while _add_months(policy.due_on, k * step) < today:
-        k += 1
-    while _add_months(policy.due_on, (k - 1) * step) >= today:
-        k -= 1
-    due = _add_months(policy.due_on, k * step)
-    return None if policy.matures is not None and due > policy.matures else due
+    return _next_on(policy.due_on, FREQ_MONTHS[policy.frequency], today, policy.matures)
+
+
+def next_fee(venture: Venture, today: date) -> date | None:
+    """The next yearly fee date on or after today; None without a date or once the right has ended."""
+    return _next_on(venture.fee_due, 12, today, venture.ends)
 
 
 def picture(book: PropertyBook, *, financial: Decimal | None, today: date) -> dict:
@@ -161,7 +194,14 @@ def picture(book: PropertyBook, *, financial: Decimal | None, today: date) -> di
     insurance = sum((v for v in held.values() if v is not None), Decimal(0))
     insurance_missing = [p.name for p in life if held[p.id] is None]
     yearly = sum((p.premium * 12 / FREQ_MONTHS[p.frequency] for p in book.policies if p.premium is not None), Decimal(0))
-    complete = financial is not None and not property_missing and not debt_missing and not insurance_missing
+    counted = [v for v in book.ventures if v.kind != "holiday_right" or v.value is not None]
+    worth = {v.id: v.value if v.value is not None else v.contributed for v in counted}
+    ventures = sum((w for w in worth.values() if w is not None), Decimal(0))
+    shares = [v for v in counted if v.kind in PROPERTY_SHARES and worth[v.id] is not None]
+    vprop = sum((worth[v.id] for v in shares), Decimal(0))
+    vunclear = sum((worth[v.id] for v in shares if v.papers != "notarized"), Decimal(0))
+    ventures_missing = [v.name for v in counted if worth[v.id] is None]
+    complete = financial is not None and not property_missing and not debt_missing and not insurance_missing and not ventures_missing
     out = {"financial": _s(financial) if financial is not None else None, "property_total": _s(property_total), "property_missing": property_missing,
            "stale": [p.name for p in book.properties if p.valued_on is None or p.valued_on < limit], "debt": _s(debt), "debt_missing": debt_missing,
            "payments": _s(paid), "payments_missing": payments_missing, "rent": _s(rent), "rent_less_payments": _s(rent - paid) if not payments_missing else None,
@@ -172,17 +212,25 @@ def picture(book: PropertyBook, *, financial: Decimal | None, today: date) -> di
            "premiums_yearly": _s(yearly.quantize(Decimal(1), ROUND_HALF_UP)), "premiums_missing": [p.name for p in book.policies if p.premium is None],
            "policy_due": {p.id: (d.isoformat() if (d := next_due(p, today)) else None) for p in book.policies},
            "insurance_share": None, "insurance_of_invest": None,
+           "ventures": _s(ventures), "ventures_missing": ventures_missing, "ventures_at_cost": [v.name for v in counted if v.value is None and v.contributed is not None],
+           "ventures_excluded": [v.name for v in book.ventures if v.kind == "holiday_right" and v.value is None],
+           "ventures_unpapered": [v.name for v in book.ventures if v.papers != "notarized"],
+           "ventures_stale": [v.name for v in counted if v.value is not None and (v.valued_on is None or v.valued_on < limit)],
+           "venture_fees_yearly": _s(sum((v.annual_fee for v in book.ventures if v.annual_fee is not None), Decimal(0))),
+           "venture_due": {v.id: (d.isoformat() if (d := next_fee(v, today)) else None) for v in book.ventures},
+           "ventures_share": None, "ventures_of_invest": None,
            "yields": {p.id: _ratio(p.rent_monthly * 12, p.value) if p.rent_monthly is not None and p.value else None for p in book.properties},
            "live_total": None, "invest_total": None, "invest_property_total": None, "live_share": None, "invest_share": None, "invest_property_of_invest": None, "financial_of_invest": None,
            "total_assets": None, "net_worth": None, "liquid_share": None, "clear_share": None, "unclear_share": None, "property_share": None, "debt_ratio": None, "over": False}
     if complete:
-        total = financial + property_total + insurance
+        total = financial + property_total + insurance + ventures
         live = sum((p.value for p in valued if p.purpose == "live"), Decimal(0))
         invest = total - live
         out |= {"live_total": _s(live), "invest_total": _s(invest), "invest_property_total": _s(property_total - live), "live_share": _ratio(live, total), "invest_share": _ratio(invest, total),
                 "invest_property_of_invest": _ratio(property_total - live, invest), "financial_of_invest": _ratio(financial, invest),
-                "insurance_share": _ratio(insurance, total), "insurance_of_invest": _ratio(insurance, invest)}
-        out |= {"total_assets": _s(total), "net_worth": _s(total - debt), "liquid_share": _ratio(financial, total), "clear_share": _ratio(property_total - unclear, total),
-                "unclear_share": _ratio(unclear, total), "property_share": _ratio(property_total, total), "debt_ratio": _ratio(debt, total),
-                "over": bool(total) and property_total / total * 100 > book.ceiling}
+                "insurance_share": _ratio(insurance, total), "insurance_of_invest": _ratio(insurance, invest),
+                "ventures_share": _ratio(ventures, total), "ventures_of_invest": _ratio(ventures, invest)}
+        out |= {"total_assets": _s(total), "net_worth": _s(total - debt), "liquid_share": _ratio(financial, total), "clear_share": _ratio(property_total - unclear + vprop - vunclear, total),
+                "unclear_share": _ratio(unclear + vunclear, total), "property_share": _ratio(property_total + vprop, total), "debt_ratio": _ratio(debt, total),
+                "over": bool(total) and (property_total + vprop) / total * 100 > book.ceiling}
     return out

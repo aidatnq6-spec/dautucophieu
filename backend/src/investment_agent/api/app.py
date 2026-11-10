@@ -190,6 +190,12 @@ if __name__ == "__main__":
         market = StoreMarket(PriceStore(data_dir), load_calendar(calendar_path), today=hanoi_today)
     deliveries = DeliveryStore(data_dir / "deliveries.sqlite")  # also the report outbox
     token = Settings.from_env().telegram_bot_token
+    try:  # open the main pages once the app is up, and keep the Firestore connection open (best effort)
+        from .auth import InternalAuthSettings
+        from .warmup import start as start_warmup
+        start_warmup(InternalAuthSettings.from_env(), repository)
+    except ValueError:
+        pass  # internal secrets missing: the routes refuse every request anyway
     uvicorn.run(create_app(personal_repository=repository, market=market, jobs=JobStore(data_dir / "jobs.sqlite"), outbox=deliveries,
                            deliveries=deliveries, data_dir=data_dir,
                            telegram=TelegramSender(token, client=httpx.Client()) if token else None),

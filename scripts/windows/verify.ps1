@@ -1,10 +1,18 @@
 ﻿# Run every automated check and print one result line per check. Exit 1 when any check fails.
-# Synthetic data only; live sources, Telegram and AI are never contacted.
+# Synthetic data only; live sources, Telegram and AI are never contacted. The dependency audit asks the public vulnerability
+# databases (PyPI/OSV, npm) about package names and versions only.
 . (Join-Path $PSScriptRoot 'common.ps1')
 $python = Get-RepoPython
 $web = Join-Path $script:RepoRoot 'apps\web'
 $checks = [ordered]@{
     'backend pytest'  = { & $python -m pytest (Join-Path $script:RepoRoot 'backend\tests') -q -p no:warnings }
+    'dependency audit' = {
+        # Locked Python packages (any known vulnerability) and the web app's runtime packages (high or critical).
+        & $python -m pip_audit -r (Join-Path $script:RepoRoot 'backend\requirements.lock') --no-deps --disable-pip --progress-spinner off
+        $py = $LASTEXITCODE
+        npm.cmd --prefix $web audit --omit=dev --audit-level=high
+        $global:LASTEXITCODE = [int](($py -ne 0) -or ($LASTEXITCODE -ne 0))
+    }
     'web typecheck'   = { npm.cmd --prefix $web run typecheck }
     'web lint'        = { npm.cmd --prefix $web run lint }
     'web unit tests'  = { npm.cmd --prefix $web run test -- --run }

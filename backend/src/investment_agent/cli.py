@@ -386,19 +386,34 @@ def trend_run(data_dir: Path, calendar_path: Path, now=None, provider=None, get=
     return 1 if result.get("errors") else 0
 
 
-def macro_sync(data_dir: Path, get=None) -> int:
-    """Exit 0 when every automatic indicator updated, 1 when some failed (each is reported)."""
+MACRO_TIMEOUTS = ("error:ReadTimeout", "error:ConnectTimeout", "error:WriteTimeout", "error:PoolTimeout")
+MACRO_SLOW_PAUSE = 30  # seconds before asking a slow source again
+MACRO_SLOW_TIMEOUT = 90
+
+
+def macro_sync(data_dir: Path, get=None, slow_get=None, sleep=None) -> int:
+    """Exit 0 when every automatic indicator updated, 1 when some failed (each is reported). Indicators whose source timed out are
+    asked once more after a pause, with a longer wait (stockbiz is often slow)."""
+    import time
     from investment_agent.market.leading import MacroStore, fetch_auto, fetch_commodities, fetch_factors, load_indicators
-    if get is None:
+
+    def fetcher(timeout):
         import httpx
 
-        def get(url):
-            response = httpx.get(url, timeout=30, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+        def fetch(url):
+            response = httpx.get(url, timeout=timeout, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
             response.raise_for_status()
             return response.text
-    results = fetch_auto(load_indicators(), MacroStore(data_dir), get=get)
-    results.update(fetch_factors(MacroStore(data_dir), get=get))  # long oil and US dollar history for the sensitivity reading
-    results.update(fetch_commodities(MacroStore(data_dir), get=get))  # monthly world prices for Chuỗi giá trị
+        return fetch
+    get, slow_get, sleep = get or fetcher(30), slow_get or fetcher(MACRO_SLOW_TIMEOUT), sleep or time.sleep
+    indicators = load_indicators()
+    results = fetch_auto(indicators, MacroStore(data_dir), get=get, sleep=sleep)
+    results.update(fetch_factors(MacroStore(data_dir), get=get, sleep=sleep))  # long oil and US dollar history for the sensitivity reading
+    results.update(fetch_commodities(MacroStore(data_dir), get=get, sleep=sleep))  # monthly world prices for Chuỗi giá trị
+    slow = [i for i in indicators if results.get(i["id"]) in MACRO_TIMEOUTS]
+    if slow:
+        sleep(MACRO_SLOW_PAUSE)
+        results.update(fetch_auto(slow, MacroStore(data_dir), get=slow_get, sleep=sleep))
     failed = {k: v for k, v in results.items() if v != "ok"}
     print(json.dumps({"status": "ok" if not failed else "partial", "results": results}))
     return 0 if not failed else 1

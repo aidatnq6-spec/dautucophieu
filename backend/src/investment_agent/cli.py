@@ -99,7 +99,7 @@ def main() -> int:
     sectors.add_argument("--output", type=Path, required=True)
     deposits = commands.add_parser("deposit-alerts", help="Sổ tiết kiệm: Telegram once per sổ from the day before it matures")
     deposits.add_argument("--data-dir", type=Path, required=True)
-    loans = commands.add_parser("loan-alerts", help="Khoản vay: Telegram once per loan 90 days before its promotion ends")
+    loans = commands.add_parser("loan-alerts", help="Khoản vay and bảo hiểm: Telegram once per loan 90 days before its promotion ends, and per premium 30 days before it is due")
     loans.add_argument("--data-dir", type=Path, required=True)
     contrib = commands.add_parser("contribution-remind", help="Góp vốn đều: Telegram once a month from the contribution day until it is met")
     contrib.add_argument("--data-dir", type=Path, required=True)
@@ -943,6 +943,7 @@ def loan_alerts_cli(data_dir: Path) -> int:
     from datetime import datetime
     from zoneinfo import ZoneInfo
 
+    from investment_agent.services.insurance_alerts import insurance_alerts_run
     from investment_agent.services.loan_alerts import loan_alerts_run, read_property_book
 
     telegram = _scheduled_telegram(data_dir)
@@ -950,7 +951,8 @@ def loan_alerts_cli(data_dir: Path) -> int:
         print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
         return 0
     send, repo, owner = telegram
-    out = loan_alerts_run(data_dir, book=read_property_book(repo, owner), send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
+    book, today = read_property_book(repo, owner), datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date()
+    out = {**loan_alerts_run(data_dir, book=book, send=send, today=today), "insurance": insurance_alerts_run(data_dir, book=book, send=send, today=today)}
     print(json.dumps(out))  # counts only, never the book
     return 0
 

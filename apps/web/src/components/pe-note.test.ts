@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { peNote } from "./financial-tables";
+import { peCalm, peNote } from "./financial-tables";
 
 const base = { quarter: "2026-Q3", year_ago: "2025-Q3", ttm: "1", ttm_year_ago: "2" };
 
@@ -16,5 +16,17 @@ describe("peNote", () => {
   it("says nothing for an ordinary year or no data", () => {
     expect(peNote({ ...base, change: "0.1000", kind: null })).toBeNull();
     expect(peNote(null)).toBeNull();
+  });
+});
+
+describe("peCalm", () => {
+  it("says in one quiet line how profit moved when the P/E is not distorted", () => {
+    expect(peCalm({ ...base, change: "0.1240", kind: null })).toBe("Lợi nhuận 4 quý đến Q3/2026 tăng 12% so với cùng kỳ, trong ngưỡng giảm 40% đến tăng 60%: P/E không bị méo vì lợi nhuận biến động mạnh.");
+    expect(peCalm({ ...base, change: "-0.0500", kind: null })).toContain("giảm 5% so với cùng kỳ");
+  });
+  it("is silent when there is a warning or no comparison", () => {
+    expect(peCalm({ ...base, change: "1.0000", kind: "earnings_spike" })).toBeNull();
+    expect(peCalm({ ...base, change: null, kind: null })).toBeNull();
+    expect(peCalm(null)).toBeNull();
   });
 });

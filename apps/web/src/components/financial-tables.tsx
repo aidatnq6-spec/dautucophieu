@@ -38,6 +38,14 @@ export function peNote(c: PeContext | null): string | null {
   return `P/E đang thấp vì lợi nhuận 4 quý đến ${quarterText(c.quarter)} tăng ${share(c.change!)} so với cùng kỳ. Nếu phần tăng đến từ khoản một lần hay đỉnh chu kỳ, P/E thấp có thể không bền.`;
 }
 
+/** The quiet line for an ordinary year: how profit moved, inside the thresholds, so the P/E is not distorted. Null otherwise. */
+export function peCalm(c: PeContext | null): string | null {
+  if (!c || c.kind || c.change === null) return null;
+  const n = Number(c.change);
+  const move = n > 0 ? `tăng ${share(c.change)}` : n < 0 ? `giảm ${share(c.change)}` : "không đổi";
+  return `Lợi nhuận 4 quý đến ${quarterText(c.quarter)} ${move} so với cùng kỳ, trong ngưỡng giảm 40% đến tăng 60%: P/E không bị méo vì lợi nhuận biến động mạnh.`;
+}
+
 export function cell(v: string | null, kind: Row["kind"], key: string | null): string {
   if (v === null) return "—";
   const n = Number(v);
@@ -143,11 +151,12 @@ export function FinancialTables({ symbol }: { symbol: string }) {
   const cols = view === "quarters" ? lastN(part.periods, count) : lastN(part.periods, 0);
   const s = data.summary;
   const pe = (data as { pe_context?: PeContext | null }).pe_context ?? null;
-  const note = peNote(pe);
+  const note = peNote(pe), calm = peCalm(pe);
   const extra = view === "quarters" && forecast?.quarter && Object.keys(forecast.values).length ? { label: `${periodLabel(forecast.quarter)}F`, values: forecast.values } : null;
   return (
     <div className="ft">
       {note && <p className="notice" data-testid="pe-context">{note}</p>}
+      {calm && <p className="caption" data-testid="pe-context">{calm}</p>}
       {s && <div className="pb-cards" aria-label="Bốn quý gần nhất">
         <div><span className="caption">LNST công ty mẹ 4 quý ({s.quarters.map(periodLabel).join(", ")})</span><strong>{ty(s.npat_ttm)}</strong></div>
         <div><span className="caption">EBITDA 4 quý</span><strong>{ty(s.ebitda_ttm)}</strong></div>

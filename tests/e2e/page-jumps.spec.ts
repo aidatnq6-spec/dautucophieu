@@ -39,3 +39,14 @@ test("on a phone the shortcut lands below the sticky menu bar, with no horizonta
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test("on a computer the strip stays at the top of a long page and marks the section being read", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 700 });
+  await page.goto("/research/FPT");
+  const strip = jumps(page);
+  await expect(strip.getByRole("button", { name: "Bảng số tài chính" })).toBeVisible();
+  await strip.getByRole("button", { name: "Sự kiện" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Sự kiện" })).toBeInViewport();
+  await expect(strip).toBeInViewport();  // still on screen far down the page
+  await expect(strip.getByRole("button", { name: "Sự kiện" })).toHaveAttribute("aria-current", "true");
+});

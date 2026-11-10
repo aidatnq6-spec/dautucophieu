@@ -401,3 +401,28 @@ def test_commodity_series_are_kept_under_their_own_keys_for_three_years(tmp_path
     assert store.read("com_coal")[-1]["value"] == "153.84" and store.read("com_rubber") == []
     assert all("cosd=2023-10-30" in u for u in asked)
     assert not any(i["id"].startswith("com_") for i in load_indicators())
+
+
+def test_macro_sync_tries_timed_out_indicators_again_with_a_longer_wait(tmp_path, capsys):
+    """The stockbiz pages (M2, 10-year yield, interbank) often time out: after the first pass they are asked once more, slowly."""
+    import httpx
+    from investment_agent.cli import macro_sync
+    rate = "Recent readings 10/23/2026 | 4.49% 10/22/2026 | 4.48% Source: Hanoi Stock Exchange"
+    m2 = "Recent readings 7/2026 | 20.456 nghìn tỷ đồng 6/2026 | 20.415 nghìn tỷ đồng Source: State Bank of Vietnam"
+    waits, slow_calls = [], []
+
+    def fast(url):
+        if "stockbiz.vn" in url:
+            raise httpx.ReadTimeout("timed out")
+        if "DGS10" in url:
+            return FRED_10Y
+        raise _status_error(url, 404)
+
+    def slow(url):
+        slow_calls.append(url)
+        return m2 if "money-supply" in url else rate
+    macro_sync(tmp_path, get=fast, slow_get=slow, sleep=waits.append)
+    results = json.loads(capsys.readouterr().out.strip().splitlines()[-1])["results"]
+    assert results["vn10y"] == results["vn_interbank_on"] == results["m2_vn"] == "ok"
+    assert MacroStore(tmp_path).read("vn10y")[-1]["value"] == "4.49"
+    assert all("stockbiz.vn" in u for u in slow_calls) and 30 in waits

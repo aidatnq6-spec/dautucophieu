@@ -212,7 +212,9 @@ legend{font-weight:600;padding:0 6px}
 @media(max-width:650px){.to-top{right:14px;bottom:14px}}
 .page-jumps{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
 .page-jumps button{border:1px solid var(--line);background:var(--paper);color:var(--link);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer}
-.page-jumps button:hover{border-color:var(--brand);background:var(--nav-on-bg)}
+.page-jumps button:hover,.page-jumps button[aria-current="true"]{border-color:var(--brand);background:var(--nav-on-bg)}
+/* On a computer the strip stays at the top while the page scrolls (one row that scrolls sideways); on a phone the menu bar already does. */
+@media(min-width:651px){.page-jumps{position:sticky;top:0;z-index:15;background:var(--bg);padding:8px 0;margin-top:-8px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}.page-jumps button{white-space:nowrap}main h2{scroll-margin-top:64px}}
 main h2{scroll-margin-top:16px}
 @media(max-width:650px){.page-jumps{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}.page-jumps button{white-space:nowrap}main h2{scroll-margin-top:120px}}
 .perf-bench{margin:4px 0 12px;padding-left:18px}.perf-bench li{margin:3px 0;overflow-wrap:anywhere}

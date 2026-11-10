@@ -15,6 +15,7 @@ function headings(main: HTMLElement): HTMLHeadingElement[] {
 export function PageJumps() {
   const path = usePathname();
   const [titles, setTitles] = useState<string[]>([]);
+  const [current, setCurrent] = useState(-1);
   const ref = useRef<HTMLElement | null>(null);
   useEffect(() => {
     const main = document.getElementById("main");
@@ -33,6 +34,29 @@ export function PageJumps() {
     observer.observe(main, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["hidden"] });
     return () => { observer.disconnect(); window.clearTimeout(timer); };
   }, [path]);
+  useEffect(() => {  // the section being read: the last heading that has reached the top of the window (below the strip)
+    const main = document.getElementById("main");
+    if (!main || titles.length < MIN_SECTIONS) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const line = (ref.current?.getBoundingClientRect().bottom ?? 0) + 24;
+      const list = headings(main);
+      let at = -1;
+      list.forEach((h, i) => { if (h.getBoundingClientRect().top <= line) at = i; });
+      setCurrent(at);
+      const button = at >= 0 ? ref.current?.querySelectorAll("button")[at] : undefined;
+      const strip = ref.current;
+      if (button && strip && strip.scrollWidth > strip.clientWidth) {  // keep the highlighted shortcut in view on a long strip
+        const left = button.offsetLeft - strip.offsetLeft;
+        if (left < strip.scrollLeft || left + button.offsetWidth > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = left - 16;
+      }
+    };
+    const onScroll = () => { if (!frame) frame = window.requestAnimationFrame(update); };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => { window.removeEventListener("scroll", onScroll); if (frame) window.cancelAnimationFrame(frame); };
+  }, [titles]);
   if (titles.length < MIN_SECTIONS) return null;
   function go(index: number) {
     const main = document.getElementById("main");
@@ -43,7 +67,7 @@ export function PageJumps() {
   }
   return (
     <nav className="page-jumps" aria-label="Trên trang này" ref={ref}>
-      {titles.map((t, i) => <button key={`${i}-${t}`} type="button" onClick={() => go(i)}>{t}</button>)}
+      {titles.map((t, i) => <button key={`${i}-${t}`} type="button" aria-current={i === current ? "true" : undefined} onClick={() => go(i)}>{t}</button>)}
     </nav>
   );
 }

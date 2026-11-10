@@ -21,10 +21,15 @@
    "rule": "up",
    "max_age_days": 7,
    "source": {
-    "kind": "fred",
-    "series": "DCOILWTICO"
+    "kind": "oilprice",
+    "blend": "WTI-Crude",
+    "fallback": {
+     "kind": "fred",
+     "series": "DCOILWTICO"
+    }
    },
-   "url": "https://fred.stlouisfed.org/series/DCOILWTICO"
+   "url": "https://oilprice.com/oil-price-charts/",
+   "note": "Giá hợp đồng tương lai WTI kỳ gần nhất trên NYMEX, trễ 10 phút (oilprice.com); khi không đọc được thì lấy giá giao ngay của EIA qua FRED, chậm khoảng một tuần."
   },
   {
    "id": "us_cpi_yoy",
@@ -180,10 +185,15 @@
    "rule": "up",
    "max_age_days": 7,
    "source": {
-    "kind": "fred",
-    "series": "DGS10"
+    "kind": "treasury",
+    "column": "10 Yr",
+    "fallback": {
+     "kind": "fred",
+     "series": "DGS10"
+    }
    },
-   "url": "https://fred.stlouisfed.org/series/DGS10"
+   "url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve",
+   "note": "Lợi suất danh nghĩa 10 năm do Bộ Tài chính Mỹ công bố cuối mỗi ngày giao dịch; khi không đọc được thì lấy FRED (DGS10), chậm 1–2 ngày."
   },
   {
    "id": "vn10y",
@@ -205,11 +215,16 @@
    "rule": "up",
    "max_age_days": 7,
    "source": {
-    "kind": "stockbiz",
-    "page": "interbank-rate",
+    "kind": "sbv_interbank",
+    "term": "Qua đêm",
+    "fallback": {
+     "kind": "stockbiz",
+     "page": "interbank-rate"
+    },
     "manual_fallback": true
    },
-   "url": "https://www.sbv.gov.vn"
+   "url": "https://sbv.gov.vn/vi/l%C3%A3i-su%E1%BA%A5t-th%E1%BB%8B-tr%C6%B0%E1%BB%9Dng-li%C3%AAn-ng%C3%A2n-h%C3%A0ng",
+   "note": "Lãi suất bình quân liên ngân hàng do Ngân hàng Nhà nước công bố khoảng 05:30 sáng hôm sau; khi không đọc được thì lấy stockbiz."
   },
   {
    "id": "vnindex_value",

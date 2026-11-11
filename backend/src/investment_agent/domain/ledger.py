@@ -19,7 +19,7 @@ from .corporate_actions import (
 )
 from .models import ContractModel, NonemptyId, SignedAmount, UnsignedAmount
 
-__all__ = ["LedgerError", "LedgerEvent", "LedgerState", "parse_events", "replay", "order_key"]
+__all__ = ["LedgerError", "LedgerEvent", "LedgerState", "parse_events", "realised_sells", "replay", "order_key"]
 
 
 class Trade(EventBase):
@@ -187,6 +187,20 @@ def snapshots(events: list):
     for event in ordered_events(events):
         _apply(book, event)
         yield event, {s: (book.quantity.get(s, 0), book.pending.get(s, 0), Decimal(_s(book.cost[s] / book.shares(s)))) for s in book.cost}
+
+
+def realised_sells(events: list, security: str) -> list[dict]:
+    """Each sale of one security, in order: its day, quantity, proceeds after fee and tax, and the moving-average cost it released
+    (the same split replay() makes, corporate actions included)."""
+    book, out = _Book(), []
+    for event in ordered_events(events):
+        if event.type == "sell" and event.security_id == security:
+            shares = book.shares(security)
+            released = book.cost[security] if event.quantity == shares else book.cost[security] * event.quantity / shares
+            out.append({"on": event.effective_at.isoformat(), "quantity": event.quantity,
+                        "proceeds": _s(event.quantity * event.price - event.fee - event.tax), "cost": _s(released)})
+        _apply(book, event)
+    return out
 
 
 def replay(events: list) -> LedgerState:

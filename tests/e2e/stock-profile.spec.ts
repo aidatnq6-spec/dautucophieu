@@ -394,3 +394,11 @@ test("a non-financial ticker shows its net debt by quarter, and a bank does not"
   await expect(page.getByRole("region", { name: "Số liệu ngân hàng" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Nợ vay ròng" })).toHaveCount(0);
 });
+
+test("a ticker shows how its price moved after each report, and projects only for a property developer", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Phản ứng giá sau báo cáo" });
+  await expect(box.getByRole("table", { name: "Phản ứng giá sau báo cáo FPT" })).toBeVisible();
+  await expect(box).toContainText("Không phải khuyến nghị");
+  await expect(page.getByRole("region", { name: "Dự án và điểm rơi lợi nhuận" })).toHaveCount(0);
+});

@@ -148,3 +148,15 @@ def test_valuation_marks_missing_price_instead_of_zero():
     rows = {r.security_id: r for r in value_positions(state, {"ent-fpt": Decimal(25_000)})}
     assert (rows["ent-fpt"].market_value, rows["ent-fpt"].unrealized_gain, rows["ent-fpt"].quality_status) == (Decimal(2_500_000), Decimal(500_000), "verified")
     assert (rows["ent-vnm"].market_value, rows["ent-vnm"].unrealized_gain, rows["ent-vnm"].quality_status) == (None, None, "missing")
+
+
+def test_each_sale_of_a_ticker_is_listed_with_its_proceeds_and_the_cost_it_releases():
+    from investment_agent.domain.ledger import realised_sells
+    events = parse_events([deposit("d", 20_000_000), trade("b1", "buy", 100, 50_000, seq=1, fee=100_000),
+                           trade("b2", "buy", 100, 70_000, day="2026-02-02"), trade("s1", "sell", 50, 80_000, day="2026-03-02", fee=40_000, tax=4_000),
+                           trade("x", "buy", 10, 10_000, day="2026-03-03", security="ent-hpg"), trade("s2", "sell", 150, 90_000, day="2026-04-01")])
+    sells = realised_sells(events, "ent-fpt")
+    assert [s["on"] for s in sells] == ["2026-03-02", "2026-04-01"]
+    assert sells[0]["quantity"] == 50 and sells[0]["proceeds"] == "3956000" and sells[0]["cost"] == "3025000"  # 12,100,000 × 50/200
+    assert sells[1]["proceeds"] == "13500000" and sells[1]["cost"] == "9075000"  # the rest of the cost
+    assert realised_sells(events, "ent-vnm") == []

@@ -206,3 +206,22 @@ def test_a_long_check_goes_out_as_several_notes_each_marked_on_its_own(tmp_path)
     assert len(sent) == 1 and all(len(t) < 4096 for t in sent)
     flags = [c["sent_first"] for c in read_theses(repo, OWNER)[0][0]["conditions"]]
     assert flags == [True, False]  # the note that went out is not sent again; the other is offered next time
+
+
+def test_a_closed_thesis_keeps_the_realised_return_of_its_sales_and_an_early_exit_is_shown_for_a_month(tmp_path):
+    from investment_agent.services.attention import attention_items
+    repo, data = _repo(), _data(tmp_path)
+    raw = {**FOMO, "target": {"return": "40", "months": 6}}
+    save(repo, OWNER, symbol="FPT", raw=raw, company="other", facts=_facts(data), today=TODAY, expected_version=0, request_id="t1", held={"FPT"})
+    ev = lambda i, kind, day, seq=0, **f: {"event_id": i, "type": kind, "effective_at": day, "sequence": seq, **f}  # noqa: E731
+    repo.write(OWNER, "ledger_events", "main", {"events": [
+        ev("d", "deposit", "2026-10-01", amount="10000000"),
+        ev("b", "buy", "2026-10-01", 1, security_id="FPT", quantity=100, price="50000", fee="0", tax="0"),
+        ev("s", "sell", "2026-12-01", security_id="FPT", quantity=100, price="53000", fee="0", tax="0")]}, expected_version=0, request_id="l1")
+    closed_on = date(2026, 12, 2)
+    thesis_check_run(repo, OWNER, data, scope="data", facts={}, shares={}, held=set(), send=None, now=NOW, today=closed_on, request_id="c1")
+    t = read_theses(repo, OWNER)[0][0]
+    assert t["closed_on"] == "2026-12-02" and t["exit"] == {"return": "0.0600", "days": 30, "early": True, "target": "40", "months": 6}
+    items = attention_items(repo, OWNER, data, now=datetime(2026, 12, 10, 3))
+    assert any(i["kind"] == "early_exit" and i["symbol"] == "FPT" and "6,0%" in i["text"] and "40%" in i["text"] for i in items)
+    assert not any(i["kind"] == "early_exit" for i in attention_items(repo, OWNER, data, now=datetime(2027, 1, 15, 3)))

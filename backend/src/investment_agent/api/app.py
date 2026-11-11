@@ -19,6 +19,8 @@ from .routes.cashflow import router as cashflow_router
 from .routes.earnings import router as earnings_router
 from .routes.balance import router as balance_router
 from .routes.sectors import router as sectors_router
+from .routes.reaction import router as reaction_router
+from .routes.projects import router as projects_router
 from .routes.cycle_targets import router as cycle_targets_router
 from .routes.money_purposes import router as money_purposes_router
 from .routes.deposit_book import router as deposit_book_router
@@ -132,6 +134,8 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(earnings_router)
     app.include_router(balance_router)
     app.include_router(sectors_router)
+    app.include_router(reaction_router)
+    app.include_router(projects_router)
     app.include_router(money_purposes_router)
     app.include_router(property_book_router)
     app.include_router(rental_book_router)

@@ -22,7 +22,7 @@ test("a thesis needs a loss limit when bought out of fear of missing out, shows 
   await expect(form.getByRole("button", { name: "Lưu luận điểm" })).toBeDisabled();
   await form.getByRole("button", { name: "Thêm điều kiện" }).click();
   await form.getByRole("combobox").nth(1).selectOption("loss_vs_cost");
-  await form.getByLabel("%").fill("10");
+  await form.getByLabel("%", { exact: true }).fill("10");
   await form.getByRole("button", { name: "Lưu luận điểm" }).click();
 
   const card = box.getByRole("article", { name: "Luận điểm FPT" });
@@ -40,6 +40,19 @@ test("a thesis needs a loss limit when bought out of fear of missing out, shows 
 
   await page.goto("/journal");
   await expect(page.getByText("Mức đặt sai, chờ kết quả quý", { exact: false })).toBeVisible();
+});
+
+test("a thesis takes the owner's target and horizon and shows how far it has come", async ({ page }) => {
+  await page.goto("/portfolio");
+  const card = page.getByRole("region", { name: "Luận điểm đầu tư" }).getByRole("article", { name: "Luận điểm FPT" });
+  await card.getByRole("button", { name: "Sửa" }).click();
+  const form = card.getByRole("form", { name: "Luận điểm FPT" });
+  await form.getByLabel("Lợi nhuận kỳ vọng (%)").fill("40");
+  await expect(form.getByRole("button", { name: "Lưu luận điểm" })).toBeDisabled();  // a target needs its horizon too
+  await form.getByLabel("Thời hạn (tháng)").fill("6");
+  await form.getByRole("button", { name: "Lưu luận điểm" }).click();
+  await expect(card.getByTestId("th-progress-FPT")).toContainText("Mục tiêu 40% trong 6 tháng");
+  await expect(card.getByTestId("th-progress-FPT")).toContainText("còn");
 });
 
 test("the thesis section has no horizontal scroll at 375px", async ({ page }) => {

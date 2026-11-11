@@ -9,7 +9,26 @@ import { levelInput } from "./price-alerts";
 type View = { state: "ok" | "broken" | "unknown"; reading: string | null; reason: string | null };
 type Cond = { id: string; kind: string; params: Record<string, string | number>; label: string; view: View; status: string | null;
   broken_on: string | null; broken_price: string | null; set_on: string; hold: { until: string; reason: string } | null };
-type Thesis = { id: string; symbol: string; reasons: string[]; note: string; created_on: string; conditions: Cond[]; company: string | null };
+type Target = { return: string; months: number; set_on: string };
+export type Progress = Target & { due: string; days_left: number; gain: string | null; reached: boolean; overdue: boolean };
+type Thesis = { id: string; symbol: string; reasons: string[]; note: string; created_on: string; conditions: Cond[]; company: string | null;
+  target: Target | null; progress: Progress | null };
+
+/** The owner's target against the gain now: "đạt 12% / mục tiêu 40%, còn 120 ngày (đến 02/05/2027)". */
+export function progressText(p: Progress): string {
+  const due = p.due.split("-").reverse().join("/");
+  const gain = p.gain === null ? "chưa có giá vốn hoặc giá" : `đang ${Number(p.gain) >= 0 ? "lãi" : "lỗ"} ${Math.abs(Math.round(Number(p.gain) * 1000) / 10).toLocaleString("vi-VN")}%`;
+  const time = p.overdue ? `đã quá thời hạn ${p.months} tháng (${due})` : `còn ${p.days_left} ngày (đến ${due})`;
+  return `Mục tiêu ${Number(p.return).toLocaleString("vi-VN")}% trong ${p.months} tháng: ${gain}${p.reached ? ", đã đạt mục tiêu" : ""}, ${time}.`;
+}
+
+/** The target from the two optional fields: both empty is no target, one empty is not ready. */
+export function targetFrom(ret: string, months: string): { ok: boolean; target: { return: string; months: number } | null } {
+  if (!ret.trim() && !months.trim()) return { ok: true, target: null };
+  const r = Number(ret.trim().replace(",", ".")), m = Number(months.trim());
+  if (!(r > 0 && r <= 1000) || !Number.isInteger(m) || m < 1 || m > 60) return { ok: false, target: null };
+  return { ok: true, target: { return: String(r), months: m } };
+}
 type Kind = { label: string; params: string[]; applies: string | null };
 type Data = { version: number; theses: Thesis[]; missing: string[]; companies: Record<string, string | null>; kinds: Record<string, Kind>;
   reasons: Record<string, string> };
@@ -70,16 +89,20 @@ function ThesisForm({ data, symbol, thesis, onSave, onCancel }: { data: Data; sy
   const company = thesis?.company ?? data.companies[symbol] ?? null;
   const [reasons, setReasons] = useState<string[]>(thesis?.reasons ?? []);
   const [note, setNote] = useState(thesis?.note ?? "");
+  const [targetReturn, setTargetReturn] = useState(thesis?.target ? thesis.target.return.replace(".", ",") : "");
+  const [targetMonths, setTargetMonths] = useState(thesis?.target ? String(thesis.target.months) : "");
+  const target = targetFrom(targetReturn, targetMonths);
   const [drafts, setDrafts] = useState<Draft[]>(thesis?.conditions.map((c) => ({ id: c.id, kind: c.kind,
     values: Object.fromEntries(Object.entries(c.params).map(([k, v]) => [k, String(v).replace(".", ",")])) })) ?? [{ kind: "loss_vs_cost", values: {} }]);
   const params = drafts.map((d) => conditionParams(data.kinds[d.kind]?.params ?? [], d.values));
   const locked = new Set(thesis?.conditions.filter((c) => c.status === "broken").map((c) => c.id) ?? []);
   const fomoWithoutLimit = reasons.includes("fomo") && !drafts.some((d) => d.kind === "loss_vs_cost");
-  const ready = reasons.length > 0 && drafts.length > 0 && params.every((p) => p !== null) && !fomoWithoutLimit;
+  const ready = reasons.length > 0 && drafts.length > 0 && params.every((p) => p !== null) && !fomoWithoutLimit && target.ok;
   return (
     <form className="th-form" aria-label={`Luận điểm ${symbol}`} onSubmit={(e) => {
       e.preventDefault();
-      if (ready) void onSave({ reasons, note, conditions: drafts.map((d, i) => ({ ...(d.id ? { id: d.id } : {}), kind: d.kind, params: params[i] })) });
+      if (ready) void onSave({ reasons, note, target: target.target,
+        conditions: drafts.map((d, i) => ({ ...(d.id ? { id: d.id } : {}), kind: d.kind, params: params[i] })) });
     }}>
       <fieldset><legend>Lý do mua</legend>
         {Object.entries(data.reasons).map(([id, label]) => <label key={id} className="th-check"><input type="checkbox" checked={reasons.includes(id)}
@@ -91,6 +114,12 @@ function ThesisForm({ data, symbol, thesis, onSave, onCancel }: { data: Data; sy
         : <ConditionFields key={d.id ?? `new-${i}`} draft={d} kinds={data.kinds} company={company}
           onChange={(next) => setDrafts(drafts.map((x, j) => (j === i ? next : x)))} onRemove={() => setDrafts(drafts.filter((_, j) => j !== i))} />)}
       <button type="button" className="btn" onClick={() => setDrafts([...drafts, { kind: "loss_vs_cost", values: {} }])}><Plus size={15} aria-hidden="true" />Thêm điều kiện</button>
+      <fieldset className="th-target"><legend>Mục tiêu của bạn (không bắt buộc)</legend>
+        <label className="field">Lợi nhuận kỳ vọng (%)<input inputMode="decimal" value={targetReturn} onChange={(e) => setTargetReturn(e.target.value)} placeholder="vd 40" /></label>
+        <label className="field">Thời hạn (tháng)<input inputMode="numeric" value={targetMonths} onChange={(e) => setTargetMonths(e.target.value)} placeholder="vd 6" /></label>
+        {!target.ok && <p className="caption negative" role="alert">Nhập cả hai: lợi nhuận từ trên 0 đến 1.000%, thời hạn từ 1 đến 60 tháng; hoặc để trống cả hai.</p>}
+        <p className="caption">Con số của bạn, phần mềm không gợi ý. Bán trước hạn khi lãi chưa tới nửa mục tiêu sẽ được nhắc ghi lý do vào Nhật ký.</p>
+      </fieldset>
       {fomoWithoutLimit && <p className="notice" role="alert">Mua vì sợ bỏ lỡ thì cần đặt điều kiện “Lỗ so với giá vốn”.</p>}
       <div className="row"><button className="btn primary" type="submit" disabled={!ready}>Lưu luận điểm</button>
         <button className="btn" type="button" onClick={onCancel}>Hủy</button></div>
@@ -173,6 +202,7 @@ export function ThesisView() {
           <div className="row"><strong>{t.symbol}</strong><span className="caption">đặt {day(t.created_on)} · {t.reasons.map((r) => data.reasons[r]).join(", ")}</span>
             {open?.thesis?.id !== t.id && <button className="btn" type="button" onClick={() => setOpen({ symbol: t.symbol, thesis: t })}><Pencil size={15} aria-hidden="true" />Sửa</button>}</div>
           {t.note && <p className="th-note">“{t.note}”</p>}
+          {t.progress && <p className="caption" data-testid={`th-progress-${t.symbol}`}>{progressText(t.progress)}</p>}
           {open?.thesis?.id === t.id ? <ThesisForm data={data} symbol={t.symbol} thesis={t} onSave={(b) => change({ action: "edit", thesis_id: t.id, ...b })}
             onCancel={() => setOpen(null)} /> : <ul className="th-conds">
             {t.conditions.map((c) => {

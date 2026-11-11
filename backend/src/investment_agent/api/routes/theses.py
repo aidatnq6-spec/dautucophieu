@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request
 from pydantic import Field
 
 from investment_agent.domain.models import ContractModel
-from investment_agent.domain.thesis import KINDS, REASON_VI, ThesisError, describe, evaluate
+from investment_agent.domain.thesis import KINDS, REASON_VI, ThesisError, describe, evaluate, target_progress
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.theses import company_of, edit, gather, hold, read_theses, save
 from investment_agent.services.weekly_brief import VN
@@ -39,7 +39,9 @@ def _view(request: Request, theses: list[dict], version: int, held: set[str], to
             else:
                 view = evaluate(c, facts.get(t["symbol"], {}))
             conds.append({**c, "label": describe(c), "view": view})
-        shown.append({**t, "conditions": conds, "company": company_of(Path(request.app.state.data_dir), t["symbol"])
+        f = facts.get(t["symbol"], {})
+        progress = target_progress(t, cost=f.get("cost"), price=f.get("price"), today=today)
+        shown.append({**t, "target": t.get("target"), "progress": progress, "conditions": conds, "company": company_of(Path(request.app.state.data_dir), t["symbol"])
                       if request.app.state.data_dir is not None else None})
     missing = sorted(held - {t["symbol"] for t in open_})
     companies = {s: company_of(Path(request.app.state.data_dir), s) if request.app.state.data_dir is not None else None for s in missing}
@@ -71,6 +73,7 @@ class ThesisChange(ContractModel):
     emotion: str | None = Field(default=None, max_length=16)
     until: date | None = None
     new_condition: dict | None = None
+    target: dict | None = None  # {"return": percent, "months": whole months}; None removes it
     expected_version: int = Field(ge=0)
     request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
 
@@ -90,7 +93,7 @@ def change_theses(request: Request, body: ThesisChange):
         company = company_of(Path(data_dir), symbol)
         facts = _facts(request, [symbol], today)[symbol]
         fair = None if facts.get("fair") is None else format(facts["fair"].normalize(), "f")
-        raw = {"reasons": body.reasons or [], "note": body.note or "", "conditions": body.conditions or []}
+        raw = {"reasons": body.reasons or [], "note": body.note or "", "conditions": body.conditions or [], "target": body.target}
         common = {"today": today, "expected_version": body.expected_version, "request_id": body.request_id}
         if body.action == "save":
             theses, version = save(repo, owner, symbol=symbol, raw=raw, company=company, facts=facts, held=held, **common)

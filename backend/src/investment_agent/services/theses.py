@@ -10,8 +10,8 @@ from pathlib import Path
 
 from investment_agent.api.routes.value_chains import chain_labels
 from investment_agent.domain.journal import JournalEntry
-from investment_agent.domain.ledger import replay
-from investment_agent.domain.thesis import (KINDS, REASON_VI, ThesisError, advance, describe, edit_thesis, evaluate, hold_condition, mark_sent, new_thesis,
+from investment_agent.domain.ledger import realised_sells, replay
+from investment_agent.domain.thesis import (KINDS, REASON_VI, ThesisError, advance, exit_result, describe, edit_thesis, evaluate, hold_condition, mark_sent, new_thesis,
                                             scenario, similar, validate_thesis)
 from investment_agent.market.financial_ratios import kind_of
 from investment_agent.market.fundamentals import FundamentalsStore
@@ -222,6 +222,15 @@ def render(blocks: list[list[str]], now: datetime) -> str:
 
 
 READINGS = ("reading", "current", "reason")
+def _exit(repo, owner, thesis: dict, today: date) -> dict | None:
+    """The realised return of the sales made while the thesis was open, from the ledger; None when they cannot be read."""
+    try:
+        events = list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)
+        return exit_result(thesis, realised_sells(events, thesis["symbol"]), closed_on=today)
+    except Exception:  # noqa: BLE001 - a ledger that cannot be read leaves the exit unknown; closing still happens
+        return None
+
+
 NOTE_LIMIT = 3800  # Telegram allows 4096 characters
 
 
@@ -238,7 +247,7 @@ def thesis_check_run(repo, owner, data_dir: Path, *, scope: str, facts: dict[str
     pieces: list[tuple[int, dict, list[str]]] = []  # (thesis position, event, lines)
     for t in theses:
         if t["closed_on"] is None and t["symbol"] not in held:
-            t = {**t, "closed_on": today.isoformat()}
+            t = {**t, "closed_on": today.isoformat(), "exit": _exit(repo, owner, t, today)}
             closed += 1
         if t["closed_on"] is not None or t["symbol"] not in facts:
             out.append(t)

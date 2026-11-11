@@ -186,7 +186,8 @@ def test_reminders_name_manual_indicators_that_are_missing_or_overdue(tmp_path):
 
 def test_monthly_and_weekly_update_rhythm_is_configured():
     ages = {i["id"]: i["max_age_days"] for i in load_indicators()}
-    assert (ages["us_pmi"], ages["vn_pmi"], ages["m2_vn"], ages["vn10y"], ages["vn_interbank_on"]) == (35, 35, 35, 7, 7)
+    # M2 comes out up to 45 days after its month, so 35 days would mark every reading old
+    assert (ages["us_pmi"], ages["vn_pmi"], ages["m2_vn"], ages["vn10y"], ages["vn_interbank_on"]) == (35, 35, 80, 7, 7)
 
 
 def news(title, published="2026-10-01T09:30:00+07:00"):
@@ -499,3 +500,23 @@ def test_the_configured_sources_for_wti_interbank_and_us10y_are_the_early_ones_w
     assert by_id["wti"]["kind"] == "oilprice" and by_id["wti"]["fallback"]["kind"] == "fred"
     assert by_id["vn_interbank_on"]["kind"] == "sbv_interbank" and by_id["vn_interbank_on"]["fallback"]["kind"] == "stockbiz"
     assert by_id["us10y"]["kind"] == "treasury" and by_id["us10y"]["fallback"]["kind"] == "fred"
+
+
+def test_a_hand_entered_indicator_never_shows_an_old_source_error(tmp_path):
+    store = MacroStore(tmp_path)
+    store.record_statuses({"us_pmi": "error:HTTPStatusError"})  # left from when it was read automatically
+    rows = {r["id"]: r for r in macro_rows(load_indicators(), store, today=date(2026, 11, 11))}
+    assert rows["us_pmi"]["auto"] is False and rows["us_pmi"]["source_error"] is None
+
+
+def test_us_inflation_uses_the_unadjusted_index_of_the_headline_figure():
+    """BLS's headline 12-month change uses the index before seasonal adjustment (CPIAUCNS); September 2026: 336.940 / 324.800 → 3.74%."""
+    source = next(i for i in load_indicators() if i["id"] == "us_cpi_yoy")["source"]
+    assert source == {"kind": "fred", "series": "CPIAUCNS", "transform": "yoy"}
+    csv = "observation_date,CPIAUCNS\n2025-09-01,324.800\n2025-10-01,\n2026-09-01,336.940\n2026-10-01,337.511\n"
+    assert parse_fred_csv(csv, transform="yoy") == [(date(2026, 9, 1), "3.74")]  # no October 2025 index: no October 2026 change
+
+
+def test_m2_counts_as_old_only_after_the_state_banks_45_day_publication_window_and_a_month():
+    m2 = next(i for i in load_indicators() if i["id"] == "m2_vn")
+    assert m2["max_age_days"] >= 76  # end of August, out by mid-October, September due by mid-November

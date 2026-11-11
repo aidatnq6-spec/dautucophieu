@@ -20,8 +20,8 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
     <div className="shell">
       <aside className="side">
         <div className="brand">Quản lý<span> Gia Sản</span><small className="brand-sub">Cổ phiếu và toàn bộ tài sản</small></div>
-        <ThemeToggle />
         <AppNav />
+        <ThemeToggle />
       </aside>
       <main className="content" id="main"><PageJumps />{children}</main>
       <BackToTop />

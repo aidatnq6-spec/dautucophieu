@@ -382,3 +382,15 @@ test("a bank with no saved quarter explains the asset quality block and fills in
   await expect(box.getByTestId("bank-quality")).toContainText("Chưa có quý nào");
   await expect(box.getByLabel("Quý")).toHaveValue(/^\d{4}-Q[1-4]$/);
 });
+
+test("a non-financial ticker shows its net debt by quarter, and a bank does not", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Nợ vay ròng" });
+  await expect(box.getByRole("table", { name: "Nợ vay ròng FPT" })).toBeVisible();
+  await expect(box.getByRole("table", { name: "Nợ vay ròng FPT" }).getByRole("row").nth(1)).toContainText("tỷ");  // newest quarter first
+  await expect(box).toContainText("Không phải khuyến nghị");
+  await expect(page.getByRole("region", { name: "Tiền khách trả trước" })).toHaveCount(0);  // FPT is not a property developer
+  await page.goto("/research/VCB");
+  await expect(page.getByRole("region", { name: "Số liệu ngân hàng" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Nợ vay ròng" })).toHaveCount(0);
+});

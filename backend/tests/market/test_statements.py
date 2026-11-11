@@ -112,7 +112,8 @@ def test_the_last_unadjusted_close_of_each_year_is_kept_with_its_day():
 
 def test_a_ticker_synced_before_year_end_closes_existed_takes_the_whole_price_history(tmp_path):
     store = StatementStore(tmp_path)
-    store.save({"symbol": "HPG", "fetched_at": "2026-10-01T00:00:00+00:00", "source": "vndirect:finfo", "quarters": {}, "years": {}})
+    store.save({"symbol": "HPG", "fetched_at": "2026-10-01T00:00:00+00:00", "source": "vndirect:finfo", "quarters": {}, "years": {},
+                "lines_version": 2})  # its lines are current: only the closes are missing
     get = Get()
     sync_statements(store, {"HPG": "Tài nguyên Cơ bản"}, get=get, now=NOW, limit=None, sleep=lambda s: None)
     prices = [u for u in get.urls if "stock_prices" in u]
@@ -204,3 +205,30 @@ def test_sync_of_insurers_asks_for_their_models(tmp_path):
     out = sync_statements(StatementStore(tmp_path), {"BVH": "Bảo hiểm", "MBB": "Ngân hàng"}, get=get, now=NOW, limit=None, sleep=lambda s: None,
                           kinds=("insurance",))
     assert out == {"BVH": "ok"} and all("modelType:411,412,413" in u for u in get.urls if "financial_statements" in u)
+
+
+def test_customer_advances_and_inventory_are_kept_from_the_balance_sheet():
+    parsed = parse_statements(text(row(13130, 6e11, "2026-09-30", model=1), row(13311, 1e11, "2026-09-30", model=1), row(11400, 9e12, "2026-09-30", model=1)),
+                              symbol="HPG", kind="QUARTER")
+    assert parsed["periods"]["2026-Q3"] == {"advances_st": "600000000000", "advances_lt": "100000000000", "inventory": "9000000000000"}
+
+
+def test_a_ticker_kept_before_the_advances_lines_is_due_and_takes_its_whole_history_once(tmp_path):
+    store = StatementStore(tmp_path)
+    store.save({"symbol": "HPG", "fetched_at": "2026-11-06T00:00:00+00:00", "source": "vndirect:finfo", "quarters": {"2015-Q1": {"revenue": "5"}},
+                "years": {}, "year_end_close": {"2024": {"date": "2024-12-31", "close": "20"}},
+                "quarter_end_close": {"2024-Q4": {"date": "2024-12-31", "close": "20"}}})  # recent, but without the newer lines
+    get = Get()
+    assert sync_statements(store, {"HPG": "Tài nguyên Cơ bản"}, get=get, now=NOW, limit=None, sleep=lambda s: None) == {"HPG": "ok"}
+    assert all("fiscalDate:gte:2010-01-01" in u for u in get.urls if "financial_statements" in u)
+    assert store.read("HPG")["lines_version"] >= 2
+    get2 = Get()
+    assert sync_statements(store, {"HPG": "Tài nguyên Cơ bản"}, get=get2, now=NOW, limit=None, sleep=lambda s: None) == {} and get2.urls == []
+
+
+def test_a_bank_needs_no_new_lines(tmp_path):
+    store = StatementStore(tmp_path)
+    store.save({"symbol": "VCB", "fetched_at": "2026-11-06T00:00:00+00:00", "source": "vndirect:finfo", "kind": "bank", "quarters": {}, "years": {},
+                "year_end_close": {}, "quarter_end_close": {}})
+    get = Get()
+    assert sync_statements(store, {"VCB": "Ngân hàng"}, get=get, now=NOW, limit=None, sleep=lambda s: None, kinds=("bank",)) == {} and get.urls == []

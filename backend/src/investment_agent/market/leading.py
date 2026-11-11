@@ -543,6 +543,7 @@ def macro_rows(indicators: list[dict], store: MacroStore, *, today: date) -> lis
                      "previous": obs[-2]["value"] if len(obs) >= 2 else None, "trend": trend, "assessment": assessment,
                      "stale": last is not None and (today - date.fromisoformat(last["date"])).days > ind["max_age_days"],
                      "source_url": (last or {}).get("source_url") or ind["url"], "note": ind.get("note"),
-                     "source_error": status if status not in (None, "ok") else None,
+                     # a hand-entered indicator has no source to fail; a status left from an older automatic source is not shown
+                     "source_error": status if status not in (None, "ok") and ind["source"]["kind"] != "manual" else None,
                      "manual_allowed": ind["source"]["kind"] == "manual" or bool(ind["source"].get("manual_fallback"))})
     return rows

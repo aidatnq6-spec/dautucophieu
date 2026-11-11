@@ -39,10 +39,11 @@
    "max_age_days": 75,
    "source": {
     "kind": "fred",
-    "series": "CPIAUCSL",
+    "series": "CPIAUCNS",
     "transform": "yoy"
    },
-   "url": "https://fred.stlouisfed.org/series/CPIAUCSL"
+   "url": "https://fred.stlouisfed.org/series/CPIAUCNS",
+   "note": "Chỉ số giá chưa điều chỉnh mùa vụ, như con số tiêu đề của Cục Thống kê Lao động Mỹ (BLS). Tháng 10/2026 không có số so cùng kỳ: Mỹ không thu thập CPI tháng 10/2025 khi chính phủ đóng cửa nên BLS không công bố mức này; tháng 11/2026 có lại bình thường."
   },
   {
    "id": "usd_vnd_free",
@@ -90,7 +91,7 @@
    "label": "Cung tiền M2 Việt Nam (tỷ đồng)",
    "unit": "tỷ đồng",
    "rule": "down",
-   "max_age_days": 35,
+   "max_age_days": 80,
    "source": {
     "kind": "stockbiz",
     "page": "money-supply-m2",
@@ -98,7 +99,8 @@
     "scale": "1000",
     "manual_fallback": true
    },
-   "url": "https://www.sbv.gov.vn"
+   "url": "https://www.sbv.gov.vn",
+   "note": "Ngân hàng Nhà nước công bố trong 45 ngày sau khi hết tháng (ví dụ số tháng 9 chậm nhất giữa tháng 11); phần mềm đọc qua stockbiz vì trang thống kê của Ngân hàng Nhà nước chặn đọc tự động."
   },
   {
    "id": "foreign_net",
@@ -123,7 +125,7 @@
     "kind": "manual"
    },
    "url": "https://vn.investing.com/economic-calendar/manufacturing-pmi-829",
-   "note": "Nhập tay: S&P Global và TradingEconomics chặn đọc tự động."
+   "note": "Nhập tay: S&P Global, ISM và TradingEconomics đều chặn đọc tự động (yêu cầu đăng nhập hoặc trả lỗi 403). Giữ một loại PMI cho cả chuỗi (S&P Global hoặc ISM) để xu hướng có ý nghĩa."
   },
   {
    "id": "vn_pmi",

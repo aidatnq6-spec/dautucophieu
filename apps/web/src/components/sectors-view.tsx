@@ -141,10 +141,10 @@ export function SectorsView() {
             <p data-testid="sector-rank">{rankText(v.now, v.median.find((m) => m.value !== null)!.month)}</p>
             <MedianChart points={v.median} />
             <table className="fv-table" aria-label={`P/B từng mã ${view.name}`}>
-              <thead><tr><th>Mã</th><th className="num">P/B</th><th className="num">So với trung vị ngành</th><th className="num">Thấp nhất 5 năm trước của mã</th><th>Ghi chú</th></tr></thead>
+              <thead><tr><th>Mã</th><th className="num">P/B hiện tại ({mLabel(v.now.month)})</th><th className="num">So với trung vị ngành</th><th className="num">Thấp nhất 5 năm trước của mã</th><th>Ghi chú</th></tr></thead>
               <tbody>{v.tickers.map((t) => <tr key={t.symbol}>
                 <td data-label="Mã"><Link href={`/research/${t.symbol}`}>{t.symbol}</Link></td>
-                <td className="num" data-label="P/B">{times(t.pb)}</td>
+                <td className="num" data-label="P/B hiện tại">{times(t.pb)}</td>
                 <td className="num" data-label="So với trung vị ngành">{Math.round(Number(t.to_median) * 100).toLocaleString("vi-VN")}%</td>
                 <td className="num" data-label="Thấp nhất 5 năm trước">{t.own_low === null ? "—" : times(t.own_low)}</td>
                 <td data-label="Ghi chú">{t.below_own_low && <span className="pill good">Bằng hoặc dưới đáy 5 năm</span>}</td>

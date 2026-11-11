@@ -100,7 +100,7 @@
     "manual_fallback": true
    },
    "url": "https://www.sbv.gov.vn",
-   "note": "Ngân hàng Nhà nước công bố trong 45 ngày sau khi hết tháng (ví dụ số tháng 9 chậm nhất giữa tháng 11); phần mềm đọc qua stockbiz vì trang thống kê của Ngân hàng Nhà nước chặn đọc tự động."
+   "note": "Ngân hàng Nhà nước công bố trong 45 ngày sau khi hết tháng (số tháng 9 chậm nhất giữa tháng 11). Từ 11/2026 stockbiz chỉ còn số theo năm và trang thống kê của Ngân hàng Nhà nước chặn đọc tự động, nên số tháng mới cần nhập tay kèm link nguồn; phần mềm vẫn thử stockbiz mỗi lần chạy."
   },
   {
    "id": "foreign_net",

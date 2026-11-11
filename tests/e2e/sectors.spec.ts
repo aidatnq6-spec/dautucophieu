@@ -13,7 +13,7 @@ test("Toàn ngành shows a sector's quarterly heatmap with its layers, and the s
   await expect(heat.getByRole("table", { name: "Bản đồ nhiệt Công nghệ Thông tin" }).getByRole("row", { name: /FPT/ })).toBeVisible();
   await heat.getByRole("radio", { name: "Dòng tiền kinh doanh (tỷ)" }).check();
   await expect(heat.getByRole("row", { name: /Cả ngành/ })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Định giá ngành" })).toContainText("ít nhất 3 mã");  // one ticker: no median
+  await expect(page.getByRole("region", { name: "Định giá ngành" })).toContainText("ít nhất 3 mã");  // one ticker: no median, so no table
 });
 
 test("a bank sector keeps to the profit layer", async ({ page }) => {

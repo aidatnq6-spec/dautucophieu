@@ -32,6 +32,9 @@ PAGE = 60000  # rows per call: a securities firm's whole quarterly history is ab
 # Unadjusted daily closes (thousand đồng; from 2013), for each year's market capitalisation at that year's own price and share count.
 PRICE_URL = "https://api-finfo.vndirect.com.vn/v4/stock_prices?sort=date&q=code:{symbol}~date:gte:{start}&size=9999&fields=code,date,close"
 FIRST_START, REFRESH_DAYS, MAX_AGE_DAYS, PACE_SECONDS = "2010-01-01", 730, 7, 1.0
+# Raised when LINES gains lines: a non-financial ticker kept with an older version is due and takes its whole history once, so the new
+# lines reach back as far as the old ones. 2: customer advances and inventory.
+LINES_VERSION = 2
 # (model, item code) → line. Model 1 balance sheet, 2 income statement, 3 cash flow (indirect); the general layout (TT200).
 LINES = {
     (2, 21000): "gross_revenue", (2, 21090): "deductions", (2, 21001): "revenue", (2, 22100): "cogs", (2, 23100): "gross_profit",
@@ -40,6 +43,9 @@ LINES = {
     (2, 23003): "npat", (2, 23500): "minority_profit", (2, 23000): "npat_parent",
     (1, 11100): "cash", (1, 11200): "st_investments", (1, 12700): "total_assets", (1, 13000): "liabilities", (1, 13110): "st_debt",
     (1, 13340): "lt_debt", (1, 14000): "equity", (1, 14240): "minority_equity", (1, 15000): "minority_equity_outside", (1, 14110): "charter_capital",
+    # Customer advances (Người mua trả tiền trước, short term 13130 and long term 13311) and inventory (11400, after its provision): names
+    # from VNDirect's own model list (v4/financial_models, checked 11/11/2026), for Tiền khách trả trước of property developers.
+    (1, 13130): "advances_st", (1, 13311): "advances_lt", (1, 11400): "inventory",
     (3, 22230): "depreciation", (3, 32000): "cfo", (3, 32100): "capex", (3, 33000): "cfi", (3, 34000): "cff", (3, 33600): "dividends_paid",
 }
 # Banks (TT49 layout: models 101 balance sheet, 102 income statement) and securities firms (TT334: 89, 90): only what their scale
@@ -161,6 +167,11 @@ def _merge(old: dict | None, key: str, new: dict) -> tuple[dict, dict, list]:
     return dict(sorted(periods.items())), dict(sorted(created.items())), sorted(conflicts, key=lambda c: (c["period"], c["line"]))
 
 
+def _old_lines(record: dict, sector: str | None) -> bool:
+    """A non-financial ticker kept before LINES had its current lines (financial layouts are not versioned)."""
+    return kind_of(sector) is None and record.get("lines_version", 1) < LINES_VERSION
+
+
 def sync_statements(store: StatementStore, sectors: dict[str, str | None], *, get: Callable[[str], str], now: datetime, limit: int | None,
                     max_age_days: int = MAX_AGE_DAYS, sleep: Callable[[float], None] = time.sleep, kinds: tuple = (None,)) -> dict[str, str]:
     """Refresh the stalest watched tickers of `kinds` (None: non-financial; "bank", "securities"), never fetched first; one failing is
@@ -169,15 +180,15 @@ def sync_statements(store: StatementStore, sectors: dict[str, str | None], *, ge
     for symbol in sorted(s for s, sector in sectors.items() if kind_of(sector) in kinds):
         rec = store.read(symbol)
         fetched = datetime.fromisoformat(rec["fetched_at"]) if rec else None
-        if fetched is None or (now - fetched).days >= max_age_days or "quarter_end_close" not in rec:  # synced before quarter closes were kept
-            ages.append((fetched is not None, fetched or now, symbol))
+        if fetched is None or (now - fetched).days >= max_age_days or "quarter_end_close" not in rec or _old_lines(rec, sectors[symbol]):
+            ages.append((fetched is not None, fetched or now, symbol))  # also synced before quarter closes, or newer lines, were kept
     todo = [s for _, _, s in sorted(ages)]
     results = {}
     for i, symbol in enumerate(todo if limit is None else todo[:limit]):
         if i:
             sleep(PACE_SECONDS)
         old = store.read(symbol)
-        start = FIRST_START if old is None else (now.date() - timedelta(days=REFRESH_DAYS)).isoformat()
+        start = FIRST_START if old is None or _old_lines(old, sectors[symbol]) else (now.date() - timedelta(days=REFRESH_DAYS)).isoformat()
         try:
             layout = LAYOUTS[kind_of(sectors[symbol])]
             parsed = {kind: parse_statements(_get_with_retry(get, URL.format(symbol=symbol, kind=kind, start=start, models=layout["models"], page=PAGE),
@@ -189,7 +200,7 @@ def sync_statements(store: StatementStore, sectors: dict[str, str | None], *, ge
             kept = old and old.get("year_end_close") and "quarter_end_close" in old
             price_start = start if kept else FIRST_START  # synced before the closes were kept: all of them
             prices = _get_with_retry(get, PRICE_URL.format(symbol=symbol, start=price_start), sleep)
-            record = {"symbol": symbol, "fetched_at": now.isoformat(), "source": "vndirect:finfo",
+            record = {"symbol": symbol, "fetched_at": now.isoformat(), "source": "vndirect:finfo", "lines_version": LINES_VERSION,
                       **({"kind": kind_of(sectors[symbol])} if kind_of(sectors[symbol]) else {})}
             for key, parse in (("year_end_close", parse_year_end_closes), ("quarter_end_close", parse_quarter_end_closes)):
                 record[key] = dict(sorted({**(old or {}).get(key, {}), **parse(prices, symbol=symbol)}.items()))

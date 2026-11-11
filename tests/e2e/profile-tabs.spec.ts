@@ -55,11 +55,11 @@ test("the menu is grouped, and every link fits a laptop screen", async ({ page }
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
   const nav = page.getByRole("navigation", { name: "Điều hướng chính" });
-  for (const [group, link] of [["Tài sản", "Hồ sơ & rủi ro"], ["Thị trường", "Vĩ mô"], ["Công cụ", "Định giá"]]) {
+  for (const [group, link] of [["Tài sản", "Hồ sơ & rủi ro"], ["Vĩ mô & thị trường", "Ngành theo quý"], ["Cổ phiếu", "Định giá"], ["Tin tức", "Nhận định"], ["Công cụ", "Cài đặt"]]) {
     await expect(nav.getByRole("group", { name: group }).getByRole("link", { name: link })).toBeVisible();
   }
   await expect(nav.getByRole("link")).toHaveCount(16);
   await expect(nav.getByRole("link", { name: "Cài đặt" })).toBeInViewport({ ratio: 1 });
   await page.setViewportSize({ width: 375, height: 800 });
-  await expect(nav.getByText("Thị trường", { exact: true })).toBeHidden();
+  await expect(nav.getByText("Cổ phiếu", { exact: true })).toBeHidden();
 });

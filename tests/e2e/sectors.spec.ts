@@ -5,7 +5,7 @@ test.beforeEach(async ({ context }) => signIn(context));
 
 test("Toàn ngành shows a sector's quarterly heatmap with its layers, and the sector's valuation", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Điều hướng chính" }).getByRole("link", { name: "Toàn ngành" }).click();
+  await page.getByRole("navigation", { name: "Điều hướng chính" }).getByRole("link", { name: "Ngành theo quý" }).click();
   await expect(page).toHaveURL(/\/sectors/);
   await page.getByRole("combobox", { name: "Ngành", exact: true }).selectOption({ label: "Công nghệ Thông tin (1 mã)" });
   await expect(page).toHaveURL(/nganh=cong-nghe-thong-tin/);

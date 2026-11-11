@@ -58,7 +58,7 @@ test("the menu is grouped, and every link fits a laptop screen", async ({ page }
   for (const [group, link] of [["Tài sản", "Hồ sơ & rủi ro"], ["Thị trường", "Vĩ mô"], ["Công cụ", "Định giá"]]) {
     await expect(nav.getByRole("group", { name: group }).getByRole("link", { name: link })).toBeVisible();
   }
-  await expect(nav.getByRole("link")).toHaveCount(15);
+  await expect(nav.getByRole("link")).toHaveCount(16);
   await expect(nav.getByRole("link", { name: "Cài đặt" })).toBeInViewport({ ratio: 1 });
   await page.setViewportSize({ width: 375, height: 800 });
   await expect(nav.getByText("Thị trường", { exact: true })).toBeHidden();

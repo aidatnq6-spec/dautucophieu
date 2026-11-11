@@ -243,9 +243,66 @@ def _fresh(cond: dict, today: date, fair: str | None) -> dict:
     return out
 
 
+TARGET_MAX_RETURN, TARGET_MAX_MONTHS = Decimal(1000), 60
+EARLY_SHARE = Decimal("0.5")  # an exit before the horizon with less than half the target return is marked early
+
+
+def validate_target(raw) -> dict | None:
+    """The owner's own target: a return in percent (above 0, at most 1000) and a horizon in whole months (1–60); None when not set."""
+    if raw in (None, {}):
+        return None
+    try:
+        ret, months = Decimal(str(raw["return"]).strip().replace(",", ".")), raw["months"]
+    except (KeyError, TypeError, ArithmeticError):
+        raise ThesisError("invalid_target", "Mục tiêu cần lợi nhuận kỳ vọng (%) và thời hạn (tháng).") from None
+    if not ret.is_finite() or not 0 < ret <= TARGET_MAX_RETURN or type(months) is not int or not 1 <= months <= TARGET_MAX_MONTHS:
+        raise ThesisError("invalid_target", "Lợi nhuận kỳ vọng từ trên 0 đến 1.000%, thời hạn từ 1 đến 60 tháng.")
+    return {"return": format(ret.normalize(), "f"), "months": months}
+
+
+def _add_months(d: date, months: int) -> date:
+    k = d.year * 12 + d.month - 1 + months
+    y, m = divmod(k, 12)
+    m += 1
+    last = (date(y + (m == 12), m % 12 + 1, 1) - timedelta(days=1)).day
+    return date(y, m, min(d.day, last))
+
+
+def target_progress(thesis: dict, *, cost: Decimal | None, price: Decimal | None, today: date) -> dict | None:
+    """Where an open thesis stands against its target: the gain against the average cost now, the due day and days left."""
+    target = thesis.get("target")
+    if not target:
+        return None
+    due = _add_months(date.fromisoformat(target["set_on"]), target["months"])
+    gain = price / cost - 1 if price is not None and cost is not None and cost > 0 else None
+    return {**target, "due": due.isoformat(), "days_left": max((due - today).days, 0),
+            "gain": str(gain.quantize(Decimal("0.0001"), ROUND_HALF_UP)) if gain is not None else None,
+            "reached": gain is not None and gain * 100 >= Decimal(target["return"]), "overdue": today > due}
+
+
+def exit_result(thesis: dict, sells: list[dict], *, closed_on: date) -> dict | None:
+    """The realised return of the sales made while the thesis was open (proceeds after fees and tax against the cost they released),
+    and whether that exit came before the horizon with less than half the target return. None when nothing was sold in that time."""
+    mine = [s for s in sells if thesis["created_on"] <= s["on"] <= closed_on.isoformat()]
+    if not mine:
+        return None
+    proceeds, cost = sum(Decimal(s["proceeds"]) for s in mine), sum(Decimal(s["cost"]) for s in mine)
+    ret = proceeds / cost - 1 if cost > 0 else None
+    target = thesis.get("target")
+    early = None
+    if target and ret is not None:
+        due = _add_months(date.fromisoformat(target["set_on"]), target["months"])
+        early = closed_on < due and ret * 100 < Decimal(target["return"]) * EARLY_SHARE
+    return {"return": str(ret.quantize(Decimal("0.0001"), ROUND_HALF_UP)) if ret is not None else None,
+            "days": (closed_on - date.fromisoformat(thesis["created_on"])).days, "early": early,
+            "target": target["return"] if target else None, "months": target["months"] if target else None}
+
+
 def new_thesis(symbol: str, validated: dict, *, today: date, snapshot: dict) -> dict:
     """A new thesis from validate_thesis(); snapshot holds the figures at that moment (each may be None)."""
+    target = validated.get("target")
     return {"id": uuid.uuid4().hex[:12], "symbol": symbol, "reasons": validated["reasons"], "note": validated["note"],
+            "target": {**target, "set_on": today.isoformat()} if target else None,
             "created_on": today.isoformat(), "snapshot": snapshot, "version": 1, "closed_on": None, "history": [],
             "conditions": [_fresh(c, today, snapshot.get("fair")) for c in validated["conditions"]]}
 
@@ -379,8 +436,11 @@ def edit_thesis(thesis: dict, raw: dict, *, company: str | None, today: date, fa
             history.append({**old, "ended_on": today.isoformat(), "ended_by": "edit"})
         conditions.append(_fresh(checked, today, fair))
     history += [{**c, "ended_on": today.isoformat(), "ended_by": "edit"} for c in thesis["conditions"] if c["id"] not in kept_ids]
-    history.append({"type": "edit", "on": today.isoformat(), "version": thesis["version"], "reasons": thesis["reasons"], "note": thesis["note"]})
-    return {**thesis, "reasons": validated["reasons"], "note": validated["note"], "conditions": conditions, "history": history,
+    history.append({"type": "edit", "on": today.isoformat(), "version": thesis["version"], "reasons": thesis["reasons"], "note": thesis["note"],
+                    **({"target": thesis["target"]} if thesis.get("target") else {})})
+    old, new = thesis.get("target"), validated.get("target")
+    target = None if not new else old if old and (old["return"], old["months"]) == (new["return"], new["months"]) else {**new, "set_on": today.isoformat()}
+    return {**thesis, "reasons": validated["reasons"], "note": validated["note"], "target": target, "conditions": conditions, "history": history,
             "version": thesis["version"] + 1}
 
 
@@ -401,4 +461,4 @@ def validate_thesis(raw: dict, *, company: str | None) -> dict:
     kept = [validate_condition(c, company=company) for c in conditions]
     if "fomo" in reasons and not any(c["kind"] == "loss_vs_cost" for c in kept):
         raise ThesisError("loss_limit_required", "Mua vì sợ bỏ lỡ thì cần đặt mức lỗ tối đa so với giá vốn.")
-    return {"reasons": [r for r in REASONS if r in reasons], "note": note, "conditions": kept}
+    return {"reasons": [r for r in REASONS if r in reasons], "note": note, "conditions": kept, "target": validate_target(raw.get("target"))}

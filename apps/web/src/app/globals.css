@@ -164,6 +164,10 @@ legend{font-weight:600;padding:0 6px}
 .sv-none{color:var(--muted);font-weight:400}
 .sv-chart{width:100%;height:auto;max-height:200px;margin:4px 0 12px}.sv-line{fill:none;stroke:var(--brand);stroke-width:2}.sv-now{stroke:var(--orange);stroke-dasharray:4 4}
 .sv-axis{fill:var(--muted);font-size:11px}
+/* Dự án và điểm rơi lợi nhuận: one bar per year, scaled to the largest year. */
+.pp-years{display:grid;gap:6px;margin:4px 0 14px}.pp-year{display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;gap:10px;align-items:center}
+.pp-bar{display:block;height:12px;border-radius:4px;background:var(--brand)}.pp-form{display:grid;gap:8px;margin-top:10px;max-width:560px}
+.th-target{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:8px}
 .macro-manual{background:var(--field)4c2}.macro-manual td{border-color:var(--macro-line)}
 /* Vĩ mô: fixed columns so the table fits its box; the long notes wrap under the name instead of widening the table. */
 .macro-table{width:100%;table-layout:fixed}.macro-table td{vertical-align:top;white-space:normal}

@@ -23,6 +23,7 @@ from investment_agent.services.system_health import health_report
 from investment_agent.services.theses import read_theses
 
 NEW_QUARTER_DAYS = 7
+EARLY_EXIT_DAYS = 30  # an early exit stays in Việc cần xem for a month after the thesis closed
 _ORDER = {"high": 0, "low": 1}
 
 
@@ -37,6 +38,11 @@ def attention_items(repo, owner, data_dir: Path, *, now: datetime) -> list[dict]
              for p in health_report(data_dir, now=now)["problems"]]
     for t in read_theses(repo, owner)[0]:
         if t.get("closed_on"):
+            e = t.get("exit") or {}
+            if e.get("early") and t["closed_on"] >= (now.date() - timedelta(days=EARLY_EXIT_DAYS)).isoformat():
+                items.append({"level": "low", "kind": "early_exit", "symbol": t["symbol"], "href": "/journal",
+                              "text": f"{t['symbol']}: đã bán sau {e['days']} ngày với lãi {_pct(e['return'])}, trong khi mục tiêu bạn đặt là {e['target']}% "
+                                      f"trong {e['months']} tháng. Ghi lại vì sao bán sớm vào Nhật ký."})
             continue
         for c in t["conditions"]:
             if c.get("status") == "broken" and not c.get("hold"):

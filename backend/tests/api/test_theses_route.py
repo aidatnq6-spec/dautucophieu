@@ -66,3 +66,20 @@ def test_a_thesis_is_saved_shown_with_live_states_and_refused_when_invalid(tmp_p
 def test_without_personal_store_theses_are_unavailable(tmp_path):
     clock = Clock()
     assert call(client(tmp_path, clock, repo=False), clock, "GET", "/internal/theses").status_code == 503
+
+
+def test_a_thesis_takes_an_optional_target_and_shows_its_progress(tmp_path):
+    SeriesStore(tmp_path / "trend-sources").upsert("FPT-1d", [(datetime(2026, 10, 28) + timedelta(days=i), v) for i, v in enumerate(["50", "56"])])
+    clock = Clock()
+    c = client(tmp_path, clock)
+    _held(c, clock)
+    bad = call(c, clock, "PUT", "/internal/theses", {"action": "save", "symbol": "FPT", **FOMO, "target": {"return": "0", "months": 6},
+                                                     "expected_version": 0, "request_id": "t0"})
+    assert bad.status_code == 422 and bad.json()["code"] == "invalid_target"
+    saved = call(c, clock, "PUT", "/internal/theses", {"action": "save", "symbol": "FPT", **FOMO, "target": {"return": "40", "months": 6},
+                                                       "expected_version": 0, "request_id": "t1"}).json()
+    t = saved["theses"][0]
+    assert t["target"]["return"] == "40" and t["progress"]["gain"] == "0.1200" and t["progress"]["reached"] is False
+    edited = call(c, clock, "PUT", "/internal/theses", {"action": "edit", "thesis_id": t["id"], **FOMO, "conditions": [{**t["conditions"][0]}],
+                                                        "target": None, "expected_version": 1, "request_id": "t2"}).json()
+    assert edited["theses"][0]["target"] is None and edited["theses"][0]["progress"] is None

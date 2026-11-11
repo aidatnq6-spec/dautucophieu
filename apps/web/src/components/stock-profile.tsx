@@ -20,6 +20,8 @@ import { PeerCompare } from "./peer-compare";
 import { AnnualPlans } from "./annual-plans";
 import { OperatingFigures } from "./operating-figures";
 import { BalanceWatch } from "./balance-watch";
+import { ReportReaction } from "./report-reaction";
+import { PropertyProjects } from "./property-projects";
 
 type Facts = { price: string | null; price_date: string | null; change_pct: string | null; high_52w: string | null; low_52w: string | null;
   shares: number | null; market_cap: string | null; avg_volume: number | null; avg_volume_sessions: number };
@@ -85,6 +87,10 @@ export function StockProfile({ symbol }: { symbol: string }) {
       </section>}
 
       {p.watched && <BalanceWatch symbol={p.symbol} />}
+
+      {p.watched && <PropertyProjects symbol={p.symbol} />}
+
+      {p.watched && <ReportReaction symbol={p.symbol} />}
 
       {p.watched && <section className="surface" aria-label="Bảng đèn chỉ báo sớm">
         <h2>Bảng đèn chỉ báo sớm</h2>

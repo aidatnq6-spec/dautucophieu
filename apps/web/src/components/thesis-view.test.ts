@@ -1,5 +1,5 @@
-import { expect, it } from "vitest";
-import { canHold, conditionParams, stateText } from "./thesis-view";
+import { describe, expect, it } from "vitest";
+import { canHold, conditionParams, progressText, stateText, targetFrom } from "./thesis-view";
 
 it("offers Giữ tiếp for a condition shown broken unless a hold is still in force", () => {
   const broken = { status: "broken", view: { state: "broken" as const, reading: null, reason: null }, hold: null };
@@ -28,4 +28,23 @@ it("names each state and when a broken condition was first seen", () => {
   expect(stateText({ state: "broken", reading: "x", reason: null }, "2026-11-02")).toEqual({ text: "Bị phá từ 02/11/2026", tone: "bad" });
   expect(stateText({ state: "broken", reading: "x", reason: null }, null)).toEqual({ text: "Bị phá", tone: "bad" });
   expect(stateText({ state: "unknown", reading: null, reason: "Chưa có F-Score" }, null)).toEqual({ text: "Chưa kiểm được", tone: "warn" });
+});
+
+
+describe("progressText", () => {
+  const p = { return: "40", months: 6, set_on: "2026-11-02", due: "2027-05-02", days_left: 120, gain: "0.1200", reached: false, overdue: false };
+  it("reads the gain against the target and the time left", () => {
+    expect(progressText(p)).toBe("Mục tiêu 40% trong 6 tháng: đang lãi 12%, còn 120 ngày (đến 02/05/2027).");
+    expect(progressText({ ...p, gain: "0.4500", reached: true, overdue: true, days_left: 0 })).toBe("Mục tiêu 40% trong 6 tháng: đang lãi 45%, đã đạt mục tiêu, đã quá thời hạn 6 tháng (02/05/2027).");
+    expect(progressText({ ...p, gain: "-0.0350" })).toContain("đang lỗ 3,5%");
+  });
+});
+
+describe("targetFrom", () => {
+  it("is no target when both are empty, and not ready when only one is filled or out of range", () => {
+    expect(targetFrom("", "")).toEqual({ ok: true, target: null });
+    expect(targetFrom("40,5", "6")).toEqual({ ok: true, target: { return: "40.5", months: 6 } });
+    expect(targetFrom("40", "").ok).toBe(false);
+    expect(targetFrom("40", "61").ok).toBe(false);
+  });
 });

@@ -279,3 +279,44 @@ def test_holding_on_takes_a_date_or_a_new_condition_not_both():
         hold_condition(t, loss, reason="Chờ", until=TODAY + timedelta(days=30), new_condition={"kind": "loss_vs_cost", "params": {"pct": "20"}},
                        today=TODAY, entry_id="j1", company="other")
     assert err.value.code == "hold_one_way"
+
+
+# --- Mục tiêu và thời hạn: the owner's own target return and horizon, optional ---
+
+def _with_target(target, today=TODAY):
+    raw = {"reasons": ["cheap"], "note": "Rẻ", "conditions": [{"kind": "loss_vs_cost", "params": {"pct": "10"}}], "target": target}
+    return new_thesis("FPT", validate_thesis(raw, company="other"), today=today, snapshot={"price": "50000"})
+
+
+def test_a_target_return_and_horizon_are_optional_and_checked():
+    from investment_agent.domain.thesis import validate_thesis as v
+    base = {"reasons": ["cheap"], "note": "", "conditions": [{"kind": "loss_vs_cost", "params": {"pct": "10"}}]}
+    assert v(base, company="other")["target"] is None
+    assert v({**base, "target": {"return": "40", "months": 6}}, company="other")["target"] == {"return": "40", "months": 6}
+    for bad in ({"return": "0", "months": 6}, {"return": "40", "months": 0}, {"return": "abc", "months": 6}, {"return": "40", "months": 61}, {"return": "40"}):
+        with pytest.raises(ThesisError) as err:
+            v({**base, "target": bad}, company="other")
+        assert err.value.code == "invalid_target"
+    assert _with_target({"return": "40", "months": 6})["target"] == {"return": "40", "months": 6, "set_on": "2026-11-02"}
+
+
+def test_progress_reads_the_gain_against_cost_and_the_time_left():
+    from investment_agent.domain.thesis import target_progress
+    t = _with_target({"return": "40", "months": 6})
+    p = target_progress(t, cost=Decimal(50000), price=Decimal(56000), today=date(2027, 1, 2))
+    assert p == {"return": "40", "months": 6, "set_on": "2026-11-02", "due": "2027-05-02", "days_left": 120, "gain": "0.1200", "reached": False, "overdue": False}
+    assert target_progress(t, cost=Decimal(50000), price=Decimal(72000), today=date(2027, 6, 1))["reached"] is True
+    assert target_progress(t, cost=None, price=Decimal(1), today=TODAY)["gain"] is None
+    assert target_progress(_with_target(None), cost=Decimal(1), price=Decimal(1), today=TODAY) is None
+
+
+def test_an_exit_well_short_of_the_target_before_its_time_is_marked_early():
+    from investment_agent.domain.thesis import exit_result
+    t = _with_target({"return": "40", "months": 6})
+    sells = [{"on": "2026-10-01", "quantity": 10, "proceeds": "999", "cost": "1"},  # before the thesis: not counted
+             {"on": "2026-12-15", "quantity": 100, "proceeds": "5300000", "cost": "5000000"}]
+    out = exit_result(t, sells, closed_on=date(2027, 1, 2))
+    assert out == {"return": "0.0600", "days": 61, "early": True, "target": "40", "months": 6}
+    assert exit_result(t, sells[1:], closed_on=date(2027, 6, 1))["early"] is False  # after the horizon
+    assert exit_result(_with_target(None), sells[1:], closed_on=date(2027, 1, 2))["early"] is None
+    assert exit_result(t, [], closed_on=date(2027, 1, 2)) is None

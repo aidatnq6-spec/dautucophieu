@@ -154,6 +154,16 @@ legend{font-weight:600;padding:0 6px}
   .fv-table td{border:0;padding:4px 0;text-align:left}
   .fv-table td[data-label]::before{content:attr(data-label) ": ";color:var(--muted);font-size:12px}
 }
+/* Toàn ngành: the heatmap's six tones mix the good and bad colours into the cell, so they follow the light and dark themes. */
+.sv-pick{max-width:360px;margin-bottom:14px}.sv-layers{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.sv-layers label{border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.sv-layers label.on{border-color:var(--brand);background:var(--nav-on-bg)}.sv-layers input{margin:0}
+.sv-heat th,.sv-heat td{padding:7px 9px}.sv-heat td{font-variant-numeric:tabular-nums;font-weight:600}.sv-heat tr.sv-total th,.sv-heat tr.sv-total td{border-top:2px solid var(--line)}
+.sv-g1{background:color-mix(in srgb,var(--good) 14%,transparent)}.sv-g2{background:color-mix(in srgb,var(--good) 30%,transparent)}.sv-g3{background:color-mix(in srgb,var(--good) 50%,transparent)}
+.sv-r1{background:color-mix(in srgb,var(--bad) 14%,transparent)}.sv-r2{background:color-mix(in srgb,var(--bad) 30%,transparent)}.sv-r3{background:color-mix(in srgb,var(--bad) 50%,transparent)}
+.sv-none{color:var(--muted);font-weight:400}
+.sv-chart{width:100%;height:auto;max-height:200px;margin:4px 0 12px}.sv-line{fill:none;stroke:var(--brand);stroke-width:2}.sv-now{stroke:var(--orange);stroke-dasharray:4 4}
+.sv-axis{fill:var(--muted);font-size:11px}
 .macro-manual{background:var(--field)4c2}.macro-manual td{border-color:var(--macro-line)}
 /* Vĩ mô: fixed columns so the table fits its box; the long notes wrap under the name instead of widening the table. */
 .macro-table{width:100%;table-layout:fixed}.macro-table td{vertical-align:top;white-space:normal}

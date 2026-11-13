@@ -43,3 +43,22 @@ def test_a_failed_or_empty_answer_keeps_what_was_stored_and_a_fund_that_drops_ou
 
 def test_no_data_dir_or_no_file_means_no_nav(tmp_path):
     assert fund_navs(None) == {} and fund_navs(tmp_path) == {}
+
+
+def profiled(code, nav, ms, kind, ytd, m12, m36=None, m60=None, fee=1.95, manager="DCVFM"):
+    return {**row(code, nav, ms, f"Quỹ {code}"), "managementFee": fee, "owner": {"shortName": manager},
+            "dataFundAssetType": {"code": kind, "name": "x"},
+            "productNavChange": {"navToLastYear": ytd, "navTo1Months": -1.1, "navTo3Months": -3.38, "navTo6Months": -13.17, "navTo12Months": m12,
+                                 "navTo36Months": m36, "navTo60Months": m60, "annualizedReturn36Months": 13.71}}
+
+
+def test_each_fund_keeps_its_kind_manager_fee_and_returns_and_a_nav_point_a_day(tmp_path):
+    from investment_agent.market.fund_nav import fund_history, fund_profiles
+    store = FundNavStore(tmp_path)
+    fund_nav_sync(store, post=lambda u, b: page(profiled("DCDS", 91922.4, 1794502800000, "STOCK", -14.19, -9.64, 47.02, 17.05)), now=NOW)
+    assert fund_profiles(tmp_path)["DCDS"] == {"kind": "STOCK", "manager": "DCVFM", "fee": "1.95", "returns": {
+        "ytd": "-14.19", "m1": "-1.1", "m3": "-3.38", "m6": "-13.17", "m12": "-9.64", "m36": "47.02", "m60": "17.05", "annual36": "13.71"}}
+    fund_nav_sync(store, post=lambda u, b: page(profiled("DCDS", 92000.0, 1794589200000, "STOCK", -14.1, -9.5)), now=NOW)
+    fund_nav_sync(store, post=lambda u, b: page(profiled("DCDS", 92000.0, 1794589200000, "STOCK", -14.1, -9.5)), now=NOW)  # same day again
+    assert fund_history(tmp_path)["DCDS"] == {"2026-11-13": "91922.4", "2026-11-14": "92000"}
+    assert fund_profiles(tmp_path)["DCDS"]["returns"]["m36"] is None  # a period the source leaves out stays blank

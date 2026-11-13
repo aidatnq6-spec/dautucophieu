@@ -13,6 +13,7 @@ from investment_agent.api.app import create_app
 from investment_agent.api.auth import InternalAuthSettings
 from investment_agent.insights.store import InsightStore
 from investment_agent.jobs.runner import JobStore
+from investment_agent.market.fund_nav import FundNavStore
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.leading import MacroStore
 from investment_agent.market.series import SeriesStore
@@ -60,6 +61,12 @@ if __name__ == "__main__":
         json.dump({"as_of": "2026-10-25", "source": "synthetic", "level": 2, "sectors": {"FPT": "Công nghệ Thông tin", "VCB": "Ngân hàng", "ACB": "Ngân hàng"}}, f,
                   ensure_ascii=False)
     SnapshotStore(os.path.join(data, "trend")).save(TREND)
+    _returns = lambda ytd, m12: {"ytd": ytd, "m1": None, "m3": None, "m6": None, "m12": m12, "m36": None, "m60": None, "annual36": None}  # noqa: E731
+    FundNavStore(data).save({"source": "Fmarket", "fetched_at": "2026-10-23T13:00:00+00:00", "funds": {
+        "QCP": {"name": "Quỹ cổ phiếu thử", "nav": "25000", "date": "2026-10-22"},
+        "QTP": {"name": "Quỹ trái phiếu thử", "nav": "12000", "date": "2026-10-22"}}, "profiles": {
+        "QCP": {"kind": "STOCK", "manager": "Công ty A", "fee": "1.9", "returns": _returns("12.5", "18.2")},
+        "QTP": {"kind": "BOND", "manager": "Công ty B", "fee": "0.8", "returns": _returns("4.1", "3.9")}}})
     # Reference valuation: FPT with P/E 12 every year and yearly cash dividends; VCB has no statements.
     FundamentalsStore(os.path.join(data, "fundamentals")).save({
         "symbol": "FPT", "fetched_at": "2026-10-26T00:00:00+00:00", "source": "synthetic",

@@ -56,3 +56,21 @@ def test_vndirect_events_become_the_same_events_with_vietnamese_names():
     assert out["FPT-a2"]["kind"] == "issue" and out["FPT-a2"]["title"].startswith("Thưởng cổ phiếu")
     assert out["FPT-a3"]["kind"] == "meeting" and out["FPT-a3"]["key_date"] == "2026-03-26"
     assert out["FPT-a4"]["kind"] == "other" and out["FPT-a4"]["key_date"] is None
+
+
+def test_the_board_also_carries_the_day_band_and_range_for_the_trend_page():
+    def get(url):
+        if "stock_prices" in url:
+            return json.dumps({"data": [{"code": "FPT", "date": "2026-11-13", "basicPrice": 49.55, "close": 50.1, "nmVolume": 10.0, "nmValue": 1.0,
+                                         "ceilingPrice": 53.0, "floorPrice": 46.1, "high": 51.0, "low": 49.1}]})
+        return json.dumps({"data": []})
+    row = price_board(["FPT"], get=get, today=date(2026, 11, 13))[0]
+    assert (row["ceiling"], row["floor"], row["highest"], row["lowest"]) == (53000, 46100, 51000, 49100)
+
+
+def test_index_levels_are_the_last_two_closes_at_the_close_of_their_day():
+    from investment_agent.market.providers.vndirect_data import index_levels
+    get = lambda url: json.dumps({"data": [{"code": "VN30", "date": "2026-11-13", "close": 1844.91}, {"code": "VN30", "date": "2026-11-12", "close": 1839.43},
+                                           {"code": "VN30", "date": "2026-11-11", "close": 1855.27}]})  # noqa: E731
+    points = index_levels("VN30", get=get, today=date(2026, 11, 13))
+    assert [(t.date().isoformat(), t.hour, v) for t, v in points] == [("2026-11-12", 15, "1839.43"), ("2026-11-13", 15, "1844.91")]

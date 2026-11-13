@@ -23,7 +23,7 @@ from investment_agent.settings import Settings
 from ..auth import require_owner
 from .common import WRITE_ERRORS, error, now, unavailable, write_error
 
-# One board read serves every poll for a while: Vnstock's free tier allows 60 calls a minute.
+# One board read serves every poll for a while (VNDirect's public API; it was Vnstock's free tier until 11/2026).
 BOARD_TTL = {True: timedelta(seconds=15), False: timedelta(minutes=5)}
 MACRO_TTL = timedelta(seconds=15)
 _board_cache: dict[str, tuple] = {}
@@ -40,21 +40,21 @@ def trend(request: Request):
     return {"snapshot": SnapshotStore(Path(data_dir) / "trend").latest() if data_dir is not None else None}
 
 
-class _Vnstock:
-    """Vnstock's free tier behind the three reads the board and chart need, and a plain GET for Coinbase's public stats."""
+class _Source:
+    """VNDirect's public API behind the three reads the board and chart need (end of day: Vnstock 6.0.0 serves prices only with
+    a broker key), and a plain GET for Coinbase's public stats."""
 
     def __init__(self):
         from investment_agent.market.providers.vnstock_adapter import VnstockProvider
-        self.provider = VnstockProvider()
+        self.provider = VnstockProvider()  # its prices come from VNDirect (vndirect_market.py)
 
     def board(self, symbols):
-        from investment_agent.market.providers.vnstock_adapter import LIVE_FIELDS, price_board
-        return price_board(symbols, LIVE_FIELDS)
+        from investment_agent.market.providers.vndirect_data import price_board
+        return price_board(symbols)
 
     def index_minutes(self, index):
-        from datetime import date
-        today = date.today()
-        return self.provider.index_minutes(index, today - timedelta(days=7), today)
+        from investment_agent.market.providers.vndirect_data import index_levels
+        return index_levels(index)
 
     def get(self, url):
         import httpx
@@ -67,7 +67,7 @@ class _Vnstock:
 
 
 def _source():
-    return _Vnstock()
+    return _Source()
 
 
 @router.get("/trend/board")

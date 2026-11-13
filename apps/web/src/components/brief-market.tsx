@@ -137,7 +137,7 @@ export function BriefMarket({ market, session }: { market: MarketSection | null;
       {news.status === "ok" ? (news.items.length ? <ul className="bm-list" aria-label="Tin nóng">{news.items.map((n) => <li key={n.url}>
         <a href={n.url} target="_blank" rel="noreferrer">{n.title}</a> <span className="caption">{n.source} · {time(n.published)} · liên quan: {n.reason}</span>
       </li>)}</ul> : <p className="muted">Không có tin liên quan đến mã đang nắm, mã theo dõi hoặc vĩ mô.</p>) : <Gap what="Tin tức" section={news} />}
-      <p className="caption">Số liệu công khai (Vnstock, HOSE, RSS CafeF/Vietstock/Vneconomy); chỉ để theo dõi, không phải khuyến nghị.</p>
+      <p className="caption">Số liệu công khai (VNDirect, HOSE, RSS CafeF/Vietstock/Vneconomy); chỉ để theo dõi, không phải khuyến nghị.</p>
     </section>
   );
 }

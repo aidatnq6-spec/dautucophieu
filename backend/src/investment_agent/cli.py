@@ -246,10 +246,35 @@ def vnstock_audit(symbols: list[str], output_dir: Path, provider=None, today=Non
     return 0
 
 
-def index_groups(groups: list[str], output: Path, provider=None, today=None) -> int:
+def _read_json(path: Path) -> dict:
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def index_groups(groups: list[str], output: Path, provider=None, today=None, get=None) -> int:
+    """VN30 from VNDirect (its listing marks VN30 members only); the other groups have no public source since Vnstock 6.0.0, so their
+    saved members are kept with the day they were taken ("kept"), never worked out."""
     from datetime import date
-    from investment_agent.market.providers.vnstock_adapter import SOURCE, ProviderUnavailable, VnstockProvider
-    provider = provider or VnstockProvider()
+    if provider is None:
+        from investment_agent.market.providers import vndirect_data as vd
+        today = today or date.today()
+        saved = _read_json(output)
+        members, kept = {}, {}
+        for g in groups:
+            fresh = vd.index_members(g, get=get or vd.default_get)
+            if fresh:
+                members[g] = fresh
+            elif g in saved.get("groups", {}):
+                members[g] = saved["groups"][g]
+                kept[g] = (saved.get("kept") or {}).get(g) or saved.get("as_of")
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps({"as_of": today.isoformat(), "source": "vndirect:finfo", "groups": members, "kept": kept}, ensure_ascii=False,
+                                     indent=1) + "\n", encoding="utf-8")
+        print(json.dumps({"status": "ok", "groups": {g: len(m) for g, m in members.items()}, "kept": kept}))
+        return 0
+    from investment_agent.market.providers.vnstock_adapter import SOURCE, ProviderUnavailable
     try:
         members = {g: provider.index_members(g) for g in groups}
     except ProviderUnavailable as exc:
@@ -506,10 +531,34 @@ def index_valuation_sync(data_dir: Path, get=None, today=None) -> int:
     return 0 if not failed else 1
 
 
-def industries(symbols: list[str], output: Path, provider=None, today=None) -> int:
+def industries(symbols: list[str], output: Path, provider=None, today=None, get=None) -> int:
+    """ICB level-2 sectors of the watched tickers. Without a provider: VNDirect's classification, named as the application names
+    sectors (the names in hose-listing.json, which decide banks, securities firms and insurers). A ticker already classified keeps
+    its sector; where VNDirect classifies it differently, the difference is reported for the owner, not applied."""
     from datetime import date
-    from investment_agent.market.providers.vnstock_adapter import ProviderUnavailable, VnstockProvider
-    provider = provider or VnstockProvider()
+    if provider is None:
+        from investment_agent.market.providers import vndirect_data as vd
+        today = today or date.today()
+        saved = _read_json(output).get("sectors", {})
+        names = (_read_json(Path(output).parent / "hose-listing.json").get("listing") or {}).get("icb_names", {})
+        found = vd.sector_codes(get=get or vd.default_get)
+        mapped = {s: names.get(code, vnd_name) for s, (code, vnd_name) in found.items()}
+        sectors, added, differ = {}, [], []
+        for s in symbols:
+            if s in saved:
+                sectors[s] = saved[s]
+                if s in mapped and mapped[s] != saved[s]:
+                    differ.append({"symbol": s, "kept": saved[s], "vndirect": mapped[s]})
+            elif s in mapped:
+                sectors[s] = mapped[s]
+                added.append(s)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps({"as_of": today.isoformat(), "source": "vndirect:finfo", "level": 2, "sectors": dict(sorted(sectors.items()))},
+                                     ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        print(json.dumps({"status": "ok", "classified": len(sectors), "added": sorted(added), "unclassified": sorted(set(symbols) - set(sectors)),
+                          "differ": differ}, ensure_ascii=False))
+        return 0
+    from investment_agent.market.providers.vnstock_adapter import ProviderUnavailable
     try:
         sectors = provider.industry_map(symbols, level=2)
     except ProviderUnavailable as exc:

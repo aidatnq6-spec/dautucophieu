@@ -113,7 +113,7 @@ def test_the_last_unadjusted_close_of_each_year_is_kept_with_its_day():
 def test_a_ticker_synced_before_year_end_closes_existed_takes_the_whole_price_history(tmp_path):
     store = StatementStore(tmp_path)
     store.save({"symbol": "HPG", "fetched_at": "2026-10-01T00:00:00+00:00", "source": "vndirect:finfo", "quarters": {}, "years": {},
-                "lines_version": 2})  # its lines are current: only the closes are missing
+                "lines_version": 3})  # its lines are current: only the closes are missing
     get = Get()
     sync_statements(store, {"HPG": "Tài nguyên Cơ bản"}, get=get, now=NOW, limit=None, sleep=lambda s: None)
     prices = [u for u in get.urls if "stock_prices" in u]
@@ -226,9 +226,14 @@ def test_a_ticker_kept_before_the_advances_lines_is_due_and_takes_its_whole_hist
     assert sync_statements(store, {"HPG": "Tài nguyên Cơ bản"}, get=get2, now=NOW, limit=None, sleep=lambda s: None) == {} and get2.urls == []
 
 
-def test_a_bank_needs_no_new_lines(tmp_path):
+def test_a_bank_follows_its_own_layout_version(tmp_path):
+    from investment_agent.market.statements import FIN_LINES_VERSION
     store = StatementStore(tmp_path)
-    store.save({"symbol": "VCB", "fetched_at": "2026-11-06T00:00:00+00:00", "source": "vndirect:finfo", "kind": "bank", "quarters": {}, "years": {},
-                "year_end_close": {}, "quarter_end_close": {}})
+    base = {"symbol": "VCB", "fetched_at": "2026-11-06T00:00:00+00:00", "source": "vndirect:finfo", "kind": "bank", "quarters": {}, "years": {},
+            "year_end_close": {}, "quarter_end_close": {}}
+    store.save({**base, "lines_version": FIN_LINES_VERSION})
     get = Get()
     assert sync_statements(store, {"VCB": "Ngân hàng"}, get=get, now=NOW, limit=None, sleep=lambda s: None, kinds=("bank",)) == {} and get.urls == []
+    store.save(base)  # kept before EPS was taken
+    assert sync_statements(store, {"VCB": "Ngân hàng"}, get=Get(), now=NOW, limit=None, sleep=lambda s: None, kinds=("bank",)) == {"VCB": "ok"}
+    assert store.read("VCB")["lines_version"] == FIN_LINES_VERSION

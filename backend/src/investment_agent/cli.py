@@ -380,6 +380,7 @@ def fundamentals_sync(data_dir: Path, *, limit: int | None, symbols: list[str] |
     import time
     from datetime import datetime, timezone
     from investment_agent.market.fundamentals import FundamentalsStore, sync_fundamentals
+    from investment_agent.market.fundamentals_vndirect import VndirectFundamentals
     from investment_agent.market.providers.vnstock_adapter import VnstockProvider
     from investment_agent.market.series import SeriesStore
     from investment_agent.market.watchlist import load_watchlist
@@ -387,7 +388,7 @@ def fundamentals_sync(data_dir: Path, *, limit: int | None, symbols: list[str] |
     # Named tickers are refreshed now (max age 0); otherwise the stalest watched tickers, more often in the months reports are due.
     max_age, limit = (0, limit) if symbols else (3, max(limit or 0, 17)) if now.month in REPORTING_MONTHS else (7, limit)
     out = sync_fundamentals(FundamentalsStore(data_dir / "fundamentals"), SeriesStore(data_dir / "trend-sources"),
-                            symbols or list(load_watchlist(data_dir).symbols), provider=provider or VnstockProvider(),
+                            symbols or list(load_watchlist(data_dir).symbols), provider=provider or VndirectFundamentals(data_dir, prices=VnstockProvider()),
                             now=now, limit=limit, max_age_days=max_age, sleep=sleep or time.sleep)
     print(json.dumps(out, ensure_ascii=False))
     return 1 if out["errors"] else 0
@@ -936,8 +937,14 @@ def health_check_cli(data_dir: Path, telegram=None) -> int:
     a problem found is the check working."""
     from datetime import datetime, timezone
 
+    from investment_agent.domain.pinned import CONFIG_DIR
     from investment_agent.services.system_health import alert_changes, health_report, render_changes
-    report = health_report(data_dir, now=datetime.now(timezone.utc))
+    now = datetime.now(timezone.utc)
+    try:  # the brief check needs this year's trading calendar; without it the other checks still run
+        calendar = load_calendar(CONFIG_DIR / f"trading-calendar-hose-{now.year}.json")
+    except (OSError, ValueError, KeyError):
+        calendar = None
+    report = health_report(data_dir, now=now, calendar=calendar)
     new, recovered = alert_changes(report["problems"], data_dir, save=False)
     if not new and not recovered:
         print(json.dumps({"status": "ok", "problems": len(report["problems"]), "sent": False}))

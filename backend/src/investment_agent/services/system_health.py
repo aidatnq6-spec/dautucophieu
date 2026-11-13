@@ -25,7 +25,7 @@ SOURCES = ({"id": "prices", "label": "Giá VN-Index", "dir": None, "max_days": 6
            {"id": "macro", "label": "Vĩ mô", "dir": "macro", "max_days": 3},
            {"id": "trend", "label": "Xu hướng", "dir": "trend", "max_days": 6},
            {"id": "events", "label": "Lịch sự kiện", "dir": "events", "max_days": 3},
-           {"id": "fundamentals", "label": "Báo cáo Vnstock", "dir": "fundamentals", "max_days": 4},
+           {"id": "fundamentals", "label": "Báo cáo cơ bản (VNDirect)", "dir": "fundamentals", "max_days": 4},
            {"id": "statements", "label": "Báo cáo VNDirect", "dir": "statements", "max_days": 4},
            {"id": "financial-ratios", "label": "Chỉ số ngành", "dir": "financial-ratios", "max_days": 4},
            {"id": "valuation-check", "label": "Đối chiếu định giá (VNDirect)", "dir": "valuation-check", "max_days": 4},
@@ -70,7 +70,41 @@ def _dmy(d: datetime) -> str:
     return d.strftime("%d/%m/%Y")
 
 
-def health_report(data_dir: Path, *, now: datetime) -> dict:
+BRIEF_DUE = (16, 30)  # by then the 15:30 run has normally sent the session's brief (it takes about 15 minutes)
+_VN = timezone(timedelta(hours=7))
+
+
+def brief_problem(lines: list[str], calendar, *, now: datetime) -> dict | None:
+    """The latest session whose brief is due (from 16:30 that day) and was not published: either the run did not reach the step
+    that sends it, or the step found data missing. Read from the after-close summary lines of the log."""
+    local = now.astimezone(_VN)
+    day = local.date()
+    if not (calendar.is_session(day) and (local.hour, local.minute) >= BRIEF_DUE):
+        earlier = calendar.sessions(day - timedelta(days=14), day - timedelta(days=1))
+        if not earlier:
+            return None
+        day = earlier[-1]
+    states = []
+    for line in lines:
+        bare = _BARE.match(line.lstrip("\ufeff"))
+        if not bare or f'"session": "{day.isoformat()}"' not in line:
+            continue
+        try:
+            summary = json.loads(line[line.index("{"):])
+        except ValueError:
+            continue
+        if "published" in (summary.get("reports") or []) or summary.get("reason") == "already_published":
+            return None
+        states.append(summary)
+    when = day.strftime("%d/%m/%Y")
+    if any("incomplete" in (s.get("reports") or []) for s in states):
+        detail = f"phiên {when} thiếu dữ liệu nên chưa gửi bản tin"
+    else:
+        detail = f"phiên {when}: lượt sau phiên chưa chạy tới bước gửi bản tin"
+    return {"id": f"brief:{day.isoformat()}", "label": "Bản tin sau phiên", "detail": detail}
+
+
+def health_report(data_dir: Path, *, now: datetime, calendar=None) -> dict:
     data_dir = Path(data_dir)
     root = data_dir.parent
     problems, sources = [], []
@@ -93,6 +127,10 @@ def health_report(data_dir: Path, *, now: datetime) -> dict:
         problems.append({"id": "after-close", "label": "Lịch sau phiên", "detail": "chưa thấy lượt chạy nào trong nhật ký"})
     elif now - last_finish > timedelta(days=AFTER_CLOSE_MAX_DAYS):
         problems.append({"id": "after-close", "label": "Lịch sau phiên", "detail": f"lượt chạy xong gần nhất là {_dmy(last_finish)}"})
+    if calendar is not None and lines is not None:
+        brief = brief_problem(lines, calendar, now=now)
+        if brief:
+            problems.append(brief)
     for s in steps:
         if s["failing"] >= FAILS_BEFORE_ALERT:
             problems.append({"id": f"step:{s['step']}", "label": s["step"], "detail": f"lỗi {s['failing']} lần liên tiếp (mã {s['exit']})"})

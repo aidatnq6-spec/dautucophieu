@@ -165,12 +165,23 @@ def sync_fundamentals(store: "FundamentalsStore", series, symbols: list[str], *,
         if i:
             sleep(PACE_SECONDS)
         try:
-            frames = _with_retry(lambda: provider.fundamentals_frames(sym), sleep)
+            built = (_with_retry(lambda: provider.record(sym, now), sleep) if hasattr(provider, "record")  # VNDirect since 11/2026
+                     else build_record(sym, _with_retry(lambda: provider.fundamentals_frames(sym), sleep), now))
             key = f"{sym}-1d"
             start = today - timedelta(days=2920 if len(series.read(key)) < 400 else 60)
             series.upsert(key, _with_retry(lambda: provider.fetch_closes(sym, start, today, interval="1D", index=False), sleep))
             previous = store.read(sym)
-            record = _keep_older_periods(build_record(sym, frames, now), previous)
+            record = _keep_older_periods(built, previous)
+            if previous and built.get("source") == "vndirect:finfo":  # figures VNDirect lacks (a bank's annual lines) stay as fetched before
+                for key in ("years", "quarters", "annual"):
+                    for period, old in (previous.get(key) or {}).items():
+                        if period in record.get(key, {}):
+                            record[key][period] = {**old, **record[key][period]}
+                # VNDirect's share count (ratio 51004) lags some issues and buybacks (SHB, PLX, VIC in 11/2026) and the balance sheet's
+                # charter capital lags stock dividends: the count already held (Vnstock, 11/2026) stays; VNDirect's is kept beside it.
+                if previous.get("shares_outstanding"):
+                    record["shares_vndirect"] = record.get("shares_outstanding")
+                    record["shares_outstanding"] = previous["shares_outstanding"]
             record["latest_quarter_seen"] = _quarter_seen(record, previous, today)
             store.save(record)
             updated.append(sym)

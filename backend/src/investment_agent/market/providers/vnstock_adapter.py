@@ -51,12 +51,17 @@ class VnstockProvider:
         self._ownership = ownership  # callable symbol -> object with .ownership(); Company(source="KBS") when None (VCI does not serve it)
 
     def _api(self):
-        if self._market is None or self._fundamental is None:
+        """Prices come from VNDirect's public API unless a market is given: Vnstock 6 (11/2026) serves prices only with the owner's own
+        broker key (see vndirect_market.py). The fundamentals object stays Vnstock's, made when first needed."""
+        if self._market is None:
+            from .vndirect_market import VndirectMarket
+            self._market = VndirectMarket()
+        if self._fundamental is None:
             try:
-                from vnstock import Fundamental, Market
+                from vnstock import Fundamental
             except ImportError as exc:
                 raise ProviderUnavailable("vnstock is not installed; install it from vnstocks.com with your own key") from exc
-            self._market, self._fundamental = self._market or Market(), self._fundamental or Fundamental()
+            self._fundamental = Fundamental()
         return self._market, self._fundamental
 
     def _listing_api(self):
@@ -209,7 +214,8 @@ class VnstockProvider:
                 if any(not v.is_finite() for v in values.values()):
                     continue
                 bar = PriceBar(entity_id=symbol, session_date=row["time"].date(), **{k: format(v.normalize(), "f") for k, v in values.items()},
-                               volume=int(row["volume"]), currency=currency, source_id=f"vnstock:{SOURCE}", observed_at=observed,
+                               volume=int(row["volume"]), currency=currency, source_id=getattr(self._market, "source_id", f"vnstock:{SOURCE}"),
+                               observed_at=observed,
                                provenance_mode="latest_restated", price_basis=basis)
             except (InvalidOperation, ValidationError, TypeError, ValueError, KeyError):
                 continue

@@ -24,5 +24,5 @@
 ## Vận hành và dữ liệu
 - Lịch Windows `InvestmentAgent-AfterClose` chạy [scripts/windows/run-after-close.ps1](scripts/windows/run-after-close.ps1) lúc 08:30, 15:30, 20:00 và khi đăng nhập; mỗi bước ghi một dòng vào `logs/scheduler.log`.
 - Bản tin Telegram gửi một lần lúc 15:30 và không sửa sau đó; trang web đọc lại ảnh chụp phiên (`data/brief/`) nên số HOSE hiện sau lượt 20:00.
-- Vnstock 5.2 gói Cộng đồng: báo cáo tài chính chỉ 8 năm (từ 2018), tối đa 60 lượt gọi/phút, nguồn MAS bị chặn. Giá ngày có từ khoảng 2010.
+- Vnstock 6.0.0 (bắt buộc từ 11/11/2026) bỏ các nguồn miễn phí: mọi nguồn giá cần khóa API của công ty chứng khoán. Giá ngày và VN-Index nay lấy từ API công khai VNDirect (`market/providers/vndirect_market.py`, cùng giá đã điều chỉnh); bảng giá toàn sàn, sự kiện doanh nghiệp, ngành ICB, nhóm chỉ số, cổ đông và giá trong phiên vẫn gọi Vnstock nên đang thiếu.
 - Nguồn công khai đọc theo robots.txt; không lấy VnExpress.

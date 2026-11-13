@@ -120,6 +120,28 @@ class FundamentalsStore:
 PACE_SECONDS, RETRY_WAIT_SECONDS = 15, 65
 
 
+SHARES_AGREE = Decimal("0.001")  # two sources within 0.1% count as the same figure
+
+
+def _agree(a: str | None, b: str | None) -> bool:
+    return a is not None and b is not None and abs(Decimal(a) / Decimal(b) - 1) <= SHARES_AGREE
+
+
+def decide_shares(held: str | None, hose: str | None, vndirect: str | None) -> tuple[str | None, dict]:
+    """The shares outstanding to keep. No single source is right every time (11/2026: VNDirect's count lagged SHB's issue, HOSE's
+    lagged TCB's bonus shares), so a held count changes only when HOSE and VNDirect agree on the new one; HOSE alone sets a ticker's
+    first count. When they disagree the held count stays and the check says so."""
+    check = {"held": held, "hose": hose, "vndirect": vndirect}
+    if held is None:
+        new = hose or vndirect
+        return new, {**check, "decision": "hose" if hose else "vndirect" if vndirect else "none"}
+    if hose is not None and _agree(hose, held):
+        return held, {**check, "decision": "unchanged"}
+    if _agree(hose, vndirect):
+        return hose, {**check, "decision": "both_sources"}
+    return held, {**check, "decision": "conflict" if hose is not None else "unchanged"}
+
+
 def _with_retry(call, sleep):
     try:
         return call()
@@ -160,7 +182,7 @@ def sync_fundamentals(store: "FundamentalsStore", series, symbols: list[str], *,
     """Refresh statements (and 8 years of daily closes for year-end prices) for the stalest tickers, paced for the rate limit."""
     todo = store.stale(symbols, now=now, max_age_days=max_age_days)
     todo = todo if limit is None else todo[:limit]
-    updated, errors, today = [], {}, now.date()
+    updated, errors, today, conflicts = [], {}, now.date(), []
     for i, sym in enumerate(todo):
         if i:
             sleep(PACE_SECONDS)
@@ -177,14 +199,14 @@ def sync_fundamentals(store: "FundamentalsStore", series, symbols: list[str], *,
                     for period, old in (previous.get(key) or {}).items():
                         if period in record.get(key, {}):
                             record[key][period] = {**old, **record[key][period]}
-                # VNDirect's share count (ratio 51004) lags some issues and buybacks (SHB, PLX, VIC in 11/2026) and the balance sheet's
-                # charter capital lags stock dividends: the count already held (Vnstock, 11/2026) stays; VNDirect's is kept beside it.
-                if previous.get("shares_outstanding"):
-                    record["shares_vndirect"] = record.get("shares_outstanding")
-                    record["shares_outstanding"] = previous["shares_outstanding"]
+            if built.get("source") == "vndirect:finfo":
+                shares, check = decide_shares((previous or {}).get("shares_outstanding"), built.get("shares_hose"), built.get("shares_outstanding"))
+                record["shares_vndirect"], record["shares_outstanding"], record["shares_check"] = built.get("shares_outstanding"), shares, check
+                if check["decision"] == "conflict":
+                    conflicts.append(sym)
             record["latest_quarter_seen"] = _quarter_seen(record, previous, today)
             store.save(record)
             updated.append(sym)
         except Exception as exc:  # one ticker never stops the others
             errors[sym] = f"error:{type(exc).__name__}"
-    return {"updated": updated, "errors": errors}
+    return {"updated": updated, "errors": errors, **({"shares_conflicts": conflicts} if conflicts else {})}

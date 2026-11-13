@@ -50,8 +50,16 @@ def test_the_source_reads_the_stored_statements_events_and_shares(tmp_path):
         if "ratios/latest" in url:
             return json.dumps({"data": [{"itemCode": "51004", "value": 1.885727648e9, "reportDate": "2026-12-31"}]})
         raise AssertionError(url)
-    rec = VndirectFundamentals(tmp_path, get=get).record("FPT", NOW)
-    assert rec["shares_outstanding"] == "1885727648" and rec["years"]["2025"]["eps"] == "5200"
+    hose = lambda url: json.dumps({"data": {"list": [{"code": "FPT", "outStanding": "1,885,727,648", "listingVolume": "1,885,727,648"}]}})  # noqa: E731
+    rec = VndirectFundamentals(tmp_path, get=get, hose_get=hose).record("FPT", NOW)
+    assert rec["shares_outstanding"] == "1885727648" and rec["shares_hose"] == "1885727648" and rec["years"]["2025"]["eps"] == "5200"
+
+
+def test_hose_outstanding_is_read_from_its_listing_api():
+    from investment_agent.market.providers.hose_data import outstanding
+    payload = {"data": {"list": [{"code": "SHB", "outStanding": "5,343,703,838", "listingVolume": "4,594,200,024"}]}}
+    assert outstanding("SHB", get=lambda url: json.dumps(payload)) == "5343703838"
+    assert outstanding("SHB", get=lambda url: json.dumps({"data": {"list": []}})) is None
 
 
 def test_sync_uses_a_source_that_builds_the_record_itself(tmp_path):
@@ -104,3 +112,42 @@ def test_the_share_count_already_held_stays_and_vndirects_is_kept_beside_it(tmp_
     sync_fundamentals(store, SeriesStore(tmp_path / "trend-sources"), ["SHB"], provider=Source(), now=NOW, limit=None, sleep=lambda s: None)
     rec = store.read("SHB")
     assert rec["shares_outstanding"] == "5343703838" and rec["shares_vndirect"] == "4884333454"
+
+
+def _sync_shares(tmp_path, held, hose, vndirect):
+    from investment_agent.market.fundamentals import FundamentalsStore, sync_fundamentals
+    from investment_agent.market.series import SeriesStore
+    store = FundamentalsStore(tmp_path / "fundamentals")
+    if held:
+        store.save({"symbol": "TCB", "fetched_at": "2026-11-01T00:00:00+00:00", "source": "vnstock:vci", "years": {}, "quarters": {}, "annual": {},
+                    "dividends": [], "issues": [], "share_issues": [], "shares_outstanding": held})
+
+    class Source:
+        def record(self, sym, now):
+            return {**build_record(sym, {"years": {}, "quarters": {}}, [], shares=vndirect, now=now), "shares_hose": hose}
+
+        def fetch_closes(self, sym, start, end, *, interval, index):
+            return []
+    sync_fundamentals(store, SeriesStore(tmp_path / "trend-sources"), ["TCB"], provider=Source(), now=NOW, limit=None, sleep=lambda s: None)
+    return store.read("TCB")
+
+
+def test_a_share_count_changes_only_when_hose_and_vndirect_agree(tmp_path):
+    rec = _sync_shares(tmp_path, "1460374611", "1534951081", "1534951081")
+    assert rec["shares_outstanding"] == "1534951081" and rec["shares_check"]["decision"] == "both_sources"
+
+
+def test_hose_matching_the_held_count_keeps_it(tmp_path):
+    rec = _sync_shares(tmp_path, "5343703838", "5343703838", "4884333454")
+    assert rec["shares_outstanding"] == "5343703838" and rec["shares_check"]["decision"] == "unchanged"
+
+
+def test_sources_that_disagree_keep_the_held_count_and_say_so(tmp_path):
+    rec = _sync_shares(tmp_path, "10629360621", "7086240414", "10629355539")
+    assert rec["shares_outstanding"] == "10629360621"
+    assert rec["shares_check"] == {"held": "10629360621", "hose": "7086240414", "vndirect": "10629355539", "decision": "conflict"}
+
+
+def test_a_new_ticker_takes_hoses_count(tmp_path):
+    rec = _sync_shares(tmp_path, None, "3000500833", None)
+    assert rec["shares_outstanding"] == "3000500833" and rec["shares_check"]["decision"] == "hose"

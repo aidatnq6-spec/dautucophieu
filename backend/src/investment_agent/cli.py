@@ -1254,11 +1254,6 @@ def events_cli(data_dir: Path) -> int:
     from investment_agent.notifications.telegram import TelegramSender
     from investment_agent.settings import Settings
 
-    try:
-        from vnstock import Company
-    except ImportError:
-        print(json.dumps({"status": "not_configured", "reason": "vnstock_missing"}))
-        return 2
     now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
     settings = Settings.from_env()
 
@@ -1282,7 +1277,8 @@ def events_cli(data_dir: Path) -> int:
         text = render_reminders(due, held=held, today=now.date())
         return _part_sender(sender, chosen.chat_id, data_dir)(text)
 
-    out = events_run(data_dir, fetch=lambda symbol: Company(source="VCI", symbol=symbol).events().to_dict("records"), notify=notify, now=now)
+    from investment_agent.market.providers.vndirect_data import events as vndirect_events
+    out = events_run(data_dir, fetch=lambda symbol: vndirect_events(symbol, today=now.date()), notify=notify, now=now)
     print(json.dumps(out, ensure_ascii=False))
     return 0
 
@@ -1311,14 +1307,24 @@ def brief_snapshot_cli(data_dir: Path, calendar_path: Path, *, listing=None, boa
     if listing is None or board is None or http_get is None:
         import httpx
 
-        from investment_agent.market.providers import vnstock_adapter as va
+        from investment_agent.market.providers import vndirect_data as vd
         client = httpx.Client(follow_redirects=True, timeout=httpx.Timeout(30, connect=10), headers={"User-Agent": USER_AGENT})
 
         def fetch(url: str) -> str:
             response = client.get(url)
             response.raise_for_status()
             return response.text
-        listing, board, http_get = listing or va.hose_listing, board or va.price_board, http_get or fetch
+        cache_path = data_dir / "hose-listing.json"
+
+        def vndirect_listing():  # sector names the brief already shows are kept
+            try:
+                known = json.loads(cache_path.read_text(encoding="utf-8"))["listing"]["icb_names"]
+            except (OSError, ValueError, KeyError, TypeError):
+                known = {}
+            return vd.hose_listing(known_names=known)
+        listing = listing or vndirect_listing
+        board = board or (lambda symbols: vd.price_board(symbols, today=session))
+        http_get = http_get or fetch
     cache = data_dir / "hose-listing.json"
 
     def cached_listing():

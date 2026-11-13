@@ -522,21 +522,26 @@ def capm_save(request: Request, body: CapmRequest):
         return write_error(exc)
 
 
-def _fetch_people(symbol: str) -> dict:
-    from investment_agent.market.providers.vnstock_adapter import VnstockProvider
-    return VnstockProvider().company_people(symbol)
+def _people_fetcher(data_dir: Path):
+    """VNDirect's disclosed holders (Vnstock 6.0.0 dropped the VCI and KBS company data in 11/2026); the shares outstanding held in
+    the fundamentals record give the foreign stake."""
+    def fetch(symbol: str) -> dict:
+        from investment_agent.market.providers.vndirect_data import company_people as vndirect_people
+        shares = (FundamentalsStore(data_dir / "fundamentals").read(symbol) or {}).get("shares_outstanding")
+        return vndirect_people(symbol, shares=shares)
+    return fetch
 
 
 @router.get("/fairvalue/people/{symbol}")
 def people(symbol: str, request: Request):
-    """Major shareholders and officers (Vnstock, VCI), cached 30 days; the saved copy when the source fails."""
+    """Major shareholders and officers (VNDirect), cached 30 days; the saved copy when the source fails."""
     require_owner(request)
     data_dir, sym = _forward_symbol(request, symbol)
     if data_dir is None:
         return unavailable()
     if sym is None:
         return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
-    return company_people(PeopleStore(data_dir), sym, fetch=_fetch_people, now=now(request))
+    return company_people(PeopleStore(data_dir), sym, fetch=_people_fetcher(Path(data_dir)), now=now(request))
 
 
 def _get_text(url: str) -> str:

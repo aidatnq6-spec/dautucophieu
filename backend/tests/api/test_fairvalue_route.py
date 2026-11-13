@@ -339,8 +339,8 @@ def test_capm_falls_back_to_damodaran_for_vietnam_until_the_owner_enters_a_premi
 def test_people_route_reads_through_the_cache(tmp_path, monkeypatch):
     from investment_agent.api.routes import fairvalue
     (tmp_path / "market-symbols.txt").write_text("FPT\n", encoding="utf-8")
-    monkeypatch.setattr(fairvalue, "_fetch_people", lambda s: {"shareholders": [{"name": "A", "type": "Individual", "quantity": 1, "percent": 0.1,
-                                                                                  "updated": "2026-08-03"}], "officers": []})
+    monkeypatch.setattr(fairvalue, "_people_fetcher", lambda data_dir: lambda s: {"shareholders": [{"name": "A", "type": "Individual", "quantity": 1,
+                                                                                                     "percent": 0.1, "updated": "2026-08-03"}], "officers": []})
     c, clock = _app(tmp_path)
     body = call(c, clock, "GET", "/internal/fairvalue/people/FPT").json()
     assert body["shareholders"][0]["name"] == "A" and body["stale"] is False

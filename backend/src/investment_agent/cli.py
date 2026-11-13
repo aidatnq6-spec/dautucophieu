@@ -793,20 +793,16 @@ def drawdown_cli(data_dir: Path) -> int:
     from investment_agent.services.records import notification_settings
     from investment_agent.settings import Settings
 
-    try:
-        from vnstock import Quote
-    except ImportError:
-        print(json.dumps({"status": "not_configured", "reason": "vnstock_missing"}))
-        return 2
+    from investment_agent.market.providers.vnstock_adapter import VnstockProvider
     settings = Settings.from_env()
     repo = personal_repository_from_env()
     owner = OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
     chosen, _ = notification_settings(repo, owner)
+    provider = VnstockProvider()  # daily closes from VNDirect since Vnstock 6.0.0 (thousand đồng, adjusted, as before)
 
     def fetch(symbol, start, end):
-        time.sleep(1.5)  # Vnstock Community allows 60 calls a minute
-        frame = Quote(symbol=symbol, source="VCI").history(start=start.isoformat(), end=end.isoformat(), interval="1D")
-        return [(row["time"].to_pydatetime(), str(row["close"])) for _, row in frame.iterrows()] if frame is not None else []
+        time.sleep(0.3)
+        return provider.fetch_closes(symbol, start, end, interval="1D", index=False)
 
     def send(text):
         if not (settings.telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):

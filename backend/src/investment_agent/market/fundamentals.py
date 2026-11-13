@@ -123,7 +123,10 @@ PACE_SECONDS, RETRY_WAIT_SECONDS = 15, 65
 def _with_retry(call, sleep):
     try:
         return call()
-    except Exception:
+    except Exception as exc:
+        from .trend import _permanent
+        if _permanent(exc):  # a disabled release or a missing key: no wait cures it (Vnstock 6.0.0, 11/2026)
+            raise
         sleep(RETRY_WAIT_SECONDS)  # usually the 60-calls-per-minute limit
         return call()
 

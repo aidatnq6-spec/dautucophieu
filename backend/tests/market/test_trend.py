@@ -216,3 +216,15 @@ def test_a_coded_permanent_error_is_not_retried():
     with pytest.raises(Disabled):
         _retry(call, 0)
     assert calls == [1]
+
+
+def test_fundamentals_do_not_wait_on_a_permanent_error():
+    from investment_agent.market.fundamentals import _with_retry
+
+    class Disabled(Exception):
+        code = "VNSTOCK_INPUT_SOURCE"
+    waits = []
+    import pytest
+    with pytest.raises(Disabled):
+        _with_retry(lambda: (_ for _ in ()).throw(Disabled("no source")), waits.append)
+    assert waits == []

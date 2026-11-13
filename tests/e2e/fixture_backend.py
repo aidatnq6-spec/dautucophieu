@@ -170,13 +170,13 @@ if __name__ == "__main__":
                     fetched_at="2026-10-26T15:40:00+07:00")
     EventStore(data).save("VCB", [_ev(1, "VCB", "meeting", 10, "VCB - Tổ chức ĐHĐCĐ bất thường 2026")], fetched_at="2026-10-26T15:40:00+07:00")
     MacroStore(data).upsert("us10y", [(date(2026, 10, 21), "4.91"), (date(2026, 10, 23), "4.96")], entry="auto")
-    # CAPM hint and the people block: a stored bond yield and beta, and cached shareholders so the page never calls Vnstock.
+    # CAPM hint and the people block: a stored bond yield and beta, and cached shareholders so the page never calls VNDirect.
     MacroStore(data).upsert("vn10y", [(date.today() - timedelta(days=1), "4.49")], entry="auto")
     from investment_agent.market.beta import BetaStore
-    from investment_agent.market.company_people import PeopleStore
+    from investment_agent.market.company_people import SCHEMA as PEOPLE_SCHEMA, PeopleStore
     BetaStore(data).save({"values": {"FPT": {"beta": "0.73", "date": (date.today() - timedelta(days=1)).isoformat()}}})
     for sym, holder in (("FPT", "Trương Gia Bình"), ("VCB", "Ngân hàng Nhà nước Việt Nam")):
-        PeopleStore(data).save(sym, {"schema": 2, "symbol": sym, "fetched_at": datetime.now(timezone.utc).isoformat(), "source": "synthetic",
+        PeopleStore(data).save(sym, {"schema": PEOPLE_SCHEMA, "symbol": sym, "fetched_at": datetime.now(timezone.utc).isoformat(), "source": "synthetic",
                                      "ownership": {"foreign": "0.2222", "foreign_max": "0.49", "state": "0", "free_float": None},
                                      "structure": [{"type": "Tổ chức nước ngoài", "percent": "0.2854", "shares": 1466163575, "updated": "2025-12-31"}],
                                      "shareholders": [{"name": holder, "type": "Individual" if sym == "FPT" else "Organization", "quantity": 117347966,

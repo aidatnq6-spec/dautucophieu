@@ -19,7 +19,7 @@ const stake = (v: string | null) => (v === null ? "chưa có số" : formatRatio
 // Same person on both lists: exact name after trimming and case folding; anything looser would be a guess.
 const key = (name: string) => name.trim().replace(/\s+/g, " ").toLocaleLowerCase("vi");
 
-/** Foreign/state stakes, holdings by owner type, major shareholders (top ten by stake, the rest as "Khác", officers' roles beside them) and officers, from the company's public disclosures (Vnstock, VCI), cached a month. */
+/** Foreign/state stakes, holdings by owner type, major shareholders (top ten by stake, the rest as "Khác", officers' roles beside them) and officers, from the company's public disclosures (VNDirect), cached a month. */
 export function CompanyPeople({ symbol }: { symbol: string }) {
   const [view, setView] = useState<View | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -39,7 +39,7 @@ export function CompanyPeople({ symbol }: { symbol: string }) {
       {view && !view.reason && <>
         <h3>Cơ cấu sở hữu</h3>
         {own ? <p>Nước ngoài <strong>{stake(own.foreign)}</strong> (room tối đa {stake(own.foreign_max)}) · Nhà nước <strong>{stake(own.state)}</strong>
-          {" "}· Tự do chuyển nhượng {stake(own.free_float)} <span className="caption">(VCI, số hiện tại)</span></p>
+          {" "}· Tự do chuyển nhượng {stake(own.free_float)} <span className="caption">(khối ngoại theo room hôm nay; Nhà nước và tự do chuyển nhượng: VNDirect không có số)</span></p>
           : <p className="muted">Chưa đọc được tỷ lệ sở hữu nước ngoài và nhà nước (nguồn VCI lỗi).</p>}
         {view.structure?.length ? <table className="fv-table" aria-label={`Cơ cấu sở hữu ${symbol}`}>
           <thead><tr><th>Nhóm cổ đông</th><th className="num">Tỷ lệ</th><th className="num">Số cổ phiếu</th><th>Ngày</th></tr></thead>
@@ -64,8 +64,8 @@ export function CompanyPeople({ symbol }: { symbol: string }) {
           <tbody>{view.officers.map((o) => <tr key={`${o.name}-${o.position}`}><td data-label="Họ tên">{o.name}</td><td data-label="Chức vụ">{o.position ?? "—"}</td>
             <td data-label="Tỷ lệ sở hữu" className="num">{share(o.percent)}</td><td data-label="Số cổ phiếu" className="num">{shares(o.quantity)}</td></tr>)}</tbody>
         </table>
-        <p className="caption">Nguồn: công bố của doanh nghiệp qua Vnstock (VCI; nhóm cổ đông từ KBS), đọc ngày {day(view.fetched_at)}{view.stale ? " — nguồn đang lỗi, đây là bản đã lưu" : ""};
-          tự đọc lại sau 30 ngày. Tỷ lệ có thể đã thay đổi sau ngày cập nhật.</p>
+        <p className="caption">Nguồn: công bố của doanh nghiệp qua VNDirect, đọc ngày {day(view.fetched_at)}{view.stale ? " — nguồn đang lỗi, đây là bản đã lưu" : ""};
+          tự đọc lại sau 30 ngày. Tỷ lệ có thể đã thay đổi sau ngày cập nhật ở từng dòng. Ban lãnh đạo chỉ gồm người đang nắm cổ phiếu (VNDirect không liệt kê người không nắm).</p>
       </>}
     </section>
   );

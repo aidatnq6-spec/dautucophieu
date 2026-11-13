@@ -108,3 +108,41 @@ def events(symbol: str, get: Callable[[str], str] = default_get, *, today: date 
     """The ticker's events disclosed in the last `years` years (raw VNDirect rows; corporate_events.normalise reads them)."""
     since = ((today or date.today()) - timedelta(days=365 * years)).isoformat()
     return _data(get, EVENTS_URL.format(symbol=symbol.upper(), since=since))
+
+SHAREHOLDERS_URL = BASE + "shareholders?q=code:{symbol}&size=500"
+FOREIGN_ROOM_URL = BASE + "foreigns?q=code:{symbol}&size=1&sort=tradingDate:desc"
+_HOLDER_ONLY = ("Cổ đông lớn", "Nhóm cổ đông lớn")
+_TYPE = {"PERSON": "Individual", "COMPANY": "Organization"}
+
+
+def _count(value) -> int | None:
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def company_people(symbol: str, get: Callable[[str], str] = default_get, *, shares: str | None) -> dict:
+    """Cổ đông lớn và ban lãnh đạo from VNDirect: every disclosed holder (stake as a ratio, with the day of its disclosure); the
+    officers are the holders with an office (VNDirect lists only officers who hold shares; a relative of one is a holder, not an
+    officer). Foreign stake and room from today's foreign room against the shares outstanding. State stake, free float and the
+    holdings by owner type have no VNDirect source and stay empty."""
+    rows = _data(get, SHAREHOLDERS_URL.format(symbol=symbol.upper()))
+    holders, officers = [], []
+    for r in rows:
+        pct = r.get("ownershipPct")
+        percent = pct / 100 if isinstance(pct, (int, float)) else None
+        name, role = str(r.get("shareholderName") or "").strip(), str(r.get("roleType") or "").strip()
+        holders.append({"name": name, "type": _TYPE.get(str(r.get("shareholderType") or "")), "quantity": _count(r.get("numberOfShares")),
+                        "percent": percent, "updated": (r.get("effectiveDate") or "")[:10] or None})
+        if role and role not in _HOLDER_ONLY and " của " not in role:
+            officers.append({"name": name, "position": role, "percent": percent, "quantity": _count(r.get("numberOfShares"))})
+    ownership = None
+    room = _data(get, FOREIGN_ROOM_URL.format(symbol=symbol.upper()))
+    if room and shares:
+        from decimal import Decimal
+        total, left, outstanding = room[0].get("totalRoom"), room[0].get("currentRoom"), Decimal(str(shares))
+        ratio = lambda v: format((Decimal(str(v)) / outstanding).quantize(Decimal("0.0001")).normalize(), "f")  # noqa: E731
+        ownership = {"foreign": ratio(total - left) if total is not None and left is not None else None,
+                     "foreign_max": ratio(total) if total is not None else None, "state": None, "free_float": None}
+    return {"shareholders": holders, "officers": officers, "ownership": ownership, "structure": None}

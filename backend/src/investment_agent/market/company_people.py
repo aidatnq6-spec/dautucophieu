@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Callable
 
 MAX_AGE = timedelta(days=30)
-SCHEMA = 2  # 2 adds foreign/state ownership and the owner-type structure; older files are read again
+SCHEMA = 3  # 3: VNDirect's holders (Vnstock's VCI/KBS data ended 11/2026); older files are read again
 TOP = 10
 _SYMBOL = re.compile(r"^[A-Z0-9]{1,10}$")
 
@@ -75,6 +75,6 @@ def company_people(store: PeopleStore, symbol: str, *, fetch: Callable[[str], di
         return {"symbol": symbol, "shareholders": [], "officers": [], "ownership": None, "structure": None, "others_percent": None,
                 "fetched_at": None, "stale": False, "reason": "Không đọc được dữ liệu cổ đông (nguồn lỗi)"}
     record = {"schema": SCHEMA, "symbol": symbol, "shareholders": fresh["shareholders"], "officers": fresh["officers"],
-              "ownership": fresh.get("ownership"), "structure": fresh.get("structure"), "fetched_at": now.isoformat(), "source": "vnstock:vci,kbs"}
+              "ownership": fresh.get("ownership"), "structure": fresh.get("structure"), "fetched_at": now.isoformat(), "source": "vndirect:finfo"}
     store.save(symbol, record)
     return _view(record, stale=False)

@@ -74,3 +74,28 @@ def test_index_levels_are_the_last_two_closes_at_the_close_of_their_day():
                                            {"code": "VN30", "date": "2026-11-11", "close": 1855.27}]})  # noqa: E731
     points = index_levels("VN30", get=get, today=date(2026, 11, 13))
     assert [(t.date().isoformat(), t.hour, v) for t, v in points] == [("2026-11-12", 15, "1839.43"), ("2026-11-13", 15, "1844.91")]
+
+
+def test_company_people_holders_officers_and_the_foreign_stake():
+    from investment_agent.market.providers.vndirect_data import company_people
+
+    def get(url):
+        if "shareholders?" in url:
+            return json.dumps({"data": [
+                {"shareholderName": "Trương Gia Bình", "shareholderType": "PERSON", "roleType": "Chủ tịch HĐQT", "numberOfShares": 88731923.0,
+                 "ownershipPct": 4.7054474220659035, "effectiveDate": "2023-07-05"},
+                {"shareholderName": "SCIC", "shareholderType": "COMPANY", "roleType": "Cổ đông lớn", "numberOfShares": 73032619.0, "ownershipPct": 3.87,
+                 "effectiveDate": "2023-07-05"},
+                {"shareholderName": "Nguyễn Văn A", "shareholderType": "PERSON", "roleType": "Con của Thành viên HĐQT", "numberOfShares": 10.0,
+                 "ownershipPct": 0.0001, "effectiveDate": "2024-01-01"}]})
+        if "foreigns?" in url:
+            return json.dumps({"data": [{"code": "FPT", "tradingDate": "2026-11-13", "totalRoom": 924006547.0, "currentRoom": 425534401.0}]})
+        raise AssertionError(url)
+    out = company_people("FPT", get=get, shares="1885727648")
+    assert [h["name"] for h in out["shareholders"]] == ["Trương Gia Bình", "SCIC", "Nguyễn Văn A"]
+    assert out["shareholders"][0] == {"name": "Trương Gia Bình", "type": "Individual", "quantity": 88731923, "percent": 0.047054474220659035,
+                                      "updated": "2023-07-05"}
+    assert out["officers"] == [{"name": "Trương Gia Bình", "position": "Chủ tịch HĐQT", "percent": 0.047054474220659035, "quantity": 88731923}]
+    own = out["ownership"]
+    assert own["foreign"] == "0.2643" and own["foreign_max"] == "0.49" and own["state"] is None and own["free_float"] is None
+    assert out["structure"] is None

@@ -74,8 +74,8 @@ def build_record(symbol: str, statements: dict, events: list[dict], *, shares: s
 class VndirectFundamentals:
     """record(symbol, now) for sync_fundamentals; daily closes keep coming from the price provider."""
 
-    def __init__(self, data_dir: Path, get: Callable[[str], str] = default_get, prices=None):
-        self.data_dir, self.get, self.prices = Path(data_dir), get, prices
+    def __init__(self, data_dir: Path, get: Callable[[str], str] = default_get, prices=None, hose_get: Callable[[str], str] | None = None):
+        self.data_dir, self.get, self.prices, self.hose_get = Path(data_dir), get, prices, hose_get
 
     def record(self, symbol: str, now: datetime) -> dict:
         sector = load_sectors(self.data_dir)[0].get(symbol)
@@ -86,7 +86,12 @@ class VndirectFundamentals:
         events = vndirect_events(symbol, get=self.get, today=now.date(), years=10)
         rows = json.loads(self.get(SHARES_URL.format(symbol=symbol.upper()))).get("data", [])
         shares = next((_num(int(r["value"])) for r in rows if str(r.get("itemCode")) == "51004" and r.get("value")), None)
-        return build_record(symbol, statements, events, shares=shares, now=now)
+        try:  # HOSE's own count, checked against VNDirect's before a held count changes (fundamentals.decide_shares)
+            from .providers.hose_data import outstanding
+            hose = outstanding(symbol, get=self.hose_get) if self.hose_get else outstanding(symbol)
+        except Exception:  # noqa: BLE001 - HOSE failing leaves the held count as it is
+            hose = None
+        return {**build_record(symbol, statements, events, shares=shares, now=now), "shares_hose": hose}
 
     def fetch_closes(self, symbol: str, start: date, end: date, *, interval: str, index: bool):
         from .providers.vnstock_adapter import VnstockProvider

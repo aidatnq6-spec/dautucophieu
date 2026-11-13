@@ -1,5 +1,5 @@
-"""Corporate events of watched tickers (Vnstock company events, Community tier): dividends, share issues, shareholder
-meetings, insider deals. Stored per ticker under data/events; Telegram reminders go out a few days before the date that
+"""Corporate events of watched tickers (VNDirect's public events since Vnstock 6.0.0 dropped its free source in 11/2026; the
+older Vnstock rows are still read): dividends, share issues, shareholder meetings, listings. Stored per ticker under data/events; Telegram reminders go out a few days before the date that
 matters (ex-rights date, or the meeting day), once per event. Events without that date are shown but never reminded."""
 
 import json
@@ -26,9 +26,34 @@ def _num(value) -> float | None:
     return None if f != f else f
 
 
+# VNDirect event types: (kind, Vietnamese name). Its own descriptions mix English in ("Bonus shares"), so the name is set here.
+_VND = {"DIVIDEND": ("dividend_cash", "Cổ tức bằng tiền"), "STOCKDIV": ("issue", "Cổ tức bằng cổ phiếu"), "KINDDIV": ("issue", "Thưởng cổ phiếu"),
+        "ISSUE": ("issue", "Phát hành thêm"), "MEETING": ("meeting", "Họp ĐHCĐ"), "meetingRight": ("other", "Chốt quyền ĐHCĐ"),
+        "LISTED": ("listing", "Niêm yết bổ sung"), "updateListed": ("listing", "Niêm yết bổ sung"), "schedDiv": ("other", "Dự kiến cổ tức"),
+        "schedIssue": ("other", "Dự kiến phát hành"), "noticed": ("other", "Nhắc nhở")}
+
+
+def _vndirect(r: dict) -> dict:
+    """One VNDirect event: effectiveDate is the ex-rights date of a dividend or issue and the day of a meeting; actualDate the
+    payment day of a cash dividend. VNDirect gives no record date, so none is shown (not worked out from the ex-rights date)."""
+    kind, name = _VND.get(str(r.get("type") or ""), ("other", str(r.get("typeDesc") or "Sự kiện")))
+    effective = _day(r.get("effectiveDate"))
+    key = effective if kind in ("dividend_cash", "issue", "meeting", "listing") else None
+    note = str(r.get("note") or "").strip()
+    ratio = _num(r.get("ratio"))
+    return {"id": f"{str(r.get('code') or '').upper()}-{r.get('id')}", "symbol": str(r.get("code") or "").upper(), "code": str(r.get("type") or ""),
+            "kind": kind, "title": f"{name} - {note}" if note else name, "key_date": key,
+            "exright": effective if kind in ("dividend_cash", "issue") else None, "record": None,
+            "payout": _day(r.get("actualDate")) if kind == "dividend_cash" else None,
+            "ratio": ratio / 100 if ratio is not None else None, "value_per_share": _num(r.get("dividend")) if kind == "dividend_cash" else None}
+
+
 def normalise(records: list[dict]) -> list[dict]:
     out = []
     for r in records:
+        if "typeDesc" in r or "effectiveDate" in r:  # VNDirect
+            out.append(_vndirect(r))
+            continue
         code = str(r.get("event_code") or "")
         kind = "insider" if code.startswith("DD") else _KIND.get(code, "other")
         key = _day(r.get("display_date1")) if kind == "meeting" else _day(r.get("exright_date")) if kind in ("dividend_cash", "issue") \
@@ -107,7 +132,7 @@ def render_reminders(events: list[dict], *, held: set[str], today: date) -> str:
     for e in sorted(events, key=lambda x: (x["symbol"] not in held, x["key_date"] or "", x["symbol"])):
         name = f"{e['symbol']} (đang nắm)" if e["symbol"] in held else e["symbol"]
         lines.append(f"- {name}: {describe(e)}")
-    lines += ["", "Nguồn: Vnstock (sự kiện doanh nghiệp). Chỉ để theo dõi, không phải khuyến nghị."]
+    lines += ["", "Nguồn: VNDirect (sự kiện doanh nghiệp). Chỉ để theo dõi, không phải khuyến nghị."]
     return "\n".join(lines)
 
 

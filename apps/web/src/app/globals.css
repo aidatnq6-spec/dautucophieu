@@ -26,7 +26,7 @@ a{color:var(--link)}
 .nav-group[class*=nav-tone-] .nav-head::before{content:"";width:4px;height:14px;border-radius:2px;background:var(--nav-tone)}
 .nav-tone-assets{--nav-tone:var(--good)}.nav-tone-market{--nav-tone:var(--brand)}.nav-tone-stocks{--nav-tone:var(--orange)}
 .nav-tone-news{--nav-tone:var(--rsi)}.nav-tone-tools{--nav-tone:var(--muted)}
-@media(min-width:651px){.side .nav a{padding-top:6px;padding-bottom:6px}.side .brand{margin-bottom:16px}}  /* sixteen links and five headings fit a 900px-high screen */
+@media(min-width:651px){.side .nav a{padding-top:5px;padding-bottom:5px}.side .brand{margin-bottom:12px}.side .nav-group[class*=nav-tone-] .nav-head{margin-top:5px}}  /* seventeen links and five headings fit a 900px-high screen */
 @media(max-width:650px){.nav-group[class*=nav-tone-] .nav-head{display:none}}  /* the phone's one-row menu has no headings */
 .nav a{text-decoration:none;color:var(--ink);padding:8px 12px;border-radius:7px;display:flex;gap:12px;align-items:center;white-space:nowrap}
 .nav a[aria-current=page]{background:var(--nav-on-bg);color:var(--nav-on-ink);font-weight:600}
@@ -172,6 +172,11 @@ legend{font-weight:600;padding:0 6px}
 .sv-none{color:var(--muted);font-weight:400}
 .sv-chart{width:100%;height:auto;max-height:200px;margin:4px 0 12px}.sv-line{fill:none;stroke:var(--brand);stroke-width:2}.sv-now{stroke:var(--orange);stroke-dasharray:4 4}
 .sv-axis{fill:var(--muted);font-size:11px}
+/* Quỹ mở */
+.fd-up{color:var(--good-ink)}.fd-down{color:var(--bad-ink)}.fd-held td{background:var(--hover)}
+.fd-bar{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:6px 0 12px;background:var(--vc-track)}.fd-seg{display:block;min-width:3px}
+.fd-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:baseline}
+.fd-stock{background:var(--op2)}.fd-balanced{background:var(--op4)}.fd-bond{background:var(--op3)}.fd-unknown{background:var(--vc-unknown)}
 /* Dự án và điểm rơi lợi nhuận: one bar per year, scaled to the largest year. */
 .pp-years{display:grid;gap:6px;margin:4px 0 14px}.pp-year{display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;gap:10px;align-items:center}
 .pp-bar{display:block;height:12px;border-radius:4px;background:var(--brand)}.pp-form{display:grid;gap:8px;margin-top:10px;max-width:560px}

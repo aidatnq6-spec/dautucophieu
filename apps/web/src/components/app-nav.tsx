@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BookOpenText, ClipboardList, Briefcase, Calculator, CalendarDays, ChartLine, Eye, Grid3x3, Globe, House, Newspaper, NotebookPen, Scale, Settings, UserRound } from "lucide-react";
+import { Activity, BookOpenText, ClipboardList, Briefcase, Calculator, CalendarDays, ChartLine, Eye, Grid3x3, Globe, House, Newspaper, NotebookPen, PiggyBank, Scale, Settings, UserRound } from "lucide-react";
 
 // Five short groups, each with its own accent colour (nav-tone-*), so the eye finds where a group starts.
 const GROUPS = [
@@ -18,7 +18,8 @@ const GROUPS = [
     { href: "/watchlist", label: "Theo dõi", icon: Eye },
     { href: "/fair-value", label: "Định giá", icon: Scale },
     { href: "/earnings", label: "Mùa báo cáo", icon: ClipboardList },
-    { href: "/events", label: "Lịch sự kiện", icon: CalendarDays }] },
+    { href: "/events", label: "Lịch sự kiện", icon: CalendarDays },
+    { href: "/funds", label: "Quỹ mở", icon: PiggyBank }] },
   { title: "Tin tức", tone: "news", links: [
     { href: "/insights", label: "Nhận định", icon: Newspaper },
     { href: "/reports", label: "Bản tin sau phiên", icon: BookOpenText }] },

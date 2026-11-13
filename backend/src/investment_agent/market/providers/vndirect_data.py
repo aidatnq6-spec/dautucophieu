@@ -72,6 +72,23 @@ def price_board(symbols: list[str], get: Callable[[str], str] = default_get, *, 
     return out
 
 
+def sector_codes(get: Callable[[str], str] = default_get) -> dict[str, tuple[str, str]]:
+    """Every listed ticker VNDirect classifies at ICB level 2: symbol → (code, VNDirect's own name)."""
+    out = {}
+    for row in _data(get, INDUSTRY_URL):
+        code = str(row.get("industryCode") or "")
+        for symbol in str(row.get("codeList") or "").split(","):
+            if code and symbol.strip():
+                out[symbol.strip().upper()] = (code, str(row.get("vietnameseName") or code).strip())
+    return out
+
+
+def index_members(group: str, get: Callable[[str], str] = default_get) -> list[str]:
+    """Members of an index group as VNDirect's listing marks them; only VN30 is marked, so other groups come back empty."""
+    rows = _data(get, BASE + f"stocks?q=indexCode:{group}&size=500&fields=code,indexCode")
+    return sorted({str(r["code"]).upper() for r in rows if str(r.get("indexCode") or "") == group and r.get("code")})
+
+
 def events(symbol: str, get: Callable[[str], str] = default_get, *, today: date | None = None, years: int = 2) -> list[dict]:
     """The ticker's events disclosed in the last `years` years (raw VNDirect rows; corporate_events.normalise reads them)."""
     since = ((today or date.today()) - timedelta(days=365 * years)).isoformat()

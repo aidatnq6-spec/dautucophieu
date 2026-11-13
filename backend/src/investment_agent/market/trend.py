@@ -111,11 +111,22 @@ class SnapshotStore:
                 p.unlink()
 
 
+def _permanent(exc: Exception) -> bool:
+    """An error a wait cannot cure: one with a code (a disabled release, a missing key, a daily-only source) other than a rate limit.
+    From 11/11/2026 every Vnstock call failed this way, and waiting 65 s on each of ~120 series kept the after-close run from ever
+    reaching the brief."""
+    code = str(getattr(exc, "code", "") or "")
+    return bool(code) and "LIMIT" not in code and "RATE" not in code
+
+
 def _retry(call, pause: float):
-    """One retry after a short pause: Vnstock and the public feeds sometimes fail once and then answer."""
+    """One retry after a short pause: Vnstock and the public feeds sometimes fail once and then answer. A permanent error is raised
+    at once."""
     try:
         return call()
-    except Exception:
+    except Exception as exc:
+        if _permanent(exc):
+            raise
         time_module.sleep(pause)
         return call()
 
@@ -163,10 +174,17 @@ def run_trend(data_dir: Path, cal, *, now: datetime, provider, get, pause: float
                 if src["kind"] == "vn":
                     _refresh(days, f"{rid}-1d", lambda s: provider.fetch_closes(rid, s, today, interval="1D", index=src["index"]),
                              today=today, full=FULL_DAYS, refresh=REFRESH_DAYS, enough=400, pause=pause, fresh_through=today, pace=pace)
-                    _refresh(hours, f"{rid}-1h", lambda s: provider.fetch_closes(rid, s, today, interval="1H", index=src["index"]),
-                             today=today, full=HOURLY_FULL_DAYS, refresh=HOURLY_REFRESH_DAYS, enough=1, pause=pause, fresh_through=today,
-                             pace=pace)
-                    cells = build_cells(days.read(f"{rid}-1d"), hours.read(f"{rid}-1h"), session_date=today, hourly_supported=True)
+                    hourly = True
+                    try:
+                        _refresh(hours, f"{rid}-1h", lambda s: provider.fetch_closes(rid, s, today, interval="1H", index=src["index"]),
+                                 today=today, full=HOURLY_FULL_DAYS, refresh=HOURLY_REFRESH_DAYS, enough=1, pause=pause, fresh_through=today,
+                                 pace=pace)
+                    except Exception as exc:  # a daily-only source: the daily, weekly and monthly cells still count
+                        if not _permanent(exc):
+                            raise
+                        hourly = False
+                    cells = build_cells(days.read(f"{rid}-1d"), hours.read(f"{rid}-1h") if hourly else None, session_date=today,
+                                        hourly_supported=hourly)
                 elif src["kind"] == "coinbase":
                     _refresh(days, f"{rid}-1d", lambda s: coinbase_closes(get, src["product"], 86400, s, today),
                              today=today, full=FULL_DAYS, refresh=REFRESH_DAYS, enough=400, pause=pause)

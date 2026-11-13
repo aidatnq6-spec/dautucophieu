@@ -181,3 +181,38 @@ def test_dxy_row_is_computed_from_ecb_in_its_own_series(tmp_path):
     run_trend(tmp_path, CAL, now=datetime(2026, 10, 26, 15, 35, tzinfo=VN), provider=FakeVn(), get=get, pause=0, pace=0)
     assert any(u.endswith("eurofxref-hist-90d.xml") for u in seen) and not any(u.endswith("eurofxref-hist.xml") for u in seen)
 
+
+
+class DailyOnlyVn(FakeVn):
+    """VNDirect: daily closes only; an hourly request fails at once with a coded error, which no wait can cure."""
+    def fetch_closes(self, symbol, start, end, *, interval, index):
+        from investment_agent.market.providers.vndirect_market import DailyOnly
+        if interval != "1D":
+            raise DailyOnly("daily only")
+        return super().fetch_closes(symbol, start, end, interval=interval, index=index)
+
+
+def test_a_daily_only_source_still_gives_daily_weekly_monthly_cells_and_no_wait(tmp_path, monkeypatch):
+    waits = []
+    monkeypatch.setattr("investment_agent.market.trend.time_module.sleep", waits.append)
+    result = run_trend(tmp_path, CAL, now=datetime(2026, 10, 23, 15, 35, tzinfo=VN), provider=DailyOnlyVn(), get=fake_get, pause=65, pace=0)
+    rows = {r["id"]: r for g in SnapshotStore(tmp_path / "trend").latest()["groups"] for r in g["rows"]}
+    assert rows["FPT"]["cells"]["D1"]["macd"] == "up,>0" and rows["FPT"]["cells"]["H1"]["reason"] == "Nguồn chỉ có giá ngày"
+    assert "FPT" not in result["errors"]
+    assert waits.count(65) <= 1  # only the offline BTC feed waits; coded, permanent errors do not
+
+
+def test_a_coded_permanent_error_is_not_retried():
+    from investment_agent.market.trend import _retry
+
+    class Disabled(Exception):
+        code = "VNSTOCK_RELEASE_DISABLED"
+    calls = []
+
+    def call():
+        calls.append(1)
+        raise Disabled("off")
+    import pytest
+    with pytest.raises(Disabled):
+        _retry(call, 0)
+    assert calls == [1]

@@ -383,7 +383,7 @@ export function TrendBoard() {
               {current.interval === "1W" || current.interval === "1M" ? ` · gộp từ nến ngày (mở đầu kỳ, cao nhất, thấp nhất, đóng cuối kỳ), ${frameWord} cuối đang chạy` : ""}
               {" "}· dưới: MACD (12, 26, 9) và RSI (14), đường 70/30
               {current.style === "line" ? " · dữ liệu phần mềm đã lưu cho bảng Xu hướng"
-                : ` · Vnstock, đọc ${current.fetched_at ? new Date(current.fetched_at).toLocaleString("vi-VN") : "—"}`}
+                : ` · VNDirect, đọc ${current.fetched_at ? new Date(current.fetched_at).toLocaleString("vi-VN") : "—"}`}
               {current.stale ? " — nguồn đang lỗi, đây là bản đã lưu" : ""}. Biểu đồ dùng thư viện mã nguồn mở Lightweight Charts của TradingView.
               Hình vẽ (màu cam) là ghi chú của bạn: đường ngang hiện ở mọi khung, đường xu hướng chỉ ở khung đã vẽ.</p>
             <DrawingList tools={tools} />

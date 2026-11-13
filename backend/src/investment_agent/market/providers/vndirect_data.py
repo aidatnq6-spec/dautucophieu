@@ -15,7 +15,8 @@ BASE = "https://api-finfo.vndirect.com.vn/v4/"
 LISTING_URL = BASE + "stocks?q=type:STOCK~floor:HOSE~status:LISTED&size=9999&fields=code,type,floor"
 INDUSTRY_URL = BASE + "industry_classification?q=industryLevel:2&size=100"
 BOARD_URL = (BASE + "stock_prices?q=floor:HOSE~date:gte:{start}~date:lte:{end}&size=9999"
-             "&fields=code,date,basicPrice,close,nmVolume,nmValue")
+             "&fields=code,date,basicPrice,close,nmVolume,nmValue,ceilingPrice,floorPrice,high,low")
+INDEX_LEVELS_URL = BASE + "vnmarket_prices?sort=date:desc&q=code:{index}~date:gte:{start}&size=10&fields=code,date,close"
 FOREIGN_URL = BASE + "foreigns?q=floor:HOSE~tradingDate:{day}&size=9999"
 EVENTS_URL = BASE + "events?q=code:{symbol}~disclosureDate:gte:{since}&size=500&sort=disclosureDate:desc"
 BOARD_LOOKBACK_DAYS = 10
@@ -63,7 +64,10 @@ def price_board(symbols: list[str], get: Callable[[str], str] = default_get, *, 
             continue
         traded = (r.get("nmVolume") or 0) > 0
         f = foreign.get(symbol)
+        thousand = lambda field: round(r[field] * 1000) if r.get(field) else None  # noqa: E731 - thousand đồng to đồng
         out.append({"symbol": symbol, "trading_date": latest, "ref_price": round((r.get("basicPrice") or 0) * 1000),
+                    "ceiling": thousand("ceilingPrice"), "floor": thousand("floorPrice"),
+                    "highest": thousand("high") if traded else None, "lowest": thousand("low") if traded else None,
                     "match_price": round((r.get("close") or 0) * 1000) if traded else 0,
                     "accumulated_value": (r.get("nmValue") or 0) / 1_000_000, "accumulated_volume": int(r.get("nmVolume") or 0),
                     "foreign_buy_volume": int(f["buyVol"]) if f and f.get("buyVol") is not None else None,
@@ -87,6 +91,17 @@ def index_members(group: str, get: Callable[[str], str] = default_get) -> list[s
     """Members of an index group as VNDirect's listing marks them; only VN30 is marked, so other groups come back empty."""
     rows = _data(get, BASE + f"stocks?q=indexCode:{group}&size=500&fields=code,indexCode")
     return sorted({str(r["code"]).upper() for r in rows if str(r.get("indexCode") or "") == group and r.get("code")})
+
+
+def index_levels(index: str, get: Callable[[str], str] = default_get, *, today: date | None = None) -> list[tuple]:
+    """The last two closes of an index as (15:00 of that day, level), oldest first: the board shows the last against the one
+    before (end of day; VNDirect serves no minute bars)."""
+    from datetime import datetime, time, timezone
+    vn = timezone(timedelta(hours=7))
+    start = ((today or date.today()) - timedelta(days=14)).isoformat()
+    rows = sorted(_data(get, INDEX_LEVELS_URL.format(index=index.upper(), start=start)), key=lambda r: r["date"])[-2:]
+    return [(datetime.combine(date.fromisoformat(r["date"]), time(15, 0), vn), format(r["close"], "f") if isinstance(r["close"], str)
+             else str(r["close"])) for r in rows if r.get("close")]
 
 
 def events(symbol: str, get: Callable[[str], str] = default_get, *, today: date | None = None, years: int = 2) -> list[dict]:

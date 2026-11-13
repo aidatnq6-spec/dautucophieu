@@ -49,7 +49,7 @@ export function EventsView() {
   if (!d) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   return (
     <>
-      <p className="notice">Cổ tức, phát hành và đại hội cổ đông của 50 mã đang theo dõi (Vnstock){d.updated_at ? `, cập nhật ${new Date(d.updated_at).toLocaleString("vi-VN")}` : ""}.
+      <p className="notice">Cổ tức, phát hành và đại hội cổ đông của các mã đang theo dõi (VNDirect){d.updated_at ? `, cập nhật ${new Date(d.updated_at).toLocaleString("vi-VN")}` : ""}.
         Ứng dụng nhắc qua Telegram trước {d.remind_days} ngày (theo ngày GDKHQ hoặc ngày họp), mỗi sự kiện một lần. Chỉ để theo dõi, không phải khuyến nghị.</p>
       <section className="surface"><h2>Sắp tới (60 ngày)</h2><EventTable label="Sự kiện sắp tới" rows={d.upcoming} /></section>
       <section className="surface"><h2>Đã qua (30 ngày)</h2><EventTable label="Sự kiện đã qua" rows={d.recent} /></section>

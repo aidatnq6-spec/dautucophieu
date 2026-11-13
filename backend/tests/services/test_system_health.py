@@ -127,3 +127,37 @@ def test_the_drill_restores_the_newest_backup_into_a_temporary_folder_and_says_a
     victim.write_text('{"x":1}', encoding="utf-8")
     out = backup_drill(root, data, now=NOW + timedelta(days=8))
     assert out["ok"] is False and out["error"] == "BackupCorrupt"
+
+
+# --- Bản tin sau phiên: from 16:30 of a session day, that session's brief must have gone out ---
+
+def _cal():
+    from datetime import date
+    from investment_agent.market.calendar import TradingCalendar
+    return TradingCalendar(version="t", source="test", holidays=frozenset(), first=date(2026, 1, 1), last=date(2026, 12, 31))
+
+
+def _log(data, *lines):
+    path = data.parent / "logs" / "scheduler.log"
+    path.write_text(path.read_text(encoding="utf-8") + "".join(f"{line}\n" for line in lines), encoding="utf-8")
+
+
+def test_a_brief_not_published_by_half_past_four_is_a_problem_and_a_published_one_is_not(tmp_path):
+    data = healthy(tmp_path)
+    drilled(data)
+    at = datetime(2026, 11, 13, 10, 0, tzinfo=timezone.utc)  # 17:00 in Vietnam, Friday
+    problems = {p["id"]: p for p in health_report(data, now=at, calendar=_cal())["problems"]}
+    assert problems["brief:2026-11-13"]["label"] == "Bản tin sau phiên" and "chưa chạy tới bước gửi" in problems["brief:2026-11-13"]["detail"]
+    _log(data, '2026-11-13T15:40:00+07:00 exit=0 {"status": "ok", "run": true, "session": "2026-11-13", "reports": ["incomplete"], "delivered": 0}')
+    assert "thiếu dữ liệu" in {p["id"]: p for p in health_report(data, now=at, calendar=_cal())["problems"]}["brief:2026-11-13"]["detail"]
+    _log(data, '2026-11-13T20:05:00+07:00 exit=0 {"status": "ok", "run": true, "session": "2026-11-13", "reports": ["published"], "delivered": 1}')
+    assert not any(p["id"].startswith("brief:") for p in health_report(data, now=at, calendar=_cal())["problems"])
+
+
+def test_before_half_past_four_the_previous_session_is_the_one_checked(tmp_path):
+    data = healthy(tmp_path)
+    drilled(data)
+    _log(data, '2026-11-12T15:40:00+07:00 exit=0 {"status": "ok", "run": false, "reason": "already_published", "session": "2026-11-12"}')
+    at = datetime(2026, 11, 13, 8, 0, tzinfo=timezone.utc)  # 15:00 in Vietnam
+    assert not any(p["id"].startswith("brief:") for p in health_report(data, now=at, calendar=_cal())["problems"])
+    assert not any(p["id"].startswith("brief:") for p in health_report(data, now=at)["problems"])  # no calendar given: not checked

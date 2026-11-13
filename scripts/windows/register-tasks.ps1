@@ -52,8 +52,9 @@ Write-Host "Đã đăng ký $updateName. Nhật ký: logs\update.log."
 
 $alertsAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $alertsArgument -WorkingDirectory $script:RepoRoot
 $alertsTrigger = New-ScheduledTaskTrigger -Daily -At '09:00'
-# A daily trigger repeating every 5 minutes for the session (09:00-15:05); weekends and holidays are skipped by the command itself.
-$alertsTrigger.Repetition = (New-ScheduledTaskTrigger -Once -At '09:00' -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Hours 6 -Minutes 5)).Repetition
+# A daily trigger repeating every 5 minutes from 09:00 to 16:35: the session's price alerts (each command skips outside the session,
+# weekends and holidays), and after it the health check that sees a 15:30 brief which did not go out by 16:30.
+$alertsTrigger.Repetition = (New-ScheduledTaskTrigger -Once -At '09:00' -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Hours 7 -Minutes 35)).Repetition
 $alertsSettings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 4)
 Register-ScheduledTask -TaskName $alertsName -Action $alertsAction -Trigger $alertsTrigger -Settings $alertsSettings `
     -Description 'Cảnh báo giá trong phiên qua Telegram' -Force -ErrorAction Stop | Out-Null

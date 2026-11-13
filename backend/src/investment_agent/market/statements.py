@@ -34,7 +34,8 @@ PRICE_URL = "https://api-finfo.vndirect.com.vn/v4/stock_prices?sort=date&q=code:
 FIRST_START, REFRESH_DAYS, MAX_AGE_DAYS, PACE_SECONDS = "2010-01-01", 730, 7, 1.0
 # Raised when LINES gains lines: a non-financial ticker kept with an older version is due and takes its whole history once, so the new
 # lines reach back as far as the old ones. 2: customer advances and inventory.
-LINES_VERSION = 2
+LINES_VERSION = 3  # 3: current assets, receivables, current and long-term liabilities, EPS
+FIN_LINES_VERSION = 2  # banks, securities firms and insurers: 2: basic EPS (23001 in each of their layouts)
 # (model, item code) → line. Model 1 balance sheet, 2 income statement, 3 cash flow (indirect); the general layout (TT200).
 LINES = {
     (2, 21000): "gross_revenue", (2, 21090): "deductions", (2, 21001): "revenue", (2, 22100): "cogs", (2, 23100): "gross_profit",
@@ -46,6 +47,10 @@ LINES = {
     # Customer advances (Người mua trả tiền trước, short term 13130 and long term 13311) and inventory (11400, after its provision): names
     # from VNDirect's own model list (v4/financial_models, checked 11/11/2026), for Tiền khách trả trước of property developers.
     (1, 13130): "advances_st", (1, 13311): "advances_lt", (1, 11400): "inventory",
+    # For the fundamentals record (Chất lượng báo cáo, EPS) since Vnstock 6.0.0: current assets, short-term receivables, current and
+    # long-term liabilities, basic EPS (đồng). Names from v4/financial_models, checked 13/11/2026.
+    (1, 11000): "current_assets", (1, 11300): "receivables", (1, 13100): "current_liabilities", (1, 13300): "long_liabilities",
+    (2, 23001): "eps",
     (3, 22230): "depreciation", (3, 32000): "cfo", (3, 32100): "capex", (3, 33000): "cfi", (3, 34000): "cff", (3, 33600): "dividends_paid",
 }
 # Banks (TT49 layout: models 101 balance sheet, 102 income statement) and securities firms (TT334: 89, 90): only what their scale
@@ -54,16 +59,19 @@ _FIN_COMMON = {"charter_capital": 14110, "equity": 14000, "minority_equity": 142
 LAYOUTS = {
     None: {"models": "1,2,3", "lines": LINES},
     "bank": {"models": "101,102,103", "lines": {**{(101, c): k for k, c in _FIN_COMMON.items()}, (102, 421701): "operating_income",
-                                                 (102, 88888): "ppop", (102, 23800): "pbt", (102, 23003): "npat", (102, 23000): "npat_parent"}},
+                                                 (102, 88888): "ppop", (102, 23800): "pbt", (102, 23003): "npat", (102, 23000): "npat_parent",
+                                                 (102, 23001): "eps"}},
     "securities": {"models": "89,90,91", "lines": {**{(89, c): k for k, c in _FIN_COMMON.items()}, (89, 13110): "st_debt", (89, 13340): "lt_debt",
-                                                   (90, 21000): "operating_revenue", (90, 23800): "pbt", (90, 23003): "npat", (90, 23000): "npat_parent"}},
+                                                   (90, 21000): "operating_revenue", (90, 23800): "pbt", (90, 23003): "npat", (90, 23000): "npat_parent",
+                                                   (90, 23001): "eps"}},
     # Insurers (models 411, 412): the result of insurance itself and of investments, the parts that add up to profit before tax (from
     # mid-2014; the older layout's do not), the investment book. Both associates lines are kept apart: BVH still fills the old one.
     "insurance": {"models": "411,412,413", "lines": {**{(411, c): k for k, c in _FIN_COMMON.items()}, (411, 11100): "cash",
                                                      (411, 11200): "st_investments", (411, 12500): "lt_investments", (412, 21440): "net_premium",
                                                      (412, 23110): "ins_result", (412, 22175): "fin_profit", (412, 22174): "other_ops",
                                                      (412, 23900): "other_profit", (412, 23200): "associates_before", (412, 23300): "associates",
-                                                     (412, 23800): "pbt", (412, 23003): "npat", (412, 23000): "npat_parent"}},
+                                                     (412, 23800): "pbt", (412, 23003): "npat", (412, 23000): "npat_parent",
+                                                     (412, 23001): "eps"}},
 }
 _SYMBOL = re.compile(r"^[A-Z0-9]{1,10}$")
 
@@ -167,9 +175,13 @@ def _merge(old: dict | None, key: str, new: dict) -> tuple[dict, dict, list]:
     return dict(sorted(periods.items())), dict(sorted(created.items())), sorted(conflicts, key=lambda c: (c["period"], c["line"]))
 
 
+def _lines_version(sector: str | None) -> int:
+    return LINES_VERSION if kind_of(sector) is None else FIN_LINES_VERSION
+
+
 def _old_lines(record: dict, sector: str | None) -> bool:
-    """A non-financial ticker kept before LINES had its current lines (financial layouts are not versioned)."""
-    return kind_of(sector) is None and record.get("lines_version", 1) < LINES_VERSION
+    """A ticker kept before its layout had its current lines."""
+    return record.get("lines_version", 1) < _lines_version(sector)
 
 
 def sync_statements(store: StatementStore, sectors: dict[str, str | None], *, get: Callable[[str], str], now: datetime, limit: int | None,
@@ -200,7 +212,7 @@ def sync_statements(store: StatementStore, sectors: dict[str, str | None], *, ge
             kept = old and old.get("year_end_close") and "quarter_end_close" in old
             price_start = start if kept else FIRST_START  # synced before the closes were kept: all of them
             prices = _get_with_retry(get, PRICE_URL.format(symbol=symbol, start=price_start), sleep)
-            record = {"symbol": symbol, "fetched_at": now.isoformat(), "source": "vndirect:finfo", "lines_version": LINES_VERSION,
+            record = {"symbol": symbol, "fetched_at": now.isoformat(), "source": "vndirect:finfo", "lines_version": _lines_version(sectors[symbol]),
                       **({"kind": kind_of(sectors[symbol])} if kind_of(sectors[symbol]) else {})}
             for key, parse in (("year_end_close", parse_year_end_closes), ("quarter_end_close", parse_quarter_end_closes)):
                 record[key] = dict(sorted({**(old or {}).get(key, {}), **parse(prices, symbol=symbol)}.items()))

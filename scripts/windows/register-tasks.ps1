@@ -24,7 +24,7 @@ Write-Host "Tác vụ: $name"
 Write-Host "Lệnh: powershell.exe $argument"
 Write-Host "Kích hoạt: hằng ngày lúc $($times -join ', ') (giờ máy, cần đặt múi giờ Asia/Ho_Chi_Minh) và khi đăng nhập (chạy bù)."
 Write-Host "Tác vụ: $updateName — 10 phút một lần và khi đăng nhập: khi main trên GitHub có bản mới thì kéo về, build và khởi động lại ứng dụng (chỉ khi thư mục đang ở main, không có thay đổi chưa commit)."
-Write-Host "Tác vụ: $alertsName — 5 phút một lần từ 09:00 đến 15:05 mỗi ngày: kiểm tra cảnh báo giá trong phiên (ngoài phiên lệnh tự bỏ qua)."
+Write-Host "Tác vụ: $alertsName — 5 phút một lần từ 09:00 đến 16:35 mỗi ngày: cảnh báo giá trong phiên (ngoài phiên lệnh tự bỏ qua) và kiểm tra bản tin sau phiên đã gửi chưa."
 if (-not $Register) { Write-Host 'Chưa đăng ký. Chạy lại với -Register sau khi cấu hình xong.'; return }
 
 $calendars = @('data\trading-calendar.json', "config\trading-calendar-hose-$((Get-Date).Year).json")

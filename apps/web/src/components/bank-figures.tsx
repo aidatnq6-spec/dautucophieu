@@ -74,7 +74,7 @@ export function BankFigures({ symbol }: { symbol: string }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => {
-    api<View>(`bank-figures/${encodeURIComponent(symbol)}`).then((v) => { setView(v); setQuarter(quarterToEnter(new Date(), v.quarters.map((q) => q.quarter))); }, (e) => {
+    api<View>(`bank-figures/${encodeURIComponent(symbol)}`).then((v) => { setView(v); setQuarter((typed) => typed || quarterToEnter(new Date(), v.quarters.map((q) => q.quarter))); }  /* never over what was typed */, (e) => {
       if (e instanceof ApiError && e.failure.code === "not_a_watched_bank") setHidden(true); else setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải.");
     });
   }, [symbol]);

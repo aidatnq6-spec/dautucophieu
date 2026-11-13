@@ -350,6 +350,11 @@ test("Bảng đèn chỉ báo sớm colours an indicator against thresholds the 
 
 
 test("a bank's asset quality names the warning signs of its latest quarter", async ({ page }) => {
+  // The e2e store persists between runs: clear quarters a failed run left, so 2025-Q3 is the latest
+  for (const q of (await (await call(page, "GET", "bank-figures/VCB")).json()).quarters as { quarter: string }[]) {
+    const now = await (await call(page, "GET", "bank-figures/VCB")).json();
+    await call(page, "POST", `bank-figures/VCB/${q.quarter}/delete`, { expected_version: now.version, request_id: `bq-clean-${q.quarter}-${Date.now()}` });
+  }
   const before = await (await call(page, "GET", "bank-figures/VCB")).json();
   const row = (g2: string, g5: string, reserve: string, accrued: string) => ({ group1: "1000", group2: g2, group3: "5", group4: "5", group5: g5, demand_deposits: null, margin_deposits: null,
     customer_deposits: null, car: null, reserve, accrued_interest: accrued, real_estate_loans: null, discounted_documents: null });

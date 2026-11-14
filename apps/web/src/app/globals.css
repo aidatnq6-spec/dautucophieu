@@ -188,6 +188,14 @@ legend{font-weight:600;padding:0 6px}
 .wq-zone.wq-good{fill:color-mix(in srgb,var(--good) 7%,transparent)}.wq-label{font-size:12px;fill:var(--muted)}.wq-tick{font-size:11px;fill:var(--muted)}
 .wq-held{fill:color-mix(in srgb,var(--brand) 55%,transparent);stroke:var(--brand)}.wq-watch{fill:var(--paper);stroke:var(--muted)}
 .wq-name{font-size:11px;font-weight:700;fill:var(--ink)}
+/* Quy trình đầu tư (Kanban) */
+.ib-add{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px}.ib-chip{margin:2px 4px}
+.ib-board{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.ib-col{background:var(--soft);border-radius:8px;padding:8px;min-width:0}
+.ib-col h3{font-size:14px;margin:2px 4px 8px}.ib-card{background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:8px;margin-bottom:8px}
+.ib-top{display:flex;justify-content:space-between;align-items:baseline}.ib-note{font-size:13px;margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.ib-hint{font-size:12px;margin:4px 0;color:var(--warn-soft-ink);background:var(--warn-soft-bg);border-radius:5px;padding:3px 6px}
+.ib-actions{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}.ib-actions .btn{padding:3px 8px;font-size:12px}.ib-card textarea{width:100%;min-height:60px}
+@media(max-width:1100px){.ib-board{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:650px){.ib-board{grid-template-columns:minmax(0,1fr)}}
 .fd-stock{background:var(--op2)}.fd-balanced{background:var(--op4)}.fd-bond{background:var(--op3)}.fd-unknown{background:var(--vc-unknown)}
 /* Dự án và điểm rơi lợi nhuận: one bar per year, scaled to the largest year. */
 .pp-years{display:grid;gap:6px;margin:4px 0 14px}.pp-year{display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;gap:10px;align-items:center}

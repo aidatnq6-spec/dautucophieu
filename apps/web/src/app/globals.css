@@ -213,6 +213,9 @@ legend{font-weight:600;padding:0 6px}
 .sm-index{fill:none;stroke:var(--vc-neutral);stroke-width:1.5}.sm-up{fill:none;stroke:var(--good);stroke-width:2}.sm-down{fill:none;stroke:var(--bad);stroke-width:2}
 /* Bản tổng kết tháng */
 .mr-link{text-align:right;margin:-8px 0 8px}.mr-tools{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}.mr-lead{font-size:16px;font-weight:600;margin:0 0 12px}
+/* Kịch bản và chỉ báo luận điểm */
+.tm-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px}
+.tm-tiles>div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}.tm-tiles strong{font-size:18px}
 .fd-stock{background:var(--op2)}.fd-balanced{background:var(--op4)}.fd-bond{background:var(--op3)}.fd-unknown{background:var(--vc-unknown)}
 /* Dự án và điểm rơi lợi nhuận: one bar per year, scaled to the largest year. */
 .pp-years{display:grid;gap:6px;margin:4px 0 14px}.pp-year{display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;gap:10px;align-items:center}

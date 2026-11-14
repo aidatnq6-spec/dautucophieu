@@ -43,6 +43,10 @@ TREASURY_CSV = ("https://home.treasury.gov/resource-center/data-chart-center/int
                 "?type=daily_treasury_yield_curve&field_tdr_date_value={year}&page&_format=csv")
 # ECB euro reference rates, last 90 days (public, robots.txt allows); DXY is computed from them with ICE's published formula.
 ECB_90D = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
+# Cục Thống kê's own site (WordPress): its public posts API, category 94 (Dữ liệu và số liệu thống kê); robots.txt disallows only
+# /wp-admin/ (checked 14/11/2026). The monthly CPI post opens with the month's year-on-year figure.
+NSO_CPI = ("https://www.nso.gov.vn/wp-json/wp/v2/posts?categories=94&search=Ch%E1%BB%89%20s%E1%BB%91%20gi%C3%A1%20ti%C3%AAu%20d%C3%B9ng"
+           "&per_page=20&_fields=date,title,content")
 DXY_WEIGHTS = {"EUR": -0.576, "JPY": 0.136, "GBP": -0.119, "CAD": 0.091, "SEK": 0.042, "CHF": 0.036}
 # HOSE's own statistics service behind hsx.vn (robots.txt allows all); one trading day per call, values in million đồng.
 HOSE_FOREIGN = "https://api.hsx.vn/mk/api/v1/market/foreign-trading-value-report?fromDate={day}&toDate={day}"
@@ -306,6 +310,37 @@ def parse_news_cpi(items: list[dict]) -> list[tuple[date, str]]:
     return sorted(found.items())
 
 
+_VN_MONTHS = {"mười một": 11, "mười hai": 12, "một": 1, "giêng": 1, "hai": 2, "ba": 3, "tư": 4, "bốn": 4, "năm": 5, "sáu": 6, "bảy": 7,
+              "tám": 8, "chín": 9, "mười": 10}
+_NSO_MONTH = re.compile(r"(?i)tháng\s+(mười một|mười hai|giêng|một|hai|ba|tư|bốn|năm|sáu|bảy|tám|chín|mười|\d{1,2})\b")
+_NSO_YOY = re.compile(r"(?i)(tăng|giảm)\s*(\d{1,2})(?:,(\d{1,2}))?\s*%\s*so với cùng kỳ năm trước")
+
+
+def parse_nso_cpi(text: str) -> list[tuple[date, str]]:
+    """Vietnam's CPI, year on year, from Cục Thống kê's monthly post "Chỉ số giá tiêu dùng … tháng Mười … năm 2026": the first
+    "% so với cùng kỳ năm trước" before any average ("bình quân", "tính chung"). Other posts (the monthly overview, the price press
+    release) are skipped: only a title that starts with "Chỉ số giá tiêu dùng". Dated to the month's end."""
+    found: dict[date, str] = {}
+    for post in json.loads(text):
+        title = html_lib.unescape(re.sub(r"<[^>]+>", " ", (post.get("title") or {}).get("rendered") or "")).strip()
+        if not title.lower().startswith("chỉ số giá tiêu dùng"):
+            continue
+        month_m, year_m = _NSO_MONTH.search(title), re.search(r"năm\s+(\d{4})", title)
+        if not month_m or not year_m:
+            continue
+        word = month_m.group(1).lower()
+        month, year = int(word) if word.isdigit() else _VN_MONTHS[word], int(year_m.group(1))
+        body = re.sub(r"\s+", " ", html_lib.unescape(re.sub(r"<[^>]+>", " ", (post.get("content") or {}).get("rendered") or "")))
+        cut = min([i for i in (body.lower().find("bình quân"), body.lower().find("tính chung")) if i >= 0] or [len(body)])
+        yoy = _NSO_YOY.search(body[:cut])
+        if not yoy or not 1 <= month <= 12:
+            continue
+        value = Decimal(f"{yoy.group(2)}.{yoy.group(3) or 0}") * (-1 if yoy.group(1).lower() == "giảm" else 1)
+        if Decimal(-10) <= value <= Decimal(30):
+            found[date(year, month, calendar.monthrange(year, month)[1])] = _plain(value)
+    return sorted(found.items())
+
+
 def parse_hose_foreign(text: str) -> dict[str, str] | None:
     """Net foreign buy-sell and total HOSE trading value (incl. put-through) in billion đồng; None on a day without trading."""
     try:
@@ -428,6 +463,8 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
             points = parse_te_pmi(page(TE_PAGE.format(country=src["country"])), year=today.year)
         elif src["kind"] == "ecb_dxy":
             points = parse_ecb_dxy(page(ECB_90D))
+        elif src["kind"] == "nso_cpi":
+            points = parse_nso_cpi(page(NSO_CPI))
         elif src["kind"] in ("news_pmi", "news_cpi"):
             from investment_agent.brief.news import FEEDS, parse_rss
             items, failed = [], 0

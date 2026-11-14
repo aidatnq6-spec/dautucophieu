@@ -278,11 +278,6 @@ def test_vietnam_cpi_year_on_year_is_read_from_news_headlines():
     assert parse_news_cpi(items) == [(date(2026, 9, 30), "3.38"), (date(2026, 10, 31), "3.2"), (date(2026, 12, 31), "-0.5")]
 
 
-def test_vietnam_cpi_is_an_automatic_indicator_with_a_manual_fallback():
-    ind = {i["id"]: i for i in load_indicators()}
-    assert ind["vn_cpi_yoy"]["source"] == {"kind": "news_cpi", "manual_fallback": True} and ind["vn_cpi_yoy"]["unit"] == "%"
-
-
 def test_one_feed_read_serves_both_pmi_and_cpi(tmp_path):
     rss = ('<rss><item><title>PMI ngành sản xuất Việt Nam tháng 10 đạt 50,8 điểm</title><link>https://cafef.vn/a.chn</link>'
            '<pubDate>Mon, 02 Nov 2026 09:30:00 +0700</pubDate></item>'
@@ -520,3 +515,29 @@ def test_us_inflation_uses_the_unadjusted_index_of_the_headline_figure():
 def test_m2_counts_as_old_only_after_the_state_banks_45_day_publication_window_and_a_month():
     m2 = next(i for i in load_indicators() if i["id"] == "m2_vn")
     assert m2["max_age_days"] >= 76  # end of August, out by mid-October, September due by mid-November
+
+
+def _nso_post(date_, title, first):
+    return {"date": date_, "title": {"rendered": title}, "content": {"rendered": f"<p>{first}</p><p>Những tín hiệu tích cực (12/10/2026)</p>"}}
+
+
+def test_vietnam_cpi_is_read_from_the_statistics_office_monthly_post():
+    from investment_agent.market.leading import parse_nso_cpi
+    posts = [
+        _nso_post("2026-11-03T09:01:54", "Chỉ số giá tiêu dùng, chỉ số giá vàng và chỉ số giá đô la Mỹ tháng Mười và mười tháng năm 2026",
+                  "Chỉ số giá tiêu dùng (CPI) tháng Mười tăng 0,20% so với tháng trước; tăng 4,41% so với tháng 12/2025 và tăng 5,09% so với cùng kỳ năm "
+                  "trước. Bình quân mười tháng năm 2026, CPI tăng 4,57% so với cùng kỳ năm trước"),
+        _nso_post("2026-07-03T09:00:39", "Chỉ số giá tiêu dùng, chỉ số giá vàng và chỉ số giá đô la Mỹ tháng Sáu, quý II và 6 tháng đầu năm 2026",
+                  "Chỉ số giá tiêu dùng (CPI) tháng Sáu giảm 0,39% so với tháng trước, chủ yếu do giá xăng dầu giảm. CPI tháng Sáu tăng 3,21% so với "
+                  "tháng 12/2025 và tăng 4,69% so với cùng kỳ năm trước. CPI bình quân quý II/2026 tăng 5,25% so với quý II/2025."),
+        _nso_post("2027-01-04T09:00:00", "Chỉ số giá tiêu dùng (CPI), chỉ số giá vàng và chỉ số giá đô la Mỹ tháng Mười hai và năm 2026",
+                  "Chỉ số giá tiêu dùng (CPI) tháng Mười hai giảm 0,10% so với tháng trước và giảm 0,30% so với cùng kỳ năm trước."),
+        _nso_post("2026-11-04T15:44:31", "Một số nét chính tình hình kinh tế – xã hội tháng 10 và 10 tháng năm 2026", "Trong mười tháng năm 2026, CPI tăng 9,99% so với cùng kỳ năm trước"),
+        _nso_post("2026-10-03T08:00:00", "Chỉ số giá tiêu dùng tháng Chín năm 2026", "Bình quân chín tháng năm 2026, CPI tăng 4,52% so với cùng kỳ năm trước."),
+    ]
+    assert parse_nso_cpi(json.dumps(posts)) == [(date(2026, 6, 30), "4.69"), (date(2026, 10, 31), "5.09"), (date(2026, 12, 31), "-0.3")]
+
+
+def test_vietnam_cpi_comes_from_the_statistics_office_with_the_news_as_fallback():
+    ind = {i["id"]: i for i in load_indicators()}
+    assert ind["vn_cpi_yoy"]["source"] == {"kind": "nso_cpi", "fallback": {"kind": "news_cpi"}, "manual_fallback": True}

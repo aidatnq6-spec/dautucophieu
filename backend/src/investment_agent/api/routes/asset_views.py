@@ -2,19 +2,21 @@
 cause), on Danh mục & Giao dịch. Owner-only views of the owner's own records; nothing here leaves the machine."""
 
 import re
-from datetime import date
+from datetime import date, datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Request
 
 from investment_agent.domain.asset_map import asset_map
+from investment_agent.domain.book_bridge import book_bridge
 from investment_agent.domain.month_bridge import month_bridge
-from investment_agent.market.fund_nav import fund_profiles
+from investment_agent.market.fund_nav import fund_history, fund_profiles
+from investment_agent.market.gold_price import gold_history
 from investment_agent.market.sectors import load_sectors
 from investment_agent.market.series import SeriesStore
 from investment_agent.repositories.personal import RepositoryUnavailable
-from investment_agent.services.deposit_book import book_quotes, read_book
+from investment_agent.services.deposit_book import book_at, book_quotes, read_book
 from investment_agent.services.overview import compose_overview
 from investment_agent.services.records import LedgerBook, read_version
 
@@ -74,4 +76,16 @@ def get_month_bridge(request: Request, month: str | None = None):
         symbols = {e.security_id for e in events if getattr(e, "security_id", None)}
         closes = {s: {t.date(): v for t, v in store.read(f"{s}-1d")} for s in symbols}  # thousand đồng, adjusted
         sessions = [t.date() for t, _ in store.read("VNINDEX-1d") if t.date() <= today]
-    return {"months": months, "bridge": month_bridge(events, closes=closes, sessions=sessions, month=month)}
+    bridge = month_bridge(events, closes=closes, sessions=sessions, month=month)
+    book = None
+    if bridge.get("end_day"):  # Sổ tài sản as last saved by the end of each day, valued at that day's NAV and gold price
+        start_day = date.fromisoformat(bridge["start_day"]) if bridge.get("start_day") else None
+        end_day = date.fromisoformat(bridge["end_day"])
+        try:
+            start_book = book_at(repo, owner, datetime.combine(start_day, time.max, VN)) if start_day else None
+            end_book = book_at(repo, owner, datetime.combine(end_day, time.max, VN))
+        except RepositoryUnavailable:
+            return unavailable()
+        if start_book is not None or end_book is not None:
+            book = book_bridge(start_book, end_book, navs=fund_history(data_dir), gold=gold_history(data_dir), start_day=start_day, end_day=end_day)
+    return {"months": months, "bridge": bridge, "book": book}

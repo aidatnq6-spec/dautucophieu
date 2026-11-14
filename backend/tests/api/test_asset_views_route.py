@@ -26,4 +26,28 @@ def test_the_month_bridge_explains_the_account_s_month_to_the_dong(tmp_path):
     b = body["bridge"]
     assert b["status"] == "ok" and b["start"] == "0" and b["end"] == "101000000" and b["other"] == "0" and b["end_day"] == "2027-01-14"
     assert b["steps"] == [{"id": "flows", "amount": "100000000"}, {"id": "ticker:FPT", "symbol": "FPT", "amount": "1000000"}]
+    assert body["book"] is None  # no Sổ tài sản saved
     assert call(c, clock, "GET", "/internal/month-bridge?month=2027-13").status_code == 422
+
+
+def test_the_month_bridge_adds_the_book_as_saved_by_the_end_of_the_month(tmp_path):
+    store = SeriesStore(tmp_path / "trend-sources")
+    store.upsert("VNINDEX-1d", [(datetime(2027, 1, d), "1700") for d in (4, 5, 14)])
+    store.upsert("FPT-1d", [(datetime(2027, 1, d), "60") for d in (5, 14)])
+    c, clock = client(tmp_path)
+    save_book(c, clock)  # stamped by the store's own clock, before the end of January 2027
+    book = call(c, clock, "GET", "/internal/month-bridge").json()["book"]
+    assert book["status"] == "ok" and book["start"] == "0" and book["end"] == "315000000"  # deposits 300 tr + accounts 15 tr
+    assert book["steps"] == [{"id": "book:entries", "amount": "315000000"}]
+
+
+def test_the_book_is_read_as_it_stood_at_a_moment(tmp_path):
+    from datetime import timedelta, timezone
+
+    from investment_agent.api.auth import OwnerContext
+    from investment_agent.services.deposit_book import book_at
+    c, clock = client(tmp_path)
+    save_book(c, clock)
+    repo, owner = c.app.state.personal_repository, OwnerContext(uid="owner-1", role="owner", correlation_id="t")
+    assert book_at(repo, owner, datetime.now(timezone.utc) - timedelta(days=1)) is None  # saved just now: not yet a day ago
+    assert len(book_at(repo, owner, datetime.now(timezone.utc) + timedelta(minutes=1)).deposits) == 2

@@ -10,6 +10,7 @@ import { ConcentrationView } from "./concentration-view";
 import { DrawdownView } from "./drawdown-view";
 import { StressView } from "./stress-view";
 import { PerformanceView } from "./performance-view";
+import { AssetMapView, MonthBridgeView } from "./asset-views";
 import { ThesisView } from "./thesis-view";
 import { TcbsImport } from "./tcbs-import";
 import { TradeBehaviour } from "./trade-behaviour";
@@ -90,6 +91,8 @@ export function PortfolioView() {
 
       <ConcentrationView />
       <PerformanceView />
+      <MonthBridgeView />
+      <AssetMapView />
       <DrawdownView />
       <StressView ledgerVersion={ledger.version} />
 

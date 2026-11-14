@@ -186,7 +186,10 @@ test("the CAPM hint starts from Damodaran's premium for Vietnam, takes the owner
   const people = page.getByRole("region", { name: "Cổ đông lớn và ban lãnh đạo" });
   const holders = people.getByRole("table", { name: "Cổ đông lớn FPT" });
   await expect(holders.getByRole("row", { name: /Trương Gia Bình/ })).toContainText("Chủ tịch Hội đồng Quản trị");  // the officer's role beside the stake
-  await expect(holders.getByRole("row", { name: /Khác/ })).toContainText("93,11%");  // 100% − 6,89%
+  await expect(holders.getByRole("row", { name: /Khác/ })).toContainText("92,11%");  // 100% − 6,89% − 1%
+  await expect(holders.getByRole("row", { name: /Quỹ đầu tư thử/ })).toContainText("dữ liệu cũ");  // disclosed in 2023
+  await expect(holders.getByRole("row", { name: /Trương Gia Bình/ })).not.toContainText("dữ liệu cũ");
+  await expect(people.getByTestId("holders-old")).toContainText("1/2 dòng");
   await expect(people).toContainText("Nước ngoài 22,22% (room tối đa 49,00%)");
   await expect(people).toContainText("Tự do chuyển nhượng chưa có số");
   await expect(people.getByRole("table", { name: "Cơ cấu sở hữu FPT" })).toContainText("Tổ chức nước ngoài");

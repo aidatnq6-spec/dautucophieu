@@ -17,6 +17,12 @@ const shares = (q: number | null) => (q === null ? "—" : formatVnd(String(q), 
 const TOP = 10;
 const stake = (v: string | null) => (v === null ? "chưa có số" : formatRatio(v, 2));
 // Same person on both lists: exact name after trimming and case folding; anything looser would be a guess.
+/** A holder's line disclosed more than 12 months before the day the list was read: the stake may have changed since. */
+export function isOld(updated: string | null, fetchedAt: string | null): boolean {
+  if (!updated || !fetchedAt) return false;
+  const [y, m, d] = fetchedAt.slice(0, 10).split("-");
+  return updated.slice(0, 10) < `${Number(y) - 1}-${m}-${d}`;
+}
 const key = (name: string) => name.trim().replace(/\s+/g, " ").toLocaleLowerCase("vi");
 
 /** Foreign/state stakes, holdings by owner type, major shareholders (top ten by stake, the rest as "Khác", officers' roles beside them) and officers, from the company's public disclosures (VNDirect), cached a month. */
@@ -48,12 +54,14 @@ export function CompanyPeople({ symbol }: { symbol: string }) {
             <td data-label="Số cổ phiếu" className="num">{shares(t.shares)}</td><td data-label="Ngày">{day(t.updated)}</td></tr>)}</tbody>
         </table> : <p className="muted">Chưa đọc được cơ cấu theo nhóm cổ đông (nguồn KBS lỗi hoặc không có số).</p>}
         <h3>{Math.min(TOP, view.shareholders.length)} cổ đông lớn nhất</h3>
+        {(() => { const old = holders.filter((h) => isOld(h.updated, view.fetched_at)).length;
+          return old > 0 && <p className="caption" data-testid="holders-old">{old}/{holders.length} dòng công bố trên 12 tháng trước (nhãn dữ liệu cũ): tỷ lệ hiện tại có thể đã khác.</p>; })()}
         <table className="fv-table" aria-label={`Cổ đông lớn ${symbol}`}>
           <thead><tr><th>Cổ đông</th><th>Chức vụ</th><th>Loại</th><th className="num">Tỷ lệ</th><th className="num">Số cổ phiếu</th><th>Cập nhật</th></tr></thead>
           <tbody>{holders.map((h) => <tr key={h.name}><td data-label="Cổ đông">{h.name}</td>
             <td data-label="Chức vụ">{roles.get(key(h.name)) ?? ""}</td><td data-label="Loại">{TYPE[h.type ?? ""] ?? h.type ?? "—"}</td>
             <td data-label="Tỷ lệ" className="num">{share(h.percent)}</td><td data-label="Số cổ phiếu" className="num">{shares(h.quantity)}</td>
-            <td data-label="Cập nhật">{day(h.updated)}</td></tr>)}</tbody>
+            <td data-label="Cập nhật">{day(h.updated)}{isOld(h.updated, view.fetched_at) && <> <span className="pill warn" title="Công bố trên 12 tháng trước ngày đọc: tỷ lệ có thể đã khác">dữ liệu cũ</span></>}</td></tr>)}</tbody>
           <tfoot><tr><td data-label="Cổ đông">Khác</td><td /><td /><td data-label="Tỷ lệ" className="num">
             {view.others_percent === null ? <span title="Một trong các cổ đông lớn không có tỷ lệ">—</span> : formatRatio(view.others_percent, 2)}</td>
             <td /><td /></tr></tfoot>

@@ -42,3 +42,11 @@ for (const width of [375, 1440]) {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 }
+
+test("the quadrant places each watched ticker or says why it is not drawn", async ({ page }) => {
+  await openWatchlist(page);
+  const box = page.getByRole("region", { name: "Bong bóng góc phần tư" });
+  await expect(box.getByText("Đang tải…")).toHaveCount(0);
+  await expect(box).toContainText("không khuyên mua hay bán");
+  await expect(box.getByTestId("quadrant-missing")).toContainText("VCB");  // no price history stored for it
+});

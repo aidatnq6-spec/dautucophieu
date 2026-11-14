@@ -52,3 +52,41 @@ def market_overview(request: Request):
             "sectors": sector_rows(rows, sectors), "sectors_as_of": sectors_as_of, "groups_as_of": wl.groups_as_of,
             # GDP, CPI, rates, money supply and FDI are paid-tier data in Vnstock; nothing is estimated in their place.
             "macro": {"available": False, "reason": "source_not_entitled"}}
+
+
+@router.get("/watchlist/quadrant")
+def watch_quadrant(request: Request):
+    """Bong bóng góc phần tư: every watched ticker by its P/B against its own past and its profit growth, sized by what is held."""
+    from decimal import Decimal
+    from pathlib import Path
+    from zoneinfo import ZoneInfo
+
+    from investment_agent.domain.watch_quadrant import quadrant
+    from investment_agent.market.financial_ratios import kind_of
+    from investment_agent.market.series import SeriesStore
+    from investment_agent.market.statements import StatementStore
+    from investment_agent.services.overview import compose_overview
+    from investment_agent.valuation.history import monthly_multiples
+    from investment_agent.valuation.sources import valuation_record
+
+    from .common import now
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    data_dir = request.app.state.data_dir
+    if repo is None or data_dir is None:
+        return unavailable()
+    try:
+        holdings = compose_overview(repo, owner, request.app.state.market, now(request))["holdings"]
+    except RepositoryUnavailable:
+        return unavailable()
+    data_dir = Path(data_dir)
+    today = now(request).astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date()
+    sectors, closes = load_sectors(data_dir)[0], SeriesStore(data_dir / "trend-sources")
+    tickers = {}
+    for s in load_watchlist(data_dir).symbols:
+        v = valuation_record(data_dir, s, today=today)
+        hist = monthly_multiples(v["record"], closes.read(f"{s}-1d"), today=today, shares=v["shares"], published=v["published"])
+        store = StatementStore(data_dir / ("statements" if kind_of(sectors.get(s)) is None else "statements-financial"))
+        tickers[s] = {"pb": [(p["month"], None if p["value"] is None else str(p["value"])) for p in hist["pb"]["points"]],
+                      "quarters": (store.read(s) or {}).get("quarters") or {}}
+    held = {h["security_id"]: Decimal(h["market_value"]) for h in holdings if h.get("market_value") is not None}
+    return {**quadrant(tickers, held=held), "sectors": {s: sectors.get(s) for s in tickers}}

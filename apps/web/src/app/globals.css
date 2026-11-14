@@ -183,6 +183,11 @@ legend{font-weight:600;padding:0 6px}
 .am-r1{fill:color-mix(in srgb,var(--bad) 35%,var(--paper))}.am-r2{fill:color-mix(in srgb,var(--bad) 60%,var(--paper))}.am-r3{fill:var(--bad)}
 .am-head{font-size:12px;font-weight:700;fill:var(--ink)}.am-label{font-size:13px;font-weight:700;fill:var(--ink)}.am-sub{font-size:11px;fill:var(--ink)}
 .am-axis{font-size:11px;fill:var(--muted)}.am-zero{stroke:var(--line)}.am-total{fill:var(--brand)}.am-up{fill:var(--good)}.am-down{fill:var(--bad)}
+/* Bong bóng góc phần tư */
+.wq-plot{width:100%;height:auto;display:block;margin:6px 0 12px}.wq-frame{fill:none;stroke:var(--line)}.wq-axis{stroke:var(--line);stroke-dasharray:4 4}
+.wq-zone.wq-good{fill:color-mix(in srgb,var(--good) 7%,transparent)}.wq-label{font-size:12px;fill:var(--muted)}.wq-tick{font-size:11px;fill:var(--muted)}
+.wq-held{fill:color-mix(in srgb,var(--brand) 55%,transparent);stroke:var(--brand)}.wq-watch{fill:var(--paper);stroke:var(--muted)}
+.wq-name{font-size:11px;font-weight:700;fill:var(--ink)}
 .fd-stock{background:var(--op2)}.fd-balanced{background:var(--op4)}.fd-bond{background:var(--op3)}.fd-unknown{background:var(--vc-unknown)}
 /* Dự án và điểm rơi lợi nhuận: one bar per year, scaled to the largest year. */
 .pp-years{display:grid;gap:6px;margin:4px 0 14px}.pp-year{display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;gap:10px;align-items:center}

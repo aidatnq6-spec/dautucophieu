@@ -70,5 +70,6 @@ describe("map tiles", () => {
     expect(fit("iPower TCBS (nhận lãi)", 100)).toBe("iPower TCBS…");
     expect(fit("KDH", 100)).toBe("KDH");
     expect(fit("KDH", 20)).toBe("");
+    expect(fit("Vàng nhẫn", 40)).toBe("");
   });
 });

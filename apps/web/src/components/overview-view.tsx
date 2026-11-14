@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { GoalScorecard } from "./goal-scorecard";
 import { useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
 import { formatVnd } from "../lib/format";
@@ -34,6 +35,7 @@ export function OverviewView() {
       {data.setup.universe_status !== "complete" && <p className="caption">Danh sách 50 mã nghiên cứu chưa được duyệt đầy đủ (phiên bản {data.setup.universe_version}).</p>}
       {glance && <QuickNumbers g={glance} />}
       {glance && <WorthALook g={glance} />}
+      <GoalScorecard />
       <DecisionSummary decision={data.decision} items={data.items} />
       <section className="surface">
         <div className="row"><h2>Cổ phiếu đang nắm giữ</h2><Link href="/portfolio">Sổ giao dịch</Link></div>

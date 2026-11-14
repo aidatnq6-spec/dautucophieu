@@ -38,8 +38,13 @@ def asset_map(holdings: list[dict], *, ledger_cash: str, book: DepositBook | Non
         note = "chưa có NAV, theo vốn" if row["source"] == "no_nav" else kind if b.fund else "theo vốn"
         groups["funds"].append({"id": f"bond:{b.id}", "label": b.fund or b.name, "note": note, "value": _s(value),
                                 "change": _change(value, b.amount) if row["source"] == "nav" else None})
-    for d in book.deposits:
-        groups["deposits"].append({"id": f"deposit:{d.id}", "label": d.bank, "note": f"đến hạn {d.matures:%d/%m/%Y}", "value": _s(d.principal), "change": None})
+    banks: dict[str, list] = {}
+    for d in book.deposits:  # one tile per bank: a dozen equal sổ of one bank read as one block, not a dozen
+        banks.setdefault(d.bank.strip(), []).append(d)
+    for bank, ds in banks.items():
+        first = min(d.matures for d in ds)
+        note = f"{len(ds)} sổ · sớm nhất đến hạn {first:%d/%m/%Y}" if len(ds) > 1 else f"đến hạn {first:%d/%m/%Y}"
+        groups["deposits"].append({"id": f"bank:{bank}", "label": bank, "note": note, "value": _s(sum((d.principal for d in ds), Decimal(0))), "change": None})
     if Decimal(ledger_cash) > 0:
         groups["cash"].append({"id": "cash:ledger", "label": "Tài khoản chứng khoán", "note": None, "value": _s(Decimal(ledger_cash)), "change": None})
     for a in book.accounts:

@@ -26,3 +26,14 @@ def test_every_asset_is_a_tile_in_its_layer_with_its_gain_on_cost_where_a_price_
     assert groups["gold"]["tiles"][0]["value"] == "9000000" and groups["gold"]["tiles"][0]["change"] == "0.125"
     assert groups["cash"]["value"] == "6000000" and groups["deposits"]["tiles"][0]["change"] is None
     assert out["total"] == str(200000000 + 9000000 + 6000000 + 6000000 + 1300000) and out["unpriced"] == ["VCB"]
+
+
+
+def test_term_deposits_are_one_tile_per_bank():
+    book = DepositBook.model_validate({"accounts": [], "bonds": [], "gold": [], "crypto": [], "deposits": [
+        {"id": f"d{i}", "bank": "NCB" if i < 3 else "SHB", "matures": f"2027-0{i + 1}-05", "principal": "50000000", "rate": "6", "interest": None,
+         "payout": "end", "locked": False} for i in range(4)]})
+    out = asset_map([], ledger_cash="0", book=book, navs={}, profiles={}, gold={}, sectors={}, today=date(2026, 11, 14))
+    tiles = {t["label"]: t for t in out["groups"][0]["tiles"]}
+    assert tiles["NCB"] == {"id": "bank:NCB", "label": "NCB", "note": "3 sổ · sớm nhất đến hạn 05/01/2027", "value": "150000000", "change": None}
+    assert tiles["SHB"]["note"] == "đến hạn 05/04/2027"

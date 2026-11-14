@@ -49,6 +49,25 @@ export function squarify(values: number[], w: number, h: number, x0 = 0, y0 = 0)
   return out;
 }
 
+/** Within one layer, tiles under 3% of the layer (when there are more than five) become one "n khoản nhỏ" tile, so the map has no
+ * slivers without a name; the list view still shows every one. */
+export function mergeSmall(tiles: Tile[]): Tile[] {
+  const total = tiles.reduce((a, t) => a + Number(t.value), 0);
+  if (tiles.length <= 5 || total <= 0) return tiles;
+  const small = tiles.filter((t) => Number(t.value) / total < 0.03);
+  if (small.length < 2) return tiles;
+  const rest = tiles.filter((t) => !small.includes(t));
+  return [...rest, { id: "small", label: `${small.length} khoản nhỏ`, note: small.map((t) => t.label).join(", "),
+    value: String(small.reduce((a, t) => a + Number(t.value), 0)), change: null }];
+}
+
+/** Text cut to fit a width at about 7 px a character (13 px bold), with an ellipsis; "" when not even three characters fit. */
+export function fit(text: string, width: number, charW = 7.2): string {
+  const n = Math.floor((width - 10) / charW);
+  if (n < 3) return "";
+  return text.length <= n ? text : `${text.slice(0, n - 1)}…`;
+}
+
 /** Tile colour from the gain on cost: green up, red down, three steps; grey when there is no market price. */
 export function changeTone(change: string | null): string {
   if (change === null) return "am-none";
@@ -79,16 +98,20 @@ export function AssetMapView() {
         </div>
         {!list ? <svg className="am-map" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Bản đồ danh mục, tổng ${formatVnd(map.total)}`}>
           {groups.map((g, gi) => {
-            const b = boxes[gi], head = b.h > 60 && b.w > 90 ? 20 : 0;
-            const tiles = squarify(g.tiles.map((t) => Number(t.value)), b.w - 2, b.h - head - 2, b.x + 1, b.y + head + 1);
+            const b = boxes[gi], head = b.h > 60 && b.w > 90 ? 22 : 0;
+            const shown = mergeSmall(g.tiles);
+            const tiles = squarify(shown.map((t) => Number(t.value)), b.w - 4, b.h - head - 4, b.x + 2, b.y + head + 2);
             return <g key={g.id}>
               <rect x={b.x} y={b.y} width={b.w} height={b.h} className="am-group" />
-              {head > 0 && <text x={b.x + 6} y={b.y + 14} className="am-head">{g.label} · {formatRatio(String(Number(g.value) / Number(map.total)), 0)}</text>}
-              {g.tiles.map((t, ti) => { const r = tiles[ti]; const big = r.w > 64 && r.h > 34;
-                return <g key={t.id}><rect x={r.x} y={r.y} width={r.w} height={r.h} className={`am-tile ${changeTone(t.change)}`}>
+              {head > 0 && <text x={b.x + 8} y={b.y + 15} className="am-head">{fit(`${g.label} · ${formatRatio(String(Number(g.value) / Number(map.total)), 0)} · ${millions(g.value)}`, b.w, 7)}</text>}
+              {shown.map((t, ti) => { const r = tiles[ti];
+                const name = r.h > 22 ? fit(t.label, r.w) : "", detail = r.h > 44 ? fit(`${millions(t.value)}${t.change !== null ? ` · ${pct(t.change)}` : ""}`, r.w, 6.2) : "";
+                const note = r.h > 64 && t.note ? fit(t.note, r.w, 6) : "";
+                return <g key={t.id}><rect x={r.x} y={r.y} width={r.w} height={r.h} rx={3} className={`am-tile ${changeTone(t.change)}`}>
                   <title>{`${g.label} · ${t.label}${t.note ? ` (${t.note})` : ""}: ${formatVnd(t.value)}${t.change !== null ? `, ${pct(t.change)} so với vốn` : ""}`}</title></rect>
-                  {big && <text x={r.x + 5} y={r.y + 15} className="am-label">{t.label}</text>}
-                  {big && r.h > 50 && <text x={r.x + 5} y={r.y + 30} className="am-sub">{millions(t.value)}{t.change !== null ? ` · ${pct(t.change)}` : ""}</text>}</g>;
+                  {name && <text x={r.x + 7} y={r.y + 18} className="am-label">{name}</text>}
+                  {detail && <text x={r.x + 7} y={r.y + 35} className="am-sub">{detail}</text>}
+                  {note && <text x={r.x + 7} y={r.y + 51} className="am-note">{note}</text>}</g>;
               })}
             </g>;
           })}

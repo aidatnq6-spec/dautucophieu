@@ -61,6 +61,25 @@ def _order(fund: dict):
     return kind, m12 is None, -Decimal(m12) if m12 is not None else 0, fund["code"]
 
 
+RANKED = ("m6", "m12")
+
+
+def _rank(funds: list[dict]) -> None:
+    """Each fund's place among the funds of its kind by its 6- and 12-month return (1 = highest), over the funds that have one.
+    run_up (Kiểm tra mua đỉnh): a positive 6-month return in the top quarter of its kind; None without a 6-month return."""
+    for fund in funds:
+        fund["rank"] = {key: None for key in RANKED}
+    for kind in KINDS:
+        same = [f for f in funds if f["kind"] == kind]
+        for key in RANKED:
+            known = sorted((f for f in same if (f["returns"] or {}).get(key) is not None), key=lambda f: -Decimal(f["returns"][key]))
+            for place, f in enumerate(known, 1):
+                f["rank"][key] = {"rank": place, "of": len(known)}
+    for fund in funds:
+        r6 = fund["rank"]["m6"]
+        fund["run_up"] = None if r6 is None else Decimal(fund["returns"]["m6"]) > 0 and r6["rank"] <= -(-r6["of"] // 4)
+
+
 def fund_board(navs: dict, profiles: dict, *, index: list[tuple[str, str]], deposit_rate: str | None, held: set[str]) -> dict:
     """navs: market.fund_nav.fund_navs(); profiles: fund_profiles(); index: VN-Index's stored daily closes; held: the owner's fund codes.
     beats_deposit: the fund's 12-month return against the 12-month deposit rate, None when either is missing."""
@@ -72,6 +91,7 @@ def fund_board(navs: dict, profiles: dict, *, index: list[tuple[str, str]], depo
         funds.append({"code": code, "name": nav["name"], "kind": profile.get("kind"), "manager": profile.get("manager"), "fee": profile.get("fee"),
                       "nav": nav["nav"], "date": nav["date"], "returns": returns, "held": code in held,
                       "beats_deposit": Decimal(m12) > Decimal(deposit_rate) if m12 is not None and deposit_rate is not None else None})
+    _rank(funds)
     funds.sort(key=_order)
     counts = {k: sum(1 for f in funds if f["kind"] == k) for k in KINDS}
     return {"funds": funds, "counts": counts, "benchmark": {"vnindex": index_returns(index), "deposit_12m": deposit_rate}}

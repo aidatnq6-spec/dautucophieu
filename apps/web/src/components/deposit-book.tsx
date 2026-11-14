@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatVnd, groupDigitsInput, parseMoneyInput } from "../lib/format";
+import { FundCheck } from "./funds-view";
 import { type Purpose, type PurposesView, PurposeSelect } from "./money-purposes";
 
 type Account = { id: string; name: string; amount: string; liquid: boolean };
@@ -343,6 +344,7 @@ export function DepositBook({ onSaved, refresh }: { onSaved?: () => void; refres
       onEdit={(row) => { setReserveDraft(null); setMessage(null); setPurposeDraft(purposes?.data.tags[row.id] ?? ""); setNewPurpose(null); setEditing({ list, draft: row, isNew: false }); }}
       onDraft={(draft) => setEditing({ list, draft, isNew: editing?.isNew ?? false })}
       onSave={() => void saveRow()} onCancel={cancel} onDelete={(row, n) => void deleteRow(list, row, n)} />
+    {editing?.list === "bonds" && list === "bonds" && (editing.draft as BondDraft).fund?.trim() && <FundCheck code={(editing.draft as BondDraft).fund} />}
     {editing?.list === list && alert}
     <button type="button" className="btn" disabled={locked || editing !== null || saved[list].length >= MAX_ROWS[list]}
       onClick={() => { setReserveDraft(null); setMessage(null); setPurposeDraft(""); setNewPurpose(null); setEditing({ list, draft: EMPTY[list](), isNew: true }); }}>

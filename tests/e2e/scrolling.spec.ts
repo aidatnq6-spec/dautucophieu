@@ -34,6 +34,20 @@ test("a back-to-top button appears after scrolling and returns to the top", asyn
   await expect(up).toBeHidden();
 });
 
+test("a to-the-end button at the top right jumps to the bottom of a long page and goes away there", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 700 });
+  await page.goto("/portfolio");
+  const down = page.getByRole("button", { name: "Xuống cuối trang" });
+  await expect(down).toBeVisible();
+  const box = await down.boundingBox();
+  expect(box!.y).toBeLessThan(80);  // top of the screen
+  expect(box!.x).toBeGreaterThan(1280 - 100);  // right side
+  await down.click();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight - (window.scrollY + window.innerHeight))).toBeLessThan(5);
+  await expect(down).toBeHidden();
+  await expect(page.getByRole("button", { name: "Lên đầu trang" })).toBeVisible();
+});
+
 test("on a phone the menu bar stays at the top while scrolling, without horizontal scroll", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 760 });
   await page.goto("/portfolio");

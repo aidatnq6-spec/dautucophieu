@@ -330,7 +330,9 @@ legend{font-weight:600;padding:0 6px}
 .watch-list li{overflow-wrap:anywhere}
 .to-top{position:fixed;right:22px;bottom:22px;z-index:30;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--brand);display:grid;place-items:center;cursor:pointer;box-shadow:0 4px 14px rgba(24,50,71,.15)}
 .to-top:hover{border-color:var(--brand);background:var(--nav-on-bg)}
-@media(max-width:650px){.to-top{right:14px;bottom:14px}}
+.to-bottom{position:fixed;right:22px;top:18px;z-index:30;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--brand);display:grid;place-items:center;cursor:pointer;box-shadow:0 4px 14px rgba(24,50,71,.15)}
+.to-bottom:hover{border-color:var(--brand);background:var(--nav-on-bg)}
+@media(max-width:650px){.to-top{right:14px;bottom:14px}.to-bottom{right:14px;top:auto;bottom:66px}}
 .page-jumps{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
 .page-jumps button{border:1px solid var(--line);background:var(--paper);color:var(--link);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer}
 .page-jumps button:hover,.page-jumps button[aria-current="true"]{border-color:var(--brand);background:var(--nav-on-bg)}
@@ -450,7 +452,7 @@ main h2{scroll-margin-top:16px}
 .ln-dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:8px}
 @media (max-width:860px){.ln-grid{grid-template-columns:minmax(0,1fr)}.ln-result{position:static}}
 .ln-print{display:none}
-@media print{.side,.page-jumps,.to-top,.ln-controls,.rc,.btn,.mr-tools,.op-tools{display:none!important}.op-page{font-size:11px}.op-page .surface{padding:8px 10px;margin:0 0 6px;box-shadow:none;break-inside:avoid}
+@media print{.side,.page-jumps,.to-top,.to-bottom,.ln-controls,.rc,.btn,.mr-tools,.op-tools{display:none!important}.op-page{font-size:11px}.op-page .surface{padding:8px 10px;margin:0 0 6px;box-shadow:none;break-inside:avoid}
 .op-page h2{font-size:13px;margin:0 0 4px}.op-tiles strong{font-size:14px}.op-questions,.op-two{gap:6px}.op-q ul,.op-table{font-size:10px}.mr-page .surface{break-inside:avoid;box-shadow:none}
 @page{size:A4;margin:12mm}.shell{display:block;min-height:0}main.content{padding:0;max-width:none}
 .ln-grid{display:block}.ln-result{position:static;break-inside:avoid;box-shadow:none}.tablewrap{overflow:visible}

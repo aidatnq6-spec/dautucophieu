@@ -122,7 +122,7 @@ test("the printout uses the whole page width, states the loan and leaves out the
   await expect(facts).toContainText("Giá trị khoản vay");
   await expect(facts).toContainText("7,5%/năm trong 1 năm");
   await expect(facts).toContainText("Dư nợ giảm dần");
-  for (const hidden of [".side", ".page-jumps", ".ln-controls", ".to-top"]) await expect(page.locator(hidden)).toBeHidden();
+  for (const hidden of [".side", ".page-jumps", ".ln-controls", ".to-top", ".to-bottom"]) await expect(page.locator(hidden)).toBeHidden();
   await expect(page.getByRole("table", { name: "Lịch thanh toán" })).toBeVisible();
   await page.screenshot({ path: info.outputPath("in-khoan-vay.png"), fullPage: false });
   const pdf = await page.pdf({ format: "A4", path: info.outputPath("in-khoan-vay.pdf") });

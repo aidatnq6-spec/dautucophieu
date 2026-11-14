@@ -338,7 +338,10 @@ legend{font-weight:600;padding:0 6px}
 .as-fab:hover{transform:translateY(-2px) scale(1.05)}
 .ms-blink .ms-eyes{animation:ms-blink 5s infinite;transform-origin:32px 34px}
 @keyframes ms-blink{0%,94%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
-@media(prefers-reduced-motion:reduce){.ms-blink .ms-eyes{animation:none}}
+.ms-arm{transform-origin:50px 46px}.ms-wave .ms-arm{animation:ms-wave 4s ease-in-out infinite}
+.as-fab:hover .ms-arm{animation:ms-wave 1.2s ease-in-out infinite}
+@keyframes ms-wave{0%,60%,100%{transform:rotate(0)}66%{transform:rotate(-22deg)}72%{transform:rotate(8deg)}78%{transform:rotate(-22deg)}84%{transform:rotate(8deg)}90%{transform:rotate(0)}}
+@media(prefers-reduced-motion:reduce){.ms-blink .ms-eyes,.ms-wave .ms-arm,.as-fab:hover .ms-arm{animation:none}}
 .as-panel{position:fixed;right:22px;bottom:82px;z-index:32;width:min(400px,calc(100vw - 28px));max-height:min(640px,calc(100vh - 110px));display:flex;flex-direction:column;background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.35);overflow:hidden}
 .as-head{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--soft)}.as-head div{display:flex;flex-direction:column;line-height:1.2}.as-x{margin-left:auto;padding:4px 6px}
 .as-body{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px}

@@ -1,8 +1,8 @@
-/** Linh vật của trợ lý: an original round robot head of the app's own, with big eyes, a headset and an antenna tipped with a gold
- * coin (Gia Sản: wealth). Drawn in SVG with fixed colours so it reads on light and dark themes alike. */
-export function Mascot({ size = 56, blink = true }: { size?: number; blink?: boolean }) {
+/** Linh vật của trợ lý: an original round robot head of the app's own, with big eyes, a headset, an antenna tipped with a gold
+ * coin (Gia Sản: wealth) and a hand that waves now and then. Drawn in SVG with fixed colours so it reads on light and dark themes. */
+export function Mascot({ size = 56, blink = true, wave = true }: { size?: number; blink?: boolean; wave?: boolean }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true" className={blink ? "ms ms-blink" : "ms"}>
+    <svg width={size} height={size} viewBox="0 0 72 66" aria-hidden="true" className={`ms${blink ? " ms-blink" : ""}${wave ? " ms-wave" : ""}`}>
       <defs>
         <radialGradient id="ms-head" cx="40%" cy="30%" r="75%"><stop offset="0" stopColor="#ffffff" /><stop offset="1" stopColor="#dbe6f7" /></radialGradient>
         <linearGradient id="ms-face" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1f4fae" /><stop offset="1" stopColor="#163b82" /></linearGradient>
@@ -27,6 +27,13 @@ export function Mascot({ size = 56, blink = true }: { size?: number; blink?: boo
         <circle cx="39" cy="32.6" r="1" fill="#ffffff" />
       </g>
       <path d="M28 40.5 Q32 43.5 36 40.5" fill="none" stroke="#7ff0d0" strokeWidth="1.8" strokeLinecap="round" />
+      {/* waving arm: from the right of the head up to an open hand, turning about the shoulder */}
+      <g className="ms-arm">
+        <path d="M50 46 Q58 44 62 33" fill="none" stroke="#9fb4d6" strokeWidth="5" strokeLinecap="round" />
+        <path d="M50 46 Q58 44 62 33" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" />
+        <circle cx="62.5" cy="30" r="5" fill="#ffffff" stroke="#9fb4d6" strokeWidth="1.2" />
+        <path d="M59.5 26.5 L59 23.5 M62 25.5 L62 22.3 M64.6 26.2 L65.4 23.3 M66.6 28.6 L68.6 27" stroke="#9fb4d6" strokeWidth="1.6" strokeLinecap="round" />
+      </g>
       {/* cheeks and microphone */}
       <circle cx="20" cy="45" r="2.2" fill="#ffb3b3" opacity=".8" />
       <circle cx="44" cy="45" r="2.2" fill="#ffb3b3" opacity=".8" />

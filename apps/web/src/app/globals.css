@@ -186,8 +186,10 @@ legend{font-weight:600;padding:0 6px}
 /* Bong bóng góc phần tư */
 .wq-plot{width:100%;height:auto;display:block;margin:6px 0 12px}.wq-frame{fill:none;stroke:var(--line)}.wq-axis{stroke:var(--line);stroke-dasharray:4 4}
 .wq-zone.wq-good{fill:color-mix(in srgb,var(--good) 7%,transparent)}.wq-label{font-size:12px;fill:var(--muted)}.wq-tick{font-size:11px;fill:var(--muted)}
-.wq-held{fill:color-mix(in srgb,var(--brand) 55%,transparent);stroke:var(--brand)}.wq-watch{fill:var(--paper);stroke:var(--muted)}
-.wq-name{font-size:11px;font-weight:700;fill:var(--ink)}
+.wq-held{fill:color-mix(in srgb,var(--brand) 70%,transparent);stroke:var(--brand);stroke-width:1.5}.wq-watch{fill:var(--paper);stroke:var(--muted);stroke-width:1.2}
+.wq-name{font-size:11px;font-weight:600;fill:var(--muted)}.wq-name-held{fill:var(--ink);font-weight:700;font-size:12px}
+.wq-grid{stroke:var(--line);stroke-width:.5;stroke-dasharray:2 4}.wq-zones{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);margin:4px 0}
+.wq-z.good{color:var(--good-ink);font-weight:600}
 /* Quy trình đầu tư (Kanban) */
 .ib-add{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px}.ib-chip{margin:2px 4px}
 .ib-board{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.ib-col{background:var(--soft);border-radius:8px;padding:8px;min-width:0}
@@ -197,9 +199,9 @@ legend{font-weight:600;padding:0 6px}
 .ib-actions{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}.ib-actions .btn{padding:3px 8px;font-size:12px}.ib-card textarea{width:100%;min-height:60px}
 @media(max-width:1100px){.ib-board{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:650px){.ib-board{grid-template-columns:minmax(0,1fr)}}
 /* Radar sức khỏe tài chính */
-.hr-wrap{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:16px;align-items:start}@media(max-width:900px){.hr-wrap{grid-template-columns:minmax(0,1fr)}}
+.hr-wrap{display:grid;grid-template-columns:minmax(0,460px) minmax(0,1fr);gap:20px;align-items:start}@media(max-width:1100px){.hr-wrap{grid-template-columns:minmax(0,1fr)}}
 .hr-plot{width:100%;height:auto;overflow:visible}.hr-ring{fill:none;stroke:var(--line)}.hr-full{stroke:var(--muted)}.hr-area{fill:color-mix(in srgb,var(--brand) 25%,transparent);stroke:var(--brand);stroke-width:2}
-.hr-dot{fill:var(--brand)}.hr-axis{font-size:11px;fill:var(--ink)}.hr-none{fill:var(--muted);font-style:italic}
+.hr-dot{fill:var(--brand)}.hr-axis{font-size:13px;fill:var(--ink);font-weight:600}.hr-none{fill:var(--muted);font-style:italic;font-weight:400}.hr-val{fill:var(--brand);font-weight:700}
 /* Lịch lãi/lỗ hằng ngày */
 .dc-wrap{overflow-x:auto;padding-bottom:4px}.dc-grid{display:flex;gap:3px;width:max-content}.dc-col{display:flex;flex-direction:column;gap:3px}
 .dc-head{height:16px;font-size:10px;color:var(--muted);line-height:16px;padding-right:4px}.dc-cell{width:16px;height:16px;border-radius:3px;border:0;padding:0;cursor:pointer}

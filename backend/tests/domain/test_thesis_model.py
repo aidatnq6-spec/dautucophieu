@@ -98,3 +98,20 @@ def test_a_few_months_of_huge_p_e_do_not_stretch_the_band():
     pe = [Decimal(10)] * 27 + [Decimal(500), Decimal(800), Decimal(10)]  # two months of near-zero profit
     row = valuation_bands(m, close=Decimal("10000"), pe=pe, pb=[])["rows"][0]
     assert row["id"] == "pe" and row["high"] == "10000" and row["low"] == "10000"  # the middle half: both ends at P/E 10
+
+
+
+def test_the_reference_valuation_joins_the_bars_and_the_scenarios_can_be_drafted_from_five_years_of_p_e():
+    from investment_agent.domain.thesis_model import suggest_scenarios, valuation_bands
+    m = validate_model({"scenarios": [], "indicators": []})
+    ref = {"fair": "52000", "low": "45000", "high": "61000", "methods": [{"label": "P/E ngành", "value": "45000"}, {"label": "P/B ngành", "value": None}]}
+    rows = valuation_bands(m, close=Decimal("45000"), pe=[], pb=[], reference=ref)["rows"]
+    assert rows[0] == {"id": "reference", "name": "Định giá tham chiếu", "low": "45000", "mid": "52000", "high": "61000", "source": "Trang Định giá: P/E ngành",
+                       "auto": True}
+    assert valuation_bands(m, close=None, pe=[], pb=[], reference={"reason": "Ít hơn 2 phương án đủ dữ liệu"})["notes"][0] == \
+        "Định giá tham chiếu: Ít hơn 2 phương án đủ dữ liệu"
+    pe = [Decimal(10)] * 10 + [Decimal(20)] * 10 + [Decimal(15)] * 10
+    s = suggest_scenarios(close=Decimal("45000"), pe=pe)
+    assert [(x["name"], x["price"], x["prob"]) for x in s] == [("bad", "30000", "25"), ("base", "45000", "50"), ("good", "60000", "25")]
+    assert s[0]["note"].startswith("Gợi ý: P/E phân vị 25% 30 tháng (10,0 lần)")
+    assert suggest_scenarios(close=Decimal("45000"), pe=pe[:10]) is None

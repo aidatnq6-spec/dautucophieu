@@ -93,3 +93,18 @@ test("the page fills in figures for the questions and offers a suggested set of 
     await expect(box.getByRole("table", { name: "Chỉ báo theo dõi" })).toContainText("tự động từ báo cáo");
   }
 });
+
+
+test("the scenarios can start from a draft worked out from five years of P/E", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Kịch bản và chỉ báo luận điểm" });
+  const suggest = box.getByRole("button", { name: "Gợi ý từ lịch sử P/E" });
+  if (await suggest.count()) {
+    await suggest.click();
+    await expect(box.getByLabel("Xác suất Cơ sở")).toHaveValue("50");
+    await expect(box.getByLabel("Giả định Xấu")).toHaveValue(/Gợi ý: P\/E phân vị 25%/);
+    await box.getByRole("button", { name: "Hủy" }).first().click();
+  } else {
+    await expect(box).toContainText("Ba kịch bản");  // the synthetic ticker may have under 24 months of P/E
+  }
+});

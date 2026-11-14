@@ -110,12 +110,36 @@ def _ranges(raw: list) -> list:
     return out
 
 
-def valuation_bands(model: dict, *, close: Decimal | None, pe: list[Decimal], pb: list[Decimal]) -> dict:
+def suggest_scenarios(*, close: Decimal | None, pe: list[Decimal]) -> list[dict] | None:
+    """A6: a mechanical first draft for the three scenarios: P/E at its 25th percentile, median and 75th percentile of the last five
+    years × what one share earns today (the close divided by today's P/E), probabilities 25/50/25. None without 24 months."""
+    recent = [v for v in pe[-BAND_MONTHS:] if v > 0]
+    if close is None or len(recent) < BAND_MIN_MONTHS:
+        return None
+    from statistics import median
+    ordered, per_share = sorted(recent), close / recent[-1]
+    at = lambda q: ordered[min(len(ordered) - 1, max(0, round(q * (len(ordered) - 1))))]  # noqa: E731
+    out = []
+    for name, multiple, prob, what in (("bad", at(0.25), "25", "phân vị 25%"), ("base", Decimal(str(median(recent))), "50", "trung vị"),
+                                       ("good", at(0.75), "25", "phân vị 75%")):
+        price = (multiple * per_share).quantize(Decimal(100), ROUND_HALF_UP)
+        out.append({"name": name, "price": _s(price), "prob": prob,
+                    "note": f"Gợi ý: P/E {what} {len(recent)} tháng ({format(multiple.quantize(Decimal('0.1'), ROUND_HALF_UP), 'f').replace('.', ',')} lần) × lợi nhuận mỗi CP hiện tại"})
+    return out
+
+
+def valuation_bands(model: dict, *, close: Decimal | None, pe: list[Decimal], pb: list[Decimal], reference: dict | None = None) -> dict:
     """L2: one bar per way of valuing, in đồng per share: the scenarios (lowest to highest, the weighted price as the middle); P/E
     and P/B over the last five years (lowest, median, highest) applied to what one share earns or owns today — the close divided by
     today's multiple, so nothing is estimated; and the owner's own ranges. pe, pb: monthly multiples, oldest first."""
     from statistics import median
     rows, notes = [], []
+    if reference and reference.get("low") and reference.get("high"):
+        names = ", ".join(m["label"] for m in reference.get("methods") or [] if m.get("value") is not None)
+        rows.append({"id": "reference", "name": "Định giá tham chiếu", "low": reference["low"], "mid": reference.get("fair"), "high": reference["high"],
+                     "source": f"Trang Định giá: {names}" if names else "Trang Định giá", "auto": True})
+    elif reference is not None:
+        notes.append(f"Định giá tham chiếu: {reference.get('reason') or 'chưa đủ dữ liệu'}")
     if model["scenarios"]:
         prices = [Decimal(s["price"]) for s in model["scenarios"]]
         expected = sum(Decimal(s["price"]) * Decimal(s["prob"]) / 100 for s in model["scenarios"])

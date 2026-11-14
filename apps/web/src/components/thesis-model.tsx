@@ -19,6 +19,7 @@ type View = { symbol: string; version: number; model: Model; close: string | nul
   scenarios: { rows: (Scenario & { upside: string | null })[]; expected: string | null; upside: string | null; review: Model["review"]; review_due: boolean } | null;
   indicators: Row[]; lights: Record<"good" | "watch" | "bad" | "none", number>; auto_metrics: Record<string, { label: string; unit: string }>;
   catalysts_due: string[]; updated_on: string | null; bands: Bands; auto_catalysts: AutoCatalyst[]; suggested_indicators: Indicator[];
+  suggested_scenarios: Scenario[] | null;
   facts: Record<string, string[]>; auto_gaps: Record<string, string[]> };
 
 const SCEN_LABEL: Record<Name, string> = { bad: "Xấu", base: "Cơ sở", good: "Tốt" };
@@ -111,7 +112,12 @@ export function ThesisModel({ symbol }: { symbol: string }) {
         <button type="button" className="btn" onClick={() => { setScen(null); setReview(model.review); }}>Hủy</button>
         {model.scenarios.length > 0 && <button type="button" className="btn" disabled={busy} onClick={() => void save({ ...model, scenarios: [] })}>Xóa kịch bản</button>}
       </div> : <p className="caption">{model.review.when ? `Xem lại khi: ${model.review.when}${model.review.on ? ` (${model.review.on.split("-").reverse().join("/")})` : ""}. ` : ""}
-        <button type="button" className="btn" onClick={() => setScen(draft)}>{model.scenarios.length ? "Sửa kịch bản" : "Nhập kịch bản"}</button></p>}
+        <button type="button" className="btn" onClick={() => setScen(draft)}>{model.scenarios.length ? "Sửa kịch bản" : "Nhập kịch bản"}</button>{" "}
+        {view.suggested_scenarios && <button type="button" className="btn" onClick={() => setScen(view.suggested_scenarios!.map((x) => ({ ...x })))}>
+          Gợi ý từ lịch sử P/E</button>}</p>}
+      {scen && view.suggested_scenarios && <p className="caption">Gợi ý cơ học: P/E phân vị 25% / trung vị / 75% của 60 tháng × lợi nhuận mỗi cổ phiếu hiện tại,
+        xác suất 25/50/25. Sửa theo nhận định của bạn trước khi lưu{" "}
+        <button type="button" className="btn" onClick={() => setScen(view.suggested_scenarios!.map((x) => ({ ...x })))}>Điền lại gợi ý</button></p>}
 
       <h3>Định giá: khoảng theo từng cách</h3>
       <ValuationBands bands={view.bands} />

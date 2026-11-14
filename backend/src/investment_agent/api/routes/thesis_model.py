@@ -11,7 +11,7 @@ from investment_agent.domain.models import ContractModel
 from investment_agent.domain.thesis_model import ModelError, validate_model
 from investment_agent.market.watchlist import load_watchlist
 from investment_agent.repositories.personal import RepositoryUnavailable
-from investment_agent.services.thesis_model import RECORD, read_models, view_for
+from investment_agent.services.thesis_model import RECORD, read_models, reference_row, view_for
 
 from ..auth import require_owner
 from .common import WRITE_ERRORS, error, now, unavailable, write_error
@@ -47,10 +47,13 @@ def _watched(request: Request, symbol: str) -> str | None:
 def _view(request: Request, symbol: str, models: dict, version: int) -> dict:
     from investment_agent.services.records import read_version
     model = models.get(symbol) or EMPTY
-    plans = read_version(request.app.state.personal_repository, require_owner(request), "settings", f"annual_plan_{symbol}", None)
+    repo, owner = request.app.state.personal_repository, require_owner(request)
+    today = now(request).astimezone(VN).date()
+    plans = read_version(repo, owner, "settings", f"annual_plan_{symbol}", None)
+    reference = reference_row(request.app.state.data_dir, request.app.state.market, repo, owner, symbol, today=today)
     return {"symbol": symbol, "version": version, "model": model,
-            **view_for(request.app.state.data_dir, symbol, model, today=now(request).astimezone(VN).date(),
-                       plans=(plans.payload if plans else {}).get("years", {}))}
+            **view_for(request.app.state.data_dir, symbol, model, today=today, plans=(plans.payload if plans else {}).get("years", {}),
+                       reference=reference)}
 
 
 @router.get("/stock/{symbol}/model")

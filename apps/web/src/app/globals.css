@@ -239,6 +239,11 @@ legend{font-weight:600;padding:0 6px}
 @media(max-width:900px){.op-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.op-two,.op-questions{grid-template-columns:minmax(0,1fr)}}
 .sp-thesis{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}.sp-thesis .btn{text-decoration:none}
 .tq-facts{margin:4px 0 6px;padding-left:16px;font-size:12px;color:var(--muted)}.tq-auto{opacity:.85}.tq-auto-row td{color:var(--muted)}
+/* Mốc và sự kiện dạng dòng thời gian */
+.ct-list{list-style:none;margin:0;padding:0}.ct-item{display:grid;grid-template-columns:118px minmax(0,1fr);gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
+.ct-item:last-child{border-bottom:0}.ct-when{display:flex;flex-direction:column;gap:2px;font-size:13px}.ct-when span{font-size:12px;color:var(--muted)}
+.ct-when .ct-days{color:var(--brand);font-weight:600}.ct-body .pill{margin-right:6px}.ct-auto{background:var(--soft);color:var(--muted)}
+.ct-text{margin:4px 0 2px;font-size:13px;overflow-wrap:anywhere}.ct-done{opacity:.55}.ct-done .ct-text{text-decoration:line-through}
 .fd-stock{background:var(--op2)}.fd-balanced{background:var(--op4)}.fd-bond{background:var(--op3)}.fd-unknown{background:var(--vc-unknown)}
 /* Dự án và điểm rơi lợi nhuận: one bar per year, scaled to the largest year. */
 .pp-years{display:grid;gap:6px;margin:4px 0 14px}.pp-year{display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;gap:10px;align-items:center}

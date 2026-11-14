@@ -55,6 +55,13 @@ def _growth_line(label: str, t) -> str | None:
     return f"{label} 4 quý đến {_ql(last)}: {_ty(now)}{change}."
 
 
+def _tidy(text: str) -> str:
+    """An event line as the page shows it: no "GDKHQ chưa có ngày" for events without an ex-right day, thousands with dots."""
+    import re
+    text = re.sub(r"\s*·\s*GDKHQ chưa có ngày", "", text)
+    return re.sub(r"(?<=\d),(?=\d{3}\b)", ".", text)
+
+
 def _short_id(raw: str) -> str:
     return "ev" + hashlib.sha1(raw.encode("utf-8")).hexdigest()[:20]
 
@@ -67,7 +74,7 @@ def catalysts(data_dir: Path, symbol: str, quarters: dict, *, today: date) -> li
         day = e.get("key_date")
         if not day or "EN_GB" in str(e.get("id")) or not (today <= date.fromisoformat(day) <= today + timedelta(days=EVENT_DAYS)):
             continue
-        text = describe(e)
+        text = _tidy(describe(e))
         if (day, text) in seen:
             continue
         seen.add((day, text))
@@ -81,7 +88,7 @@ def catalysts(data_dir: Path, symbol: str, quarters: dict, *, today: date) -> li
         due = end + timedelta(days=REPORT_DAYS)
         if due >= today - timedelta(days=60):
             out.append({"id": _short_id(f"report-{y}-Q{q}"), "when": _ql(f"{y}-Q{q}"), "on": due.isoformat(), "sign": "?",
-                        "text": f"Hạn công bố báo cáo tài chính {_ql(f'{y}-Q{q}')} ({due:%d/%m/%Y}, 20 ngày sau quý)", "source": "Thông tư 96/2020 Điều 14",
+                        "text": f"Hạn công bố báo cáo tài chính {_ql(f'{y}-Q{q}')} (20 ngày sau khi hết quý)", "source": "Thông tư 96/2020 Điều 14",
                         "done": False, "auto": True})
     return sorted(out, key=lambda c: c["on"])
 

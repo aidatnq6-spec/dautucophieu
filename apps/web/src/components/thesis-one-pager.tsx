@@ -5,6 +5,8 @@ import { ApiError, api } from "../lib/api";
 import { formatDecimal, formatRatio, formatVnd } from "../lib/format";
 import { gapText, type Catalyst, type Question, QUESTIONS } from "./thesis-questions";
 import { type Bands, ValuationBands } from "./valuation-bands";
+import { CatalystTimeline } from "./catalyst-timeline";
+import { hanoiDate } from "../lib/format";
 
 type Grade = "good" | "watch" | "bad";
 type View = { symbol: string; close: string | null; close_date: string | null; updated_on: string | null; stage: "draft" | "reviewed";
@@ -76,9 +78,7 @@ export function ThesisOnePager({ symbol }: { symbol: string }) {
           <p className="caption">Tốt = bằng hoặc vượt mức Cơ sở; Xấu = chạm mức Xấu; giữa = Theo dõi.</p>
         </section>
         <section className="surface" aria-label="Mốc và sự kiện"><h2>Mốc và sự kiện</h2>
-          {v.catalysts.length + v.auto_catalysts.length ? <table className="op-table"><tbody>{[...v.catalysts, ...v.auto_catalysts].map((c) => <tr key={c.id} className={c.done ? "tq-done" : undefined}>
-            <th>{c.when || "chưa có mốc"}</th><td className={c.sign === "+" ? "fd-up" : c.sign === "-" ? "fd-down" : undefined}><strong>{c.sign === "-" ? "−" : c.sign}</strong></td>
-            <td>{c.text}{c.source && <span className="caption"> — {c.source}</span>}</td></tr>)}</tbody></table> : <p className="muted">Chưa có mốc.</p>}
+          <CatalystTimeline items={[...v.catalysts, ...v.auto_catalysts.map((c) => ({ ...c, auto: true }))]} today={hanoiDate()} />
         </section>
       </div>
       <p className="caption op-foot">Mô tả trạng thái, không phải khuyến nghị mua/bán. Giá và số tự động lấy từ dữ liệu công khai đã lưu; kịch bản, câu trả lời, ngưỡng và mốc là của bạn.</p>

@@ -101,3 +101,9 @@ def test_insider_and_valuation_facts_read_as_sentences(tmp_path):
                              today=d(2026, 11, 14))
     assert f["monitoring"] == ["Nội bộ 12 tháng: mua 3.000.000 CP (1 báo cáo), bán 1.000.000 CP (1 báo cáo)."]
     assert f["valuation"][0].endswith("thấp nhất trong 31 tháng.")
+
+
+
+def test_an_event_line_is_tidied_for_the_page():
+    from investment_agent.services.thesis_auto import _tidy
+    assert _tidy("Niêm yết bổ sung - Số lượng 10,864,000 CP · GDKHQ chưa có ngày") == "Niêm yết bổ sung - Số lượng 10.864.000 CP"

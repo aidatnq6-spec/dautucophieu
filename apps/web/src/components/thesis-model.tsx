@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatDecimal, formatRatio, formatVnd } from "../lib/format";
 import Link from "next/link";
-import { type Catalyst, type Question, ThesisCatalysts, ThesisQuestions } from "./thesis-questions";
+import { type AutoCatalyst, type Catalyst, type Question, ThesisCatalysts, ThesisQuestions } from "./thesis-questions";
 import { type Band, type Bands, ValuationBands } from "./valuation-bands";
 
 type Name = "bad" | "base" | "good";
@@ -18,7 +18,8 @@ type Row = Indicator & { current: string | null; period: string | null; grade: "
 type View = { symbol: string; version: number; model: Model; close: string | null; close_date: string | null;
   scenarios: { rows: (Scenario & { upside: string | null })[]; expected: string | null; upside: string | null; review: Model["review"]; review_due: boolean } | null;
   indicators: Row[]; lights: Record<"good" | "watch" | "bad" | "none", number>; auto_metrics: Record<string, { label: string; unit: string }>;
-  catalysts_due: string[]; updated_on: string | null; bands: Bands };
+  catalysts_due: string[]; updated_on: string | null; bands: Bands; auto_catalysts: AutoCatalyst[]; suggested_indicators: Indicator[];
+  facts: Record<string, string[]>; auto_gaps: Record<string, string[]> };
 
 const SCEN_LABEL: Record<Name, string> = { bad: "Xấu", base: "Cơ sở", good: "Tốt" };
 const TIER: Record<Tier, string> = { lead: "Dẫn", coincident: "Đồng hành", lag: "Sau", valuation: "Định giá" };
@@ -84,7 +85,7 @@ export function ThesisModel({ symbol }: { symbol: string }) {
       {s?.review_due && <p className="notice" role="note">Đến ngày xem lại kịch bản: {s.review.when || s.review.on}.</p>}
 
       {view.updated_on && <p className="caption">Cập nhật {view.updated_on.split("-").reverse().join("/")}.</p>}
-      <ThesisQuestions model={model} save={save} busy={busy} />
+      <ThesisQuestions model={model} save={save} busy={busy} facts={view.facts} autoGaps={view.auto_gaps} />
       <h3>Ba kịch bản</h3>
       <table className="fv-table" aria-label="Ba kịch bản">
         <thead><tr><th>Kịch bản</th><th className="num">Giá (đ/CP)</th><th className="num">Xác suất</th><th className="num">So giá hiện tại</th><th>Giả định</th></tr></thead>
@@ -151,7 +152,7 @@ export function ThesisModel({ symbol }: { symbol: string }) {
               onClick={() => { if (window.confirm(`Xóa chỉ báo ${r.name}?`)) void save({ ...model, indicators: model.indicators.filter((x) => x.id !== r.id) }); }}>Xóa</button>
           </div></td></tr>)}</tbody>
       </table>}
-      <ThesisCatalysts model={model} save={save} busy={busy} due={view.catalysts_due} />
+      <ThesisCatalysts model={model} save={save} busy={busy} due={view.catalysts_due} auto={view.auto_catalysts} />
       {adding ? <form className="formgrid" aria-label="Thêm chỉ báo" onSubmit={(e) => { e.preventDefault(); void save({ ...model, indicators: [...model.indicators,
         { ...adding, bad: dec(adding.bad), base: dec(adding.base), good: dec(adding.good) }] }); }}>
         <label className="field">Nguồn<select aria-label="Nguồn chỉ báo" value={adding.source} onChange={(e) => {
@@ -168,7 +169,12 @@ export function ThesisModel({ symbol }: { symbol: string }) {
         <label className="field">Mức Tốt<input aria-label="Mức Tốt" inputMode="decimal" value={adding.good} onChange={(e) => setAdding({ ...adding, good: e.target.value })} /></label>
         <label className="db-check"><input type="checkbox" checked={adding.lower_better} onChange={(e) => setAdding({ ...adding, lower_better: e.target.checked })} />Thấp là tốt</label>
         <button type="submit" className="btn" disabled={busy}>Lưu chỉ báo</button><button type="button" className="btn" onClick={() => setAdding(null)}>Hủy</button>
-      </form> : <button type="button" className="btn" onClick={() => setAdding(blankIndicator())}>Thêm chỉ báo</button>}
+      </form> : <div className="ib-actions"><button type="button" className="btn" onClick={() => setAdding(blankIndicator())}>Thêm chỉ báo</button>
+        {view.suggested_indicators.length > 0 && <button type="button" className="btn" disabled={busy}
+          onClick={() => void save({ ...model, indicators: [...model.indicators, ...view.suggested_indicators] })}>
+          Thêm bộ chỉ báo gợi ý ({view.suggested_indicators.length})</button>}
+        {view.suggested_indicators.length > 0 && <span className="caption">Gợi ý: {view.suggested_indicators.map((i) => i.name).join(", ")}; ngưỡng Xấu/Cơ sở/Tốt lấy
+          từ phân vị 25%, trung vị, 75% của 12 quý gần nhất (P/E: 60 tháng, thấp là tốt). Chỉnh ngưỡng sau nếu cần, nhất là với ngành có mùa vụ.</span>}</div>}
       <p className="caption">Giá kỳ vọng = tổng giá từng kịch bản × xác suất; tiềm năng so với giá đóng cửa gần nhất. Đánh giá theo quy tắc của bạn: Tốt khi bằng hoặc vượt mức
         Cơ sở, Xấu khi chạm mức Xấu, ở giữa là Theo dõi; mức Tốt là mốc vươn tới. Chỉ báo tự động lấy từ báo cáo đã công bố (tỷ đồng, %, lần); chỉ báo bạn nhập lấy số ghi gần
         nhất. Đèn chuyển Xấu hoặc đến ngày xem lại thì báo một lần qua Telegram sau phiên. Không phải khuyến nghị.</p>

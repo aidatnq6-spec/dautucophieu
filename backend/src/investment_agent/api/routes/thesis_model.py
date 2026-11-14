@@ -45,9 +45,12 @@ def _watched(request: Request, symbol: str) -> str | None:
 
 
 def _view(request: Request, symbol: str, models: dict, version: int) -> dict:
+    from investment_agent.services.records import read_version
     model = models.get(symbol) or EMPTY
+    plans = read_version(request.app.state.personal_repository, require_owner(request), "settings", f"annual_plan_{symbol}", None)
     return {"symbol": symbol, "version": version, "model": model,
-            **view_for(request.app.state.data_dir, symbol, model, today=now(request).astimezone(VN).date())}
+            **view_for(request.app.state.data_dir, symbol, model, today=now(request).astimezone(VN).date(),
+                       plans=(plans.payload if plans else {}).get("years", {}))}
 
 
 @router.get("/stock/{symbol}/model")

@@ -51,13 +51,26 @@ def public_figures(data_dir: Path | None, symbol: str, *, today: date, multiples
     return close, day, auto
 
 
-def view_for(data_dir, symbol: str, model: dict, *, today: date) -> dict:
+def view_for(data_dir, symbol: str, model: dict, *, today: date, plans: dict | None = None) -> dict:
+    """plans: the owner's own annual plans for the ticker (settings/annual_plan_<symbol>), for the strategy facts."""
     from investment_agent.domain.thesis_model import valuation_bands
     multiples: dict = {}
     close, day, auto = public_figures(data_dir, symbol, today=today, multiples=multiples)
     view = model_view(model, close=close, close_date=day, auto=auto, today=today)
     full = {**model, "ranges": model.get("ranges") or []}
-    return {**view, "bands": valuation_bands(full, close=close, pe=multiples.get("pe", []), pb=multiples.get("pb", []))}
+    out = {**view, "bands": valuation_bands(full, close=close, pe=multiples.get("pe", []), pb=multiples.get("pb", []))}
+    if data_dir is None:
+        return {**out, "auto_catalysts": [], "suggested_indicators": [], "facts": {}, "auto_gaps": {}}
+    from investment_agent.market.statements import StatementStore
+    from investment_agent.services import thesis_auto
+    record = StatementStore(Path(data_dir) / "statements").read(symbol) or StatementStore(Path(data_dir) / "statements-financial").read(symbol) or {}
+    quarters, years = record.get("quarters") or {}, record.get("years") or {}
+    own = {c["id"] for c in model.get("catalysts") or []}
+    facts, gaps = thesis_auto.facts(Path(data_dir), symbol, quarters, years, pe=multiples.get("pe", []), pb=multiples.get("pb", []), plans=plans or {},
+                                    lights=view["lights"], today=today)
+    return {**out, "auto_catalysts": [c for c in thesis_auto.catalysts(Path(data_dir), symbol, quarters, today=today) if c["id"] not in own],
+            "suggested_indicators": thesis_auto.suggested_indicators(quarters, multiples.get("pe", []), have={i["source"] for i in model.get("indicators") or []}),
+            "facts": facts, "auto_gaps": gaps}
 
 
 def check_lights(repo, owner, data_dir, *, send, today: date, request_id: str) -> dict:

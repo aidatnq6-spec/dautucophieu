@@ -11,7 +11,8 @@ type View = { symbol: string; close: string | null; close_date: string | null; u
   model: { headline: string; summary: string; questions: Record<string, Question>; review: { when: string; on: string | null } };
   scenarios: { rows: { name: "bad" | "base" | "good"; price: string; prob: string; note: string; upside: string | null }[]; expected: string | null; upside: string | null } | null;
   indicators: { id: string; name: string; tier: string; unit: string; bad: string; base: string; good: string; current: string | null; period: string | null; grade: Grade | null }[];
-  lights: Record<Grade | "none", number>; questions: Record<string, Question>; gaps: { open: number; total: number }; catalysts: Catalyst[]; bands: Bands };
+  lights: Record<Grade | "none", number>; questions: Record<string, Question>; gaps: { open: number; total: number }; catalysts: Catalyst[]; bands: Bands;
+  auto_catalysts: Catalyst[]; facts: Record<string, string[]>; auto_gaps: Record<string, string[]> };
 
 const SCEN = { bad: "Xấu", base: "Cơ sở", good: "Tốt" };
 const TIER: Record<string, string> = { lead: "Dẫn", coincident: "Đồng hành", lag: "Sau", valuation: "Định giá" };
@@ -42,7 +43,7 @@ export function ThesisOnePager({ symbol }: { symbol: string }) {
         <div><span>Giá kỳ vọng (3 kịch bản)</span><strong>{s?.expected ? formatVnd(s.expected) : "—"}</strong></div>
         <div><span>Tiềm năng so giá hiện tại</span><strong className={s?.upside && Number(s.upside) >= 0 ? "fd-up" : "fd-down"}>{signed(s?.upside ?? null)}</strong></div>
         <div><span>Đèn theo dõi</span><strong>{v.lights.good} tốt{v.lights.bad ? ` · ${v.lights.bad} xấu` : ""}</strong></div>
-        <div><span>Độ đủ dữ liệu</span><strong>{gapText(v.questions)}</strong></div>
+        <div><span>Độ đủ dữ liệu</span><strong>{gapText(v.questions, v.auto_gaps)}</strong></div>
       </div>
       <div className="op-two">
         <section className="surface" aria-label="Dải định giá"><h2>Định giá: khoảng theo từng cách (đ/CP)</h2><ValuationBands bands={v.bands} compact /></section>
@@ -56,8 +57,11 @@ export function ThesisOnePager({ symbol }: { symbol: string }) {
       <div className="op-questions">{QUESTIONS.map(([key, title], n) => { const q = v.questions[key];
         return <section key={key} className="surface op-q" aria-label={`Câu ${n + 1}`}>
           <div className="row"><h3>{n + 1} · {title}</h3>{q?.status && <span className={`pill ${GRADE[q.status][1]}`}>{GRADE[q.status][0]}</span>}</div>
-          {q?.summary ? <p className="op-sum">{q.summary}</p> : <p className="muted">Chưa trả lời.</p>}
+          {q?.summary ? <p className="op-sum">{q.summary}</p> : null}
           {q && q.points.length > 0 && <ul>{q.points.map((p, i) => <li key={i}>{p}</li>)}</ul>}
+          {(v.facts[key] ?? []).length > 0 && <ul className="tq-facts">{v.facts[key].map((f) => <li key={f}>{f}</li>)}</ul>}
+          {!q?.summary && !(v.facts[key] ?? []).length && <p className="muted">Chưa trả lời.</p>}
+          {(v.auto_gaps[key] ?? []).map((g) => <p key={g} className="op-gap"><span className="pill warn">GAP</span> {g}</p>)}
           {q?.gaps.filter((g) => !g.done).map((g) => <p key={g.id} className="op-gap"><span className="pill warn">GAP</span> {g.text}{g.ref ? ` (${g.ref})` : ""}</p>)}
         </section>; })}</div>
       <div className="op-two">
@@ -72,7 +76,7 @@ export function ThesisOnePager({ symbol }: { symbol: string }) {
           <p className="caption">Tốt = bằng hoặc vượt mức Cơ sở; Xấu = chạm mức Xấu; giữa = Theo dõi.</p>
         </section>
         <section className="surface" aria-label="Mốc và sự kiện"><h2>Mốc và sự kiện</h2>
-          {v.catalysts.length ? <table className="op-table"><tbody>{v.catalysts.map((c) => <tr key={c.id} className={c.done ? "tq-done" : undefined}>
+          {v.catalysts.length + v.auto_catalysts.length ? <table className="op-table"><tbody>{[...v.catalysts, ...v.auto_catalysts].map((c) => <tr key={c.id} className={c.done ? "tq-done" : undefined}>
             <th>{c.when || "chưa có mốc"}</th><td className={c.sign === "+" ? "fd-up" : c.sign === "-" ? "fd-down" : undefined}><strong>{c.sign === "-" ? "−" : c.sign}</strong></td>
             <td>{c.text}{c.source && <span className="caption"> — {c.source}</span>}</td></tr>)}</tbody></table> : <p className="muted">Chưa có mốc.</p>}
         </section>

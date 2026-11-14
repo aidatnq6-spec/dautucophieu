@@ -81,3 +81,15 @@ test("the one-page thesis is reachable from the top of a company's page", async 
   await expect(page).toHaveURL(/\/thesis\/FPT/);
   await expect(page.getByRole("button", { name: "In" })).toBeVisible();
 });
+
+
+test("the page fills in figures for the questions and offers a suggested set of indicators", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Kịch bản và chỉ báo luận điểm" });
+  await expect(box.getByRole("list", { name: "Số liệu tự động câu 1" })).toContainText("Doanh thu 4 quý");
+  const suggest = box.getByRole("button", { name: /Thêm bộ chỉ báo gợi ý/ });
+  if (await suggest.count()) {
+    await suggest.click();
+    await expect(box.getByRole("table", { name: "Chỉ báo theo dõi" })).toContainText("tự động từ báo cáo");
+  }
+});

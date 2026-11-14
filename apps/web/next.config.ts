@@ -12,8 +12,10 @@ const nextConfig: NextConfig = {
         { key: "Referrer-Policy", value: "same-origin" },
         { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
         { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },  // signing in with Google opens a popup
-        // Report-only for now: nothing is blocked; what would be is logged to logs/csp-report.log (see src/lib/csp.ts).
-        { key: "Content-Security-Policy-Report-Only", value: contentSecurityPolicy(process.env.NODE_ENV !== "production") },
+        // Enforced since 14/11/2026 after report-only use left logs/csp-report.log empty; breaches are still logged there.
+        // CSP_REPORT_ONLY=1 in .env.local goes back to report-only (nothing blocked) if signing in ever breaks.
+        { key: process.env.CSP_REPORT_ONLY === "1" ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy",
+          value: contentSecurityPolicy(process.env.NODE_ENV !== "production") },
       ],
     }];
   },

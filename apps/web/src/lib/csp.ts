@@ -1,7 +1,7 @@
 /**
- * Content-Security-Policy, sent first as Content-Security-Policy-Report-Only: the browser blocks nothing yet and reports what it
- * would block to /api/csp-report, which keeps one line per report in logs/csp-report.log. Once a week of normal use (including signing
- * in with Google) leaves that log empty, the same policy can be enforced.
+ * Content-Security-Policy, enforced (14/11/2026) after a week and more of report-only use left logs/csp-report.log empty. The browser
+ * still reports what it blocks to /api/csp-report, one line per report in logs/csp-report.log. CSP_REPORT_ONLY=1 in .env.local sends
+ * it as Content-Security-Policy-Report-Only again (next.config.ts).
  *
  * Scripts and styles stay 'unsafe-inline' for now: Next.js and the theme script are inline. What the policy closes is loading code,
  * frames or plugins from anywhere other than this site and Google sign-in, and being framed by another site.

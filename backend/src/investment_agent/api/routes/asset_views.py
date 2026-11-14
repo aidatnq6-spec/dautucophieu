@@ -54,7 +54,8 @@ def _months(first: date, today: date) -> list[str]:
 
 
 @router.get("/month-bridge")
-def get_month_bridge(request: Request, month: str | None = None):
+@router.get("/month-bridge/{month}")
+def get_month_bridge(request: Request, month: str | None = None):  # a path segment: the web proxy forwards no query string
     owner, repo = require_owner(request), request.app.state.personal_repository
     if repo is None:
         return unavailable()

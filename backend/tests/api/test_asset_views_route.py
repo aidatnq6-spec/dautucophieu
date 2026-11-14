@@ -27,7 +27,7 @@ def test_the_month_bridge_explains_the_account_s_month_to_the_dong(tmp_path):
     assert b["status"] == "ok" and b["start"] == "0" and b["end"] == "101000000" and b["other"] == "0" and b["end_day"] == "2027-01-14"
     assert b["steps"] == [{"id": "flows", "amount": "100000000"}, {"id": "ticker:FPT", "symbol": "FPT", "amount": "1000000"}]
     assert body["book"] is None  # no Sổ tài sản saved
-    assert call(c, clock, "GET", "/internal/month-bridge?month=2027-13").status_code == 422
+    assert call(c, clock, "GET", "/internal/month-bridge/2027-13").status_code == 422
 
 
 def test_the_month_bridge_adds_the_book_as_saved_by_the_end_of_the_month(tmp_path):

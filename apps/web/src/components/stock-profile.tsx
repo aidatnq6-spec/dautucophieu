@@ -22,6 +22,7 @@ import { AnnualPlans } from "./annual-plans";
 import { OperatingFigures } from "./operating-figures";
 import { BalanceWatch } from "./balance-watch";
 import { ReportReaction } from "./report-reaction";
+import { ProfitBridge } from "./profit-bridge";
 import { PropertyProjects } from "./property-projects";
 
 type Facts = { price: string | null; price_date: string | null; change_pct: string | null; high_52w: string | null; low_52w: string | null;
@@ -91,6 +92,7 @@ export function StockProfile({ symbol }: { symbol: string }) {
 
       {p.watched && <PropertyProjects symbol={p.symbol} />}
 
+      {p.watched && <ProfitBridge symbol={p.symbol} />}
       {p.watched && <ReportReaction symbol={p.symbol} />}
 
       {p.watched && <section className="surface" aria-label="Bảng đèn chỉ báo sớm">

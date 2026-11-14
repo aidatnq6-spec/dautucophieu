@@ -2,7 +2,9 @@
 import { useEffect, useState } from "react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatDecimal, formatRatio, formatVnd } from "../lib/format";
+import Link from "next/link";
 import { type Catalyst, type Question, ThesisCatalysts, ThesisQuestions } from "./thesis-questions";
+import { type Band, type Bands, ValuationBands } from "./valuation-bands";
 
 type Name = "bad" | "base" | "good";
 type Scenario = { name: Name; price: string; prob: string; note: string };
@@ -10,12 +12,13 @@ type Tier = "lead" | "coincident" | "lag" | "valuation";
 export type Indicator = { id: string; name: string; tier: Tier; unit: string; bad: string; base: string; good: string; lower_better: boolean; source: string;
   readings: { period: string; value: string }[] };
 type Model = { scenarios: Scenario[]; review: { when: string; on: string | null }; indicators: Indicator[]; questions: Record<string, Question>;
-  catalysts: Catalyst[]; stage: "draft" | "reviewed"; updated_on: string | null };
+  catalysts: Catalyst[]; stage: "draft" | "reviewed"; updated_on: string | null; headline: string; summary: string;
+  ranges: Omit<Band, "auto">[] };
 type Row = Indicator & { current: string | null; period: string | null; grade: "good" | "watch" | "bad" | null };
 type View = { symbol: string; version: number; model: Model; close: string | null; close_date: string | null;
   scenarios: { rows: (Scenario & { upside: string | null })[]; expected: string | null; upside: string | null; review: Model["review"]; review_due: boolean } | null;
   indicators: Row[]; lights: Record<"good" | "watch" | "bad" | "none", number>; auto_metrics: Record<string, { label: string; unit: string }>;
-  catalysts_due: string[]; updated_on: string | null };
+  catalysts_due: string[]; updated_on: string | null; bands: Bands };
 
 const SCEN_LABEL: Record<Name, string> = { bad: "Xấu", base: "Cơ sở", good: "Tốt" };
 const TIER: Record<Tier, string> = { lead: "Dẫn", coincident: "Đồng hành", lag: "Sau", valuation: "Định giá" };
@@ -40,6 +43,8 @@ export function ThesisModel({ symbol }: { symbol: string }) {
   const [review, setReview] = useState<Model["review"]>({ when: "", on: null });
   const [adding, setAdding] = useState<Indicator | null>(null);
   const [reading, setReading] = useState<Record<string, { period: string; value: string }>>({});
+  const [head, setHead] = useState<{ headline: string; summary: string } | null>(null);
+  const [range, setRange] = useState<{ name: string; low: string; mid: string; high: string; source: string }>({ name: "", low: "", mid: "", high: "", source: "" });
   useEffect(() => {
     api<View>(`stock/${encodeURIComponent(symbol)}/model`).then((v) => { setView(v); setReview(v.model.review); },
       (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải."));
@@ -60,7 +65,15 @@ export function ThesisModel({ symbol }: { symbol: string }) {
     source: "manual", readings: [] });
   return (
     <section className="surface" aria-label="Kịch bản và chỉ báo luận điểm">
-      <h2>Kịch bản và chỉ báo luận điểm</h2>
+      <div className="row"><h2>Kịch bản và chỉ báo luận điểm</h2><Link href={`/thesis/${symbol}`}>Trang luận điểm 1 trang để in</Link></div>
+      {head ? <div className="formgrid" aria-label="Sửa tiêu đề và tóm tắt">
+        <label className="field">Tiêu đề luận điểm<input aria-label="Tiêu đề luận điểm" maxLength={200} value={head.headline} onChange={(e) => setHead({ ...head, headline: e.target.value })} /></label>
+        <label className="field">Tóm tắt<textarea aria-label="Tóm tắt luận điểm" maxLength={800} rows={3} value={head.summary} onChange={(e) => setHead({ ...head, summary: e.target.value })} /></label>
+        <div className="ib-actions"><button type="button" className="btn" disabled={busy} onClick={() => void save({ ...view.model, ...head }).then(() => setHead(null))}>Lưu</button>
+          <button type="button" className="btn" onClick={() => setHead(null)}>Hủy</button></div>
+      </div> : <div className="tm-head">{view.model.headline ? <p className="tm-headline">{view.model.headline}</p> : <p className="muted">Chưa có tiêu đề luận điểm.</p>}
+        {view.model.summary && <p>{view.model.summary}</p>}
+        <button type="button" className="btn" onClick={() => setHead({ headline: view.model.headline ?? "", summary: view.model.summary ?? "" })}>Sửa tiêu đề và tóm tắt</button></div>}
       {error && <p className="errors" role="alert">{error}</p>}
       <div className="tm-tiles">
         <div><span className="caption">Giá {view.close_date ? `${view.close_date.slice(8, 10)}/${view.close_date.slice(5, 7)}` : ""}</span><strong>{formatVnd(view.close)}</strong></div>
@@ -99,6 +112,22 @@ export function ThesisModel({ symbol }: { symbol: string }) {
       </div> : <p className="caption">{model.review.when ? `Xem lại khi: ${model.review.when}${model.review.on ? ` (${model.review.on.split("-").reverse().join("/")})` : ""}. ` : ""}
         <button type="button" className="btn" onClick={() => setScen(draft)}>{model.scenarios.length ? "Sửa kịch bản" : "Nhập kịch bản"}</button></p>}
 
+      <h3>Định giá: khoảng theo từng cách</h3>
+      <ValuationBands bands={view.bands} />
+      {(model.ranges ?? []).length > 0 && <ul className="tm-ranges">{model.ranges.map((r) => <li key={r.id}><em>{r.name}</em>: {formatVnd(r.low)} – {formatVnd(r.high)}
+        {r.mid ? ` (giữa ${formatVnd(r.mid)})` : ""}{r.source ? ` · ${r.source}` : ""} <button type="button" className="btn tq-x" aria-label={`Xóa khoảng ${r.name}`} disabled={busy}
+          onClick={() => void save({ ...model, ranges: model.ranges.filter((x) => x.id !== r.id) })}>×</button></li>)}</ul>}
+      <form className="formgrid" aria-label="Thêm khoảng định giá" onSubmit={(e) => { e.preventDefault();
+        void save({ ...model, ranges: [...(model.ranges ?? []), { id: requestId().slice(0, 24), name: range.name, low: num(range.low), mid: range.mid ? num(range.mid) : null,
+          high: num(range.high), source: range.source }] }).then(() => setRange({ name: "", low: "", mid: "", high: "", source: "" })); }}>
+        <label className="field">Cách định giá<input aria-label="Tên cách định giá" placeholder="SOTP, EV/EBITDA, CTCK…" maxLength={40} value={range.name}
+          onChange={(e) => setRange({ ...range, name: e.target.value })} /></label>
+        <label className="field">Thấp (đ)<input aria-label="Giá thấp" inputMode="numeric" value={range.low} onChange={(e) => setRange({ ...range, low: e.target.value })} /></label>
+        <label className="field">Giữa (đ)<input aria-label="Giá giữa" inputMode="numeric" value={range.mid} onChange={(e) => setRange({ ...range, mid: e.target.value })} /></label>
+        <label className="field">Cao (đ)<input aria-label="Giá cao" inputMode="numeric" value={range.high} onChange={(e) => setRange({ ...range, high: e.target.value })} /></label>
+        <label className="field">Nguồn<input aria-label="Nguồn khoảng" maxLength={120} value={range.source} onChange={(e) => setRange({ ...range, source: e.target.value })} /></label>
+        <button type="submit" className="btn" disabled={busy || !range.name.trim() || !range.low || !range.high}>Thêm khoảng</button>
+      </form>
       <h3>Chỉ báo theo dõi</h3>
       {view.indicators.length > 0 && <table className="fv-table" aria-label="Chỉ báo theo dõi">
         <thead><tr><th>Chỉ báo</th><th>Tầng</th><th className="num">Hiện tại</th><th className="num">Xấu</th><th className="num">Cơ sở</th><th className="num">Tốt</th><th>Đánh giá</th><th /></tr></thead>

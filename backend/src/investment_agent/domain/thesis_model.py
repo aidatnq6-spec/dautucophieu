@@ -87,7 +87,52 @@ def validate_model(raw: dict) -> dict:
                            "lower_better": lower, "source": source, "readings": readings})
     return {"scenarios": scenarios, "review": {"when": str(review.get("when") or "").strip()[:200], "on": on}, "indicators": indicators,
             "questions": _questions(raw.get("questions") or {}), "catalysts": _catalysts(raw.get("catalysts") or []),
-            "stage": "reviewed" if raw.get("stage") == "reviewed" else "draft", "updated_on": raw.get("updated_on")}
+            "stage": "reviewed" if raw.get("stage") == "reviewed" else "draft", "updated_on": raw.get("updated_on"),
+            "headline": _text(raw.get("headline"), 200), "summary": _text(raw.get("summary"), 800), "ranges": _ranges(raw.get("ranges") or [])}
+
+
+MAX_RANGES, BAND_MONTHS, BAND_MIN_MONTHS = 8, 60, 24
+
+
+def _ranges(raw: list) -> list:
+    """L2: the owner's own valuation ranges (SOTP, EV/EBITDA, brokers' targets…), each low to high with an optional middle."""
+    if len(raw) > MAX_RANGES:
+        raise ModelError("too_many", f"Tối đa {MAX_RANGES} cách định giá tự nhập.")
+    out = []
+    for r in raw:
+        name = _text(r.get("name"), 40)
+        low, high = _dec(r.get("low"), f"{name or 'Cách định giá'}: giá thấp"), _dec(r.get("high"), f"{name or 'Cách định giá'}: giá cao")
+        mid = _dec(r.get("mid"), f"{name}: mốc giữa") if str(r.get("mid") or "").strip() else None
+        if not _ID.fullmatch(str(r.get("id") or "")) or not name or low <= 0 or high < low or (mid is not None and not low <= mid <= high):
+            raise ModelError("invalid_range", "Mỗi cách định giá cần tên và giá thấp ≤ (giữa) ≤ cao, đều dương.")
+        out.append({"id": r["id"], "name": name, "low": _s(low), "mid": _s(mid) if mid is not None else None, "high": _s(high),
+                    "source": _text(r.get("source"), 120)})
+    return out
+
+
+def valuation_bands(model: dict, *, close: Decimal | None, pe: list[Decimal], pb: list[Decimal]) -> dict:
+    """L2: one bar per way of valuing, in đồng per share: the scenarios (lowest to highest, the weighted price as the middle); P/E
+    and P/B over the last five years (lowest, median, highest) applied to what one share earns or owns today — the close divided by
+    today's multiple, so nothing is estimated; and the owner's own ranges. pe, pb: monthly multiples, oldest first."""
+    from statistics import median
+    rows, notes = [], []
+    if model["scenarios"]:
+        prices = [Decimal(s["price"]) for s in model["scenarios"]]
+        expected = sum(Decimal(s["price"]) * Decimal(s["prob"]) / 100 for s in model["scenarios"])
+        rows.append({"id": "scenarios", "name": "Kịch bản (của bạn)", "low": _s(min(prices)), "mid": _s(expected.quantize(Decimal(1), ROUND_HALF_UP)),
+                     "high": _s(max(prices)), "source": "Ba kịch bản ở trên", "auto": True})
+    for key, label, series in (("pe", "P/E 5 năm", pe), ("pb", "P/B 5 năm", pb)):
+        recent = [v for v in series[-BAND_MONTHS:] if v > 0]
+        if close is None or len(recent) < BAND_MIN_MONTHS:
+            notes.append(f"{label}: chưa đủ {BAND_MIN_MONTHS} tháng số dương")
+            continue
+        per_share = close / recent[-1]
+        price = lambda m: _s((m * per_share).quantize(Decimal(100), ROUND_HALF_UP))  # noqa: E731
+        rows.append({"id": key, "name": label, "low": price(min(recent)), "mid": price(Decimal(str(median(recent)))), "high": price(max(recent)),
+                     "source": f"{len(recent)} tháng, thấp–trung vị–cao × {'lợi nhuận' if key == 'pe' else 'giá trị sổ sách'} mỗi CP hiện tại",
+                     "auto": True})
+    rows += [{**r, "auto": False} for r in model.get("ranges") or []]
+    return {"rows": rows, "close": _s(close) if close is not None else None, "notes": notes}
 
 
 def _text(v, limit: int) -> str:
@@ -166,6 +211,7 @@ def model_view(model: dict, *, close: Decimal | None, close_date: str | None, au
         lights[g or "none"] += 1
         out.append({**i, "current": current, "period": period, "grade": g})
     questions = model.get("questions") or _questions({})
+    model = {**model, "ranges": model.get("ranges") or [], "headline": model.get("headline", ""), "summary": model.get("summary", "")}
     catalysts = sorted(model.get("catalysts") or [], key=lambda c: (c["done"], c["on"] or "9999", c["when"]))
     due = [c["id"] for c in catalysts if c["on"] and not c["done"] and today >= date.fromisoformat(c["on"])]
     return {"scenarios": scen, "close": _s(close) if close else None, "close_date": close_date, "indicators": out, "lights": lights,

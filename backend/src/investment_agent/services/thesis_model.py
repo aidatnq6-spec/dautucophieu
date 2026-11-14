@@ -17,8 +17,9 @@ def read_models(repo, owner) -> tuple[dict, int]:
     return (dict(record.payload.get("models", {})), record.version) if record else ({}, 0)
 
 
-def public_figures(data_dir: Path | None, symbol: str, *, today: date) -> tuple[Decimal | None, str | None, dict]:
-    """(latest close in đồng, its day, {metric: (period, value)}) from stored public data; a metric without a figure is left out."""
+def public_figures(data_dir: Path | None, symbol: str, *, today: date, multiples: dict | None = None) -> tuple[Decimal | None, str | None, dict]:
+    """(latest close in đồng, its day, {metric: (period, value)}) from stored public data; a metric without a figure is left out.
+    multiples: filled with the monthly P/E and P/B series (oldest first) when given."""
     if data_dir is None:
         return None, None, {}
     from investment_agent.market.series import SeriesStore
@@ -43,14 +44,20 @@ def public_figures(data_dir: Path | None, symbol: str, *, today: date) -> tuple[
     hist = monthly_multiples(v["record"], series.read(f"{symbol}-1d"), today=today, shares=v["shares"], published=v["published"])
     for metric, key in (("pe_ttm", "pe"), ("pb", "pb")):
         known = [p for p in hist[key]["points"] if p["value"] is not None]
+        if multiples is not None:
+            multiples[key] = [Decimal(str(p["value"])) for p in known]
         if known:
             auto[metric] = (known[-1]["month"], Decimal(str(known[-1]["value"])).quantize(Decimal("0.01"), ROUND_HALF_UP))
     return close, day, auto
 
 
 def view_for(data_dir, symbol: str, model: dict, *, today: date) -> dict:
-    close, day, auto = public_figures(data_dir, symbol, today=today)
-    return model_view(model, close=close, close_date=day, auto=auto, today=today)
+    from investment_agent.domain.thesis_model import valuation_bands
+    multiples: dict = {}
+    close, day, auto = public_figures(data_dir, symbol, today=today, multiples=multiples)
+    view = model_view(model, close=close, close_date=day, auto=auto, today=today)
+    full = {**model, "ranges": model.get("ranges") or []}
+    return {**view, "bands": valuation_bands(full, close=close, pe=multiples.get("pe", []), pb=multiples.get("pb", []))}
 
 
 def check_lights(repo, owner, data_dir, *, send, today: date, request_id: str) -> dict:

@@ -51,3 +51,25 @@ test("a question gets its answer and a gap, a catalyst is added and marked as ha
   await row.getByRole("button", { name: "Đã xảy ra" }).click();
   await expect(row.getByRole("button", { name: "Mở lại" })).toBeVisible();
 });
+
+
+test("an own valuation range joins the bars, and the one-page thesis opens ready to print", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Kịch bản và chỉ báo luận điểm" });
+  await box.getByRole("button", { name: "Sửa tiêu đề và tóm tắt" }).click();
+  await box.getByLabel("Tiêu đề luận điểm").fill("Xuất khẩu phần mềm tăng đều");
+  await box.getByRole("button", { name: "Lưu", exact: true }).first().click();
+  await expect(box).toContainText("Xuất khẩu phần mềm tăng đều");
+  const name = `CTCK ${Date.now() % 100000}`;
+  await box.getByLabel("Tên cách định giá").fill(name);
+  await box.getByLabel("Giá thấp").fill("50000");
+  await box.getByLabel("Giá cao").fill("70000");
+  await box.getByRole("button", { name: "Thêm khoảng" }).click();
+  await expect(box.getByRole("img", { name: /Dải định giá/ })).toContainText(name);
+  await box.getByRole("link", { name: "Trang luận điểm 1 trang để in" }).click();
+  await expect(page).toHaveURL(/\/thesis\/FPT/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Xuất khẩu phần mềm tăng đều");
+  await expect(page.getByRole("region", { name: "Dải định giá" })).toContainText(name);
+  await page.emulateMedia({ media: "print" });
+  await expect(page.getByRole("button", { name: "In" })).toBeHidden();
+});

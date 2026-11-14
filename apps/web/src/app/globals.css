@@ -211,6 +211,8 @@ legend{font-weight:600;padding:0 6px}
 .sm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}.sm-card{margin:0;border:1px solid var(--line);border-radius:8px;padding:8px}
 .sm-card figcaption{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.sm-svg{width:100%;height:auto;margin-top:4px;overflow:visible}
 .sm-index{fill:none;stroke:var(--vc-neutral);stroke-width:1.5}.sm-up{fill:none;stroke:var(--good);stroke-width:2}.sm-down{fill:none;stroke:var(--bad);stroke-width:2}
+/* Bản tổng kết tháng */
+.mr-link{text-align:right;margin:-8px 0 8px}.mr-tools{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}.mr-lead{font-size:16px;font-weight:600;margin:0 0 12px}
 .fd-stock{background:var(--op2)}.fd-balanced{background:var(--op4)}.fd-bond{background:var(--op3)}.fd-unknown{background:var(--vc-unknown)}
 /* Dự án và điểm rơi lợi nhuận: one bar per year, scaled to the largest year. */
 .pp-years{display:grid;gap:6px;margin:4px 0 14px}.pp-year{display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;gap:10px;align-items:center}
@@ -406,7 +408,8 @@ main h2{scroll-margin-top:16px}
 .ln-dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:8px}
 @media (max-width:860px){.ln-grid{grid-template-columns:minmax(0,1fr)}.ln-result{position:static}}
 .ln-print{display:none}
-@media print{.side,.page-jumps,.to-top,.ln-controls,.rc,.btn{display:none!important}.shell{display:block;min-height:0}main.content{padding:0;max-width:none}
+@media print{.side,.page-jumps,.to-top,.ln-controls,.rc,.btn,.mr-tools{display:none!important}.mr-page .surface{break-inside:avoid;box-shadow:none}
+@page{size:A4;margin:12mm}.shell{display:block;min-height:0}main.content{padding:0;max-width:none}
 .ln-grid{display:block}.ln-result{position:static;break-inside:avoid;box-shadow:none}.tablewrap{overflow:visible}
 .ln-print{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;margin:0 0 12px;font-size:13px}.ln-print>div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding:3px 0}.ln-print dd{margin:0;font-weight:600}}
 /* Ma trận tín hiệu */

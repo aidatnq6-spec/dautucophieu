@@ -169,9 +169,9 @@ export function Waterfall({ bars, unit = "tr", label = "Thác nước thay đổ
   );
 }
 
-export function MonthBridgeView() {
+export function MonthBridgeView({ initial = null }: { initial?: string | null } = {}) {
   const [data, setData] = useState<BridgeData | null>(null);
-  const [month, setMonth] = useState<string | null>(null);
+  const [month, setMonth] = useState<string | null>(initial);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let live = true;

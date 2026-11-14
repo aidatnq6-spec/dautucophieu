@@ -72,6 +72,7 @@ export function PortfolioView() {
 
   return (
     <>
+      <p className="mr-link"><Link href="/monthly">Bản tổng kết tháng để in</Link></p>
       <FormErrors failure={failure} />
       {ledger.stale && <p className="notice">Đang xem bản sao cũ vì chưa kết nối được kho dữ liệu; không thể ghi giao dịch.</p>}
       {personal && (!personal.profile || !personal.risk) && (

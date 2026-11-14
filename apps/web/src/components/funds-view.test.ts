@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coveredText, mineNotes, returnText, runUpCheck, scoreView } from "./funds-view";
+import { coveredText, mineNotes, orderFunds, returnText, runUpCheck, scoreView } from "./funds-view";
 
 describe("returnText", () => {
   it("shows a percentage return with its sign, and a dash when the source has none", () => {
@@ -51,5 +51,24 @@ describe("scoreView", () => {
     expect(scoreView({ ...s, trend: { previous: "70", change: "-7.5" } }).arrow).toBe("▼7,5");
     expect(scoreView({ ...s, score: null, peers: 1 }).title).toBe("Quỹ duy nhất trong nhóm: không so được");
     expect(scoreView(null).text).toBe("—");
+  });
+});
+
+
+describe("orderFunds", () => {
+  const fund = (code: string, kind: "STOCK" | "BOND", score: string | null, m12: string | null, m36: string | null, fee: string, held = false) => ({
+    code, name: code, kind, manager: null, fee, nav: "1", date: "2026-11-13", held, beats_deposit: null,
+    returns: { ytd: null, m1: null, m3: null, m6: null, m12, m36, m60: null, annual36: null },
+    score: score === null ? null : { score, parts: { returns: null, fee: null, risk: null }, counted: [], risk_days: 0, peers: 9, trend: null } });
+  const funds = [fund("NEW", "STOCK", "99", "20", null, "1"), fund("OLD", "STOCK", "70", "5", "40", "1.5"), fund("BEST", "STOCK", "90", "4", "30", "2"),
+    fund("MINE", "STOCK", "10", "1", "10", "1.9", true), fund("BND", "BOND", "50", "6", "20", "0.5")];
+  it("puts the owner's funds first, then funds with three years before new ones, by score within each kind", () => {
+    expect(orderFunds(funds, "score", true).list.map((f) => f.code)).toEqual(["MINE", "BEST", "OLD", "NEW", "BND"]);
+    expect(orderFunds(funds, "score", false).list.map((f) => f.code)).toEqual(["BEST", "OLD", "MINE", "NEW", "BND"]);
+  });
+  it("sorts by the lowest fee and marks the top three of each kind", () => {
+    const o = orderFunds(funds, "fee", false);
+    expect(o.list.map((f) => f.code)).toEqual(["OLD", "MINE", "BEST", "NEW", "BND"]);
+    expect(o.top).toEqual({ NEW: 1, OLD: 2, MINE: 3, BND: 1 });
   });
 });

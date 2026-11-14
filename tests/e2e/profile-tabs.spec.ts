@@ -63,3 +63,10 @@ test("the menu is grouped, and every link fits a laptop screen", async ({ page }
   await page.setViewportSize({ width: 375, height: 800 });
   await expect(nav.getByText("Cổ phiếu", { exact: true })).toBeHidden();
 });
+
+test("the cash-flow tab opens with a radar of the measures it has figures for", async ({ page }) => {
+  await page.goto("/profile?tab=dong-tien");
+  const radar = page.getByRole("region", { name: "Radar các yếu tố tài chính" });
+  await expect(radar.getByText("Đang tải…")).toHaveCount(0);
+  await expect(radar.getByRole("table", { name: "Các yếu tố sức khỏe tài chính" }).getByRole("row")).toHaveCount(8);
+});

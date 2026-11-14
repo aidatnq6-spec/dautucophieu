@@ -19,6 +19,7 @@ import { MoneyPurposes } from "./money-purposes";
 import { PassiveIncome } from "./passive-income";
 import { type Assessment } from "./profile-form";
 import { RiskSection } from "./risk-section";
+import { HealthRadar } from "./health-radar";
 
 type ProfileView = { version: number; assessment: Assessment; confirmed_at: string; freshness: { status: string; allows_new_recommendations: boolean } };
 const FRESHNESS: Record<string, string> = { current: "Còn hiệu lực", refresh_soon: "Sắp đến hạn rà soát tháng",
@@ -86,6 +87,7 @@ export function ProfileSummary() {
         <Intangibles onChanged={() => setIntangibleChanges((n) => n + 1)} />
       </div>
       <div role="tabpanel" id="panel-dong-tien" aria-labelledby="tab-dong-tien" hidden={tab !== "dong-tien"}>
+        <HealthRadar key={`${wealthSaves}-${bookSaves}`} />
         <WealthCheck onSaved={() => setWealthSaves((n) => n + 1)} />
         <LifestyleInflation refresh={wealthSaves + cashflowSaves} />
         <Cashflow onSaved={() => setCashflowSaves((n) => n + 1)} />

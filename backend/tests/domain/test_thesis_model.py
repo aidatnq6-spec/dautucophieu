@@ -71,3 +71,21 @@ def test_catalysts_have_a_sign_and_are_due_on_their_day_until_marked_done():
     assert [c["id"] for c in v["catalysts"]] == ["c1", "c2", "c3"] and v["catalysts_due"] == ["c1"]
     with pytest.raises(ModelError):
         validate_model({"scenarios": [], "indicators": [], "catalysts": [{"id": "x", "text": "a", "sign": "!"}]})
+
+
+
+def test_valuation_bands_from_the_scenarios_five_years_of_multiples_and_the_owner_s_ranges():
+    from investment_agent.domain.thesis_model import valuation_bands
+    m = validate_model({"scenarios": SCEN, "indicators": [], "headline": " Rời sông ra biển ", "ranges": [
+        {"id": "r1", "name": "CTCK 6 tháng", "low": "44000", "mid": "50400", "high": "65100", "source": "10 CTCK"}]})
+    assert m["headline"] == "Rời sông ra biển"
+    pe = [Decimal(v) for v in [10] * 10 + [20] * 10 + [15] * 10]  # 30 months; today 15
+    out = valuation_bands(m, close=Decimal("45000"), pe=pe, pb=[Decimal(1)] * 10)
+    rows = {r["id"]: r for r in out["rows"]}
+    assert rows["scenarios"] == {"id": "scenarios", "name": "Kịch bản (của bạn)", "low": "44106", "mid": "55435", "high": "61362",
+                                 "source": "Ba kịch bản ở trên", "auto": True}
+    assert (rows["pe"]["low"], rows["pe"]["mid"], rows["pe"]["high"]) == ("30000", "45000", "60000")  # 45,000 / 15 = 3,000 a share × 10 / 15 / 20
+    assert rows["r1"]["mid"] == "50400" and rows["r1"]["auto"] is False
+    assert "pb" not in rows and out["notes"] == ["P/B 5 năm: chưa đủ 24 tháng số dương"]
+    with pytest.raises(ModelError):
+        validate_model({"scenarios": [], "indicators": [], "ranges": [{"id": "r", "name": "SOTP", "low": "50", "high": "40"}]})

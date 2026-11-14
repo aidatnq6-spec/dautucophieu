@@ -22,10 +22,21 @@ export function growthScale(g: number): number {
 }
 
 /** Where a bubble goes in a w × h plot: across by cheaper_months (0 left), up by growth on the compressed scale; r by the value held. */
-export function place(p: Point, w: number, h: number, maxHeld: number): { x: number; y: number; r: number; clipped: boolean } {
+/** The lowest height the plot needs: the lowest ticker's, rounded down to a tick, never above −50%, so the plot uses its full height
+ * when no ticker fell far (−1 = −300%). */
+export function floorScale(growths: number[]): number {
+  const lowest = Math.min(-0.5, ...growths);
+  const tick = [...GROWTH_TICKS].reverse().find((t) => t <= lowest) ?? -GROWTH_EDGE;
+  return growthScale(Math.max(tick, -GROWTH_EDGE));
+}
+
+/** y of a height s on a plot of height h that runs from +300% at the top down to `low` at the bottom. */
+export const yAt = (s: number, h: number, low = -1) => ((1 - s) / (1 - low)) * h;
+
+export function place(p: Point, w: number, h: number, maxHeld: number, low = -1): { x: number; y: number; r: number; clipped: boolean } {
   const g = Number(p.growth);
   const r = p.held && maxHeld > 0 ? 6 + 12 * Math.sqrt(Number(p.held) / maxHeld) : 4;
-  return { x: Number(p.cheaper_months) * w, y: h / 2 - growthScale(g) * (h / 2), r, clipped: Math.abs(g) > GROWTH_EDGE };
+  return { x: Number(p.cheaper_months) * w, y: yAt(Math.max(growthScale(g), low), h, low), r, clipped: Math.abs(g) > GROWTH_EDGE };
 }
 
 type Box = { x: number; y: number; w: number; h: number };
@@ -73,7 +84,9 @@ export function WatchQuadrant() {
       {!view && !error && <p className="muted fx-loading" role="status">Đang tải…</p>}
       {view && <>
         {view.points.length > 0 && (() => {
-          const spots = view.points.map((p) => ({ p, b: place(p, W, H, maxHeld) }));
+          const low = floorScale(view.points.map((p) => Number(p.growth)));
+          const zero = yAt(0, H, low);
+          const spots = view.points.map((p) => ({ p, b: place(p, W, H, maxHeld, low) }));
           const labels = labelSpots(spots.map(({ p, b }) => ({ key: p.symbol, x: b.x, y: b.y, r: b.r, text: `${p.symbol}${b.clipped ? "*" : ""}`, first: !!p.held })), W, H);
           const count = (z: Point["zone"]) => view.points.filter((p) => p.zone === z).length;
           const hidden = view.points.filter((p) => !labels[p.symbol]).length;
@@ -82,9 +95,9 @@ export function WatchQuadrant() {
               <span className="wq-z">{ZONES.dear_growing} ({count("dear_growing")}) ↗</span></div>
             <svg className="wq-plot" viewBox={`0 0 ${W + pad * 2} ${H + pad * 2}`} role="img" aria-label={`Bong bóng góc phần tư của ${view.points.length} mã`}>
               <g transform={`translate(${pad},${pad / 2})`}>
-                <rect x={0} y={0} width={W / 2} height={H / 2} className="wq-zone wq-good" />
+                <rect x={0} y={0} width={W / 2} height={zero} className="wq-zone wq-good" />
                 <rect x={0} y={0} width={W} height={H} className="wq-frame" />
-                {GROWTH_TICKS.map((g) => { const y = H / 2 - growthScale(g) * (H / 2);
+                {GROWTH_TICKS.filter((g) => growthScale(g) >= low - 1e-9).map((g) => { const y = yAt(growthScale(g), H, low);
                   return <g key={g}><line x1={0} x2={W} y1={y} y2={y} className={g === 0 ? "wq-axis" : "wq-grid"} />
                     <text x={-6} y={y + 4} textAnchor="end" className="wq-tick">{g > 0 ? "+" : g < 0 ? "−" : ""}{Math.abs(g * 100)}%</text></g>; })}
                 <line x1={W / 2} x2={W / 2} y1={0} y2={H} className="wq-axis" />
@@ -113,7 +126,7 @@ export function WatchQuadrant() {
         </table>
         {missing.length > 0 && <p className="caption" data-testid="quadrant-missing">Chưa vẽ: {missing.map(([s, why]) => `${s} (${why})`).join("; ")}.</p>}
         <p className="caption">Ngang: P/B hôm nay so với P/B từng tháng của chính mã (từ {24} tháng trở lên): bên trái là rẻ hơn phần lớn quá khứ. Dọc: lợi nhuận sau thuế
-          cổ đông công ty mẹ 4 quý gần nhất so với 4 quý trước đó, thang nén để các mã quanh 0 không dồn cục (dấu * là vượt ±300%, xem số ở bảng). Chấm đặc, to là
+          cổ đông công ty mẹ 4 quý gần nhất so với 4 quý trước đó, thang nén để các mã quanh 0 không dồn cục (dấu * là vượt ±300%, xem số ở bảng). Chấm cam đặc là
           mã đang nắm (to theo giá trị); chấm rỗng là mã chỉ theo dõi. Bốn vùng chỉ mô tả vị trí,
           không khuyên mua hay bán: rẻ có thể vì có lý do, cần đọc cùng luận điểm và báo cáo.</p>
       </>}

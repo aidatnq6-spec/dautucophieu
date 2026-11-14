@@ -186,8 +186,8 @@ legend{font-weight:600;padding:0 6px}
 /* Bong bóng góc phần tư */
 .wq-plot{width:100%;height:auto;display:block;margin:6px 0 12px}.wq-frame{fill:none;stroke:var(--line)}.wq-axis{stroke:var(--line);stroke-dasharray:4 4}
 .wq-zone.wq-good{fill:color-mix(in srgb,var(--good) 7%,transparent)}.wq-label{font-size:12px;fill:var(--muted)}.wq-tick{font-size:11px;fill:var(--muted)}
-.wq-held{fill:color-mix(in srgb,var(--brand) 70%,transparent);stroke:var(--brand);stroke-width:1.5}.wq-watch{fill:var(--paper);stroke:var(--muted);stroke-width:1.2}
-.wq-name{font-size:11px;font-weight:600;fill:var(--muted)}.wq-name-held{fill:var(--ink);font-weight:700;font-size:12px}
+.wq-held{fill:color-mix(in srgb,var(--orange) 80%,transparent);stroke:var(--orange);stroke-width:2}.wq-watch{fill:var(--paper);stroke:var(--muted);stroke-width:1.2}
+.wq-name{font-size:11px;font-weight:600;fill:var(--muted)}.wq-name-held{fill:var(--orange);font-weight:700;font-size:13px}
 .wq-grid{stroke:var(--line);stroke-width:.5;stroke-dasharray:2 4}.wq-zones{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);margin:4px 0}
 .wq-z.good{color:var(--good-ink);font-weight:600}
 /* Quy trình đầu tư (Kanban) */
@@ -223,6 +223,20 @@ legend{font-weight:600;padding:0 6px}
 .tq-summary{font-weight:600;margin:6px 0}.tq-points{margin:4px 0 6px;padding-left:18px;font-size:13px}.tq-gaps{margin-top:8px;border-top:1px dashed var(--line);padding-top:6px}
 .tq-gap{display:flex;gap:6px;align-items:center;font-size:13px;margin:3px 0;overflow-wrap:anywhere}.tq-gap.done{color:var(--muted);text-decoration:line-through}
 .tq-x{padding:0 6px;margin-left:auto}.tq-ref{max-width:90px}.tq-done td{color:var(--muted)}
+/* Dải định giá, trang luận điểm 1 trang */
+.vb-fig{margin:4px 0 10px}.vb-svg{width:100%;height:auto;display:block}.vb-grid{stroke:var(--chart-grid)}.vb-tick{font-size:11px;fill:var(--muted)}
+.vb-name{font-size:13px;fill:var(--ink);font-weight:600}.vb-own{font-style:italic}.vb-bar{fill:color-mix(in srgb,var(--brand) 22%,var(--paper));stroke:var(--brand)}
+.vb-mid{stroke:var(--ink);stroke-width:3}.vb-end{font-size:11px;fill:var(--muted)}.vb-close{stroke:var(--bad);stroke-width:2;stroke-dasharray:5 3}
+.vb-close-label{font-size:12px;font-weight:700;fill:var(--bad)}.tm-head{margin-bottom:10px}.tm-headline{font-size:17px;font-weight:700;margin:2px 0 4px}
+.tm-ranges{font-size:13px;padding-left:18px;margin:4px 0 8px}
+.op-tools{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.op-head h1{font-size:22px;margin:0 0 6px}.op-head p{margin:4px 0}
+.op-tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:10px 0}.op-tiles>div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--paper)}
+.op-tiles span{display:block;font-size:12px;color:var(--muted)}.op-tiles strong{font-size:18px}
+.op-two{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:10px}.op-questions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.op-q h3{font-size:14px;margin:0}.op-q ul{margin:4px 0;padding-left:16px;font-size:13px}.op-sum{font-weight:600;font-size:13px;margin:6px 0}.op-gap{font-size:12px;margin:3px 0}
+.op-table{width:100%;border-collapse:collapse;font-size:13px}.op-table th,.op-table td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.op-table .num{text-align:right}.op-foot{margin-top:10px}
+@media(max-width:900px){.op-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.op-two,.op-questions{grid-template-columns:minmax(0,1fr)}}
 .fd-stock{background:var(--op2)}.fd-balanced{background:var(--op4)}.fd-bond{background:var(--op3)}.fd-unknown{background:var(--vc-unknown)}
 /* Dự án và điểm rơi lợi nhuận: one bar per year, scaled to the largest year. */
 .pp-years{display:grid;gap:6px;margin:4px 0 14px}.pp-year{display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;gap:10px;align-items:center}
@@ -418,7 +432,8 @@ main h2{scroll-margin-top:16px}
 .ln-dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:8px}
 @media (max-width:860px){.ln-grid{grid-template-columns:minmax(0,1fr)}.ln-result{position:static}}
 .ln-print{display:none}
-@media print{.side,.page-jumps,.to-top,.ln-controls,.rc,.btn,.mr-tools{display:none!important}.mr-page .surface{break-inside:avoid;box-shadow:none}
+@media print{.side,.page-jumps,.to-top,.ln-controls,.rc,.btn,.mr-tools,.op-tools{display:none!important}.op-page{font-size:11px}.op-page .surface{padding:8px 10px;margin:0 0 6px;box-shadow:none;break-inside:avoid}
+.op-page h2{font-size:13px;margin:0 0 4px}.op-tiles strong{font-size:14px}.op-questions,.op-two{gap:6px}.op-q ul,.op-table{font-size:10px}.mr-page .surface{break-inside:avoid;box-shadow:none}
 @page{size:A4;margin:12mm}.shell{display:block;min-height:0}main.content{padding:0;max-width:none}
 .ln-grid{display:block}.ln-result{position:static;break-inside:avoid;box-shadow:none}.tablewrap{overflow:visible}
 .ln-print{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;margin:0 0 12px;font-size:13px}.ln-print>div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding:3px 0}.ln-print dd{margin:0;font-weight:600}}

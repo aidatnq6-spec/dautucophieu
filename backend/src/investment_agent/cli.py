@@ -44,6 +44,9 @@ def main() -> int:
     es.add_argument("--data-dir", type=Path, required=True)
     fn = commands.add_parser("fund-nav-sync", help="NAV/đơn vị of every open-ended fund from Fmarket into data/fund-nav.json, one call")
     fn.add_argument("--data-dir", type=Path, required=True)
+    ic = commands.add_parser("index-closes-rebuild", help="rebuild VN-Index and VN30 daily closes in points (VNDirect from 08/2017, CafeF before), "
+                             "after a backup into backups/; run once")
+    ic.add_argument("--data-dir", type=Path, required=True)
     gp = commands.add_parser("gold-price-sync", help="Phú Quý's gold buying and selling prices per chỉ into data/gold-price.json, one page")
     gp.add_argument("--data-dir", type=Path, required=True)
     wb = commands.add_parser("weekly-brief", help="Bản tin tuần over Telegram on the weekend, once per week")
@@ -148,6 +151,8 @@ def main() -> int:
         return fund_nav_sync_cli(args.data_dir)
     if args.command == "gold-price-sync":
         return gold_price_sync_cli(args.data_dir)
+    if args.command == "index-closes-rebuild":
+        return index_closes_cli(args.data_dir)
     if args.command == "lights-check":
         return lights_check_cli(args.data_dir)
     if args.command == "health-check":
@@ -867,6 +872,38 @@ def fund_nav_sync_cli(data_dir: Path, *, post=None) -> int:
     out = fund_nav_sync(FundNavStore(data_dir), post=post, now=datetime.now(timezone.utc))
     print(json.dumps(out))
     return 1 if out["status"] == "error" else 0
+
+
+def index_closes_cli(data_dir: Path, *, get=None, today=None, sleep=None) -> int:
+    """Rebuilds VNINDEX-1d and VN30-1d in points; the files held before are copied into backups/index-closes-<date>/ first."""
+    import shutil
+    import time
+    from datetime import date
+
+    from investment_agent.market.index_closes import rebuild_index_history
+    from investment_agent.market.series import SeriesStore
+    if get is None:
+        import httpx
+
+        def get(url: str) -> str:
+            response = httpx.get(url, timeout=60, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+            response.raise_for_status()
+            return response.text
+    today = today or date.today()
+    store = SeriesStore(Path(data_dir) / "trend-sources")
+    backup = Path(data_dir).parent / "backups" / f"index-closes-{today.isoformat()}"
+    results = []
+    for index in ("VNINDEX", "VN30"):
+        held = store.root / f"{index}-1d.json"
+        if held.is_file():
+            backup.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(held, backup / held.name)
+        try:
+            results.append(rebuild_index_history(store, index, get=get, today=today, sleep=sleep or time.sleep))
+        except Exception as exc:  # noqa: BLE001 - a source down leaves the series as it was
+            results.append({"status": "error", "reason": type(exc).__name__, "index": index})
+    print(json.dumps({"results": results, "backup": str(backup)}, ensure_ascii=False))
+    return 0 if all(r["status"] == "ok" for r in results) else 1
 
 
 def gold_price_sync_cli(data_dir: Path, *, get=None) -> int:

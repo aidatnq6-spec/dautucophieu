@@ -44,6 +44,8 @@ def main() -> int:
     es.add_argument("--data-dir", type=Path, required=True)
     fn = commands.add_parser("fund-nav-sync", help="NAV/đơn vị of every open-ended fund from Fmarket into data/fund-nav.json, one call")
     fn.add_argument("--data-dir", type=Path, required=True)
+    bp = commands.add_parser("buy-plan-check", help="after the close, one Telegram note for the planned tranches whose condition is now met")
+    bp.add_argument("--data-dir", type=Path, required=True)
     fh = commands.add_parser("fund-holdings-sync", help="every open-ended fund's published top holdings from Fmarket into data/fund-holdings.json, "
                              "a fund read again only when its month changes")
     fh.add_argument("--data-dir", type=Path, required=True)
@@ -152,6 +154,8 @@ def main() -> int:
         return erp_sync_cli(args.data_dir)
     if args.command == "fund-nav-sync":
         return fund_nav_sync_cli(args.data_dir)
+    if args.command == "buy-plan-check":
+        return buy_plan_cli(args.data_dir)
     if args.command == "fund-holdings-sync":
         return fund_holdings_sync_cli(args.data_dir)
     if args.command == "gold-price-sync":
@@ -923,6 +927,25 @@ def index_closes_cli(data_dir: Path, *, get=None, today=None, sleep=None) -> int
             results.append({"status": "error", "reason": type(exc).__name__, "index": index})
     print(json.dumps({"results": results, "backup": str(backup)}, ensure_ascii=False))
     return 0 if all(r["status"] == "ok" for r in results) else 1
+
+
+def buy_plan_cli(data_dir: Path) -> int:
+    """Kế hoạch giải ngân after the close; skipped (the plan is not read) while scheduled delivery is off."""
+    import uuid
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from investment_agent.services.buy_plan import check_plan
+
+    telegram = _scheduled_telegram(data_dir)
+    if telegram is None:
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
+        return 0
+    send, repo, owner = telegram
+    out = check_plan(repo, owner, data_dir, send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date(),
+                     request_id=f"buy-plan-{uuid.uuid4().hex[:16]}")
+    print(json.dumps(out))  # counts only, never the plan
+    return 0
 
 
 def fund_holdings_sync_cli(data_dir: Path, *, post=None, get=None) -> int:

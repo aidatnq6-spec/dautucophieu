@@ -11,6 +11,7 @@ import { DrawdownView } from "./drawdown-view";
 import { StressView } from "./stress-view";
 import { PerformanceView } from "./performance-view";
 import { AssetMapView, MonthBridgeView } from "./asset-views";
+import { BuyPlan } from "./buy-plan";
 import { ThesisView } from "./thesis-view";
 import { TcbsImport } from "./tcbs-import";
 import { TradeBehaviour } from "./trade-behaviour";
@@ -93,6 +94,7 @@ export function PortfolioView() {
       <PerformanceView />
       <MonthBridgeView />
       <AssetMapView />
+      <BuyPlan />
       <DrawdownView />
       <StressView ledgerVersion={ledger.version} />
 

@@ -170,14 +170,58 @@ function BuyCheckSection({ funds }: { funds: Fund[] }) {
   );
 }
 
+export type SortKey = "score" | "ytd" | "m12" | "m36" | "m60" | "fee";
+export const SORTS: { id: SortKey; label: string }[] = [{ id: "score", label: "Điểm" }, { id: "ytd", label: "Từ đầu năm" }, { id: "m12", label: "1 năm" },
+  { id: "m36", label: "3 năm" }, { id: "m60", label: "5 năm" }, { id: "fee", label: "Phí thấp nhất" }];
+const KIND_ORDER: (Kind | null)[] = ["STOCK", "BALANCED", "BOND", null];
+
+const sortValue = (f: Fund, key: SortKey): number | null => {
+  if (key === "score") return f.score?.score != null ? Number(f.score.score) : null;
+  if (key === "fee") return f.fee !== null ? -Number(f.fee) : null;  // lower fee ranks higher
+  const v = f.returns?.[key];
+  return v != null ? Number(v) : null;
+};
+export const isNewFund = (f: Fund) => f.returns?.m36 == null;
+
+/** The table's order: by kind; within it the owner's funds first (when pinned), funds with three years of history before new ones,
+ * then by the chosen measure (missing last), ties by three-year return. top: each fund's place among the first three of its kind. */
+export function orderFunds(funds: Fund[], key: SortKey, pinHeld: boolean): { list: Fund[]; top: Record<string, number> } {
+  const cmp = (a: Fund, b: Fund) => {
+    const ka = KIND_ORDER.indexOf(a.kind), kb = KIND_ORDER.indexOf(b.kind);
+    if (ka !== kb) return ka - kb;
+    if (pinHeld && a.held !== b.held) return a.held ? -1 : 1;
+    if (isNewFund(a) !== isNewFund(b)) return isNewFund(a) ? 1 : -1;
+    const va = sortValue(a, key), vb = sortValue(b, key);
+    if (va === null || vb === null) { if (va !== vb) return va === null ? 1 : -1; }
+    else if (va !== vb) return vb - va;
+    return (Number(b.returns?.m36 ?? -1e9)) - (Number(a.returns?.m36 ?? -1e9)) || a.code.localeCompare(b.code);
+  };
+  const list = [...funds].sort(cmp);
+  const top: Record<string, number> = {};
+  for (const kind of KIND_ORDER) {
+    const ranked = funds.filter((f) => f.kind === kind && sortValue(f, key) !== null).sort((a, b) => sortValue(b, key)! - sortValue(a, key)!);
+    ranked.slice(0, 3).forEach((f, i) => { top[f.code] = i + 1; });
+  }
+  return { list, top };
+}
+
+const STORE = "funds-sort";
+function loadSort(): { key: SortKey; pin: boolean } {
+  try { const v = JSON.parse(localStorage.getItem(STORE) ?? "null"); if (v && SORTS.some((s) => s.id === v.key)) return { key: v.key, pin: v.pin !== false }; } catch { /* no storage */ }
+  return { key: "score", pin: true };
+}
+
 export function FundsView() {
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [kind, setKind] = useState<Kind | "all">("all");
+  const [sort, setSort] = useState<{ key: SortKey; pin: boolean }>(loadSort);  // the saved choice; the first screen is the loading line either way
+  const changeSort = (next: { key: SortKey; pin: boolean }) => { setSort(next); try { localStorage.setItem(STORE, JSON.stringify(next)); } catch { /* no storage */ } };
   useEffect(() => { api<Board>("funds").then(setBoard, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
   if (error) return <p className="errors" role="alert">{error}</p>;
   if (!board) return <p className="muted fx-loading" role="status">Đang tải…</p>;
-  const shown = board.funds.filter((f) => kind === "all" || f.kind === kind);
+  const ordered = orderFunds(board.funds.filter((f) => kind === "all" || f.kind === kind), sort.key, sort.pin);
+  const shown = ordered.list;
   const vn = board.benchmark.vnindex, deposit = board.benchmark.deposit_12m;
   const days = Math.max(0, ...Object.values(board.history_days));
   return (
@@ -197,27 +241,40 @@ export function FundsView() {
             So sánh: VN-Index {PERIODS.map((p) => `${p.label.toLowerCase()} ${returnText(vn[p.key])}`).join(", ")}
             {vn.as_of ? ` (đến ${day(vn.as_of)})` : ""}; lãi gửi 12 tháng {deposit === null ? "chưa có" : `${formatDecimal(deposit, 2)}%/năm`}.
           </p>
+          <div className="fd-sortbar">
+            <label className="field">Sắp xếp theo<select aria-label="Sắp xếp theo" value={sort.key} onChange={(e) => changeSort({ ...sort, key: e.target.value as SortKey })}>
+              {SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select></label>
+            <label className="db-check"><input type="checkbox" checked={sort.pin} onChange={(e) => changeSort({ ...sort, pin: e.target.checked })} />Quỹ đang nắm lên đầu</label>
+            <span className="caption">Trong mỗi nhóm: quỹ đủ 3 năm lịch sử đứng trước quỹ mới.</span>
+          </div>
           <table className="fv-table" aria-label="Danh sách quỹ mở">
-            <thead><tr><th>Quỹ</th><th>Nhóm</th><th className="num">NAV/đơn vị</th>{PERIODS.map((p) => <th key={p.key} className="num">{p.label}</th>)}
-              <th className="num">Phí quản lý</th><th className="num">Điểm</th><th>1 năm so với gửi tiết kiệm</th></tr></thead>
-            <tbody>{shown.map((f) => <tr key={f.code} className={f.held ? "fd-held" : undefined}>
-              <td data-label="Quỹ"><strong>{f.code}</strong>{f.held && <> <span className="pill">Bạn đang giữ</span></>}
+            <thead><tr><th>Quỹ</th><th>Nhóm</th><th className="num">NAV/đơn vị</th>{PERIODS.map((p) => <th key={p.key} className="num" aria-sort={sort.key === p.key ? "descending" : undefined}>
+              <button type="button" className={`fd-th${sort.key === p.key ? " on" : ""}`} onClick={() => changeSort({ ...sort, key: p.key })}>{p.label}{sort.key === p.key ? " ▼" : ""}</button></th>)}
+              <th className="num" aria-sort={sort.key === "fee" ? "ascending" : undefined}><button type="button" className={`fd-th${sort.key === "fee" ? " on" : ""}`}
+                onClick={() => changeSort({ ...sort, key: "fee" })}>Phí quản lý{sort.key === "fee" ? " ▲" : ""}</button></th>
+              <th className="num" aria-sort={sort.key === "score" ? "descending" : undefined}><button type="button" className={`fd-th${sort.key === "score" ? " on" : ""}`}
+                onClick={() => changeSort({ ...sort, key: "score" })}>Điểm{sort.key === "score" ? " ▼" : ""}</button></th><th>1 năm so với gửi tiết kiệm</th></tr></thead>
+            <tbody>{shown.map((f, i) => { const first = i === 0 || shown[i - 1].kind !== f.kind;
+              return [kind === "all" && first ? <tr key={`k-${f.kind}`} className="fd-kindrow"><th colSpan={11}>{f.kind ? KIND_LABEL[f.kind] : "Chưa rõ nhóm"}
+                ({shown.filter((x) => x.kind === f.kind).length})</th></tr> : null,
+              <tr key={f.code} className={f.held ? "fd-held" : undefined}>
+              <td data-label="Quỹ"><strong>{f.code}</strong>{ordered.top[f.code] && <> <span className="pill good" title={`Thứ ${ordered.top[f.code]} trong nhóm theo ${SORTS.find((x) => x.id === sort.key)!.label.toLowerCase()}`}>
+                Top {ordered.top[f.code]}</span></>}{f.held && <> <span className="pill">Bạn đang giữ</span></>}{isNewFund(f) && <> <span className="pill warn">quỹ mới &lt; 3 năm</span></>}
                 <div className="caption">{f.name}{f.manager ? ` · ${f.manager}` : ""}</div></td>
               <td data-label="Nhóm">{f.kind ? KIND_LABEL[f.kind] : "—"}</td>
               <td className="num" data-label="NAV/đơn vị">{formatDecimal(f.nav, 0)}<div className="caption">{day(f.date)}</div></td>
               {PERIODS.map((p) => <td key={p.key} className={`num ${tone(f.returns?.[p.key]) ?? ""}`} data-label={p.label}>{returnText(f.returns?.[p.key])}</td>)}
               <td className="num" data-label="Phí quản lý">{f.fee === null ? "—" : `${formatDecimal(f.fee, 2)}%`}</td>
-              {(() => { const s = scoreView(f.score); return <td className="num" data-label="Điểm" title={s.title}>{s.text}{s.arrow && <span className="caption"> {s.arrow}</span>}
-                <div className="caption">{s.title}</div></td>; })()}
+              {(() => { const s = scoreView(f.score); return <td className="num" data-label="Điểm" title={s.title}><strong>{s.text}</strong>{s.arrow && <span className="caption"> {s.arrow}</span>}</td>; })()}
               <td data-label="So với gửi tiết kiệm">{f.beats_deposit === null ? "—"
                 : f.beats_deposit ? <span className="pill good">Cao hơn</span> : <span className="pill bad">Thấp hơn</span>}</td>
-            </tr>)}</tbody>
+            </tr>]; })}</tbody>
           </table>
           <p className="caption">NAV và lợi nhuận theo từng kỳ là số Fmarket công bố (đơn vị phân phối, không phải công ty quản lý quỹ){board.source
             ? `, lấy lúc ${new Date(board.source.fetched_at).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}` : ""}. Kỳ Fmarket không có số thì để trống.
             VN-Index tính từ giá đóng cửa đã lưu, cùng các kỳ. Điểm (0–100) chỉ chấm phần đo được, xếp hạng trong cùng nhóm: hiệu suất 1 và 3 năm, phí quản lý
             (thấp hơn là tốt), rủi ro (sụt giảm lớn nhất và độ dao động của NAV, khi đã lưu đủ 120 ngày); triển vọng là nhận định nên không chấm. Mũi tên so
-            với điểm tháng trước. Quỹ mới thì lợi nhuận ngắn hạn dao động mạnh; so quỹ cùng nhóm với nhau. Lịch sử NAV bắt đầu lưu
+            với điểm tháng trước; rê chuột lên điểm để xem điểm từng phần. Top 1–3 là thứ hạng trong nhóm theo cách sắp xếp đang chọn. Quỹ mới thì lợi nhuận ngắn hạn dao động mạnh; so quỹ cùng nhóm với nhau. Lịch sử NAV bắt đầu lưu
             mỗi ngày: hiện có {days} ngày. Không phải khuyến nghị.</p>
         </>}
       </section>

@@ -88,3 +88,28 @@ def test_a_negative_six_months_is_never_a_run_up():
                                                                          "m60": None, "annual36": None}}}
     f = fund_board({"A": {"name": "A", "nav": "1", "date": "2026-11-13"}}, p, index=[], deposit_rate=None, held=set())["funds"][0]
     assert f["rank"]["m6"] == {"rank": 1, "of": 1} and f["run_up"] is False
+
+
+HOLD = {"DCDS": {"as_of": "2026-10", "stocks": [{"symbol": "VIC", "percent": "10", "industry": "x"}, {"symbol": "FPT", "percent": "5", "industry": "x"}],
+                 "bonds": [], "assets": [], "industries": []},
+        "VIBF": {"as_of": "2026-09", "stocks": [{"symbol": "FPT", "percent": "20", "industry": "x"}], "bonds": [{"code": "MSN123010", "percent": "14", "industry": "x"}],
+                 "assets": [], "industries": []}}
+
+
+def test_look_through_adds_what_the_funds_hold_to_the_stocks_held_directly():
+    from investment_agent.domain.fund_board import look_through
+    bonds = [bond("a", "DCDS", 30), bond("b", "VIBF", 100), bond("c", "GONE", 1)]  # DCDS 3,000; VIBF 1,000; GONE has no NAV
+    out = look_through(bonds, NAVS, HOLD, direct={"FPT": Decimal(1000), "HPG": Decimal(500)})
+    rows = {r["symbol"]: r for r in out["rows"]}
+    assert rows["FPT"] == {"symbol": "FPT", "direct": "1000", "through": "350", "total": "1350", "share": "0.2455",
+                           "funds": [{"code": "DCDS", "percent": "5"}, {"code": "VIBF", "percent": "20"}]}  # 150 + 200, of 1,500 direct + 4,000 in funds
+    assert rows["VIC"]["direct"] == "0" and rows["VIC"]["through"] == "300" and rows["HPG"]["through"] == "0"
+    assert [r["symbol"] for r in out["rows"]] == ["FPT", "HPG", "VIC"]
+    assert out["base"] == "5500" and out["unvalued"] == ["GONE"]  # a fund without a NAV is left out, not valued at cost
+    assert out["covered"] == {"DCDS": {"as_of": "2026-10", "stocks": "15", "bonds": "0"}, "VIBF": {"as_of": "2026-09", "stocks": "20", "bonds": "14"}}
+
+
+def test_held_funds_holding_a_stock():
+    from investment_agent.domain.fund_board import funds_holding
+    out = funds_holding("FPT", [bond("a", "DCDS", 30), bond("b", "VFF", 10)], NAVS, HOLD)
+    assert out == [{"code": "DCDS", "name": "Quỹ cổ phiếu A", "percent": "5", "as_of": "2026-10", "amount": "150"}]

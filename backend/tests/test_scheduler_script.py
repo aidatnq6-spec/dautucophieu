@@ -65,6 +65,11 @@ def test_fund_navs_are_synced_on_every_wake_up():
     assert any("investment_agent.cli fund-nav-sync" in l for l in lines())
 
 
+def test_fund_holdings_are_synced_after_the_navs():
+    ls = lines()
+    assert next(i for i, l in enumerate(ls) if "cli fund-nav-sync" in l) < next(i for i, l in enumerate(ls) if "cli fund-holdings-sync" in l)
+
+
 def test_gold_prices_are_synced_on_every_wake_up():
     assert any("investment_agent.cli gold-price-sync" in l for l in lines())
 

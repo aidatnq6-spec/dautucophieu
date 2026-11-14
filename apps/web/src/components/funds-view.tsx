@@ -10,7 +10,9 @@ export type Fund = { code: string; name: string; kind: Kind | null; manager: str
   returns: Returns | null; held: boolean; beats_deposit: boolean | null; rank?: { m6: Place; m12: Place }; run_up?: boolean | null };
 type Group = { kind: Kind | "unknown"; value: string; share: string; funds: string[] };
 type Mine = { groups: Group[]; total: string; fund_count: number; at_cost: string[]; notes: ("fewer_than_3" | "single_kind")[] };
-type Board = { funds: Fund[]; counts: Record<Kind, number>;
+type ThroughRow = { symbol: string; direct: string; through: string; total: string; share: string | null; funds: { code: string; percent: string }[] };
+type Through = { rows: ThroughRow[]; base: string; unvalued: string[]; unpriced: string[]; covered: Record<string, { as_of: string | null; stocks: string; bonds: string }> };
+type Board = { funds: Fund[]; counts: Record<Kind, number>; through?: Through;
   benchmark: { vnindex: { as_of: string | null; ytd: string | null; m12: string | null; m36: string | null; m60: string | null }; deposit_12m: string | null };
   mine: Mine; source: { name: string; fetched_at: string } | null; history_days: Record<string, number> };
 
@@ -88,6 +90,56 @@ function MineSection({ mine }: { mine: Mine }) {
   );
 }
 
+const month = (ym: string | null) => (ym ? `${ym.slice(5, 7)}/${ym.slice(0, 4)}` : "—");
+
+/** Which published holdings of the owner's funds were counted: "DCDS 10/2026 (10 mã lớn nhất, 55,7% NAV)". */
+export function coveredText(covered: Through["covered"]): string {
+  return Object.entries(covered).map(([code, c]) => `${code} ${month(c.as_of)}: cổ phiếu công bố ${formatDecimal(c.stocks, 1)}% NAV`
+    + (Number(c.bonds) > 0 ? `, trái phiếu ${formatDecimal(c.bonds, 1)}%` : "")).join("; ");
+}
+
+function ThroughSection({ through }: { through: Through }) {
+  const viaFunds = through.rows.filter((r) => Number(r.through) > 0);
+  return (
+    <section className="surface" aria-label="Cổ phiếu bạn nắm qua quỹ">
+      <h2>Cổ phiếu bạn nắm qua quỹ</h2>
+      {viaFunds.length === 0 ? <p className="muted">Chưa có: các quỹ bạn giữ chưa có danh mục công bố, hoặc Sổ tài sản chưa có dòng quỹ.</p> : <>
+        <table className="fv-table" aria-label="Cổ phiếu trực tiếp và qua quỹ">
+          <thead><tr><th>Mã</th><th className="num">Nắm trực tiếp</th><th className="num">Qua quỹ</th><th className="num">Cộng</th>
+            <th className="num">Tỷ trọng</th><th>Quỹ đang nắm (% NAV)</th></tr></thead>
+          <tbody>{through.rows.map((r) => <tr key={r.symbol}>
+            <td data-label="Mã"><strong>{r.symbol}</strong></td>
+            <td className="num" data-label="Nắm trực tiếp">{formatVnd(r.direct)}</td>
+            <td className="num" data-label="Qua quỹ">{formatVnd(r.through)}</td>
+            <td className="num" data-label="Cộng">{formatVnd(r.total)}</td>
+            <td className="num" data-label="Tỷ trọng">{r.share === null ? "—" : formatRatio(r.share, 1)}</td>
+            <td data-label="Quỹ đang nắm">{r.funds.map((f) => `${f.code} ${formatDecimal(f.percent, 2)}%`).join(", ") || "—"}</td></tr>)}</tbody>
+        </table>
+        <p className="caption">Tỷ trọng trên tổng cổ phiếu nắm trực tiếp và giá trị các quỹ ({formatVnd(through.base)}). Qua quỹ = giá trị quỹ × tỷ trọng mã đó trong
+          NAV theo danh mục công bố. Chỉ tính các mã lớn nhất mỗi quỹ công bố trên Fmarket ({coveredText(through.covered)}); phần còn lại của quỹ chưa biết nên
+          không cộng.{through.unvalued.length ? ` Chưa có NAV, không tính: ${through.unvalued.join(", ")}.` : ""}{through.unpriced.length
+            ? ` Chưa có giá, không tính phần trực tiếp: ${through.unpriced.join(", ")}.` : ""}</p>
+      </>}
+    </section>
+  );
+}
+
+/** Qua quỹ bạn giữ, on a stock's page: the owner's funds whose published holdings include it. */
+export function FundsHoldingStock({ symbol }: { symbol: string }) {
+  const [view, setView] = useState<{ funds: { code: string; name: string; percent: string; as_of: string | null; amount: string }[]; fund_rows: number } | null>(null);
+  useEffect(() => { api<NonNullable<typeof view>>(`funds/holding/${encodeURIComponent(symbol)}`).then(setView, () => setView(null)); }, [symbol]);
+  if (!view || view.fund_rows === 0) return null;
+  return (
+    <section className="surface" aria-label="Qua quỹ bạn giữ">
+      <h2>Qua quỹ bạn giữ</h2>
+      {view.funds.length === 0 ? <p className="muted">Không quỹ nào bạn giữ có {symbol} trong danh mục công bố (các mã lớn nhất mỗi quỹ).</p>
+        : <ul>{view.funds.map((f) => <li key={f.code}><strong>{f.code}</strong> ({f.name}): {symbol} chiếm {formatDecimal(f.percent, 2)}% NAV kỳ {month(f.as_of)},
+          tương ứng khoảng {formatVnd(f.amount)} trong phần quỹ của bạn.</li>)}</ul>}
+      <p className="caption">Theo danh mục quỹ công bố trên Fmarket, chỉ gồm các mã lớn nhất; xem tổng ở trang Quỹ mở.</p>
+    </section>
+  );
+}
+
 function BuyCheckSection({ funds }: { funds: Fund[] }) {
   const [code, setCode] = useState("");
   const fund = funds.find((f) => f.code === code);
@@ -118,6 +170,7 @@ export function FundsView() {
   return (
     <>
       <MineSection mine={board.mine} />
+      {board.through && <ThroughSection through={board.through} />}
       <BuyCheckSection funds={board.funds} />
       <section className="surface" aria-label="Bảng quỹ mở">
         <h2>Bảng quỹ mở</h2>

@@ -27,7 +27,7 @@ export function radarAxes(s: RadarSources): Axis[] {
     { id: "savings", label: "Tỷ lệ tiết kiệm", value: c ? cap(Number(c.rate) / Number(c.target)) : null, actual: c ? formatRatio(c.rate, 0) : "—",
       need: c ? `≥ ${formatRatio(c.target, 0)} (bằng tuổi)` : "nhập thu chi" },
     { id: "reserve", label: "Quỹ dự phòng", value: liq && Number(liq.reserve) > 0 ? cap(Number(liq.now) / Number(liq.reserve)) : null,
-      actual: liq ? formatVnd(liq.now) : "—", need: liq ? formatVnd(liq.reserve) : "nhập Sổ tài sản" },
+      actual: liq ? formatVnd(liq.now) : "—", need: liq ? (Number(liq.reserve) > 0 ? formatVnd(liq.reserve) : "chưa đặt quỹ dự phòng") : "nhập Sổ tài sản" },
     { id: "spread", label: "Đa dạng hóa", value: top === null || !s.conc ? null : top <= Number(s.conc.limit) ? 1 : cap(Number(s.conc.limit) / top),
       actual: top === null ? "—" : `mã lớn nhất ${formatRatio(String(top), 0)}`, need: s.conc ? `≤ ${formatRatio(s.conc.limit, 0)} mỗi mã` : "—" },
     { id: "pyramid", label: "Tháp tài sản", value: ranged.length ? ranged.filter((l) => l.status === "ok").length / ranged.length : null,
@@ -42,6 +42,14 @@ export function radarAxes(s: RadarSources): Axis[] {
 }
 
 /** The two measures furthest from what is needed, among those with figures. */
+/** A long axis name on two lines, split at the space nearest its middle. */
+export function axisLines(label: string): string[] {
+  if (label.length <= 14) return [label];
+  const mid = label.length / 2;
+  const cut = [...label].map((ch, i) => (ch === " " ? i : -1)).filter((i) => i > 0).sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid))[0];
+  return cut ? [label.slice(0, cut), label.slice(cut + 1)] : [label];
+}
+
 export function bottlenecks(axes: Axis[]): Axis[] {
   return axes.filter((a) => a.value !== null && a.value < 1).sort((a, b) => a.value! - b.value!).slice(0, 2);
 }
@@ -60,8 +68,8 @@ export function HealthRadar() {
     return () => { live = false; };
   }, []);
   const axes = s ? radarAxes(s) : [];
-  const R = 150, C = 200, n = axes.length || 1;
-  const at = (i: number, v: number) => [C + R * v * Math.sin((2 * Math.PI * i) / n), C - R * v * Math.cos((2 * Math.PI * i) / n)];
+  const R = 140, CX = 260, CY = 215, n = axes.length || 1;
+  const at = (i: number, v: number) => [CX + R * v * Math.sin((2 * Math.PI * i) / n), CY - R * v * Math.cos((2 * Math.PI * i) / n)];
   const known = axes.map((a, i) => (a.value === null ? null : at(i, a.value))).filter(Boolean) as number[][];
   const narrow = bottlenecks(axes);
   return (
@@ -69,11 +77,15 @@ export function HealthRadar() {
       <h2>Radar sức khỏe tài chính</h2>
       {!s ? <p className="muted fx-loading" role="status">Đang tải…</p> : <>
         <div className="hr-wrap">
-          <svg className="hr-plot" viewBox="0 0 400 400" role="img" aria-label={`Radar ${axes.filter((a) => a.value !== null).length} trên ${axes.length} yếu tố có số`}>
+          <svg className="hr-plot" viewBox="0 0 520 430" role="img" aria-label={`Radar ${axes.filter((a) => a.value !== null).length} trên ${axes.length} yếu tố có số`}>
             {[0.25, 0.5, 0.75, 1].map((r) => <polygon key={r} className={r === 1 ? "hr-ring hr-full" : "hr-ring"}
               points={axes.map((_, i) => at(i, r).join(",")).join(" ")} />)}
-            {axes.map((a, i) => { const [x, y] = at(i, 1.12); return <g key={a.id}><line x1={C} y1={C} x2={at(i, 1)[0]} y2={at(i, 1)[1]} className="hr-ring" />
-              <text x={x} y={y} textAnchor={Math.abs(x - C) < 10 ? "middle" : x > C ? "start" : "end"} className={a.value === null ? "hr-axis hr-none" : "hr-axis"}>{a.label}</text></g>; })}
+            {axes.map((a, i) => { const [x, y] = at(i, 1.14), lines = axisLines(a.label);
+              const anchor = Math.abs(x - CX) < 12 ? "middle" : x > CX ? "start" : "end", top = y - (lines.length - 1) * 7 + (y > CY ? 8 : 0);
+              return <g key={a.id}><line x1={CX} y1={CY} x2={at(i, 1)[0]} y2={at(i, 1)[1]} className="hr-ring" />
+                <text x={x} y={top} textAnchor={anchor} className={a.value === null ? "hr-axis hr-none" : "hr-axis"}>
+                  {lines.map((l, k) => <tspan key={k} x={x} dy={k ? 14 : 0}>{l}</tspan>)}
+                  {a.value !== null && <tspan x={x} dy={14} className="hr-val">{Math.round(a.value * 100)}%</tspan>}</text></g>; })}
             {known.length >= 3 && <polygon className="hr-area" points={known.map((p) => p.join(",")).join(" ")} />}
             {axes.map((a, i) => a.value === null ? null : <circle key={a.id} cx={at(i, a.value)[0]} cy={at(i, a.value)[1]} r={4} className="hr-dot" />)}
           </svg>

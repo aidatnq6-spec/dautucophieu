@@ -104,6 +104,22 @@ def brief_problem(lines: list[str], calendar, *, now: datetime) -> dict | None:
     return {"id": f"brief:{day.isoformat()}", "label": "Bản tin sau phiên", "detail": detail}
 
 
+INDEX_SERIES = ("VNINDEX", "VN30")
+INDEX_FLOOR = 100  # neither index has closed below 100 points; a lower stored close is in another unit (thousand points before 10/2022)
+
+
+def index_unit_problems(data_dir: Path) -> list[dict]:
+    """An index series holding closes below 100 points: ratios across it are wrong until it is rebuilt (cli index-closes-rebuild)."""
+    out = []
+    store = SeriesStore(Path(data_dir) / "trend-sources")
+    for index in INDEX_SERIES:
+        low = [t for t, v in store.points(f"{index}-1d") if float(v) < INDEX_FLOOR]
+        if low:
+            out.append({"id": f"index_units:{index}", "label": f"Lịch sử {index}",
+                        "detail": f"{len(low)} phiên (đến {low[-1][8:10]}/{low[-1][5:7]}/{low[-1][:4]}) lưu theo nghìn điểm: chạy index-closes-rebuild"})
+    return out
+
+
 def health_report(data_dir: Path, *, now: datetime, calendar=None) -> dict:
     data_dir = Path(data_dir)
     root = data_dir.parent
@@ -127,6 +143,7 @@ def health_report(data_dir: Path, *, now: datetime, calendar=None) -> dict:
         problems.append({"id": "after-close", "label": "Lịch sau phiên", "detail": "chưa thấy lượt chạy nào trong nhật ký"})
     elif now - last_finish > timedelta(days=AFTER_CLOSE_MAX_DAYS):
         problems.append({"id": "after-close", "label": "Lịch sau phiên", "detail": f"lượt chạy xong gần nhất là {_dmy(last_finish)}"})
+    problems.extend(index_unit_problems(data_dir))
     if calendar is not None and lines is not None:
         brief = brief_problem(lines, calendar, now=now)
         if brief:

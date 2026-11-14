@@ -33,6 +33,13 @@ class SeriesStore:
         path = self._path(key)
         return [tuple(p) for p in json.loads(path.read_text(encoding="utf-8"))["points"]] if path.is_file() else []
 
+    def replace(self, key: str, points: list[tuple[datetime, str]]) -> None:
+        """The series becomes exactly these points (a rebuild from new sources); upsert keeps old days the new points lack."""
+        path = self._path(key)
+        if path.is_file():
+            path.unlink()
+        self.upsert(key, points)
+
     def upsert(self, key: str, points: list[tuple[datetime, str]], *, keep: int = 9000) -> None:  # ~36 years of sessions (full history for drawdowns)
         path = self._path(key)
         merged = {t: v for t, v in (json.loads(path.read_text(encoding="utf-8"))["points"] if path.is_file() else [])}

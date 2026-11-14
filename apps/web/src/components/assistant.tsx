@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Bot, Send, X } from "lucide-react";
+import { Send, X } from "lucide-react";
+import { Mascot } from "./mascot";
 import { api } from "../lib/api";
 import { formatRatio, formatVnd } from "../lib/format";
 import { type Intent, parse } from "../lib/assistant";
@@ -134,9 +135,9 @@ export function Assistant() {
   return (
     <>
       <button type="button" className="as-fab" aria-label={open ? "Đóng trợ lý" : "Mở trợ lý"} title="Trợ lý" onClick={() => setOpen(!open)}>
-        {open ? <X size={22} aria-hidden="true" /> : <Bot size={24} aria-hidden="true" />}</button>
+        {open ? <X size={22} aria-hidden="true" /> : <Mascot size={58} />}</button>
       {open && <section className="as-panel" role="dialog" aria-label="Trợ lý">
-        <header className="as-head"><Bot size={20} aria-hidden="true" /><div><strong>Trợ lý</strong><span className="caption">trên máy bạn · không dùng AI</span></div>
+        <header className="as-head"><Mascot size={34} blink={false} /><div><strong>Trợ lý</strong><span className="caption">trên máy bạn · không dùng AI</span></div>
           <button type="button" className="btn as-x" aria-label="Đóng trợ lý" onClick={() => setOpen(false)}><X size={16} aria-hidden="true" /></button></header>
         <div className="as-body">
           {messages.map((m, i) => m.from === "me" ? <p key={i} className="as-me">{m.text}</p> : <div key={i} className="as-bot">

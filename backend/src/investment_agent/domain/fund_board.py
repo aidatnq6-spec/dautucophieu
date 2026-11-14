@@ -15,6 +15,9 @@ from .deposit_book import Bond
 KINDS = ("STOCK", "BALANCED", "BOND")
 PERIODS = {"m12": 1, "m36": 3, "m60": 5}  # years back
 FEW_FUNDS = 3
+# VN-Index began at 100 in 2000 and has not closed below it since; the stored series before 10/2022 is in thousand points rounded to
+# 0.01 (1.47 for about 1,470), too coarse to rescale, so a period starting on such a close stays blank.
+INDEX_FLOOR = Decimal(100)
 
 
 def _s(value: Decimal) -> str:
@@ -42,7 +45,8 @@ def index_returns(points: list[tuple[str, str]]) -> dict:
     def on_or_before(day: date) -> Decimal | None:
         if closes[0][0] > day:
             return None
-        return next(v for d, v in reversed(closes) if d <= day)
+        value = next(v for d, v in reversed(closes) if d <= day)
+        return value if value >= INDEX_FLOOR else None
     start_ytd = on_or_before(date(last_day.year - 1, 12, 31))
     out = {"as_of": last_day.isoformat(), "ytd": _pct(last, start_ytd) if start_ytd else None}
     for key, years in PERIODS.items():

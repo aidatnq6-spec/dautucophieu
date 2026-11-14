@@ -62,3 +62,9 @@ def test_composition_notes_too_few_funds_and_a_single_kind():
     out = composition([bond("a", "VFF", 10)], NAVS, PROFILES)
     assert out["notes"] == ["fewer_than_3", "single_kind"] and out["groups"][0]["share"] == "1"
     assert composition([], NAVS, PROFILES) == {"groups": [], "total": "0", "fund_count": 0, "at_cost": [], "notes": []}
+
+
+def test_a_period_starting_on_a_close_in_another_unit_stays_blank():
+    # The stored series before 10/2022 is in thousand points rounded to 0.01 (1.47 for about 1,470): not rescaled, left out.
+    out = index_returns([("2021-11-12T00:00:00", "1.47"), ("2023-11-13T00:00:00", "1100"), ("2026-11-13T00:00:00", "1734.93")])
+    assert out["m60"] is None and out["m36"] == "57.72"

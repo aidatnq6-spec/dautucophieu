@@ -65,3 +65,26 @@ def test_the_book_is_read_as_it_stood_at_a_moment(tmp_path):
     repo, owner = c.app.state.personal_repository, OwnerContext(uid="owner-1", role="owner", correlation_id="t")
     assert book_at(repo, owner, datetime.now(timezone.utc) - timedelta(days=1)) is None  # saved just now: not yet a day ago
     assert len(book_at(repo, owner, datetime.now(timezone.utc) + timedelta(minutes=1)).deposits) == 2
+
+
+
+def test_the_book_at_a_moment_is_found_by_halving_not_by_reading_every_revision(tmp_path):
+    from datetime import timedelta, timezone
+
+    from investment_agent.api.auth import OwnerContext
+    from investment_agent.services.deposit_book import book_at
+    c, clock = client(tmp_path)
+    for i in range(20):
+        save_book(c, clock, version=i, rid=f"many{i}", reserve=str(1000000 * (i + 1)))
+    repo, owner = c.app.state.personal_repository, OwnerContext(uid="owner-1", role="owner", correlation_id="t")
+    store_reads = []
+    original = repo.read
+
+    def counting(*args, **kwargs):
+        store_reads.append(kwargs.get("version"))
+        return original(*args, **kwargs)
+    repo.read = counting
+    later = book_at(repo, owner, datetime.now(timezone.utc) + timedelta(minutes=1))
+    assert later.reserve == 20000000 and len(store_reads) == 1  # the head is already the answer
+    store_reads.clear()
+    assert book_at(repo, owner, datetime.now(timezone.utc) - timedelta(days=1)) is None and len(store_reads) <= 6  # 20 revisions: about log2(20)

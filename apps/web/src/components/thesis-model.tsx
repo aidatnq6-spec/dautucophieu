@@ -2,17 +2,20 @@
 import { useEffect, useState } from "react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatDecimal, formatRatio, formatVnd } from "../lib/format";
+import { type Catalyst, type Question, ThesisCatalysts, ThesisQuestions } from "./thesis-questions";
 
 type Name = "bad" | "base" | "good";
 type Scenario = { name: Name; price: string; prob: string; note: string };
 type Tier = "lead" | "coincident" | "lag" | "valuation";
 export type Indicator = { id: string; name: string; tier: Tier; unit: string; bad: string; base: string; good: string; lower_better: boolean; source: string;
   readings: { period: string; value: string }[] };
-type Model = { scenarios: Scenario[]; review: { when: string; on: string | null }; indicators: Indicator[] };
+type Model = { scenarios: Scenario[]; review: { when: string; on: string | null }; indicators: Indicator[]; questions: Record<string, Question>;
+  catalysts: Catalyst[]; stage: "draft" | "reviewed"; updated_on: string | null };
 type Row = Indicator & { current: string | null; period: string | null; grade: "good" | "watch" | "bad" | null };
 type View = { symbol: string; version: number; model: Model; close: string | null; close_date: string | null;
   scenarios: { rows: (Scenario & { upside: string | null })[]; expected: string | null; upside: string | null; review: Model["review"]; review_due: boolean } | null;
-  indicators: Row[]; lights: Record<"good" | "watch" | "bad" | "none", number>; auto_metrics: Record<string, { label: string; unit: string }> };
+  indicators: Row[]; lights: Record<"good" | "watch" | "bad" | "none", number>; auto_metrics: Record<string, { label: string; unit: string }>;
+  catalysts_due: string[]; updated_on: string | null };
 
 const SCEN_LABEL: Record<Name, string> = { bad: "Xấu", base: "Cơ sở", good: "Tốt" };
 const TIER: Record<Tier, string> = { lead: "Dẫn", coincident: "Đồng hành", lag: "Sau", valuation: "Định giá" };
@@ -67,6 +70,8 @@ export function ThesisModel({ symbol }: { symbol: string }) {
       </div>
       {s?.review_due && <p className="notice" role="note">Đến ngày xem lại kịch bản: {s.review.when || s.review.on}.</p>}
 
+      {view.updated_on && <p className="caption">Cập nhật {view.updated_on.split("-").reverse().join("/")}.</p>}
+      <ThesisQuestions model={model} save={save} busy={busy} />
       <h3>Ba kịch bản</h3>
       <table className="fv-table" aria-label="Ba kịch bản">
         <thead><tr><th>Kịch bản</th><th className="num">Giá (đ/CP)</th><th className="num">Xác suất</th><th className="num">So giá hiện tại</th><th>Giả định</th></tr></thead>
@@ -117,6 +122,7 @@ export function ThesisModel({ symbol }: { symbol: string }) {
               onClick={() => { if (window.confirm(`Xóa chỉ báo ${r.name}?`)) void save({ ...model, indicators: model.indicators.filter((x) => x.id !== r.id) }); }}>Xóa</button>
           </div></td></tr>)}</tbody>
       </table>}
+      <ThesisCatalysts model={model} save={save} busy={busy} due={view.catalysts_due} />
       {adding ? <form className="formgrid" aria-label="Thêm chỉ báo" onSubmit={(e) => { e.preventDefault(); void save({ ...model, indicators: [...model.indicators,
         { ...adding, bad: dec(adding.bad), base: dec(adding.base), good: dec(adding.good) }] }); }}>
         <label className="field">Nguồn<select aria-label="Nguồn chỉ báo" value={adding.source} onChange={(e) => {

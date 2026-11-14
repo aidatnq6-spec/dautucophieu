@@ -216,6 +216,11 @@ legend{font-weight:600;padding:0 6px}
 /* Kịch bản và chỉ báo luận điểm */
 .tm-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px}
 .tm-tiles>div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}.tm-tiles strong{font-size:18px}
+/* Sáu câu hỏi, chỗ trống, mốc */
+.tq-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-bottom:12px}.tq-card{border:1px solid var(--line);border-radius:8px;padding:10px;min-width:0}
+.tq-summary{font-weight:600;margin:6px 0}.tq-points{margin:4px 0 6px;padding-left:18px;font-size:13px}.tq-gaps{margin-top:8px;border-top:1px dashed var(--line);padding-top:6px}
+.tq-gap{display:flex;gap:6px;align-items:center;font-size:13px;margin:3px 0;overflow-wrap:anywhere}.tq-gap.done{color:var(--muted);text-decoration:line-through}
+.tq-x{padding:0 6px;margin-left:auto}.tq-ref{max-width:90px}.tq-done td{color:var(--muted)}
 .fd-stock{background:var(--op2)}.fd-balanced{background:var(--op4)}.fd-bond{background:var(--op3)}.fd-unknown{background:var(--vc-unknown)}
 /* Dự án và điểm rơi lợi nhuận: one bar per year, scaled to the largest year. */
 .pp-years{display:grid;gap:6px;margin:4px 0 14px}.pp-year{display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;gap:10px;align-items:center}

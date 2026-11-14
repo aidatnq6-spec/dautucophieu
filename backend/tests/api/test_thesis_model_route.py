@@ -44,3 +44,16 @@ def test_scenarios_and_indicators_are_saved_and_graded_with_the_published_figure
     assert out == {"status": "ok", "lines": 2, "sent": True} and "Hiệu suất 59 % (2026-Q3) chạm mức Xấu 60.1" in sent[0] and "xem lại kịch bản" in sent[0]
     again = check_lights(c.app.state.personal_repository, owner, tmp_path, send=lambda t: sent.append(t) or True, today=date(2027, 1, 15), request_id="lights2")
     assert again["sent"] is False and len(sent) == 1  # each once
+
+
+
+def test_questions_and_catalysts_are_saved_with_the_day_and_a_due_catalyst_is_sent_once(tmp_path):
+    c, clock = setup(tmp_path)
+    body = call(c, clock, "PUT", "/internal/stock/PHP/model", {"scenarios": [], "indicators": [], "stage": "draft",
+        "questions": {"business": {"status": "good", "summary": "Tiền thuê chắc chắn", "gaps": [{"id": "g1", "text": "TEU quý từng cảng", "ref": "PHP-01"}]}},
+        "catalysts": [{"id": "c1", "when": "Q4/2026", "on": "2027-01-10", "sign": "+", "text": "Bàn giao hạ tầng đợt 3", "source": "ĐHĐCĐ"}],
+        "expected_version": 0, "request_id": "q1"}).json()
+    assert body["gaps"] == {"open": 1, "total": 1} and body["updated_on"] == "2027-01-15" and body["catalysts_due"] == ["c1"]
+    owner, sent = OwnerContext(uid="owner-1", role="owner", correlation_id="t"), []
+    out = check_lights(c.app.state.personal_repository, owner, tmp_path, send=lambda t: sent.append(t) or True, today=date(2027, 1, 15), request_id="cat1")
+    assert out["sent"] is True and "đến mốc Q4/2026 (+) Bàn giao hạ tầng đợt 3" in sent[0]

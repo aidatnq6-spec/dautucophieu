@@ -68,6 +68,10 @@ def check_lights(repo, owner, data_dir, *, send, today: date, request_id: str) -
             if i["grade"] == "bad" and mine.get(i["id"]) != i["period"]:
                 lines.append(f"• {symbol}: {i['name']} {i['current']} {i['unit']} ({i['period']}) chạm mức Xấu {i['bad']}")
                 mine[i["id"]] = i["period"]
+        for c in view["catalysts"]:
+            if c["id"] in view["catalysts_due"] and mine.get(f"_c_{c['id']}") != c["on"]:
+                lines.append(f"• {symbol}: đến mốc {c['when'] or c['on']} ({c['sign']}) {c['text']}")
+                mine[f"_c_{c['id']}"] = c["on"]
         s = view["scenarios"]
         if s and s["review_due"] and mine.get("_review") != s["review"]["on"]:
             lines.append(f"• {symbol}: đến ngày xem lại kịch bản ({s['review']['when'] or s['review']['on']})")

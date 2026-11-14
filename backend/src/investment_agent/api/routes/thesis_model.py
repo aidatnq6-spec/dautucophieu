@@ -19,13 +19,17 @@ from .common import WRITE_ERRORS, error, now, unavailable, write_error
 router = APIRouter(prefix="/internal")
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
 _SYMBOL = re.compile(r"^[A-Z0-9]{3,10}$")
-EMPTY = {"scenarios": [], "review": {"when": "", "on": None}, "indicators": []}
+EMPTY = {"scenarios": [], "review": {"when": "", "on": None}, "indicators": [], "questions": {}, "catalysts": [], "stage": "draft", "updated_on": None}
 
 
 class ModelRequest(ContractModel):
     scenarios: list[dict] = Field(max_length=3)
     review: dict | None = None
     indicators: list[dict] = Field(max_length=15)
+    questions: dict | None = None
+    catalysts: list[dict] = Field(default_factory=list, max_length=20)
+    stage: str | None = Field(default=None, max_length=10)
+    updated_on: str | None = Field(default=None, max_length=10)  # sent back as read; the server sets the day itself
     expected_version: int = Field(strict=True, ge=0)
     request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
 
@@ -63,9 +67,12 @@ def put_model(symbol: str, request: Request, body: ModelRequest):
     if not (sym := _watched(request, symbol)):
         return error(404, "symbol_not_watched", "Mã này không có trong danh sách theo dõi.")
     try:
-        model = validate_model({"scenarios": body.scenarios, "review": body.review, "indicators": body.indicators})
+        model = validate_model({"scenarios": body.scenarios, "review": body.review, "indicators": body.indicators, "questions": body.questions,
+                                "catalysts": body.catalysts, "stage": body.stage, "updated_on": now(request).astimezone(VN).date().isoformat()})
         models, _ = read_models(repo, owner)
-        models = {**models, sym: model} if (model["scenarios"] or model["indicators"] or model["review"]["when"]) else {k: v for k, v in models.items() if k != sym}
+        written = any(q["status"] or q["summary"] or q["points"] or q["gaps"] for q in model["questions"].values())
+        keep = model["scenarios"] or model["indicators"] or model["review"]["when"] or model["catalysts"] or written
+        models = {**models, sym: model} if keep else {k: v for k, v in models.items() if k != sym}
         record = repo.write(owner, *RECORD, {"models": models}, expected_version=body.expected_version, request_id=body.request_id)
         return _view(request, sym, models, record.version)
     except ModelError as exc:

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mineNotes, returnText } from "./funds-view";
+import { mineNotes, returnText, runUpCheck } from "./funds-view";
 
 describe("returnText", () => {
   it("shows a percentage return with its sign, and a dash when the source has none", () => {
@@ -18,5 +18,20 @@ describe("mineNotes", () => {
       "Toàn bộ nằm trong một nhóm (Trái phiếu): chưa có nhóm khác để cân lại khi thị trường đổi chiều.",
       "Chưa có NAV của GONE: tính theo vốn đã mua và chưa rõ nhóm."]);
     expect(mineNotes({ groups: [], total: "0", fund_count: 0, at_cost: [], notes: [] })).toEqual([]);
+  });
+});
+
+describe("runUpCheck", () => {
+  const base = { code: "DCDS", name: "Quỹ", kind: "STOCK" as const, manager: null, fee: null, nav: "100", date: "2026-11-13", held: false, beats_deposit: null,
+    returns: { ytd: null, m1: null, m3: null, m6: "21.5", m12: "30.2", m36: null, m60: null, annual36: null } };
+  it("places the fund in its kind and warns when its six months are in the top quarter", () => {
+    const warn = runUpCheck({ ...base, rank: { m6: { rank: 2, of: 35 }, m12: { rank: 5, of: 30 } }, run_up: true });
+    expect(warn.warn).toBe(true);
+    expect(warn.text).toContain("DCDS 6 tháng +21,50%, cao thứ 2/35 quỹ cổ phiếu; 12 tháng +30,20%, cao thứ 5/30 quỹ cổ phiếu (NAV ngày 13/11/2026).");
+    expect(warn.text).toContain("Quỹ vừa tăng mạnh");
+    expect(runUpCheck({ ...base, rank: { m6: { rank: 20, of: 35 }, m12: null }, run_up: false }).warn).toBe(false);
+  });
+  it("says it cannot check a fund without returns", () => {
+    expect(runUpCheck({ ...base, returns: null, run_up: null }).text).toContain("chưa kiểm tra được");
   });
 });

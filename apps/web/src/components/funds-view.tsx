@@ -5,8 +5,9 @@ import { formatDecimal, formatRatio, formatVnd } from "../lib/format";
 
 export type Kind = "STOCK" | "BALANCED" | "BOND";
 type Returns = { ytd: string | null; m1: string | null; m3: string | null; m6: string | null; m12: string | null; m36: string | null; m60: string | null; annual36: string | null };
-type Fund = { code: string; name: string; kind: Kind | null; manager: string | null; fee: string | null; nav: string; date: string;
-  returns: Returns | null; held: boolean; beats_deposit: boolean | null };
+type Place = { rank: number; of: number } | null;
+export type Fund = { code: string; name: string; kind: Kind | null; manager: string | null; fee: string | null; nav: string; date: string;
+  returns: Returns | null; held: boolean; beats_deposit: boolean | null; rank?: { m6: Place; m12: Place }; run_up?: boolean | null };
 type Group = { kind: Kind | "unknown"; value: string; share: string; funds: string[] };
 type Mine = { groups: Group[]; total: string; fund_count: number; at_cost: string[]; notes: ("fewer_than_3" | "single_kind")[] };
 type Board = { funds: Fund[]; counts: Record<Kind, number>;
@@ -38,6 +39,31 @@ export function mineNotes(mine: Mine): string[] {
   return out;
 }
 
+/** Kiểm tra mua đỉnh: how far the fund rose over 6 and 12 months and where that puts it among the funds of its kind. */
+export function runUpCheck(f: Fund): { text: string; warn: boolean } {
+  const kind = f.kind ? `quỹ ${KIND_LABEL[f.kind].toLowerCase()}` : "quỹ cùng nhóm";
+  const place = (p: Place) => (p ? `, cao thứ ${p.rank}/${p.of} ${kind}` : "");
+  const m6 = f.returns?.m6 ?? null, m12 = f.returns?.m12 ?? null;
+  if (m6 === null && m12 === null) return { text: `${f.code}: Fmarket chưa có lợi nhuận 6 và 12 tháng (quỹ mới hoặc thiếu số), chưa kiểm tra được.`, warn: false };
+  const text = `${f.code} 6 tháng ${returnText(m6)}${place(f.rank?.m6 ?? null)}; 12 tháng ${returnText(m12)}${place(f.rank?.m12 ?? null)} (NAV ngày ${day(f.date)}).`;
+  return f.run_up
+    ? { text: `${text} Quỹ vừa tăng mạnh: nằm trong nhóm một phần tư tăng nhiều nhất 6 tháng qua. Mua vì đã tăng dễ là mua đỉnh; hãy chắc lý do mua không chỉ là mức tăng này.`, warn: true }
+    : { text, warn: false };
+}
+
+let boardOnce: Promise<Board> | null = null;
+const loadBoard = () => (boardOnce ??= api<Board>("funds").catch((e) => { boardOnce = null; throw e; }));
+
+/** The check for one fund code, as typed in Sổ tài sản; nothing for a code Fmarket does not list. */
+export function FundCheck({ code }: { code: string }) {
+  const [board, setBoard] = useState<Board | null>(null);
+  useEffect(() => { loadBoard().then(setBoard, () => setBoard(null)); }, []);
+  const fund = board?.funds.find((f) => f.code === code.trim().toUpperCase());
+  if (!fund) return null;
+  const c = runUpCheck(fund);
+  return <p className={c.warn ? "notice" : "caption"} role="note" data-testid="fund-check">Kiểm tra mua đỉnh: {c.text}</p>;
+}
+
 function MineSection({ mine }: { mine: Mine }) {
   return (
     <section className="surface" aria-label="Quỹ của bạn theo nhóm">
@@ -62,6 +88,23 @@ function MineSection({ mine }: { mine: Mine }) {
   );
 }
 
+function BuyCheckSection({ funds }: { funds: Fund[] }) {
+  const [code, setCode] = useState("");
+  const fund = funds.find((f) => f.code === code);
+  const c = fund ? runUpCheck(fund) : null;
+  return (
+    <section className="surface" aria-label="Kiểm tra mua đỉnh">
+      <h2>Kiểm tra trước khi mua quỹ</h2>
+      <label className="field sv-pick">Quỹ định mua<select aria-label="Quỹ định mua" value={code} onChange={(e) => setCode(e.target.value)}>
+        <option value="">Chọn quỹ</option>
+        {funds.map((f) => <option key={f.code} value={f.code}>{f.code} · {f.name}</option>)}</select></label>
+      {c && <p className={c.warn ? "notice" : undefined} role="note" data-testid="fund-check">{c.text}</p>}
+      <p className="caption">So lợi nhuận 6 và 12 tháng của quỹ với các quỹ cùng nhóm. Cảnh báo khi 6 tháng qua quỹ tăng và nằm trong một phần tư đứng đầu nhóm.
+        Chỉ để nhìn lại, không chặn việc mua và không phải khuyến nghị.</p>
+    </section>
+  );
+}
+
 export function FundsView() {
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +118,7 @@ export function FundsView() {
   return (
     <>
       <MineSection mine={board.mine} />
+      <BuyCheckSection funds={board.funds} />
       <section className="surface" aria-label="Bảng quỹ mở">
         <h2>Bảng quỹ mở</h2>
         {board.funds.length === 0 ? <p className="muted">Chưa có số quỹ: lịch chạy sau phiên lấy NAV từ Fmarket lúc 08:30, 15:30 và 20:00.</p> : <>

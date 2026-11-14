@@ -23,3 +23,15 @@ test("Quỹ mở adds no sideways scroll at 375px", async ({ page }) => {
   await expect(page.getByRole("region", { name: "Bảng quỹ mở" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });
+
+test("Kiểm tra mua đỉnh places a fund among its kind, on Quỹ mở and while typing a fund row in Sổ tài sản", async ({ page }) => {
+  await page.goto("/funds");
+  const check = page.getByRole("region", { name: "Kiểm tra mua đỉnh" });
+  await check.getByRole("combobox", { name: "Quỹ định mua" }).selectOption("QCP");
+  await expect(check.getByTestId("fund-check")).toContainText("12 tháng +18,20%, cao thứ 1/1 quỹ cổ phiếu");
+  await page.goto("/profile?tab=tai-san");
+  const book = page.getByRole("region", { name: "Sổ tài sản" });
+  await book.getByRole("button", { name: "Thêm dòng trái phiếu" }).click();
+  await book.getByLabel("Mã quỹ").fill("qtp");
+  await expect(book.getByTestId("fund-check")).toContainText("QTP 6 tháng —; 12 tháng +3,90%, cao thứ 1/1 quỹ trái phiếu");
+});

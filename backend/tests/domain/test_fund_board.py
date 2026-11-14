@@ -31,7 +31,8 @@ def test_the_board_groups_funds_by_kind_best_year_first_and_marks_the_owners():
     assert stock == ["DCDS", "NEW"]  # a blank 12-month return goes last, not as zero
     vff = next(f for f in out["funds"] if f["code"] == "VFF")
     assert vff == {"code": "VFF", "name": "Quỹ trái phiếu B", "kind": "BOND", "manager": "M", "fee": "1.5", "nav": "20", "date": "2026-11-13",
-                   "returns": PROFILES["VFF"]["returns"], "held": True, "beats_deposit": True}
+                   "returns": PROFILES["VFF"]["returns"], "held": True, "beats_deposit": True,
+                   "rank": {"m6": None, "m12": {"rank": 1, "of": 1}}, "run_up": None}
     assert next(f for f in out["funds"] if f["code"] == "DCDS")["beats_deposit"] is False
     assert next(f for f in out["funds"] if f["code"] == "NEW")["beats_deposit"] is None
     assert out["counts"] == {"STOCK": 2, "BALANCED": 1, "BOND": 1}
@@ -68,3 +69,22 @@ def test_a_period_starting_on_a_close_in_another_unit_stays_blank():
     # The stored series before 10/2022 is in thousand points rounded to 0.01 (1.47 for about 1,470): not rescaled, left out.
     out = index_returns([("2021-11-12T00:00:00", "1.47"), ("2023-11-13T00:00:00", "1100"), ("2026-11-13T00:00:00", "1734.93")])
     assert out["m60"] is None and out["m36"] == "57.72"
+
+
+def test_each_fund_ranks_within_its_kind_and_a_top_quarter_six_months_is_a_run_up():
+    profiles = {f"S{i}": {"kind": "STOCK", "manager": None, "fee": None, "returns": {"ytd": None, "m1": None, "m3": None, "m6": str(10 - i),
+                                                                                  "m12": str(20 - i), "m36": None, "m60": None, "annual36": None}}
+                for i in range(8)}
+    profiles["S7"]["returns"]["m6"] = None
+    navs = {c: {"name": c, "nav": "10", "date": "2026-11-13"} for c in profiles}
+    funds = {f["code"]: f for f in fund_board(navs, profiles, index=[], deposit_rate=None, held=set())["funds"]}
+    assert funds["S0"]["rank"] == {"m6": {"rank": 1, "of": 7}, "m12": {"rank": 1, "of": 8}} and funds["S0"]["run_up"] is True
+    assert funds["S1"]["run_up"] is True and funds["S2"]["run_up"] is False  # top quarter of 7 is the first 2
+    assert funds["S7"]["rank"]["m6"] is None and funds["S7"]["run_up"] is None  # no 6-month return: nothing said
+
+
+def test_a_negative_six_months_is_never_a_run_up():
+    p = {"A": {"kind": "BOND", "manager": None, "fee": None, "returns": {"ytd": None, "m1": None, "m3": None, "m6": "-1", "m12": None, "m36": None,
+                                                                         "m60": None, "annual36": None}}}
+    f = fund_board({"A": {"name": "A", "nav": "1", "date": "2026-11-13"}}, p, index=[], deposit_rate=None, held=set())["funds"][0]
+    assert f["rank"]["m6"] == {"rank": 1, "of": 1} and f["run_up"] is False

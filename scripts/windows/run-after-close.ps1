@@ -42,6 +42,9 @@ $frs = & $python -W ignore -m investment_agent.cli financial-ratios-sync --data-
 # Chung chi quy theo NAV: every open-ended fund's NAV from Fmarket (one public call, names no fund).
 $fn = & $python -W ignore -m investment_agent.cli fund-nav-sync --data-dir $data 2>$null
 "$(Get-Date -Format o) fund-nav-sync exit=$LASTEXITCODE $fn" | Add-Content -LiteralPath $log -Encoding UTF8
+# Chi bao luan diem: one Telegram note for thesis indicators newly at their bad level and scenario reviews due.
+$tl = & $python -W ignore -m investment_agent.cli thesis-lights --data-dir $data 2>$null
+"$(Get-Date -Format o) thesis-lights exit=$LASTEXITCODE $tl" | Add-Content -LiteralPath $log -Encoding UTF8
 # Ke hoach giai ngan: one Telegram note for the planned tranches whose condition is now met (after the closes are stored).
 $bp = & $python -W ignore -m investment_agent.cli buy-plan-check --data-dir $data 2>$null
 "$(Get-Date -Format o) buy-plan-check exit=$LASTEXITCODE $bp" | Add-Content -LiteralPath $log -Encoding UTF8

@@ -121,3 +121,53 @@ def composition(bonds: list[Bond] | tuple[Bond, ...], navs: dict, profiles: dict
     count = len({f for m in members.values() for f in m})
     notes = [n for n, on in (("fewer_than_3", 0 < count < FEW_FUNDS), ("single_kind", len(groups) == 1)) if on]
     return {"groups": groups, "total": _s(total), "fund_count": count, "at_cost": sorted(at_cost), "notes": notes}
+
+
+def _fund_values(bonds, navs: dict) -> tuple[dict[str, Decimal], list[str]]:
+    values, unvalued = {}, set()
+    for b in bonds:
+        if b.fund is None:
+            continue
+        nav = navs.get(b.fund)
+        if nav is None:
+            unvalued.add(b.fund)
+            continue
+        values[b.fund] = values.get(b.fund, Decimal(0)) + (b.units * Decimal(nav["nav"])).quantize(Decimal(1), ROUND_HALF_UP)
+    return values, sorted(unvalued)
+
+
+def look_through(bonds, navs: dict, holdings: dict, *, direct: dict[str, Decimal]) -> dict:
+    """Each stock held directly or through the owner's funds: the direct market value, the part of each fund's value its published
+    holding stands for (value × % of NAV), their total and its share of base (stocks held directly + the funds' value). Only the
+    holdings Fmarket publishes (a fund's ten largest) count; a fund without a NAV is left out and named in unvalued."""
+    values, unvalued = _fund_values(bonds, navs)
+    through: dict[str, Decimal] = {}
+    funds: dict[str, list[dict]] = {}
+    for code, value in sorted(values.items()):
+        for s in (holdings.get(code) or {}).get("stocks", []):
+            through[s["symbol"]] = through.get(s["symbol"], Decimal(0)) + (value * Decimal(s["percent"]) / 100).quantize(Decimal(1), ROUND_HALF_UP)
+            funds.setdefault(s["symbol"], []).append({"code": code, "percent": s["percent"]})
+    base = sum(direct.values(), Decimal(0)) + sum(values.values(), Decimal(0))
+    rows = []
+    for symbol in set(direct) | set(through):
+        d, t = direct.get(symbol, Decimal(0)), through.get(symbol, Decimal(0))
+        rows.append({"symbol": symbol, "direct": _s(d), "through": _s(t), "total": _s(d + t),
+                     "share": _s(((d + t) / base).quantize(Decimal("0.0001"), ROUND_HALF_UP)) if base else None, "funds": funds.get(symbol, [])})
+    rows.sort(key=lambda r: (-Decimal(r["total"]), r["symbol"]))
+    covered = {code: {"as_of": h.get("as_of"), "stocks": _s(sum((Decimal(s["percent"]) for s in h.get("stocks", [])), Decimal(0))),
+                      "bonds": _s(sum((Decimal(b["percent"]) for b in h.get("bonds", [])), Decimal(0)))}
+               for code in sorted(values) if (h := holdings.get(code))}
+    return {"rows": rows, "base": _s(base), "unvalued": unvalued, "covered": covered}
+
+
+def funds_holding(symbol: str, bonds, navs: dict, holdings: dict) -> list[dict]:
+    """The owner's funds whose published holdings include symbol, with its % of NAV, the month and the part of the fund's value."""
+    values, _ = _fund_values(bonds, navs)
+    out = []
+    for code, value in sorted(values.items()):
+        h = holdings.get(code) or {}
+        line = next((s for s in h.get("stocks", []) if s["symbol"] == symbol.upper()), None)
+        if line:
+            out.append({"code": code, "name": navs[code]["name"], "percent": line["percent"], "as_of": h.get("as_of"),
+                        "amount": _s((value * Decimal(line["percent"]) / 100).quantize(Decimal(1), ROUND_HALF_UP))})
+    return out

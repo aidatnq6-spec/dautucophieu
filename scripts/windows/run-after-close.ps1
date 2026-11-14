@@ -42,6 +42,9 @@ $frs = & $python -W ignore -m investment_agent.cli financial-ratios-sync --data-
 # Chung chi quy theo NAV: every open-ended fund's NAV from Fmarket (one public call, names no fund).
 $fn = & $python -W ignore -m investment_agent.cli fund-nav-sync --data-dir $data 2>$null
 "$(Get-Date -Format o) fund-nav-sync exit=$LASTEXITCODE $fn" | Add-Content -LiteralPath $log -Encoding UTF8
+# Danh muc cua quy: every fund's published top holdings (Fmarket); a fund is read again only when its month changes.
+$fh = & $python -W ignore -m investment_agent.cli fund-holdings-sync --data-dir $data 2>$null
+"$(Get-Date -Format o) fund-holdings-sync exit=$LASTEXITCODE $fh" | Add-Content -LiteralPath $log -Encoding UTF8
 # Vang theo gia Phu Quy: every kind's buying and selling price per chi from Phu Quy's home page (one public page).
 $gp = & $python -W ignore -m investment_agent.cli gold-price-sync --data-dir $data 2>$null
 "$(Get-Date -Format o) gold-price-sync exit=$LASTEXITCODE $gp" | Add-Content -LiteralPath $log -Encoding UTF8

@@ -15,6 +15,7 @@ test("Quỹ mở lists the funds by kind with their returns, and an empty split 
   await expect(table.getByRole("row", { name: /QCP/ })).toHaveCount(0);
   await expect(board.getByTestId("fund-benchmark")).toContainText("VN-Index");
   await expect(page.getByRole("region", { name: "Quỹ của bạn theo nhóm" })).toContainText("Chưa có dòng quỹ nào");
+  await expect(page.getByRole("region", { name: "Cổ phiếu bạn nắm qua quỹ" })).toContainText("Chưa có");  // the shared store has no fund row
 });
 
 test("Quỹ mở adds no sideways scroll at 375px", async ({ page }) => {

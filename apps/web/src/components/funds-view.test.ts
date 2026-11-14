@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mineNotes, returnText, runUpCheck } from "./funds-view";
+import { coveredText, mineNotes, returnText, runUpCheck } from "./funds-view";
 
 describe("returnText", () => {
   it("shows a percentage return with its sign, and a dash when the source has none", () => {
@@ -33,5 +33,12 @@ describe("runUpCheck", () => {
   });
   it("says it cannot check a fund without returns", () => {
     expect(runUpCheck({ ...base, returns: null, run_up: null }).text).toContain("chưa kiểm tra được");
+  });
+});
+
+describe("coveredText", () => {
+  it("names the month and how much of each fund its published holdings cover", () => {
+    expect(coveredText({ DCDS: { as_of: "2026-10", stocks: "55.73", bonds: "0" }, VIBF: { as_of: "2026-09", stocks: "18.62", bonds: "30.1" } }))
+      .toBe("DCDS 10/2026: cổ phiếu công bố 55,7% NAV; VIBF 09/2026: cổ phiếu công bố 18,6% NAV, trái phiếu 30,1%");
   });
 });

@@ -13,6 +13,7 @@ import { ForwardValuation } from "./forward-valuation";
 import { DividendHistory } from "./dividend-history";
 import { CapmTicker } from "./capm";
 import { CompanyPeople } from "./company-people";
+import { FundsHoldingStock } from "./funds-view";
 import { InsiderDeals } from "./insider-deals";
 import { FinancialTables } from "./financial-tables";
 import { EarlyLights } from "./early-lights";
@@ -115,6 +116,7 @@ export function StockProfile({ symbol }: { symbol: string }) {
       {p.watched && <DividendHistory symbol={p.symbol} />}
 
       {p.watched && <CompanyPeople symbol={p.symbol} />}
+      <FundsHoldingStock symbol={p.symbol} />
       {p.watched && <InsiderDeals symbol={p.symbol} />}
 
       <section className="surface" aria-label="Sự kiện">

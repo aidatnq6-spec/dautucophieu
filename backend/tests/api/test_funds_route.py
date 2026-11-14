@@ -33,3 +33,20 @@ def test_without_a_sync_the_board_is_empty_not_guessed(tmp_path):
     c, clock = client(tmp_path)
     body = call(c, clock, "GET", "/internal/funds").json()
     assert body["funds"] == [] and body["mine"]["groups"] == [] and body["source"] is None
+
+
+def test_stocks_held_through_funds_add_to_those_held_directly_and_the_stock_page_names_the_funds(tmp_path):
+    from investment_agent.market.fund_holdings import FundHoldingsStore
+    seed(tmp_path)
+    FundHoldingsStore(tmp_path).save({"source": "Fmarket", "fetched_at": "2026-11-14T00:00:00+00:00", "funds": {
+        "VFF": {"as_of": "2026-10", "stocks": [{"symbol": "FPT", "percent": "10", "industry": "x"}], "bonds": [], "assets": [], "industries": []}}})
+    c, clock = client(tmp_path)  # FPT 100 shares at 60,000 held directly
+    save_book(c, clock, bonds=[{"id": "f1", "name": "Quỹ B", "amount": "900", "fund": "VFF", "units": "50"}])
+    through = call(c, clock, "GET", "/internal/funds").json()["through"]
+    assert through["rows"] == [{"symbol": "FPT", "direct": "6000000", "through": "100", "total": "6000100", "share": "0.9999",
+                                "funds": [{"code": "VFF", "percent": "10"}]}]
+    assert through["covered"] == {"VFF": {"as_of": "2026-10", "stocks": "10", "bonds": "0"}} and through["unpriced"] == []
+    body = call(c, clock, "GET", "/internal/funds/holding/fpt").json()
+    assert body == {"symbol": "FPT", "funds": [{"code": "VFF", "name": "Quỹ trái phiếu B", "percent": "10", "as_of": "2026-10", "amount": "100"}],
+                    "fund_rows": 1}
+    assert call(c, clock, "GET", "/internal/funds/holding/HPG").json()["funds"] == []

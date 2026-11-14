@@ -88,6 +88,20 @@ export function wrap(text: string, width: number, charW = 7.2, max = 2): { lines
   return { lines: shown.map((l) => (l.length > per ? `${l.slice(0, per - 1)}…` : l)), full };
 }
 
+/** The value and the gain on one line when they fit, else on two (value, then gain), so the gain is never the part cut off. */
+export function detailLines(value: string, gain: string | null, width: number, charW: number): string[] {
+  const one = gain === null ? value : `${value} · ${gain}`;
+  if (fit(one, width, charW) === one) return [one];
+  return [fit(value, width, charW), ...(gain !== null ? [fit(gain, width, charW)] : [])].filter(Boolean);
+}
+
+/** A holding's name for the list under the map: at most 40 characters, cut at a word with "…"; the full name shows on hover. */
+export function shortName(name: string, max = 40): string {
+  if (name.length <= max) return name;
+  const cut = name.slice(0, max - 1), space = cut.lastIndexOf(" ");
+  return `${(space > max / 2 ? cut.slice(0, space) : cut).replace(/[\s,(·-]+$/, "")}…`;
+}
+
 /** Tile colour from the gain on cost: green up, red down, three steps; grey when there is no market price. */
 export function changeTone(change: string | null): string {
   if (change === null) return "am-none";
@@ -129,28 +143,31 @@ export function AssetMapView() {
               const name = wrap(t.label, r.w, charW, Math.min(2, Math.max(1, room - 1)));
               const nameLines = room >= 1 ? name.lines : [];
               const detailY = 4 + lineH * (nameLines.length + 1);
-              const detail = r.h > detailY + 4 ? fit(`${millions(t.value)}${t.change !== null ? ` · ${pct(t.change)}` : ""}`, r.w, small ? 5.6 : 6.2) : "";
-              const note = r.h > detailY + lineH + 6 && t.note ? fit(t.note, r.w, 6) : "";
-              if (t.id !== "small" && (!name.full || nameLines.length === 0 || !detail)) missing.push(t);
-              return { t, r, small, lineH, nameLines, detail, detailY, note };
+              const details = detailLines(millions(t.value), t.change !== null ? pct(t.change) : null, r.w, small ? 5.6 : 6.2)
+                .filter((_, k) => r.h > detailY + lineH * k + 4);
+              const noteY = detailY + lineH * details.length;
+              const note = r.h > noteY + 6 && t.note ? fit(t.note, r.w, 6) : "";
+              const complete = details.join(" ").includes(millions(t.value)) && (t.change === null || details.join(" ").includes(pct(t.change)));
+              if (t.id !== "small" && (!name.full || nameLines.length === 0 || !complete)) missing.push(t);
+              return { t, r, small, lineH, nameLines, details, detailY, note, noteY };
             });
             if (missing.length || !head) hidden.push({ group: g, tiles: missing.length ? missing : g.tiles });
             return <g key={g.id}>
               <rect x={b.x} y={b.y} width={b.w} height={b.h} className="am-group" />
               {head > 0 && <text x={b.x + 8} y={b.y + 15} className="am-head">{fit(`${g.label} · ${formatRatio(String(Number(g.value) / Number(map.total)), 0)} · ${millions(g.value)}`, b.w, 7)}</text>}
-              {cells.map(({ t, r, small, lineH, nameLines, detail, detailY, note }) => <g key={t.id}>
+              {cells.map(({ t, r, small, lineH, nameLines, details, detailY, note, noteY }) => <g key={t.id}>
                 <rect x={r.x} y={r.y} width={r.w} height={r.h} rx={3} className={`am-tile ${changeTone(t.change)}`}>
                   <title>{`${g.label} · ${t.label}${t.note ? ` (${t.note})` : ""}: ${formatVnd(t.value)}${t.change !== null ? `, ${pct(t.change)} so với vốn` : ""}`}</title></rect>
                 {nameLines.map((l, k) => <text key={k} x={r.x + 6} y={r.y + 4 + lineH * (k + 1) - 2} className={small ? "am-label am-small" : "am-label"}>{l}</text>)}
-                {detail && <text x={r.x + 6} y={r.y + detailY} className="am-sub">{detail}</text>}
-                {note && <text x={r.x + 6} y={r.y + detailY + lineH} className="am-note">{note}</text>}</g>)}
+                {details.map((d, k) => <text key={k} x={r.x + 6} y={r.y + detailY + lineH * k} className="am-sub">{d}</text>)}
+                {note && <text x={r.x + 6} y={r.y + noteY} className="am-note">{note}</text>}</g>)}
             </g>;
           });
           return <>
             <svg className="am-map" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Bản đồ danh mục, tổng ${formatVnd(map.total)}`}>{drawn}</svg>
             {hidden.length > 0 && <ul className="am-hidden" aria-label="Khoản không đủ chỗ ghi trên bản đồ">{hidden.map(({ group, tiles }) => <li key={group.id}>
               <strong>{group.label} · {formatRatio(String(Number(group.value) / Number(map.total)), 0)} · {millions(group.value)}:</strong>{" "}
-              {tiles.map((t) => `${t.label} (${millions(t.value)}${t.change !== null ? `, ${pct(t.change)}` : ""})`).join(" · ")}</li>)}</ul>}
+              {tiles.map((t, k) => <span key={t.id} title={t.label}>{k ? " · " : ""}{shortName(t.label)} ({millions(t.value)}{t.change !== null ? `, ${pct(t.change)}` : ""})</span>)}</li>)}</ul>}
           </>;
         })() : <table className="fv-table" aria-label="Danh sách tài sản theo lớp">
           <thead><tr><th>Lớp</th><th>Tài sản</th><th className="num">Giá trị</th><th className="num">Tỷ trọng</th><th className="num">So với vốn</th></tr></thead>

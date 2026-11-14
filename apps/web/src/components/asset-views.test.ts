@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { barSpans, bridgeBars, bridgeNotes, changeTone, fit, mergeSmall, squarify, wrap } from "./asset-views";
+import { barSpans, bridgeBars, bridgeNotes, changeTone, detailLines, fit, mergeSmall, shortName, squarify, wrap } from "./asset-views";
 
 describe("squarify", () => {
   it("fills the box exactly, each area in proportion to its value", () => {
@@ -80,5 +80,18 @@ describe("wrap", () => {
     expect(wrap("iPower TCBS (nhận lãi)", 110)).toEqual({ lines: ["iPower TCBS", "(nhận lãi)"], full: true });
     expect(wrap("iPower TCBS (nhận lãi)", 110, 7.2, 1)).toEqual({ lines: ["iPower TCBS…"], full: false });
     expect(wrap("KDH", 20)).toEqual({ lines: [], full: false });
+  });
+});
+
+
+describe("detailLines and shortName", () => {
+  it("moves the gain to its own line rather than cutting it", () => {
+    expect(detailLines("54,1 tr", "+8,1%", 200, 6.2)).toEqual(["54,1 tr · +8,1%"]);
+    expect(detailLines("54,1 tr", "+8,1%", 90, 6.2)).toEqual(["54,1 tr", "+8,1%"]);
+    expect(detailLines("355 tr", null, 90, 6.2)).toEqual(["355 tr"]);
+  });
+  it("cuts a long name at a word for the list under the map", () => {
+    expect(shortName("Vàng nhẫn trang sức PNJ mua tặng vợ tại PNJ đường Trần Phú")).toBe("Vàng nhẫn trang sức PNJ mua tặng vợ…");
+    expect(shortName("MBB")).toBe("MBB");
   });
 });

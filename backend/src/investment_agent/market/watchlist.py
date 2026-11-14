@@ -18,6 +18,9 @@ class Watchlist:
     symbols: tuple[str, ...] = ()
     groups: dict[str, tuple[str, ...]] = field(default_factory=dict)
     groups_as_of: str | None = None
+    group_dates: dict[str, str] = field(default_factory=dict)  # each group's own date: a kept group's is the day it was taken
+    kept: tuple[str, ...] = ()  # groups without a public source, kept as last taken
+    vn30_changed_on: str | None = None
 
 
 def load_watchlist(data_dir: Path | None) -> Watchlist:
@@ -29,11 +32,20 @@ def load_watchlist(data_dir: Path | None) -> Watchlist:
         s = line.strip().upper()
         if s and s not in symbols:
             symbols.append(s)
-    groups, as_of = {}, None
+    groups, as_of, raw = {}, None, {}
     if (data_dir / GROUPS_FILE).is_file():
         raw = json.loads((data_dir / GROUPS_FILE).read_text(encoding="utf-8"))
         groups, as_of = {g: tuple(m) for g, m in raw["groups"].items()}, raw.get("as_of")
-    return Watchlist(tuple(symbols), groups, as_of)
+    kept = raw.get("kept") or {}
+    dates = {g: kept.get(g) or as_of for g in groups if kept.get(g) or as_of}
+    return Watchlist(tuple(symbols), groups, as_of, dates, tuple(sorted(kept)), raw.get("vn30_changed_on"))
+
+
+def vn100_review(watchlist: Watchlist) -> dict | None:
+    """VN30 changed after the kept VN100 list was taken: HOSE reviewed its baskets, so VN100 may be out of date."""
+    kept_on = watchlist.group_dates.get("VN100") if "VN100" in watchlist.kept else None
+    changed = watchlist.vn30_changed_on
+    return {"vn30_changed_on": changed, "vn100_as_of": kept_on} if kept_on and changed and changed > kept_on else None
 
 
 def _change(new: Decimal, old: Decimal) -> str:

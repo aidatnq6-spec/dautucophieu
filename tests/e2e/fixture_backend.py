@@ -56,7 +56,8 @@ if __name__ == "__main__":
     with open(os.path.join(data, "market-symbols.txt"), "w", encoding="utf-8") as f:
         f.write("FPT\nVCB\nACB\n")
     with open(os.path.join(data, "index-groups.json"), "w", encoding="utf-8") as f:
-        json.dump({"as_of": "2026-10-25", "source": "synthetic", "groups": {"VN30": ["FPT"], "VN100": ["FPT", "VCB"]}}, f)
+        json.dump({"as_of": "2026-10-25", "source": "synthetic", "groups": {"VN30": ["FPT"], "VN100": ["FPT", "VCB"]},
+                   "kept": {"VN100": "2026-10-20"}, "vn30_changed_on": "2026-10-25"}, f)
     with open(os.path.join(data, "industries.json"), "w", encoding="utf-8") as f:
         json.dump({"as_of": "2026-10-25", "source": "synthetic", "level": 2, "sectors": {"FPT": "Công nghệ Thông tin", "VCB": "Ngân hàng", "ACB": "Ngân hàng"}}, f,
                   ensure_ascii=False)

@@ -147,11 +147,14 @@
    "rule": "up",
    "max_age_days": 40,
    "source": {
-    "kind": "news_cpi",
+    "kind": "nso_cpi",
+    "fallback": {
+     "kind": "news_cpi"
+    },
     "manual_fallback": true
    },
-   "url": "https://www.gso.gov.vn/",
-   "note": "Tự động từ tiêu đề tin CafeF/Vietstock/Vneconomy khi Tổng cục Thống kê công bố (khoảng ngày 6 hằng tháng); nhập tay nếu tháng nào không có tin."
+   "url": "https://www.nso.gov.vn/",
+   "note": "Tự động từ bài Chỉ số giá tiêu dùng hằng tháng của Cục Thống kê (khoảng ngày 3–6 hằng tháng); nguồn đó lỗi thì đọc tiêu đề tin CafeF/Vietstock/Vneconomy; nhập tay nếu tháng nào không có."
   },
   {
    "id": "fed_effr",

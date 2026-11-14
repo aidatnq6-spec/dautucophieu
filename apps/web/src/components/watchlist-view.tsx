@@ -6,7 +6,19 @@ import { formatRatio, formatVnd } from "../lib/format";
 
 type Row = { ticker: string; groups: string[]; held: boolean; close: string | null; date: string | null;
   change_1d: string | null; change_20d: string | null; stale: boolean };
-type Watchlist = { provenance: string; groups_as_of: string | null; rows: Row[] };
+type Watchlist = { provenance: string; groups_as_of: string | null; group_dates?: Record<string, string>; kept?: string[];
+  vn100_review?: { vn30_changed_on: string; vn100_as_of: string } | null; rows: Row[] };
+const dmy = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+
+/** Each group's date: VN30 from VNDirect on that day; a kept group (VN100: no public source) on the day it was last taken. */
+export function groupsCaption(w: Pick<Watchlist, "groups_as_of" | "group_dates" | "kept">): string | null {
+  const dates = w.group_dates ?? {};
+  const parts = Object.keys(dates).sort((a, b) => a.length - b.length || a.localeCompare(b)).map((g) => (w.kept ?? []).includes(g)
+    ? `${g}: danh sách lưu ngày ${dmy(dates[g])} (không có nguồn tự động, cập nhật tay sau mỗi kỳ HOSE xét lại rổ)`
+    : `${g}: theo VNDirect ngày ${dmy(dates[g])}`);
+  if (parts.length) return `Thành phần ${parts.join("; ")}.`;
+  return w.groups_as_of ? `Thành phần VN30/VN100 theo nguồn ngày ${w.groups_as_of}.` : null;
+}
 
 const FILTERS = [{ id: "all", label: "Tất cả" }, { id: "VN30", label: "VN30" }, { id: "VN100", label: "VN100" }, { id: "held", label: "Đang nắm" }];
 const SORTS = [{ id: "ticker", label: "Mã (A–Z)" }, { id: "change_1d", label: "Thay đổi trong phiên" }, { id: "change_20d", label: "Thay đổi 20 phiên" }] as const;
@@ -56,7 +68,9 @@ export function WatchlistView() {
           </tbody>
         </table>
       </div>
-      {data.groups_as_of && <p className="caption">Thành phần VN30/VN100 theo nguồn ngày {data.groups_as_of}.</p>}
+      {data.vn100_review && <p className="notice" role="note" data-testid="vn100-review">VN30 đổi thành phần ngày {dmy(data.vn100_review.vn30_changed_on)} (HOSE vừa
+        xét lại rổ): danh sách VN100 lưu ngày {dmy(data.vn100_review.vn100_as_of)} có thể đã cũ. Hãy nhắn để cập nhật VN100 theo thông báo của HOSE.</p>}
+      {groupsCaption(data) && <p className="caption" data-testid="groups-caption">{groupsCaption(data)}</p>}
     </section>
   );
 }

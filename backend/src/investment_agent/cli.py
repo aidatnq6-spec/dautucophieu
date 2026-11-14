@@ -274,9 +274,15 @@ def index_groups(groups: list[str], output: Path, provider=None, today=None, get
             elif g in saved.get("groups", {}):
                 members[g] = saved["groups"][g]
                 kept[g] = (saved.get("kept") or {}).get(g) or saved.get("as_of")
+        payload = {"as_of": today.isoformat(), "source": "vndirect:finfo", "groups": members, "kept": kept}
+        # VN30 changing is HOSE's review of its baskets: VN100, which has no public source, may have changed the same day.
+        before = saved.get("groups", {}).get("VN30")
+        if "VN30" in members and before is not None and sorted(before) != sorted(members["VN30"]):
+            payload["vn30_changed_on"] = today.isoformat()
+        elif saved.get("vn30_changed_on"):
+            payload["vn30_changed_on"] = saved["vn30_changed_on"]
         output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(json.dumps({"as_of": today.isoformat(), "source": "vndirect:finfo", "groups": members, "kept": kept}, ensure_ascii=False,
-                                     indent=1) + "\n", encoding="utf-8")
+        output.write_text(json.dumps(payload, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
         print(json.dumps({"status": "ok", "groups": {g: len(m) for g, m in members.items()}, "kept": kept}))
         return 0
     from investment_agent.market.providers.vnstock_adapter import SOURCE, ProviderUnavailable

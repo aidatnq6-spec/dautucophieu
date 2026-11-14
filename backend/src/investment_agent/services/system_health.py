@@ -120,6 +120,17 @@ def index_unit_problems(data_dir: Path) -> list[dict]:
     return out
 
 
+def vn100_problem(data_dir: Path) -> dict | None:
+    from investment_agent.market.watchlist import load_watchlist, vn100_review
+    review = vn100_review(load_watchlist(data_dir))
+    if review is None:
+        return None
+    dmy = lambda iso: f"{iso[8:10]}/{iso[5:7]}/{iso[:4]}"  # noqa: E731
+    return {"id": "vn100_review", "label": "Danh sách VN100",
+            "detail": f"VN30 đổi thành phần ngày {dmy(review['vn30_changed_on'])} (HOSE xét lại rổ); danh sách VN100 lưu ngày "
+                      f"{dmy(review['vn100_as_of'])} có thể đã cũ: cập nhật từ thông báo của HOSE"}
+
+
 def health_report(data_dir: Path, *, now: datetime, calendar=None) -> dict:
     data_dir = Path(data_dir)
     root = data_dir.parent
@@ -144,6 +155,8 @@ def health_report(data_dir: Path, *, now: datetime, calendar=None) -> dict:
     elif now - last_finish > timedelta(days=AFTER_CLOSE_MAX_DAYS):
         problems.append({"id": "after-close", "label": "Lịch sau phiên", "detail": f"lượt chạy xong gần nhất là {_dmy(last_finish)}"})
     problems.extend(index_unit_problems(data_dir))
+    if vn100 := vn100_problem(data_dir):
+        problems.append(vn100)
     if calendar is not None and lines is not None:
         brief = brief_problem(lines, calendar, now=now)
         if brief:

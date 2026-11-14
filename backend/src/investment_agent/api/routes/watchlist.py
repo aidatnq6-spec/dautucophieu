@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request
 
 from investment_agent.market.sectors import breadth, index_summary, load_sectors, sector_rows
-from investment_agent.market.watchlist import load_watchlist, watchlist_rows
+from investment_agent.market.watchlist import load_watchlist, watchlist_rows, vn100_review
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.holdings_view import held_from_repo
 
@@ -33,7 +33,8 @@ def watchlist(request: Request):
         wl, rows = _rows(request)
     except RepositoryUnavailable:
         return unavailable()
-    return {"provenance": request.app.state.market.provenance, "groups_as_of": wl.groups_as_of, "rows": rows}
+    return {"provenance": request.app.state.market.provenance, "groups_as_of": wl.groups_as_of, "group_dates": wl.group_dates, "kept": list(wl.kept),
+            "vn100_review": vn100_review(wl), "rows": rows}
 
 
 @router.get("/market/overview")

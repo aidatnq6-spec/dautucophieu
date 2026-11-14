@@ -28,6 +28,12 @@ test("filters by index group", async ({ page }) => {
   await expect(table.getByRole("row", { name: /VCB/ })).toHaveCount(0);
 });
 
+test("each index group shows its own date, and VN100 is flagged after VN30 changed", async ({ page }) => {
+  await openWatchlist(page);
+  await expect(page.getByTestId("groups-caption")).toContainText("VN100: danh sách lưu ngày 20/10/2026 (không có nguồn tự động");
+  await expect(page.getByTestId("vn100-review")).toContainText("VN30 đổi thành phần ngày 25/10/2026");
+});
+
 for (const width of [375, 1440]) {
   test(`no horizontal page scroll on the watchlist at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });

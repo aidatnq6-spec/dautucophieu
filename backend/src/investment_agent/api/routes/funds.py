@@ -4,10 +4,12 @@ rows of Sổ tài sản split by kind (domain.fund_board). Public fund data only
 import re
 from decimal import Decimal
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Request
 
 from investment_agent.domain.fund_board import composition, fund_board, funds_holding, look_through
+from investment_agent.domain.fund_score import fund_scores, read_snapshots, score_trend
 from investment_agent.market.fund_holdings import fund_holdings
 from investment_agent.market.fund_nav import FundNavStore, fund_history, fund_profiles
 from investment_agent.market.leading import MacroStore
@@ -49,6 +51,12 @@ def get_funds(request: Request):
     board = fund_board(navs, profiles, index=index, deposit_rate=deposits[-1]["value"] if deposits else None,
                        held={b.fund for b in bonds if b.fund})
     held = fund_holdings(data_dir)
+    scores = fund_scores(profiles, fund_history(data_dir))
+    month = now(request).astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).strftime("%Y-%m")
+    before = {m: v for m, v in (read_snapshots(data_dir) if data_dir is not None else {}).items() if m < month}  # this month's own snapshot is today
+    trend = score_trend({**before, month: {c: s["score"] for c, s in scores.items()}}, month)
+    for f in board["funds"]:
+        f["score"] = {**scores[f["code"]], "trend": trend.get(f["code"])} if f["code"] in scores else None
     return {**board, "mine": composition(bonds, navs, profiles), "through": {**look_through(bonds, navs, held, direct=direct), "unpriced": unpriced},
             "source": {"name": stored.get("source"), "fetched_at": stored.get("fetched_at")} if stored else None,
             "history_days": {code: len(points) for code, points in fund_history(data_dir).items()}}

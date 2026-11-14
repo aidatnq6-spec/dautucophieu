@@ -11,6 +11,7 @@ test("Quỹ mở lists the funds by kind with their returns, and an empty split 
   const table = board.getByRole("table", { name: "Danh sách quỹ mở" });
   await expect(table.getByRole("row", { name: /QCP/ })).toContainText("+18,20%");
   await expect(table.getByRole("row", { name: /QTP/ })).toContainText("Trái phiếu");
+  await expect(table.getByRole("row", { name: /QCP/ })).toContainText("Quỹ duy nhất trong nhóm");  // alone in its kind: no score
   await board.getByRole("radio", { name: /Trái phiếu/ }).check();
   await expect(table.getByRole("row", { name: /QCP/ })).toHaveCount(0);
   await expect(board.getByTestId("fund-benchmark")).toContainText("VN-Index");

@@ -27,6 +27,8 @@ def test_the_board_lists_every_fund_with_benchmarks_and_the_owners_split(tmp_pat
     assert body["mine"]["groups"] == [{"kind": "BOND", "value": "1000", "share": "1", "funds": ["VFF"]}]
     assert body["mine"]["notes"] == ["fewer_than_3", "single_kind"]
     assert body["source"] == {"name": "Fmarket", "fetched_at": "2026-11-14T00:00:00+00:00"} and body["history_days"] == {"DCDS": 1, "VFF": 1}
+    assert body["funds"][0]["score"] == {"score": None, "parts": {"returns": None, "fee": None, "risk": None}, "counted": [], "risk_days": 1,
+                                         "peers": 1, "trend": None}  # alone in its kind: no score
 
 
 def test_without_a_sync_the_board_is_empty_not_guessed(tmp_path):
@@ -50,3 +52,14 @@ def test_stocks_held_through_funds_add_to_those_held_directly_and_the_stock_page
     assert body == {"symbol": "FPT", "funds": [{"code": "VFF", "name": "Quỹ trái phiếu B", "percent": "10", "as_of": "2026-10", "amount": "100"}],
                     "fund_rows": 1}
     assert call(c, clock, "GET", "/internal/funds/holding/HPG").json()["funds"] == []
+
+
+def test_the_score_trend_is_against_the_month_before_not_this_month_s_own_snapshot(tmp_path):
+    from investment_agent.domain.fund_score import record_scores
+    rows = [{**FUND_ROWS[0], "shortName": code, "productNavChange": {"navTo12Months": m12}} for code, m12 in (("DCDS", 5), ("DCAF", 1))]
+    fund_nav_sync(FundNavStore(tmp_path), post=lambda u, b: {"data": {"rows": rows}}, now=datetime(2026, 11, 14, tzinfo=timezone.utc))
+    c, clock = client(tmp_path)  # today 2027-01-15 in the fixture clock
+    record_scores(tmp_path, "2026-12", {"DCDS": {"score": "40"}})
+    record_scores(tmp_path, "2027-01", {"DCDS": {"score": "100"}})
+    dcds = next(f for f in call(c, clock, "GET", "/internal/funds").json()["funds"] if f["code"] == "DCDS")
+    assert dcds["score"]["score"] == "75" and dcds["score"]["trend"] == {"previous": "40", "change": "35"}

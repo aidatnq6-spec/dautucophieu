@@ -73,3 +73,11 @@ test("an own valuation range joins the bars, and the one-page thesis opens ready
   await page.emulateMedia({ media: "print" });
   await expect(page.getByRole("button", { name: "In" })).toBeHidden();
 });
+
+
+test("the one-page thesis is reachable from the top of a company's page", async ({ page }) => {
+  await page.goto("/research/FPT");
+  await page.getByRole("navigation", { name: "Luận điểm của mã" }).getByRole("link", { name: "Trang luận điểm 1 trang để in" }).click();
+  await expect(page).toHaveURL(/\/thesis\/FPT/);
+  await expect(page.getByRole("button", { name: "In" })).toBeVisible();
+});

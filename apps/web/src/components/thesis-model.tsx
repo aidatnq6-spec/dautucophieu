@@ -64,7 +64,7 @@ export function ThesisModel({ symbol }: { symbol: string }) {
   const blankIndicator = (): Indicator => ({ id: requestId().slice(0, 24), name: "", tier: "coincident", unit: "", bad: "", base: "", good: "", lower_better: false,
     source: "manual", readings: [] });
   return (
-    <section className="surface" aria-label="Kịch bản và chỉ báo luận điểm">
+    <section className="surface" id="kich-ban-chi-bao" aria-label="Kịch bản và chỉ báo luận điểm">
       <div className="row"><h2>Kịch bản và chỉ báo luận điểm</h2><Link href={`/thesis/${symbol}`}>Trang luận điểm 1 trang để in</Link></div>
       {head ? <div className="formgrid" aria-label="Sửa tiêu đề và tóm tắt">
         <label className="field">Tiêu đề luận điểm<input aria-label="Tiêu đề luận điểm" maxLength={200} value={head.headline} onChange={(e) => setHead({ ...head, headline: e.target.value })} /></label>

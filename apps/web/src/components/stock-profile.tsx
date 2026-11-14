@@ -55,6 +55,9 @@ export function StockProfile({ symbol }: { symbol: string }) {
   const f = p.facts, v = p.valuation, s = p.insights.sector;
   return (
     <>
+      {p.watched && <nav className="sp-thesis" aria-label="Luận điểm của mã">
+        <Link className="btn" href={`/thesis/${p.symbol}`}>Trang luận điểm 1 trang để in</Link>
+        <a className="btn" href="#kich-ban-chi-bao">Kịch bản, chỉ báo, 6 câu hỏi</a></nav>}
       <section className="surface" aria-label="Thông tin nhanh">
         <div className="kpi-row">
           <Fact label="Giá" note={f.price_date ? `phiên ${day(f.price_date)}` : undefined}>{formatVnd(f.price)}</Fact>

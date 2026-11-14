@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PauseCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
@@ -199,7 +200,7 @@ export function ThesisView() {
           {open?.symbol === s && !open.thesis && <ThesisForm data={data} symbol={s} onSave={(b) => change({ action: "save", symbol: s, ...b })} onCancel={() => setOpen(null)} />}
         </div>)}
         {data.theses.map((t) => <article key={t.id} className="th-card" aria-label={`Luận điểm ${t.symbol}`}>
-          <div className="row"><strong>{t.symbol}</strong><span className="caption">đặt {day(t.created_on)} · {t.reasons.map((r) => data.reasons[r]).join(", ")}</span>
+          <div className="row"><strong>{t.symbol}</strong><Link href={`/thesis/${t.symbol}`} className="caption">Trang 1 trang để in</Link><span className="caption">đặt {day(t.created_on)} · {t.reasons.map((r) => data.reasons[r]).join(", ")}</span>
             {open?.thesis?.id !== t.id && <button className="btn" type="button" onClick={() => setOpen({ symbol: t.symbol, thesis: t })}><Pencil size={15} aria-hidden="true" />Sửa</button>}</div>
           {t.note && <p className="th-note">“{t.note}”</p>}
           {t.progress && <p className="caption" data-testid={`th-progress-${t.symbol}`}>{progressText(t.progress)}</p>}

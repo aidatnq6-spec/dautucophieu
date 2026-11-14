@@ -21,7 +21,7 @@ const k = (v: number) => `${(v / 1000).toLocaleString("vi-VN", { maximumFraction
 /** Dải định giá theo từng cách: one bar per way, low to high, its middle marked, and the latest close as a red line. */
 export function ValuationBands({ bands, compact = false }: { bands: Bands; compact?: boolean }) {
   if (!bands.rows.length) return <p className="muted">Chưa có cách định giá nào: nhập kịch bản, hoặc chờ đủ 24 tháng P/E, P/B.</p>;
-  const W = 900, left = compact ? 130 : 170, right = 24, rowH = compact ? 30 : 36, top = 26;
+  const W = 900, left = compact ? 130 : 170, right = 24, rowH = compact ? 38 : 42, top = 26;
   const H = top + bands.rows.length * rowH + 30;
   const { lo, hi, ticks } = bandAxis(bands.rows, bands.close);
   const x = (v: number) => left + ((v - lo) * (W - left - right)) / (hi - lo || 1);
@@ -36,14 +36,14 @@ export function ValuationBands({ bands, compact = false }: { bands: Bands; compa
             <text x={left - 8} y={y + 4} textAnchor="end" className={r.auto ? "vb-name" : "vb-name vb-own"}>{r.name}</text>
             <rect x={x(l)} y={y - 7} width={Math.max(2, x(h) - x(l))} height={14} rx={3} className="vb-bar"><title>{`${r.name}: ${formatVnd(r.low)} – ${formatVnd(r.high)}${r.mid ? `, giữa ${formatVnd(r.mid)}` : ""}${r.source ? ` (${r.source})` : ""}`}</title></rect>
             {r.mid && <line x1={x(Number(r.mid))} x2={x(Number(r.mid))} y1={y - 9} y2={y + 9} className="vb-mid" />}
-            <text x={x(l) - 4} y={y + 4} textAnchor="end" className="vb-end">{k(l)}</text>
-            <text x={x(h) + 4} y={y + 4} className="vb-end">{k(h)}</text>
+            <text x={x(l)} y={y + 19} textAnchor="start" className="vb-end">{k(l)}</text>
+            <text x={x(h)} y={y + 19} textAnchor="end" className="vb-end">{x(h) - x(l) > 70 ? k(h) : ""}</text>
           </g>; })}
         {close !== null && <g><line x1={x(close)} x2={x(close)} y1={top - 8} y2={H - 26} className="vb-close" />
           <text x={x(close)} y={top - 12} textAnchor="middle" className="vb-close-label">Giá hiện tại {k(close)}</text></g>}
       </svg>
-      <figcaption className="caption">Thanh = thấp → cao; vạch đậm = mốc giữa; vạch đỏ = giá đóng cửa gần nhất. P/E, P/B 5 năm = bội số thấp nhất, trung vị, cao nhất của 60
-        tháng × lợi nhuận hoặc giá trị sổ sách mỗi cổ phiếu hiện tại. Tên in nghiêng là khoảng bạn tự nhập.{bands.notes.length ? ` ${bands.notes.join("; ")}.` : ""}</figcaption>
+      <figcaption className="caption">Thanh = thấp → cao; vạch đậm = mốc giữa; vạch đỏ = giá đóng cửa gần nhất. P/E, P/B 5 năm = bội số ở phân vị 25%, trung vị, phân vị 75% của 60
+        tháng (nửa giữa, bỏ các tháng bất thường) × lợi nhuận hoặc giá trị sổ sách mỗi cổ phiếu hiện tại. Tên in nghiêng là khoảng bạn tự nhập.{bands.notes.length ? ` ${bands.notes.join("; ")}.` : ""}</figcaption>
     </figure>
   );
 }

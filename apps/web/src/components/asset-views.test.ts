@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { barSpans, bridgeBars, bridgeNotes, changeTone, fit, mergeSmall, squarify } from "./asset-views";
+import { barSpans, bridgeBars, bridgeNotes, changeTone, fit, mergeSmall, squarify, wrap } from "./asset-views";
 
 describe("squarify", () => {
   it("fills the box exactly, each area in proportion to its value", () => {
@@ -71,5 +71,14 @@ describe("map tiles", () => {
     expect(fit("KDH", 100)).toBe("KDH");
     expect(fit("KDH", 20)).toBe("");
     expect(fit("Vàng nhẫn", 40)).toBe("");
+  });
+});
+
+
+describe("wrap", () => {
+  it("puts a long name over two lines between words and says when it is all shown", () => {
+    expect(wrap("iPower TCBS (nhận lãi)", 110)).toEqual({ lines: ["iPower TCBS", "(nhận lãi)"], full: true });
+    expect(wrap("iPower TCBS (nhận lãi)", 110, 7.2, 1)).toEqual({ lines: ["iPower TCBS…"], full: false });
+    expect(wrap("KDH", 20)).toEqual({ lines: [], full: false });
   });
 });

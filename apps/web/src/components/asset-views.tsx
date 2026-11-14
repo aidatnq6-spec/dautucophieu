@@ -68,6 +68,26 @@ export function fit(text: string, width: number, charW = 7.2): string {
   return text.length <= n ? text : `${text.slice(0, n - 1)}…`;
 }
 
+/** A name over at most `max` lines that fit `width`, broken between words; the last line cut with "…" if the name is longer.
+ * full: whether the whole name is shown. */
+export function wrap(text: string, width: number, charW = 7.2, max = 2): { lines: string[]; full: boolean } {
+  const per = Math.floor((width - 10) / charW);
+  if (per < 4) return { lines: [], full: false };
+  const words = text.split(" "), lines: string[] = [];
+  let line = "";
+  for (const w of words) {
+    const next = line ? `${line} ${w}` : w;
+    if (next.length <= per) { line = next; continue; }
+    if (line) lines.push(line);
+    line = w;
+    if (lines.length === max) break;
+  }
+  if (lines.length < max && line) lines.push(line);
+  const shown = lines.slice(0, max), full = shown.join(" ") === text && shown.every((l) => l.length <= per);
+  if (!full && shown.length) { const last = shown[shown.length - 1]; shown[shown.length - 1] = last.length >= per ? `${last.slice(0, per - 1)}…` : `${last}…`; }
+  return { lines: shown.map((l) => (l.length > per ? `${l.slice(0, per - 1)}…` : l)), full };
+}
+
 /** Tile colour from the gain on cost: green up, red down, three steps; grey when there is no market price. */
 export function changeTone(change: string | null): string {
   if (change === null) return "am-none";
@@ -96,26 +116,43 @@ export function AssetMapView() {
           {[[false, "Bản đồ"], [true, "Danh sách"]].map(([v, label]) => <label key={String(v)} className={list === v ? "on" : undefined}>
             <input type="radio" name="am-view" checked={list === v} onChange={() => setList(v as boolean)} />{label as string}</label>)}
         </div>
-        {!list ? <svg className="am-map" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Bản đồ danh mục, tổng ${formatVnd(map.total)}`}>
-          {groups.map((g, gi) => {
-            const b = boxes[gi], head = b.h > 60 && b.w > 90 ? 22 : 0;
-            const shown = mergeSmall(g.tiles);
+        {!list ? (() => {
+          const hidden: { group: Group; tiles: Tile[] }[] = [];
+          const drawn = groups.map((g, gi) => {
+            const b = boxes[gi], head = b.h > 44 && b.w > 54 ? 22 : 0;
+            const shown = mergeSmall(g.tiles), merged = g.tiles.filter((t) => !shown.includes(t));
             const tiles = squarify(shown.map((t) => Number(t.value)), b.w - 4, b.h - head - 4, b.x + 2, b.y + head + 2);
+            const missing: Tile[] = [...merged];
+            const cells = shown.map((t, ti) => {
+              const r = tiles[ti], small = r.w < 90 || r.h < 50, charW = small ? 6.2 : 7.2, lineH = small ? 13 : 16;
+              const room = Math.max(0, Math.floor((r.h - 8) / lineH));
+              const name = wrap(t.label, r.w, charW, Math.min(2, Math.max(1, room - 1)));
+              const nameLines = room >= 1 ? name.lines : [];
+              const detailY = 4 + lineH * (nameLines.length + 1);
+              const detail = r.h > detailY + 4 ? fit(`${millions(t.value)}${t.change !== null ? ` · ${pct(t.change)}` : ""}`, r.w, small ? 5.6 : 6.2) : "";
+              const note = r.h > detailY + lineH + 6 && t.note ? fit(t.note, r.w, 6) : "";
+              if (t.id !== "small" && (!name.full || nameLines.length === 0 || !detail)) missing.push(t);
+              return { t, r, small, lineH, nameLines, detail, detailY, note };
+            });
+            if (missing.length || !head) hidden.push({ group: g, tiles: missing.length ? missing : g.tiles });
             return <g key={g.id}>
               <rect x={b.x} y={b.y} width={b.w} height={b.h} className="am-group" />
               {head > 0 && <text x={b.x + 8} y={b.y + 15} className="am-head">{fit(`${g.label} · ${formatRatio(String(Number(g.value) / Number(map.total)), 0)} · ${millions(g.value)}`, b.w, 7)}</text>}
-              {shown.map((t, ti) => { const r = tiles[ti];
-                const name = r.h > 22 ? fit(t.label, r.w) : "", detail = r.h > 44 ? fit(`${millions(t.value)}${t.change !== null ? ` · ${pct(t.change)}` : ""}`, r.w, 6.2) : "";
-                const note = r.h > 64 && t.note ? fit(t.note, r.w, 6) : "";
-                return <g key={t.id}><rect x={r.x} y={r.y} width={r.w} height={r.h} rx={3} className={`am-tile ${changeTone(t.change)}`}>
+              {cells.map(({ t, r, small, lineH, nameLines, detail, detailY, note }) => <g key={t.id}>
+                <rect x={r.x} y={r.y} width={r.w} height={r.h} rx={3} className={`am-tile ${changeTone(t.change)}`}>
                   <title>{`${g.label} · ${t.label}${t.note ? ` (${t.note})` : ""}: ${formatVnd(t.value)}${t.change !== null ? `, ${pct(t.change)} so với vốn` : ""}`}</title></rect>
-                  {name && <text x={r.x + 7} y={r.y + 18} className="am-label">{name}</text>}
-                  {detail && <text x={r.x + 7} y={r.y + 35} className="am-sub">{detail}</text>}
-                  {note && <text x={r.x + 7} y={r.y + 51} className="am-note">{note}</text>}</g>;
-              })}
+                {nameLines.map((l, k) => <text key={k} x={r.x + 6} y={r.y + 4 + lineH * (k + 1) - 2} className={small ? "am-label am-small" : "am-label"}>{l}</text>)}
+                {detail && <text x={r.x + 6} y={r.y + detailY} className="am-sub">{detail}</text>}
+                {note && <text x={r.x + 6} y={r.y + detailY + lineH} className="am-note">{note}</text>}</g>)}
             </g>;
-          })}
-        </svg> : <table className="fv-table" aria-label="Danh sách tài sản theo lớp">
+          });
+          return <>
+            <svg className="am-map" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Bản đồ danh mục, tổng ${formatVnd(map.total)}`}>{drawn}</svg>
+            {hidden.length > 0 && <ul className="am-hidden" aria-label="Khoản không đủ chỗ ghi trên bản đồ">{hidden.map(({ group, tiles }) => <li key={group.id}>
+              <strong>{group.label} · {formatRatio(String(Number(group.value) / Number(map.total)), 0)} · {millions(group.value)}:</strong>{" "}
+              {tiles.map((t) => `${t.label} (${millions(t.value)}${t.change !== null ? `, ${pct(t.change)}` : ""})`).join(" · ")}</li>)}</ul>}
+          </>;
+        })() : <table className="fv-table" aria-label="Danh sách tài sản theo lớp">
           <thead><tr><th>Lớp</th><th>Tài sản</th><th className="num">Giá trị</th><th className="num">Tỷ trọng</th><th className="num">So với vốn</th></tr></thead>
           <tbody>{groups.flatMap((g) => g.tiles.map((t) => <tr key={t.id}><td data-label="Lớp">{g.label}</td>
             <td data-label="Tài sản">{t.label}{t.note && <div className="caption">{t.note}</div>}</td>

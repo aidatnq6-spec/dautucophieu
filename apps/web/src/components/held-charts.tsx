@@ -23,7 +23,7 @@ export function HeldCharts() {
   const [data, setData] = useState<{ charts: Chart[]; short: Record<string, string> } | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { api<{ charts: Chart[]; short: Record<string, string> }>("held-charts").then(setData, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
-  const W = 220, H = 70;
+  const W = 260, H = 96;
   const short = Object.entries(data?.short ?? {});
   return (
     <section className="surface" aria-label="Lưới biểu đồ nhỏ">
@@ -31,14 +31,20 @@ export function HeldCharts() {
       {error && <p className="errors" role="alert">{error}</p>}
       {!data && !error && <p className="muted fx-loading" role="status">Đang tải…</p>}
       {data && (data.charts.length === 0 && short.length === 0 ? <p className="muted">Chưa nắm mã nào.</p> : <>
-        <div className="sm-grid">{data.charts.map((c) => { const p = linePaths(c.points, W, H);
+        <p className="sm-legend" aria-hidden="true"><span className="sm-key sm-key-stock" />Mã<span className="sm-key sm-key-index" />VN-Index<span className="sm-key sm-key-base" />Mốc 100</p>
+        <div className="sm-grid">{data.charts.map((c) => { const p = linePaths(c.points, W, H), gap = Number(c.change) - Number(c.index_change);
+          const base = H - ((100 - p.lo) * H) / (p.hi - p.lo || 1);
           return <figure key={c.symbol} className="sm-card" aria-label={`${c.symbol} ${pct(c.change)}, VN-Index ${pct(c.index_change)}`}>
             <figcaption><Link href={`/research/${c.symbol}`}><strong>{c.symbol}</strong></Link>
-              <span className={c.ahead ? "fd-up" : "fd-down"}>{pct(c.change)}</span><span className="caption">VN-Index {pct(c.index_change)}</span></figcaption>
-            <svg viewBox={`0 0 ${W} ${H}`} className="sm-svg" aria-hidden="true"><path d={p.index} className="sm-index" /><path d={p.stock} className={c.ahead ? "sm-up" : "sm-down"} /></svg>
+              <span className={Number(c.change) >= 100 ? "fd-up sm-big" : "fd-down sm-big"}>{pct(c.change)}</span>
+              <span className={`pill ${gap >= 0 ? "good" : "bad"}`}>{gap >= 0 ? "hơn" : "kém"} VN-Index {formatDecimal(String(Math.abs(gap)), 1)} điểm %</span></figcaption>
+            <svg viewBox={`0 0 ${W} ${H}`} className="sm-svg" aria-hidden="true">
+              {base >= 0 && base <= H && <line x1={0} x2={W} y1={base} y2={base} className="sm-base" />}
+              <path d={p.index} className="sm-index" /><path d={p.stock} className="sm-stock" /></svg>
+            <p className="caption">VN-Index cùng kỳ {pct(c.index_change)}</p>
           </figure>; })}</div>
         {short.length > 0 && <p className="caption">Chưa vẽ: {short.map(([s, why]) => `${s} (${why})`).join("; ")}.</p>}
-        <p className="caption">Giá đóng cửa đã điều chỉnh, mỗi tuần một điểm, quy về 100 ở tuần đầu cùng VN-Index (đường xám). Xanh là mạnh hơn VN-Index, đỏ là yếu hơn.
+        <p className="caption">Giá đóng cửa đã điều chỉnh, mỗi tuần một điểm, quy về 100 ở tuần đầu cùng VN-Index (đường xám). % của mã tô xanh khi lãi, đỏ khi lỗ; nhãn hơn/kém là chênh với VN-Index cùng kỳ.
           Xếp từ tăng nhiều nhất.</p>
       </>)}
     </section>

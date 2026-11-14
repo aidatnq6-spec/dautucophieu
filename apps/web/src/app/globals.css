@@ -211,7 +211,7 @@ legend{font-weight:600;padding:0 6px}
 .dc-r1{background:color-mix(in srgb,var(--bad) 30%,var(--paper))}.dc-r2{background:color-mix(in srgb,var(--bad) 60%,var(--paper))}.dc-r3{background:var(--bad)}
 .dc-on{outline:2px solid var(--ink);outline-offset:1px}
 /* Lưới biểu đồ nhỏ */
-.sm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}.sm-card{margin:0;border:1px solid var(--line);border-radius:8px;padding:8px}
+.sm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}.sm-card{margin:0;border:1px solid var(--line);border-radius:8px;padding:8px}
 .sm-card figcaption{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.sm-svg{width:100%;height:auto;margin-top:4px;overflow:visible}
 .sm-index{fill:none;stroke:var(--vc-neutral);stroke-width:1.5}.sm-up{fill:none;stroke:var(--good);stroke-width:2}.sm-down{fill:none;stroke:var(--bad);stroke-width:2}
 /* Bản tổng kết tháng */
@@ -245,6 +245,15 @@ legend{font-weight:600;padding:0 6px}
 .ct-item:last-child{border-bottom:0}.ct-when{display:flex;flex-direction:column;gap:2px;font-size:13px}.ct-when span{font-size:12px;color:var(--muted)}
 .ct-when .ct-days{color:var(--brand);font-weight:600}.ct-body .pill{margin-right:6px}.ct-auto{background:var(--soft);color:var(--muted)}
 .ct-text{margin:4px 0 2px;font-size:13px;overflow-wrap:anywhere}.ct-done{opacity:.55}.ct-done .ct-text{text-decoration:line-through}
+/* Lịch theo tháng, biểu đồ nhỏ */
+.dc-legend{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12px;color:var(--muted);margin:2px 0 10px}.dc-chip{display:inline-block;width:14px;height:14px;border-radius:3px;margin-right:-4px}
+.dc-months{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}.dc-month{border:1px solid var(--line);border-radius:8px;padding:8px}
+.dc-mhead{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;margin-bottom:6px}.dc-row{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:4px}
+.dc-wd span{font-size:11px;color:var(--muted);text-align:center}.dc-cell2{height:40px;border:0;border-radius:5px;padding:2px 4px;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;cursor:pointer;color:var(--ink)}
+.dc-cell2.dc-off{background:transparent;cursor:default}.dc-cell2.dc-closed{background:var(--soft);cursor:default}.dc-day{font-size:10px;color:var(--muted)}.dc-pct{font-size:12px;font-weight:700;align-self:flex-end}
+.sm-legend{display:flex;gap:6px 12px;align-items:center;font-size:12px;color:var(--muted);margin:0 0 8px}.sm-key{display:inline-block;width:18px;height:3px;margin-right:-6px}
+.sm-key-stock{background:var(--brand)}.sm-key-index{background:var(--vc-neutral)}.sm-key-base{border-top:1px dashed var(--muted)}
+.sm-stock{fill:none;stroke:var(--brand);stroke-width:2.2}.sm-base{stroke:var(--muted);stroke-dasharray:3 3;stroke-width:1}.sm-big{font-weight:700;font-size:15px}
 .fd-stock{background:var(--op2)}.fd-balanced{background:var(--op4)}.fd-bond{background:var(--op3)}.fd-unknown{background:var(--vc-unknown)}
 /* Dự án và điểm rơi lợi nhuận: one bar per year, scaled to the largest year. */
 .pp-years{display:grid;gap:6px;margin:4px 0 14px}.pp-year{display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;gap:10px;align-items:center}

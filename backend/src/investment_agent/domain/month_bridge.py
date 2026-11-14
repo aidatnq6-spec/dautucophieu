@@ -44,7 +44,11 @@ def month_bridge(events: list, *, closes: dict[str, dict[date, float]], sessions
     end = in_month[-1]
     first_event = min(e.effective_at for e in events)
     before = [d for d in days if d.isoformat()[:7] < month and d >= first_event]
-    start = before[-1] if before else None
+    return {**bridge_between(events, closes=closes, start=before[-1] if before else None, end=end), "month": month}
+
+
+def bridge_between(events: list, *, closes: dict[str, dict[date, float]], start: date | None, end: date) -> dict:
+    """The same split between two closes: start (None = before the first event, from nothing) and end."""
     cash_s, held_s = _holdings(events, start)
     cash_e, held_e = _holdings(events, end)
     missing = sorted({s for s in held_s if _close(closes, s, start) is None} | {s for s in held_e if _close(closes, s, end) is None})
@@ -52,7 +56,7 @@ def month_bridge(events: list, *, closes: dict[str, dict[date, float]], sessions
     openings = [(e, p) for e in window if e.type == "opening_balance" for p in e.positions]
     missing = sorted(set(missing) | {p.security_id for e, p in openings if _close(closes, p.security_id, e.effective_at) is None})
     if missing:
-        return {"status": "missing_prices", "month": month, "missing": missing, "start_day": start.isoformat() if start else None,
+        return {"status": "missing_prices", "missing": missing, "start_day": start.isoformat() if start else None,
                 "end_day": end.isoformat()}
     value = lambda cash, held, day: cash + sum((q * _close(closes, s, day) for s, q in held.items()), Decimal(0))  # noqa: E731
     v_start, v_end = value(cash_s, held_s, start) if start else Decimal(0), value(cash_e, held_e, end)
@@ -83,6 +87,36 @@ def month_bridge(events: list, *, closes: dict[str, dict[date, float]], sessions
     steps += [{"id": f"ticker:{s}", "symbol": s, "amount": a} for s, a in sorted(tickers.items(), key=lambda kv: -abs(kv[1]))]
     steps += [{"id": "dividends", "amount": dividends}, {"id": "costs", "amount": costs}]
     other = v_end - v_start - sum((s["amount"] for s in steps), Decimal(0))
-    return {"status": "ok", "month": month, "start_day": start.isoformat() if start else None, "end_day": end.isoformat(),
+    return {"status": "ok", "start_day": start.isoformat() if start else None, "end_day": end.isoformat(),
             "start": _s(v_start), "end": _s(v_end), "other": _s(other),
             "steps": [{**s, "amount": _s(s["amount"])} for s in steps if _s(s["amount"]) != "0"]}
+
+
+CALENDAR_WEEKS = 26
+
+
+def daily_moves(events: list, *, closes: dict[str, dict[date, float]], sessions: list[date], today: date, weeks: int = CALENDAR_WEEKS) -> list[dict]:
+    """Each session of the last `weeks` weeks since the ledger began: the account's gain that day (the change in value less money in
+    or out), as a share of the value at the close before, and the three tickers that moved it most. A day a held ticker has no close
+    is listed as missing, not guessed."""
+    from datetime import timedelta
+    if not events:
+        return []
+    first = min(e.effective_at for e in events)
+    days = sorted(d for d in sessions if first <= d <= today)
+    out = []
+    for prev, day in zip(days, days[1:]):
+        if day < today - timedelta(weeks=weeks):
+            continue
+        b = bridge_between(events, closes=closes, start=prev, end=day)
+        if b["status"] != "ok":
+            out.append({"date": day.isoformat(), "status": "missing", "missing": b["missing"]})
+            continue
+        flows = sum((Decimal(s["amount"]) for s in b["steps"] if s["id"] == "flows"), Decimal(0))
+        gain = Decimal(b["end"]) - Decimal(b["start"]) - flows
+        base = Decimal(b["start"])
+        tickers = sorted((s for s in b["steps"] if s.get("symbol")), key=lambda s: -abs(Decimal(s["amount"])))[:3]
+        out.append({"date": day.isoformat(), "status": "ok", "gain": _s(gain),
+                    "return": format((gain / base).quantize(Decimal("0.0001"), ROUND_HALF_UP).normalize(), "f") if base > 0 else None,
+                    "tickers": [{"symbol": s["symbol"], "amount": s["amount"]} for s in tickers]})
+    return out

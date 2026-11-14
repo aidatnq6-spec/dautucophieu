@@ -90,3 +90,25 @@ def get_month_bridge(request: Request, month: str | None = None):  # a path segm
         if start_book is not None or end_book is not None:
             book = book_bridge(start_book, end_book, navs=fund_history(data_dir), gold=gold_history(data_dir), start_day=start_day, end_day=end_day)
     return {"months": months, "bridge": bridge, "book": book}
+
+
+@router.get("/performance-daily")
+def get_daily(request: Request):
+    """Lịch nhiệt lãi/lỗ: each session of the last 26 weeks, the account's gain that day and the tickers that moved it."""
+    from investment_agent.domain.month_bridge import daily_moves
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None:
+        return unavailable()
+    try:
+        events = list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)
+    except RepositoryUnavailable:
+        return unavailable()
+    today = now(request).astimezone(VN).date()
+    data_dir = request.app.state.data_dir
+    closes, sessions = {}, []
+    if data_dir is not None and events:
+        store = SeriesStore(Path(data_dir) / "trend-sources")
+        symbols = {e.security_id for e in events if getattr(e, "security_id", None)}
+        closes = {s: {t.date(): v for t, v in store.read(f"{s}-1d")} for s in symbols}
+        sessions = [t.date() for t, _ in store.read("VNINDEX-1d") if t.date() <= today]
+    return {"days": daily_moves(events, closes=closes, sessions=sessions, today=today)}

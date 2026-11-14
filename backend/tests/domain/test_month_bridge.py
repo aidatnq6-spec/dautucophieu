@@ -47,3 +47,19 @@ def test_the_first_month_starts_from_nothing():
 
 def test_a_month_without_sessions_says_so():
     assert month_bridge(EVENTS, closes=CLOSES, sessions=DAYS, month="2026-12")["status"] == "no_sessions"
+
+
+
+def test_each_session_s_gain_leaves_money_in_and_out_aside_and_names_the_tickers_that_moved_it():
+    from investment_agent.domain.month_bridge import daily_moves
+    closes = {"FPT": {date(2026, 10, 1): 50.0, date(2026, 10, 2): 51.0, date(2026, 10, 5): 50.5, date(2026, 10, 6): 52.0}}
+    events = parse_events([
+        {"event_id": "d1", "type": "deposit", "effective_at": "2026-09-30", "sequence": 0, "amount": "100000000"},
+        {"event_id": "b1", "type": "buy", "effective_at": "2026-10-01", "sequence": 0, "security_id": "FPT", "quantity": 1000, "price": "50000", "fee": "0", "tax": "0"},
+        {"event_id": "d2", "type": "deposit", "effective_at": "2026-10-05", "sequence": 0, "amount": "10000000"},
+        {"event_id": "b2", "type": "buy", "effective_at": "2026-10-06", "sequence": 0, "security_id": "HPG", "quantity": 100, "price": "20000", "fee": "0", "tax": "0"}])
+    days = [date(2026, 10, 1), date(2026, 10, 2), date(2026, 10, 5), date(2026, 10, 6)]
+    out = daily_moves(events, closes=closes, sessions=days, today=date(2026, 10, 6))
+    assert out[0] == {"date": "2026-10-02", "status": "ok", "gain": "1000000", "return": "0.01", "tickers": [{"symbol": "FPT", "amount": "1000000"}]}
+    assert out[1]["gain"] == "-500000"  # the 10 tr deposit that day is not a gain
+    assert out[2] == {"date": "2026-10-06", "status": "missing", "missing": ["HPG"]}

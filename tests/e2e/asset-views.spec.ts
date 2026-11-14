@@ -24,3 +24,11 @@ test("the two views add no sideways scroll at 375px", async ({ page }) => {
   await expect(page.getByRole("region", { name: "Bản đồ danh mục" }).getByText("Đang tải…")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });
+
+
+test("the daily calendar shows each session, or says the ledger has none yet", async ({ page }) => {
+  await page.goto("/portfolio");
+  const box = page.getByRole("region", { name: "Lịch lãi lỗ hằng ngày" });
+  await expect(box.getByText("Đang tải…")).toHaveCount(0);
+  await expect(box).toContainText(/Chưa có phiên nào|Mỗi ô một phiên/);
+});

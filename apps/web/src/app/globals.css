@@ -200,6 +200,13 @@ legend{font-weight:600;padding:0 6px}
 .hr-wrap{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:16px;align-items:start}@media(max-width:900px){.hr-wrap{grid-template-columns:minmax(0,1fr)}}
 .hr-plot{width:100%;height:auto;overflow:visible}.hr-ring{fill:none;stroke:var(--line)}.hr-full{stroke:var(--muted)}.hr-area{fill:color-mix(in srgb,var(--brand) 25%,transparent);stroke:var(--brand);stroke-width:2}
 .hr-dot{fill:var(--brand)}.hr-axis{font-size:11px;fill:var(--ink)}.hr-none{fill:var(--muted);font-style:italic}
+/* Lịch lãi/lỗ hằng ngày */
+.dc-wrap{overflow-x:auto;padding-bottom:4px}.dc-grid{display:flex;gap:3px;width:max-content}.dc-col{display:flex;flex-direction:column;gap:3px}
+.dc-head{height:16px;font-size:10px;color:var(--muted);line-height:16px;padding-right:4px}.dc-cell{width:16px;height:16px;border-radius:3px;border:0;padding:0;cursor:pointer}
+.dc-off{background:transparent;cursor:default}.dc-none{background:var(--vc-unknown)}.dc-flat{background:var(--vc-neutral)}
+.dc-g1{background:color-mix(in srgb,var(--good) 30%,var(--paper))}.dc-g2{background:color-mix(in srgb,var(--good) 60%,var(--paper))}.dc-g3{background:var(--good)}
+.dc-r1{background:color-mix(in srgb,var(--bad) 30%,var(--paper))}.dc-r2{background:color-mix(in srgb,var(--bad) 60%,var(--paper))}.dc-r3{background:var(--bad)}
+.dc-on{outline:2px solid var(--ink);outline-offset:1px}
 .fd-stock{background:var(--op2)}.fd-balanced{background:var(--op4)}.fd-bond{background:var(--op3)}.fd-unknown{background:var(--vc-unknown)}
 /* Dự án và điểm rơi lợi nhuận: one bar per year, scaled to the largest year. */
 .pp-years{display:grid;gap:6px;margin:4px 0 14px}.pp-year{display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;gap:10px;align-items:center}

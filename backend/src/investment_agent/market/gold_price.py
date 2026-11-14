@@ -96,6 +96,15 @@ def _parse(page: str) -> tuple[dict, str] | str:
     return kinds, datetime.strptime(" ".join(when.group(1).split()), "%H:%M %d/%m/%Y").replace(tzinfo=VN).isoformat()
 
 
+HISTORY_FILE = "gold-price-history.json"
+
+
+def gold_history(data_dir: Path | None) -> dict[str, dict[str, str]]:
+    """{kind: {day: buying price per chỉ}}: the last price seen each day, kept from 11/2026 for the month waterfall."""
+    path = Path(data_dir) / HISTORY_FILE if data_dir is not None else None
+    return json.loads(path.read_text(encoding="utf-8")) if path is not None and path.is_file() else {}
+
+
 def gold_price_sync(store: GoldPriceStore, *, get: Callable[[str], str], now: datetime) -> dict:
     try:
         parsed = _parse(get(URL))
@@ -105,4 +114,11 @@ def gold_price_sync(store: GoldPriceStore, *, get: Callable[[str], str], now: da
         return {"status": "error", "reason": parsed}
     kinds, as_of = parsed
     store.save({"source": "Phú Quý", "unit": "chỉ", "url": URL, "fetched_at": now.isoformat(), "as_of": as_of, "kinds": kinds})
+    history = gold_history(store.path.parent)
+    for kind, price in kinds.items():
+        history.setdefault(kind, {})[as_of[:10]] = price["buy"]
+    path = store.path.parent / HISTORY_FILE
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(history, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+    os.replace(tmp, path)
     return {"status": "ok", "kinds": len(kinds)}

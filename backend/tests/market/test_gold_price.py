@@ -40,3 +40,13 @@ def test_a_changed_unit_a_failed_or_empty_page_keeps_what_was_stored(tmp_path):
     assert gold_price_sync(store, get=boom, now=NOW)["status"] == "error"
     assert list(gold_prices(tmp_path)["kinds"]) == ["Vàng miếng SJC"]
     assert gold_prices(None) == {} and gold_prices(tmp_path / "none") == {}
+
+
+def test_each_day_s_buying_price_of_every_kind_is_kept(tmp_path):
+    from investment_agent.market.gold_price import gold_history
+    store = GoldPriceStore(tmp_path)
+    gold_price_sync(store, get=lambda url: page(ROWS), now=NOW)
+    gold_price_sync(store, get=lambda url: page([("Vàng miếng SJC", "13,800,000", "14,150,000")], when="09:00 07/11/2026"), now=NOW)
+    gold_price_sync(store, get=lambda url: page([("Vàng miếng SJC", "13,900,000", "14,200,000")], when="15:00 07/11/2026"), now=NOW)  # later the same day
+    assert gold_history(tmp_path)["Vàng miếng SJC"] == {"2026-11-06": "13750000", "2026-11-07": "13900000"}
+    assert gold_history(tmp_path)["Nhẫn tròn Phú Quý 999.9"] == {"2026-11-06": "13750000"}

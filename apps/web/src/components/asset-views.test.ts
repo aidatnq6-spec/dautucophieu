@@ -44,3 +44,15 @@ describe("barSpans", () => {
       .toEqual([[0, 100], [100, 120], [120, 70], [0, 70]]);
   });
 });
+
+describe("bridge with the book", () => {
+  const b = { status: "ok" as const, month: "2026-12", start_day: "2026-11-30", end_day: "2026-12-31", start: "100", end: "110", other: "0",
+    steps: [{ id: "ticker:FPT", symbol: "FPT", amount: "10" }] };
+  const book = { status: "ok" as const, start: "1000", end: "1060", steps: [{ id: "book:fund_price", amount: "20" }, { id: "book:entries", amount: "40" }] };
+  it("adds the book to the start and the end and lists its causes after the account", () => {
+    const bars = bridgeBars(b, book);
+    expect(bars.map((x) => [x.label, x.amount])).toEqual([["Đầu tháng", 1100], ["FPT", 10], ["Giá quỹ", 20], ["Sổ tài sản: ghi thêm/bớt/sửa", 40], ["Cuối kỳ", 1170]]);
+    expect(barSpans(bars).at(-2)![1]).toBe(1170);  // the steps reach the end exactly
+    expect(bridgeNotes(b, book)).toEqual(["Giá quỹ đóng góp 20 đ", "FPT đóng góp 10 đ"]);  // entries are money moved, not a cause
+  });
+});

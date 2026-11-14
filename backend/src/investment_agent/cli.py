@@ -880,7 +880,15 @@ def fund_nav_sync_cli(data_dir: Path, *, post=None) -> int:
             response = httpx.post(url, json=body, timeout=30, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
             response.raise_for_status()
             return response.json()
-    out = fund_nav_sync(FundNavStore(data_dir), post=post, now=datetime.now(timezone.utc))
+    now = datetime.now(timezone.utc)
+    out = fund_nav_sync(FundNavStore(data_dir), post=post, now=now)
+    if out["status"] == "ok":  # Điểm khách quan của quỹ: this month's snapshot, for the trend
+        from zoneinfo import ZoneInfo
+
+        from investment_agent.domain.fund_score import fund_scores, record_scores
+        from investment_agent.market.fund_nav import fund_history, fund_profiles
+        record_scores(data_dir, now.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).strftime("%Y-%m"),
+                      fund_scores(fund_profiles(data_dir), fund_history(data_dir)))
     print(json.dumps(out))
     return 1 if out["status"] == "error" else 0
 

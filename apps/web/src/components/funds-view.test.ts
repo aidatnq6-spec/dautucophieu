@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coveredText, mineNotes, returnText, runUpCheck } from "./funds-view";
+import { coveredText, mineNotes, returnText, runUpCheck, scoreView } from "./funds-view";
 
 describe("returnText", () => {
   it("shows a percentage return with its sign, and a dash when the source has none", () => {
@@ -40,5 +40,16 @@ describe("coveredText", () => {
   it("names the month and how much of each fund its published holdings cover", () => {
     expect(coveredText({ DCDS: { as_of: "2026-10", stocks: "55.73", bonds: "0" }, VIBF: { as_of: "2026-09", stocks: "18.62", bonds: "30.1" } }))
       .toBe("DCDS 10/2026: cổ phiếu công bố 55,7% NAV; VIBF 09/2026: cổ phiếu công bố 18,6% NAV, trái phiếu 30,1%");
+  });
+});
+
+describe("scoreView", () => {
+  it("shows the score, its change since last month and what was counted", () => {
+    const s = { score: "62.5", parts: { returns: "75", fee: "50", risk: null }, counted: ["returns", "fee"], risk_days: 3, peers: 35,
+      trend: { previous: "60", change: "2.5" } };
+    expect(scoreView(s)).toEqual({ text: "63", arrow: "▲2,5", title: "hiệu suất 75, phí 50; rủi ro chưa tính (có 3 ngày NAV, cần 120)" });
+    expect(scoreView({ ...s, trend: { previous: "70", change: "-7.5" } }).arrow).toBe("▼7,5");
+    expect(scoreView({ ...s, score: null, peers: 1 }).title).toBe("Quỹ duy nhất trong nhóm: không so được");
+    expect(scoreView(null).text).toBe("—");
   });
 });

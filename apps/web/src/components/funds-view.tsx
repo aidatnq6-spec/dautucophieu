@@ -7,7 +7,20 @@ export type Kind = "STOCK" | "BALANCED" | "BOND";
 type Returns = { ytd: string | null; m1: string | null; m3: string | null; m6: string | null; m12: string | null; m36: string | null; m60: string | null; annual36: string | null };
 type Place = { rank: number; of: number } | null;
 export type Fund = { code: string; name: string; kind: Kind | null; manager: string | null; fee: string | null; nav: string; date: string;
-  returns: Returns | null; held: boolean; beats_deposit: boolean | null; rank?: { m6: Place; m12: Place }; run_up?: boolean | null };
+  returns: Returns | null; held: boolean; beats_deposit: boolean | null; rank?: { m6: Place; m12: Place }; run_up?: boolean | null; score?: Score | null };
+type Score = { score: string | null; parts: { returns: string | null; fee: string | null; risk: string | null }; counted: string[]; risk_days: number;
+  peers: number; trend: { previous: string; change: string } | null };
+const PART_LABEL: Record<string, string> = { returns: "hiệu suất", fee: "phí", risk: "rủi ro" };
+
+/** Điểm khách quan: the score, its arrow against last month, and what it is made of. */
+export function scoreView(s: Score | null | undefined): { text: string; arrow: string; title: string } {
+  if (!s || s.score === null) return { text: "—", arrow: "", title: s && s.peers < 2 ? "Quỹ duy nhất trong nhóm: không so được" : "Chưa đủ số để chấm" };
+  const change = s.trend ? Number(s.trend.change) : null;
+  const arrow = change === null ? "" : change > 0 ? `▲${formatDecimal(s.trend!.change, 1)}` : change < 0 ? `▼${formatDecimal(s.trend!.change.replace("-", ""), 1)}` : "=";
+  const parts = s.counted.map((k) => `${PART_LABEL[k]} ${formatDecimal(s.parts[k as keyof Score["parts"]]!, 0)}`).join(", ");
+  const risk = s.parts.risk === null ? `; rủi ro chưa tính (có ${s.risk_days} ngày NAV, cần 120)` : "";
+  return { text: formatDecimal(s.score, 0), arrow, title: `${parts}${risk}` };
+}
 type Group = { kind: Kind | "unknown"; value: string; share: string; funds: string[] };
 type Mine = { groups: Group[]; total: string; fund_count: number; at_cost: string[]; notes: ("fewer_than_3" | "single_kind")[] };
 type ThroughRow = { symbol: string; direct: string; through: string; total: string; share: string | null; funds: { code: string; percent: string }[] };
@@ -186,7 +199,7 @@ export function FundsView() {
           </p>
           <table className="fv-table" aria-label="Danh sách quỹ mở">
             <thead><tr><th>Quỹ</th><th>Nhóm</th><th className="num">NAV/đơn vị</th>{PERIODS.map((p) => <th key={p.key} className="num">{p.label}</th>)}
-              <th className="num">Phí quản lý</th><th>1 năm so với gửi tiết kiệm</th></tr></thead>
+              <th className="num">Phí quản lý</th><th className="num">Điểm</th><th>1 năm so với gửi tiết kiệm</th></tr></thead>
             <tbody>{shown.map((f) => <tr key={f.code} className={f.held ? "fd-held" : undefined}>
               <td data-label="Quỹ"><strong>{f.code}</strong>{f.held && <> <span className="pill">Bạn đang giữ</span></>}
                 <div className="caption">{f.name}{f.manager ? ` · ${f.manager}` : ""}</div></td>
@@ -194,13 +207,17 @@ export function FundsView() {
               <td className="num" data-label="NAV/đơn vị">{formatDecimal(f.nav, 0)}<div className="caption">{day(f.date)}</div></td>
               {PERIODS.map((p) => <td key={p.key} className={`num ${tone(f.returns?.[p.key]) ?? ""}`} data-label={p.label}>{returnText(f.returns?.[p.key])}</td>)}
               <td className="num" data-label="Phí quản lý">{f.fee === null ? "—" : `${formatDecimal(f.fee, 2)}%`}</td>
+              {(() => { const s = scoreView(f.score); return <td className="num" data-label="Điểm" title={s.title}>{s.text}{s.arrow && <span className="caption"> {s.arrow}</span>}
+                <div className="caption">{s.title}</div></td>; })()}
               <td data-label="So với gửi tiết kiệm">{f.beats_deposit === null ? "—"
                 : f.beats_deposit ? <span className="pill good">Cao hơn</span> : <span className="pill bad">Thấp hơn</span>}</td>
             </tr>)}</tbody>
           </table>
           <p className="caption">NAV và lợi nhuận theo từng kỳ là số Fmarket công bố (đơn vị phân phối, không phải công ty quản lý quỹ){board.source
             ? `, lấy lúc ${new Date(board.source.fetched_at).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}` : ""}. Kỳ Fmarket không có số thì để trống.
-            VN-Index tính từ giá đóng cửa đã lưu, cùng các kỳ. Quỹ mới thì lợi nhuận ngắn hạn dao động mạnh; so quỹ cùng nhóm với nhau. Lịch sử NAV bắt đầu lưu
+            VN-Index tính từ giá đóng cửa đã lưu, cùng các kỳ. Điểm (0–100) chỉ chấm phần đo được, xếp hạng trong cùng nhóm: hiệu suất 1 và 3 năm, phí quản lý
+            (thấp hơn là tốt), rủi ro (sụt giảm lớn nhất và độ dao động của NAV, khi đã lưu đủ 120 ngày); triển vọng là nhận định nên không chấm. Mũi tên so
+            với điểm tháng trước. Quỹ mới thì lợi nhuận ngắn hạn dao động mạnh; so quỹ cùng nhóm với nhau. Lịch sử NAV bắt đầu lưu
             mỗi ngày: hiện có {days} ngày. Không phải khuyến nghị.</p>
         </>}
       </section>

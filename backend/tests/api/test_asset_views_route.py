@@ -30,6 +30,15 @@ def test_the_month_bridge_explains_the_account_s_month_to_the_dong(tmp_path):
     assert call(c, clock, "GET", "/internal/month-bridge/2027-13").status_code == 422
 
 
+def test_the_daily_calendar_gives_each_session_s_gain(tmp_path):
+    store = SeriesStore(tmp_path / "trend-sources")
+    store.upsert("VNINDEX-1d", [(datetime(2027, 1, d), "1700") for d in (5, 6, 7)])
+    store.upsert("FPT-1d", [(datetime(2027, 1, 5), "50"), (datetime(2027, 1, 6), "55"), (datetime(2027, 1, 7), "54")])
+    c, clock = client(tmp_path)
+    days = call(c, clock, "GET", "/internal/performance-daily").json()["days"]
+    assert [(d["date"], d["gain"]) for d in days] == [("2027-01-06", "500000"), ("2027-01-07", "-100000")]
+
+
 def test_the_month_bridge_adds_the_book_as_saved_by_the_end_of_the_month(tmp_path):
     store = SeriesStore(tmp_path / "trend-sources")
     store.upsert("VNINDEX-1d", [(datetime(2027, 1, d), "1700") for d in (4, 5, 14)])

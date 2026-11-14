@@ -182,7 +182,8 @@ legend{font-weight:600;padding:0 6px}
 .am-g1{fill:color-mix(in srgb,var(--good) 22%,var(--paper))}.am-g2{fill:color-mix(in srgb,var(--good) 38%,var(--paper))}.am-g3{fill:color-mix(in srgb,var(--good) 55%,var(--paper))}
 .am-r1{fill:color-mix(in srgb,var(--bad) 22%,var(--paper))}.am-r2{fill:color-mix(in srgb,var(--bad) 38%,var(--paper))}.am-r3{fill:color-mix(in srgb,var(--bad) 55%,var(--paper))}
 .am-head{font-size:12px;font-weight:700;fill:var(--muted);letter-spacing:.02em}.am-label{font-size:13px;font-weight:700;fill:var(--ink)}.am-sub{font-size:11.5px;fill:var(--ink)}
-.am-note{font-size:10.5px;fill:var(--muted)}
+.am-note{font-size:10.5px;fill:var(--muted)}.am-small{font-size:11.5px}
+.am-hidden{list-style:none;margin:6px 0 4px;padding:0;font-size:13px;display:grid;gap:4px}.am-hidden li{border-left:3px solid var(--line);padding-left:8px}
 .am-axis{font-size:11px;fill:var(--muted)}.am-zero{stroke:var(--line)}.am-total{fill:var(--brand)}.am-up{fill:var(--good)}.am-down{fill:var(--bad)}
 /* Bong bóng góc phần tư */
 .wq-plot{width:100%;height:auto;display:block;margin:6px 0 12px}.wq-frame{fill:none;stroke:var(--line)}.wq-axis{stroke:var(--line);stroke-dasharray:4 4}

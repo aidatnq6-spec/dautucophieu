@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { growthScale, labelSpots, place } from "./watch-quadrant";
+import { floorScale, growthScale, labelSpots, place } from "./watch-quadrant";
 
 const p = { symbol: "AAA", pb: "1", cheaper_months: "0.25", months: 40, growth: "0.5", quarter: "2026-Q3", held: "400", zone: "cheap_growing" as const };
 
@@ -24,5 +24,13 @@ describe("labelSpots", () => {
     expect(spots.A).toEqual({ x: 100, y: 93, anchor: "middle" });
     expect(spots.B).not.toBeNull();
     expect(spots.B!.y).not.toBe(93);
+  });
+});
+
+describe("floorScale", () => {
+  it("stops the plot just below the lowest ticker instead of at −300%", () => {
+    expect(floorScale([0.2, -0.95])).toBeCloseTo(growthScale(-1), 9);
+    expect(floorScale([0.2, 0.1])).toBeCloseTo(growthScale(-0.5), 9);
+    expect(floorScale([-7])).toBeCloseTo(-1, 9);
   });
 });

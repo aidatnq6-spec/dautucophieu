@@ -20,6 +20,15 @@ def _change(value: Decimal, cost: Decimal) -> str | None:
     return _s(((value - cost) / cost).quantize(Decimal("0.0001"), ROUND_HALF_UP)) if cost > 0 else None
 
 
+def bank_key(name: str) -> str:
+    """The bank a sổ belongs to, from the name typed for it: "NCB ·0990" and "SHB gửi góp ·795" are NCB and SHB — the trailing
+    "·number" dropped, then the leading upper-case code when there is one; a name like "Ngân hàng A" stays whole."""
+    import re
+    base = re.sub(r"\s*[·•.#-]?\s*\d+\s*$", "", name.strip()) or name.strip()
+    code = re.match(r"^([A-ZĐ0-9]{2,10})\b", base)
+    return code.group(1) if code else base
+
+
 def asset_map(holdings: list[dict], *, ledger_cash: str, book: DepositBook | None, navs: dict, profiles: dict, gold: dict,
               sectors: dict[str, str], today: date) -> dict:
     book = book or DepositBook()
@@ -40,7 +49,7 @@ def asset_map(holdings: list[dict], *, ledger_cash: str, book: DepositBook | Non
                                 "change": _change(value, b.amount) if row["source"] == "nav" else None})
     banks: dict[str, list] = {}
     for d in book.deposits:  # one tile per bank: a dozen equal sổ of one bank read as one block, not a dozen
-        banks.setdefault(d.bank.strip(), []).append(d)
+        banks.setdefault(bank_key(d.bank), []).append(d)
     for bank, ds in banks.items():
         first = min(d.matures for d in ds)
         note = f"{len(ds)} sổ · sớm nhất đến hạn {first:%d/%m/%Y}" if len(ds) > 1 else f"đến hạn {first:%d/%m/%Y}"

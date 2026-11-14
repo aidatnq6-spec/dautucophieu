@@ -53,8 +53,8 @@ export function squarify(values: number[], w: number, h: number, x0 = 0, y0 = 0)
  * slivers without a name; the list view still shows every one. */
 export function mergeSmall(tiles: Tile[]): Tile[] {
   const total = tiles.reduce((a, t) => a + Number(t.value), 0);
-  if (tiles.length <= 5 || total <= 0) return tiles;
-  const small = tiles.filter((t) => Number(t.value) / total < 0.03);
+  if (tiles.length < 4 || total <= 0) return tiles;
+  const small = tiles.filter((t) => Number(t.value) / total < 0.04);
   if (small.length < 2) return tiles;
   const rest = tiles.filter((t) => !small.includes(t));
   return [...rest, { id: "small", label: `${small.length} khoản nhỏ`, note: small.map((t) => t.label).join(", "),
@@ -64,7 +64,7 @@ export function mergeSmall(tiles: Tile[]): Tile[] {
 /** Text cut to fit a width at about 7 px a character (13 px bold), with an ellipsis; "" when not even three characters fit. */
 export function fit(text: string, width: number, charW = 7.2): string {
   const n = Math.floor((width - 10) / charW);
-  if (n < 3) return "";
+  if (n < 5) return "";  // a name cut to one or two letters says nothing: the tile stays plain, its title shows on hover
   return text.length <= n ? text : `${text.slice(0, n - 1)}…`;
 }
 

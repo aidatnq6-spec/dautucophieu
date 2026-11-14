@@ -37,3 +37,9 @@ def test_term_deposits_are_one_tile_per_bank():
     tiles = {t["label"]: t for t in out["groups"][0]["tiles"]}
     assert tiles["NCB"] == {"id": "bank:NCB", "label": "NCB", "note": "3 sổ · sớm nhất đến hạn 05/01/2027", "value": "150000000", "change": None}
     assert tiles["SHB"]["note"] == "đến hạn 05/04/2027"
+
+
+
+def test_a_sor_named_with_its_number_goes_with_its_bank():
+    from investment_agent.domain.asset_map import bank_key
+    assert [bank_key(n) for n in ("NCB ·0990", "SHB ·7536", "SHB gửi góp ·795", "Ngân hàng A", "VCB", "TCB-1234")] == ["NCB", "SHB", "SHB", "Ngân hàng A", "VCB", "TCB"]

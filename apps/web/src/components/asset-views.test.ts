@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { barSpans, bridgeBars, bridgeNotes, changeTone, squarify } from "./asset-views";
+import { barSpans, bridgeBars, bridgeNotes, changeTone, fit, mergeSmall, squarify } from "./asset-views";
 
 describe("squarify", () => {
   it("fills the box exactly, each area in proportion to its value", () => {
@@ -54,5 +54,21 @@ describe("bridge with the book", () => {
     expect(bars.map((x) => [x.label, x.amount])).toEqual([["Đầu tháng", 1100], ["FPT", 10], ["Giá quỹ", 20], ["Sổ tài sản: ghi thêm/bớt/sửa", 40], ["Cuối kỳ", 1170]]);
     expect(barSpans(bars).at(-2)![1]).toBe(1170);  // the steps reach the end exactly
     expect(bridgeNotes(b, book)).toEqual(["Giá quỹ đóng góp 20 đ", "FPT đóng góp 10 đ"]);  // entries are money moved, not a cause
+  });
+});
+
+
+describe("map tiles", () => {
+  const tile = (id: string, value: string) => ({ id, label: id, note: null, value, change: null });
+  it("puts the slivers of a crowded layer into one tile and leaves a short layer alone", () => {
+    const out = mergeSmall([tile("a", "500"), tile("b", "300"), tile("c", "150"), tile("d", "20"), tile("e", "10"), tile("f", "10")]);
+    expect(out.map((t) => t.label)).toEqual(["a", "b", "c", "3 khoản nhỏ"]);
+    expect(out[3].value).toBe("40");
+    expect(mergeSmall([tile("a", "500"), tile("b", "1")])).toHaveLength(2);
+  });
+  it("cuts a name to its tile with an ellipsis", () => {
+    expect(fit("iPower TCBS (nhận lãi)", 100)).toBe("iPower TCBS…");
+    expect(fit("KDH", 100)).toBe("KDH");
+    expect(fit("KDH", 20)).toBe("");
   });
 });

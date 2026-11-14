@@ -51,14 +51,41 @@ def public_figures(data_dir: Path | None, symbol: str, *, today: date, multiples
     return close, day, auto
 
 
-def view_for(data_dir, symbol: str, model: dict, *, today: date, plans: dict | None = None) -> dict:
+def reference_row(data_dir, market, repo, owner, symbol: str, *, today: date) -> dict | None:
+    """The ticker's row of Định giá tham chiếu, worked out over its sector's watched tickers only (its peers); None without data."""
+    if data_dir is None or market is None:
+        return None
+    from investment_agent.market.sectors import load_sectors
+    from investment_agent.market.series import SeriesStore
+    from investment_agent.market.watchlist import load_watchlist
+    from investment_agent.services.holdings_view import _bank_figures
+    from investment_agent.services.records import valuation_settings
+    from investment_agent.valuation.reference import Settings, reference_board, year_end_prices
+    from investment_agent.valuation.sources import merged_fundamentals
+    data_dir = Path(data_dir)
+    sectors = load_sectors(data_dir)[0]
+    symbols = [s for s in load_watchlist(data_dir).symbols if s == symbol or (sectors.get(symbol) and sectors.get(s) == sectors.get(symbol))]
+    if symbol not in symbols:
+        return None
+    settings, _ = valuation_settings(repo, owner)
+    series = SeriesStore(data_dir / "trend-sources")
+    board = reference_board(symbols, sectors=sectors, records={s: merged_fundamentals(data_dir, s)[0] for s in symbols},
+                            prices={s: p.price for s in symbols if (p := market.price(s)) is not None},
+                            year_end={s: year_end_prices(series.read(f"{s}-1d"), today=today) for s in symbols},
+                            settings=Settings(settings.required_return, settings.long_term_growth, settings.threshold), today=today, held=set(),
+                            bank=_bank_figures(repo, owner, data_dir, symbols, sectors))
+    return next((r for r in board["rows"] if r["symbol"] == symbol), None)
+
+
+def view_for(data_dir, symbol: str, model: dict, *, today: date, plans: dict | None = None, reference: dict | None = None) -> dict:
     """plans: the owner's own annual plans for the ticker (settings/annual_plan_<symbol>), for the strategy facts."""
-    from investment_agent.domain.thesis_model import valuation_bands
+    from investment_agent.domain.thesis_model import suggest_scenarios, valuation_bands
     multiples: dict = {}
     close, day, auto = public_figures(data_dir, symbol, today=today, multiples=multiples)
     view = model_view(model, close=close, close_date=day, auto=auto, today=today)
     full = {**model, "ranges": model.get("ranges") or []}
-    out = {**view, "bands": valuation_bands(full, close=close, pe=multiples.get("pe", []), pb=multiples.get("pb", []))}
+    out = {**view, "bands": valuation_bands(full, close=close, pe=multiples.get("pe", []), pb=multiples.get("pb", []), reference=reference),
+           "suggested_scenarios": suggest_scenarios(close=close, pe=multiples.get("pe", []))}
     if data_dir is None:
         return {**out, "auto_catalysts": [], "suggested_indicators": [], "facts": {}, "auto_gaps": {}}
     from investment_agent.market.statements import StatementStore

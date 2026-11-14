@@ -56,3 +56,13 @@ test("no horizontal scroll with the quick numbers at 375px", async ({ page }) =>
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+
+test("Tổng quan gathers the goals set elsewhere, and says where to set the missing ones", async ({ page, context }) => {
+  const { signIn } = await import("./helpers");
+  await signIn(context);
+  await page.goto("/");
+  const card = page.getByRole("table", { name: "Mục tiêu và thực tế" });
+  await expect(card.getByRole("row", { name: /Góp vốn đều/ })).toBeVisible();
+  await expect(card.getByRole("link", { name: /Dòng tiền thụ động/ })).toHaveAttribute("href", "/profile?tab=dong-tien");
+});

@@ -39,6 +39,11 @@ def test_the_daily_calendar_gives_each_session_s_gain(tmp_path):
     assert [(d["date"], d["gain"]) for d in days] == [("2027-01-06", "500000"), ("2027-01-07", "-100000")]
 
 
+def test_held_charts_need_a_year_of_closes(tmp_path):
+    c, clock = client(tmp_path)  # FPT held, no closes stored
+    assert call(c, clock, "GET", "/internal/held-charts").json() == {"charts": [], "short": {"FPT": "chưa đủ 12 tháng giá"}}
+
+
 def test_the_month_bridge_adds_the_book_as_saved_by_the_end_of_the_month(tmp_path):
     store = SeriesStore(tmp_path / "trend-sources")
     store.upsert("VNINDEX-1d", [(datetime(2027, 1, d), "1700") for d in (4, 5, 14)])

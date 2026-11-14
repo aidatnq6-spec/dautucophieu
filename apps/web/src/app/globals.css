@@ -207,6 +207,10 @@ legend{font-weight:600;padding:0 6px}
 .dc-g1{background:color-mix(in srgb,var(--good) 30%,var(--paper))}.dc-g2{background:color-mix(in srgb,var(--good) 60%,var(--paper))}.dc-g3{background:var(--good)}
 .dc-r1{background:color-mix(in srgb,var(--bad) 30%,var(--paper))}.dc-r2{background:color-mix(in srgb,var(--bad) 60%,var(--paper))}.dc-r3{background:var(--bad)}
 .dc-on{outline:2px solid var(--ink);outline-offset:1px}
+/* Lưới biểu đồ nhỏ */
+.sm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}.sm-card{margin:0;border:1px solid var(--line);border-radius:8px;padding:8px}
+.sm-card figcaption{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.sm-svg{width:100%;height:auto;margin-top:4px;overflow:visible}
+.sm-index{fill:none;stroke:var(--vc-neutral);stroke-width:1.5}.sm-up{fill:none;stroke:var(--good);stroke-width:2}.sm-down{fill:none;stroke:var(--bad);stroke-width:2}
 .fd-stock{background:var(--op2)}.fd-balanced{background:var(--op4)}.fd-bond{background:var(--op3)}.fd-unknown{background:var(--vc-unknown)}
 /* Dự án và điểm rơi lợi nhuận: one bar per year, scaled to the largest year. */
 .pp-years{display:grid;gap:6px;margin:4px 0 14px}.pp-year{display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;gap:10px;align-items:center}

@@ -13,6 +13,7 @@ import { PerformanceView } from "./performance-view";
 import { AssetMapView, MonthBridgeView } from "./asset-views";
 import { BuyPlan } from "./buy-plan";
 import { DailyCalendar } from "./daily-calendar";
+import { HeldCharts } from "./held-charts";
 import { ThesisView } from "./thesis-view";
 import { TcbsImport } from "./tcbs-import";
 import { TradeBehaviour } from "./trade-behaviour";
@@ -94,6 +95,7 @@ export function PortfolioView() {
       <ConcentrationView />
       <PerformanceView />
       <DailyCalendar />
+      <HeldCharts />
       <MonthBridgeView />
       <AssetMapView />
       <BuyPlan />

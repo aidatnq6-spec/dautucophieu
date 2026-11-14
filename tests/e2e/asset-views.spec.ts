@@ -32,3 +32,11 @@ test("the daily calendar shows each session, or says the ledger has none yet", a
   await expect(box.getByText("Đang tải…")).toHaveCount(0);
   await expect(box).toContainText(/Chưa có phiên nào|Mỗi ô một phiên/);
 });
+
+
+test("the small charts draw each held ticker or name the ones short of a year", async ({ page }) => {
+  await page.goto("/portfolio");
+  const box = page.getByRole("region", { name: "Lưới biểu đồ nhỏ" });
+  await expect(box.getByText("Đang tải…")).toHaveCount(0);
+  await expect(box).toContainText(/Chưa nắm mã nào|VN-Index/);
+});

@@ -112,3 +112,22 @@ def get_daily(request: Request):
         closes = {s: {t.date(): v for t, v in store.read(f"{s}-1d")} for s in symbols}
         sessions = [t.date() for t, _ in store.read("VNINDEX-1d") if t.date() <= today]
     return {"days": daily_moves(events, closes=closes, sessions=sessions, today=today)}
+
+
+@router.get("/held-charts")
+def get_held_charts(request: Request):
+    """Lưới biểu đồ nhỏ: each held ticker's last twelve months against VN-Index, both rebased to 100."""
+    from investment_agent.domain.small_multiples import small_multiples
+    from investment_agent.services.holdings_view import held_from_repo
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    data_dir = request.app.state.data_dir
+    if repo is None:
+        return unavailable()
+    try:
+        held = held_from_repo(repo, owner)
+    except RepositoryUnavailable:
+        return unavailable()
+    if data_dir is None:
+        return {"charts": [], "short": {}}
+    store = SeriesStore(Path(data_dir) / "trend-sources")
+    return small_multiples({s: store.read(f"{s}-1d") for s in sorted(held)}, index=store.read("VNINDEX-1d"), today=now(request).astimezone(VN).date())

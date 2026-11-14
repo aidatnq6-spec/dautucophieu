@@ -54,6 +54,9 @@ def market_overview(request: Request):
             "macro": {"available": False, "reason": "source_not_entitled"}}
 
 
+_QUADRANT_INPUTS: dict[str, tuple[tuple, dict]] = {}  # symbol -> (the day and its files' versions, its P/B months and quarters)
+
+
 @router.get("/watchlist/quadrant")
 def watch_quadrant(request: Request):
     """Bong bóng góc phần tư: every watched ticker by its P/B against its own past and its profit growth, sized by what is held."""
@@ -83,10 +86,19 @@ def watch_quadrant(request: Request):
     sectors, closes = load_sectors(data_dir)[0], SeriesStore(data_dir / "trend-sources")
     tickers = {}
     for s in load_watchlist(data_dir).symbols:
+        folder = "statements" if kind_of(sectors.get(s)) is None else "statements-financial"
+        files = [data_dir / "trend-sources" / f"{s}-1d.json", data_dir / "fundamentals" / f"{s}.json", data_dir / "statements" / f"{s}.json",
+                 data_dir / folder / f"{s}.json"]
+        stamp = (today, folder, tuple((f.stat().st_mtime_ns, f.stat().st_size) if f.is_file() else None for f in files))
+        hit = _QUADRANT_INPUTS.get(s)
+        if hit and hit[0] == stamp:
+            tickers[s] = hit[1]
+            continue
         v = valuation_record(data_dir, s, today=today)
         hist = monthly_multiples(v["record"], closes.read(f"{s}-1d"), today=today, shares=v["shares"], published=v["published"])
-        store = StatementStore(data_dir / ("statements" if kind_of(sectors.get(s)) is None else "statements-financial"))
+        store = StatementStore(data_dir / folder)
         tickers[s] = {"pb": [(p["month"], None if p["value"] is None else str(p["value"])) for p in hist["pb"]["points"]],
                       "quarters": (store.read(s) or {}).get("quarters") or {}}
+        _QUADRANT_INPUTS[s] = (stamp, tickers[s])  # kept until the day or one of its files changes
     held = {h["security_id"]: Decimal(h["market_value"]) for h in holdings if h.get("market_value") is not None}
     return {**quadrant(tickers, held=held), "sectors": {s: sectors.get(s) for s in tickers}}

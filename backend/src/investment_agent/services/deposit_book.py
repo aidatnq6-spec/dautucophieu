@@ -25,13 +25,20 @@ def book_at(repo, owner, cutoff) -> DepositBook | None:
     its own revision with the time it was written, so this is the book as it stood, not a reconstruction."""
     from datetime import datetime
     head = read_version(repo, owner, *RECORD, None)
-    version = head.version if head else 0
-    while version >= 1:
-        record = head if head and head.version == version else read_version(repo, owner, *RECORD, version)
-        if record and datetime.fromisoformat(record.created_at) <= cutoff:
-            return DepositBook.model_validate(record.payload)
-        version -= 1
-    return None
+    if head is None:
+        return None
+    when = lambda r: datetime.fromisoformat(r.created_at)  # noqa: E731 - revisions are written in order, so their times only grow
+    if when(head) <= cutoff:
+        return DepositBook.model_validate(head.payload)
+    lo, hi, found = 1, head.version - 1, None  # halving: a few reads, not one per revision (4 s on a book saved many times)
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        record = read_version(repo, owner, *RECORD, mid)
+        if record is not None and when(record) <= cutoff:
+            found, lo = record, mid + 1
+        else:
+            hi = mid - 1
+    return DepositBook.model_validate(found.payload) if found else None
 
 
 def ledger_cash(repo, owner) -> Decimal:

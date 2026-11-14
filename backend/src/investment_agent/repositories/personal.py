@@ -33,6 +33,35 @@ def read_scope():
         _REQUEST_READS.reset(token)
 
 
+class ReadPlan:
+    """Which records each GET path read last time, so the next request for it reads them all in one batch before the route asks
+    (two Firestore round trips instead of one or two per record, read one after another). Only the list of records is kept, never
+    their contents: every request still reads them fresh."""
+
+    MAX_PATHS = 400
+
+    def __init__(self):
+        self._plans: dict[str, tuple[tuple[str, str], ...]] = {}
+        self._lock = RLock()
+
+    def records(self, path: str) -> tuple[tuple[str, str], ...]:
+        with self._lock:
+            return self._plans.get(path, ())
+
+    def learn(self, path: str, owner_uid: str) -> None:
+        """After a request: the records it read (latest versions only) in the current read scope."""
+        reads = _REQUEST_READS.get()
+        if reads is None:
+            return
+        seen = tuple(sorted((c, r) for (uid, c, r, v) in reads if uid == owner_uid and v is None))
+        with self._lock:
+            self._plans.pop(path, None)
+            if seen:
+                self._plans[path] = seen
+                while len(self._plans) > self.MAX_PATHS:
+                    self._plans.pop(next(iter(self._plans)))
+
+
 def prefetch(repo, context, records) -> None:
     """Read several records at once (in parallel) into the current request's reads; a no-op outside read_scope().
 
@@ -223,6 +252,20 @@ class PersonalRepository:
         for item, v in versions.items():
             if type(v) is not int or v < 1:
                 raise InvalidRecord("Invalid revision")
+        # An older revision already in memory needs no head: it exists, so it is at or below the head, and it never changes.
+        out = {}
+        with self._revisions_lock:
+            for item in wanted:
+                asked = versions.get(item)
+                path = f"owners/{self.owner_uid}/{item[0]}/{keys[item]}-v{asked}" if asked is not None else None
+                if path is not None and path in self._revisions:
+                    out[item] = deepcopy(self._revisions[path])
+        if out:
+            known_records = {item: self._check(data, item[0], item[1], versions[item]) for item, data in out.items()}
+            rest = [item for item in wanted if item not in known_records]
+            if not rest:
+                return known_records
+            return {**known_records, **self.read_many(context, rest, versions={i: v for i, v in versions.items() if i in rest})}
         heads = self.store.get_many([f"owners/{self.owner_uid}/record_heads/{keys[item]}" for item in wanted])
         targets = {}
         for item in wanted:

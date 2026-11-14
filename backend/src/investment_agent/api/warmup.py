@@ -12,7 +12,12 @@ import uuid
 from .auth import InternalAuthSettings, OwnerContext
 
 BASE = "http://127.0.0.1:8000"
-WARM_PATHS = ("/internal/glance", "/internal/overview", "/internal/equity-budget", "/internal/earnings")
+# The main pages' calls: each is answered once so the app learns which records it reads (one batch next time) and the price files
+# it parses are kept in memory before the owner's first view.
+WARM_PATHS = ("/internal/glance", "/internal/overview", "/internal/equity-budget", "/internal/earnings", "/internal/passive-income",
+              "/internal/contributions", "/internal/deposit-book", "/internal/theses", "/internal/performance", "/internal/month-bridge",
+              "/internal/asset-map", "/internal/performance-daily", "/internal/held-charts", "/internal/watchlist", "/internal/watchlist/quadrant",
+              "/internal/funds", "/internal/fairvalue", "/internal/concentration", "/internal/wealth-check")
 KEEP_ALIVE_SECONDS = 20 * 60
 STARTUP_WAIT_SECONDS = 60
 

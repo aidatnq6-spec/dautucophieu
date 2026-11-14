@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from investment_agent.market.view import EmptyMarket
-from investment_agent.repositories.personal import read_scope
+from investment_agent.repositories.personal import ReadPlan, prefetch, read_scope
 
 from .auth import InternalAuthSettings, InternalAuthenticator, Unauthorized, require_owner
 from .routes.buy_check import router as buy_check_router
@@ -76,6 +76,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
                market=None, jobs=None, outbox=None, telegram=None, deliveries=None, data_dir=None) -> FastAPI:
     """personal_repository None keeps personal routes fail-closed (503)."""
     authenticator = InternalAuthenticator(settings or InternalAuthSettings.from_env(), clock)
+    read_plan = ReadPlan()  # per app: which records each GET path read last time
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     app.state.clock, app.state.personal_repository = clock, personal_repository
     app.state.market = market or EmptyMarket()  # no licensed market source is connected yet
@@ -100,7 +101,16 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
                     return JSONResponse({"code": "request_too_large", "message": "Yêu cầu quá lớn."}, status_code=413, headers={"Cache-Control": "no-store"})
                 request.state.owner = authenticator.verify(request, body)
             with read_scope():  # each personal record is read from Firestore at most once per request
+                owner = getattr(request.state, "owner", None)
+                repo = getattr(app.state, "personal_repository", None)
+                plan_key = request.url.path if request.method == "GET" and owner is not None and repo is not None else None
+                if plan_key and (records := read_plan.records(plan_key)):
+                    # What this page read last time, in one batch before the route asks for it (off the event loop).
+                    from starlette.concurrency import run_in_threadpool
+                    await run_in_threadpool(prefetch, getattr(repo, "authoritative", repo), owner, list(records))
                 response = await call_next(request)
+                if plan_key and response.status_code == 200:
+                    read_plan.learn(plan_key, owner.uid)
         except Unauthorized:
             response = JSONResponse({"code": "unauthorized", "message": "Yêu cầu nội bộ không hợp lệ."}, status_code=401)
         response.headers["Cache-Control"] = "no-store"

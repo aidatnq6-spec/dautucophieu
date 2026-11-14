@@ -128,8 +128,11 @@ def valuation_bands(model: dict, *, close: Decimal | None, pe: list[Decimal], pb
             continue
         per_share = close / recent[-1]
         price = lambda m: _s((m * per_share).quantize(Decimal(100), ROUND_HALF_UP))  # noqa: E731
-        rows.append({"id": key, "name": label, "low": price(min(recent)), "mid": price(Decimal(str(median(recent)))), "high": price(max(recent)),
-                     "source": f"{len(recent)} tháng, thấp–trung vị–cao × {'lợi nhuận' if key == 'pe' else 'giá trị sổ sách'} mỗi CP hiện tại",
+        ordered = sorted(recent)
+        pct = lambda q: ordered[min(len(ordered) - 1, max(0, round(q * (len(ordered) - 1))))]  # noqa: E731 - nearest rank
+        # The middle half (25th to 75th percentile), not lowest to highest: months of near-zero profit put P/E in the hundreds (ANV, 11/2026).
+        rows.append({"id": key, "name": label, "low": price(pct(Decimal("0.25"))), "mid": price(Decimal(str(median(recent)))), "high": price(pct(Decimal("0.75"))),
+                     "source": f"{len(recent)} tháng, phân vị 25%–trung vị–75% × {'lợi nhuận' if key == 'pe' else 'giá trị sổ sách'} mỗi CP hiện tại",
                      "auto": True})
     rows += [{**r, "auto": False} for r in model.get("ranges") or []]
     return {"rows": rows, "close": _s(close) if close is not None else None, "notes": notes}

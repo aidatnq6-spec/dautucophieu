@@ -89,3 +89,12 @@ def test_valuation_bands_from_the_scenarios_five_years_of_multiples_and_the_owne
     assert "pb" not in rows and out["notes"] == ["P/B 5 năm: chưa đủ 24 tháng số dương"]
     with pytest.raises(ModelError):
         validate_model({"scenarios": [], "indicators": [], "ranges": [{"id": "r", "name": "SOTP", "low": "50", "high": "40"}]})
+
+
+
+def test_a_few_months_of_huge_p_e_do_not_stretch_the_band():
+    from investment_agent.domain.thesis_model import valuation_bands
+    m = validate_model({"scenarios": [], "indicators": []})
+    pe = [Decimal(10)] * 27 + [Decimal(500), Decimal(800), Decimal(10)]  # two months of near-zero profit
+    row = valuation_bands(m, close=Decimal("10000"), pe=pe, pb=[])["rows"][0]
+    assert row["id"] == "pe" and row["high"] == "10000" and row["low"] == "10000"  # the middle half: both ends at P/E 10

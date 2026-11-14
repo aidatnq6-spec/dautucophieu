@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AppNav } from "../../components/app-nav";
-import { BackToTop } from "../../components/back-to-top";
+import { BackToTop, ToBottom } from "../../components/back-to-top";
 import { PageJumps } from "../../components/page-jumps";
 import { ThemeToggle } from "../../components/theme-toggle";
 import { sessionAuth } from "../../lib/server/firebase-admin";
@@ -24,6 +24,7 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
         <ThemeToggle />
       </aside>
       <main className="content" id="main"><PageJumps />{children}</main>
+      <ToBottom />
       <BackToTop />
     </div>
   );

@@ -47,3 +47,27 @@ def test_the_view_weighs_the_scenarios_against_the_latest_close_and_counts_the_l
     assert rows["a"]["current"] == "66.7" and rows["a"]["period"] == "2026-Q3" and rows["a"]["grade"] == "good"
     assert rows["b"]["current"] == "120" and rows["b"]["grade"] == "watch" and rows["c"]["grade"] is None
     assert v["lights"] == {"good": 1, "watch": 1, "bad": 0, "none": 1}
+
+
+
+def test_the_six_questions_keep_their_answers_and_gaps_and_count_the_open_ones():
+    m = validate_model({"scenarios": [], "indicators": [], "stage": "reviewed", "questions": {
+        "business": {"status": "good", "summary": "Hai nguồn mới", "points": ["Thuê hạ tầng 50 năm", ""], "gaps": [{"id": "g1", "text": "Tách sản lượng × giá", "ref": "PHP-01"}]},
+        "valuation": {"status": "maybe", "gaps": [{"id": "g2", "text": "Giá ngầm định TEU", "done": True}]}}})
+    assert m["stage"] == "reviewed" and list(m["questions"]) == ["business", "strategy", "industry", "valuation", "monitoring", "timing"]
+    assert m["questions"]["business"]["points"] == ["Thuê hạ tầng 50 năm"] and m["questions"]["valuation"]["status"] is None  # unknown status dropped
+    v = model_view(m, close=None, close_date=None, auto={}, today=date(2026, 11, 14))
+    assert v["gaps"] == {"open": 1, "total": 2} and v["stage"] == "reviewed"
+    with pytest.raises(ModelError):
+        validate_model({"scenarios": [], "indicators": [], "questions": {"business": {"gaps": [{"id": "g", "text": " "}]}}})
+
+
+def test_catalysts_have_a_sign_and_are_due_on_their_day_until_marked_done():
+    m = validate_model({"scenarios": [], "indicators": [], "catalysts": [
+        {"id": "c1", "when": "Q4/2026", "on": "2026-11-10", "sign": "+", "text": "Bàn giao hạ tầng đợt 3", "source": "ĐHĐCĐ 2026"},
+        {"id": "c2", "when": "2028", "sign": "-", "text": "Bến 7&8 vào khai thác", "source": "FPTS"},
+        {"id": "c3", "when": "Q3/2026", "on": "2026-09-30", "sign": "?", "text": "Góp vốn Bạch Đằng", "done": True}]})
+    v = model_view(m, close=None, close_date=None, auto={}, today=date(2026, 11, 14))
+    assert [c["id"] for c in v["catalysts"]] == ["c1", "c2", "c3"] and v["catalysts_due"] == ["c1"]
+    with pytest.raises(ModelError):
+        validate_model({"scenarios": [], "indicators": [], "catalysts": [{"id": "x", "text": "a", "sign": "!"}]})

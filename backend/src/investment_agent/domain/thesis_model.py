@@ -18,6 +18,11 @@ TIERS = ("lead", "coincident", "lag", "valuation")
 AUTO = {"npat_parent_q": ("LN cổ đông mẹ quý", "tỷ"), "revenue_q": ("Doanh thu thuần quý", "tỷ"), "associates_q": ("Lãi công ty liên doanh, liên kết quý", "tỷ"),
         "gross_margin_q": ("Biên lợi nhuận gộp quý", "%"), "pe_ttm": ("P/E bốn quý", "lần"), "pb": ("P/B", "lần")}
 MAX_INDICATORS, MAX_READINGS = 15, 12
+# L4: the six questions of a thesis, each with a status, a one-line answer, its points and its gaps (what is still to find out).
+QUESTIONS = ("business", "strategy", "industry", "valuation", "monitoring", "timing")
+STATUSES = ("good", "watch", "bad")
+MAX_POINTS, MAX_GAPS, MAX_CATALYSTS = 8, 10, 20
+SIGNS = ("+", "-", "?")
 _ID = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
 
 
@@ -80,7 +85,55 @@ def validate_model(raw: dict) -> dict:
                     for r in (i.get("readings") or [])][-MAX_READINGS:] if source == "manual" else []
         indicators.append({"id": i["id"], "name": name, "tier": i["tier"], "unit": str(i.get("unit") or "").strip()[:12], **{k: _s(v) for k, v in levels.items()},
                            "lower_better": lower, "source": source, "readings": readings})
-    return {"scenarios": scenarios, "review": {"when": str(review.get("when") or "").strip()[:200], "on": on}, "indicators": indicators}
+    return {"scenarios": scenarios, "review": {"when": str(review.get("when") or "").strip()[:200], "on": on}, "indicators": indicators,
+            "questions": _questions(raw.get("questions") or {}), "catalysts": _catalysts(raw.get("catalysts") or []),
+            "stage": "reviewed" if raw.get("stage") == "reviewed" else "draft", "updated_on": raw.get("updated_on")}
+
+
+def _text(v, limit: int) -> str:
+    return str(v or "").strip()[:limit]
+
+
+def _day(v, what: str) -> str | None:
+    v = _text(v, 10) or None
+    if v:
+        try:
+            date.fromisoformat(v)
+        except ValueError:
+            raise ModelError("invalid_date", f"{what}: ngày theo dạng YYYY-MM-DD.") from None
+    return v
+
+
+def _questions(raw: dict) -> dict:
+    out = {}
+    for key in QUESTIONS:
+        q = raw.get(key) or {}
+        status = q.get("status") if q.get("status") in STATUSES else None
+        points = [p for p in (_text(p, 300) for p in q.get("points") or []) if p][:MAX_POINTS]
+        gaps = []
+        for g in (q.get("gaps") or [])[:MAX_GAPS]:
+            if not _ID.fullmatch(str(g.get("id") or "")) or not _text(g.get("text"), 200):
+                raise ModelError("invalid_gap", "Mỗi chỗ trống cần nội dung.")
+            gaps.append({"id": g["id"], "text": _text(g.get("text"), 200), "ref": _text(g.get("ref"), 20), "done": bool(g.get("done"))})
+        out[key] = {"status": status, "summary": _text(q.get("summary"), 300), "points": points, "gaps": gaps}
+    return out
+
+
+def _catalysts(raw: list) -> list:
+    if len(raw) > MAX_CATALYSTS:
+        raise ModelError("too_many", f"Tối đa {MAX_CATALYSTS} mốc.")
+    out = []
+    for c in raw:
+        if not _ID.fullmatch(str(c.get("id") or "")) or not _text(c.get("text"), 200) or c.get("sign") not in SIGNS:
+            raise ModelError("invalid_catalyst", "Mỗi mốc cần nội dung và dấu +, − hoặc ?.")
+        out.append({"id": c["id"], "when": _text(c.get("when"), 20), "on": _day(c.get("on"), "Ngày nhắc"), "sign": c["sign"], "text": _text(c.get("text"), 200),
+                    "source": _text(c.get("source"), 120), "done": bool(c.get("done"))})
+    return out
+
+
+def gap_count(questions: dict) -> dict:
+    gaps = [g for q in questions.values() for g in q["gaps"]]
+    return {"open": sum(1 for g in gaps if not g["done"]), "total": len(gaps)}
 
 
 def grade(value: Decimal, *, bad: Decimal, base: Decimal, lower_better: bool) -> str:
@@ -112,5 +165,10 @@ def model_view(model: dict, *, close: Decimal | None, close_date: str | None, au
         g = grade(Decimal(current), bad=Decimal(i["bad"]), base=Decimal(i["base"]), lower_better=i["lower_better"]) if current is not None else None
         lights[g or "none"] += 1
         out.append({**i, "current": current, "period": period, "grade": g})
+    questions = model.get("questions") or _questions({})
+    catalysts = sorted(model.get("catalysts") or [], key=lambda c: (c["done"], c["on"] or "9999", c["when"]))
+    due = [c["id"] for c in catalysts if c["on"] and not c["done"] and today >= date.fromisoformat(c["on"])]
     return {"scenarios": scen, "close": _s(close) if close else None, "close_date": close_date, "indicators": out, "lights": lights,
+            "questions": questions, "gaps": gap_count(questions), "catalysts": catalysts, "catalysts_due": due,
+            "stage": model.get("stage", "draft"), "updated_on": model.get("updated_on"),
             "auto_metrics": {k: {"label": v[0], "unit": v[1]} for k, v in AUTO.items()}}

@@ -196,6 +196,10 @@ legend{font-weight:600;padding:0 6px}
 .ib-hint{font-size:12px;margin:4px 0;color:var(--warn-soft-ink);background:var(--warn-soft-bg);border-radius:5px;padding:3px 6px}
 .ib-actions{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}.ib-actions .btn{padding:3px 8px;font-size:12px}.ib-card textarea{width:100%;min-height:60px}
 @media(max-width:1100px){.ib-board{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:650px){.ib-board{grid-template-columns:minmax(0,1fr)}}
+/* Radar sức khỏe tài chính */
+.hr-wrap{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:16px;align-items:start}@media(max-width:900px){.hr-wrap{grid-template-columns:minmax(0,1fr)}}
+.hr-plot{width:100%;height:auto;overflow:visible}.hr-ring{fill:none;stroke:var(--line)}.hr-full{stroke:var(--muted)}.hr-area{fill:color-mix(in srgb,var(--brand) 25%,transparent);stroke:var(--brand);stroke-width:2}
+.hr-dot{fill:var(--brand)}.hr-axis{font-size:11px;fill:var(--ink)}.hr-none{fill:var(--muted);font-style:italic}
 .fd-stock{background:var(--op2)}.fd-balanced{background:var(--op4)}.fd-bond{background:var(--op3)}.fd-unknown{background:var(--vc-unknown)}
 /* Dự án và điểm rơi lợi nhuận: one bar per year, scaled to the largest year. */
 .pp-years{display:grid;gap:6px;margin:4px 0 14px}.pp-year{display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;gap:10px;align-items:center}

@@ -144,19 +144,24 @@ export function barSpans(bars: { amount: number; kind: "total" | "step" }[]): [n
 
 const dmy = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 
-function Waterfall({ bars }: { bars: ReturnType<typeof bridgeBars> }) {
+export type Bar = { label: string; amount: number; kind: "total" | "step" };
+const billions = (v: string) => `${(Number(v) / 1e9).toLocaleString("vi-VN", { maximumFractionDigits: 0 })} tỷ`;
+
+/** A waterfall: totals stand on zero, each step starts where the one before ended; amounts in million (tr) or billion (tỷ) đồng. */
+export function Waterfall({ bars, unit = "tr", label = "Thác nước thay đổi tài sản trong tháng" }: { bars: Bar[]; unit?: "tr" | "tỷ"; label?: string }) {
+  const short = unit === "tỷ" ? billions : millions;
   const W = 960, H = 300, top = 18, bottom = 64, left = 8, gap = 8;
   const spans = barSpans(bars);
   const lo = Math.min(0, ...spans.flat()), hi = Math.max(...spans.flat(), 1);
   const y = (v: number) => top + ((hi - v) * (H - top - bottom)) / (hi - lo || 1);
   const bw = (W - left * 2) / bars.length - gap;
   return (
-    <svg className="am-fall" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Thác nước thay đổi tài sản trong tháng">
+    <svg className="am-fall" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label}>
       {bars.map((b, i) => { const [a, c] = spans[i], x = left + i * (bw + gap), y1 = y(Math.max(a, c)), y2 = y(Math.min(a, c));
         const cls = b.kind === "total" ? "am-total" : b.amount >= 0 ? "am-up" : "am-down";
         return <g key={`${b.label}-${i}`}>
           <rect x={x} y={y1} width={bw} height={Math.max(1, y2 - y1)} className={cls}><title>{`${b.label}: ${formatVnd(String(Math.round(b.amount)))}`}</title></rect>
-          <text x={x + bw / 2} y={y1 - 4} textAnchor="middle" className="am-sub">{b.kind === "step" && b.amount > 0 ? "+" : ""}{millions(String(b.amount))}</text>
+          <text x={x + bw / 2} y={y1 - 4} textAnchor="middle" className="am-sub">{b.kind === "step" && b.amount > 0 ? "+" : ""}{short(String(b.amount))}</text>
           <text x={x + bw / 2} y={H - bottom + 16} textAnchor="middle" className="am-axis">{b.label.length > 14 ? `${b.label.slice(0, 13)}…` : b.label}</text>
         </g>; })}
       <line x1={left} x2={W - left} y1={y(0)} y2={y(0)} className="am-zero" />
@@ -170,7 +175,7 @@ export function MonthBridgeView() {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
-    api<BridgeData>(`month-bridge${month ? `?month=${month}` : ""}`)
+    api<BridgeData>(`month-bridge${month ? `/${month}` : ""}`)
       .then((d) => { if (live) setData(d); }, (e) => { if (live) setError(e instanceof ApiError ? e.failure.message : "Lỗi tải."); });
     return () => { live = false; };
   }, [month]);

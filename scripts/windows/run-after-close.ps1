@@ -33,6 +33,9 @@ if (Test-Path -LiteralPath $symbols) {
 # Public macro feeds (FRED, Vietcombank); a failing source is logged and the run continues.
 $macro = & $python -W ignore -m investment_agent.cli macro-sync --data-dir $data 2>$null
 "$(Get-Date -Format o) macro-sync exit=$LASTEXITCODE $macro" | Add-Content -LiteralPath $log -Encoding UTF8
+# Nhac thanh khoan va ty gia: one Telegram note when the overnight interbank rate jumps or the Vietcombank rate nears the ceiling.
+$la = & $python -W ignore -m investment_agent.cli liquidity-alerts --data-dir $data 2>$null
+"$(Get-Date -Format o) liquidity-alerts exit=$LASTEXITCODE $la" | Add-Content -LiteralPath $log -Encoding UTF8
 # Dinh gia chi so: daily P/E and P/B of VNINDEX and VN30 from VNDirect's public API (whole history once, then the last 14 days).
 $ivs = & $python -W ignore -m investment_agent.cli index-valuation-sync --data-dir $data 2>$null
 "$(Get-Date -Format o) index-valuation-sync exit=$LASTEXITCODE $ivs" | Add-Content -LiteralPath $log -Encoding UTF8

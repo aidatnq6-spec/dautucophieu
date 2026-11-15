@@ -48,6 +48,8 @@ def main() -> int:
     tl.add_argument("--data-dir", type=Path, required=True)
     bp = commands.add_parser("buy-plan-check", help="after the close, one Telegram note for the planned tranches whose condition is now met")
     bp.add_argument("--data-dir", type=Path, required=True)
+    la = commands.add_parser("liquidity-alerts", help="one Telegram note when the overnight interbank rate jumps or the bank USD rate nears the ceiling")
+    la.add_argument("--data-dir", type=Path, required=True)
     me = commands.add_parser("macro-events-remind", help="one Telegram note the day before the owner's macro events marked for a reminder")
     me.add_argument("--data-dir", type=Path, required=True)
     fh = commands.add_parser("fund-holdings-sync", help="every open-ended fund's published top holdings from Fmarket into data/fund-holdings.json, "
@@ -162,6 +164,8 @@ def main() -> int:
         return thesis_lights_cli(args.data_dir)
     if args.command == "buy-plan-check":
         return buy_plan_cli(args.data_dir)
+    if args.command == "liquidity-alerts":
+        return liquidity_alerts_cli(args.data_dir)
     if args.command == "macro-events-remind":
         return macro_events_cli(args.data_dir)
     if args.command == "fund-holdings-sync":
@@ -976,6 +980,22 @@ def buy_plan_cli(data_dir: Path) -> int:
     out = check_plan(repo, owner, data_dir, send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date(),
                      request_id=f"buy-plan-{uuid.uuid4().hex[:16]}")
     print(json.dumps(out))  # counts only, never the plan
+    return 0
+
+
+def liquidity_alerts_cli(data_dir: Path) -> int:
+    """Nhắc thanh khoản và tỷ giá; skipped while scheduled delivery is off. Public figures only."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from investment_agent.services.liquidity_alerts import check_liquidity
+
+    telegram = _scheduled_telegram(data_dir)
+    if telegram is None:
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
+        return 0
+    out = check_liquidity(data_dir, send=telegram[0], today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
+    print(json.dumps(out))
     return 0
 
 

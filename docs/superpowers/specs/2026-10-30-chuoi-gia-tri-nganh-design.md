@@ -184,6 +184,10 @@ Cũng trong ngày 15/11/2026, chủ sở hữu chốt lại: **Phân tích ngàn
   - **"Giá urê"** đọc theo giá urê thế giới (Trung Đông, f.o.b.), lấy từ bảng giá hàng hóa hằng tháng của World Bank. Tệp xlsx được tìm qua trang commodity-markets, và chỉ tải lại khi còn thiếu giá của tháng trước.
   - **"Sản lượng container qua cảng"** đọc theo sản lượng container so với cùng kỳ, lấy từ bài thống kê hằng tháng của Hiệp hội Cảng biển Việt Nam. Bài đầu tiên là tháng 10/2026, nên chuỗi số dày dần theo từng tháng.
   - Cả hai nguồn đều đã được kiểm tra robots.txt.
+  - **"Xuất khẩu cá tra"** là yếu tố mới, mức chính, thêm vào chuỗi Thủy sản (VHC, ANV) theo yêu cầu của chủ sở hữu ngày 15/11/2026. Yếu tố này thay cho giá tôm thế giới, vì không có nguồn nối giá tôm với hai doanh nghiệp cá tra.
+    - Số liệu là kim ngạch xuất khẩu cá tra trong tháng so với cùng kỳ, đọc từ bài tổng kết hằng tháng công khai của VASEP.
+    - Trang thống kê của VASEP bắt đăng nhập nên không dùng.
+    - robots.txt của VASEP chặn các đường dẫn chứa một số chuỗi ký tự; bài nào có đường dẫn như vậy thì bỏ qua.
 - **Yếu tố sự kiện (cùng ngày, sửa quy tắc ở mục "Cách tính", chủ sở hữu đồng ý):**
   - Thuế quan và phòng vệ thương mại nay có `"kind": "event"`, không gắn chuỗi số liệu nào.
   - Các yếu tố này vẫn hiện trên sơ đồ, kèm link tới Lịch và nhật ký vĩ mô, nhưng không tính vào thanh tốt/xấu.

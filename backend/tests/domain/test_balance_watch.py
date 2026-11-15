@@ -117,6 +117,15 @@ def test_carry_is_named_only_when_both_borrowing_and_cash_are_material_and_the_s
     assert (carry(no_debt)["kind"], carry(no_debt)["cost"], carry(no_debt)["yield"]) == ("no_debt", None, "0.0700")
 
 
+def test_figures_no_deposit_pays_or_no_loan_costs_are_named_instead_of_carry():
+    rich = year_of_quarters(fin_income=30)  # 120 on 400: 30% a year, no deposit pays that (exchange gains, gains on investments)
+    assert (carry(rich)["kind"], carry(rich)["yield"]) == ("unusual_income", "0.3000")
+    cheap = year_of_quarters(interest=0.5)  # 2 on 200: 1% a year, interest likely capitalised into projects or assets being built
+    assert (carry(cheap)["kind"], carry(cheap)["cost"]) == ("low_interest", "0.0100")
+    edge = year_of_quarters(fin_income=10, interest=1)  # exactly 10% earned and 2% paid: still carry
+    assert carry(edge)["kind"] == "carry"
+
+
 def test_carry_with_a_quarter_missing_names_it_and_computes_nothing():
     qs = year_of_quarters()
     del qs["2026-Q1"]["interest"]

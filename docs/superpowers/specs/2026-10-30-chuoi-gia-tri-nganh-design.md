@@ -140,6 +140,12 @@ Hiện ứng dụng đã có các mảnh rời: 17 chỉ số vĩ mô đã lưu,
 
 Từ 15/11/2026, theo đề xuất của chủ sở hữu, Chuỗi giá trị chuyển sang trang **Phân tích ngành** (`/sectors`, trước đây tên là "Ngành theo quý"). Trang này có hai phần con, mở dạng tab: "Ngành theo quý" và "Chuỗi giá trị" (`/sectors?tab=chuoi-gia-tri`).
 
+Cũng trong ngày 15/11/2026, chủ sở hữu chốt lại: **Phân tích ngành** là một nhóm menu riêng, ngang hàng với "Vĩ mô & thị trường", gồm hai trang:
+- **Chuỗi giá trị** (`/value-chains`);
+- **Ngành theo quý** (`/sectors`), gồm Bản đồ nhiệt theo quý và Định giá ngành.
+
+Địa chỉ cũ `/sectors?tab=chuoi-gia-tri` tự chuyển sang `/value-chains`.
+
 **Thẻ tổng quan:**
 - Mỗi chuỗi một thẻ, gồm tên, thanh tốt/xấu, nhãn tổng và số mã theo dõi.
 - Thẻ có mã đang nắm thì hiện dấu "Đang nắm".

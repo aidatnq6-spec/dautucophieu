@@ -5,7 +5,7 @@ import { signIn } from "./helpers";
 test.beforeEach(async ({ context }) => signIn(context));
 
 async function openSection(page: import("@playwright/test").Page) {
-  await page.goto("/sectors?tab=chuoi-gia-tri");
+  await page.goto("/value-chains");
   const section = page.getByRole("region", { name: "Chuỗi giá trị" });
   await expect(section.getByRole("button", { name: /Cao su tự nhiên/ })).toBeVisible();
   return section;

@@ -1,9 +1,9 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BookOpenText, ClipboardList, Briefcase, Calculator, CalendarDays, ChartLine, Eye, Grid3x3, Globe, House, Newspaper, NotebookPen, PiggyBank, Scale, Settings, UserRound } from "lucide-react";
+import { Activity, BookOpenText, ClipboardList, Briefcase, Calculator, CalendarDays, ChartLine, Eye, Grid3x3, Globe, House, Newspaper, NotebookPen, PiggyBank, Scale, Settings, UserRound, Workflow } from "lucide-react";
 
-// Five short groups, each with its own accent colour (nav-tone-*), so the eye finds where a group starts.
+// Six short groups, each with its own accent colour (nav-tone-*), so the eye finds where a group starts.
 const GROUPS = [
   { title: null, tone: null, links: [{ href: "/", label: "Tổng quan", icon: House }] },
   { title: "Tài sản", tone: "assets", links: [
@@ -12,8 +12,10 @@ const GROUPS = [
   { title: "Vĩ mô & thị trường", tone: "market", links: [
     { href: "/macro", label: "Vĩ mô", icon: Globe },
     { href: "/market", label: "Thị trường trong phiên", icon: ChartLine },
-    { href: "/sectors", label: "Phân tích ngành", icon: Grid3x3 },
     { href: "/trend", label: "Xu hướng", icon: Activity }] },
+  { title: "Phân tích ngành", tone: "sectors", links: [
+    { href: "/value-chains", label: "Chuỗi giá trị", icon: Workflow },
+    { href: "/sectors", label: "Ngành theo quý", icon: Grid3x3 }] },
   { title: "Cổ phiếu", tone: "stocks", links: [
     { href: "/watchlist", label: "Theo dõi", icon: Eye },
     { href: "/fair-value", label: "Định giá", icon: Scale },

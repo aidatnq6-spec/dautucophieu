@@ -52,7 +52,7 @@ export function MarketView() {
         </div>
         {data.sectors_as_of && <p className="caption">Phân ngành ICB cấp 2 theo nguồn ngày {data.sectors_as_of}.</p>}
       </section>
-      <p className="caption">Chuỗi giá trị của từng ngành nay ở trang <Link href="/sectors?tab=chuoi-gia-tri">Phân tích ngành</Link>.</p>
+      <p className="caption">Chuỗi giá trị của từng ngành nay ở trang <Link href="/value-chains">Phân tích ngành → Chuỗi giá trị</Link>.</p>
     </>
   );
 }

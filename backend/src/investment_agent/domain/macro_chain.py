@@ -1,5 +1,6 @@
 """Chuỗi tác động vĩ mô on Vĩ mô: oil → Vietnam inflation → Vietnam rates → foreign flows → VN-Index, the chain the owner saw on a
-war-watch page. Each link reads its direction over about a month from data already stored and whether that weighs on stocks.
+war-watch page; since 11/2026 also liquidity — the VND–USD overnight spread with the latest open-market session — between
+inflation and rates. Each link reads its direction over about a month from data already stored and whether that weighs on stocks.
 Descriptive only: no recommendation, no model."""
 
 from datetime import date, timedelta
@@ -9,7 +10,7 @@ MONTH = timedelta(days=30)
 OIL_BAND, INDEX_BAND = Decimal("0.05"), Decimal("0.03")      # share moves
 CPI_BAND, RATE_BAND = Decimal("0.2"), Decimal("0.25")         # percentage points
 FOREIGN_SESSIONS = 20
-STALE_DAYS = {"oil": 10, "inflation": 45, "rates": 10, "foreign": 7, "vnindex": 7}
+STALE_DAYS = {"oil": 10, "inflation": 45, "liquidity": 10, "rates": 10, "foreign": 7, "vnindex": 7}
 RATES = ("vn_interbank_on", "vn10y")
 
 Points = list[tuple[date, Decimal]]
@@ -77,6 +78,20 @@ def _inflation(points: Points, today: date) -> dict:
             "from": points[-2][0].isoformat(), "change": _pp(change), "short_history": False, "stale": _stale(points, "inflation", today)}
 
 
+def _liquidity(points: Points, omo: dict | None, today: date) -> dict:
+    """Below zero, holding VND pays less than USD: pressure on the đồng, so less room for rates to fall. The spread's month move is
+    shown; the effect reads its sign."""
+    if not points:
+        return {**_missing("liquidity"), "omo": omo}
+    (start, then), short = _base(points)
+    change = points[-1][1] - then
+    latest = points[-1][1]
+    effect = "pressure" if latest < 0 else "support" if latest > 0 else "neutral"
+    return {"id": "liquidity", "direction": _direction(change, RATE_BAND) if len(points) > 1 else None, "effect": effect,
+            "latest": _latest(points), "from": start.isoformat(), "change": _pp(change), "short_history": short,
+            "stale": _stale(points, "liquidity", today), "omo": omo}
+
+
 def _rates(series: dict[str, Points], today: date) -> dict:
     parts = []
     for key in RATES:
@@ -106,11 +121,13 @@ def _foreign(points: Points, today: date) -> dict:
             "short_history": len(window) < FOREIGN_SESSIONS, "stale": _stale(points, "foreign", today)}
 
 
-def macro_chain(series: dict[str, Points], *, today: date) -> dict:
-    """series: wti, vn_cpi_yoy, vn_interbank_on, vn10y, foreign_net (tỷ đồng per session) and vnindex (points), oldest first."""
+def macro_chain(series: dict[str, Points], *, today: date, omo: dict | None = None) -> dict:
+    """series: wti, vn_cpi_yoy, vnd_usd_spread (percentage points), vn_interbank_on, vn10y, foreign_net (tỷ đồng per session) and
+    vnindex (points), oldest first; omo: the latest open-market session, shown with the liquidity link."""
     nodes = [
         _share_move("oil", series.get("wti") or [], OIL_BAND, pressure_when="up", today=today),
         _inflation(series.get("vn_cpi_yoy") or [], today),
+        _liquidity(series.get("vnd_usd_spread") or [], omo, today),
         _rates(series, today),
         _foreign(series.get("foreign_net") or [], today),
         _share_move("vnindex", series.get("vnindex") or [], INDEX_BAND, pressure_when="down", today=today),

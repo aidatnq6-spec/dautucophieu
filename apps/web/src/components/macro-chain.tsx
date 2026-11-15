@@ -4,11 +4,14 @@ import { ApiError, api } from "../lib/api";
 
 type Part = { id: string; direction: string | null; latest: { date: string; value: string }; from: string; change: string; short_history: boolean; stale: boolean };
 type Node = { id: string; direction: string | null; effect: "pressure" | "support" | "neutral" | "missing"; latest: { date: string; value: string } | null;
-  from?: string | null; change?: string | null; short_history?: boolean; stale: boolean; sessions?: number; parts?: Part[] };
-type Chain = { nodes: Node[]; pressure: string[]; support: string[]; missing: string[] };
+  from?: string | null; change?: string | null; short_history?: boolean; stale: boolean; sessions?: number; parts?: Part[];
+  omo?: { date: string; inject: string; absorb: string; net: string | null } | null };
+type Chain = { nodes: Node[]; pressure: string[]; support: string[]; missing: string[]; rate_sensitive?: { symbol: string; sector: string }[] | null };
 
-const NAME: Record<string, string> = { oil: "Giá dầu (WTI)", inflation: "Lạm phát Việt Nam", rates: "Lãi suất Việt Nam", foreign: "Khối ngoại", vnindex: "VN-Index" };
-const SHORT: Record<string, string> = { oil: "giá dầu", inflation: "lạm phát", rates: "lãi suất", foreign: "khối ngoại", vnindex: "VN-Index" };
+const NAME: Record<string, string> = { oil: "Giá dầu (WTI)", inflation: "Lạm phát Việt Nam", liquidity: "Thanh khoản và chênh lệch VND–USD",
+  rates: "Lãi suất Việt Nam", foreign: "Khối ngoại", vnindex: "VN-Index" };
+const SHORT: Record<string, string> = { oil: "giá dầu", inflation: "lạm phát", liquidity: "chênh lệch lãi suất VND–USD", rates: "lãi suất",
+  foreign: "khối ngoại", vnindex: "VN-Index" };
 const RATE_NAME: Record<string, string> = { vn_interbank_on: "Liên ngân hàng qua đêm", vn10y: "TPCP 10 năm" };
 const MOVE: Record<string, string> = { up: "Tăng", down: "Giảm", flat: "Đi ngang", buy: "Mua ròng", sell: "Bán ròng" };
 const EFFECT: Record<string, [string, string]> = { pressure: ["tạo áp lực", "bad"], support: ["hỗ trợ", "good"], neutral: ["trung tính", ""],
@@ -19,8 +22,14 @@ const num = (v: string | number, digits = 2) => Number(v).toLocaleString("vi-VN"
 const signed = (v: string, digits = 2) => `${Number(v) > 0 ? "+" : Number(v) < 0 ? "−" : ""}${num(Math.abs(Number(v)), digits)}`;
 const since = (from: string, short?: boolean) => short ? `chỉ có số từ ${day(from)}` : `so với ${day(from)}`;
 
+function Omo({ o }: { o: NonNullable<Node["omo"]> }) {
+  return <p className="caption">Thị trường mở {day(o.date)}: bơm {num(o.inject, 0)} tỷ đ{Number(o.absorb) > 0 ? `, hút ${num(o.absorb, 0)} tỷ đ` : ""}
+    {o.net !== null ? ` (ròng ${signed(o.net, 0)} tỷ đ)` : ""}</p>;
+}
+
 function Figure({ n }: { n: Node }) {
-  if (n.effect === "missing") return <p className="muted">Chưa có số liệu{n.id === "inflation" ? " — nhập tay ở bảng bên dưới" : ""}.</p>;
+  if (n.effect === "missing") return <><p className="muted">Chưa có số liệu{n.id === "inflation" ? " — nhập tay ở bảng bên dưới" : ""}.</p>
+    {n.omo && <Omo o={n.omo} />}</>;
   const l = n.latest;
   switch (n.id) {
     case "oil": case "vnindex":
@@ -29,6 +38,9 @@ function Figure({ n }: { n: Node }) {
     case "inflation":
       return <p><strong>{num(l!.value)}%</strong> <span className="caption">so cùng kỳ, tháng {l!.date.slice(5, 7)}/{l!.date.slice(0, 4)}
         {n.change !== null && n.change !== undefined ? ` (${signed(n.change)} điểm % so với tháng trước)` : ""}</span></p>;
+    case "liquidity":
+      return <><p><strong>{signed(l!.value)} điểm %</strong> <span className="caption">VND qua đêm − USD qua đêm
+        {n.change ? ` (${signed(n.change)} điểm % ${since(n.from!, n.short_history)})` : ""}</span></p>{n.omo && <Omo o={n.omo} />}</>;
     case "foreign":
       return <p><strong>{n.direction === "sell" ? "Bán" : "Mua"} ròng {num(Math.abs(Number(l!.value)), 0)} tỷ đ</strong>
         <span className="caption"> ({n.sessions} phiên từ {day(n.from!)})</span></p>;
@@ -47,7 +59,8 @@ export function MacroChain() {
   return (
     <section className="surface" aria-label="Chuỗi tác động vĩ mô">
       <h2>Chuỗi tác động vĩ mô</h2>
-      <p className="caption">Giá dầu đẩy lạm phát, lạm phát kéo lãi suất, lãi suất ảnh hưởng dòng vốn ngoại, rồi đến VN-Index. Mỗi ô so số mới nhất với khoảng
+      <p className="caption">Giá dầu đẩy lạm phát, lạm phát kéo lãi suất; thanh khoản dồi dào và chênh lệch lãi suất VND–USD dương cho lãi suất dư địa giảm;
+        lãi suất ảnh hưởng dòng vốn ngoại, rồi đến VN-Index. Mỗi ô so số mới nhất với khoảng
         1 tháng trước; đỏ là đang tạo áp lực lên cổ phiếu, xanh là đang hỗ trợ. Chỉ mô tả dữ liệu, không phải khuyến nghị.</p>
       {error && <p className="errors" role="alert">{error}</p>}
       {!c && !error && <p className="muted fx-loading" role="status">Đang tải…</p>}
@@ -71,6 +84,9 @@ export function MacroChain() {
           {c.missing.length > 0 && <><strong>Chưa có số:</strong> {list(c.missing)}.</>}
           {c.pressure.length + c.support.length + c.missing.length === 0 && "Các mắt xích đều đi ngang."}
         </p>
+        {c.rate_sensitive && c.rate_sensitive.length > 0 && <p data-testid="chain-held">
+          <strong>Mã bạn đang nắm nhạy với lãi suất</strong> (ngân hàng, bất động sản, chứng khoán):{" "}
+          {c.rate_sensitive.map((h) => `${h.symbol} (${h.sector.toLowerCase()})`).join(", ")}.</p>}
       </>}
     </section>
   );

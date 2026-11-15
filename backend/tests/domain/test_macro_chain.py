@@ -28,7 +28,7 @@ def full():
 def test_each_link_reads_its_one_month_direction_and_whether_it_weighs_on_stocks():
     chain = macro_chain(full(), today=TODAY)
     n = by_id(chain)
-    assert [x["id"] for x in chain["nodes"]] == ["oil", "inflation", "rates", "foreign", "vnindex"]
+    assert [x["id"] for x in chain["nodes"]] == ["oil", "inflation", "liquidity", "rates", "foreign", "vnindex"]
     # oil: 108 against the last price at least a month before the latest (100 on 20/09): +8% → up, weighs on stocks
     assert (n["oil"]["direction"], n["oil"]["effect"], n["oil"]["change"], n["oil"]["from"]) == ("up", "pressure", "0.08", "2026-09-20")
     assert (n["inflation"]["direction"], n["inflation"]["effect"], n["inflation"]["change"]) == ("up", "pressure", "0.30")  # points
@@ -37,7 +37,7 @@ def test_each_link_reads_its_one_month_direction_and_whether_it_weighs_on_stocks
     assert [(p["id"], p["direction"], p["change"]) for p in rates["parts"]] == [("vn_interbank_on", "down", "-0.50"), ("vn10y", "flat", "0.05")]
     assert (n["foreign"]["direction"], n["foreign"]["effect"], n["foreign"]["latest"]["value"], n["foreign"]["sessions"]) == ("sell", "pressure", "-600", 3)
     assert (n["vnindex"]["direction"], n["vnindex"]["effect"], n["vnindex"]["change"]) == ("flat", "neutral", "-0.0291")  # −2,9% is within ±3%
-    assert chain["pressure"] == ["oil", "inflation", "foreign"] and chain["support"] == ["rates"] and chain["missing"] == []
+    assert chain["pressure"] == ["oil", "inflation", "foreign"] and chain["support"] == ["rates"] and chain["missing"] == ["liquidity"]
 
 
 def test_a_series_with_no_data_is_missing_and_one_younger_than_a_month_says_since_when():
@@ -50,7 +50,7 @@ def test_a_series_with_no_data_is_missing_and_one_younger_than_a_month_says_sinc
     assert (n["inflation"]["effect"], n["inflation"]["latest"]) == ("missing", None)
     assert n["rates"]["direction"] == "up" and n["rates"]["short_history"] is True
     assert [p["from"] for p in n["rates"]["parts"]] == ["2026-10-07", "2026-10-08"]
-    assert chain["missing"] == ["inflation"] and "rates" in chain["pressure"]
+    assert chain["missing"] == ["inflation", "liquidity"] and "rates" in chain["pressure"]
 
 
 def test_mixed_rate_moves_read_flat_and_an_old_value_is_marked_stale():
@@ -61,3 +61,13 @@ def test_mixed_rate_moves_read_flat_and_an_old_value_is_marked_stale():
     assert (n["rates"]["direction"], n["rates"]["effect"]) == ("flat", "neutral")
     assert n["oil"]["stale"] is True and n["oil"]["direction"] == "down" and n["oil"]["effect"] == "support"
     assert n["vnindex"]["stale"] is False
+
+
+def test_liquidity_reads_the_vnd_usd_spread_and_shows_the_latest_open_market_session():
+    s = {**full(), "vnd_usd_spread": [(date(2026, 9, 20), Decimal("0.5")), (date(2026, 10, 24), Decimal("-0.3"))]}
+    omo = {"date": "2026-10-24", "inject": "1000", "absorb": "0", "net": None}
+    n = by_id(macro_chain(s, today=TODAY, omo=omo))["liquidity"]
+    assert (n["direction"], n["effect"], n["change"]) == ("down", "pressure", "-0.80") and n["latest"] == {"date": "2026-10-24", "value": "-0.3"}
+    assert n["omo"] == omo
+    positive = {**full(), "vnd_usd_spread": [(date(2026, 10, 24), Decimal("0.4"))]}
+    assert by_id(macro_chain(positive, today=TODAY))["liquidity"]["effect"] == "support"

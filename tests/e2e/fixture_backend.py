@@ -223,6 +223,16 @@ if __name__ == "__main__":
     # Chênh lệch VND–USD: synthetic overnight rates, the latest day below zero.
     MacroStore(data).upsert("vn_interbank_on", [(date.today() - timedelta(days=2), "4.5"), (date.today() - timedelta(days=1), "3.6")], entry="auto")
     MacroStore(data).upsert("sofr", [(date.today() - timedelta(days=2), "3.9")], entry="auto")
+    # Tỷ giá trung tâm, thị trường mở, cán cân: synthetic, the bank rate close to the ceiling.
+    MacroStore(data).upsert("usd_vnd_central", [(date.today(), "25000")], entry="auto")
+    MacroStore(data).upsert("usd_vnd_vcb", [(date.today() - timedelta(days=1), "26200")], entry="auto")
+    MacroStore(data).upsert("vn_trade_balance", [(date(2026, 9, 30), "-1.5")], entry="auto")
+    MacroStore(data).upsert("vn_fdi_disbursed", [(date(2026, 9, 30), "20")], entry="auto")
+    MacroStore(data).upsert("vn_fdi_disbursed_yoy", [(date(2026, 9, 30), "8.5")], entry="auto")
+    from investment_agent.market.omo import OmoStore
+    OmoStore(data).upsert({"date": (date.today() - timedelta(days=1)).isoformat(), "total": "1500", "rows": [
+        {"kind": "repo", "group": "Mua kỳ hạn", "term_days": 7, "members": "4/4", "volume": "1500", "rate": "4.5"},
+        {"kind": "repo", "group": "Mua kỳ hạn", "term_days": 91, "members": "0/0", "volume": "0", "rate": "0"}]})
     MacroStore(data).upsert("wti", [(date.today() - timedelta(days=35), "60"), (date.today() - timedelta(days=1), "66")], entry="auto")
     MacroStore(data).upsert("com_rubber", [(date.today() - timedelta(days=60), "120"), (date.today() - timedelta(days=30), "130")], entry="auto")
     # Bảng giá và biểu đồ: a fixed board (FPT up to its ceiling, VNINDEX down) and 60 daily candles; no network.

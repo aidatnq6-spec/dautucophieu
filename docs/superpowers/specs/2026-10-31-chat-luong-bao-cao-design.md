@@ -41,6 +41,10 @@ Không áp dụng cho ngân hàng, dịch vụ tài chính, bảo hiểm (cấu 
 - **Lãi nhưng dòng tiền kinh doanh âm:** ít nhất 2 trong 3 năm gần nhất.
 - **Phải thu tăng nhanh hơn doanh thu:** năm gần nhất, tăng trưởng phải thu cao hơn tăng trưởng doanh thu từ 20 điểm % trở lên.
 - **Lợi nhuận dồn tích lớn:** tổng (lợi nhuận − dòng tiền kinh doanh) 3 năm gần nhất lớn hơn 10% tổng tài sản cuối kỳ.
+- **Lợi nhuận phụ thuộc thu nhập tài chính** (chủ sở hữu đồng ý 15/11/2026): lãi tài chính ròng (doanh thu tài chính − chi phí tài chính) năm gần nhất từ 30% lợi nhuận trước thuế. Năm lỗ trước thuế thì không đánh giá.
+- **Phải thu khác lớn** (chủ sở hữu đồng ý 15/11/2026): phải thu khác (ngắn hạn + dài hạn) năm gần nhất đạt một trong hai điều kiện:
+  - từ 10% tổng tài sản;
+  - gấp đôi năm trước, khi năm trước đã từ 1% tổng tài sản.
 
 Mỗi dấu hiệu hiện số thật của các năm liên quan. Không gộp thành một điểm.
 

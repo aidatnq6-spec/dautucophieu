@@ -1,5 +1,5 @@
 {
- "version": "macro-2026-11-15.2",
+ "version": "macro-2026-11-15.3",
  "notice": "Quy tắc đánh giá theo bảng Leading Indicator của chủ sở hữu (25/10/2026). bad_when: up = tăng là Xấu; down = giảm là Xấu; sign = âm là Xấu; pmi = Tốt khi trên 50 và không giảm.",
  "indicators": [
   {
@@ -43,10 +43,14 @@
     "fallback": {
      "kind": "fred",
      "series": "DCOILBRENTEU"
+    },
+    "history": {
+     "kind": "fred",
+     "series": "DCOILBRENTEU"
     }
    },
    "url": "https://oilprice.com/oil-price-charts/",
-   "note": "Giá hợp đồng tương lai Brent kỳ gần nhất trên ICE, trễ 10 phút (oilprice.com); khi không đọc được thì lấy giá giao ngay của EIA qua FRED, chậm khoảng một tuần. Brent là giá tham chiếu cho dầu thô Việt Nam xuất khẩu và xăng dầu nhập khẩu."
+   "note": "Giá hợp đồng tương lai Brent kỳ gần nhất trên ICE, trễ 10 phút (oilprice.com); khi không đọc được thì lấy giá giao ngay của EIA qua FRED, chậm khoảng một tuần. Brent là giá tham chiếu cho dầu thô Việt Nam xuất khẩu và xăng dầu nhập khẩu. Lịch sử trước ngày đầu tiên lưu được lấy một lần từ giá giao ngay EIA qua FRED."
   },
   {
    "id": "us_cpi_yoy",
@@ -211,7 +215,7 @@
     "kind": "manual"
    },
    "url": "https://vn.investing.com/economic-calendar/manufacturing-pmi-829",
-   "note": "Nhập tay: S&P Global, ISM và TradingEconomics đều chặn đọc tự động (yêu cầu đăng nhập hoặc trả lỗi 403). Giữ một loại PMI cho cả chuỗi (S&P Global hoặc ISM) để xu hướng có ý nghĩa."
+   "note": "Nhập tay: S&P Global, ISM và TradingEconomics đều chặn đọc tự động (yêu cầu đăng nhập hoặc trả lỗi 403). Giữ một loại PMI cho cả chuỗi (S&P Global hoặc ISM) để xu hướng có ý nghĩa. Chưa tự động được: ISM chỉ công bố cho thành viên đăng nhập, S&P Global và Trading Economics chặn đọc tự động (kiểm tra 15/11/2026)."
   },
   {
    "id": "vn_pmi",
@@ -220,11 +224,14 @@
    "rule": "pmi",
    "max_age_days": 35,
    "source": {
-    "kind": "news_pmi",
+    "kind": "cafef_pmi",
+    "fallback": {
+     "kind": "news_pmi"
+    },
     "manual_fallback": true
    },
-   "url": "https://drphe.github.io/BM/chart.html",
-   "note": "Tự động từ tiêu đề tin CafeF/Vietstock/Vneconomy khi S&P Global công bố; nhập tay nếu tháng nào không có tin."
+   "url": "https://cafef.vn/pmi.html",
+   "note": "PMI sản xuất Việt Nam của S&P Global, đọc từ bài CafeF hằng tháng (câu đầu ghi số và tháng; trang S&P Global chặn đọc tự động); không đọc được thì tìm trong tiêu đề tin RSS; nhập tay nếu tháng nào vẫn thiếu."
   },
   {
    "id": "vn_cpi_yoy",

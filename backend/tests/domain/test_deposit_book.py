@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from investment_agent.domain.deposit_book import DepositBook, bond_income, deposit_income, liquidity, maturity_calendar, totals
+from investment_agent.domain.deposit_book import DepositBook, bond_income, deposit_income, liquidity, maturity_calendar, maturity_ladder, totals
 
 TODAY = date(2027, 1, 15)
 
@@ -109,3 +109,31 @@ def test_bond_income_uses_each_rate_and_the_owner_bond_rate_for_rows_without_one
 def test_invalid_holdings_are_refused(bad):
     with pytest.raises(ValidationError):
         DepositBook.model_validate(bad)
+
+
+# T6 Tiền theo kỳ hạn còn lại: the owner's cash and deposits by the time left to maturity, as a company's statements split them
+# (under 3 months, 3 to 12 months, over 12 months), with what is locked in each.
+def test_the_ladder_groups_by_time_left_to_maturity_and_keeps_overdue_and_locked_apart():
+    b = book([deposit("a", "2027-04-15", principal="100000000"),                 # exactly three months: within 3 months
+              deposit("b", "2027-04-16", principal="200000000", locked=False),   # a day later: 3 to 12 months
+              deposit("c", "2028-01-15", principal="300000000"),                 # exactly twelve months
+              deposit("d", "2028-01-16", principal="400000000"),                 # over twelve months
+              deposit("e", "2027-01-10", principal="50000000")],                 # past its date
+             [{"id": "x", "name": "Ví", "amount": "10000000", "liquid": True}, {"id": "y", "name": "Quỹ hưu", "amount": "40000000", "liquid": False}])
+    lad = maturity_ladder(b, ledger_cash=Decimal("15000000"), today=TODAY)
+    rows = {r["bucket"]: r for r in lad["rows"]}
+    assert [r["bucket"] for r in lad["rows"]] == ["now", "within_3m", "3_12m", "over_12m", "overdue", "not_liquid"]
+    assert (rows["now"]["amount"], rows["now"]["count"]) == ("25000000", 0)
+    assert (rows["within_3m"]["amount"], rows["within_3m"]["count"], rows["within_3m"]["locked"]) == ("100000000", 1, "100000000")
+    assert (rows["3_12m"]["amount"], rows["3_12m"]["count"], rows["3_12m"]["locked"]) == ("500000000", 2, "300000000")
+    assert (rows["over_12m"]["amount"], rows["overdue"]["amount"], rows["not_liquid"]["amount"]) == ("400000000", "50000000", "40000000")
+    assert lad["total"] == "1115000000" and rows["3_12m"]["share"] == "0.4484"
+    # the statements' "tiền và tương đương tiền": cash now and what comes back within three months
+    assert lad["cash_equivalent"] == "125000000"
+
+
+def test_the_ladder_of_an_empty_book_is_the_ledger_cash_or_nothing():
+    lad = maturity_ladder(book(), ledger_cash=Decimal(0), today=TODAY)
+    assert lad["total"] == "0" and all(r["share"] is None for r in lad["rows"])
+    kept = DepositBook.model_validate({"count_ledger_cash": False})
+    assert maturity_ladder(kept, ledger_cash=Decimal("9"), today=TODAY)["rows"][0]["amount"] == "0"  # the ledger's cash is not counted

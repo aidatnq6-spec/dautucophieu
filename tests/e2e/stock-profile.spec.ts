@@ -398,9 +398,13 @@ test("a non-financial ticker shows its net debt by quarter, and a bank does not"
   await expect(box.getByRole("table", { name: "Nợ vay ròng FPT" }).getByRole("row").nth(1)).toContainText("tỷ");  // newest quarter first
   await expect(box).toContainText("Không phải khuyến nghị");
   await expect(page.getByRole("region", { name: "Tiền khách trả trước" })).toHaveCount(0);  // FPT is not a property developer
+  const cash = page.getByRole("region", { name: "Tiền và chênh lệch lãi suất" });
+  await expect(cash.getByRole("table", { name: "Thang thanh khoản FPT" }).getByRole("row").nth(1)).toContainText("lần");
+  await expect(cash.getByTestId("carry")).toContainText("Bốn quý đến");
   await page.goto("/research/VCB");
   await expect(page.getByRole("region", { name: "Số liệu ngân hàng" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Nợ vay ròng" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Tiền và chênh lệch lãi suất" })).toHaveCount(0);  // borrowing is a bank's trade
 });
 
 test("a ticker shows how its price moved after each report, and projects only for a property developer", async ({ page }) => {

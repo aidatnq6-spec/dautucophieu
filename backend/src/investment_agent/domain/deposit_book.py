@@ -2,6 +2,7 @@
 can be withdrawn now against the protected reserve. A deposit not yet due, locked or not, is never cash now; one past its date is overdue
 (rolled over or closed is unknown, so it is not guessed). Blank fields stay unknown, never 0. Personal data; never sent to a model."""
 
+import calendar
 from collections import Counter
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
@@ -146,6 +147,37 @@ def liquidity(book: DepositBook, *, ledger_cash: Decimal, reserve: Decimal, toda
                         "overdue": _s(total(d.principal for d in book.deposits if d.matures < today))},
             "reserve": _s(reserve), "status": "short" if short > 0 else "enough", "short": _s(short) if short > 0 else None,
             "maturing_90d": _s(total(d.principal for d in ahead if d.matures <= today + timedelta(days=MATURING_DAYS)))}
+
+
+def _months_on(day: date, months: int) -> date:
+    k = day.year * 12 + day.month - 1 + months
+    y, m = divmod(k, 12)
+    return date(y, m + 1, min(day.day, calendar.monthrange(y, m + 1)[1]))
+
+
+LADDER = ("now", "within_3m", "3_12m", "over_12m", "overdue", "not_liquid")
+
+
+def maturity_ladder(book: DepositBook, *, ledger_cash: Decimal, today: date) -> dict:
+    """Tiền theo kỳ hạn còn lại: cash now (as in liquidity), deposits by the time left to maturity — within three months (to the same
+    day three months on), three to twelve months, over twelve — deposits past their date, and accounts that cannot be withdrawn; with
+    each one's share, count and locked principal. The book keeps no opening date, so this is time left, not the original term.
+    cash_equivalent: cash now and deposits within three months, as a company's statements count tiền và tương đương tiền."""
+    three, twelve = _months_on(today, 3), _months_on(today, 12)
+    rows = {k: {"amount": Decimal(0), "count": 0, "locked": Decimal(0)} for k in LADDER}
+    rows["now"]["amount"] = (ledger_cash if book.count_ledger_cash else Decimal(0)) + sum((a.amount for a in book.accounts if a.liquid), Decimal(0))
+    rows["not_liquid"]["amount"] = sum((a.amount for a in book.accounts if not a.liquid), Decimal(0))
+    for d in book.deposits:
+        key = "overdue" if d.matures < today else "within_3m" if d.matures <= three else "3_12m" if d.matures <= twelve else "over_12m"
+        rows[key]["amount"] += d.principal
+        rows[key]["count"] += 1
+        rows[key]["locked"] += d.principal if d.locked else Decimal(0)
+    total = sum((r["amount"] for r in rows.values()), Decimal(0))
+    return {"rows": [{"bucket": k, "amount": _s(r["amount"]), "count": r["count"], "locked": _s(r["locked"]),
+                      "share": str((r["amount"] / total).quantize(Decimal("0.0001"), ROUND_HALF_UP)) if total > 0 else None}
+                     for k, r in rows.items()],
+            "total": _s(total), "cash_equivalent": _s(rows["now"]["amount"] + rows["within_3m"]["amount"]),
+            "within_3m_until": three.isoformat(), "within_12m_until": twelve.isoformat()}
 
 
 def _bond_value(bond: Bond, navs: dict[str, dict]) -> Decimal:

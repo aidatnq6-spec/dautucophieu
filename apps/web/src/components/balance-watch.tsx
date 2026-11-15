@@ -8,8 +8,12 @@ type SectorDebt = { members: number; growth_2y: string | null; compared: number;
   quarters: { quarter: string; count: number; debt: string | null; net_debt: string | null; net_count: number }[] };
 type CashRow = { quarter: string; advances: string | null; inventory: string | null; cfo: string | null; npat_parent: string | null };
 type Signal = { kind: "handover" | "collecting" | null; quarter: string | null; advances_yoy: string | null; profit_yoy: string | null };
+type LiquidityRow = { quarter: string; cash: string | null; st_investments: string | null; cash_like: string | null; st_debt: string | null;
+  cover: string | null; cash_share: string | null };
+export type Carry = { quarter: string | null; kind: "carry" | "no_debt" | null; missing: string[]; fin_income: string | null; interest: string | null;
+  net: string | null; avg_cash_like: string | null; avg_debt: string | null; yield: string | null; cost: string | null; spread: string | null };
 type Balance = { symbol: string; sector: string | null; debt: { rows: DebtRow[]; flag: Flag }; sector_debt: SectorDebt | null;
-  property: { rows: CashRow[]; signal: Signal } | null };
+  property: { rows: CashRow[]; signal: Signal } | null; liquidity: LiquidityRow[]; carry: Carry };
 
 const SHOWN = 8;  // quarters in each table
 const q = (p: string) => `Q${p.slice(-1)}/${p.slice(0, 4)}`;
@@ -39,6 +43,23 @@ export function advancesText(s: Signal): string {
   }
   return `${q(s.quarter)}: tiền khách trả trước ${move(s.advances_yoy)} so cùng kỳ: chưa rõ chiều nào. Ngưỡng của phần mềm: giảm từ 10% kèm lợi nhuận tăng từ 50% `
     + "là đang bàn giao; tăng từ 20% là đang thu tiền chờ bàn giao.";
+}
+
+const rate = (v: string) => `${(Number(v) * 100).toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+
+/** Chênh lệch lãi vay – lãi gửi over the last four quarters, in words. */
+export function carryText(c: Carry): string {
+  if (!c.quarter) return "Báo cáo đã lưu chưa có doanh thu tài chính, nên chưa tính được.";
+  if (c.missing.length) return `Chưa đủ bốn quý liên tiếp đến ${q(c.quarter)} để tính: thiếu số của ${c.missing.map(q).join(", ")}.`;
+  const earned = `doanh thu tài chính ${ty(c.fin_income)} trên tiền và đầu tư ngắn hạn bình quân ${ty(c.avg_cash_like)}`
+    + (c.yield !== null ? ` (khoảng ${rate(c.yield)}/năm)` : "");
+  if (c.kind === "no_debt") return `Bốn quý đến ${q(c.quarter)}: không vay; ${earned}.`;
+  const paid = `lãi vay ${ty(c.interest)} trên nợ vay bình quân ${ty(c.avg_debt)}${c.cost !== null ? ` (khoảng ${rate(c.cost)}/năm)` : ""}`;
+  const gap = c.spread === null ? "" : ` Chênh lệch ${Number(c.spread) >= 0 ? "+" : "−"}${rate(String(Math.abs(Number(c.spread)))).replace("%", "")} điểm %.`;
+  const verdict = c.kind === "carry"
+    ? " Doanh nghiệp vừa vay vừa giữ nhiều tiền và thu từ tiền nhiều hơn trả lãi vay: kiểu \"vay rẻ, gửi đắt\"."
+    : c.spread !== null && Number(c.spread) < 0 ? " Thu từ tiền thấp hơn chi phí vay." : "";
+  return `Bốn quý đến ${q(c.quarter)}: ${earned}; ${paid}.${gap}${verdict}`;
 }
 
 /** One line on the sector's borrowing. */
@@ -88,6 +109,29 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
         {sector && <p data-testid="sector-debt">{sector}</p>}
         <p className="caption">Nợ vay = vay ngắn hạn + vay dài hạn; nợ vay ròng = nợ vay − tiền − đầu tư ngắn hạn, âm là tiền ròng. Cảnh báo khi nợ vay gấp từ 2 lần
           tám quý trước và bằng từ 5% tổng tài sản. Báo cáo công khai (VNDirect); ô thiếu số để trống. Không phải khuyến nghị.</p>
+      </section>
+      <section className="surface" aria-label="Tiền và chênh lệch lãi suất">
+        <h2>Tiền và chênh lệch lãi suất</h2>
+        <p data-testid="carry">{data.carry.kind === "carry" && <><span className="pill good">Vay rẻ, gửi đắt</span> </>}{carryText(data.carry)}</p>
+        <table className="fv-table" aria-label={`Thang thanh khoản ${symbol}`}>
+          <thead><tr><th>Quý</th><th className="num">Tiền và tương đương tiền</th><th className="num">Đầu tư tài chính ngắn hạn</th>
+            <th className="num">Vay ngắn hạn</th><th className="num">Tiền + đầu tư NH / vay NH</th><th className="num">Trên tổng tài sản</th></tr></thead>
+          <tbody>{data.liquidity.slice(-SHOWN).reverse().map((r) => (
+            <tr key={r.quarter}>
+              <td data-label="Quý">{q(r.quarter)}</td>
+              <td className="num" data-label="Tiền và tương đương tiền">{ty(r.cash)}</td>
+              <td className="num" data-label="Đầu tư tài chính ngắn hạn">{ty(r.st_investments)}</td>
+              <td className="num" data-label="Vay ngắn hạn">{ty(r.st_debt)}</td>
+              <td className={`num${r.cover !== null && Number(r.cover) < 1 ? " negative" : ""}`} data-label="Tiền + đầu tư NH / vay NH">
+                {r.cover === null ? "—" : `${Number(r.cover).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} lần`}</td>
+              <td className="num" data-label="Trên tổng tài sản">{r.cash_share === null ? "—" : rate(r.cash_share)}</td>
+            </tr>))}
+          </tbody>
+        </table>
+        <p className="caption">Tiền và tương đương tiền gồm cả tiền gửi kỳ hạn đến 3 tháng; đầu tư tài chính ngắn hạn chủ yếu là tiền gửi 3–12 tháng (có thể có cả
+          chứng khoán kinh doanh). Dưới 1 lần: tiền và đầu tư ngắn hạn chưa đủ trả vay ngắn hạn. Lợi suất trên tiền là ước tính thô: doanh thu tài chính còn gồm lãi
+          tỷ giá, cổ tức và lãi bán khoản đầu tư; bình quân trên năm thời điểm cuối quý. “Vay rẻ, gửi đắt” khi nợ vay và tiền đều từ 5% tổng tài sản và chênh lệch
+          dương. Báo cáo công khai (VNDirect). Không phải khuyến nghị.</p>
       </section>
       {data.property && <section className="surface" aria-label="Tiền khách trả trước">
         <h2>Tiền khách trả trước</h2>

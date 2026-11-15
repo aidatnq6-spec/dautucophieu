@@ -1,4 +1,4 @@
-from investment_agent.domain.balance_watch import borrowing_flag, net_debt_rows, property_cash, sector_debt
+from investment_agent.domain.balance_watch import borrowing_flag, carry, liquidity_rows, net_debt_rows, property_cash, sector_debt
 
 B = 10**9
 
@@ -74,3 +74,53 @@ def test_property_cash_reads_collecting_when_advances_rise_and_says_nothing_othe
 def test_property_cash_without_the_advances_lines_says_so_rather_than_guessing():
     view = property_cash(quarters_from(2025, [q(inventory=5000, cfo=100, npat_parent=40)] * 5))
     assert view["rows"][-1]["advances"] is None and view["signal"]["kind"] is None and view["signal"]["advances_yoy"] is None
+
+
+# T3 Thang thanh khoản: cash and short-term investments against short-term borrowing, and their share of total assets.
+def test_liquidity_rows_set_cash_against_short_term_borrowing():
+    qs = {"2026-Q2": q(cash=40, st_investments=160, st_debt=100, lt_debt=50, total_assets=1000),
+          "2026-Q3": q(cash=30, st_investments=20, st_debt=0, lt_debt=50, total_assets=1000),
+          "2026-Q4": q(cash=30, st_debt=100, total_assets=1000)}  # short-term investments missing
+    r2, r3, r4 = liquidity_rows(qs)
+    assert r2 == {"quarter": "2026-Q2", "cash": str(40 * B), "st_investments": str(160 * B), "cash_like": str(200 * B), "st_debt": str(100 * B),
+                  "cover": "2.0000", "cash_share": "0.2000"}
+    assert r3["cover"] is None and r3["st_debt"] == "0"  # no short-term borrowing: nothing to cover, not infinitely covered
+    assert (r4["cash_like"], r4["cover"], r4["cash_share"]) == (None, None, None)
+
+
+def year_of_quarters(**over):
+    """Five quarter ends 2025-Q3 … 2026-Q3; the last four carry their quarter's financial income and interest."""
+    base = dict(cash=100, st_investments=300, st_debt=150, lt_debt=50, total_assets=2000)
+    out = {"2025-Q3": q(**base)}
+    for p in ("2025-Q4", "2026-Q1", "2026-Q2", "2026-Q3"):
+        out[p] = q(**{**base, "fin_income": 7, "interest": 2, **over})
+    return out
+
+
+# T1 Chênh lệch lãi vay – lãi gửi over the last four quarters, on the averages of the five quarter ends around them.
+def test_carry_reads_four_quarters_of_financial_income_and_interest_on_average_balances():
+    c = carry(year_of_quarters())
+    assert c == {"quarter": "2026-Q3", "kind": "carry", "missing": [], "fin_income": str(28 * B), "interest": str(8 * B), "net": str(20 * B),
+                 "avg_cash_like": str(400 * B), "avg_debt": str(200 * B), "yield": "0.0700", "cost": "0.0400", "spread": "0.0300"}
+
+
+def test_carry_is_named_only_when_both_borrowing_and_cash_are_material_and_the_spread_is_positive():
+    small_debt = year_of_quarters()
+    for p in small_debt:
+        small_debt[p] = {**small_debt[p], "st_debt": str(10 * B), "lt_debt": "0"}  # 0.5% of total assets
+    assert carry(small_debt)["kind"] is None and carry(small_debt)["spread"] is not None
+    dear = year_of_quarters(interest=10)  # 40 on 200 borrowed: 20% against 7% earned
+    assert carry(dear)["kind"] is None and carry(dear)["spread"] == "-0.1300"
+    no_debt = year_of_quarters(interest=0)
+    for p in no_debt:
+        no_debt[p] = {**no_debt[p], "st_debt": "0", "lt_debt": "0"}
+    assert (carry(no_debt)["kind"], carry(no_debt)["cost"], carry(no_debt)["yield"]) == ("no_debt", None, "0.0700")
+
+
+def test_carry_with_a_quarter_missing_names_it_and_computes_nothing():
+    qs = year_of_quarters()
+    del qs["2026-Q1"]["interest"]
+    del qs["2025-Q3"]
+    c = carry(qs)
+    assert c["quarter"] == "2026-Q3" and c["missing"] == ["2025-Q3", "2026-Q1"] and c["yield"] is None and c["kind"] is None
+    assert carry({})["quarter"] is None

@@ -5,7 +5,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from investment_agent.domain.deposit_book import DepositBook, bond_values, gold_values, liquidity, maturity_calendar
+from investment_agent.domain.deposit_book import DepositBook, bond_values, gold_values, liquidity, maturity_calendar, maturity_ladder
 from investment_agent.domain.ledger import replay
 from investment_agent.market.fund_nav import fund_navs
 from investment_agent.market.gold_price import gold_prices
@@ -56,7 +56,8 @@ def book_view(repo, owner, *, reserve: Decimal, profile_reserve: Decimal, quotes
     book, version = read_book(repo, owner)
     book = book or DepositBook()
     return {"version": version, "book": book.model_dump(mode="json"), "calendar": maturity_calendar(book, today=today),
-            "liquidity": liquidity(book, ledger_cash=ledger_cash(repo, owner), reserve=reserve, today=today),
+            "liquidity": liquidity(book, ledger_cash=(cash := ledger_cash(repo, owner)), reserve=reserve, today=today),
+            "ladder": maturity_ladder(book, ledger_cash=cash, today=today),
             "profile_reserve": format(profile_reserve, "f"), "bond_values": bond_values(book, quotes["funds"], today=today),
             "nav_source": "Fmarket" if quotes["funds"] else None, "gold_values": gold_values(book, quotes["gold"], today=today),
             "gold_kinds": list((quotes["gold"].get("kinds") or {})), "gold_source": quotes["gold"].get("source"),

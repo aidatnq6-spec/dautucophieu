@@ -1,5 +1,6 @@
 import { MacroChain } from "../../../components/macro-chain";
 import { MacroView } from "../../../components/macro-view";
+import { MacroCalendar, RateSpread } from "../../../components/macro-extras";
 import { Sensitivity } from "../../../components/sensitivity";
 import { RateCycle } from "../../../components/rate-cycle";
 
@@ -10,6 +11,8 @@ export default function MacroPage() {
       <MacroChain />
       <Sensitivity />
       <RateCycle />
+      <RateSpread />
+      <MacroCalendar />
       <MacroView />
     </>
   );

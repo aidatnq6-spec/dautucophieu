@@ -48,6 +48,8 @@ def main() -> int:
     tl.add_argument("--data-dir", type=Path, required=True)
     bp = commands.add_parser("buy-plan-check", help="after the close, one Telegram note for the planned tranches whose condition is now met")
     bp.add_argument("--data-dir", type=Path, required=True)
+    me = commands.add_parser("macro-events-remind", help="one Telegram note the day before the owner's macro events marked for a reminder")
+    me.add_argument("--data-dir", type=Path, required=True)
     fh = commands.add_parser("fund-holdings-sync", help="every open-ended fund's published top holdings from Fmarket into data/fund-holdings.json, "
                              "a fund read again only when its month changes")
     fh.add_argument("--data-dir", type=Path, required=True)
@@ -160,6 +162,8 @@ def main() -> int:
         return thesis_lights_cli(args.data_dir)
     if args.command == "buy-plan-check":
         return buy_plan_cli(args.data_dir)
+    if args.command == "macro-events-remind":
+        return macro_events_cli(args.data_dir)
     if args.command == "fund-holdings-sync":
         return fund_holdings_sync_cli(args.data_dir)
     if args.command == "gold-price-sync":
@@ -968,6 +972,24 @@ def buy_plan_cli(data_dir: Path) -> int:
     out = check_plan(repo, owner, data_dir, send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date(),
                      request_id=f"buy-plan-{uuid.uuid4().hex[:16]}")
     print(json.dumps(out))  # counts only, never the plan
+    return 0
+
+
+def macro_events_cli(data_dir: Path) -> int:
+    """Lịch vĩ mô: the reminder the day before; skipped (the list is not read) while scheduled delivery is off."""
+    import uuid
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from investment_agent.services.macro_events import remind
+
+    telegram = _scheduled_telegram(data_dir)
+    if telegram is None:
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
+        return 0
+    send, repo, owner = telegram
+    out = remind(repo, owner, send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date(), request_id=f"macro-events-{uuid.uuid4().hex[:16]}")
+    print(json.dumps(out))  # counts only
     return 0
 
 

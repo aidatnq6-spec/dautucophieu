@@ -48,6 +48,9 @@ $tl = & $python -W ignore -m investment_agent.cli thesis-lights --data-dir $data
 # Ke hoach giai ngan: one Telegram note for the planned tranches whose condition is now met (after the closes are stored).
 $bp = & $python -W ignore -m investment_agent.cli buy-plan-check --data-dir $data 2>$null
 "$(Get-Date -Format o) buy-plan-check exit=$LASTEXITCODE $bp" | Add-Content -LiteralPath $log -Encoding UTF8
+# Lich vi mo: one Telegram note the day before the owner's events marked for a reminder (sent once per event).
+$me = & $python -W ignore -m investment_agent.cli macro-events-remind --data-dir $data 2>$null
+"$(Get-Date -Format o) macro-events-remind exit=$LASTEXITCODE $me" | Add-Content -LiteralPath $log -Encoding UTF8
 # Danh muc cua quy: every fund's published top holdings (Fmarket); a fund is read again only when its month changes.
 $fh = & $python -W ignore -m investment_agent.cli fund-holdings-sync --data-dir $data 2>$null
 "$(Get-Date -Format o) fund-holdings-sync exit=$LASTEXITCODE $fh" | Add-Content -LiteralPath $log -Encoding UTF8

@@ -117,3 +117,33 @@ test("the indicator table fits its box on a laptop screen and writes the day in 
   const [tableWidth, boxWidth] = await table.evaluate((t) => [t.scrollWidth, t.parentElement!.clientWidth]);
   expect(tableWidth).toBeLessThanOrEqual(boxWidth);
 });
+
+test("the VND–USD spread warns below zero and the swap calculator prices a swap", async ({ page }) => {
+  await openMacro(page);
+  const spread = page.getByRole("region", { name: "Chênh lệch lãi suất VND–USD" });
+  await expect(spread.getByTestId("spread-latest")).toContainText("−0,30 điểm %");
+  await expect(spread).toContainText("Chênh lệch đang âm");
+  const swap = page.getByRole("region", { name: "Chi phí hoán đổi ngoại tệ" });
+  await expect(swap.getByLabel("Lãi suất USD")).toHaveValue("3,9");
+  await swap.getByLabel("Tỷ giá giao ngay").fill("24.399");
+  await swap.getByLabel("Tỷ giá kỳ hạn").fill("24.704");
+  await swap.getByLabel("Lãi suất USD").fill("3,89");
+  const out = swap.getByRole("list", { name: "Kết quả hoán đổi" });
+  await expect(out).toContainText("2,50%/năm");
+  await expect(out).toContainText("6,39%/năm");
+});
+
+test("the owner logs a macro event with its source and removes it", async ({ page }) => {
+  await openMacro(page);
+  const cal = page.getByRole("region", { name: "Lịch và nhật ký vĩ mô" });
+  const form = cal.getByRole("form", { name: "Thêm sự kiện vĩ mô" });
+  await form.getByLabel("Ngày sự kiện").fill("2099-01-02");
+  await form.getByLabel("Loại sự kiện").selectOption("fed");
+  await form.getByLabel("Nội dung sự kiện").fill("Họp chính sách thử nghiệm");
+  await form.getByLabel("Nguồn sự kiện").fill("https://example.invalid/fed");
+  await form.getByRole("button", { name: "Thêm sự kiện" }).click();
+  const coming = cal.getByRole("table", { name: "Sự kiện vĩ mô sắp tới" });
+  await expect(coming.getByRole("row", { name: /Họp chính sách thử nghiệm/ })).toContainText("Nhắc trước 1 ngày");
+  await coming.getByRole("button", { name: "Xóa Họp chính sách thử nghiệm" }).click();
+  await expect(cal).toContainText("Chưa có sự kiện sắp tới.");
+});

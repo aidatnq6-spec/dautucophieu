@@ -59,6 +59,8 @@ def test_saved_book_gives_the_calendar_and_liquidity_against_the_reserve_of_the_
     l = body["liquidity"]
     assert l["now"] == "105000000" and l["reserve"] == "120000000" and l["status"] == "short" and l["short"] == "15000000"
     assert l["not_now"] == {"accounts": "5000000", "locked": "200000000", "unlocked": "0", "overdue": "100000000"}
+    ladder = {r["bucket"]: r["amount"] for r in body["ladder"]["rows"]}
+    assert ladder["now"] == l["now"] and ladder["within_3m"] == "200000000" and ladder["overdue"] == "100000000"
 
 
 def test_the_pyramid_takes_deposits_and_cash_accounts_from_the_book(tmp_path):

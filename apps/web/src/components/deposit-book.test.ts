@@ -1,5 +1,5 @@
-import { expect, it } from "vitest";
-import { bookPayload, removeRow, reservePayload, upsertRow, type AccountDraft, type BondDraft, type DepositDraft, type GoldDraft, type HoldingDraft } from "./deposit-book";
+import { describe, expect, it } from "vitest";
+import { ladderLabel, bookPayload, removeRow, reservePayload, upsertRow, type AccountDraft, type BondDraft, type DepositDraft, type GoldDraft, type HoldingDraft } from "./deposit-book";
 
 const depo = (d: Partial<DepositDraft> = {}): DepositDraft => ({ id: "a", bank: "Ngân hàng A", matures: "2027-03-05", principal: "50.000.000", rate: "",
   interest: "", payout: "end", locked: true, ...d });
@@ -74,4 +74,13 @@ it("takes a gold kind with its chi, and refuses one without the other", () => {
   expect(err({ kind: "Vàng miếng SJC" })).toEqual({ error: "Vàng 1: chọn cả loại giá và số chỉ, hoặc để trống cả hai." });
   expect(err({ chi: "1" })).toEqual({ error: "Vàng 1: chọn cả loại giá và số chỉ, hoặc để trống cả hai." });
   expect(err({ kind: "Vàng miếng SJC", chi: "1,255" })).toEqual({ error: "Vàng 1: số chỉ lớn hơn 0, tối đa 2 chữ số thập phân." });
+});
+
+describe("ladderLabel", () => {
+  it("names each group of the ladder with the day its boundary falls on", () => {
+    const l = { within_3m_until: "2027-04-15", within_12m_until: "2028-01-15" };
+    expect(ladderLabel("within_3m", l)).toBe("Đến hạn trong 3 tháng (đến 15/04/2027)");
+    expect(ladderLabel("3_12m", l)).toBe("Đến hạn sau 3 đến 12 tháng (đến 15/01/2028)");
+    expect(ladderLabel("overdue", l)).toBe("Đã qua ngày đáo hạn, chưa cập nhật");
+  });
 });

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Request
 
-from investment_agent.domain.balance_watch import borrowing_flag, net_debt_rows, property_cash, sector_debt
+from investment_agent.domain.balance_watch import borrowing_flag, carry, liquidity_rows, net_debt_rows, property_cash, sector_debt
 from investment_agent.market.financial_ratios import kind_of
 from investment_agent.market.sectors import load_sectors
 from investment_agent.market.statements import StatementStore
@@ -45,4 +45,5 @@ def balance(symbol: str, request: Request):
     peers = {s: qs for s, qs in peers.items() if qs}
     return {"symbol": symbol, "sector": sector, "debt": {"rows": net_debt_rows(quarters), "flag": borrowing_flag(quarters)},
             "sector_debt": {**sector_debt(peers), "members": len(peers)} if sector else None,
-            "property": property_cash(quarters) if sector == PROPERTY else None}
+            "property": property_cash(quarters) if sector == PROPERTY else None,
+            "liquidity": liquidity_rows(quarters), "carry": carry(quarters)}

@@ -20,10 +20,22 @@ type Holdings = { bonds: Bond[]; gold: Gold[]; crypto: Holding[] };
 type Month = { month: string; count: number; principal: string; interest: string; missing_interest: number };
 type Liquidity = { now: string; ledger_cash: string; ledger_cash_counted: boolean; accounts_liquid: string; reserve: string; status: "enough" | "short"; short: string | null;
   maturing_90d: string; not_now: { accounts: string; locked: string; unlocked: string; overdue: string } };
-type View = { version: number; book: { accounts: Account[]; deposits: Deposit[]; count_ledger_cash: boolean; reserve: string | null } & Holdings;
+export type LadderRow = { bucket: "now" | "within_3m" | "3_12m" | "over_12m" | "overdue" | "not_liquid"; amount: string; count: number; locked: string;
+  share: string | null };
+type Ladder = { rows: LadderRow[]; total: string; cash_equivalent: string; within_3m_until: string; within_12m_until: string };
+type View = { version: number; ladder: Ladder; book: { accounts: Account[]; deposits: Deposit[]; count_ledger_cash: boolean; reserve: string | null } & Holdings;
   calendar: { months: Month[]; due_soon: string[]; overdue: string[] }; liquidity: Liquidity; profile_reserve: string;
   bond_values: BondValue[]; nav_source: string | null; gold_values: GoldValue[]; gold_kinds: string[]; gold_source: string | null;
   gold_as_of: string | null };
+
+const dmy = (iso: string) => iso.split("-").reverse().join("/");
+
+/** The ladder's row names, with the day each boundary falls on. */
+export function ladderLabel(bucket: LadderRow["bucket"], l: { within_3m_until: string; within_12m_until: string }): string {
+  return { now: "Rút ngay", within_3m: `Đến hạn trong 3 tháng (đến ${dmy(l.within_3m_until)})`,
+    "3_12m": `Đến hạn sau 3 đến 12 tháng (đến ${dmy(l.within_12m_until)})`, over_12m: "Đến hạn sau hơn 12 tháng",
+    overdue: "Đã qua ngày đáo hạn, chưa cập nhật", not_liquid: "Tài khoản chưa rút được" }[bucket];
+}
 
 /** Rows as typed: money grouped with dots, rate with a comma, blanks kept blank. */
 export type AccountDraft = Account;
@@ -428,6 +440,25 @@ export function DepositBook({ onSaved, refresh }: { onSaved?: () => void; refres
       </>}
       {view && view.calendar.overdue.length > 0 && <p className="notice">{view.calendar.overdue.length} sổ đã qua ngày đáo hạn. Phần mềm không biết ngân hàng
         đã tái tục hay bạn đã tất toán: hãy sửa ngày đáo hạn mới hoặc xóa sổ. Gốc của sổ quá hạn vẫn ở lớp tiền gửi, không tính là rút ngay.</p>}
+
+      {view?.ladder && Number(view.ladder.total) > 0 && <>
+        <h3>Tiền theo kỳ hạn còn lại</h3>
+        <table className="fv-table" aria-label="Tiền theo kỳ hạn còn lại">
+          <thead><tr><th>Nhóm</th><th className="num">Số tiền</th><th className="num">Tỷ trọng</th><th className="num">Số sổ</th><th className="num">Trong đó phong tỏa</th></tr></thead>
+          <tbody>{view.ladder.rows.filter((r) => Number(r.amount) > 0 || r.bucket === "now").map((r) => (
+            <tr key={r.bucket} data-testid={`ladder-${r.bucket}`}>
+              <td data-label="Nhóm">{ladderLabel(r.bucket, view.ladder)}</td>
+              <td className="num" data-label="Số tiền">{formatVnd(r.amount)}</td>
+              <td className="num" data-label="Tỷ trọng">{r.share === null ? "—" : `${(Number(r.share) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`}</td>
+              <td className="num" data-label="Số sổ">{r.bucket === "now" || r.bucket === "not_liquid" ? "—" : r.count}</td>
+              <td className="num" data-label="Trong đó phong tỏa">{r.bucket === "now" || r.bucket === "not_liquid" ? "—" : formatVnd(r.locked)}</td>
+            </tr>))}</tbody>
+        </table>
+        <p className="caption wrap">Chia như báo cáo tài chính của doanh nghiệp: tương đương tiền là phần rút ngay cộng sổ đến hạn trong 3 tháng
+          ({formatVnd(view.ladder.cash_equivalent)}); 3–12 tháng ứng với đầu tư tài chính ngắn hạn; trên 12 tháng là dài hạn. Sổ không ghi ngày gửi nên phần mềm
+          xếp theo thời gian còn lại đến ngày đáo hạn, không theo kỳ hạn gốc. Trái phiếu, chứng chỉ quỹ, vàng và tiền số không có ngày đáo hạn trong sổ nên
+          không xếp ở đây.</p>
+      </>}
 
       {l && <>
         <h3>Thanh khoản so với quỹ dự phòng</h3>

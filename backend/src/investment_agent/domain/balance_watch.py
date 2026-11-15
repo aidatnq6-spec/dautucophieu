@@ -5,7 +5,14 @@ banks (net cash). Borrowing that at least doubled in two years is flagged when i
 sector adds up its tickers' borrowing each quarter. For a property developer, money customers paid ahead (người mua trả tiền
 trước, short and long term) against the same quarter a year before: profit jumping while those advances fall reads as handing
 over homes already paid for; advances rising reads as money collected for homes still to be handed over. A missing line leaves
-its figure blank; nothing is filled in. Readings, not advice."""
+its figure blank; nothing is filled in. Readings, not advice.
+
+Thang thanh khoản: cash (tiền và tương đương tiền, deposits up to three months included) and short-term financial investments
+(mostly deposits of three to twelve months, also trading securities) against short-term borrowing, and their share of total assets.
+Chênh lệch lãi vay – lãi gửi: over the last four quarters, financial income on the average of cash and short-term investments
+against interest on the average borrowing (five quarter ends). Financial income also holds exchange gains and dividends received, so
+the yield is a rough reading; "carry" names a company that borrows and keeps cash, both at least 5% of total assets, earning more on
+the one than it pays on the other (borrowing cheap to deposit dear)."""
 
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -99,6 +106,54 @@ def sector_debt(records: dict[str, dict], n: int = 12) -> dict:
         growth = now / before - 1 if pairs and before > 0 else None
         top = max(pairs, key=lambda s: pairs[s][0] - pairs[s][1], default=None)
     return {"quarters": rows, "growth_2y": _r(growth), "compared": compared, "top": top}
+
+
+def _cash_like(q: dict) -> Decimal | None:
+    cash, inv = _get(q, "cash", "st_investments")
+    return cash + inv if cash is not None and inv is not None else None
+
+
+def liquidity_rows(quarters: dict, n: int = 12) -> list[dict]:
+    """The last n quarters, oldest first: cash, short-term investments, both together, short-term borrowing, how many times the
+    first covers the second (None without short-term borrowing), and the cash's share of total assets."""
+    out = []
+    for period in sorted(quarters)[-n:]:
+        q = quarters[period]
+        cash, inv, st_debt, assets = _get(q, "cash", "st_investments", "st_debt", "total_assets")
+        like = _cash_like(q)
+        out.append({"quarter": period, "cash": _s(cash), "st_investments": _s(inv), "cash_like": _s(like), "st_debt": _s(st_debt),
+                    "cover": _r(like / st_debt) if like is not None and st_debt else None,
+                    "cash_share": _r(like / assets) if like is not None and assets and assets > 0 else None})
+    return out
+
+
+def carry(quarters: dict) -> dict:
+    """The last four quarters to the latest one with financial income: their financial income and interest, the average cash and
+    short-term investments and the average borrowing over the five quarter ends, the yield on the one, the cost of the other and the
+    spread. A quarter missing any of these is named in missing, and nothing is computed."""
+    latest = next((p for p in sorted(quarters, reverse=True) if _get(quarters[p], "fin_income")[0] is not None), None)
+    empty = {"quarter": latest, "kind": None, "missing": [], "fin_income": None, "interest": None, "net": None, "avg_cash_like": None,
+             "avg_debt": None, "yield": None, "cost": None, "spread": None}
+    if latest is None:
+        return empty
+    flows = [_back(latest, k) for k in range(3, -1, -1)]
+    ends = [_back(latest, 4), *flows]
+    missing = sorted({p for p in flows if None in _get(quarters.get(p, {}), "fin_income", "interest")}
+                     | {p for p in ends if _cash_like(quarters.get(p, {})) is None or _debt(quarters.get(p, {})) is None})
+    if missing:
+        return {**empty, "missing": missing}
+    income = sum((_get(quarters[p], "fin_income")[0] for p in flows), Decimal(0))
+    interest = sum((_get(quarters[p], "interest")[0] for p in flows), Decimal(0))
+    avg_cash = sum((_cash_like(quarters[p]) for p in ends), Decimal(0)) / len(ends)
+    avg_debt = sum((_debt(quarters[p]) for p in ends), Decimal(0)) / len(ends)
+    earned = income / avg_cash if avg_cash > 0 else None
+    cost = interest / avg_debt if avg_debt > 0 else None
+    spread = earned - cost if earned is not None and cost is not None else None
+    (assets,) = _get(quarters[latest], "total_assets")
+    material = assets is not None and assets > 0 and avg_debt >= MATERIAL_DEBT * assets and avg_cash >= MATERIAL_DEBT * assets
+    kind = "no_debt" if avg_debt == 0 else "carry" if material and spread is not None and spread > 0 else None
+    return {**empty, "kind": kind, "fin_income": _s(income), "interest": _s(interest), "net": _s(income - interest), "avg_cash_like": _s(avg_cash),
+            "avg_debt": _s(avg_debt), "yield": _r(earned), "cost": _r(cost), "spread": _r(spread)}
 
 
 def _advances(q: dict) -> Decimal | None:

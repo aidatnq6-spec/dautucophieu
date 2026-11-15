@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { advancesText, borrowingText, sectorText } from "./balance-watch";
+import { advancesText, borrowingText, carryText, sectorText, type Carry } from "./balance-watch";
+
+const C: Carry = { quarter: "2026-Q3", kind: "carry", missing: [], fin_income: "28000000000", interest: "8000000000", net: "20000000000",
+  avg_cash_like: "400000000000", avg_debt: "200000000000", yield: "0.0700", cost: "0.0400", spread: "0.0300" };
+
+describe("carryText", () => {
+  it("sets the yield on cash against the cost of borrowing and names borrowing cheap to deposit dear", () => {
+    expect(carryText(C)).toBe("Bốn quý đến Q3/2026: doanh thu tài chính 28 tỷ trên tiền và đầu tư ngắn hạn bình quân 400 tỷ (khoảng 7,0%/năm); "
+      + "lãi vay 8 tỷ trên nợ vay bình quân 200 tỷ (khoảng 4,0%/năm). Chênh lệch +3,0 điểm %. Doanh nghiệp vừa vay vừa giữ nhiều tiền và thu từ tiền "
+      + "nhiều hơn trả lãi vay: kiểu \"vay rẻ, gửi đắt\".");
+  });
+  it("says when it costs more than it earns, when there is no borrowing, and what is missing", () => {
+    expect(carryText({ ...C, kind: null, spread: "-0.1300" })).toContain("Chênh lệch −13,0 điểm %. Thu từ tiền thấp hơn chi phí vay.");
+    expect(carryText({ ...C, kind: "no_debt", cost: null, spread: null })).toBe(
+      "Bốn quý đến Q3/2026: không vay; doanh thu tài chính 28 tỷ trên tiền và đầu tư ngắn hạn bình quân 400 tỷ (khoảng 7,0%/năm).");
+    expect(carryText({ ...C, missing: ["2025-Q3", "2026-Q1"] })).toBe("Chưa đủ bốn quý liên tiếp đến Q3/2026 để tính: thiếu số của Q3/2025, Q1/2026.");
+    expect(carryText({ ...C, quarter: null })).toContain("chưa có doanh thu tài chính");
+  });
+});
 
 describe("borrowingText", () => {
   it("names how many times borrowing grew in two years when it is flagged", () => {

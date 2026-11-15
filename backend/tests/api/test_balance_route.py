@@ -43,6 +43,7 @@ def test_a_company_outside_property_has_no_advances_block_and_net_cash_shows(tmp
     assert nlg["debt"]["rows"][-1]["net_cash"] is True
     fpt = call(c, clock, "GET", "/internal/stock/FPT/balance").json()
     assert fpt["property"] is None and fpt["sector_debt"]["members"] == 1
+    assert fpt["liquidity"][-1]["cover"] == "0.2000" and (fpt["carry"]["quarter"], fpt["carry"]["yield"]) == (None, None)  # no financial income stored: nothing read
 
 
 def test_banks_and_unwatched_tickers_are_not_read_this_way(tmp_path):

@@ -16,6 +16,8 @@ describe("carryText", () => {
       "Bốn quý đến Q3/2026: không vay; doanh thu tài chính 28 tỷ trên tiền và đầu tư ngắn hạn bình quân 400 tỷ (khoảng 7,0%/năm).");
     expect(carryText({ ...C, missing: ["2025-Q3", "2026-Q1"] })).toBe("Chưa đủ bốn quý liên tiếp đến Q3/2026 để tính: thiếu số của Q3/2025, Q1/2026.");
     expect(carryText({ ...C, quarter: null })).toContain("chưa có doanh thu tài chính");
+    expect(carryText({ ...C, kind: "unusual_income", yield: "0.2340" })).toContain("không coi là lãi gửi");
+    expect(carryText({ ...C, kind: "low_interest", cost: "0.0027" })).toContain("vốn hóa vào dự án");
   });
 });
 

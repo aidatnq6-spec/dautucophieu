@@ -10,7 +10,7 @@ type CashRow = { quarter: string; advances: string | null; inventory: string | n
 type Signal = { kind: "handover" | "collecting" | null; quarter: string | null; advances_yoy: string | null; profit_yoy: string | null };
 type LiquidityRow = { quarter: string; cash: string | null; st_investments: string | null; cash_like: string | null; st_debt: string | null;
   cover: string | null; cash_share: string | null };
-export type Carry = { quarter: string | null; kind: "carry" | "no_debt" | null; missing: string[]; fin_income: string | null; interest: string | null;
+export type Carry = { quarter: string | null; kind: "carry" | "no_debt" | "unusual_income" | "low_interest" | null; missing: string[]; fin_income: string | null; interest: string | null;
   net: string | null; avg_cash_like: string | null; avg_debt: string | null; yield: string | null; cost: string | null; spread: string | null };
 type Balance = { symbol: string; sector: string | null; debt: { rows: DebtRow[]; flag: Flag }; sector_debt: SectorDebt | null;
   property: { rows: CashRow[]; signal: Signal } | null; liquidity: LiquidityRow[]; carry: Carry };
@@ -58,7 +58,11 @@ export function carryText(c: Carry): string {
   const gap = c.spread === null ? "" : ` Chênh lệch ${Number(c.spread) >= 0 ? "+" : "−"}${rate(String(Math.abs(Number(c.spread)))).replace("%", "")} điểm %.`;
   const verdict = c.kind === "carry"
     ? " Doanh nghiệp vừa vay vừa giữ nhiều tiền và thu từ tiền nhiều hơn trả lãi vay: kiểu \"vay rẻ, gửi đắt\"."
-    : c.spread !== null && Number(c.spread) < 0 ? " Thu từ tiền thấp hơn chi phí vay." : "";
+    : c.kind === "unusual_income"
+      ? " Mức trên 10%/năm cao hơn mọi lãi tiền gửi: doanh thu tài chính còn gồm lãi tỷ giá, lãi bán hoặc lãi từ khoản đầu tư, cho vay; đọc thuyết minh, không coi là lãi gửi."
+      : c.kind === "low_interest"
+        ? " Chi phí vay dưới 2%/năm thấp hơn mọi lãi vay ngân hàng: lãi vay có thể đã được vốn hóa vào dự án hoặc tài sản dở dang (thường gặp ở bất động sản); đọc thuyết minh."
+        : c.spread !== null && Number(c.spread) < 0 ? " Thu từ tiền thấp hơn chi phí vay." : "";
   return `Bốn quý đến ${q(c.quarter)}: ${earned}; ${paid}.${gap}${verdict}`;
 }
 
@@ -131,7 +135,7 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
         <p className="caption">Tiền và tương đương tiền gồm cả tiền gửi kỳ hạn đến 3 tháng; đầu tư tài chính ngắn hạn chủ yếu là tiền gửi 3–12 tháng (có thể có cả
           chứng khoán kinh doanh). Dưới 1 lần: tiền và đầu tư ngắn hạn chưa đủ trả vay ngắn hạn. Lợi suất trên tiền là ước tính thô: doanh thu tài chính còn gồm lãi
           tỷ giá, cổ tức và lãi bán khoản đầu tư; bình quân trên năm thời điểm cuối quý. “Vay rẻ, gửi đắt” khi nợ vay và tiền đều từ 5% tổng tài sản và chênh lệch
-          dương. Báo cáo công khai (VNDirect). Không phải khuyến nghị.</p>
+          dương, lợi suất trên tiền không quá 10%/năm và chi phí vay từ 2%/năm. Báo cáo công khai (VNDirect). Không phải khuyến nghị.</p>
       </section>
       {data.property && <section className="surface" aria-label="Tiền khách trả trước">
         <h2>Tiền khách trả trước</h2>

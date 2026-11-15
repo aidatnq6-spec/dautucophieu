@@ -22,6 +22,10 @@ MATERIAL_DEBT = Decimal("0.05")  # ... and at least 5% of total assets, so a tin
 HANDOVER_ADVANCES = Decimal("-0.10")  # advances down 10% or more against a year before
 HANDOVER_PROFIT = Decimal("0.50")  # while the quarter's parent profit is up 50% or more (or turned from a loss)
 COLLECTING_ADVANCES = Decimal("0.20")  # advances up 20% or more against a year before
+# Bounds of a plain reading of Chênh lệch lãi vay – lãi gửi: above 10% a year no deposit pays it (the financial income holds exchange
+# gains, gains on investments or lending), below 2% a year no bank lends at it (interest capitalised into projects or assets being
+# built, common among property developers); either way the figures are shown and named, and the company is not called carry.
+DEPOSIT_YIELD_CEILING, LOAN_COST_FLOOR = Decimal("0.10"), Decimal("0.02")
 
 
 def _d(v) -> Decimal | None:
@@ -151,7 +155,14 @@ def carry(quarters: dict) -> dict:
     spread = earned - cost if earned is not None and cost is not None else None
     (assets,) = _get(quarters[latest], "total_assets")
     material = assets is not None and assets > 0 and avg_debt >= MATERIAL_DEBT * assets and avg_cash >= MATERIAL_DEBT * assets
-    kind = "no_debt" if avg_debt == 0 else "carry" if material and spread is not None and spread > 0 else None
+    if avg_debt == 0:
+        kind = "no_debt"
+    elif earned is not None and earned > DEPOSIT_YIELD_CEILING:
+        kind = "unusual_income"
+    elif cost is not None and material and cost < LOAN_COST_FLOOR:
+        kind = "low_interest"
+    else:
+        kind = "carry" if material and spread is not None and spread > 0 else None
     return {**empty, "kind": kind, "fin_income": _s(income), "interest": _s(interest), "net": _s(income - interest), "avg_cash_like": _s(avg_cash),
             "avg_debt": _s(avg_debt), "yield": _r(earned), "cost": _r(cost), "spread": _r(spread)}
 

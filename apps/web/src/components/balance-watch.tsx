@@ -12,8 +12,13 @@ type LiquidityRow = { quarter: string; cash: string | null; st_investments: stri
   cover: string | null; cash_share: string | null };
 export type Carry = { quarter: string | null; kind: "carry" | "no_debt" | "unusual_income" | "low_interest" | null; missing: string[]; fin_income: string | null; interest: string | null;
   net: string | null; avg_cash_like: string | null; avg_debt: string | null; yield: string | null; cost: string | null; spread: string | null };
+type ArRow = { quarter: string; customers: string | null; prepay: string | null; loans: string | null; other: string | null; provision: string | null;
+  total: string | null; total_share: string | null; other_share: string | null; dso: string | null };
+export type Dso = { quarter: string | null; days: string | null; year_ago: string | null; change: string | null; sector_median: string | null; sector_count: number };
+export type Provision = { quarter: string | null; amount: string | null; share: string | null; year_ago: string | null; kind: "jump" | "none" | null };
 type Balance = { symbol: string; sector: string | null; debt: { rows: DebtRow[]; flag: Flag }; sector_debt: SectorDebt | null;
-  property: { rows: CashRow[]; signal: Signal } | null; liquidity: LiquidityRow[]; carry: Carry };
+  property: { rows: CashRow[]; signal: Signal } | null; liquidity: LiquidityRow[]; carry: Carry;
+  receivables: { rows: ArRow[]; dso: Dso; provision: Provision } };
 
 const SHOWN = 8;  // quarters in each table
 const q = (p: string) => `Q${p.slice(-1)}/${p.slice(0, 4)}`;
@@ -64,6 +69,25 @@ export function carryText(c: Carry): string {
         ? " Chi phí vay dưới 2%/năm thấp hơn mọi lãi vay ngân hàng: lãi vay có thể đã được vốn hóa vào dự án hoặc tài sản dở dang (thường gặp ở bất động sản); đọc thuyết minh."
         : c.spread !== null && Number(c.spread) < 0 ? " Thu từ tiền thấp hơn chi phí vay." : "";
   return `Bốn quý đến ${q(c.quarter)}: ${earned}; ${paid}.${gap}${verdict}`;
+}
+
+/** Số ngày thu tiền of the latest quarter, against a year before and the sector. */
+export function dsoText(d: Dso): string {
+  if (!d.quarter || d.days === null) return "Chưa đủ phải thu khách hàng và doanh thu bốn quý để tính số ngày thu tiền.";
+  const ago = d.change !== null
+    ? Number(d.change) === 0 ? ", bằng cùng kỳ năm trước" : `, ${Number(d.change) > 0 ? "chậm hơn" : "nhanh hơn"} ${Math.abs(Number(d.change))} ngày so với cùng kỳ năm trước (${d.year_ago} ngày)`
+    : "";
+  const peers = d.sector_median !== null ? `; trung vị ngành ${d.sector_median} ngày (${d.sector_count} mã theo dõi khác)` : "";
+  return `Số ngày thu tiền ${q(d.quarter)}: ${d.days} ngày${ago}${peers}.`;
+}
+
+/** The bad-debt provision of the latest quarter, in words. */
+export function provisionText(p: Provision): string {
+  if (!p.quarter || p.amount === null) return "Báo cáo đã lưu chưa có dòng dự phòng phải thu khó đòi.";
+  if (p.kind === "none") return `${q(p.quarter)}: không trích dự phòng phải thu ngắn hạn khó đòi.`;
+  const share = p.share !== null ? `, bằng ${rate(p.share)} phải thu ngắn hạn trước dự phòng` : "";
+  const jump = p.kind === "jump" ? ` Tăng mạnh so với cùng kỳ năm trước (${ty(p.year_ago)}): doanh nghiệp vừa thừa nhận thêm khoản khó thu; đọc thuyết minh xem của khách hàng nào.` : "";
+  return `${q(p.quarter)}: dự phòng phải thu ngắn hạn khó đòi ${ty(p.amount)}${share}.${jump}`;
 }
 
 /** One line on the sector's borrowing. */
@@ -136,6 +160,34 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
           chứng khoán kinh doanh). Dưới 1 lần: tiền và đầu tư ngắn hạn chưa đủ trả vay ngắn hạn. Lợi suất trên tiền là ước tính thô: doanh thu tài chính còn gồm lãi
           tỷ giá, cổ tức và lãi bán khoản đầu tư; bình quân trên năm thời điểm cuối quý. “Vay rẻ, gửi đắt” khi nợ vay và tiền đều từ 5% tổng tài sản và chênh lệch
           dương, lợi suất trên tiền không quá 10%/năm và chi phí vay từ 2%/năm. Báo cáo công khai (VNDirect). Không phải khuyến nghị.</p>
+      </section>
+      <section className="surface" aria-label="Phải thu">
+        <h2>Phải thu</h2>
+        <p data-testid="dso">{dsoText(data.receivables.dso)}</p>
+        <p data-testid="provision">{data.receivables.provision.kind === "jump" && <><span className="pill warn">Dự phòng tăng mạnh</span> </>}
+          {provisionText(data.receivables.provision)}</p>
+        <div className="tablewrap"><table className="fv-table" aria-label={`Phải thu ${symbol}`}>
+          <thead><tr><th>Quý</th><th className="num">Khách hàng</th><th className="num">Trả trước người bán</th><th className="num">Cho vay</th>
+            <th className="num">Phải thu khác</th><th className="num">Dự phòng</th><th className="num">Tổng phải thu</th><th className="num">Trên tổng tài sản</th>
+            <th className="num">Số ngày thu tiền</th></tr></thead>
+          <tbody>{data.receivables.rows.slice(-SHOWN).reverse().map((r) => (
+            <tr key={r.quarter}>
+              <td data-label="Quý">{q(r.quarter)}</td>
+              <td className="num" data-label="Khách hàng">{ty(r.customers)}</td>
+              <td className="num" data-label="Trả trước người bán">{ty(r.prepay)}</td>
+              <td className="num" data-label="Cho vay">{ty(r.loans)}</td>
+              <td className="num" data-label="Phải thu khác">{ty(r.other)}{r.other_share !== null && <span className="caption"> ({rate(r.other_share)} TS)</span>}</td>
+              <td className="num" data-label="Dự phòng">{ty(r.provision)}</td>
+              <td className="num" data-label="Tổng phải thu">{ty(r.total)}</td>
+              <td className="num" data-label="Trên tổng tài sản">{r.total_share === null ? "—" : rate(r.total_share)}</td>
+              <td className="num" data-label="Số ngày thu tiền">{r.dso === null ? "—" : `${r.dso} ngày`}</td>
+            </tr>))}
+          </tbody>
+        </table></div>
+        <p className="caption">Mỗi cột cộng phần ngắn hạn và dài hạn (trả trước người bán: ngắn hạn); dự phòng mang dấu âm, đã trừ trong tổng. Số ngày thu tiền = phải
+          thu khách hàng ngắn hạn cuối quý ÷ doanh thu bốn quý gần nhất × 365; trung vị ngành trên các mã theo dõi cùng ngành. Dự phòng được ghi là tăng mạnh khi
+          tăng từ 50% so với cùng kỳ và bằng từ 1% phải thu ngắn hạn. Phải thu từ bên liên quan và tên từng khách hàng chỉ có trong thuyết minh, không có ở đây.
+          Báo cáo công khai (VNDirect); ô thiếu số để trống. Không phải khuyến nghị.</p>
       </section>
       {data.property && <section className="surface" aria-label="Tiền khách trả trước">
         <h2>Tiền khách trả trước</h2>

@@ -172,6 +172,14 @@ Hiện ứng dụng đã có các mảnh rời: 17 chỉ số vĩ mô đã lưu,
   - "Sức mua người tiêu dùng" theo tổng mức bán lẻ tháng so với cùng kỳ.
 
   Hai chuỗi cuối lấy từ báo cáo tháng của Cục Thống kê. Các chỉ số tăng trưởng đọc theo điểm phần trăm; thay đổi trong vòng 1 điểm được coi là đi ngang.
+- **Thêm nguồn (chủ sở hữu đồng ý ngày 15/11/2026):**
+  - **"Giá urê"** đọc theo giá urê thế giới (Trung Đông, f.o.b.), lấy từ bảng giá hàng hóa hằng tháng của World Bank. Tệp xlsx được tìm qua trang commodity-markets, và chỉ tải lại khi còn thiếu giá của tháng trước.
+  - **"Sản lượng container qua cảng"** đọc theo sản lượng container so với cùng kỳ, lấy từ bài thống kê hằng tháng của Hiệp hội Cảng biển Việt Nam. Bài đầu tiên là tháng 10/2026, nên chuỗi số dày dần theo từng tháng.
+  - Cả hai nguồn đều đã được kiểm tra robots.txt.
+- **Yếu tố sự kiện (cùng ngày, sửa quy tắc ở mục "Cách tính", chủ sở hữu đồng ý):**
+  - Thuế quan và phòng vệ thương mại nay có `"kind": "event"`, không gắn chuỗi số liệu nào.
+  - Các yếu tố này vẫn hiện trên sơ đồ, kèm link tới Lịch và nhật ký vĩ mô, nhưng không tính vào thanh tốt/xấu.
+  - Chuỗi chỉ có yếu tố sự kiện thì thẻ ghi "chưa có yếu tố đo được"; khi đã duyệt, nhãn tổng là "Chưa đủ dữ liệu".
 
 ## Kiểm thử
 

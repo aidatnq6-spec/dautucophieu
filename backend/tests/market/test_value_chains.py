@@ -78,11 +78,31 @@ def test_the_fingerprint_follows_what_the_owner_reads_not_the_status(tmp_path):
     assert print_of(unused) == print_of(DOC)  # a source the chain does not cite is not part of it
 
 
+def test_an_event_factor_names_no_series(tmp_path):
+    event = {"id": "tariff", "label": "Thuế quan Mỹ", "stage": "output", "kind": "event", "indicator": None, "when_up": "bad", "weight": "minor",
+             "share": None, "why": "Thuế quan", "refs": REF}
+    assert load_value_chains(write(tmp_path, changed(lambda d: d["chains"][0]["factors"].append(event)))).chains[0].factors[-1].kind == "event"
+    with pytest.raises(ValidationError):
+        load_value_chains(write(tmp_path, changed(lambda d: d["chains"][0]["factors"].append({**event, "indicator": "wti"}))))
+
+
+def test_adding_the_factor_kind_did_not_change_fingerprints(tmp_path):
+    marked = changed(lambda d: [f.update(kind="series") for f in d["chains"][0]["factors"]])
+    assert fingerprint(load_value_chains(write(tmp_path, marked)), "cement") == fingerprint(load_value_chains(write(tmp_path, DOC)), "cement")
+
+
 def test_the_committed_chains_read_the_series_the_app_now_keeps():
     by = {(c.id, f.id): f.indicator for c in load_value_chains().chains for f in c.factors}
     assert by[("industrial-park", "fdi")] == "vn_fdi_disbursed_yoy" and by[("gas-power", "gas_price")] == "com_lng"
     assert by[("construction", "public_spend")] == "vn_public_invest_yoy"
     assert all(by[(c, "demand")] == "vn_retail_yoy" for c in ("consumer", "ict-retail", "jewellery"))
+    assert by[("fertiliser", "urea_price")] == "com_urea"
+    kinds = {(c.id, f.id): f.kind for c in load_value_chains().chains for f in c.factors}
+    port = next(f for c in load_value_chains().chains if c.id == "port" for f in c.factors if f.kind == "series")
+    assert port.indicator == "port_container_yoy"
+    # tariffs and trade defence are events: noted on the diagram, kept off the good/bad bar
+    assert {k for k, v in kinds.items() if v == "event"} == {("industrial-park", "us_tariff"), ("port", "us_tariff"), ("seafood", "us_tariff"),
+                                                             ("steel", "trade_defence")}
 
 
 # The 50 watched tickers on 30/10/2026, as listed in the spec (data\ is not in Git).

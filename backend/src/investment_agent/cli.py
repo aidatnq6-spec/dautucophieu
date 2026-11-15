@@ -449,11 +449,11 @@ MACRO_SLOW_PAUSE = 30  # seconds before asking a slow source again
 MACRO_SLOW_TIMEOUT = 90
 
 
-def macro_sync(data_dir: Path, get=None, slow_get=None, sleep=None) -> int:
+def macro_sync(data_dir: Path, get=None, slow_get=None, sleep=None, get_bytes=None) -> int:
     """Exit 0 when every automatic indicator updated, 1 when some failed (each is reported). Indicators whose source timed out are
     asked once more after a pause, with a longer wait (stockbiz is often slow)."""
     import time
-    from investment_agent.market.leading import MacroStore, fetch_auto, fetch_commodities, fetch_factors, load_indicators
+    from investment_agent.market.leading import MacroStore, fetch_auto, fetch_chain_series, fetch_commodities, fetch_factors, load_indicators
 
     def fetcher(timeout):
         import httpx
@@ -463,11 +463,22 @@ def macro_sync(data_dir: Path, get=None, slow_get=None, sleep=None) -> int:
             response.raise_for_status()
             return response.text
         return fetch
+    def bytes_fetcher(timeout):
+        import httpx
+
+        def fetch(url):
+            response = httpx.get(url, timeout=timeout, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+            response.raise_for_status()
+            return response.content
+        return fetch
+    if get_bytes is None and get is None:  # injected text fetchers (tests) get no live workbook download
+        get_bytes = bytes_fetcher(60)
     get, slow_get, sleep = get or fetcher(30), slow_get or fetcher(MACRO_SLOW_TIMEOUT), sleep or time.sleep
     indicators = load_indicators()
     results = fetch_auto(indicators, MacroStore(data_dir), get=get, sleep=sleep)
     results.update(fetch_factors(MacroStore(data_dir), get=get, sleep=sleep))  # long oil and US dollar history for the sensitivity reading
     results.update(fetch_commodities(MacroStore(data_dir), get=get, sleep=sleep))  # monthly world prices for Chuỗi giá trị
+    results.update(fetch_chain_series(MacroStore(data_dir), get=get, get_bytes=get_bytes, sleep=sleep))  # urea, container throughput
     from investment_agent.market.leading import _get_with_retry
     from investment_agent.market.omo import OmoStore, omo_sync
     # Nghiệp vụ thị trường mở: the page shows only the latest session, so each run keeps it (Thanh khoản hệ thống)

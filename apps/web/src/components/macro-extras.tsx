@@ -107,7 +107,7 @@ export function MacroCalendar() {
   </tr>;
   const head = <thead><tr><th>Ngày</th><th>Loại</th><th>Nội dung</th><th>Nguồn</th><th>Nhắc</th><th /></tr></thead>;
   return (
-    <section className="surface" aria-label="Lịch và nhật ký vĩ mô">
+    <section className="surface" id="lich-vi-mo" aria-label="Lịch và nhật ký vĩ mô">
       <h2>Lịch và nhật ký vĩ mô</h2>
       <p className="caption">Ghi các cuộc họp Fed, nghiệp vụ của NHNN (hoán đổi, OMO, điều chỉnh tỷ giá trung tâm) và ngày công bố số liệu, kèm nguồn.
         Ứng dụng không tự điền ngày; sự kiện có đánh dấu nhắc được báo qua Telegram một lần, trước một ngày.</p>

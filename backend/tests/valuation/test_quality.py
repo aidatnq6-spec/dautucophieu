@@ -23,7 +23,7 @@ def test_all_nine_criteria_pass_for_a_company_improving_on_every_line():
     assert [c["passed"] for c in f["criteria"]] == [True] * 9
     assert f["criteria"][0]["detail"] == "ROA 9,0% (lợi nhuận 9 tỷ / tài sản đầu kỳ 100 tỷ)"
     assert f["criteria"][6]["detail"] == "Không có đợt huy động vốn bằng cổ phiếu năm 2025 (cổ phiếu thưởng, cổ tức bằng cổ phiếu không tính)"
-    assert [s["flag"] for s in q["signs"]] == [False, False, False, None]  # no financial income kept: not read
+    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None]  # no financial income or other receivables kept: not read
 
 
 def test_a_capital_raise_and_worse_lines_fail_and_the_signs_show_their_numbers():
@@ -184,3 +184,27 @@ def test_a_loss_before_tax_or_missing_lines_leave_the_sign_unread():
     loss = finance_sign(with_finance(40, 10, -5))
     assert loss["flag"] is None and "lỗ trước thuế" in loss["detail"]
     assert finance_sign(STRONG)["flag"] is None
+
+
+def with_other(now_st, now_lt, before_st=None, before_lt=None):
+    rec = {"annual": {k: dict(v) for k, v in STRONG["annual"].items()}, "share_issues": STRONG["share_issues"]}  # total assets 105 tỷ in 2025
+    rec["annual"]["2025"].update(other_receivables=str(now_st * BN), other_receivables_lt=str(now_lt * BN))
+    if before_st is not None:
+        rec["annual"]["2024"].update(other_receivables=str(before_st * BN), other_receivables_lt=str(before_lt * BN))  # 100 tỷ in 2024
+    return next(s for s in report_quality(rec, "Công nghệ Thông tin")["signs"] if s["id"] == "other_receivables")
+
+
+def test_large_other_receivables_are_a_sign_from_a_tenth_of_total_assets_or_doubling():
+    big = with_other(8, 3)  # 11 of 105
+    assert (big["flag"], big["label"]) == (True, "Phải thu khác lớn")
+    assert big["detail"] == "Năm 2025: phải thu khác 11 tỷ (ngắn hạn 8 tỷ, dài hạn 3 tỷ), bằng 10,5% tổng tài sản 105 tỷ"
+    assert big["rule"] == "phải thu khác (ngắn và dài hạn) từ 10% tổng tài sản, hoặc gấp đôi năm trước khi năm trước đã từ 1% tổng tài sản"
+    assert with_other(6, 2, 2, 1)["flag"] is True   # 8 against 3 a year before (3% of 100): more than doubled
+    assert with_other(1, 0, 0.3, 0.1)["flag"] is False  # doubled, but from 0,4% of total assets: not material
+    small = with_other(4, 1, 3, 1)
+    assert small["flag"] is False and "so với 4 tỷ năm 2024" in small["detail"]
+
+
+def test_other_receivables_missing_leave_the_sign_unread():
+    s = next(s for s in report_quality(STRONG, "Công nghệ Thông tin")["signs"] if s["id"] == "other_receivables")
+    assert s["flag"] is None and "Thiếu phải thu khác" in s["detail"]

@@ -404,6 +404,26 @@ test("a non-financial ticker shows its net debt by quarter, and a bank does not"
   const ar = page.getByRole("region", { name: "Phải thu" });
   await expect(ar.getByRole("table", { name: "Phải thu FPT" })).toBeVisible();
   await expect(ar.getByTestId("provision")).toContainText("chưa có dòng dự phòng");  // the fixture keeps no receivable parts: blank, not guessed
+});
+
+test("the owner copies related-party receivables year by year and sees a named party vanish into a group", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Phải thu bên liên quan" });
+  const form = box.getByRole("form", { name: "Nhập phải thu bên liên quan" });
+  const year = async (y: string, source: string, name: string, amount: string, grouped: boolean) => {
+    await form.getByLabel("Năm báo cáo").fill(y);
+    await form.getByLabel("Nguồn thuyết minh").fill(source);
+    await form.getByLabel("Đối tượng dòng 1").fill(name);
+    await form.getByLabel("Số dư dòng 1").fill(amount);
+    if (grouped) await form.getByLabel("Dòng gộp (không nêu tên)").check();
+    await form.getByRole("button", { name: "Lưu năm" }).click();
+    await expect(box.getByRole("table", { name: `Phải thu bên liên quan năm ${y}` })).toBeVisible();
+  };
+  await year("2019", "BCTC 2019, thuyết minh 7", "Công ty Alpha", "2820", false);
+  await year("2020", "BCTC 2020, thuyết minh 38", "Bên liên quan khác", "2953", true);
+  await expect(box.getByTestId("rr-findings")).toContainText("Công ty Alpha (2.820 tỷ năm 2019) không còn được nêu tên năm 2020");
+  for (const y of ["2020", "2019"]) await box.getByRole("button", { name: `Xóa năm ${y}` }).click();  // the suite shares one store
+  await expect(box.getByRole("table")).toHaveCount(0);
   await page.goto("/research/VCB");
   await expect(page.getByRole("region", { name: "Số liệu ngân hàng" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Nợ vay ròng" })).toHaveCount(0);

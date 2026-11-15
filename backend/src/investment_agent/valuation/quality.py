@@ -16,6 +16,7 @@ MIN_EVALUATED = 7
 RECEIVABLES_GAP = Decimal("0.20")  # receivables growth above revenue growth, in share points
 ACCRUAL_SHARE = Decimal("0.10")  # three years of (profit − operating cash flow) against latest total assets
 FIN_PROFIT_SHARE = Decimal("0.30")  # financial income less financial expenses against profit before tax, latest year
+OTHER_RECEIVABLES_SHARE, OTHER_RECEIVABLES_FLOOR = Decimal("0.10"), Decimal("0.01")  # of total assets; doubling counts above the floor
 BN = Decimal(1_000_000_000)
 # Sector context shown with the signs, where a sign is usual for the business rather than a warning by itself.
 NOTES = {"Bất động sản": "Bất động sản: chủ đầu tư thường lãi nhưng dòng tiền kinh doanh âm khi đang đổ tiền vào quỹ đất, dự án (hàng tồn kho); "
@@ -176,6 +177,23 @@ def _signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:
     else:
         signs.append({"id": "financial_profit", "label": label, "flag": None,
                       "detail": f"Thiếu doanh thu tài chính, chi phí tài chính hoặc lợi nhuận trước thuế năm {y} (có sau lần cập nhật báo cáo tới)"})
+    # Phải thu khác: money out with no sale behind it (advances to others, deposits, lending in all but name); large or doubling, it asks
+    # who owes it and why, in the notes (related parties above all)
+    label = "Phải thu khác lớn"
+    if all(k in cur for k in ("other_receivables", "other_receivables_lt", "total_assets")) and cur["total_assets"] > 0:
+        st, lt = cur["other_receivables"], cur["other_receivables_lt"]
+        other, share = st + lt, (st + lt) / cur["total_assets"]
+        before = prev["other_receivables"] + prev["other_receivables_lt"] if all(k in prev for k in ("other_receivables", "other_receivables_lt")) else None
+        material = before is not None and prev.get("total_assets", Decimal(0)) > 0 and before >= OTHER_RECEIVABLES_FLOOR * prev["total_assets"]
+        signs.append({"id": "other_receivables", "label": label,
+                      "flag": share >= OTHER_RECEIVABLES_SHARE or (material and other >= 2 * before),
+                      "rule": f"phải thu khác (ngắn và dài hạn) từ {_num(OTHER_RECEIVABLES_SHARE * 100, 0)}% tổng tài sản, hoặc gấp đôi năm trước khi năm "
+                              f"trước đã từ {_num(OTHER_RECEIVABLES_FLOOR * 100, 0)}% tổng tài sản",
+                      "detail": f"Năm {y}: phải thu khác {_bn(other)} (ngắn hạn {_bn(st)}, dài hạn {_bn(lt)}), bằng {_pct(share)} tổng tài sản "
+                                f"{_bn(cur['total_assets'])}" + (f"; so với {_bn(before)} năm {y - 1}" if before is not None else "")})
+    else:
+        signs.append({"id": "other_receivables", "label": label, "flag": None,
+                      "detail": f"Thiếu phải thu khác hoặc tổng tài sản năm {y} (có sau lần cập nhật báo cáo tới)"})
     return signs
 
 

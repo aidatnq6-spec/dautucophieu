@@ -76,6 +76,13 @@ def test_monthly_reports_give_retail_sales_and_budget_investment_growth():
     assert parse_nso_report(RETAIL, field="public_invest_yoy") == [(date(2026, 1, 31), "9.3"), (date(2026, 10, 31), "18.8")]
 
 
+def test_reports_typed_with_separate_accents_read_the_same():
+    import unicodedata
+    decomposed = unicodedata.normalize("NFD", json.loads(RETAIL)[0]["content"]["rendered"])  # "tháng", "đạt" as some reports type them
+    post = {**json.loads(RETAIL)[0], "content": {"rendered": decomposed}}
+    assert parse_nso_report(json.dumps([post]), field="retail_yoy") == [(date(2026, 10, 31), "13.7")]
+
+
 def test_a_rule_of_none_gives_the_trend_only():
     assert evaluate("none", ["1", "2"]) == ("Tăng", None)
 

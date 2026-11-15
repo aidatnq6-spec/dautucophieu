@@ -18,6 +18,7 @@ import html as html_lib
 import json
 import os
 import re
+import unicodedata
 import xml.etree.ElementTree as ET
 import calendar
 import time
@@ -454,13 +455,15 @@ def parse_nso_report(text: str, *, field: str) -> list[tuple[date, str]]:
     negative. A report without the sentence gives nothing for that month (quarter reports give no budget investment figure)."""
     found: dict[date, str] = {}
     for post in json.loads(text):
-        title = _text((post.get("title") or {}).get("rendered") or "").strip()
+        # some reports type accents as separate marks ("tháng"): compose them first so the sentences match
+        nfc = lambda s: unicodedata.normalize("NFC", s)  # noqa: E731
+        title = nfc(_text((post.get("title") or {}).get("rendered") or "")).strip()
         if not title.lower().startswith("báo cáo tình hình kinh tế"):
             continue
         month = _report_month(title)
         if month is None:
             continue
-        body = _text((post.get("content") or {}).get("rendered") or "")
+        body = nfc(_text((post.get("content") or {}).get("rendered") or ""))
         value = None
         if field in ("retail_yoy", "public_invest_yoy"):
             m = (_RETAIL if field == "retail_yoy" else _PUBLIC_INVEST).search(body)

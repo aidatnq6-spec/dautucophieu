@@ -6,15 +6,18 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Request
+from pydantic import Field
 
+from investment_agent.domain.models import ContractModel
 from investment_agent.domain.value_chain import factor_status, label, read_indicator, score
 from investment_agent.market.leading import MacroStore, load_indicators
-from investment_agent.market.value_chains import COMMODITY_LABELS, COMMODITY_MAX_AGE_DAYS, VALUE_CHAINS_PATH, load_value_chains
+from investment_agent.market.value_chains import COMMODITY_LABELS, COMMODITY_MAX_AGE_DAYS, VALUE_CHAINS_PATH, fingerprint, load_value_chains
+from investment_agent.services import value_chain_approvals as approvals
 from investment_agent.market.watchlist import load_watchlist
 from investment_agent.repositories.personal import RepositoryUnavailable
 
 from ..auth import require_owner
-from .common import now, unavailable
+from .common import error, now, unavailable
 from .watchlist import held_tickers
 
 router = APIRouter(prefix="/internal/market")
@@ -22,12 +25,45 @@ VN = ZoneInfo("Asia/Ho_Chi_Minh")
 ORDER = {"tailwind": 0, "neutral": 1, "headwind": 2, "insufficient": 3, None: 4}
 
 
+class ApprovalRequest(ContractModel):
+    approved: bool
+    fingerprint: str = Field(pattern=r"^[0-9a-f]{16}$")  # of the content the page showed
+    note: str | None = Field(default=None, max_length=approvals.NOTE_MAX)
+
+
 @router.get("/value-chains")
 def value_chains(request: Request):
+    require_owner(request)
+    if request.app.state.data_dir is None:
+        return unavailable()
+    return _view(request)
+
+
+@router.put("/value-chains/{chain_id}/approval")
+def set_approval(request: Request, chain_id: str, body: ApprovalRequest):
+    """Duyệt or bỏ duyệt one chain; the approval holds for the content the page showed (its fingerprint) and nothing else."""
     require_owner(request)
     data_dir = request.app.state.data_dir
     if data_dir is None:
         return unavailable()
+    config = load_value_chains(getattr(request.app.state, "value_chains_path", VALUE_CHAINS_PATH))
+    chain = next((c for c in config.chains if c.id == chain_id), None)
+    if chain is None:
+        return error(404, "chain_not_found", "Không có chuỗi giá trị này.")
+    if chain.status == "approved":
+        return error(422, "approved_in_config", "Chuỗi này đã duyệt trong tệp cấu hình; đổi trạng thái ở đó.")
+    if body.approved and body.fingerprint != fingerprint(config, chain_id):
+        return error(409, "content_changed", "Nội dung chuỗi đã đổi từ lúc mở trang; tải lại để đọc bản mới rồi duyệt.")
+    if body.approved:
+        approvals.approve(Path(data_dir), chain_id, fingerprint=body.fingerprint, note=(body.note or "").strip() or None,
+                          on=now(request).astimezone(VN).date())
+    else:
+        approvals.withdraw(Path(data_dir), chain_id)
+    return _view(request)
+
+
+def _view(request: Request) -> dict:
+    data_dir = request.app.state.data_dir
     try:
         held = held_tickers(request) if request.app.state.personal_repository is not None else set()
     except RepositoryUnavailable:
@@ -42,9 +78,10 @@ def value_chains(request: Request):
 
 
 def scored_chains(data_dir: Path, config, *, today: date, held: set[str]) -> list[dict]:
-    """Each chain with its factors read from the stored macro series, its score and label (None when not approved)."""
+    """Each chain with its factors read from the stored macro series, its score and label (None when not approved). A chain is approved
+    in the config, or in the app for its current content; an app approval of earlier content shows as stale."""
     indicators = {i["id"]: i for i in load_indicators()}
-    store, readings = MacroStore(data_dir), {}
+    store, readings, approved_in_app = MacroStore(data_dir), {}, approvals.read_approvals(data_dir)
 
     def reading(series: str | None) -> dict | None:
         if series is None:
@@ -63,8 +100,17 @@ def scored_chains(data_dir: Path, config, *, today: date, held: set[str]) -> lis
             factors.append({**f.model_dump(mode="json"), "status": factor_status(f.when_up, r), "reading": r,
                             "indicator_label": indicators[f.indicator]["label"] if f.indicator in indicators else COMMODITY_LABELS.get(f.indicator)})
         shares = score([(f["weight"], f["status"]) for f in factors])
-        chains.append({**chain.model_dump(mode="json", exclude={"symbols", "factors"}), "factors": factors, "score": shares,
-                       "label": label(shares, approved=chain.status == "approved"),
+        print_, app = fingerprint(config, chain.id), approved_in_app.get(chain.id)
+        if chain.status == "approved":
+            approval = {"on": None, "note": None, "by": "config", "stale": False}
+        elif app:
+            approval = {"on": app["on"], "note": app.get("note"), "by": "app", "stale": app["fingerprint"] != print_}
+        else:
+            approval = None
+        approved = approval is not None and not approval["stale"]
+        chains.append({**chain.model_dump(mode="json", exclude={"symbols", "factors"}), "status": "approved" if approved else "draft",
+                       "fingerprint": print_, "approval": approval, "factors": factors, "score": shares,
+                       "label": label(shares, approved=approved),
                        "symbols": [{"symbol": s, "held": s in held} for s in chain.symbols]})
     return chains
 

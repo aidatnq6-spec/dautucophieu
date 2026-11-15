@@ -28,6 +28,22 @@ test("each chain is a card; a card opens its sourced Đầu vào → Trung gian 
   await expect(page).toHaveURL(/\/research\/GVR$/);
 });
 
+test("the owner approves a chain in the app and can withdraw it", async ({ page }) => {
+  const section = await openSection(page);
+  const rubber = section.getByRole("button", { name: /Cao su tự nhiên/ });
+  await rubber.click();
+  const diagram = page.getByRole("region", { name: "Chuỗi giá trị Cao su tự nhiên" });
+  await diagram.getByLabel("Ghi chú khi duyệt (không bắt buộc)").fill("Đã đọc ACBS");
+  await diagram.getByRole("button", { name: "Duyệt chuỗi này" }).click();
+  await expect(diagram).toContainText("Đã duyệt ngày");
+  await expect(diagram).toContainText("Đã đọc ACBS");
+  await expect(diagram).not.toContainText("Chưa duyệt:");
+  await expect(rubber).toContainText("Thuận gió");  // rubber reads tốt 100% in the fixture
+  await diagram.getByRole("button", { name: "Bỏ duyệt" }).click();
+  await expect(rubber).toContainText("Chưa duyệt");
+  await expect(diagram.getByRole("button", { name: "Duyệt chuỗi này" })).toBeVisible();
+});
+
 test("a factor without a stored series says so instead of guessing", async ({ page }) => {
   const section = await openSection(page);
   await section.getByRole("button", { name: /^Thép/ }).click();

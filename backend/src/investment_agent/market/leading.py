@@ -421,6 +421,12 @@ def parse_sbv_central(page: str) -> list[tuple[date, str]]:
 _QUARTER_END = {"i": 3, "ii": 6, "iii": 9, "iv": 12}
 _TRADE_MONTH = re.compile(r"(?i)cán cân thương mại hàng hóa tháng [^,.;]{1,30}?(xuất|nhập) siêu ([\d.,]+) tỷ USD")
 _TRADE_YTD = re.compile(r"(?i)cán cân thương mại hàng hóa (?!tháng)[^,.;]{0,40}?(xuất|nhập) siêu ([\d.,]+) tỷ USD")
+_AMOUNT = r"(?:gần |khoảng |hơn )?[\d.,]+ nghìn tỷ đồng"
+_RETAIL = re.compile(r"(?i)tổng mức bán lẻ hàng hóa và doanh thu dịch vụ tiêu dùng theo giá hiện hành tháng [^,;.]{1,30}?ước đạt " + _AMOUNT
+                     + r", (?:(?:tăng|giảm) [\d.,]+% so với tháng trước và )?(tăng|giảm) ([\d.,]+)% so với cùng kỳ năm trước")
+# since January: the sentence that gives the share of the year's plan (January's own sentence is the year to date)
+_PUBLIC_INVEST = re.compile(r"(?i)vốn đầu tư thực hiện từ nguồn ngân sách nhà nước (?:tháng [^,;.]{1,12}? )?ước đạt " + _AMOUNT
+                            + r", bằng [\d.,]+% kế hoạch năm và (tăng|giảm) ([\d.,]+)% so với cùng kỳ năm trước")
 _FDI = re.compile(r"(?i)vốn đầu tư trực tiếp nước ngoài thực hiện tại Việt Nam [^.;]{0,80}?đạt ([\d.,]+) tỷ USD, (tăng|giảm) ([\d.,]+)%")
 
 
@@ -443,8 +449,9 @@ def _report_month(title: str) -> date | None:
 
 def parse_nso_report(text: str, *, field: str) -> list[tuple[date, str]]:
     """From each "Báo cáo tình hình kinh tế – xã hội …" post (the press releases repeat it): the month's goods trade balance, the balance
-    since January, disbursed FDI since January (bn USD) or its change on a year before (%); dated to the month's end. A deficit is
-    negative. A report without the sentence gives nothing for that month."""
+    since January, disbursed FDI since January (bn USD) or its change on a year before (%), the month's retail sales against a year
+    before (%), or budget-funded investment since January against a year before (%); dated to the month's end. A deficit is
+    negative. A report without the sentence gives nothing for that month (quarter reports give no budget investment figure)."""
     found: dict[date, str] = {}
     for post in json.loads(text):
         title = _text((post.get("title") or {}).get("rendered") or "").strip()
@@ -455,7 +462,11 @@ def parse_nso_report(text: str, *, field: str) -> list[tuple[date, str]]:
             continue
         body = _text((post.get("content") or {}).get("rendered") or "")
         value = None
-        if field in ("trade_month", "trade_ytd"):
+        if field in ("retail_yoy", "public_invest_yoy"):
+            m = (_RETAIL if field == "retail_yoy" else _PUBLIC_INVEST).search(body)
+            if m:
+                value = _vn_number(m.group(2)) * (-1 if m.group(1).lower() == "giảm" else 1)
+        elif field in ("trade_month", "trade_ytd"):
             m = (_TRADE_MONTH if field == "trade_month" else _TRADE_YTD).search(body)
             if m:
                 value = _vn_number(m.group(2)) * (-1 if m.group(1).lower() == "nhập" else 1)

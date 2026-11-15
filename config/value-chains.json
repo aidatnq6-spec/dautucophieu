@@ -1,5 +1,5 @@
 {
- "version": "2026-10-30",
+ "version": "2026-11-15",
  "sources": {
   "acbs-bank": {
    "title": "Ngành Ngân hàng 2026F – Tăng trưởng giảm tốc",
@@ -681,11 +681,11 @@
      "id": "fdi",
      "label": "Dòng vốn FDI",
      "stage": "output",
-     "indicator": null,
+     "indicator": "vn_fdi_disbursed_yoy",
      "when_up": "good",
      "weight": "major",
      "share": null,
-     "why": "KBC hưởng lợi khi thu hút dự án FDI quy mô lớn",
+     "why": "KBC hưởng lợi khi thu hút dự án FDI quy mô lớn; đọc theo mức tăng vốn FDI giải ngân từ đầu năm so với cùng kỳ (Cục Thống kê)",
      "refs": [
       {
        "source": "acbs-kbc",
@@ -801,11 +801,11 @@
      "id": "public_spend",
      "label": "Giải ngân đầu tư công",
      "stage": "output",
-     "indicator": null,
+     "indicator": "vn_public_invest_yoy",
      "when_up": "good",
      "weight": "major",
      "share": null,
-     "why": "Giải ngân 5T2026 chỉ đạt 24% kế hoạch",
+     "why": "Giải ngân 5T2026 chỉ đạt 24% kế hoạch; đọc theo mức tăng vốn đầu tư từ ngân sách Nhà nước từ đầu năm so với cùng kỳ (Cục Thống kê)",
      "refs": [
       {
        "source": "acbs-infra",
@@ -1601,11 +1601,11 @@
      "id": "gas_price",
      "label": "Giá khí đầu vào",
      "stage": "input",
-     "indicator": null,
+     "indicator": "com_lng",
      "when_up": "bad",
      "weight": "major",
      "share": null,
-     "why": "Chi phí nguyên liệu Q2/2026 là 2.280 tỷ đồng trên doanh thu 2.825 tỷ đồng; ứng dụng không có chuỗi giá khí trong nước",
+     "why": "Chi phí nguyên liệu Q2/2026 là 2.280 tỷ đồng trên doanh thu 2.825 tỷ đồng. Giá LNG Nhật Bản chỉ là thước đo gần đúng: giá khí trong nước cho NT2 theo hợp đồng riêng, ứng dụng không có chuỗi số đó",
      "refs": [
       {
        "source": "acbs-nt2",
@@ -2124,11 +2124,11 @@
      "id": "demand",
      "label": "Sức mua người tiêu dùng",
      "stage": "output",
-     "indicator": null,
+     "indicator": "vn_retail_yoy",
      "when_up": "good",
      "weight": "major",
      "share": null,
-     "why": "Sức mua được kỳ vọng cải thiện trong 2026 nhưng chậm",
+     "why": "Sức mua được kỳ vọng cải thiện trong 2026 nhưng chậm; đọc theo mức tăng tổng mức bán lẻ tháng so với cùng kỳ (Cục Thống kê, giá hiện hành)",
      "refs": [
       {
        "source": "acbs-retail",
@@ -2196,11 +2196,11 @@
      "id": "demand",
      "label": "Sức mua người tiêu dùng",
      "stage": "output",
-     "indicator": null,
+     "indicator": "vn_retail_yoy",
      "when_up": "good",
      "weight": "major",
      "share": null,
-     "why": "Sức mua được kỳ vọng cải thiện trong 2026 nhưng chậm",
+     "why": "Sức mua được kỳ vọng cải thiện trong 2026 nhưng chậm; đọc theo mức tăng tổng mức bán lẻ tháng so với cùng kỳ (Cục Thống kê, giá hiện hành)",
      "refs": [
       {
        "source": "acbs-retail",
@@ -2267,11 +2267,11 @@
      "id": "demand",
      "label": "Sức mua người tiêu dùng",
      "stage": "output",
-     "indicator": null,
+     "indicator": "vn_retail_yoy",
      "when_up": "good",
      "weight": "major",
      "share": null,
-     "why": "PNJ nằm trong nhóm bán lẻ niêm yết; sức mua được kỳ vọng cải thiện trong 2026 nhưng chậm",
+     "why": "PNJ nằm trong nhóm bán lẻ niêm yết; sức mua được kỳ vọng cải thiện trong 2026 nhưng chậm; đọc theo mức tăng tổng mức bán lẻ tháng so với cùng kỳ (Cục Thống kê, giá hiện hành)",
      "refs": [
       {
        "source": "acbs-retail",

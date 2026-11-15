@@ -5,6 +5,7 @@ macro-indicators.json or the commodity prices) or none when the app keeps no suc
 switching its status from draft to approved.
 """
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Literal
@@ -108,6 +109,16 @@ class ValueChains(ContractModel):
                 if f.indicator is not None and f.indicator not in known:
                     raise ValueError(f"chain {chain.id}: unknown series {f.indicator}")
         return self
+
+
+def fingerprint(config: ValueChains, chain_id: str) -> str:
+    """16 hex characters over the chain as the owner reads it (stages, factors, tickers) and the sources it cites; not its status.
+    An approval in the app holds for this fingerprint only: any change to the content asks for approval again."""
+    chain = next(c for c in config.chains if c.id == chain_id)
+    body = chain.model_dump(mode="json", exclude={"status"})
+    cited = sorted({r.source for x in [*chain.stages.input, *chain.stages.middle, *chain.stages.output, *chain.factors] for r in x.refs})
+    text = json.dumps({"chain": body, "sources": {k: config.sources[k].model_dump(mode="json") for k in cited}}, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
 def load_value_chains(path: Path = VALUE_CHAINS_PATH) -> ValueChains:

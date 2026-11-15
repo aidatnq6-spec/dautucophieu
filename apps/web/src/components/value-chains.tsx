@@ -12,7 +12,8 @@ type Reading = { direction: "up" | "down" | "flat" | null; change: string | null
 type Factor = { id: string; label: string; stage: Stage; indicator: string | null; indicator_label: string | null; when_up: "good" | "bad";
   weight: "major" | "minor" | "small"; share: string | null; why: string; refs: Ref[]; status: Status; reading: Reading | null };
 type Label = "tailwind" | "neutral" | "headwind" | "insufficient" | null;
-type Chain = { id: string; name: string; icb: string; status: "draft" | "approved"; label: Label; score: Record<Status, string>;
+type Approval = { on: string | null; note: string | null; by: "app" | "config"; stale: boolean };
+type Chain = { id: string; name: string; icb: string; status: "draft" | "approved"; fingerprint: string; approval: Approval | null; label: Label; score: Record<Status, string>;
   symbols: { symbol: string; held: boolean }[]; stages: Record<Stage, Item[]>; factors: Factor[] };
 type Source = { title: string; publisher: string; date: string; url: string };
 type Data = { as_of: string; chains: Chain[]; sources: Record<string, Source>; uncovered: string[] };
@@ -55,7 +56,39 @@ function Bar({ score }: { score: Chain["score"] }) {
   );
 }
 
-function Diagram({ chain, sources }: { chain: Chain; sources: Record<string, Source> }) {
+/** Duyệt in the app: the approval holds for the content shown (its fingerprint); a later change to the chain asks again. */
+function ApprovalPanel({ chain, onChange }: { chain: Chain; onChange: (d: Data) => void }) {
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const a = chain.approval;
+  async function send(approved: boolean) {
+    setBusy(true); setError(null);
+    try {
+      onChange(await api<Data>(`market/value-chains/${chain.id}/approval`, { method: "PUT", body: { approved, fingerprint: chain.fingerprint, note: note || null } }));
+      setNote("");
+    } catch (e) { setError(e instanceof ApiError ? e.failure.message : "Không lưu được."); } finally { setBusy(false); }
+  }
+  if (a?.by === "config") return <p className="caption">Đã duyệt trong tệp cấu hình.</p>;
+  return (
+    <div className="vc-approval" aria-label="Duyệt chuỗi">
+      {chain.status === "approved" && a ? <>
+        <p><span className="pill good">Đã duyệt</span> ngày {a.on ? day(a.on) : "—"}{a.note && <> · <span className="caption">{a.note}</span></>}</p>
+        <button className="btn text" disabled={busy} onClick={() => send(false)}>Bỏ duyệt</button>
+      </> : <>
+        {a?.stale && <p className="notice">Bạn đã duyệt ngày {a.on ? day(a.on) : "—"}, nhưng nội dung chuỗi đã đổi sau đó: đọc lại rồi duyệt bản mới.</p>}
+        <p className="caption">Đọc các mục, nguồn và mức quan trọng của từng yếu tố. Duyệt thì thẻ có nhãn tổng (Thuận gió, Ngược gió…) và nhãn này được
+          dùng trong Bộ lọc tín hiệu và Luận điểm; nội dung chuỗi đổi thì phải duyệt lại.</p>
+        <label className="vc-note">Ghi chú khi duyệt (không bắt buộc)
+          <input value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} /></label>
+        <button className="btn primary" disabled={busy} onClick={() => send(true)}>Duyệt chuỗi này</button>
+      </>}
+      {error && <p className="errors" role="alert">{error}</p>}
+    </div>
+  );
+}
+
+function Diagram({ chain, sources, onChange }: { chain: Chain; sources: Record<string, Source>; onChange: (d: Data) => void }) {
   return (
     <section className="surface vc-open" aria-label={`Chuỗi giá trị ${chain.name}`}>
       <h3>{chain.name} <span className="caption">({chain.icb})</span></h3>
@@ -79,6 +112,7 @@ function Diagram({ chain, sources }: { chain: Chain; sources: Record<string, Sou
       </ol>
       <p>Mã theo dõi: {chain.symbols.map((s, i) => <span key={s.symbol}>{i > 0 && ", "}<Link href={`/research/${s.symbol}`}>{s.held ? <strong>{s.symbol}</strong> : s.symbol}</Link>
         {s.held && " (đang nắm)"}</span>)}</p>
+      <ApprovalPanel chain={chain} onChange={onChange} />
     </section>
   );
 }
@@ -105,7 +139,7 @@ export function ValueChains() {
           <Bar score={c.score} />
           <span className="caption">{c.symbols.map((s) => s.symbol).join(", ")}{c.symbols.some((s) => s.held) && " · có mã đang nắm"}</span>
         </button>
-        {open === c.id && <Diagram chain={c} sources={data.sources} />}
+        {open === c.id && <Diagram chain={c} sources={data.sources} onChange={setData} />}
         </Fragment>))}
       </div>
       {data.uncovered.length > 0 && <p className="caption">Chưa có chuỗi giá trị cho: {data.uncovered.join(", ")}.</p>}

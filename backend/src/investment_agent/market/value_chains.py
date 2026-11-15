@@ -16,7 +16,7 @@ from investment_agent.domain.models import ContractModel
 from investment_agent.domain.pinned import CONFIG_DIR
 from investment_agent.domain.value_chain import weight_for_share
 
-from .leading import COMMODITIES, load_indicators
+from .leading import CHAIN_SERIES, COMMODITIES, load_indicators
 
 VALUE_CHAINS_PATH = CONFIG_DIR / "value-chains.json"
 _SHARE = r"^0\.\d{1,4}(-0\.\d{1,4})?$"
@@ -24,7 +24,8 @@ _SHARE = r"^0\.\d{1,4}(-0\.\d{1,4})?$"
 COMMODITY_LABELS = {"com_coal": "Giá than thế giới (Úc)", "com_iron_ore": "Giá quặng sắt thế giới", "com_rubber": "Giá cao su thế giới",
                     "com_sugar": "Giá đường thế giới", "com_shrimp": "Giá tôm thế giới", "com_lng": "Giá khí LNG (Nhật Bản)",
                     "com_aluminium": "Giá nhôm thế giới", "com_copper": "Giá đồng thế giới", "com_wheat": "Giá lúa mì thế giới",
-                    "com_soybean": "Giá đậu tương thế giới"}
+                    "com_soybean": "Giá đậu tương thế giới", "com_urea": "Giá urê thế giới (Trung Đông, World Bank)",
+                    "port_container_yoy": "Sản lượng container qua cảng Việt Nam so cùng kỳ (VPA)"}
 COMMODITY_MAX_AGE_DAYS = 75  # monthly averages, published with about a month's lag
 
 
@@ -52,6 +53,8 @@ class Factor(ContractModel):
     id: str = Field(pattern=r"^[a-z0-9_]{1,40}$")
     label: str = Field(min_length=1)
     stage: Literal["input", "middle", "output"]
+    # an event (a tariff, a trade-defence case) is noted on the diagram and kept off the good/bad bar; it names no series
+    kind: Literal["series", "event"] = "series"
     indicator: str | None
     when_up: Literal["good", "bad"]
     weight: Literal["major", "minor", "small"]
@@ -61,6 +64,8 @@ class Factor(ContractModel):
 
     @model_validator(mode="after")
     def _weight_matches_share(self):
+        if self.kind == "event" and self.indicator is not None:
+            raise ValueError(f"factor {self.id}: an event names no series")
         if self.share is not None and weight_for_share(self.share) != self.weight:
             raise ValueError(f"factor {self.id}: share {self.share} is {weight_for_share(self.share)}, not {self.weight}")
         return self
@@ -89,7 +94,7 @@ class ValueChains(ContractModel):
 
     @model_validator(mode="after")
     def _consistent(self):
-        known = {i["id"] for i in load_indicators()} | set(COMMODITIES)
+        known = {i["id"] for i in load_indicators()} | set(COMMODITIES) | set(CHAIN_SERIES)
         ids, owner = set(), {}
         for chain in self.chains:
             if chain.id in ids:
@@ -116,6 +121,9 @@ def fingerprint(config: ValueChains, chain_id: str) -> str:
     An approval in the app holds for this fingerprint only: any change to the content asks for approval again."""
     chain = next(c for c in config.chains if c.id == chain_id)
     body = chain.model_dump(mode="json", exclude={"status"})
+    for f in body["factors"]:  # the kind came later: a plain series factor reads as before, so earlier approvals still hold
+        if f["kind"] == "series":
+            del f["kind"]
     cited = sorted({r.source for x in [*chain.stages.input, *chain.stages.middle, *chain.stages.output, *chain.factors] for r in x.refs})
     text = json.dumps({"chain": body, "sources": {k: config.sources[k].model_dump(mode="json") for k in cited}}, ensure_ascii=False, sort_keys=True)
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]

@@ -96,10 +96,11 @@ def scored_chains(data_dir: Path, config, *, today: date, held: set[str]) -> lis
     for chain in config.chains:
         factors = []
         for f in chain.factors:
-            r = reading(f.indicator)
-            factors.append({**f.model_dump(mode="json"), "status": factor_status(f.when_up, r), "reading": r,
+            r = None if f.kind == "event" else reading(f.indicator)
+            factors.append({**f.model_dump(mode="json"), "status": "event" if f.kind == "event" else factor_status(f.when_up, r), "reading": r,
                             "indicator_label": indicators[f.indicator]["label"] if f.indicator in indicators else COMMODITY_LABELS.get(f.indicator)})
-        shares = score([(f["weight"], f["status"]) for f in factors])
+        measured = [(f["weight"], f["status"]) for f in factors if f["status"] != "event"]
+        shares = score(measured)
         print_, app = fingerprint(config, chain.id), approved_in_app.get(chain.id)
         if chain.status == "approved":
             approval = {"on": None, "note": None, "by": "config", "stale": False}
@@ -109,8 +110,9 @@ def scored_chains(data_dir: Path, config, *, today: date, held: set[str]) -> lis
             approval = None
         approved = approval is not None and not approval["stale"]
         chains.append({**chain.model_dump(mode="json", exclude={"symbols", "factors"}), "status": "approved" if approved else "draft",
-                       "fingerprint": print_, "approval": approval, "factors": factors, "score": shares,
-                       "label": label(shares, approved=approved),
+                       "fingerprint": print_, "approval": approval, "factors": factors, "score": shares, "measured": len(measured),
+                       # events alone say nothing measurable: too little data, once approved
+                       "label": label(shares, approved=approved) if measured else ("insufficient" if approved else None),
                        "symbols": [{"symbol": s, "held": s in held} for s in chain.symbols]})
     return chains
 

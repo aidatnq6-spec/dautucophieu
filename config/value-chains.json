@@ -1,5 +1,5 @@
 {
- "version": "2026-11-15",
+ "version": "2026-11-15.2",
  "sources": {
   "acbs-bank": {
    "title": "Ngành Ngân hàng 2026F – Tăng trưởng giảm tốc",
@@ -697,6 +697,7 @@
      "id": "us_tariff",
      "label": "Thuế quan Mỹ (Mục 301)",
      "stage": "output",
+     "kind": "event",
      "indicator": null,
      "when_up": "bad",
      "weight": "minor",
@@ -1063,6 +1064,7 @@
      "id": "trade_defence",
      "label": "Phòng vệ thương mại với HRC Trung Quốc",
      "stage": "output",
+     "kind": "event",
      "indicator": null,
      "when_up": "good",
      "weight": "minor",
@@ -1264,11 +1266,11 @@
      "id": "urea_price",
      "label": "Giá urê",
      "stage": "output",
-     "indicator": null,
+     "indicator": "com_urea",
      "when_up": "good",
      "weight": "major",
      "share": null,
-     "why": "Giá urê tăng lên khoảng 19.000 đồng/kg so với 12.000 đồng/kg năm 2025",
+     "why": "Giá urê tăng lên khoảng 19.000 đồng/kg so với 12.000 đồng/kg năm 2025; đọc theo giá urê thế giới (Trung Đông, f.o.b.) hằng tháng của World Bank, gần đúng cho giá bán trong nước",
      "refs": [
       {
        "source": "acbs-dcm",
@@ -1693,11 +1695,11 @@
      "id": "throughput",
      "label": "Sản lượng container qua cảng",
      "stage": "output",
-     "indicator": null,
+     "indicator": "port_container_yoy",
      "when_up": "good",
      "weight": "major",
      "share": null,
-     "why": "Sản lượng container tăng 8% svck",
+     "why": "Sản lượng container tăng 8% svck; đọc theo sản lượng container qua cảng Việt Nam so cùng kỳ do Hiệp hội Cảng biển Việt Nam công bố hằng tháng",
      "refs": [
       {
        "source": "acbs-gmd",
@@ -1709,6 +1711,7 @@
      "id": "us_tariff",
      "label": "Thuế quan Mỹ (Mục 301)",
      "stage": "output",
+     "kind": "event",
      "indicator": null,
      "when_up": "bad",
      "weight": "minor",
@@ -1956,6 +1959,7 @@
      "id": "us_tariff",
      "label": "Thuế quan và phòng vệ thương mại Mỹ",
      "stage": "output",
+     "kind": "event",
      "indicator": null,
      "when_up": "bad",
      "weight": "minor",

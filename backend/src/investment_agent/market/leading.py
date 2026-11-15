@@ -20,6 +20,8 @@ import os
 import re
 import unicodedata
 import xml.etree.ElementTree as ET
+import zipfile
+import io
 import calendar
 import time
 from datetime import date, datetime, timedelta, timezone
@@ -714,6 +716,97 @@ def fetch_commodities(store: MacroStore, *, get: Callable[[str], str], today: da
             results[key] = "ok"
         except Exception as exc:
             results[key] = f"error:{type(exc).__name__}"
+    return results
+
+
+# Chuỗi giá trị series from other public sources (checked 15/11/2026), kept like the commodity prices (never on Vĩ mô):
+# - urea from the World Bank's monthly commodity prices ("Pink Sheet"; worldbank.org robots.txt allows the page, thedocs has none), whose
+#   workbook link changes each month, so it is read from the page; fetched only while last month's price is missing;
+# - Vietnam's container throughput against a year before, from the monthly posts of the Vietnam Seaports Association (robots.txt allows
+#   all but /wp-admin/), which began in 10/2026, so the series fills in month by month.
+WB_COMMODITY_PAGE = "https://www.worldbank.org/en/research/commodity-markets"
+VPA_POSTS = "https://www.vpa.org.vn/wp-json/wp/v2/posts?search=container%20throughput&per_page=24&_fields=date,title"
+CHAIN_SERIES = ("com_urea", "port_container_yoy")
+_XL = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+_XL_REL = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+_EN_MONTHS = {m: i for i, m in enumerate(("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
+                                          "november", "december"), start=1)}
+_VPA = re.compile(r"(?i)^(" + "|".join(_EN_MONTHS) + r")\s+(\d{4})\s+container throughput\b.*?\b(up|down)\s+([\d.]+)%\s+year[\s-]+on[\s-]+year")
+
+
+def parse_wb_link(page: str) -> str:
+    m = re.search(r'href="(https://thedocs\.worldbank\.org/[^"]+/CMO-Historical-Data-Monthly\.xlsx)"', page)
+    if not m:
+        raise MacroError("wb_link_missing")
+    return m.group(1)
+
+
+def parse_wb_monthly(data: bytes, *, column: str) -> list[tuple[date, str]]:
+    """One column of the "Monthly Prices" sheet, dated to the month's first day like the FRED series; blanks ("…") are skipped."""
+    z = zipfile.ZipFile(io.BytesIO(data))
+    rid = next((s.get(_XL_REL + "id") for s in ET.fromstring(z.read("xl/workbook.xml")).iter(_XL + "sheet") if s.get("name") == "Monthly Prices"), None)
+    target = next((r.get("Target") for r in ET.fromstring(z.read("xl/_rels/workbook.xml.rels")) if r.get("Id") == rid), None)
+    if target is None:
+        raise MacroError("wb_sheet_missing")
+    strings = ["".join(t.text or "" for t in si.iter(_XL + "t")) for si in ET.fromstring(z.read("xl/sharedStrings.xml"))]
+    rows = []
+    for row in ET.fromstring(z.read("xl/" + target.lstrip("/").removeprefix("xl/"))).iter(_XL + "row"):
+        cells = {}
+        for c in row.iter(_XL + "c"):
+            v = c.find(_XL + "v")
+            if v is not None and v.text is not None:
+                cells[re.match(r"[A-Z]+", c.get("r")).group(0)] = strings[int(v.text)] if c.get("t") == "s" else v.text
+        rows.append(cells)
+    col = next((k for r in rows for k, v in r.items() if v.strip() == column), None)
+    if col is None:
+        raise MacroError("wb_column_missing")
+    out = []
+    for r in rows:
+        m = re.fullmatch(r"(\d{4})M(\d{2})", r.get("A", "").strip())
+        try:
+            value = Decimal(r.get(col, ""))
+        except InvalidOperation:
+            continue
+        if m and value > 0:
+            out.append((date(int(m.group(1)), int(m.group(2)), 1), _plain(value)))
+    if not out:
+        raise MacroError("wb_no_observations")
+    return out
+
+
+def parse_vpa_container(text: str) -> list[tuple[date, str]]:
+    """Each "<Month> <year> container throughput reaches … , up|down x% year on year" post, dated to the month's end."""
+    found = {}
+    for post in json.loads(text):
+        m = _VPA.search(html_lib.unescape((post.get("title") or {}).get("rendered") or "").strip())
+        if m:
+            y, mo = int(m.group(2)), _EN_MONTHS[m.group(1).lower()]
+            found.setdefault(date(y, mo, calendar.monthrange(y, mo)[1]), _plain(Decimal(m.group(4)) * (-1 if m.group(3).lower() == "down" else 1)))
+    if not found:
+        raise MacroError("vpa_unreadable")
+    return sorted(found.items())
+
+
+def fetch_chain_series(store: MacroStore, *, get: Callable[[str], str], get_bytes: Callable[[str], bytes] | None, today: date | None = None,
+                       sleep: Callable[[float], None] = time.sleep) -> dict[str, str]:
+    """Urea (only with a bytes fetcher, and only while last month's price is missing) and container throughput; each reported apart."""
+    today = today or datetime.now(VN).date()
+    results = {}
+    if get_bytes is not None:
+        try:
+            have = store.read("com_urea")
+            last_month = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+            if not have or date.fromisoformat(have[-1]["date"]) < last_month:
+                url = parse_wb_link(_get_with_retry(get, WB_COMMODITY_PAGE, sleep))
+                store.upsert("com_urea", parse_wb_monthly(get_bytes(url), column="Urea")[-COMMODITY_YEARS * 12:], entry="auto")
+            results["com_urea"] = "ok"
+        except Exception as exc:
+            results["com_urea"] = f"error:{type(exc).__name__}"
+    try:
+        store.upsert("port_container_yoy", parse_vpa_container(_get_with_retry(get, VPA_POSTS, sleep)), entry="auto")
+        results["port_container_yoy"] = "ok"
+    except Exception as exc:
+        results["port_container_yoy"] = f"error:{type(exc).__name__}"
     return results
 
 

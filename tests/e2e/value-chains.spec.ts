@@ -52,6 +52,16 @@ test("a factor without a stored series says so instead of guessing", async ({ pa
   await expect(steel).toContainText("Ứng dụng chưa có chuỗi số liệu cho yếu tố này.");
 });
 
+test("tariffs are events: off the bar, with a link to the macro calendar", async ({ page }) => {
+  const section = await openSection(page);
+  const seafood = section.getByRole("button", { name: /Thủy sản/ });
+  await expect(seafood).toContainText("Chưa có yếu tố đo được bằng số liệu");
+  await seafood.click();
+  const diagram = page.getByRole("region", { name: "Chuỗi giá trị Thủy sản" });
+  await expect(diagram).toContainText("Thuế quan và phòng vệ thương mại Mỹ: sự kiện");
+  await expect(diagram.getByRole("link", { name: "Lịch và nhật ký vĩ mô" })).toHaveAttribute("href", "/macro#lich-vi-mo");
+});
+
 test("no horizontal scroll with a chain open at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 900 });
   const section = await openSection(page);

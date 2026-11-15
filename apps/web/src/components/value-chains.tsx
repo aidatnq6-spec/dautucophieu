@@ -8,12 +8,13 @@ type Ref = { source: string; page: number | null };
 type Item = { name: string; note: string | null; share: string | null; basis: string | null; refs: Ref[] };
 type Stage = "input" | "middle" | "output";
 type Status = "good" | "bad" | "neutral" | "unknown";
+type FactorStatus = Status | "event";
 type Reading = { direction: "up" | "down" | "flat" | null; change: string | null; kind: "ratio" | "points" | "net" | null; from: string | null; date: string; value: string; stale: boolean };
-type Factor = { id: string; label: string; stage: Stage; indicator: string | null; indicator_label: string | null; when_up: "good" | "bad";
-  weight: "major" | "minor" | "small"; share: string | null; why: string; refs: Ref[]; status: Status; reading: Reading | null };
+type Factor = { id: string; label: string; stage: Stage; kind: "series" | "event"; indicator: string | null; indicator_label: string | null; when_up: "good" | "bad";
+  weight: "major" | "minor" | "small"; share: string | null; why: string; refs: Ref[]; status: FactorStatus; reading: Reading | null };
 type Label = "tailwind" | "neutral" | "headwind" | "insufficient" | null;
 type Approval = { on: string | null; note: string | null; by: "app" | "config"; stale: boolean };
-type Chain = { id: string; name: string; icb: string; status: "draft" | "approved"; fingerprint: string; approval: Approval | null; label: Label; score: Record<Status, string>;
+type Chain = { id: string; name: string; icb: string; status: "draft" | "approved"; fingerprint: string; approval: Approval | null; label: Label; score: Record<Status, string>; measured: number;
   symbols: { symbol: string; held: boolean }[]; stages: Record<Stage, Item[]>; factors: Factor[] };
 type Source = { title: string; publisher: string; date: string; url: string };
 type Data = { as_of: string; chains: Chain[]; sources: Record<string, Source>; uncovered: string[] };
@@ -22,7 +23,7 @@ const LABEL: Record<Exclude<Label, null>, { text: string; tone: string }> = {
   tailwind: { text: "Thuận gió", tone: "good" }, neutral: { text: "Trung tính", tone: "" }, headwind: { text: "Ngược gió", tone: "bad" },
   insufficient: { text: "Chưa đủ dữ liệu", tone: "warn" },
 };
-const STATUS: Record<Status, string> = { good: "tốt", bad: "xấu", neutral: "trung tính", unknown: "chưa đánh giá được" };
+const STATUS: Record<FactorStatus, string> = { good: "tốt", bad: "xấu", neutral: "trung tính", unknown: "chưa đánh giá được", event: "sự kiện" };
 const WEIGHT = { major: "chính", minor: "phụ", small: "nhỏ" };
 const STAGES: [Stage, string][] = [["input", "Đầu vào"], ["middle", "Trung gian"], ["output", "Đầu ra"]];
 const day = (iso: string) => iso.split("-").reverse().join("/");
@@ -46,7 +47,8 @@ function Refs({ refs, sources }: { refs: Ref[]; sources: Record<string, Source> 
     return <span key={i}>{i > 0 && " · "}<a href={s.url} target="_blank" rel="noreferrer">{s.publisher}, {day(s.date)}{r.page ? `, tr. ${r.page}` : ""}</a></span>; })}</span>;
 }
 
-function Bar({ score }: { score: Chain["score"] }) {
+function Bar({ score, measured }: { score: Chain["score"]; measured: number }) {
+  if (measured === 0) return <p className="caption">Chưa có yếu tố đo được bằng số liệu; chuỗi này chỉ có yếu tố sự kiện.</p>;
   const parts: [Status, string][] = [["good", "var(--good)"], ["neutral", "var(--vc-neutral)"], ["unknown", "var(--vc-unknown)"], ["bad", "var(--bad)"]];
   return (
     <>
@@ -100,7 +102,12 @@ function Diagram({ chain, sources, onChange }: { chain: Chain; sources: Record<s
             <li key={i}><strong>{it.name}</strong>{it.share && <> · {share(it.share)}{it.basis ? ` ${it.basis}` : ""}</>}
               {it.note && <div className="caption">{it.note}</div>}<Refs refs={it.refs} sources={sources} /></li>))}
           </ul>
-          <ul className="vc-factors">{chain.factors.filter((f) => f.stage === stage).map((f) => (
+          <ul className="vc-factors">{chain.factors.filter((f) => f.stage === stage).map((f) => f.status === "event" ? (
+            <li key={f.id} className="vc-factor vc-event">
+              <strong>{f.label}</strong>: <span className="vc-status">{STATUS.event}</span>
+              <div className="caption">Không tính vào thanh tốt/xấu. Ghi các mốc (ngày áp thuế, kết luận điều tra…) vào{" "}
+                <Link href="/macro#lich-vi-mo">Lịch và nhật ký vĩ mô</Link> để được nhắc. Khi xảy ra thì {f.when_up === "good" ? "tốt" : "xấu"} cho ngành: {f.why}</div>
+              <Refs refs={f.refs} sources={sources} /></li>) : (
             <li key={f.id} className={`vc-factor vc-${f.status}`}>
               <strong>{f.label}</strong>: <span className="vc-status">{STATUS[f.status]}</span> · mức {WEIGHT[f.weight]}{f.share ? ` (${share(f.share)})` : ""}
               <div className="caption">{f.reading ? <>{f.indicator_label}: {move(f.reading)} từ {f.reading.from ? day(f.reading.from) : "—"} đến {day(f.reading.date)}
@@ -129,14 +136,15 @@ export function ValueChains() {
     <section className="surface" aria-label="Chuỗi giá trị">
       <h2>Chuỗi giá trị</h2>
       <p className="caption">Đầu vào, trung gian, đầu ra của từng ngành theo tài liệu công khai, và vĩ mô khoảng một tháng qua đang tốt hay xấu cho ngành
-        (yếu tố chính tính 3, phụ 2, nhỏ 1). Đây là bức tranh mô tả, không đưa ra lời khuyên mua bán.</p>
+        (yếu tố chính tính 3, phụ 2, nhỏ 1). Yếu tố sự kiện như thuế quan, phòng vệ thương mại được ghi riêng, không tính vào thanh.
+        Đây là bức tranh mô tả, không đưa ra lời khuyên mua bán.</p>
       {data.chains.length === 0 && <p className="muted">Chưa có chuỗi giá trị nào.</p>}
       <div className="vc-cards">{data.chains.map((c) => (
         <Fragment key={c.id}>
         <button className="vc-card" aria-expanded={open === c.id} onClick={() => setOpen(open === c.id ? null : c.id)}>
           <span className="vc-card-head"><strong>{c.name}</strong>
             {c.label ? <span className={`pill ${LABEL[c.label].tone}`}>{LABEL[c.label].text}</span> : <span className="pill warn">Chưa duyệt</span>}</span>
-          <Bar score={c.score} />
+          <Bar score={c.score} measured={c.measured} />
           <span className="caption">{c.symbols.map((s) => s.symbol).join(", ")}{c.symbols.some((s) => s.held) && " · có mã đang nắm"}</span>
         </button>
         {open === c.id && <Diagram chain={c} sources={data.sources} onChange={setData} />}

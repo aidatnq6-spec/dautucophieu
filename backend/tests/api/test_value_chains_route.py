@@ -88,6 +88,19 @@ def test_the_owner_approves_a_chain_in_the_app_and_a_content_change_asks_again(t
     assert (undone["status"], undone["approval"]) == ("draft", None)
 
 
+def test_event_factors_stay_off_the_bar_and_a_chain_of_events_alone_has_too_little_data(tmp_path):
+    get, put, path, doc = setup(tmp_path)
+    event = {**copy.deepcopy(CHAIN["factors"][1]), "id": "tariff", "kind": "event", "weight": "major"}
+    doc["chains"][0].update(status="approved")
+    doc["chains"][0]["factors"].append(event)                                                          # steel: oil (major, bad) + an event
+    doc["chains"].append({**chain("seafood", ["VHC"], "approved", []), "factors": [{**event}]})       # events only
+    path.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+    steel, seafood = sorted(get()["chains"], key=lambda c: c["id"] != "steel")
+    assert steel["score"] == {"good": "0.0000", "bad": "1.0000", "neutral": "0.0000", "unknown": "0.0000"} and steel["measured"] == 1
+    assert steel["factors"][-1]["status"] == "event" and steel["label"] == "headwind"
+    assert seafood["measured"] == 0 and seafood["label"] == "insufficient"
+
+
 def test_a_chain_approved_in_the_config_needs_no_approval_in_the_app(tmp_path):
     get, put, path, doc = setup(tmp_path)
     doc["chains"][0]["status"] = "approved"

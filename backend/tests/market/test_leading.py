@@ -36,9 +36,9 @@ def test_pmi_aggregator_requires_value_and_named_publication_month():
 
 def test_indicators_config_lists_auto_and_manual_rows():
     ind = load_indicators()
-    assert len(ind) == 26 and {i["id"] for i in ind if i["source"]["kind"] != "manual"} == {
+    assert len(ind) == 28 and {i["id"] for i in ind if i["source"]["kind"] != "manual"} == {
         "dxy", "wti", "brent", "us_cpi_yoy", "usd_vnd_vcb", "usd_vnd_central", "fed_effr", "sofr", "vn_interbank_1w", "vn_interbank_1m",
-        "vn_trade_balance", "vn_trade_balance_ytd", "vn_fdi_disbursed", "vn_fdi_disbursed_yoy", "us10y", "usd_vnd_free", "usd_vnd_sbv", "deposit_12m",
+        "vn_trade_balance", "vn_trade_balance_ytd", "vn_fdi_disbursed", "vn_fdi_disbursed_yoy", "vn_retail_yoy", "vn_public_invest_yoy", "us10y", "usd_vnd_free", "usd_vnd_sbv", "deposit_12m",
         "foreign_net", "vnindex_value", "m2_vn", "vn10y", "vn_interbank_on", "vn_pmi", "vn_cpi_yoy"}  # us_pmi: manual since 26/10/2026 (sources block bots)
 
 

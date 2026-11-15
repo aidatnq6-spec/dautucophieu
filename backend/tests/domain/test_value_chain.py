@@ -38,6 +38,14 @@ def test_foreign_flows_read_the_sign_of_twenty_sessions():
     assert (r["direction"], r["change"], r["kind"]) == ("down", "-2000", "net")  # the five early buying days are outside the 20 sessions
 
 
+@pytest.mark.parametrize("indicator", ["vn_retail_yoy", "vn_public_invest_yoy", "vn_fdi_disbursed_yoy"])
+def test_growth_rates_move_in_points_with_a_one_point_band(indicator):
+    read = lambda a, b: read_indicator(indicator, [(date(2026, 9, 30), Decimal(a)), (date(2026, 10, 31), Decimal(b))],  # noqa: E731
+                                       today=date(2026, 11, 10), max_age_days=75)
+    assert (read("14.1", "14.7")["direction"], read("14.1", "14.7")["change"], read("14.1", "14.7")["kind"]) == ("flat", "0.60", "points")
+    assert read("12", "13.5")["direction"] == "up" and read("-2", "-3.5")["direction"] == "down"
+
+
 def test_pmi_reads_its_level_against_fifty():
     assert read_indicator("vn_pmi", series(("2026-08-31", "50.5"), ("2026-09-30", "51.2")), today=TODAY, max_age_days=35)["direction"] == "up"
     assert read_indicator("vn_pmi", series(("2026-08-31", "49.5"), ("2026-09-30", "48.1")), today=TODAY, max_age_days=35)["direction"] == "down"

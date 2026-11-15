@@ -4,7 +4,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from investment_agent.market.value_chains import load_value_chains
+from investment_agent.market.value_chains import fingerprint, load_value_chains
 
 SOURCE = {"title": "Câu chuyện đầu tư HT1", "publisher": "ACBS", "date": "2026-10-28",
           "url": "https://acbs.com.vn/acbsmedia/2026/10/HT1-Cau-chuyen-dau-tu-28102026-2.pdf"}
@@ -64,6 +64,25 @@ def test_a_source_dated_by_month_alone_is_allowed(tmp_path):
 
 def test_the_committed_config_loads():
     load_value_chains()
+
+
+def test_the_fingerprint_follows_what_the_owner_reads_not_the_status(tmp_path):
+    base = load_value_chains(write(tmp_path, DOC))
+    print_of = lambda doc: fingerprint(load_value_chains(write(tmp_path, doc)), "cement")  # noqa: E731
+    assert print_of(DOC) == fingerprint(base, "cement") and len(print_of(DOC)) == 16
+    assert print_of(changed(lambda d: d["chains"][0].update(status="approved"))) == print_of(DOC)
+    assert print_of(changed(lambda d: d["chains"][0]["factors"][1].update(why="Khác"))) != print_of(DOC)
+    assert print_of(changed(lambda d: d["chains"][0].update(symbols=["HT1", "BCC"]))) != print_of(DOC)
+    assert print_of(changed(lambda d: d["sources"]["acbs-ht1"].update(title="Khác"))) != print_of(DOC)
+    unused = changed(lambda d: d["sources"].update(other={**SOURCE, "title": "Không dùng"}))
+    assert print_of(unused) == print_of(DOC)  # a source the chain does not cite is not part of it
+
+
+def test_the_committed_chains_read_the_series_the_app_now_keeps():
+    by = {(c.id, f.id): f.indicator for c in load_value_chains().chains for f in c.factors}
+    assert by[("industrial-park", "fdi")] == "vn_fdi_disbursed_yoy" and by[("gas-power", "gas_price")] == "com_lng"
+    assert by[("construction", "public_spend")] == "vn_public_invest_yoy"
+    assert all(by[(c, "demand")] == "vn_retail_yoy" for c in ("consumer", "ict-retail", "jewellery"))
 
 
 # The 50 watched tickers on 30/10/2026, as listed in the spec (data\ is not in Git).

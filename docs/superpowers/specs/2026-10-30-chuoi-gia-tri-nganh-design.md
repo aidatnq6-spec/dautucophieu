@@ -160,6 +160,18 @@ Hiện ứng dụng đã có các mảnh rời: 17 chỉ số vĩ mô đã lưu,
   - duyệt trong ứng dụng, giống luồng duyệt danh sách nghiên cứu, gắn với phiên bản nội dung; sửa nội dung thì phải duyệt lại;
   - duyệt qua review PR.
 - Chuỗi nháp vẫn hiện trên trang, nhưng có nhãn "Chưa duyệt" và không có nhãn tổng.
+- **Đã chọn (chủ sở hữu đồng ý 15/11/2026): duyệt trong ứng dụng.**
+  - Mỗi sơ đồ có nút "Duyệt chuỗi này", kèm ô ghi chú không bắt buộc, và nút "Bỏ duyệt".
+  - Lần duyệt lưu trong `data/value-chain-approvals.json`, kèm dấu vân tay của nội dung chuỗi. Dấu vân tay tính trên các khâu, các yếu tố, các mã và các nguồn chuỗi đó trích dẫn; trạng thái không nằm trong đó.
+  - Nội dung đổi thì chuỗi tự về "Chưa duyệt", và trang báo lần duyệt cũ là của nội dung khác.
+  - `"status": "approved"` trong tệp cấu hình vẫn được tính là đã duyệt.
+- Cũng từ 15/11/2026, các yếu tố sau đọc theo chuỗi số liệu:
+  - "Dòng vốn FDI" theo vốn FDI giải ngân so với cùng kỳ;
+  - "Giá khí đầu vào" của nhiệt điện khí theo giá LNG Nhật Bản (chỉ là thước đo gần đúng);
+  - "Giải ngân đầu tư công" theo vốn đầu tư từ ngân sách lũy kế so với cùng kỳ;
+  - "Sức mua người tiêu dùng" theo tổng mức bán lẻ tháng so với cùng kỳ.
+
+  Hai chuỗi cuối lấy từ báo cáo tháng của Cục Thống kê. Các chỉ số tăng trưởng đọc theo điểm phần trăm; thay đổi trong vòng 1 điểm được coi là đi ngang.
 
 ## Kiểm thử
 

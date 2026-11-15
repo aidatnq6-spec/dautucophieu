@@ -49,6 +49,54 @@ def client_for(tmp_path):
     return lambda: call(client, clock, "GET", "/internal/market/value-chains").json()
 
 
+def setup(tmp_path):
+    """(get, put) against one app; put sends the approval for a chain."""
+    (tmp_path / "market-symbols.txt").write_text("HPG\n", encoding="utf-8")
+    doc = {"version": "t", "sources": {"acbs-ht1": SOURCE}, "chains": [chain("steel", ["HPG"], "draft", [("oil", "wti", "bad", "major")])]}
+    path = tmp_path / "value-chains.json"
+    path.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+    MacroStore(tmp_path).upsert("wti", [(TODAY - timedelta(days=35), "60"), (TODAY - timedelta(days=1), "66")], entry="auto")
+    clock = Clock()
+    app = create_app(InternalAuthSettings("owner-1", TOKEN, SECRET), clock=clock, personal_repository=PersonalRepository("owner-1", MemoryDocumentStore()),
+                     data_dir=tmp_path)
+    app.state.value_chains_path = path
+    client = TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000))
+    get = lambda: call(client, clock, "GET", "/internal/market/value-chains").json()  # noqa: E731
+    put = lambda cid, body: call(client, clock, "PUT", f"/internal/market/value-chains/{cid}/approval", body)  # noqa: E731
+    return get, put, path, doc
+
+
+def test_the_owner_approves_a_chain_in_the_app_and_a_content_change_asks_again(tmp_path):
+    get, put, path, doc = setup(tmp_path)
+    steel = get()["chains"][0]
+    assert (steel["status"], steel["label"], steel["approval"]) == ("draft", None, None) and len(steel["fingerprint"]) == 16
+    stale = put("steel", {"approved": True, "fingerprint": "0" * 16, "note": None})
+    assert stale.status_code == 409 and stale.json()["code"] == "content_changed"  # the page showed other content
+    assert put("nope", {"approved": True, "fingerprint": steel["fingerprint"], "note": None}).status_code == 404
+    done = put("steel", {"approved": True, "fingerprint": steel["fingerprint"], "note": "Đã đọc ACBS"})
+    assert done.status_code == 200
+    steel = done.json()["chains"][0]
+    assert (steel["status"], steel["label"]) == ("approved", "headwind")
+    assert steel["approval"] == {"on": "2027-01-15", "note": "Đã đọc ACBS", "by": "app", "stale": False}
+    # the chain's content changes: back to Chưa duyệt, and the page says the earlier approval was for other content
+    doc["chains"][0]["factors"][0]["why"] = "Lý do mới"
+    path.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+    steel = get()["chains"][0]
+    assert (steel["status"], steel["label"], steel["approval"]["stale"], steel["approval"]["on"]) == ("draft", None, True, "2027-01-15")
+    put("steel", {"approved": True, "fingerprint": steel["fingerprint"], "note": None})
+    undone = put("steel", {"approved": False, "fingerprint": steel["fingerprint"], "note": None}).json()["chains"][0]
+    assert (undone["status"], undone["approval"]) == ("draft", None)
+
+
+def test_a_chain_approved_in_the_config_needs_no_approval_in_the_app(tmp_path):
+    get, put, path, doc = setup(tmp_path)
+    doc["chains"][0]["status"] = "approved"
+    path.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+    steel = get()["chains"][0]
+    assert (steel["status"], steel["approval"]) == ("approved", {"on": None, "note": None, "by": "config", "stale": False})
+    assert put("steel", {"approved": False, "fingerprint": steel["fingerprint"], "note": None}).status_code == 422
+
+
 def test_value_chains_are_read_against_stored_series_and_ordered(tmp_path):
     body = client_for(tmp_path)()
     assert [c["id"] for c in body["chains"]] == ["bank", "steel", "draft"]  # Thuận gió, then Ngược gió (bad − good = 0.20 exactly), drafts last

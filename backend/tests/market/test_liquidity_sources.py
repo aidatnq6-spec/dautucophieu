@@ -53,6 +53,29 @@ def test_monthly_reports_give_the_trade_balance_and_disbursed_fdi_at_the_month_e
         parse_nso_report(json.dumps([report("Báo cáo tình hình kinh tế – xã hội tháng Mười năm 2026", "không có số")]), field="trade_month")
 
 
+RETAIL = json.dumps([
+    report("Báo cáo tình hình kinh tế – xã hội tháng Mười và 10 tháng năm 2026",
+           "Tổng mức bán lẻ hàng hóa và doanh thu dịch vụ tiêu dùng theo giá hiện hành tháng Mười ước đạt 600,5 nghìn tỷ đồng, tăng 1,0% so với tháng "
+           "trước và tăng 13,7% so với cùng kỳ năm trước. Tính chung mười tháng, tổng mức bán lẻ hàng hóa và doanh thu dịch vụ tiêu dùng theo giá hiện "
+           "hành ước đạt 6.000 nghìn tỷ đồng. Vốn đầu tư thực hiện từ nguồn ngân sách nhà nước tháng Mười đạt 100,6 nghìn tỷ đồng, tăng 20,7% so với "
+           "cùng kỳ năm trước. Tính chung mười tháng, vốn đầu tư thực hiện từ nguồn ngân sách nhà nước ước đạt 700,9 nghìn tỷ đồng, bằng 60,0% kế "
+           "hoạch năm và tăng 18,8% so với cùng kỳ năm trước (cùng kỳ năm 2025 bằng 64,3% và tăng 30,7%)."),
+    # quarter reports give total social investment instead: no budget figure that month
+    report("Báo cáo tình hình kinh tế – xã hội quý III và 9 tháng năm 2026",
+           "Tổng mức bán lẻ hàng hóa và doanh thu dịch vụ tiêu dùng theo giá hiện hành tháng Chín năm 2026 ước đạt gần 590 nghìn tỷ đồng, giảm 0,5% "
+           "so với cùng kỳ năm trước."),
+    report("Báo cáo tình hình kinh tế – xã hội tháng 01 năm 2026",
+           "Vốn đầu tư thực hiện từ nguồn ngân sách Nhà nước tháng 01/2026 ước đạt 43,1 nghìn tỷ đồng, bằng 4,8% kế hoạch năm và tăng 9,3% so với "
+           "cùng kỳ năm trước (cùng kỳ năm 2025 bằng 3,6% và tăng 11,8%)."),
+])
+
+
+def test_monthly_reports_give_retail_sales_and_budget_investment_growth():
+    assert parse_nso_report(RETAIL, field="retail_yoy") == [(date(2026, 9, 30), "-0.5"), (date(2026, 10, 31), "13.7")]
+    # since January (January's own sentence is the year to date), not the month alone
+    assert parse_nso_report(RETAIL, field="public_invest_yoy") == [(date(2026, 1, 31), "9.3"), (date(2026, 10, 31), "18.8")]
+
+
 def test_a_rule_of_none_gives_the_trend_only():
     assert evaluate("none", ["1", "2"]) == ("Tăng", None)
 

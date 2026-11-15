@@ -401,6 +401,9 @@ test("a non-financial ticker shows its net debt by quarter, and a bank does not"
   const cash = page.getByRole("region", { name: "Tiền và chênh lệch lãi suất" });
   await expect(cash.getByRole("table", { name: "Thang thanh khoản FPT" }).getByRole("row").nth(1)).toContainText("lần");
   await expect(cash.getByTestId("carry")).toContainText("Bốn quý đến");
+  const ar = page.getByRole("region", { name: "Phải thu" });
+  await expect(ar.getByRole("table", { name: "Phải thu FPT" })).toBeVisible();
+  await expect(ar.getByTestId("provision")).toContainText("chưa có dòng dự phòng");  // the fixture keeps no receivable parts: blank, not guessed
   await page.goto("/research/VCB");
   await expect(page.getByRole("region", { name: "Số liệu ngân hàng" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Nợ vay ròng" })).toHaveCount(0);

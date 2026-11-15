@@ -1,5 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { advancesText, borrowingText, carryText, sectorText, type Carry } from "./balance-watch";
+import { advancesText, borrowingText, carryText, dsoText, provisionText, sectorText, type Carry } from "./balance-watch";
+
+describe("dsoText", () => {
+  it("sets the days to collect against a year before and the sector", () => {
+    expect(dsoText({ quarter: "2026-Q3", days: "70", year_ago: "55", change: "15", sector_median: "48", sector_count: 3 }))
+      .toBe("Số ngày thu tiền Q3/2026: 70 ngày, chậm hơn 15 ngày so với cùng kỳ năm trước (55 ngày); trung vị ngành 48 ngày (3 mã theo dõi khác).");
+    expect(dsoText({ quarter: "2026-Q3", days: "40", year_ago: null, change: null, sector_median: null, sector_count: 0 })).toBe("Số ngày thu tiền Q3/2026: 40 ngày.");
+    expect(dsoText({ quarter: "2026-Q3", days: null, year_ago: null, change: null, sector_median: null, sector_count: 0 })).toContain("Chưa đủ");
+  });
+});
+
+describe("provisionText", () => {
+  it("names the provision, its share, and a jump", () => {
+    expect(provisionText({ quarter: "2026-Q3", amount: "20000000000", share: "0.1333", year_ago: "10000000000", kind: "jump" }))
+      .toBe("Q3/2026: dự phòng phải thu ngắn hạn khó đòi 20 tỷ, bằng 13,3% phải thu ngắn hạn trước dự phòng. Tăng mạnh so với cùng kỳ năm trước (10 tỷ): "
+        + "doanh nghiệp vừa thừa nhận thêm khoản khó thu; đọc thuyết minh xem của khách hàng nào.");
+    expect(provisionText({ quarter: "2026-Q3", amount: "0", share: "0.0000", year_ago: "0", kind: "none" })).toBe("Q3/2026: không trích dự phòng phải thu ngắn hạn khó đòi.");
+    expect(provisionText({ quarter: null, amount: null, share: null, year_ago: null, kind: null })).toContain("chưa có dòng dự phòng");
+  });
+});
 
 const C: Carry = { quarter: "2026-Q3", kind: "carry", missing: [], fin_income: "28000000000", interest: "8000000000", net: "20000000000",
   avg_cash_like: "400000000000", avg_debt: "200000000000", yield: "0.0700", cost: "0.0400", spread: "0.0300" };

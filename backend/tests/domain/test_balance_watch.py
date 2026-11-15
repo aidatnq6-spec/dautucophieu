@@ -1,4 +1,6 @@
-from investment_agent.domain.balance_watch import borrowing_flag, carry, liquidity_rows, net_debt_rows, property_cash, sector_debt
+from investment_agent.domain.balance_watch import (
+    borrowing_flag, carry, liquidity_rows, net_debt_rows, property_cash, receivables_view, sector_debt,
+)
 
 B = 10**9
 
@@ -133,3 +135,46 @@ def test_carry_with_a_quarter_missing_names_it_and_computes_nothing():
     c = carry(qs)
     assert c["quarter"] == "2026-Q3" and c["missing"] == ["2025-Q3", "2026-Q1"] and c["yield"] is None and c["kind"] is None
     assert carry({})["quarter"] is None
+
+
+def ar_quarter(customers=100, prepay=20, loans=0, other=30, provision=-10, total_st=140, lt_total=50, lt_customers=0, lt_loans=0,
+               lt_other=50, lt_provision=0, revenue=91.25, assets=1000):
+    return q(ar_customers=customers, prepay_suppliers=prepay, st_loans_receivable=loans, other_receivables=other, bad_debt_st=provision,
+             receivables=total_st, receivables_lt=lt_total, ar_customers_lt=lt_customers, lt_loans_receivable=lt_loans,
+             other_receivables_lt=lt_other, bad_debt_lt=lt_provision, revenue=revenue, total_assets=assets)
+
+
+# R1 Bóc tách phải thu: short and long-term parts side by side, each row adding the two.
+def test_receivable_rows_add_short_and_long_term_parts_and_their_share_of_total_assets():
+    qs = quarters_from(2025, [ar_quarter() for _ in range(8)])
+    row = receivables_view(qs)["rows"][-1]
+    assert row == {"quarter": "2026-Q4", "customers": str(100 * B), "prepay": str(20 * B), "loans": str(0), "other": str(80 * B),
+                   "provision": str(-10 * B), "total": str(190 * B), "total_share": "0.1900", "other_share": "0.0800", "dso": "100"}
+
+
+# R2 Số ngày thu tiền: short-term customer receivables at the quarter's end against the last four quarters' revenue, × 365.
+def test_days_to_collect_on_four_quarters_of_revenue_and_against_the_sector_median():
+    qs = quarters_from(2025, [ar_quarter(customers=100 + 10 * i) for i in range(8)])
+    v = receivables_view(qs, peers={"AAA": quarters_from(2025, [ar_quarter(customers=50)] * 8),
+                                    "BBB": quarters_from(2025, [ar_quarter(customers=80)] * 8),
+                                    "CCC": quarters_from(2025, [ar_quarter(customers=200)] * 8)})
+    assert v["dso"] == {"quarter": "2026-Q4", "days": "170", "year_ago": "130", "change": "40", "sector_median": "80", "sector_count": 3}
+    assert receivables_view(quarters_from(2026, [ar_quarter()] * 3))["dso"]["days"] is None  # fewer than four quarters of revenue
+
+
+# R3 Dự phòng phải thu khó đòi: its share of gross short-term receivables, and a jump against a year before.
+def test_bad_debt_provision_share_and_a_jump_from_a_year_before():
+    qs = quarters_from(2025, [ar_quarter(provision=-10)] * 4 + [ar_quarter(provision=-10)] * 3 + [ar_quarter(provision=-20, total_st=130)])
+    p = receivables_view(qs)["provision"]
+    assert p == {"quarter": "2026-Q4", "amount": str(20 * B), "share": "0.1333", "year_ago": str(10 * B), "kind": "jump"}  # 20 of 150 gross
+    calm = receivables_view(quarters_from(2025, [ar_quarter()] * 8))["provision"]
+    assert (calm["kind"], calm["share"]) == (None, "0.0667")
+    none = receivables_view(quarters_from(2025, [ar_quarter(provision=0, total_st=150)] * 8))["provision"]
+    assert (none["kind"], none["amount"]) == ("none", "0")
+
+
+def test_missing_receivable_lines_leave_their_cells_blank():
+    v = receivables_view({"2026-Q3": q(receivables=100, total_assets=1000)})
+    row = v["rows"][-1]
+    assert (row["customers"], row["other"], row["total"], row["dso"]) == (None, None, None, None)
+    assert v["provision"]["amount"] is None and v["dso"]["days"] is None

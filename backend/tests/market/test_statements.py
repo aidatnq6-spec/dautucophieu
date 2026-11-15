@@ -1,7 +1,7 @@
 import json
 from datetime import date, datetime, timezone
 
-from investment_agent.market.statements import StatementStore, parse_statements, parse_year_end_closes, sync_statements
+from investment_agent.market.statements import LINES_VERSION, StatementStore, parse_statements, parse_year_end_closes, sync_statements
 
 
 def row(item, value, fiscal, model=2, created="2026-10-29 00:00:00", code="HPG", kind="QUARTER"):
@@ -113,7 +113,7 @@ def test_the_last_unadjusted_close_of_each_year_is_kept_with_its_day():
 def test_a_ticker_synced_before_year_end_closes_existed_takes_the_whole_price_history(tmp_path):
     store = StatementStore(tmp_path)
     store.save({"symbol": "HPG", "fetched_at": "2026-10-01T00:00:00+00:00", "source": "vndirect:finfo", "quarters": {}, "years": {},
-                "lines_version": 3})  # its lines are current: only the closes are missing
+                "lines_version": LINES_VERSION})  # its lines are current: only the closes are missing
     get = Get()
     sync_statements(store, {"HPG": "Tài nguyên Cơ bản"}, get=get, now=NOW, limit=None, sleep=lambda s: None)
     prices = [u for u in get.urls if "stock_prices" in u]

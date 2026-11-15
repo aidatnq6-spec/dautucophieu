@@ -12,7 +12,12 @@ Thang thanh khoản: cash (tiền và tương đương tiền, deposits up to th
 Chênh lệch lãi vay – lãi gửi: over the last four quarters, financial income on the average of cash and short-term investments
 against interest on the average borrowing (five quarter ends). Financial income also holds exchange gains and dividends received, so
 the yield is a rough reading; "carry" names a company that borrows and keeps cash, both at least 5% of total assets, earning more on
-the one than it pays on the other (borrowing cheap to deposit dear)."""
+the one than it pays on the other (borrowing cheap to deposit dear).
+
+Phải thu: receivables by part, short and long term added (customers, prepayments to suppliers, loans, other receivables, the
+bad-debt provision) and their share of total assets; số ngày thu tiền = short-term customer receivables at the quarter's end ÷ the
+last four quarters' revenue × 365, against a year before and the median of the sector's watched tickers; dự phòng phải thu khó đòi
+(short term) as a share of gross short-term receivables, "jump" when it grew by half or more in a year and is at least 1% of them."""
 
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -165,6 +170,65 @@ def carry(quarters: dict) -> dict:
         kind = "carry" if material and spread is not None and spread > 0 else None
     return {**empty, "kind": kind, "fin_income": _s(income), "interest": _s(interest), "net": _s(income - interest), "avg_cash_like": _s(avg_cash),
             "avg_debt": _s(avg_debt), "yield": _r(earned), "cost": _r(cost), "spread": _r(spread)}
+
+
+PROVISION_JUMP, PROVISION_MATERIAL = Decimal("0.50"), Decimal("0.01")
+
+
+def _both(q: dict, st: str, lt: str) -> Decimal | None:
+    a, b = _get(q, st, lt)
+    return a + b if a is not None and b is not None else None
+
+
+def _dso(quarters: dict, period: str) -> Decimal | None:
+    flows = [_get(quarters.get(_back(period, k), {}), "revenue")[0] for k in range(4)]
+    (ar,) = _get(quarters.get(period, {}), "ar_customers")
+    if ar is None or None in flows or sum(flows) <= 0:
+        return None
+    return (ar / sum(flows) * 365).quantize(Decimal(1), ROUND_HALF_UP)
+
+
+def _provision(q: dict) -> tuple[Decimal | None, Decimal | None]:
+    """The short-term bad-debt provision as a positive amount, and its share of gross short-term receivables."""
+    p, net = _get(q, "bad_debt_st", "receivables")
+    if p is None:
+        return None, None
+    gross = (net or Decimal(0)) - p
+    return -p, (-p / gross if net is not None and gross > 0 else None)
+
+
+def receivables_view(quarters: dict, peers: dict | None = None, n: int = 12) -> dict:
+    """The last n quarters of receivables by part, the latest days to collect (with a year before and the sector's median over peers'
+    latest quarters) and the latest provision. A missing line leaves its cell blank."""
+    rows = []
+    for period in sorted(quarters)[-n:]:
+        q = quarters[period]
+        total, other = _both(q, "receivables", "receivables_lt"), _both(q, "other_receivables", "other_receivables_lt")
+        (assets,) = _get(q, "total_assets")
+        share = lambda v: _r(v / assets) if v is not None and assets and assets > 0 else None  # noqa: E731
+        rows.append({"quarter": period, "customers": _s(_both(q, "ar_customers", "ar_customers_lt")), "prepay": _s(_get(q, "prepay_suppliers")[0]),
+                     "loans": _s(_both(q, "st_loans_receivable", "lt_loans_receivable")), "other": _s(other),
+                     "provision": _s(_both(q, "bad_debt_st", "bad_debt_lt")), "total": _s(total), "total_share": share(total),
+                     "other_share": share(other), "dso": _s(_dso(quarters, period))})
+    latest = max(quarters) if quarters else None
+    days = _dso(quarters, latest) if latest else None
+    ago = _dso(quarters, _back(latest, 4)) if latest else None
+    peer_days = sorted(d for d in (_dso(qs, max(qs)) for qs in (peers or {}).values() if qs) if d is not None)
+    median = None
+    if peer_days:
+        mid = len(peer_days) // 2
+        median = peer_days[mid] if len(peer_days) % 2 else ((peer_days[mid - 1] + peer_days[mid]) / 2).quantize(Decimal(1), ROUND_HALF_UP)
+    amount, part = _provision(quarters[latest]) if latest else (None, None)
+    before, _ = _provision(quarters.get(_back(latest, 4), {})) if latest else (None, None)
+    kind = None
+    if amount is not None and amount == 0:
+        kind = "none"
+    elif amount is not None and before is not None and before > 0 and amount / before - 1 >= PROVISION_JUMP and part is not None and part >= PROVISION_MATERIAL:
+        kind = "jump"
+    return {"rows": rows,
+            "dso": {"quarter": latest, "days": _s(days), "year_ago": _s(ago), "change": _s(days - ago) if days is not None and ago is not None else None,
+                    "sector_median": _s(median), "sector_count": len(peer_days)},
+            "provision": {"quarter": latest, "amount": _s(amount), "share": _r(part), "year_ago": _s(before), "kind": kind}}
 
 
 def _advances(q: dict) -> Decimal | None:

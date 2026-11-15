@@ -220,6 +220,9 @@ if __name__ == "__main__":
     SeriesStore(os.path.join(data, "index-valuation")).upsert("VN30-pb-1d", [(d, "2") for d in ix_days])
     SeriesStore(os.path.join(data, "trend-sources")).upsert("VN30-1d", [(ix_days[-1], "1800")])
     # Chuỗi giá trị: oil up 10% over a month (bad for plastic pipe, good for drilling and gas) and world rubber up (good for rubber).
+    # Chênh lệch VND–USD: synthetic overnight rates, the latest day below zero.
+    MacroStore(data).upsert("vn_interbank_on", [(date.today() - timedelta(days=2), "4.5"), (date.today() - timedelta(days=1), "3.6")], entry="auto")
+    MacroStore(data).upsert("sofr", [(date.today() - timedelta(days=2), "3.9")], entry="auto")
     MacroStore(data).upsert("wti", [(date.today() - timedelta(days=35), "60"), (date.today() - timedelta(days=1), "66")], entry="auto")
     MacroStore(data).upsert("com_rubber", [(date.today() - timedelta(days=60), "120"), (date.today() - timedelta(days=30), "130")], entry="auto")
     # Bảng giá và biểu đồ: a fixed board (FPT up to its ceiling, VNINDEX down) and 60 daily candles; no network.

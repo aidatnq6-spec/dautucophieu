@@ -11,6 +11,8 @@ from pydantic import Field
 from investment_agent.domain.models import ContractModel
 from investment_agent.domain.macro_chain import RATES, macro_chain
 from investment_agent.domain.ledger import replay
+from investment_agent.domain.macro_extras import MAX_EVENTS, EventError, events_view, rate_spread
+from investment_agent.services.macro_events import RECORD as EVENTS_RECORD, merge_events, read_events
 from investment_agent.domain.rate_cycle import US, VIETNAM, rate_cycle
 from investment_agent.domain.sensitivity import SPANS, exposure, sensitivity
 from investment_agent.market.leading import MacroStore, load_indicators, macro_rows
@@ -20,7 +22,7 @@ from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.records import LedgerBook, read_version
 
 from ..auth import require_owner
-from .common import error, now, unavailable
+from .common import WRITE_ERRORS, error, now, unavailable, write_error
 
 router = APIRouter(prefix="/internal/macro")
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
@@ -102,6 +104,54 @@ def sensitivity_span(request: Request, span: str):
         results[symbol] = sensitivity(closes(symbol), index=index, oil=factor["oil"], usd=factor["usd"], weeks=SPANS[span])
     return {"span": span, "factors": {k: v[-1][0].isoformat() if v else None for k, v in factor.items()},
             "rows": [{"symbol": s, "held": s in costs, **results[s]} for s in symbols], "exposure": exposure(results, costs)}
+
+
+@router.get("/spread")
+def spread(request: Request):
+    """Chênh lệch lãi suất VND–USD: the State Bank's overnight interbank average less SOFR (else EFFR), each stored day."""
+    require_owner(request)
+    store = _store(request)
+    if store is None:
+        return unavailable()
+    read = lambda i: [(date.fromisoformat(o["date"]), o["value"]) for o in store.read(i)]  # noqa: E731
+    return rate_spread(read("vn_interbank_on"), sofr=read("sofr"), effr=read("fed_effr"))
+
+
+class EventsRequest(ContractModel):
+    events: list[dict] = Field(max_length=MAX_EVENTS)
+    expected_version: int = Field(strict=True, ge=0)
+    request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
+
+
+def _events_view(request: Request, events: list[dict], version: int) -> dict:
+    return {"version": version, **events_view(events, today=now(request).astimezone(VN).date())}
+
+
+@router.get("/events")
+def get_events(request: Request):
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None:
+        return unavailable()
+    try:
+        return _events_view(request, *read_events(repo, owner))
+    except RepositoryUnavailable:
+        return unavailable()
+
+
+@router.put("/events")
+def put_events(request: Request, body: EventsRequest):
+    """Lịch và nhật ký vĩ mô: the owner's whole list as sent; nothing is filled in from elsewhere."""
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None:
+        return unavailable()
+    try:
+        events = merge_events(read_events(repo, owner)[0], body.events)
+        version = repo.write(owner, *EVENTS_RECORD, {"events": events}, expected_version=body.expected_version, request_id=body.request_id).version
+        return _events_view(request, events, version)
+    except EventError as exc:
+        return error(422, exc.code, exc.message)
+    except WRITE_ERRORS as exc:
+        return write_error(exc)
 
 
 @router.post("/{indicator}/observations")

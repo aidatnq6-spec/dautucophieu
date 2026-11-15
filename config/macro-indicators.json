@@ -1,5 +1,5 @@
 {
- "version": "macro-2026-10-26.6",
+ "version": "macro-2026-11-15.1",
  "notice": "Quy tắc đánh giá theo bảng Leading Indicator của chủ sở hữu (25/10/2026). bad_when: up = tăng là Xấu; down = giảm là Xấu; sign = âm là Xấu; pmi = Tốt khi trên 50 và không giảm.",
  "indicators": [
   {
@@ -30,6 +30,23 @@
    },
    "url": "https://oilprice.com/oil-price-charts/",
    "note": "Giá hợp đồng tương lai WTI kỳ gần nhất trên NYMEX, trễ 10 phút (oilprice.com); khi không đọc được thì lấy giá giao ngay của EIA qua FRED, chậm khoảng một tuần."
+  },
+  {
+   "id": "brent",
+   "label": "Giá dầu Brent",
+   "unit": "USD/thùng",
+   "rule": "up",
+   "max_age_days": 7,
+   "source": {
+    "kind": "oilprice",
+    "blend": "Brent-Crude",
+    "fallback": {
+     "kind": "fred",
+     "series": "DCOILBRENTEU"
+    }
+   },
+   "url": "https://oilprice.com/oil-price-charts/",
+   "note": "Giá hợp đồng tương lai Brent kỳ gần nhất trên ICE, trễ 10 phút (oilprice.com); khi không đọc được thì lấy giá giao ngay của EIA qua FRED, chậm khoảng một tuần. Brent là giá tham chiếu cho dầu thô Việt Nam xuất khẩu và xăng dầu nhập khẩu."
   },
   {
    "id": "us_cpi_yoy",
@@ -167,6 +184,19 @@
     "series": "EFFR"
    },
    "url": "https://fred.stlouisfed.org/series/EFFR"
+  },
+  {
+   "id": "sofr",
+   "label": "Lãi suất USD qua đêm có bảo đảm (SOFR)",
+   "unit": "%/năm",
+   "rule": "up",
+   "max_age_days": 7,
+   "source": {
+    "kind": "fred",
+    "series": "SOFR"
+   },
+   "url": "https://fred.stlouisfed.org/series/SOFR",
+   "note": "Lãi suất vay USD qua đêm có thế chấp trái phiếu Chính phủ Mỹ do Fed New York công bố; dùng để tính chênh lệch lãi suất VND–USD."
   },
   {
    "id": "deposit_12m",

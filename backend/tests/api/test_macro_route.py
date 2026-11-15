@@ -79,3 +79,4 @@ def test_macro_chain_reads_the_stored_series_and_the_vn_index(tmp_path):
     assert (n["foreign"]["direction"], n["foreign"]["latest"]["value"]) == ("buy", "420.5")
     assert (n["vnindex"]["direction"], n["vnindex"]["latest"]["value"]) == ("up", "1700")
     assert body["missing"] == ["inflation", "liquidity", "rates"]
+    assert body["cash_rich"] == []  # no watched ticker with statements here

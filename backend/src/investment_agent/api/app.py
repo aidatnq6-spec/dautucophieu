@@ -62,6 +62,7 @@ from .routes.stock import router as stock_router
 from .routes.stress import router as stress_router
 from .routes.theses import router as theses_router
 from .routes.value_chains import router as value_chains_router
+from .routes.cash_rank import router as cash_rank_router
 from .routes.universe import router as universe_router
 from .routes.early_lights import router as early_lights_router
 from .routes.system_health import router as system_health_router
@@ -136,6 +137,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(watchlist_router)
     app.include_router(stock_router)
     app.include_router(value_chains_router)
+    app.include_router(cash_rank_router)
     app.include_router(macro_router)
     app.include_router(trend_router)
     app.include_router(fairvalue_router)

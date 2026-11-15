@@ -25,7 +25,7 @@ from .statements import StatementStore
 SHARES_URL = BASE + "ratios/latest?filter=itemCode:51004&where=code:{symbol}&order=reportDate&fields=itemCode,value,reportDate"
 ANNUAL = {"revenue": "revenue", "gross_profit": "gross_profit", "selling": "selling", "admin": "admin", "npat": "profit", "total_assets": "total_assets",
           "current_assets": "current_assets", "current_liabilities": "current_liabilities", "long_liabilities": "long_liabilities",
-          "receivables": "receivables", "cfo": "cfo"}
+          "receivables": "receivables", "cfo": "cfo", "fin_income": "fin_income", "fin_expense": "fin_expense", "pbt": "pbt"}
 COSTS = ("selling", "admin")  # VNDirect: positive; Vnstock (and Chất lượng báo cáo): negative
 BONUS, RAISE = ("STOCKDIV", "KINDDIV"), ("ISSUE",)
 

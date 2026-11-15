@@ -15,6 +15,7 @@ FINANCIAL = {"Ngân hàng", "Dịch vụ tài chính", "Bảo hiểm"}
 MIN_EVALUATED = 7
 RECEIVABLES_GAP = Decimal("0.20")  # receivables growth above revenue growth, in share points
 ACCRUAL_SHARE = Decimal("0.10")  # three years of (profit − operating cash flow) against latest total assets
+FIN_PROFIT_SHARE = Decimal("0.30")  # financial income less financial expenses against profit before tax, latest year
 BN = Decimal(1_000_000_000)
 # Sector context shown with the signs, where a sign is usual for the business rather than a warning by itself.
 NOTES = {"Bất động sản": "Bất động sản: chủ đầu tư thường lãi nhưng dòng tiền kinh doanh âm khi đang đổ tiền vào quỹ đất, dự án (hàng tồn kho); "
@@ -157,6 +158,24 @@ def _signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:
                       "detail": f"{last3[0]}–{y}: {_bn(accrued)}, bằng {_pct(share)} tổng tài sản {_bn(cur['total_assets'])}"})
     else:
         signs.append({"id": "accruals", "label": label, "flag": None, "detail": "Cần lợi nhuận, dòng tiền kinh doanh 3 năm và tổng tài sản năm gần nhất"})
+    # Lãi đến từ kinh doanh cốt lõi hay từ tiền gửi: a large net financial income (deposit interest, exchange gains, dividends) props up the
+    # profit; a reading to look into, as the warning signs above
+    label = "Lợi nhuận phụ thuộc thu nhập tài chính"
+    if all(k in cur for k in ("fin_income", "fin_expense", "pbt")):
+        income, expense, pbt = cur["fin_income"], cur["fin_expense"], cur["pbt"]
+        net = income - expense
+        if pbt <= 0:
+            signs.append({"id": "financial_profit", "label": label, "flag": None,
+                          "detail": f"Năm {y}: lỗ trước thuế {_bn(pbt)}, lãi tài chính ròng {_bn(net)}; tỷ trọng không có nghĩa khi lỗ"})
+        else:
+            share = net / pbt
+            signs.append({"id": "financial_profit", "label": label, "flag": share >= FIN_PROFIT_SHARE,
+                          "rule": f"lãi tài chính ròng từ {_num(FIN_PROFIT_SHARE * 100, 0)}% lợi nhuận trước thuế (doanh thu tài chính gồm lãi tiền gửi, lãi tỷ giá, cổ tức)",
+                          "detail": f"Năm {y}: lãi tài chính ròng {_bn(net)} (doanh thu tài chính {_bn(income)} − chi phí tài chính {_bn(expense)}), "
+                                    f"bằng {_pct(share)} lợi nhuận trước thuế {_bn(pbt)}"})
+    else:
+        signs.append({"id": "financial_profit", "label": label, "flag": None,
+                      "detail": f"Thiếu doanh thu tài chính, chi phí tài chính hoặc lợi nhuận trước thuế năm {y} (có sau lần cập nhật báo cáo tới)"})
     return signs
 
 

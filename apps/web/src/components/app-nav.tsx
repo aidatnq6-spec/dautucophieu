@@ -12,7 +12,7 @@ const GROUPS = [
   { title: "Vĩ mô & thị trường", tone: "market", links: [
     { href: "/macro", label: "Vĩ mô", icon: Globe },
     { href: "/market", label: "Thị trường trong phiên", icon: ChartLine },
-    { href: "/sectors", label: "Ngành theo quý", icon: Grid3x3 },
+    { href: "/sectors", label: "Phân tích ngành", icon: Grid3x3 },
     { href: "/trend", label: "Xu hướng", icon: Activity }] },
   { title: "Cổ phiếu", tone: "stocks", links: [
     { href: "/watchlist", label: "Theo dõi", icon: Eye },

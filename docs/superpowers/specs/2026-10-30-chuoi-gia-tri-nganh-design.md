@@ -136,7 +136,9 @@ Hiện ứng dụng đã có các mảnh rời: 17 chỉ số vĩ mô đã lưu,
 
 ## Giao diện
 
-**Vị trí:** mục mới "Chuỗi giá trị" trong trang Thị trường & Ngành, đặt dưới mục "Diễn biến theo ngành" hiện có.
+**Vị trí:** ban đầu là mục mới "Chuỗi giá trị" trong trang Thị trường & Ngành, đặt dưới mục "Diễn biến theo ngành".
+
+Từ 15/11/2026, theo đề xuất của chủ sở hữu, Chuỗi giá trị chuyển sang trang **Phân tích ngành** (`/sectors`, trước đây tên là "Ngành theo quý"). Trang này có hai phần con, mở dạng tab: "Ngành theo quý" và "Chuỗi giá trị" (`/sectors?tab=chuoi-gia-tri`).
 
 **Thẻ tổng quan:**
 - Mỗi chuỗi một thẻ, gồm tên, thanh tốt/xấu, nhãn tổng và số mã theo dõi.

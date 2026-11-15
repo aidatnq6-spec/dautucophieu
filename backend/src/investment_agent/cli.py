@@ -464,6 +464,10 @@ def macro_sync(data_dir: Path, get=None, slow_get=None, sleep=None) -> int:
     results = fetch_auto(indicators, MacroStore(data_dir), get=get, sleep=sleep)
     results.update(fetch_factors(MacroStore(data_dir), get=get, sleep=sleep))  # long oil and US dollar history for the sensitivity reading
     results.update(fetch_commodities(MacroStore(data_dir), get=get, sleep=sleep))  # monthly world prices for Chuỗi giá trị
+    from investment_agent.market.leading import _get_with_retry
+    from investment_agent.market.omo import OmoStore, omo_sync
+    # Nghiệp vụ thị trường mở: the page shows only the latest session, so each run keeps it (Thanh khoản hệ thống)
+    results["omo"] = omo_sync(OmoStore(data_dir), get=lambda url: _get_with_retry(get, url, sleep))
     slow = [i for i in indicators if results.get(i["id"]) in MACRO_TIMEOUTS]
     if slow:
         sleep(MACRO_SLOW_PAUSE)

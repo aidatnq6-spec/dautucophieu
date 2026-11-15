@@ -1,5 +1,5 @@
 {
- "version": "macro-2026-11-15.1",
+ "version": "macro-2026-11-15.2",
  "notice": "Quy tắc đánh giá theo bảng Leading Indicator của chủ sở hữu (25/10/2026). bad_when: up = tăng là Xấu; down = giảm là Xấu; sign = âm là Xấu; pmi = Tốt khi trên 50 và không giảm.",
  "indicators": [
   {
@@ -104,6 +104,19 @@
    "url": "https://portal.vietcombank.com.vn/Personal/TG/Pages/ty-gia.aspx"
   },
   {
+   "id": "usd_vnd_central",
+   "label": "Tỷ giá trung tâm USD/VND (NHNN)",
+   "unit": "VND",
+   "rule": "up",
+   "max_age_days": 4,
+   "source": {
+    "kind": "sbv_central",
+    "manual_fallback": true
+   },
+   "url": "https://sbv.gov.vn/vi/t%E1%BB%B7-gi%C3%A1",
+   "note": "NHNN công bố tối hôm trước cho ngày áp dụng (cả cuối tuần). Ngân hàng được giao dịch trong biên độ ±5% quanh tỷ giá trung tâm."
+  },
+  {
    "id": "m2_vn",
    "label": "Cung tiền M2 Việt Nam (tỷ đồng)",
    "unit": "tỷ đồng",
@@ -118,6 +131,62 @@
    },
    "url": "https://www.sbv.gov.vn",
    "note": "Ngân hàng Nhà nước công bố trong 45 ngày sau khi hết tháng (số tháng 9 chậm nhất giữa tháng 11). Từ 11/2026 stockbiz chỉ còn số theo năm và trang thống kê của Ngân hàng Nhà nước chặn đọc tự động, nên số tháng mới cần nhập tay kèm link nguồn; phần mềm vẫn thử stockbiz mỗi lần chạy."
+  },
+  {
+   "id": "vn_trade_balance",
+   "label": "Cán cân thương mại hàng hóa trong tháng (tỷ USD)",
+   "unit": "tỷ USD",
+   "rule": "sign",
+   "max_age_days": 45,
+   "source": {
+    "kind": "nso_report",
+    "field": "trade_month",
+    "manual_fallback": true
+   },
+   "url": "https://www.nso.gov.vn/",
+   "note": "Dương là xuất siêu, âm là nhập siêu. Từ Báo cáo tình hình kinh tế – xã hội hằng tháng của Cục Thống kê (khoảng ngày 3–6 tháng sau), ghi vào ngày cuối tháng; số sơ bộ, tháng sau có thể sửa. Tháng nào báo cáo không có câu này thì để trống; nhập tay kèm nguồn nếu cần."
+  },
+  {
+   "id": "vn_trade_balance_ytd",
+   "label": "Cán cân thương mại hàng hóa từ đầu năm (tỷ USD)",
+   "unit": "tỷ USD",
+   "rule": "sign",
+   "max_age_days": 45,
+   "source": {
+    "kind": "nso_report",
+    "field": "trade_ytd",
+    "manual_fallback": true
+   },
+   "url": "https://www.nso.gov.vn/",
+   "note": "Lũy kế từ tháng 1; dương là xuất siêu, âm là nhập siêu. Từ Báo cáo tình hình kinh tế – xã hội hằng tháng của Cục Thống kê (khoảng ngày 3–6 tháng sau), ghi vào ngày cuối tháng; số sơ bộ, tháng sau có thể sửa. Tháng nào báo cáo không có câu này thì để trống; nhập tay kèm nguồn nếu cần."
+  },
+  {
+   "id": "vn_fdi_disbursed",
+   "label": "Vốn FDI giải ngân từ đầu năm (tỷ USD)",
+   "unit": "tỷ USD",
+   "rule": "none",
+   "max_age_days": 45,
+   "source": {
+    "kind": "nso_report",
+    "field": "fdi_ytd",
+    "manual_fallback": true
+   },
+   "url": "https://www.nso.gov.vn/",
+   "note": "Vốn đầu tư trực tiếp nước ngoài thực hiện, lũy kế từ tháng 1 (ước tính), nên tháng 1 luôn thấp hơn tháng 12: không đánh giá theo xu hướng. Từ Báo cáo tình hình kinh tế – xã hội hằng tháng của Cục Thống kê (khoảng ngày 3–6 tháng sau), ghi vào ngày cuối tháng; số sơ bộ, tháng sau có thể sửa. Tháng nào báo cáo không có câu này thì để trống; nhập tay kèm nguồn nếu cần."
+  },
+  {
+   "id": "vn_fdi_disbursed_yoy",
+   "label": "Vốn FDI giải ngân từ đầu năm so cùng kỳ (%)",
+   "unit": "%",
+   "rule": "down",
+   "max_age_days": 45,
+   "source": {
+    "kind": "nso_report",
+    "field": "fdi_yoy",
+    "manual_fallback": true
+   },
+   "url": "https://www.nso.gov.vn/",
+   "note": "Mức tăng (giảm) của vốn FDI giải ngân lũy kế so với cùng kỳ năm trước; giảm so với tháng trước là Xấu. Từ Báo cáo tình hình kinh tế – xã hội hằng tháng của Cục Thống kê (khoảng ngày 3–6 tháng sau), ghi vào ngày cuối tháng; số sơ bộ, tháng sau có thể sửa. Tháng nào báo cáo không có câu này thì để trống; nhập tay kèm nguồn nếu cần."
   },
   {
    "id": "foreign_net",
@@ -260,6 +329,34 @@
    },
    "url": "https://sbv.gov.vn/vi/l%C3%A3i-su%E1%BA%A5t-th%E1%BB%8B-tr%C6%B0%E1%BB%9Dng-li%C3%AAn-ng%C3%A2n-h%C3%A0ng",
    "note": "Lãi suất bình quân liên ngân hàng do Ngân hàng Nhà nước công bố khoảng 05:30 sáng hôm sau; khi không đọc được thì lấy stockbiz."
+  },
+  {
+   "id": "vn_interbank_1w",
+   "label": "Lãi suất liên ngân hàng VN 1 tuần",
+   "unit": "%/năm",
+   "rule": "up",
+   "max_age_days": 5,
+   "source": {
+    "kind": "sbv_interbank",
+    "term": "1 Tuần",
+    "manual_fallback": true
+   },
+   "url": "https://sbv.gov.vn/vi/l%C3%A3i-su%E1%BA%A5t-th%E1%BB%8B-tr%C6%B0%E1%BB%9Dng-li%C3%AAn-ng%C3%A2n-h%C3%A0ng",
+   "note": "Lãi suất bình quân liên ngân hàng kỳ hạn 1 tuần do NHNN công bố, cùng bảng với kỳ qua đêm."
+  },
+  {
+   "id": "vn_interbank_1m",
+   "label": "Lãi suất liên ngân hàng VN 1 tháng",
+   "unit": "%/năm",
+   "rule": "up",
+   "max_age_days": 5,
+   "source": {
+    "kind": "sbv_interbank",
+    "term": "1 Tháng",
+    "manual_fallback": true
+   },
+   "url": "https://sbv.gov.vn/vi/l%C3%A3i-su%E1%BA%A5t-th%E1%BB%8B-tr%C6%B0%E1%BB%9Dng-li%C3%AAn-ng%C3%A2n-h%C3%A0ng",
+   "note": "Lãi suất bình quân liên ngân hàng kỳ hạn 1 tháng do NHNN công bố, cùng bảng với kỳ qua đêm."
   },
   {
    "id": "vnindex_value",

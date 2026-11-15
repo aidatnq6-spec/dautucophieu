@@ -11,7 +11,10 @@ from pydantic import Field
 from investment_agent.domain.models import ContractModel
 from investment_agent.domain.macro_chain import RATES, macro_chain
 from investment_agent.domain.ledger import replay
+from investment_agent.domain.liquidity import TERMS, central_view, interbank_view, omo_view
 from investment_agent.domain.macro_extras import MAX_EVENTS, EventError, events_view, rate_spread
+from investment_agent.market.omo import OmoStore
+from investment_agent.market.sectors import load_sectors
 from investment_agent.services.macro_events import RECORD as EVENTS_RECORD, merge_events, read_events
 from investment_agent.domain.rate_cycle import US, VIETNAM, rate_cycle
 from investment_agent.domain.sensitivity import SPANS, exposure, sensitivity
@@ -70,7 +73,52 @@ def chain(request: Request):
     series = {i: [(date.fromisoformat(o["date"]), Decimal(o["value"])) for o in store.read(i)] for i in ("wti", "vn_cpi_yoy", *RATES, "foreign_net")}
     index = SeriesStore(Path(request.app.state.data_dir) / "trend-sources").read("VNINDEX-1d")
     series["vnindex"] = [(t.date(), Decimal(str(v))) for t, v in index]
-    return macro_chain(series, today=now(request).astimezone(VN).date())
+    raw = lambda i: [(date.fromisoformat(o["date"]), o["value"]) for o in store.read(i)]  # noqa: E731
+    spread = rate_spread(raw("vn_interbank_on"), sofr=raw("sofr"), effr=raw("fed_effr"))["points"]
+    series["vnd_usd_spread"] = [(date.fromisoformat(p["date"]), Decimal(p["spread"])) for p in spread]
+    today = now(request).astimezone(VN).date()
+    omo = _omo(request, store, today)
+    latest = omo["latest"]
+    chain = macro_chain(series, today=today, omo={"date": latest["date"], "inject": latest["inject"], "absorb": latest["absorb"],
+                                                   "net": omo["net"]} if latest else None)
+    return {**chain, "rate_sensitive": _rate_sensitive(request)}
+
+
+RATE_SECTORS = ("Ngân hàng", "Bất động sản", "Dịch vụ tài chính")  # ICB names: banks, real estate, securities firms
+
+
+def _rate_sensitive(request: Request) -> list[dict] | None:
+    """The owner's held tickers in the sectors that move most with rates; read here only, never sent anywhere."""
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None:
+        return None
+    try:
+        state = replay(list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events))
+    except RepositoryUnavailable:
+        return None
+    sectors = load_sectors(Path(request.app.state.data_dir))[0]
+    held = sorted({p.security_id for p in state.positions if p.quantity + p.pending_quantity > 0})
+    return [{"symbol": s, "sector": sectors[s]} for s in held if sectors.get(s) in RATE_SECTORS]
+
+
+def _omo(request: Request, store: MacroStore, today: date) -> dict:
+    index = SeriesStore(Path(request.app.state.data_dir) / "trend-sources").read("VNINDEX-1d")
+    return omo_view(OmoStore(Path(request.app.state.data_dir)).sessions(), trading_days=[t.date() for t, _ in index], today=today)
+
+
+@router.get("/liquidity")
+def liquidity(request: Request):
+    """Thanh khoản và tỷ giá: the central rate and its band, the open market, interbank rates by term, and the month's trade and FDI."""
+    require_owner(request)
+    store = _store(request)
+    if store is None:
+        return unavailable()
+    today = now(request).astimezone(VN).date()
+    dec = lambda i: [(date.fromisoformat(o["date"]), Decimal(o["value"])) for o in store.read(i)]  # noqa: E731
+    last = lambda i: ({"date": o[-1]["date"], "value": o[-1]["value"]} if (o := store.read(i)) else None)  # noqa: E731
+    return {"fx": central_view(dec("usd_vnd_central"), vcb=dec("usd_vnd_vcb"), today=today), "omo": _omo(request, store, today),
+            "interbank": interbank_view({k: dec(k) for k in TERMS}),
+            "external": {k: last(k) for k in ("vn_trade_balance", "vn_trade_balance_ytd", "vn_fdi_disbursed", "vn_fdi_disbursed_yoy")}}
 
 
 @router.get("/sensitivity")

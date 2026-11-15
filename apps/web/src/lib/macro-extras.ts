@@ -25,3 +25,10 @@ export function spreadPath(points: { spread: string }[], width: number, height: 
   const x = (i: number) => (vals.length > 1 ? Math.round((i / (vals.length - 1)) * width * 100) / 100 : 0);
   return { line: vals.map((v, i) => `${x(i)},${y(v)}`).join(" "), zero: y(0) };
 }
+
+/** Where a rate sits in the band, 0 at the floor and 1 at the ceiling (clamped); null without a rate. */
+export function bandSpot(rate: string | null, floor: string, ceiling: string): number | null {
+  if (rate === null) return null;
+  const share = (Number(rate) - Number(floor)) / (Number(ceiling) - Number(floor));
+  return Math.min(1, Math.max(0, share));
+}

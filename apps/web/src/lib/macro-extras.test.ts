@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseFx, parseRate, spreadPath, swapCost } from "./macro-extras";
+import { bandSpot, parseFx, parseRate, spreadPath, swapCost } from "./macro-extras";
 
 describe("swapCost", () => {
   it("annualises the forward premium over the tenor and adds the USD rate for the cost of VND", () => {
@@ -35,5 +35,14 @@ describe("spreadPath", () => {
   });
   it("keeps zero on the chart when every spread is positive", () => {
     expect(spreadPath([{ spread: "2" }, { spread: "1" }], 100, 40).zero).toBe(40);
+  });
+});
+
+describe("bandSpot", () => {
+  it("places a rate between the floor and the ceiling of the band, as a share of the bar", () => {
+    expect(bandSpot("25000", "23750", "26250")).toBeCloseTo(0.5, 5);
+    expect(bandSpot("26250", "23750", "26250")).toBe(1);
+    expect(bandSpot("27000", "23750", "26250")).toBe(1);
+    expect(bandSpot(null, "23750", "26250")).toBeNull();
   });
 });

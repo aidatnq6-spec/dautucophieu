@@ -41,7 +41,9 @@ test("the impact chain shows five links, says what is missing, and reads inflati
   await openMacro(page);
   const chain = page.getByRole("region", { name: "Chuỗi tác động vĩ mô" });
   const links = chain.getByRole("list", { name: "Các mắt xích, từ giá dầu đến VN-Index" }).locator(":scope > li");  // not the rate rows inside a link
-  await expect(links).toHaveText([/Giá dầu/, /Lạm phát Việt Nam/, /Lãi suất Việt Nam/, /Khối ngoại/, /VN-Index/]);
+  await expect(links).toHaveText([/Giá dầu/, /Lạm phát Việt Nam/, /Thanh khoản và chênh lệch VND–USD/, /Lãi suất Việt Nam/, /Khối ngoại/, /VN-Index/]);
+  await expect(chain.getByTestId("chain-liquidity")).toContainText("tạo áp lực");  // the synthetic spread is below zero
+  await expect(chain.getByTestId("chain-liquidity")).toContainText("bơm 1.500 tỷ đ");
   await expect(chain).toContainText("không phải khuyến nghị");
   // Months before the 03/2026 figure performance.spec enters, so either order leaves CPI rising: 2,0 → 2,9 (→ 3,2).
   for (const [day, value] of [["2026-01-31", "2,0"], ["2026-02-28", "2,9"]]) {
@@ -146,4 +148,20 @@ test("the owner logs a macro event with its source and removes it", async ({ pag
   await expect(coming.getByRole("row", { name: /Họp chính sách thử nghiệm/ })).toContainText("Nhắc trước 1 ngày");
   await coming.getByRole("button", { name: "Xóa Họp chính sách thử nghiệm" }).click();
   await expect(cal).toContainText("Chưa có sự kiện sắp tới.");
+});
+
+test("the central rate shows its band, the open market its latest session, and the month's trade and FDI", async ({ page }) => {
+  await openMacro(page);
+  const fx = page.getByRole("region", { name: "Tỷ giá trung tâm và biên độ" });
+  await expect(fx.getByTestId("fx-central")).toContainText("25.000 đ/USD");
+  await expect(fx).toContainText("sàn 23.750 – trần 26.250");
+  await expect(fx).toContainText("Tỷ giá Vietcombank chỉ còn cách trần 0,19%");
+  await expect(fx).toContainText("Chưa có tỷ giá trung tâm đầu năm");
+  const omo = page.getByRole("region", { name: "Thanh khoản hệ thống" });
+  await expect(omo.getByTestId("omo-latest")).toContainText("bơm 1.500 tỷ đ");
+  await expect(omo.getByRole("table", { name: "Kết quả thị trường mở phiên mới nhất" }).getByRole("row")).toHaveCount(2);  // the empty 91-day row is left out
+  await expect(omo).toContainText("cần đủ phiên của 91 ngày");
+  const ext = page.getByRole("region", { name: "Cán cân ngoại tệ" }).getByRole("list", { name: "Cán cân và FDI" });
+  await expect(ext).toContainText("nhập siêu 1,5 tỷ USD");
+  await expect(ext).toContainText("20 tỷ USD (+8,5% so cùng kỳ)");
 });

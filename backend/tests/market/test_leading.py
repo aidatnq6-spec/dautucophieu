@@ -36,8 +36,9 @@ def test_pmi_aggregator_requires_value_and_named_publication_month():
 
 def test_indicators_config_lists_auto_and_manual_rows():
     ind = load_indicators()
-    assert len(ind) == 19 and {i["id"] for i in ind if i["source"]["kind"] != "manual"} == {
-        "dxy", "wti", "brent", "us_cpi_yoy", "usd_vnd_vcb", "fed_effr", "sofr", "us10y", "usd_vnd_free", "usd_vnd_sbv", "deposit_12m",
+    assert len(ind) == 26 and {i["id"] for i in ind if i["source"]["kind"] != "manual"} == {
+        "dxy", "wti", "brent", "us_cpi_yoy", "usd_vnd_vcb", "usd_vnd_central", "fed_effr", "sofr", "vn_interbank_1w", "vn_interbank_1m",
+        "vn_trade_balance", "vn_trade_balance_ytd", "vn_fdi_disbursed", "vn_fdi_disbursed_yoy", "us10y", "usd_vnd_free", "usd_vnd_sbv", "deposit_12m",
         "foreign_net", "vnindex_value", "m2_vn", "vn10y", "vn_interbank_on", "vn_pmi", "vn_cpi_yoy"}  # us_pmi: manual since 26/10/2026 (sources block bots)
 
 
@@ -101,7 +102,8 @@ def test_cli_macro_sync_writes_automatic_indicators(tmp_path, capsys):
     from investment_agent.cli import macro_sync
     assert macro_sync(tmp_path, get=lambda url: FRED_10Y if "DGS10" in url else (_ for _ in ()).throw(OSError("offline"))) == 1
     assert MacroStore(tmp_path).read("us10y")[-1]["value"] == "4.96"
-    assert '"us10y": "ok"' in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert '"us10y": "ok"' in out and '"omo": "error:OSError"' in out  # the open-market page is read on every run too
 
 
 def test_backup_includes_macro_observations(tmp_path):

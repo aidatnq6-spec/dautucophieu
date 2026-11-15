@@ -47,6 +47,10 @@ ECB_90D = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
 # /wp-admin/ (checked 14/11/2026). The monthly CPI post opens with the month's year-on-year figure.
 NSO_CPI = ("https://www.nso.gov.vn/wp-json/wp/v2/posts?categories=94&search=Ch%E1%BB%89%20s%E1%BB%91%20gi%C3%A1%20ti%C3%AAu%20d%C3%B9ng"
            "&per_page=20&_fields=date,title,content")
+# The State Bank's pages (robots.txt allows all, checked 15/11/2026): the day's central rate is in the page itself; /vi/ answers without
+# a redirect. Cục Thống kê's monthly socio-economic report (category 78) gives the trade balance and disbursed FDI.
+SBV_CENTRAL = "https://sbv.gov.vn/vi/t%E1%BB%B7-gi%C3%A1"
+NSO_REPORT = "https://www.nso.gov.vn/wp-json/wp/v2/posts?categories=78&per_page=24&_fields=date,title,content"
 DXY_WEIGHTS = {"EUR": -0.576, "JPY": 0.136, "GBP": -0.119, "CAD": 0.091, "SEK": 0.042, "CHF": 0.036}
 # HOSE's own statistics service behind hsx.vn (robots.txt allows all); one trading day per call, values in million đồng.
 HOSE_FOREIGN = "https://api.hsx.vn/mk/api/v1/market/foreign-trading-value-report?fromDate={day}&toDate={day}"
@@ -341,6 +345,81 @@ def parse_nso_cpi(text: str) -> list[tuple[date, str]]:
     return sorted(found.items())
 
 
+def _text(fragment: str) -> str:
+    return re.sub(r"\s+", " ", html_lib.unescape(re.sub(r"<[^>]+>", " ", fragment or "")))
+
+
+def _vn_number(raw: str) -> Decimal:
+    """ "1.012,07" → 1012.07; ",00" → 0."""
+    return Decimal(raw.replace(".", "").replace(",", ".").rstrip(".") or "0")
+
+
+_CENTRAL = re.compile(r"(?is)áp dụng cho ngày\s+(\d{1,2})/(\d{1,2})/(\d{4}).{0,400}?1\s+Đô la Mỹ\s*=\s*([\d.]+)\s*VND")
+
+
+def parse_sbv_central(page: str) -> list[tuple[date, str]]:
+    """The State Bank's central USD/VND rate, dated on the day it applies to (published the evening before, weekends included)."""
+    m = _CENTRAL.search(_text(page))
+    if not m:
+        raise MacroError("sbv_central_unreadable")
+    value = int(m.group(4).replace(".", ""))
+    if not 10_000 <= value <= 100_000:
+        raise MacroError("sbv_central_out_of_range")
+    return [(date(int(m.group(3)), int(m.group(2)), int(m.group(1))), str(value))]
+
+
+_QUARTER_END = {"i": 3, "ii": 6, "iii": 9, "iv": 12}
+_TRADE_MONTH = re.compile(r"(?i)cán cân thương mại hàng hóa tháng [^,.;]{1,30}?(xuất|nhập) siêu ([\d.,]+) tỷ USD")
+_TRADE_YTD = re.compile(r"(?i)cán cân thương mại hàng hóa (?!tháng)[^,.;]{0,40}?(xuất|nhập) siêu ([\d.,]+) tỷ USD")
+_FDI = re.compile(r"(?i)vốn đầu tư trực tiếp nước ngoài thực hiện tại Việt Nam [^.;]{0,80}?đạt ([\d.,]+) tỷ USD, (tăng|giảm) ([\d.,]+)%")
+
+
+def _report_month(title: str) -> date | None:
+    year = re.search(r"năm\s+(\d{4})", title)
+    quarter = re.search(r"(?i)quý\s+(IV|III|II|I)\b", title)
+    if quarter:
+        month = _QUARTER_END[quarter.group(1).lower()]
+    else:
+        m = _NSO_MONTH.search(title)
+        if not m:
+            return None
+        word = m.group(1).lower()
+        month = int(word) if word.isdigit() else _VN_MONTHS[word]
+    if not year or not 1 <= month <= 12:
+        return None
+    y = int(year.group(1))
+    return date(y, month, calendar.monthrange(y, month)[1])
+
+
+def parse_nso_report(text: str, *, field: str) -> list[tuple[date, str]]:
+    """From each "Báo cáo tình hình kinh tế – xã hội …" post (the press releases repeat it): the month's goods trade balance, the balance
+    since January, disbursed FDI since January (bn USD) or its change on a year before (%); dated to the month's end. A deficit is
+    negative. A report without the sentence gives nothing for that month."""
+    found: dict[date, str] = {}
+    for post in json.loads(text):
+        title = _text((post.get("title") or {}).get("rendered") or "").strip()
+        if not title.lower().startswith("báo cáo tình hình kinh tế"):
+            continue
+        month = _report_month(title)
+        if month is None:
+            continue
+        body = _text((post.get("content") or {}).get("rendered") or "")
+        value = None
+        if field in ("trade_month", "trade_ytd"):
+            m = (_TRADE_MONTH if field == "trade_month" else _TRADE_YTD).search(body)
+            if m:
+                value = _vn_number(m.group(2)) * (-1 if m.group(1).lower() == "nhập" else 1)
+        else:
+            m = _FDI.search(body)
+            if m:
+                value = _vn_number(m.group(1)) if field == "fdi_ytd" else _vn_number(m.group(3)) * (-1 if m.group(2).lower() == "giảm" else 1)
+        if value is not None:
+            found.setdefault(month, _plain(value))  # newest post first: a later revision of the same month wins
+    if not found:
+        raise MacroError("nso_report_unreadable")
+    return sorted(found.items())
+
+
 def parse_hose_foreign(text: str) -> dict[str, str] | None:
     """Net foreign buy-sell and total HOSE trading value (incl. put-through) in billion đồng; None on a day without trading."""
     try:
@@ -365,6 +444,8 @@ def evaluate(rule: str, values: list[str]) -> tuple[str | None, str | None]:
     if len(values) >= 2:
         prev = Decimal(values[-2])
         trend = "Tăng" if latest > prev else "Giảm" if latest < prev else "Đi ngang"
+    if rule == "none":
+        return trend, None
     if rule == "sign" and latest is not None:
         return trend, "Tốt" if latest > 0 else "Xấu" if latest < 0 else "Trung tính"
     if trend is None:
@@ -463,6 +544,10 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
             points = parse_te_pmi(page(TE_PAGE.format(country=src["country"])), year=today.year)
         elif src["kind"] == "ecb_dxy":
             points = parse_ecb_dxy(page(ECB_90D))
+        elif src["kind"] == "sbv_central":
+            points = parse_sbv_central(page(SBV_CENTRAL))
+        elif src["kind"] == "nso_report":
+            points = parse_nso_report(page(NSO_REPORT), field=src["field"])
         elif src["kind"] == "nso_cpi":
             points = parse_nso_cpi(page(NSO_CPI))
         elif src["kind"] in ("news_pmi", "news_cpi"):

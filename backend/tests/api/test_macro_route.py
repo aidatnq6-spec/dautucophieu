@@ -21,7 +21,7 @@ def test_macro_lists_every_indicator(tmp_path):
     MacroStore(tmp_path).upsert("us10y", [(date(2026, 10, 21), "4.91"), (date(2026, 10, 23), "4.96")], entry="auto")
     body = call(client(tmp_path, clock), clock, "GET", "/internal/macro").json()
     rows = {r["id"]: r for r in body["rows"]}
-    assert len(rows) == 19 and rows["us10y"]["assessment"] == "Xấu" and rows["vn_pmi"]["value"] is None
+    assert len(rows) == 26 and rows["us10y"]["assessment"] == "Xấu" and rows["vn_pmi"]["value"] is None
 
 
 def test_owner_enters_a_manual_value_with_its_source(tmp_path):
@@ -78,4 +78,4 @@ def test_macro_chain_reads_the_stored_series_and_the_vn_index(tmp_path):
     assert (n["oil"]["direction"], n["oil"]["effect"]) == ("down", "support")
     assert (n["foreign"]["direction"], n["foreign"]["latest"]["value"]) == ("buy", "420.5")
     assert (n["vnindex"]["direction"], n["vnindex"]["latest"]["value"]) == ("up", "1700")
-    assert body["missing"] == ["inflation", "rates"]
+    assert body["missing"] == ["inflation", "liquidity", "rates"]

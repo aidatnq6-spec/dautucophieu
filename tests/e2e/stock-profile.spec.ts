@@ -137,7 +137,7 @@ test("So sánh cùng ngành sets a sector's tickers side by side: best and worst
   await expect(page.getByRole("region", { name: "So sánh cùng ngành" })).toContainText("Chỉ có 1 mã ngành Công nghệ Thông tin trong danh sách theo dõi");
   // From Định giá, the chosen sector opens the comparison.
   await page.goto("/fair-value");
-  await page.getByLabel("Ngành").selectOption("Ngân hàng");
+  await page.getByRole("combobox", { name: "Ngành" }).selectOption("Ngân hàng");
   await page.getByRole("link", { name: "So sánh ngành này" }).click();
   await expect(page).toHaveURL(/\/research\/ACB#so-sanh-cung-nganh$/);
   await expect(page.getByRole("region", { name: "So sánh cùng ngành" }).getByRole("table", { name: /So sánh ngành Ngân hàng/ })).toBeVisible();

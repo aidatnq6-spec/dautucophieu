@@ -733,6 +733,9 @@ VPA_POSTS = "https://www.vpa.org.vn/wp-json/wp/v2/posts?search=container%20throu
 VASEP_PANGASIUS = "https://vasep.com.vn/san-pham-xuat-khau/ca-tra/xuat-nhap-khau"
 VASEP_BASE = "https://vasep.com.vn"
 VASEP_PER_RUN = 3
+# older listing pages are read only while fewer than six months are stored (to fill the history once); some months have no summary
+# at all (12/2025, 6/2026), so waiting for twelve would read them on every run
+VASEP_PAGES, VASEP_FULL_HISTORY = 4, 6
 _VASEP_ROBOTS = ("print-", "xodpqbox", "【", "news-", ".tag", ".shtml", "betgg8", "xsn", "zop", "android", "vietlott", "ban-ca", "games", "gods",
                  "Gov", "ios", "iphone", "jun", "king", "kwin", "muv", "poc", "poker", "qsj", "rna", "mac", "soft", "store", "tig", "vn/2024",
                  "Wap", "xiazai", "Xoilac", "Zop", "bóng", "bắn")
@@ -798,8 +801,19 @@ def parse_vpa_container(text: str) -> list[tuple[date, str]]:
 
 
 _VASEP_LINK = re.compile(r'<a[^>]+href="(?:https://vasep\.com\.vn)?(/san-pham-xuat-khau/ca-tra/[^"]+?\.html)"[^>]*title="([^"]+)"')
-_VASEP_TITLE = re.compile(r"(?i)^xuất khẩu cá tra (\d{1,2}) tháng(?: đầu năm (\d{4}))?")
-_VASEP_MONTH = re.compile(r"(?i)riêng tháng (\d{1,2})(?:/(\d{4}))?, (?:kim ngạch )?xuất khẩu(?: cá tra)? đạt ([\d.,]+) triệu USD, (tăng|giảm) ([\d.,]+)%")
+# Titles name the month in several ways ("8 tháng", "5 tháng đầu năm", "tháng 4/2026" shown as "tháng 42026", "tháng đầu năm 2026",
+# "sau 8 tháng"); a piece on one market ("sang Brazil") or one company is not the industry's month.
+_VASEP_NOT_INDUSTRY = re.compile(r"(?i) sang |vĩnh hoàn|doanh thu|doanh nghiệp")
+_VASEP_MONTH_YEAR = re.compile(r"tháng (\d{1,2}?)/?(20\d{2})\b")
+_VASEP_COUNT = re.compile(r"(?i)(\d{1,2}) tháng")
+# The whole month's sentence, in the wordings VASEP uses: "Riêng (trong) tháng 8, xuất khẩu (cá tra) đạt …", "Tháng 5/2026, (kim ngạch)
+# xuất khẩu cá tra (của) Việt Nam … đạt …", "(Kim ngạch) xuất khẩu|XK cá tra (Việt Nam) (trong) tháng 9/2025 … đạt|với …"; then
+# "… triệu USD, (tiếp tục|nhẹ) tăng|giảm x%". A sentence on one market names it ("sang Mỹ", "thị trường này") and does not match.
+_VASEP_MONTH = re.compile(
+    r"(?i)(?:riêng (?:trong )?tháng (\d{1,2})(?:/(\d{4}))?, xuất khẩu(?: cá tra)?"
+    r"|(?:xuất khẩu|XK) cá tra (?:của )?(?:Việt Nam )?(?:trong )?tháng (\d{1,2})/(\d{4})"
+    r"|tháng (\d{1,2})/(\d{4}),? (?:kim ngạch )?xuất khẩu cá tra (?:của )?(?:Việt Nam)?)"
+    r"[^.;]{0,90}?(?:đạt|với) (?:gần |hơn )?[\d.,]+ triệu USD,[^.;]{0,30}?(tăng|giảm)[^.;\d]{0,10}([\d.,]+)%")
 
 
 def parse_vasep_links(page: str) -> list[tuple[int, int | None, str]]:
@@ -807,11 +821,21 @@ def parse_vasep_links(page: str) -> list[tuple[int, int | None, str]]:
     robots.txt disallows are left out."""
     out, seen = [], set()
     for path, raw in _VASEP_LINK.findall(page):
-        m = _VASEP_TITLE.search(unicodedata.normalize("NFC", html_lib.unescape(raw)).strip())
-        if not m or path in seen or not 1 <= int(m.group(1)) <= 12 or any(w in path for w in _VASEP_ROBOTS):
+        title = unicodedata.normalize("NFC", html_lib.unescape(raw)).strip()
+        if path in seen or "cá tra" not in title.lower() or _VASEP_NOT_INDUSTRY.search(title) or any(w in path for w in _VASEP_ROBOTS):
             continue
-        seen.add(path)
-        out.append((int(m.group(1)), int(m.group(2)) if m.group(2) else None, path))
+        dated, count, year = _VASEP_MONTH_YEAR.search(title), _VASEP_COUNT.search(title), re.search(r"năm (20\d{2})", title)
+        if dated:
+            month, year = int(dated.group(1)), int(dated.group(2))
+        elif count:
+            month, year = int(count.group(1)), int(year.group(1)) if year else None
+        elif re.search(r"(?i)tháng đầu năm", title):
+            month, year = 1, int(year.group(1)) if year else None
+        else:
+            continue
+        if 1 <= month <= 12:
+            seen.add(path)
+            out.append((month, year, path))
     if not out:
         raise MacroError("vasep_unreadable")
     return out
@@ -822,13 +846,14 @@ def parse_vasep_article(page: str, *, month: int, year: int | None) -> tuple[dat
     a year in the title, the year is the one published in (the year before for a December figure read in January)."""
     body = unicodedata.normalize("NFC", _text(re.sub(r"(?is)<script.*?</script>|<style.*?</style>", " ", page)))
     for m in _VASEP_MONTH.finditer(body):
-        if int(m.group(1)) != month:
+        said, said_year = next(((g[0], g[1]) for g in ((m.group(1), m.group(2)), (m.group(3), m.group(4)), (m.group(5), m.group(6))) if g[0]))
+        if int(said) != month:
             continue
-        value = _vn_number(m.group(5)) * (-1 if m.group(4).lower() == "giảm" else 1)
+        value = _vn_number(m.group(8)) * (-1 if m.group(7).lower() == "giảm" else 1)
         if abs(value) > 200:
             return None
-        if year is None:
-            year = int(m.group(2)) if m.group(2) else None
+        if said_year:
+            year = int(said_year)
         if year is None:
             pub = re.search(r'"datePublished"\s*:\s*"(\d{4})-(\d{2})', page)
             if not pub:
@@ -863,7 +888,13 @@ def fetch_chain_series(store: MacroStore, *, get: Callable[[str], str], get_byte
         # a month's summary comes out after the month: a title without a year is this year's, or last year's for a month not over yet;
         # used only to skip what is stored (the stored date comes from the article's own publication date)
         year_of = lambda m, y: y or (today.year if m < today.month else today.year - 1)  # noqa: E731
-        due = [(m, y, p) for m, y, p in parse_vasep_links(_get_with_retry(get, VASEP_PANGASIUS, sleep))
+        links = parse_vasep_links(_get_with_retry(get, VASEP_PANGASIUS, sleep))
+        for n in range(2, VASEP_PAGES + 1) if len(known) < VASEP_FULL_HISTORY else ():
+            try:
+                links += [x for x in parse_vasep_links(_get_with_retry(get, f"{VASEP_PANGASIUS}?trang={n}", sleep)) if x not in links]
+            except MacroError:
+                break
+        due = [(m, y, p) for m, y, p in links
                if date(year_of(m, y), m, calendar.monthrange(year_of(m, y), m)[1]).isoformat() not in known][:VASEP_PER_RUN]
         found = [parse_vasep_article(_get_with_retry(get, VASEP_BASE + p, sleep), month=m, year=y) for m, y, p in due]
         points = sorted({d: v for d, v in (f for f in found if f) if d.isoformat() not in known}.items())

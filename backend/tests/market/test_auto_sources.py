@@ -167,3 +167,66 @@ def test_the_month_alone_is_read_not_a_market_or_the_year_to_date():
     # a December summary read in January belongs to the year before
     assert parse_vasep_article(vasep_article("Riêng tháng 12, xuất khẩu đạt 200 triệu USD, tăng 3%.", "2027-01-15T07:00:00+07:00"),
                                month=12, year=None) == (date(2026, 12, 31), "3")
+
+
+# Title and sentence shapes seen on VASEP between 09/2025 and 09/2026 (the figures are made up).
+def vasep_link(slug, title):
+    return f'<a href="https://vasep.com.vn/san-pham-xuat-khau/ca-tra/xuat-nhap-khau/{slug}.html" title="{title}">x</a>'
+
+
+VASEP_TITLES = "".join([
+    vasep_link("a-1", "Trung Quốc và CPTPP là động lực cho xuất khẩu cá tra 5 tháng đầu năm"),
+    vasep_link("b-2", "Xuất khẩu cá tra tháng 42026 tăng trưởng 18%, thị trường Mỹ có tín hiệu phục hồi"),
+    vasep_link("c-3", "Tăng trưởng chậm, Trung Quốc vẫn là điểm tựa của cá tra Việt Nam trong tháng 32026"),
+    vasep_link("d-4", "Xuất khẩu cá tra tháng đầu năm 2026 Trung Quốc tăng mạnh"),
+    vasep_link("e-5", "Xuất khẩu cá tra tháng 102025 Tăng trưởng tích cực"),
+    vasep_link("f-6", "Cá tra Việt Nam Vượt thách thức thương mại, xuất khẩu đạt 1,4 tỷ USD sau 8 tháng"),
+    vasep_link("g-7", "Xuất khẩu cá tra sang Brazil phục hồi mạnh trong tháng 8"),
+    vasep_link("h-8", "Doanh thu Vĩnh Hoàn phục hồi trong tháng 82026"),
+])
+
+
+def test_vasep_titles_of_every_shape_give_their_month():
+    assert [(m, y) for m, y, _ in parse_vasep_links(VASEP_TITLES)] == [(5, None), (4, 2026), (3, 2026), (1, 2026), (10, 2025), (8, None)]
+
+
+@pytest.mark.parametrize("sentence, month, expected", [
+    ("Tháng 5/2026, xuất khẩu cá tra Việt Nam đạt 190 triệu USD, tăng 1% so với cùng kỳ năm trước.", 5, (date(2026, 5, 31), "1")),
+    ("Theo số liệu Hải quan Việt Nam, xuất khẩu cá tra trong tháng 4/2026 đạt 206 triệu USD, tăng 18% so với cùng kỳ năm 2025.", 4,
+     (date(2026, 4, 30), "18")),
+    ("Tháng 3/2026, kim ngạch xuất khẩu cá tra của Việt Nam đạt 182 triệu USD, tăng 1% so với cùng kỳ năm 2025.", 3, (date(2026, 3, 31), "1")),
+    ("Trong tháng 2/2026, xuất khẩu sang thị trường này đạt 26 triệu USD, tăng 19% so với cùng kỳ. Trong tháng 2/2026, xuất khẩu cá tra của "
+     "Việt Nam đạt 119 triệu USD, giảm nhẹ 5% so với cùng kỳ năm trước.", 2, (date(2026, 2, 28), "-5")),
+    ("Tháng 1/2026, xuất khẩu cá tra Việt Nam ghi nhận tín hiệu tăng trưởng tích cực ngay từ đầu năm với tổng kim ngạch đạt 212 triệu USD, "
+     "tăng 59% so với cùng kỳ năm 2025.", 1, (date(2026, 1, 31), "59")),
+    ("Kim ngạch xuất khẩu cá tra Việt Nam tháng 9/2025 đạt 181 triệu USD, tăng 5% so với cùng kỳ 2024.", 9, (date(2025, 9, 30), "5")),
+    ("Số liệu mới nhất cho thấy, kim ngạch XK cá tra Việt Nam tháng 8/2025 vẫn tiếp tục tăng trưởng, với 200 triệu USD, tăng 5% so với "
+     "tháng 8/2024.", 8, (date(2025, 8, 31), "5")),
+    ("Riêng trong tháng 11, xuất khẩu cá tra đạt 195 triệu USD, tiếp tục tăng 9% so với cùng kỳ năm ngoái.", 11, (date(2026, 11, 30), "9")),
+    # a market or a running total is not the month as a whole
+    ("Kim ngạch xuất khẩu cá tra sang Mỹ trong tháng 9/2025 đạt 23 triệu USD, giảm 23% so với cùng kỳ năm ngoái.", 9, None),
+    ("Lũy kế 4 tháng đầu năm 2026, tổng kim ngạch xuất khẩu cá tra toàn ngành đạt 720 triệu USD, tăng 17% so cùng kỳ.", 4, None),
+])
+def test_the_whole_months_sentence_in_its_several_wordings(sentence, month, expected):
+    assert parse_vasep_article(vasep_article(sentence, "2026-12-15T07:00:00+07:00"), month=month, year=None) == expected
+
+
+def test_a_short_history_reads_older_listing_pages_too(tmp_path):
+    asked = []
+    older = vasep_link("xuat-khau-ca-tra-thang-32026-1", "Xuất khẩu cá tra tháng 32026 tăng")
+
+    def get(url):
+        asked.append(url)
+        if url.endswith("?trang=2"):
+            return older
+        if url.endswith("-1.html"):
+            return vasep_article("Tháng 3/2026, xuất khẩu cá tra Việt Nam đạt 182 triệu USD, tăng 1% so với cùng kỳ.", "2026-04-24T07:00:00+07:00")
+        return VASEP_PAGES.get(url, VASEP_LIST) if "vasep" in url else VPA
+    store = MacroStore(tmp_path)
+    fetch_chain_series(store, get=get, get_bytes=None, today=date(2026, 11, 15))
+    assert [o["date"] for o in store.read("vn_pangasius_export_yoy")] == ["2026-03-31", "2026-07-31", "2026-08-31"]
+    assert any(u.endswith("?trang=2") for u in asked)
+    store.upsert("vn_pangasius_export_yoy", [(date(2025, m, 28), "1") for m in range(1, 4)], entry="auto")
+    asked.clear()
+    fetch_chain_series(store, get=get, get_bytes=None, today=date(2026, 11, 15))
+    assert not any("?trang=" in u for u in asked)  # six months or more stored: the first page is enough

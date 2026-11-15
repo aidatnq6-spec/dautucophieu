@@ -50,6 +50,13 @@ NSO_CPI = ("https://www.nso.gov.vn/wp-json/wp/v2/posts?categories=94&search=Ch%E
 # The State Bank's pages (robots.txt allows all, checked 15/11/2026): the day's central rate is in the page itself; /vi/ answers without
 # a redirect. Cục Thống kê's monthly socio-economic report (category 78) gives the trade balance and disbursed FDI.
 SBV_CENTRAL = "https://sbv.gov.vn/vi/t%E1%BB%B7-gi%C3%A1"
+# CafeF's PMI topic page (robots.txt allows all, checked 15/11/2026): each month's article on S&P Global's Vietnam PMI opens with the
+# figure ("PMI ngành sản xuất Việt Nam đạt 52,3 điểm trong tháng 10/2026"); only months not stored yet are opened, three per run.
+CAFEF_PMI = "https://cafef.vn/pmi.html"
+CAFEF_BASE = "https://cafef.vn"
+CAFEF_PMI_PER_RUN = 3
+# An indicator whose stored history is shorter than this takes FRED's series once ("history" in its source), e.g. Brent.
+HISTORY_MIN_POINTS, HISTORY_YEARS = 60, 2
 NSO_REPORT = "https://www.nso.gov.vn/wp-json/wp/v2/posts?categories=78&per_page=24&_fields=date,title,content"
 DXY_WEIGHTS = {"EUR": -0.576, "JPY": 0.136, "GBP": -0.119, "CAD": 0.091, "SEK": 0.042, "CHF": 0.036}
 # HOSE's own statistics service behind hsx.vn (robots.txt allows all); one trading day per call, values in million đồng.
@@ -288,6 +295,49 @@ def parse_news_pmi(items: list[dict]) -> list[tuple[date, str]]:
     return sorted(found.items())
 
 
+_PMI_LINK = re.compile(r'<a[^>]+href="(/[^"]+?\.chn)"[^>]*title="([^"]+)"')
+_PMI_LEAD = re.compile(r"(?i)PMI\)?[^.]{0,160}?(\d{2})[,.](\d{1,2})\s*điểm\s*(?:trong|của)?\s*tháng\s*(\d{1,2})")
+
+
+def parse_cafef_pmi_links(page: str) -> list[tuple[int, int | None, str]]:
+    """(month, year or None, article path) of each Vietnam manufacturing PMI article on CafeF's topic page, newest first."""
+    out, seen = [], set()
+    for path, raw in _PMI_LINK.findall(page):
+        title = html_lib.unescape(raw)
+        if "PMI" not in title or not re.search(r"(?i)việt nam", title) or _PMI_OTHER.search(title) or path in seen:
+            continue
+        m = re.search(r"tháng\s*(\d{1,2})(?:\s*/\s*(\d{4}))?", title)
+        if m and 1 <= int(m.group(1)) <= 12:
+            month, year = int(m.group(1)), int(m.group(2)) if m.group(2) else None
+            published = re.search(r"-188(\d{2})(\d{2})(\d{2})\d{6,}\.chn$", path)  # CafeF's article number: 188, then yymmdd
+            if year is None and published and 1 <= int(published.group(2)) <= 12:
+                year = 2000 + int(published.group(1)) - (1 if month > int(published.group(2)) else 0)
+            seen.add(path)
+            out.append((month, year, path))
+    if not out:
+        raise MacroError("cafef_pmi_unreadable")
+    return out
+
+
+def parse_cafef_pmi_article(page: str, *, month: int, year: int | None) -> tuple[date, str] | None:
+    """The month's figure from the article's first sentence naming it; the month in that sentence must be the title's. Without a
+    year in the title, the year is the one published in (the year before for a December figure read in January)."""
+    body = _text(re.sub(r"(?is)<script.*?</script>|<style.*?</style>", " ", page))
+    for m in _PMI_LEAD.finditer(body):
+        if int(m.group(3)) != month:
+            continue
+        value = Decimal(f"{m.group(1)}.{m.group(2)}")
+        if not Decimal(30) <= value <= Decimal(70):
+            return None
+        if year is None:
+            pub = re.search(r'"datePublished"\s*:\s*"(\d{4})-(\d{2})', page)
+            if not pub:
+                return None
+            year = int(pub.group(1)) - (1 if month > int(pub.group(2)) else 0)
+        return date(year, month, calendar.monthrange(year, month)[1]), _plain(value)
+    return None
+
+
 _CPI_NAME = re.compile(r"(?i)\bCPI\b|chỉ số giá tiêu dùng")
 _CPI_YOY = re.compile(r"(?i)(tăng|giảm)\s*(\d{1,2})(?:[,.](\d{1,2}))?\s*%\s*so với cùng kỳ")
 
@@ -518,8 +568,14 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
                     down[host] = exc
                 raise
         return pages[url]
-    def read(src: dict):
+    def read(src: dict, known: set[str]):
         """The source's points; None when it has nothing new today (not a failure), False for a manual source; raises when it fails."""
+        if src["kind"] == "cafef_pmi":
+            due = [(m, y, p) for m, y, p in parse_cafef_pmi_links(page(CAFEF_PMI))
+                   if not (y and date(y, m, calendar.monthrange(y, m)[1]).isoformat() in known)][:CAFEF_PMI_PER_RUN]
+            found = [parse_cafef_pmi_article(page(CAFEF_BASE + p), month=m, year=y) for m, y, p in due]
+            points = sorted({d: v for d, v in (f for f in found if f) if d.isoformat() not in known}.items())
+            return points or None
         if src["kind"] == "oilprice":
             points = parse_oilprice(page(OILPRICE_PAGE), blend=src["blend"])
         elif src["kind"] == "sbv_interbank":
@@ -572,13 +628,20 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
     results = {}
     for ind in indicators:
         src, first_error = ind["source"], None
+        known = {o["date"] for o in store.read(ind["id"])}
         while src:
             try:
-                points = read(src)
+                points = read(src, known)
                 if points is False:  # manual: nothing to fetch
                     break
                 if points:
                     store.upsert(ind["id"], points[-400:], entry="auto")
+                history = ind["source"].get("history")
+                if history and len(store.read(ind["id"])) < HISTORY_MIN_POINTS:
+                    start = today.replace(year=today.year - HISTORY_YEARS, day=min(today.day, 28))
+                    older = parse_fred_csv(page(FRED_CSV.format(series=history["series"]) + f"&cosd={start.isoformat()}"))
+                    have = {o["date"] for o in store.read(ind["id"])}
+                    store.upsert(ind["id"], [p for p in older if p[0].isoformat() not in have], entry="auto")
                 results[ind["id"]] = "ok"
                 break
             except Exception as exc:  # network, parse or source change: the fallback is tried; a timeout anywhere is the error

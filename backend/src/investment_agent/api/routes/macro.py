@@ -81,7 +81,9 @@ def chain(request: Request):
     latest = omo["latest"]
     chain = macro_chain(series, today=today, omo={"date": latest["date"], "inject": latest["inject"], "absorb": latest["absorb"],
                                                    "net": omo["net"]} if latest else None)
-    return {**chain, "rate_sensitive": _rate_sensitive(request)}
+    # watched companies holding net cash of a fifth of their market value or more: a higher deposit rate pays them (public figures)
+    from investment_agent.services.cash_rank import cash_rank_rich
+    return {**chain, "rate_sensitive": _rate_sensitive(request), "cash_rich": cash_rank_rich(Path(request.app.state.data_dir))}
 
 
 RATE_SECTORS = ("Ngân hàng", "Bất động sản", "Dịch vụ tài chính")  # ICB names: banks, real estate, securities firms

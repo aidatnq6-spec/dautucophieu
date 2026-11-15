@@ -23,7 +23,7 @@ def test_all_nine_criteria_pass_for_a_company_improving_on_every_line():
     assert [c["passed"] for c in f["criteria"]] == [True] * 9
     assert f["criteria"][0]["detail"] == "ROA 9,0% (lợi nhuận 9 tỷ / tài sản đầu kỳ 100 tỷ)"
     assert f["criteria"][6]["detail"] == "Không có đợt huy động vốn bằng cổ phiếu năm 2025 (cổ phiếu thưởng, cổ tức bằng cổ phiếu không tính)"
-    assert [s["flag"] for s in q["signs"]] == [False, False, False]
+    assert [s["flag"] for s in q["signs"]] == [False, False, False, None]  # no financial income kept: not read
 
 
 def test_a_capital_raise_and_worse_lines_fail_and_the_signs_show_their_numbers():
@@ -159,3 +159,28 @@ def test_vietcaps_notes_score_casa_and_group_two_for_every_bank_with_entered_qua
     notes["2025-09-30"] = {**_notes("15", "300"), "group4": "9"}
     by_id = {c["id"]: c for c in report_quality({}, "Ngân hàng", ratios=ratios, bank=bank_ratio_rows({}, notes))["f_score"]["criteria"]}
     assert by_id["group2_down"]["passed"] is None and by_id["casa_up"]["passed"] is True
+
+
+def with_finance(income, expense, pbt, y="2025"):
+    rec = {"annual": {k: dict(v) for k, v in STRONG["annual"].items()}, "share_issues": STRONG["share_issues"]}
+    rec["annual"][y].update(fin_income=str(income * BN), fin_expense=str(expense * BN), pbt=str(pbt * BN))
+    return rec
+
+
+def finance_sign(rec):
+    return next(s for s in report_quality(rec, "Công nghệ Thông tin")["signs"] if s["id"] == "financial_profit")
+
+
+def test_profit_resting_on_financial_income_is_a_sign_from_thirty_percent():
+    s = finance_sign(with_finance(40, 10, 100))  # 30 of 100 before tax
+    assert (s["flag"], s["label"]) == (True, "Lợi nhuận phụ thuộc thu nhập tài chính")
+    assert s["detail"] == "Năm 2025: lãi tài chính ròng 30 tỷ (doanh thu tài chính 40 tỷ − chi phí tài chính 10 tỷ), bằng 30,0% lợi nhuận trước thuế 100 tỷ"
+    assert s["rule"] == "lãi tài chính ròng từ 30% lợi nhuận trước thuế (doanh thu tài chính gồm lãi tiền gửi, lãi tỷ giá, cổ tức)"
+    assert finance_sign(with_finance(39, 10, 100))["flag"] is False
+    assert finance_sign(with_finance(5, 20, 100))["flag"] is False  # a net financial cost depends on nothing
+
+
+def test_a_loss_before_tax_or_missing_lines_leave_the_sign_unread():
+    loss = finance_sign(with_finance(40, 10, -5))
+    assert loss["flag"] is None and "lỗ trước thuế" in loss["detail"]
+    assert finance_sign(STRONG)["flag"] is None

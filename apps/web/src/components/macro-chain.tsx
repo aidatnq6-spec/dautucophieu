@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
 
@@ -6,7 +7,8 @@ type Part = { id: string; direction: string | null; latest: { date: string; valu
 type Node = { id: string; direction: string | null; effect: "pressure" | "support" | "neutral" | "missing"; latest: { date: string; value: string } | null;
   from?: string | null; change?: string | null; short_history?: boolean; stale: boolean; sessions?: number; parts?: Part[];
   omo?: { date: string; inject: string; absorb: string; net: string | null } | null };
-type Chain = { nodes: Node[]; pressure: string[]; support: string[]; missing: string[]; rate_sensitive?: { symbol: string; sector: string }[] | null };
+type Chain = { nodes: Node[]; pressure: string[]; support: string[]; missing: string[]; rate_sensitive?: { symbol: string; sector: string }[] | null;
+  cash_rich?: { symbol: string; net_cash_to_cap: string; quarter: string }[] };
 
 const NAME: Record<string, string> = { oil: "Giá dầu (WTI)", inflation: "Lạm phát Việt Nam", liquidity: "Thanh khoản và chênh lệch VND–USD",
   rates: "Lãi suất Việt Nam", foreign: "Khối ngoại", vnindex: "VN-Index" };
@@ -87,6 +89,9 @@ export function MacroChain() {
         {c.rate_sensitive && c.rate_sensitive.length > 0 && <p data-testid="chain-held">
           <strong>Mã bạn đang nắm nhạy với lãi suất</strong> (ngân hàng, bất động sản, chứng khoán):{" "}
           {c.rate_sensitive.map((h) => `${h.symbol} (${h.sector.toLowerCase()})`).join(", ")}.</p>}
+        {c.cash_rich && c.cash_rich.length > 0 && <p data-testid="chain-cash-rich">
+          <strong>Hưởng lợi khi lãi suất tăng</strong> (tiền ròng từ 20% vốn hóa, thu lãi tiền gửi nhiều hơn):{" "}
+          {c.cash_rich.map((r) => `${r.symbol} (${Math.round(Number(r.net_cash_to_cap) * 100)}%)`).join(", ")}. <Link href="/sectors#kho-tien">Xem kho tiền</Link></p>}
       </>}
     </section>
   );

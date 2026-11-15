@@ -44,6 +44,13 @@ test("Phân tích ngành is its own menu group, with Chuỗi giá trị and Ngà
   await expect(page).toHaveURL(/\/value-chains$/);
 });
 
+test("Kho tiền ranks the watched non-financial tickers by net cash against market value", async ({ page }) => {
+  await page.goto("/sectors");
+  const box = page.getByRole("region", { name: "Kho tiền" });
+  await expect(box.getByRole("table", { name: "Xếp hạng kho tiền" }).getByRole("link", { name: "FPT" })).toBeVisible();
+  await expect(box.getByRole("table", { name: "Xếp hạng kho tiền" })).not.toContainText("VCB");  // banks are left out
+});
+
 test("the in-session market page no longer carries the value chains, and points to them", async ({ page }) => {
   await page.goto("/market");
   await expect(page.getByRole("region", { name: "Chuỗi giá trị", exact: true })).toHaveCount(0);

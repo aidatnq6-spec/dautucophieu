@@ -25,7 +25,8 @@ COMMODITY_LABELS = {"com_coal": "Giá than thế giới (Úc)", "com_iron_ore": 
                     "com_sugar": "Giá đường thế giới", "com_shrimp": "Giá tôm thế giới", "com_lng": "Giá khí LNG (Nhật Bản)",
                     "com_aluminium": "Giá nhôm thế giới", "com_copper": "Giá đồng thế giới", "com_wheat": "Giá lúa mì thế giới",
                     "com_soybean": "Giá đậu tương thế giới", "com_urea": "Giá urê thế giới (Trung Đông, World Bank)",
-                    "port_container_yoy": "Sản lượng container qua cảng Việt Nam so cùng kỳ (VPA)"}
+                    "port_container_yoy": "Sản lượng container qua cảng Việt Nam so cùng kỳ (VPA)",
+                    "vn_pangasius_export_yoy": "Kim ngạch xuất khẩu cá tra tháng so cùng kỳ (VASEP)"}
 COMMODITY_MAX_AGE_DAYS = 75  # monthly averages, published with about a month's lag
 
 

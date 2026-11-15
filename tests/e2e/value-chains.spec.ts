@@ -52,13 +52,14 @@ test("a factor without a stored series says so instead of guessing", async ({ pa
   await expect(steel).toContainText("Ứng dụng chưa có chuỗi số liệu cho yếu tố này.");
 });
 
-test("tariffs are events: off the bar, with a link to the macro calendar", async ({ page }) => {
+test("tariffs are events: off the bar, with a link to the macro calendar, beside the measured cá tra exports", async ({ page }) => {
   const section = await openSection(page);
   const seafood = section.getByRole("button", { name: /Thủy sản/ });
-  await expect(seafood).toContainText("Chưa có yếu tố đo được bằng số liệu");
+  await expect(seafood).not.toContainText("Chưa có yếu tố đo được bằng số liệu");  // Xuất khẩu cá tra is measured; the tariff is not
   await seafood.click();
   const diagram = page.getByRole("region", { name: "Chuỗi giá trị Thủy sản" });
   await expect(diagram).toContainText("Thuế quan và phòng vệ thương mại Mỹ: sự kiện");
+  await expect(diagram).toContainText("Xuất khẩu cá tra:");
   await expect(diagram.getByRole("link", { name: "Lịch và nhật ký vĩ mô" })).toHaveAttribute("href", "/macro#lich-vi-mo");
 });
 

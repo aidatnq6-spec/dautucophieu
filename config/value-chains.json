@@ -1,5 +1,5 @@
 {
- "version": "2026-11-15.2",
+ "version": "2026-11-15.3",
  "sources": {
   "acbs-bank": {
    "title": "Ngành Ngân hàng 2026F – Tăng trưởng giảm tốc",
@@ -186,6 +186,18 @@
    "publisher": "ACBS",
    "date": "2026-03-18",
    "url": "https://acbs.com.vn/acbsmedia/2026/03/VHM-by-ACBS_18.3.2026-EN.pdf"
+  },
+  "vasep-vhc-0826": {
+   "title": "Doanh thu Vĩnh Hoàn phục hồi trong tháng 8/2026",
+   "publisher": "VASEP",
+   "date": "2026-10-08",
+   "url": "https://vasep.com.vn/san-pham-xuat-khau/ca-tra/doanh-nghiep/doanh-thu-vinh-hoan-phuc-hoi-trong-thang-8-2026-38432.html"
+  },
+  "vasep-catra-8m": {
+   "title": "Xuất khẩu cá tra 8 tháng: Duy trì đà tăng, Trung Quốc và Brazil tạo lực đẩy",
+   "publisher": "VASEP",
+   "date": "2026-09-22",
+   "url": "https://vasep.com.vn/san-pham-xuat-khau/ca-tra/xuat-nhap-khau/xuat-khau-ca-tra-8-thang-duy-tri-da-tang-trung-quoc-va-brazil-tao-luc-day-38249.html"
   }
  },
  "chains": [
@@ -1955,6 +1967,27 @@
     ]
    },
    "factors": [
+    {
+     "id": "pangasius_export",
+     "label": "Xuất khẩu cá tra",
+     "stage": "output",
+     "kind": "series",
+     "indicator": "vn_pangasius_export_yoy",
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "Cá tra là mặt hàng chủ lực của Vĩnh Hoàn (doanh thu cá tra tháng 8/2026 đạt 535 tỷ đồng) và VHC, ANV bán chủ yếu ra nước ngoài; mức chính do người soạn gán vì nguồn không nêu tỷ trọng. Đọc theo kim ngạch xuất khẩu cá tra trong tháng so với cùng kỳ do VASEP công bố (toàn ngành, không riêng hai mã)",
+     "refs": [
+      {
+       "source": "vasep-vhc-0826",
+       "page": null
+      },
+      {
+       "source": "vasep-catra-8m",
+       "page": null
+      }
+     ]
+    },
     {
      "id": "us_tariff",
      "label": "Thuế quan và phòng vệ thương mại Mỹ",

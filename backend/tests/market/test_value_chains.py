@@ -100,6 +100,8 @@ def test_the_committed_chains_read_the_series_the_app_now_keeps():
     kinds = {(c.id, f.id): f.kind for c in load_value_chains().chains for f in c.factors}
     port = next(f for c in load_value_chains().chains if c.id == "port" for f in c.factors if f.kind == "series")
     assert port.indicator == "port_container_yoy"
+    seafood = next(c for c in load_value_chains().chains if c.id == "seafood")
+    assert [(f.id, f.indicator, f.weight) for f in seafood.factors if f.kind == "series"] == [("pangasius_export", "vn_pangasius_export_yoy", "major")]
     # tariffs and trade defence are events: noted on the diagram, kept off the good/bad bar
     assert {k for k, v in kinds.items() if v == "event"} == {("industrial-park", "us_tariff"), ("port", "us_tariff"), ("seafood", "us_tariff"),
                                                              ("steel", "trade_defence")}

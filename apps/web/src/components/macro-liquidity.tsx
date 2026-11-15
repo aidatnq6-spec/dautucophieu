@@ -31,13 +31,14 @@ export function MacroLiquidity() {
       <section className="surface" aria-label="Tỷ giá trung tâm và biên độ">
         <h2>Tỷ giá trung tâm và biên độ</h2>
         <p className="caption">Ngân hàng chỉ được bán USD trong biên độ ±5% quanh tỷ giá trung tâm của NHNN. Tỷ giá bán của Vietcombank càng gần trần thì
-          áp lực tỷ giá càng lớn; dưới 1% là sát trần.</p>
+          áp lực tỷ giá càng lớn; dưới 1% là sát trần và được nhắc qua Telegram một lần.</p>
         {state}
         {d && (d.fx.latest ? <FxBand fx={d.fx} /> : <p className="muted">Chưa có tỷ giá trung tâm.</p>)}
       </section>
       <section className="surface" aria-label="Thanh khoản hệ thống">
         <h2>Thanh khoản hệ thống (thị trường mở)</h2>
-        <p className="caption">NHNN bơm tiền qua mua kỳ hạn giấy tờ có giá (đến hạn thì tiền quay về) và hút tiền qua bán tín phiếu. Trang NHNN chỉ hiện phiên
+        <p className="caption">Lãi suất qua đêm tăng hơn 1 điểm % trong 5 phiên được nhắc qua Telegram một lần.
+          NHNN bơm tiền qua mua kỳ hạn giấy tờ có giá (đến hạn thì tiền quay về) và hút tiền qua bán tín phiếu. Trang NHNN chỉ hiện phiên
           mới nhất, nên lịch sử là các phiên ứng dụng đã lưu từ mỗi lượt cập nhật.</p>
         {state}
         {d && <OmoView omo={d.omo} interbank={d.interbank} />}

@@ -198,7 +198,8 @@ def test_large_other_receivables_are_a_sign_from_a_tenth_of_total_assets_or_doub
     big = with_other(8, 3)  # 11 of 105
     assert (big["flag"], big["label"]) == (True, "Phải thu khác lớn")
     assert big["detail"] == "Năm 2025: phải thu khác 11 tỷ (ngắn hạn 8 tỷ, dài hạn 3 tỷ), bằng 10,5% tổng tài sản 105 tỷ"
-    assert big["rule"] == "phải thu khác (ngắn và dài hạn) từ 10% tổng tài sản, hoặc gấp đôi năm trước khi năm trước đã từ 1% tổng tài sản"
+    assert big["rule"] == ("phải thu khác và phải thu về cho vay (ngắn và dài hạn; từ 2026 Thông tư 99 gộp cho vay vào phải thu khác) từ 10% tổng tài sản, "
+                           "hoặc gấp đôi năm trước khi năm trước đã từ 1% tổng tài sản")
     assert with_other(6, 2, 2, 1)["flag"] is True   # 8 against 3 a year before (3% of 100): more than doubled
     assert with_other(1, 0, 0.3, 0.1)["flag"] is False  # doubled, but from 0,4% of total assets: not material
     small = with_other(4, 1, 3, 1)
@@ -229,3 +230,15 @@ def test_large_prepayments_to_suppliers_are_a_sign_from_a_tenth_of_total_assets_
     assert calm["flag"] is False and calm["detail"].endswith("; so với 3 tỷ năm 2024")
     none = next(s for s in report_quality(STRONG, "Công nghệ Thông tin")["signs"] if s["id"] == "prepay_suppliers")
     assert none["flag"] is None and "Thiếu trả trước cho người bán" in none["detail"]
+
+
+def test_loans_merged_into_other_receivables_from_2026_do_not_read_as_doubling():
+    # Thông tư 99 (from 2026) drops "phải thu về cho vay": loans move into other receivables. Both years count them, so the move alone
+    # is no jump: 2024 other 3 + loans 5 against 2025 other 8 + loans 0.
+    rec = {"annual": {k: dict(v) for k, v in STRONG["annual"].items()}, "share_issues": STRONG["share_issues"]}
+    rec["annual"]["2024"].update(other_receivables=str(2 * BN), other_receivables_lt=str(1 * BN), st_loans_receivable=str(4 * BN), lt_loans_receivable=str(1 * BN))
+    rec["annual"]["2025"].update(other_receivables=str(7 * BN), other_receivables_lt=str(1 * BN), st_loans_receivable="0", lt_loans_receivable="0")
+    s = next(x for x in report_quality(rec, "Công nghệ Thông tin")["signs"] if x["id"] == "other_receivables")
+    assert s["flag"] is False
+    assert s["detail"] == ("Năm 2025: phải thu khác và cho vay 8 tỷ (phải thu khác ngắn hạn 7 tỷ, dài hạn 1 tỷ), bằng 7,6% tổng tài sản 105 tỷ; "
+                           "so với 8 tỷ năm 2024 (gồm 5 tỷ cho vay)")

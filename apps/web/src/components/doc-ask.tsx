@@ -10,7 +10,9 @@ export const PRESETS = [
   "Phải thu bên liên quan gồm những đối tượng nào, có bảo đảm và có tính lãi không?",
   "Thuyết minh trả trước cho người bán nêu tên những nhà cung cấp nào?",
   "Có khoản trả trước cho người bán nào được hoàn lại bằng tiền không?",
-  "Phải thu khác gồm những khoản gì, của những đối tượng nào?",
+  "Phải thu khác gồm những khoản gì (đặt cọc, ký quỹ, lãi cho vay phải thu…), của những đối tượng nào?",
+  "Phải thu về cho vay gồm những đối tượng nào, lãi suất bao nhiêu, có phải bên liên quan không?",
+  "Lãi cho vay phải thu tăng hay giảm so với năm trước, doanh nghiệp đã thu được tiền lãi chưa?",
   "Doanh thu tài chính gồm những khoản gì: lãi tiền gửi, lãi tỷ giá, cổ tức hay lãi bán khoản đầu tư?",
   "Ý kiến kiểm toán có ngoại trừ hay nhấn mạnh vấn đề gì không?",
 ];

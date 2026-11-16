@@ -112,7 +112,7 @@ def test_an_event_line_is_tidied_for_the_page():
 def test_coming_catalysts_of_every_watched_ticker_are_listed_on_one_timeline(tmp_path):
     c, clock = setup(tmp_path)  # today 2027-01-15; PHP's last quarter 2026-Q3, so 2026-Q4's report is due 20/01/2027
     before = call(c, clock, "GET", "/internal/theses/catalysts").json()["items"]  # before any model: the automatic ones only
-    assert before and all(i["auto"] for i in before)
+    assert before and all(i["auto"] for i in before) and all(i["held"] is False for i in before)  # nothing in the ledger
     cats = [{"id": "c1", "when": "Q4/2026", "on": "2027-01-10", "sign": "+", "text": "Bàn giao hạ tầng đợt 3", "source": "ĐHĐCĐ"},
             {"id": "c2", "when": "Q3/2027", "on": "2027-08-01", "sign": "+", "text": "Xa hơn 90 ngày", "source": ""},
             {"id": "c3", "when": "2027", "on": None, "sign": "?", "text": "Chưa có ngày", "source": ""},

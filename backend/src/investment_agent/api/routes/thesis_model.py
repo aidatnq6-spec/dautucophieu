@@ -71,8 +71,13 @@ def get_coming_catalysts(request: Request):
     except RepositoryUnavailable:
         return unavailable()
     today = now(request).astimezone(VN).date()
+    from .watchlist import held_tickers
+    try:
+        held = held_tickers(request)
+    except RepositoryUnavailable:
+        held = set()
     items = coming_catalysts(models, Path(data_dir), load_watchlist(Path(data_dir)).symbols, today=today, days=UPCOMING_DAYS)
-    return {"days": UPCOMING_DAYS, "items": items}
+    return {"days": UPCOMING_DAYS, "items": [{**c, "held": c["symbol"] in held} for c in items]}
 
 
 @router.get("/stock/{symbol}/model")

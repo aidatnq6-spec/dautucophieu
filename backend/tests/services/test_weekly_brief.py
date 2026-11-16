@@ -211,3 +211,19 @@ def test_the_week_line_counts_the_session_signals():
     assert ("Tín hiệu trong tuần (5 phiên có số): 0 phiên xanh vỏ đỏ lòng · 0 phiên thanh khoản thấp · chưa có số châu Á cùng phiên"
             in compose(**INPUTS, held=set(), watched=set(), today=SAT, week_signals=quiet))
     assert "Tín hiệu trong tuần" not in compose(**INPUTS, held=set(), watched=set(), today=SAT)
+
+
+def test_a_new_fuel_price_period_is_listed_with_its_change_from_the_one_before(tmp_path):
+    from investment_agent.market.leading import MacroStore
+    from investment_agent.services.weekly_brief import fuel_periods
+    store = MacroStore(tmp_path)
+    store.upsert("vn_ron95_price", [(date(2026, 10, 22), "25213"), (SAT - timedelta(days=3), "19840")], entry="manual")
+    store.upsert("vn_diesel_price", [(date(2026, 10, 22), "29550")], entry="auto")
+    specs = [{"id": "vn_ron95_price", "label": "Giá trần xăng E10 RON95-III (đồng/lít)"}, {"id": "vn_diesel_price", "label": "Giá trần dầu diesel 0,05S (đồng/lít)"}]
+    rows = fuel_periods(tmp_path, specs, today=SAT)
+    assert rows == [{"label": "Giá trần xăng E10 RON95-III", "date": (SAT - timedelta(days=3)).isoformat(), "value": "19840",
+                     "previous": {"date": "2026-10-22", "value": "25213"}}]
+    text = compose(**INPUTS, held=set(), watched=set(), today=SAT, fuel=rows)
+    d = (SAT - timedelta(days=3)).strftime("%d/%m")
+    assert f"GIÁ XĂNG DẦU (kỳ điều hành mới)\n- Giá trần xăng E10 RON95-III: 19.840 đ/lít từ {d} (−5.373 đ, −21,31% so với kỳ 22/10)" in text
+    assert "GIÁ XĂNG DẦU" not in compose(**INPUTS, held=set(), watched=set(), today=SAT, fuel=[])

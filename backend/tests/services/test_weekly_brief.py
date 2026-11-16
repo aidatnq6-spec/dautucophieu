@@ -139,3 +139,10 @@ def test_the_marks_are_kept_once_the_note_is_sent(tmp_path):
     weekly_brief_run(tmp_path, inputs=got, send=lambda t: True, now=datetime(2026, 10, 31, 1, 30, tzinfo=timezone.utc))
     state = json.loads((tmp_path / "alerts" / "weekly.json").read_text(encoding="utf-8"))
     assert state["signs"] == {"VCG": ["paper_income"]} and state["macro"] == {"vn_pmi": "2026-10-31"}
+
+
+def test_hand_entries_to_look_at_are_listed_or_the_note_says_there_are_none():
+    issues = [{"indicator": "vn10y", "label": "Lợi suất TPCP 10 năm", "date": "2026-10-25", "value": "4.58", "reasons": ["ngày không có phiên giao dịch"]}]
+    text = compose(**INPUTS, held=set(), watched=set(), today=SAT, manual=issues)
+    assert "DỮ LIỆU NHẬP TAY CẦN XEM\n- Lợi suất TPCP 10 năm, 25/10/2026 = 4,58: ngày không có phiên giao dịch" in text
+    assert "DỮ LIỆU NHẬP TAY CẦN XEM\nKhông có dòng nhập tay bất thường." in compose(**INPUTS, held=set(), watched=set(), today=SAT, manual=[])

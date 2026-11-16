@@ -35,16 +35,8 @@ VN = ZoneInfo("Asia/Ho_Chi_Minh")
 
 
 def _is_session(day) -> bool:
-    """HOSE's official calendar of that year when the app has it; otherwise every weekday counts (nothing is guessed beyond that)."""
-    from investment_agent.cli import load_calendar
-    from investment_agent.domain.pinned import CONFIG_DIR
-    path = CONFIG_DIR / f"trading-calendar-hose-{day.year}.json"
-    if path.is_file():
-        try:
-            return load_calendar(path).is_session(day)
-        except ValueError:
-            pass
-    return day.weekday() < 5
+    from investment_agent.market.sessions import is_session
+    return is_session(day)
 
 
 class ManualObservation(ContractModel):

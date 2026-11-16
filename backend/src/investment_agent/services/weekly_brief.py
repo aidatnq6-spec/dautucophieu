@@ -164,7 +164,7 @@ def _macro(macro: dict) -> list[str]:
 def compose(*, series, index, briefs, closes, insider, events, alerts, held: set[str], watched: set[str], today: date,
             sessions: list[date] | None = None, theses: list[dict] | None = None, costs: dict[str, str] | None = None,
             shares: dict[str, int] | None = None, todo: list[str] | None = None, signs: dict | None = None, macro: dict | None = None,
-            sources: list[dict] | None = None) -> str:
+            sources: list[dict] | None = None, manual: list[dict] | None = None) -> str:
     start, end = week_of(today)
     sessions = sessions if sessions is not None else [start + timedelta(days=i) for i in range(5)]
     lines = [f"BẢN TIN TUẦN {_dm(start)}–{_dm(end)}/{end.year}", "",
@@ -203,6 +203,10 @@ def compose(*, series, index, briefs, closes, insider, events, alerts, held: set
     if sources is not None:
         lines += ["", "NGUỒN SỐ LIỆU", *([f"- {g['source']} lỗi {g['fails']} lượt liên tiếp: {', '.join(g['labels'])}" for g in sources]
                                         or ["Mọi nguồn đều lấy được ở lượt gần nhất."])]
+    if manual is not None:
+        lines += ["", "DỮ LIỆU NHẬP TAY CẦN XEM",
+                  *([f"- {m['label']}, {date.fromisoformat(m['date']).strftime('%d/%m/%Y')} = {_plain(m['value'])}: {'; '.join(m['reasons'])}"
+                     for m in manual] or ["Không có dòng nhập tay bất thường."])]
     if todo:
         lines += ["", "VIỆC CẦN XEM", *[f"- {t}" for t in todo]]
     lines += ["", "Nguồn: dữ liệu phần mềm đã lưu (Vnstock, VNDirect). Chỉ để theo dõi. Không phải khuyến nghị."]

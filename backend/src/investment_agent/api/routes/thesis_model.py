@@ -56,6 +56,41 @@ def _view(request: Request, symbol: str, models: dict, version: int) -> dict:
                        reference=reference)}
 
 
+UPCOMING_DAYS = 90
+
+
+@router.get("/theses/catalysts")
+def coming_catalysts(request: Request):
+    """Mốc sắp tới: every watched ticker's own catalysts not yet happened (dated within 90 days, overdue ones marked, undated ones too)
+    and the automatic ones (coming corporate events, the next report deadline), on one timeline. Read here, shown only to the owner."""
+    from datetime import timedelta
+
+    from investment_agent.market.statements import StatementStore
+    from investment_agent.services import thesis_auto
+    owner, repo, data_dir = require_owner(request), request.app.state.personal_repository, request.app.state.data_dir
+    if repo is None or data_dir is None:
+        return unavailable()
+    try:
+        models, _ = read_models(repo, owner)
+    except RepositoryUnavailable:
+        return unavailable()
+    today = now(request).astimezone(VN).date()
+    until, items = (today + timedelta(days=UPCOMING_DAYS)).isoformat(), []
+    for symbol in load_watchlist(Path(data_dir)).symbols:
+        own = (models.get(symbol) or {}).get("catalysts") or []
+        for c in own:
+            if c.get("done") or (c.get("on") and c["on"] > until):
+                continue
+            items.append({**c, "symbol": symbol, "auto": False, "due": bool(c.get("on")) and c["on"] <= today.isoformat()})
+        record = StatementStore(Path(data_dir) / "statements").read(symbol) or StatementStore(Path(data_dir) / "statements-financial").read(symbol) or {}
+        kept = {c["id"] for c in own}
+        for c in thesis_auto.catalysts(Path(data_dir), symbol, record.get("quarters") or {}, today=today):
+            if c["id"] not in kept and c["on"] <= until:
+                items.append({**c, "symbol": symbol, "auto": True, "due": False})
+    items.sort(key=lambda c: (c["on"] or "9999", c["symbol"], c["text"]))
+    return {"days": UPCOMING_DAYS, "items": items}
+
+
 @router.get("/stock/{symbol}/model")
 def get_model(symbol: str, request: Request):
     owner, repo = require_owner(request), request.app.state.personal_repository

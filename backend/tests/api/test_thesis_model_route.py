@@ -107,3 +107,21 @@ def test_insider_and_valuation_facts_read_as_sentences(tmp_path):
 def test_an_event_line_is_tidied_for_the_page():
     from investment_agent.services.thesis_auto import _tidy
     assert _tidy("Niêm yết bổ sung - Số lượng 10,864,000 CP · GDKHQ chưa có ngày") == "Niêm yết bổ sung - Số lượng 10.864.000 CP"
+
+
+def test_coming_catalysts_of_every_watched_ticker_are_listed_on_one_timeline(tmp_path):
+    c, clock = setup(tmp_path)  # today 2027-01-15; PHP's last quarter 2026-Q3, so 2026-Q4's report is due 20/01/2027
+    before = call(c, clock, "GET", "/internal/theses/catalysts").json()["items"]  # before any model: the automatic ones only
+    assert before and all(i["auto"] for i in before)
+    cats = [{"id": "c1", "when": "Q4/2026", "on": "2027-01-10", "sign": "+", "text": "Bàn giao hạ tầng đợt 3", "source": "ĐHĐCĐ"},
+            {"id": "c2", "when": "Q3/2027", "on": "2027-08-01", "sign": "+", "text": "Xa hơn 90 ngày", "source": ""},
+            {"id": "c3", "when": "2027", "on": None, "sign": "?", "text": "Chưa có ngày", "source": ""},
+            {"id": "c4", "when": "Q4/2026", "on": "2027-01-12", "sign": "-", "text": "Đã xảy ra", "source": "", "done": True}]
+    call(c, clock, "PUT", "/internal/stock/PHP/model", {"scenarios": [], "indicators": [], "catalysts": cats, "expected_version": 0, "request_id": "u1"})
+    body = call(c, clock, "GET", "/internal/theses/catalysts").json()
+    assert body["days"] == 90
+    rows = [(i["symbol"], i["text"], i["due"], i["auto"]) for i in body["items"]]
+    assert ("PHP", "Bàn giao hạ tầng đợt 3", True, False) in rows and ("PHP", "Chưa có ngày", False, False) in rows
+    assert not any(t in ("Xa hơn 90 ngày", "Đã xảy ra") for _, t, _, _ in rows)
+    auto = [i for i in body["items"] if i["auto"]]
+    assert auto and auto[0]["on"] == "2027-01-20" and auto[0]["symbol"] == "PHP" and "Hạn công bố báo cáo tài chính" in auto[0]["text"]

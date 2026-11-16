@@ -20,8 +20,8 @@ export function daysText(days: number | null, done: boolean): string {
 
 /** Mốc và sự kiện as a timeline: the day (and the quarter it stands for), how far away, the sign as a coloured label, the event, its source.
  * In the editor each one also carries its buttons (actions) and a label when its day has come (due). */
-export function CatalystTimeline({ items, today, label, due = [], actions }: { items: Item[]; today: string; label?: string; due?: string[];
-  actions?: (c: Item) => ReactNode }) {
+export function CatalystTimeline({ items, today, label, due = [], actions, lead }: { items: Item[]; today: string; label?: string; due?: string[];
+  actions?: (c: Item) => ReactNode; lead?: (c: Item) => ReactNode }) {
   if (!items.length) return <p className="muted">Chưa có mốc.</p>;
   return (
     <ol className="ct-list" aria-label={label}>{timeline(items, today).map((c) => <li key={c.id} className={c.done ? "ct-item ct-done" : "ct-item"}>
@@ -29,7 +29,7 @@ export function CatalystTimeline({ items, today, label, due = [], actions }: { i
         {c.on && c.when && !c.when.includes("/") ? <span>{c.when}</span> : c.on && c.when && c.when !== dmy(c.on) ? <span>{c.when}</span> : null}
         <span className="ct-days">{daysText(c.days, c.done)}</span></div>
       <div className="ct-body">
-        <div><span className={`pill ct-sign ${SIGN[c.sign][1]}`}>{SIGN[c.sign][0]}</span>{c.auto && <span className="pill ct-auto">tự động</span>}
+        <div>{lead?.(c)}<span className={`pill ct-sign ${SIGN[c.sign][1]}`}>{SIGN[c.sign][0]}</span>{c.auto && <span className="pill ct-auto">tự động</span>}
           {due.includes(c.id) && <span className="pill warn">đã đến mốc</span>}</div>
         <p className="ct-text">{c.text}</p>
         {c.source && <p className="caption">Nguồn: {c.source}</p>}

@@ -48,6 +48,8 @@ def main() -> int:
     tl.add_argument("--data-dir", type=Path, required=True)
     bp = commands.add_parser("buy-plan-check", help="after the close, one Telegram note for the planned tranches whose condition is now met")
     bp.add_argument("--data-dir", type=Path, required=True)
+    sa = commands.add_parser("source-alerts", help="one Telegram note when a public source failed three macro runs in a row, and when it is back")
+    sa.add_argument("--data-dir", type=Path, required=True)
     la = commands.add_parser("liquidity-alerts", help="one Telegram note when the overnight interbank rate jumps or the bank USD rate nears the ceiling")
     la.add_argument("--data-dir", type=Path, required=True)
     me = commands.add_parser("macro-events-remind", help="one Telegram note the day before the owner's macro events marked for a reminder")
@@ -164,6 +166,8 @@ def main() -> int:
         return thesis_lights_cli(args.data_dir)
     if args.command == "buy-plan-check":
         return buy_plan_cli(args.data_dir)
+    if args.command == "source-alerts":
+        return source_alerts_cli(args.data_dir)
     if args.command == "liquidity-alerts":
         return liquidity_alerts_cli(args.data_dir)
     if args.command == "macro-events-remind":
@@ -488,6 +492,11 @@ def macro_sync(data_dir: Path, get=None, slow_get=None, sleep=None, get_bytes=No
         sleep(MACRO_SLOW_PAUSE)
         results.update(fetch_auto(slow, MacroStore(data_dir), get=slow_get, sleep=sleep))
     failed = {k: v for k, v in results.items() if v != "ok"}
+    # every source of this run, for Nhắc lỗi nguồn (source-alerts counts runs in a row)
+    from datetime import datetime, timezone
+    last = Path(data_dir) / "macro" / "_last_run.json"
+    last.parent.mkdir(parents=True, exist_ok=True)
+    last.write_text(json.dumps({"at": datetime.now(timezone.utc).isoformat(), "results": results}), encoding="utf-8")
     print(json.dumps({"status": "ok" if not failed else "partial", "results": results}))
     return 0 if not failed else 1
 
@@ -991,6 +1000,16 @@ def buy_plan_cli(data_dir: Path) -> int:
     out = check_plan(repo, owner, data_dir, send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date(),
                      request_id=f"buy-plan-{uuid.uuid4().hex[:16]}")
     print(json.dumps(out))  # counts only, never the plan
+    return 0
+
+
+def source_alerts_cli(data_dir: Path) -> int:
+    """Nhắc lỗi nguồn; while scheduled delivery is off nothing is sent but the counts still move, and the note goes once delivery is on."""
+    from investment_agent.services.source_alerts import check_sources, macro_labels
+
+    telegram = _scheduled_telegram(data_dir)
+    out = check_sources(data_dir, send=telegram[0] if telegram else (lambda text: False), labels=macro_labels())
+    print(json.dumps(out))
     return 0
 
 

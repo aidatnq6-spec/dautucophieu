@@ -25,8 +25,9 @@ export function AiStatusSection() {
           <li>Đã dùng tháng {s.spend.month.slice(5)}/{s.spend.month.slice(0, 4)}: <strong>{usd(s.spend.used_usd)} / {Number(s.policy.monthly_usd).toLocaleString("vi-VN")} USD</strong>
             {" "}<span className="caption">({s.spend.calls} lượt gọi)</span></li>
         </ul>
-        <p>Chỉ dùng cho tab Nhận định: AI đọc nội dung báo cáo vĩ mô, ngành công khai (ACBS, World Bank). Bản tin sau phiên dùng số liệu đã kiểm chứng, không gọi AI.</p>
-        <p className="notice">Không gửi danh mục, mã đang nắm, danh sách theo dõi hay kết quả định giá cho AI. Đổi model hoặc ngân sách trong config/ai-policy.json.</p>
+        <p>Dùng cho tab Nhận định (AI đọc báo cáo vĩ mô, ngành công khai: ACBS, World Bank) và &quot;Hỏi AI về tài liệu&quot; trên trang mã (tài liệu công khai của
+          doanh nghiệp; chỉ gửi mã của trang, câu hỏi đã lọc và đoạn trích tài liệu). Bản tin sau phiên dùng số liệu đã kiểm chứng, không gọi AI.</p>
+        <p className="notice">Không gửi danh mục, giá vốn, danh sách theo dõi, kết quả định giá hay số liệu cá nhân cho AI. Đổi model hoặc ngân sách trong config/ai-policy.json.</p>
       </>}
     </section>
   );

@@ -104,6 +104,9 @@ def test_cli_macro_sync_writes_automatic_indicators(tmp_path, capsys):
     assert MacroStore(tmp_path).read("us10y")[-1]["value"] == "4.96"
     out = capsys.readouterr().out
     assert '"us10y": "ok"' in out and '"omo": "error:OSError"' in out  # the open-market page is read on every run too
+    import json
+    last = json.loads((tmp_path / "macro" / "_last_run.json").read_text(encoding="utf-8"))  # for Nhắc lỗi nguồn: every source of the run
+    assert last["results"]["us10y"] == "ok" and last["results"]["omo"] == "error:OSError" and last["at"]
 
 
 def test_backup_includes_macro_observations(tmp_path):

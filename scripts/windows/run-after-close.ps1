@@ -33,6 +33,9 @@ if (Test-Path -LiteralPath $symbols) {
 # Public macro feeds (FRED, Vietcombank); a failing source is logged and the run continues.
 $macro = & $python -W ignore -m investment_agent.cli macro-sync --data-dir $data 2>$null
 "$(Get-Date -Format o) macro-sync exit=$LASTEXITCODE $macro" | Add-Content -LiteralPath $log -Encoding UTF8
+# Nhac loi nguon: one Telegram note when a public source failed three runs in a row, and one when it is back.
+$sa = & $python -W ignore -m investment_agent.cli source-alerts --data-dir $data 2>$null
+"$(Get-Date -Format o) source-alerts exit=$LASTEXITCODE $sa" | Add-Content -LiteralPath $log -Encoding UTF8
 # Nhac thanh khoan va ty gia: one Telegram note when the overnight interbank rate jumps or the Vietcombank rate nears the ceiling.
 $la = & $python -W ignore -m investment_agent.cli liquidity-alerts --data-dir $data 2>$null
 "$(Get-Date -Format o) liquidity-alerts exit=$LASTEXITCODE $la" | Add-Content -LiteralPath $log -Encoding UTF8

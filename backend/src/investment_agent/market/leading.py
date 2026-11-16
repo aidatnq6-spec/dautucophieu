@@ -428,6 +428,56 @@ def parse_sbv_m2(page: str) -> list[tuple[date, str]]:
     return [(date(y, mo, calendar.monthrange(y, mo)[1]), str(value))]
 
 
+# Tỷ giá trung tâm đầu năm: NHNN's page shows only the latest day, so the first week of a year is read once from the daily central-rate
+# article of Thị trường Tài chính Tiền tệ (the banking association's paper; robots.txt allows all but /search), found through its daily
+# sitemaps (checked 16/11/2026). One point on or before 7 January is all Thanh khoản và tỷ giá needs for the change since January.
+TTT_SITEMAP = "https://thitruongtaichinhtiente.vn/sitemap-article-{day}.xml"
+_TTT_CENTRAL = re.compile(r"(?is)ngày\s+(\d{1,2})/(\d{1,2}),\s*tỷ giá trung tâm.{0,250}?ở mức\s+([\d.]+)\s*(?:đồng|VND)")
+
+
+def parse_ttt_sitemap(xml: str) -> list[str]:
+    return [u for u in re.findall(r"<loc>([^<]+)</loc>", xml) if "ty-gia-trung-tam" in u]
+
+
+def parse_ttt_central(page: str) -> tuple[date, str] | None:
+    """The day's central rate from the article's own opening sentence ("Sáng ngày 6/1, tỷ giá trung tâm … ở mức 25.122 đồng")."""
+    m = _TTT_CENTRAL.search(unicodedata.normalize("NFC", _text(re.sub(r"(?is)<script.*?</script>|<style.*?</style>", " ", page))))
+    pub = re.search(r'"datePublished"\s*:\s*"(\d{4})-(\d{2})', page)
+    if not m or not pub:
+        return None
+    day, month, value = int(m.group(1)), int(m.group(2)), int(m.group(3).replace(".", ""))
+    year = int(pub.group(1)) - (1 if month > int(pub.group(2)) else 0)
+    if not 15_000 <= value <= 40_000:
+        return None
+    try:
+        return date(year, month, day), str(value)
+    except ValueError:
+        return None
+
+
+def fetch_central_baseline(store: "MacroStore", data_dir: Path, *, get: Callable[[str], str], today: date) -> str:
+    """"ok" when a central rate of 1–7 January of this year is stored (looked up once if needed), "waiting" before 8 January,
+    "not_found" when the first week had no article (that year is not searched again)."""
+    year = today.year
+    if any(date(year, 1, 1).isoformat() <= o["date"] <= date(year, 1, 7).isoformat() for o in store.read("usd_vnd_central")):
+        return "ok"
+    if today < date(year, 1, 8):
+        return "waiting"
+    marker = Path(data_dir) / "macro" / "_central_baseline.json"
+    tried = json.loads(marker.read_text(encoding="utf-8")).get("not_found", []) if marker.is_file() else []
+    if year in tried:
+        return "not_found"
+    for d in range(1, 8):
+        for url in parse_ttt_sitemap(get(TTT_SITEMAP.format(day=date(year, 1, d).isoformat()))):
+            found = parse_ttt_central(get(url))
+            if found and found[0].year == year and found[0].month == 1 and found[0].day <= 7:
+                store.upsert("usd_vnd_central", [found], entry="auto", source_url=url)
+                return "ok"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(json.dumps({"not_found": sorted({*tried, year})}), encoding="utf-8")
+    return "not_found"
+
+
 def parse_sbv_central(page: str) -> list[tuple[date, str]]:
     """The State Bank's central USD/VND rate, dated on the day it applies to (published the evening before, weekends included)."""
     m = _CENTRAL.search(_text(page))

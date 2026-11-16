@@ -48,6 +48,8 @@ def main() -> int:
     tl.add_argument("--data-dir", type=Path, required=True)
     bp = commands.add_parser("buy-plan-check", help="after the close, one Telegram note for the planned tranches whose condition is now met")
     bp.add_argument("--data-dir", type=Path, required=True)
+    ra = commands.add_parser("receivable-alerts", help="one Telegram note when a held ticker shows a receivable sign it did not show before")
+    ra.add_argument("--data-dir", type=Path, required=True)
     sa = commands.add_parser("source-alerts", help="one Telegram note when a public source failed three macro runs in a row, and when it is back")
     sa.add_argument("--data-dir", type=Path, required=True)
     la = commands.add_parser("liquidity-alerts", help="one Telegram note when the overnight interbank rate jumps or the bank USD rate nears the ceiling")
@@ -166,6 +168,8 @@ def main() -> int:
         return thesis_lights_cli(args.data_dir)
     if args.command == "buy-plan-check":
         return buy_plan_cli(args.data_dir)
+    if args.command == "receivable-alerts":
+        return receivable_alerts_cli(args.data_dir)
     if args.command == "source-alerts":
         return source_alerts_cli(args.data_dir)
     if args.command == "liquidity-alerts":
@@ -483,6 +487,14 @@ def macro_sync(data_dir: Path, get=None, slow_get=None, sleep=None, get_bytes=No
     results.update(fetch_factors(MacroStore(data_dir), get=get, sleep=sleep))  # long oil and US dollar history for the sensitivity reading
     results.update(fetch_commodities(MacroStore(data_dir), get=get, sleep=sleep))  # monthly world prices for Chuỗi giá trị
     results.update(fetch_chain_series(MacroStore(data_dir), get=get, get_bytes=get_bytes, sleep=sleep))  # urea, container throughput
+    from investment_agent.market.leading import fetch_central_baseline
+    try:  # Tỷ giá trung tâm đầu năm, once a year
+        from datetime import datetime as _dt
+        from zoneinfo import ZoneInfo as _Zone
+        results["central_baseline"] = fetch_central_baseline(MacroStore(data_dir), Path(data_dir), get=get,
+                                                             today=_dt.now(_Zone("Asia/Ho_Chi_Minh")).date())
+    except Exception as exc:
+        results["central_baseline"] = f"error:{type(exc).__name__}"
     from investment_agent.market.leading import _get_with_retry
     from investment_agent.market.omo import OmoStore, omo_sync
     # Nghiệp vụ thị trường mở: the page shows only the latest session, so each run keeps it (Thanh khoản hệ thống)
@@ -1000,6 +1012,22 @@ def buy_plan_cli(data_dir: Path) -> int:
     out = check_plan(repo, owner, data_dir, send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date(),
                      request_id=f"buy-plan-{uuid.uuid4().hex[:16]}")
     print(json.dumps(out))  # counts only, never the plan
+    return 0
+
+
+def receivable_alerts_cli(data_dir: Path) -> int:
+    """Nhắc dấu hiệu phải thu mới on held tickers; skipped while scheduled delivery is off. The held tickers are read here only."""
+    from investment_agent.services.drawdown import held_costs
+    from investment_agent.services.receivable_signs import SIGNS, receivable_signs
+    from investment_agent.services.sign_alerts import check_signs
+
+    telegram = _scheduled_telegram(data_dir)
+    if telegram is None:
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
+        return 0
+    send, repo, owner = telegram
+    out = check_signs(data_dir, rows=receivable_signs(data_dir), held=set(held_costs(repo, owner)), titles=dict(SIGNS), send=send)
+    print(json.dumps(out))
     return 0
 
 

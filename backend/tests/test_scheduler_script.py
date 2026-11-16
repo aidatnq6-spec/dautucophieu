@@ -69,6 +69,11 @@ def test_thesis_lights_are_checked_on_every_wake_up():
     assert any("investment_agent.cli thesis-lights" in l for l in lines())
 
 
+def test_receivable_sign_alerts_follow_the_statement_refresh():
+    ls = lines()
+    assert next(i for i, l in enumerate(ls) if "cli statements-sync" in l) < next(i for i, l in enumerate(ls) if "cli receivable-alerts" in l)
+
+
 def test_source_alerts_follow_the_macro_update():
     ls = lines()
     assert next(i for i, l in enumerate(ls) if "cli macro-sync" in l) < next(i for i, l in enumerate(ls) if "cli source-alerts" in l)

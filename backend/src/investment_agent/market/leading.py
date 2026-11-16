@@ -53,6 +53,10 @@ NSO_CPI = ("https://www.nso.gov.vn/wp-json/wp/v2/posts?categories=94&search=Ch%E
 # The State Bank's pages (robots.txt allows all, checked 15/11/2026): the day's central rate is in the page itself; /vi/ answers without
 # a redirect. Cục Thống kê's monthly socio-economic report (category 78) gives the trade balance and disbursed FDI.
 SBV_CENTRAL = "https://sbv.gov.vn/vi/t%E1%BB%B7-gi%C3%A1"
+# NHNN's Tổng phương tiện thanh toán và tiền gửi của khách hàng tại TCTD (readable again on 16/11/2026): only the latest month is shown,
+# so the history builds up from each run (stockbiz stays the fallback)
+SBV_M2 = ("https://sbv.gov.vn/vi/t%E1%BB%95ng-ph%C6%B0%C6%A1ng-ti%E1%BB%87n-thanh-to%C3%A1n-v%C3%A0-ti%E1%BB%81n-g%E1%BB%ADi-c%E1%BB%A7a-"
+          "kh%C3%A1ch-h%C3%A0ng-t%E1%BA%A1i-tctd")
 # CafeF's PMI topic page (robots.txt allows all, checked 15/11/2026): each month's article on S&P Global's Vietnam PMI opens with the
 # figure ("PMI ngành sản xuất Việt Nam đạt 52,3 điểm trong tháng 10/2026"); only months not stored yet are opened, three per run.
 CAFEF_PMI = "https://cafef.vn/pmi.html"
@@ -410,6 +414,20 @@ def _vn_number(raw: str) -> Decimal:
 _CENTRAL = re.compile(r"(?is)áp dụng cho ngày\s+(\d{1,2})/(\d{1,2})/(\d{4}).{0,400}?1\s+Đô la Mỹ\s*=\s*([\d.]+)\s*VND")
 
 
+_SBV_M2 = re.compile(r"(?is)THÁNG\s+(\d{1,2})\s+NĂM\s+(\d{4}).{0,600}?Tổng phương tiện thanh toán\s*\(\*\)\s*([\d.]+)")
+
+
+def parse_sbv_m2(page: str) -> list[tuple[date, str]]:
+    """The latest month's money supply (tỷ đồng) from NHNN's statistics page, dated to the month's end."""
+    m = _SBV_M2.search(unicodedata.normalize("NFC", _text(page)))
+    if not m:
+        raise MacroError("sbv_m2_unreadable")
+    y, mo, value = int(m.group(2)), int(m.group(1)), int(m.group(3).replace(".", ""))
+    if not 1 <= mo <= 12 or not 1_000_000 <= value <= 1_000_000_000:
+        raise MacroError("sbv_m2_out_of_range")
+    return [(date(y, mo, calendar.monthrange(y, mo)[1]), str(value))]
+
+
 def parse_sbv_central(page: str) -> list[tuple[date, str]]:
     """The State Bank's central USD/VND rate, dated on the day it applies to (published the evening before, weekends included)."""
     m = _CENTRAL.search(_text(page))
@@ -616,6 +634,8 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
             points = parse_te_pmi(page(TE_PAGE.format(country=src["country"])), year=today.year)
         elif src["kind"] == "ecb_dxy":
             points = parse_ecb_dxy(page(ECB_90D))
+        elif src["kind"] == "sbv_m2":
+            points = parse_sbv_m2(page(SBV_M2))
         elif src["kind"] == "sbv_central":
             points = parse_sbv_central(page(SBV_CENTRAL))
         elif src["kind"] == "nso_report":

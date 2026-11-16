@@ -51,6 +51,15 @@ test("Kho tiền ranks the watched non-financial tickers by net cash against mar
   await expect(box.getByRole("table", { name: "Xếp hạng kho tiền" })).not.toContainText("VCB");  // banks are left out
 });
 
+test("Dấu hiệu phải thu gathers the receivable signs of the watched non-financial tickers", async ({ page }) => {
+  await page.goto("/sectors");
+  const box = page.getByRole("region", { name: "Dấu hiệu phải thu" });
+  await expect(box).toContainText("mã có ít nhất một dấu hiệu");
+  await box.getByRole("button", { name: "Hiện mọi mã" }).click();
+  await expect(box.getByRole("table", { name: "Bảng dấu hiệu phải thu" }).getByRole("link", { name: "FPT" })).toBeVisible();
+  await expect(box.getByRole("table", { name: "Bảng dấu hiệu phải thu" })).not.toContainText("VCB");  // banks are left out
+});
+
 test("the in-session market page no longer carries the value chains, and points to them", async ({ page }) => {
   await page.goto("/market");
   await expect(page.getByRole("region", { name: "Chuỗi giá trị", exact: true })).toHaveCount(0);

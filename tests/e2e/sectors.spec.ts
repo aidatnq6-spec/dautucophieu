@@ -56,8 +56,19 @@ test("Dấu hiệu phải thu gathers the receivable signs of the watched non-fi
   const box = page.getByRole("region", { name: "Dấu hiệu phải thu" });
   await expect(box).toContainText("mã có ít nhất một dấu hiệu");
   await box.getByRole("button", { name: "Hiện mọi mã" }).click();
-  await expect(box.getByRole("table", { name: "Bảng dấu hiệu phải thu" }).getByRole("link", { name: "FPT" })).toBeVisible();
-  await expect(box.getByRole("table", { name: "Bảng dấu hiệu phải thu" })).not.toContainText("VCB");  // banks are left out
+  const list = box.getByRole("list", { name: "Dấu hiệu phải thu theo mã" });
+  await expect(list.getByRole("link", { name: "FPT" })).toBeVisible();
+  await expect(list).not.toContainText("VCB");  // banks are left out
+});
+
+test("Dấu hiệu phải thu reads without a sideways scroll on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  await page.goto("/sectors");
+  const box = page.getByRole("region", { name: "Dấu hiệu phải thu" });
+  await box.getByRole("button", { name: "Hiện mọi mã" }).click();
+  await expect(box.getByRole("list", { name: "Dấu hiệu phải thu theo mã" })).toBeVisible();
+  expect(await box.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
 
 test("the in-session market page no longer carries the value chains, and points to them", async ({ page }) => {

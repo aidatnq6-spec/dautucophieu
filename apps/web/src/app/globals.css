@@ -499,3 +499,7 @@ main h2{scroll-margin-top:16px}
 .theme-mobile{display:none}
 @media(max-width:650px){.theme-pick{margin:4px 0 6px;max-width:260px}.side .theme-pick{display:none}.theme-mobile{display:block}
   main.content a:not(.btn){position:relative}main.content a:not(.btn)::after{content:"";position:absolute;inset:-6px 0}}
+/* Dấu hiệu phải thu: one block a ticker, its signs written out; no sideways scroll on any width */
+.rs-list{list-style:none;margin:8px 0;padding:0}.rs-item{padding:10px 0;border-bottom:1px solid var(--line);min-width:0}.rs-item:last-child{border-bottom:0}
+.rs-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px}.rs-head .muted{font-size:13px}
+.rs-signs{margin:6px 0 2px;padding-left:18px;font-size:13px}.rs-signs li{margin:3px 0;overflow-wrap:anywhere}

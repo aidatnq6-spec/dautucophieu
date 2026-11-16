@@ -23,7 +23,7 @@ def test_all_nine_criteria_pass_for_a_company_improving_on_every_line():
     assert [c["passed"] for c in f["criteria"]] == [True] * 9
     assert f["criteria"][0]["detail"] == "ROA 9,0% (lợi nhuận 9 tỷ / tài sản đầu kỳ 100 tỷ)"
     assert f["criteria"][6]["detail"] == "Không có đợt huy động vốn bằng cổ phiếu năm 2025 (cổ phiếu thưởng, cổ tức bằng cổ phiếu không tính)"
-    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None]  # no financial income or other receivables kept: not read
+    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None]  # financial income, other receivables, prepayments: not kept
 
 
 def test_a_capital_raise_and_worse_lines_fail_and_the_signs_show_their_numbers():
@@ -208,3 +208,24 @@ def test_large_other_receivables_are_a_sign_from_a_tenth_of_total_assets_or_doub
 def test_other_receivables_missing_leave_the_sign_unread():
     s = next(s for s in report_quality(STRONG, "Công nghệ Thông tin")["signs"] if s["id"] == "other_receivables")
     assert s["flag"] is None and "Thiếu phải thu khác" in s["detail"]
+
+
+def with_prepay(now, before=None):
+    rec = {"annual": {k: dict(v) for k, v in STRONG["annual"].items()}, "share_issues": STRONG["share_issues"]}  # total assets 105 / 100 tỷ
+    rec["annual"]["2025"]["prepay_suppliers"] = str(now * BN)
+    if before is not None:
+        rec["annual"]["2024"]["prepay_suppliers"] = str(before * BN)
+    return next(s for s in report_quality(rec, "Công nghệ Thông tin")["signs"] if s["id"] == "prepay_suppliers")
+
+
+def test_large_prepayments_to_suppliers_are_a_sign_from_a_tenth_of_total_assets_or_doubling():
+    big = with_prepay(11)
+    assert (big["flag"], big["label"]) == (True, "Trả trước người bán lớn")
+    assert big["detail"] == "Năm 2025: trả trước cho người bán 11 tỷ, bằng 10,5% tổng tài sản 105 tỷ"
+    assert big["rule"] == ("trả trước cho người bán (ngắn hạn) từ 10% tổng tài sản, hoặc gấp đôi năm trước khi năm trước đã từ 1% tổng tài sản; "
+                           "khoản này thu hồi bằng hàng hóa, dịch vụ chứ không bằng tiền")
+    assert with_prepay(7, 3)["flag"] is True and with_prepay(1, 0.4)["flag"] is False
+    calm = with_prepay(4, 3)
+    assert calm["flag"] is False and calm["detail"].endswith("; so với 3 tỷ năm 2024")
+    none = next(s for s in report_quality(STRONG, "Công nghệ Thông tin")["signs"] if s["id"] == "prepay_suppliers")
+    assert none["flag"] is None and "Thiếu trả trước cho người bán" in none["detail"]

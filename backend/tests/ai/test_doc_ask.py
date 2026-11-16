@@ -79,7 +79,10 @@ def test_proposed_rows_keep_only_amounts_found_on_their_page_converted_to_ty():
          "collect_within": None}]})
     rows, dropped = check_rows(out, passages, document_text=" ".join(PAGES))
     assert rows == [{"name": "Bên liên quan khác", "amount": "2953", "grouped": True, "related": True, "secured": False, "interest": False,
-                     "collect_within": None, "page": 3}]
+                     "collect_within": None, "kind": None, "page": 3}]
+    kinded = json.dumps({"unit": "triệu đồng", "rows": [{"name": "Bên liên quan khác", "amount_text": "2.953.000", "page": 3, "kind": "prepay",
+                                                         "related": True, "grouped": True}]})
+    assert check_rows(kinded, passages, document_text=" ".join(PAGES))[0][0]["kind"] == "prepay"
     assert dropped == [{"name": "Công ty Bịa", "reason": "amount_not_on_page"}]
     with pytest.raises(Unverified):  # a unit the document never states
         check_rows(json.dumps({"unit": "tỷ đồng", "rows": []}), passages, document_text=" ".join(PAGES))

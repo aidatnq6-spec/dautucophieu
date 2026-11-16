@@ -24,7 +24,7 @@ YEARS = {
 def test_a_named_party_dropped_the_next_year_is_found_with_the_group_that_may_hold_it():
     found = review(YEARS)["findings"]
     gone = [f for f in found if f["kind"] == "vanished"]
-    assert gone == [{"kind": "vanished", "year": "2020", "from_year": "2019", "name": "Công ty Alpha", "amount": "2820",
+    assert gone == [{"kind": "vanished", "year": "2020", "from_year": "2019", "name": "Công ty Alpha", "amount": "2820", "row_kind": None,
                      "group": {"name": "Bên liên quan khác", "amount": "2953"}}]  # the largest related group at least half its size
 
 
@@ -61,4 +61,20 @@ def test_a_year_needs_its_source_and_named_rows_with_amounts(source, rows, code)
 
 def test_a_valid_year_is_kept_with_names_trimmed_and_amounts_as_typed():
     year = validate_year(" BCTC 2020 ", [row(" Công ty A ", "1.234,5")])
-    assert year == {"source": "BCTC 2020", "rows": [row("Công ty A", "1234.5")]}
+    assert year == {"source": "BCTC 2020", "rows": [{**row("Công ty A", "1234.5"), "kind": None}]}  # a row saved before kinds: kind unknown
+
+
+def test_each_row_may_say_which_receivable_it_is():
+    year = validate_year("BCTC 2021, TM 6", [{**row("Công ty Wang Sea", "300", related=False), "kind": "prepay"}])
+    assert year["rows"][0]["kind"] == "prepay"
+    with pytest.raises(RelatedError) as exc:
+        validate_year("BCTC 2021", [{**row("A", "1"), "kind": "khac"}])
+    assert exc.value.code == "invalid_row"
+
+
+def test_a_named_supplier_dropped_the_next_year_is_found_too():
+    years = {"2021": {"source": "BCTC 2021", "rows": [{**row("Công ty Wang Sea", "300", related=False), "kind": "prepay"}]},
+             "2022": {"source": "BCTC 2022", "rows": [{**row("Các nhà cung cấp khác", "1493", grouped=True, related=False), "kind": "prepay"}]}}
+    gone = [f for f in review(years)["findings"] if f["kind"] == "vanished"]
+    assert gone == [{"kind": "vanished", "year": "2022", "from_year": "2021", "name": "Công ty Wang Sea", "amount": "300", "row_kind": "prepay",
+                     "group": {"name": "Các nhà cung cấp khác", "amount": "1493"}}]

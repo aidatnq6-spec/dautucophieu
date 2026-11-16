@@ -3,10 +3,12 @@ import { useEffect, useState } from "react";
 import { ApiError, api, requestId } from "../lib/api";
 
 export type RrRow = { name: string; amount: string; grouped: boolean; related: boolean; secured: boolean | null; interest: boolean | null;
-  collect_within: string | null };
+  collect_within: string | null; kind?: RrKind | null };
+export type RrKind = "customer" | "prepay" | "other" | "loan";
+export const KIND: Record<RrKind, string> = { customer: "Phải thu khách hàng", prepay: "Trả trước người bán", other: "Phải thu khác", loan: "Cho vay" };
 type Year = { year: string; source: string; rows: RrRow[]; related_total: string; named_related: string };
 export type Finding =
-  | { kind: "vanished"; year: string; from_year: string; name: string; amount: string; group: { name: string; amount: string } | null }
+  | { kind: "vanished"; year: string; from_year: string; name: string; amount: string; row_kind?: RrKind | null; group: { name: string; amount: string } | null }
   | { kind: "not_collected"; year: string; name: string; before: string; now: string; promised: string }
   | { kind: "unsecured_free"; year: string; name: string; amount: string };
 type View = { symbol: string; version: number; years: Year[]; findings: Finding[] };
@@ -24,16 +26,18 @@ export function proposalNote(p: Proposal): string {
   return `${kept}${left} Chi phí ${p.cost_usd} USD.`;
 }
 
-type Draft = { name: string; amount: string; grouped: boolean; related: boolean; secured: "" | "yes" | "no"; interest: "" | "yes" | "no"; collect_within: string };
+type Draft = { name: string; amount: string; grouped: boolean; related: boolean; secured: "" | "yes" | "no"; interest: "" | "yes" | "no"; collect_within: string;
+  kind: "" | RrKind };
 
 export const ty = (v: string) => `${Number(v).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tỷ`;
 const tri = (v: boolean | null) => (v === null ? "—" : v ? "có" : "không");
-const EMPTY: Draft = { name: "", amount: "", grouped: false, related: true, secured: "", interest: "", collect_within: "" };
+const EMPTY: Draft = { name: "", amount: "", grouped: false, related: true, secured: "", interest: "", collect_within: "", kind: "" };
 
 /** One finding in words. */
 export function findingText(f: Finding): string {
   if (f.kind === "vanished") {
-    return `${f.name} (${ty(f.amount)} năm ${f.from_year}) không còn được nêu tên năm ${f.year}`
+    const what = f.row_kind === "prepay" ? " (nhà cung cấp được nêu tên trong thuyết minh trả trước)" : "";
+    return `${f.name}${what} (${ty(f.amount)} năm ${f.from_year}) không còn được nêu tên năm ${f.year}`
       + (f.group ? `; có thể đã nằm trong dòng gộp "${f.group.name}" (${ty(f.group.amount)}).` : ".")
       + " Đọc thuyết minh năm trước để biết đối tượng và hỏi khoản này đã thu chưa.";
   }
@@ -44,9 +48,9 @@ export function findingText(f: Finding): string {
 }
 
 const toDraft = (r: RrRow): Draft => ({ name: r.name, amount: r.amount.replace(".", ","), grouped: r.grouped, related: r.related,
-  secured: r.secured === null ? "" : r.secured ? "yes" : "no", interest: r.interest === null ? "" : r.interest ? "yes" : "no", collect_within: r.collect_within ?? "" });
+  secured: r.secured === null ? "" : r.secured ? "yes" : "no", interest: r.interest === null ? "" : r.interest ? "yes" : "no", collect_within: r.collect_within ?? "", kind: r.kind ?? "" });
 const fromDraft = (d: Draft) => ({ name: d.name, amount: d.amount, grouped: d.grouped, related: d.related,
-  secured: d.secured === "" ? null : d.secured === "yes", interest: d.interest === "" ? null : d.interest === "yes", collect_within: d.collect_within || null });
+  secured: d.secured === "" ? null : d.secured === "yes", interest: d.interest === "" ? null : d.interest === "yes", collect_within: d.collect_within || null, kind: d.kind || null });
 
 /** Sổ phải thu bên liên quan: the owner copies each year's notes; the app sets the years side by side and says what a later year stops naming. */
 export function RelatedReceivables({ symbol }: { symbol: string }) {
@@ -92,7 +96,7 @@ export function RelatedReceivables({ symbol }: { symbol: string }) {
   return (
     <section className="surface" aria-label="Phải thu bên liên quan">
       <h2>Phải thu bên liên quan</h2>
-      <p className="caption">Chép từ thuyết minh phải thu và giao dịch với bên liên quan của từng năm (đơn vị tỷ đồng, kèm nguồn). Phần mềm đặt các năm cạnh nhau
+      <p className="caption">Chép từ thuyết minh phải thu, trả trước cho người bán (các nhà cung cấp chiếm từ 10% được nêu tên) và giao dịch với bên liên quan của từng năm (đơn vị tỷ đồng, kèm nguồn). Phần mềm đặt các năm cạnh nhau
         và báo khi một đối tượng có tên năm trước không còn được nêu năm sau, khi khoản hứa thu trong hạn vẫn còn từ một nửa, và khoản bên liên quan không bảo đảm,
         không lãi. Số do bạn nhập; lưu trên máy, không gửi đi đâu.</p>
       {view.findings.length > 0 && <ul className="quality-list" data-testid="rr-findings">{view.findings.map((f, i) => (
@@ -102,10 +106,11 @@ export function RelatedReceivables({ symbol }: { symbol: string }) {
         <div key={y.year} className="rr-year">
           <h3>Năm {y.year} <span className="caption">— {y.source}</span></h3>
           <div className="tablewrap"><table className="fv-table" aria-label={`Phải thu bên liên quan năm ${y.year}`}>
-            <thead><tr><th>Đối tượng</th><th className="num">Số dư</th><th>Bên liên quan</th><th>Bảo đảm</th><th>Có lãi</th><th>Hạn thu</th></tr></thead>
+            <thead><tr><th>Đối tượng</th><th>Loại</th><th className="num">Số dư</th><th>Bên liên quan</th><th>Bảo đảm</th><th>Có lãi</th><th>Hạn thu</th></tr></thead>
             <tbody>{y.rows.map((r) => (
               <tr key={r.name}>
                 <td data-label="Đối tượng">{r.name}{r.grouped && <span className="caption"> (dòng gộp)</span>}</td>
+                <td data-label="Loại">{r.kind ? KIND[r.kind] : "—"}</td>
                 <td className="num" data-label="Số dư">{ty(r.amount)}</td>
                 <td data-label="Bên liên quan">{r.related ? "có" : "không"}</td>
                 <td data-label="Bảo đảm">{tri(r.secured)}</td>
@@ -135,6 +140,8 @@ export function RelatedReceivables({ symbol }: { symbol: string }) {
               <option value="">Không rõ</option><option value="yes">Có</option><option value="no">Không</option></select></label>
             <label className="field">Có lãi<select aria-label={`Có lãi dòng ${i + 1}`} value={r.interest} onChange={(e) => setRow(i, { interest: e.target.value as Draft["interest"] })}>
               <option value="">Không rõ</option><option value="yes">Có</option><option value="no">Không</option></select></label>
+            <label className="field">Loại<select aria-label={`Loại dòng ${i + 1}`} value={r.kind} onChange={(e) => setRow(i, { kind: e.target.value as Draft["kind"] })}>
+              <option value="">Không rõ</option>{(Object.keys(KIND) as RrKind[]).map((k) => <option key={k} value={k}>{KIND[k]}</option>)}</select></label>
             <label className="field">Hạn thu<input aria-label={`Hạn thu dòng ${i + 1}`} maxLength={60} placeholder="6–12 tháng" value={r.collect_within}
               onChange={(e) => setRow(i, { collect_within: e.target.value })} /></label>
             {rows.length > 1 && <button type="button" className="btn text" onClick={() => setRows(rows.filter((_, k) => k !== i))}>Bỏ dòng {i + 1}</button>}

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { chainSummary, fitLabel } from "./us-chain";
+import { chainSummary, fitLabel, premiumText } from "./us-chain";
+
+describe("premiumText", () => {
+  it("says how far SJC sells above the world price in đồng a chỉ", () => {
+    expect(premiumText({ world_per_chi: "12125065", sjc_sell: "13750000", gap: "1624935", gap_pct: "0.1340", xau_date: "2026-11-16",
+      fx_date: "2026-11-16", sjc_as_of: "2026-11-16T18:00:00+07:00" }))
+      .toBe("Vàng miếng SJC bán ra 13.750.000 đ/chỉ, cao hơn giá thế giới quy đổi 12.125.065 đ/chỉ là 1.624.935 đ (+13,4%)");
+  });
+});
 
 describe("chainSummary", () => {
   it("names the chain's way, then the links with it, against it, flat and missing", () => {

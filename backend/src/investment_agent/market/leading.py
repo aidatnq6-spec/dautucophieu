@@ -41,6 +41,9 @@ TE_PAGE = "https://tradingeconomics.com/{country}/manufacturing-pmi"
 # Earlier sources (robots.txt allows each): WTI front-month futures 10 minutes late; the State Bank's own interbank rates, out about 05:30
 # the next morning; the US Treasury's daily yield curve, out the same US afternoon. Each keeps its older source as a fallback.
 OILPRICE_PAGE = "https://oilprice.com/oil-price-charts/"
+# gold-api.com: the live price endpoint is free, without a key or a rate limit (terms of 10/09/2026; no robots.txt); its history needs a
+# paid key, so the app keeps its own daily series from the live price.
+GOLD_API = "https://api.gold-api.com/price/XAU"
 SBV_INTERBANK = "https://sbv.gov.vn/o/headless-delivery/v1.0/content-structures/3450260/structured-contents?pageSize=30&sort=datePublished:desc"
 TREASURY_CSV = ("https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/{year}/all"
                 "?type=daily_treasury_yield_curve&field_tdr_date_value={year}&page&_format=csv")
@@ -166,6 +169,22 @@ def _grouped(raw: str) -> str:
     if re.fullmatch(r"\d{1,3}(?:[.,]\d{3})+", raw):
         return re.sub(r"[.,]", "", raw)
     return raw.replace(".", "").replace(",", ".") if raw.count(",") == 1 else raw
+
+
+def parse_gold_api(text: str) -> list[tuple[date, str]]:
+    """XAU/USD from gold-api.com, dated on the Vietnam day it was taken."""
+    from zoneinfo import ZoneInfo
+    try:
+        data = json.loads(text)
+        if data.get("symbol") != "XAU" or data.get("currency", "USD") != "USD":
+            raise ValueError("not XAU/USD")
+        price = Decimal(str(data["price"]))
+        at = datetime.fromisoformat(str(data["updatedAt"]).replace("Z", "+00:00"))
+    except (ValueError, KeyError, TypeError, ArithmeticError) as exc:
+        raise MacroError("gold_api_unreadable") from exc
+    if price <= 0:
+        raise MacroError("gold_api_unreadable")
+    return [(at.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date(), str(price.quantize(Decimal("0.01"), ROUND_HALF_UP)))]
 
 
 def parse_oilprice(page: str, *, blend: str) -> list[tuple[date, str]]:
@@ -662,6 +681,8 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
             return points or None
         if src["kind"] == "oilprice":
             points = parse_oilprice(page(OILPRICE_PAGE), blend=src["blend"])
+        elif src["kind"] == "gold_api":
+            points = parse_gold_api(page(GOLD_API))
         elif src["kind"] == "sbv_interbank":
             points = parse_sbv_interbank(page(SBV_INTERBANK), term=src["term"])
         elif src["kind"] == "treasury":

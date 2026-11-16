@@ -21,7 +21,7 @@ def test_macro_lists_every_indicator(tmp_path):
     MacroStore(tmp_path).upsert("us10y", [(date(2026, 10, 21), "4.91"), (date(2026, 10, 23), "4.96")], entry="auto")
     body = call(client(tmp_path, clock), clock, "GET", "/internal/macro").json()
     rows = {r["id"]: r for r in body["rows"]}
-    assert len(rows) == 29 and "us_core_cpi_yoy" in rows and rows["us10y"]["assessment"] == "Xấu" and rows["vn_pmi"]["value"] is None
+    assert len(rows) == 30 and "us_core_cpi_yoy" in rows and rows["us10y"]["assessment"] == "Xấu" and rows["vn_pmi"]["value"] is None
 
 
 def test_owner_enters_a_manual_value_with_its_source(tmp_path):
@@ -141,4 +141,20 @@ def test_the_week_chain_reads_us_inflation_rates_dxy_gold_and_the_dong(tmp_path)
                                                      encoding="utf-8")
     body = call(client(tmp_path, clock), clock, "GET", "/internal/macro/us-chain").json()
     assert body["mode"] == "tightening" and body["with"] == ["us_rates", "dxy", "gold"] and body["flat"] == ["usd_vnd"]
-    assert {n["id"]: n.get("label") for n in body["nodes"]}["gold"] == "Vàng miếng SJC (giá mua vào của Phú Quý, đồng/chỉ)"
+    gold = {n["id"]: n for n in body["nodes"]}["gold"]
+    assert gold["label"] == "Vàng miếng SJC (giá mua vào của Phú Quý)" and gold["unit"] == "đ/chỉ" and gold.get("premium") is None
+
+
+def test_the_week_chain_takes_the_world_gold_price_once_a_week_of_it_is_kept_and_shows_the_sjc_gap(tmp_path):
+    import json
+    from datetime import timedelta
+    clock = Clock()  # 2027-01-15
+    store, today = MacroStore(tmp_path), date(2027, 1, 15)
+    store.upsert("xau_usd", [(today - timedelta(days=8), "3950"), (today, "3875.47")], entry="auto")
+    store.upsert("usd_vnd_vcb", [(today - timedelta(days=8), "25900"), (today, "25950")], entry="auto")
+    (tmp_path / "gold-price.json").write_text(json.dumps({"as_of": "2027-01-15T18:00:00+07:00", "unit": "chỉ",
+                                                          "kinds": {"Vàng miếng SJC": {"buy": "13450000", "sell": "13750000"}}}), encoding="utf-8")
+    body = call(client(tmp_path, clock), clock, "GET", "/internal/macro/us-chain").json()
+    gold = {n["id"]: n for n in body["nodes"]}["gold"]
+    assert gold["unit"] == "USD/oz" and gold["label"] == "Giá vàng thế giới XAU/USD (gold-api.com)" and gold["direction"] == "down"
+    assert gold["premium"]["world_per_chi"] == "12125065" and gold["premium"]["gap_pct"] == "0.1340"

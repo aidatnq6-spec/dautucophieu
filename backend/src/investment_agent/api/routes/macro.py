@@ -171,20 +171,30 @@ GOLD_KIND = "Vàng miếng SJC"
 @router.get("/us-chain")
 def us_week_chain(request: Request):
     """Chuỗi liên thị trường trong tuần: US CPI → US rates → DXY → gold → USD/VND, each link's move over the last week (domain.us_chain)."""
-    from investment_agent.domain.us_chain import us_chain
-    from investment_agent.market.gold_price import gold_history
+    from investment_agent.domain.us_chain import WEEK, gold_premium, us_chain
+    from investment_agent.market.gold_price import gold_history, gold_prices
     require_owner(request)
     store = _store(request)
     if store is None:
         return unavailable()
     series = {i: [(date.fromisoformat(o["date"]), Decimal(o["value"])) for o in store.read(i)]
-              for i in ("us_cpi_yoy", "us_core_cpi_yoy", "fed_effr", "us10y", "dxy", "usd_vnd_vcb")}
-    gold = gold_history(Path(request.app.state.data_dir)).get(GOLD_KIND) or {}
-    series["gold"] = sorted((date.fromisoformat(d), Decimal(v)) for d, v in gold.items())
+              for i in ("us_cpi_yoy", "us_core_cpi_yoy", "fed_effr", "us10y", "dxy", "usd_vnd_vcb", "xau_usd")}
+    world = series.pop("xau_usd")
+    # the world price once a week of it is kept (the app keeps it from 16/11/2026); until then Phú Quý's SJC price
+    use_world = bool(world) and any(d <= world[-1][0] - WEEK for d, _ in world)
+    if use_world:
+        series["gold"], label, unit = world, "Giá vàng thế giới XAU/USD (gold-api.com)", "USD/oz"
+    else:
+        kept = gold_history(Path(request.app.state.data_dir)).get(GOLD_KIND) or {}
+        series["gold"], label, unit = sorted((date.fromisoformat(d), Decimal(v)) for d, v in kept.items()), f"{GOLD_KIND} (giá mua vào của Phú Quý)", "đ/chỉ"
     out = us_chain(series, today=now(request).astimezone(VN).date())
+    prices = gold_prices(Path(request.app.state.data_dir))
+    sell = ((prices.get("kinds") or {}).get(GOLD_KIND) or {}).get("sell")
     for n in out["nodes"]:
         if n["id"] == "gold":
-            n["label"] = f"{GOLD_KIND} (giá mua vào của Phú Quý, đồng/chỉ)"
+            n["label"], n["unit"] = label, unit
+            fx = series.get("usd_vnd_vcb") or []
+            n["premium"] = gold_premium(xau=world[-1], usd_vnd=fx[-1], sjc_sell=Decimal(sell), sjc_as_of=prices.get("as_of"))                 if world and fx and sell else None
     return out
 
 

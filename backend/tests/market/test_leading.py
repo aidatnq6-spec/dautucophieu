@@ -36,8 +36,8 @@ def test_pmi_aggregator_requires_value_and_named_publication_month():
 
 def test_indicators_config_lists_auto_and_manual_rows():
     ind = load_indicators()
-    assert len(ind) == 29 and {i["id"] for i in ind if i["source"]["kind"] != "manual"} == {
-        "dxy", "wti", "brent", "us_cpi_yoy", "us_core_cpi_yoy", "usd_vnd_vcb", "usd_vnd_central", "fed_effr", "sofr", "vn_interbank_1w", "vn_interbank_1m",
+    assert len(ind) == 30 and {i["id"] for i in ind if i["source"]["kind"] != "manual"} == {
+        "dxy", "xau_usd", "wti", "brent", "us_cpi_yoy", "us_core_cpi_yoy", "usd_vnd_vcb", "usd_vnd_central", "fed_effr", "sofr", "vn_interbank_1w", "vn_interbank_1m",
         "vn_trade_balance", "vn_trade_balance_ytd", "vn_fdi_disbursed", "vn_fdi_disbursed_yoy", "vn_retail_yoy", "vn_public_invest_yoy", "us10y", "usd_vnd_free", "usd_vnd_sbv", "deposit_12m",
         "foreign_net", "vnindex_value", "m2_vn", "vn10y", "vn_interbank_on", "vn_pmi", "vn_cpi_yoy"}  # us_pmi: manual since 26/10/2026 (sources block bots)
 
@@ -559,3 +559,15 @@ def test_monthly_indicators_are_marked_so_hand_entry_asks_for_the_month():
 
 def test_session_indicators_are_marked_so_hand_entry_skips_days_without_a_session():
     assert {i["id"] for i in load_indicators() if i.get("period") == "session"} == {"vn10y", "vn_interbank_on", "vn_interbank_1w", "vn_interbank_1m", "foreign_net", "vnindex_value"}
+
+
+def test_the_world_gold_price_is_read_from_gold_api_on_the_vietnam_day_it_was_taken():
+    from investment_agent.market.leading import parse_gold_api
+    text = '{"currency":"USD","name":"Gold","price":3875.469971,"symbol":"XAU","updatedAt":"2026-11-16T18:03:28Z"}'
+    assert parse_gold_api(text) == [(date(2026, 11, 17), "3875.47")]  # 01:03 on 17/11 in Hà Nội
+    import pytest
+    from investment_agent.market.leading import MacroError
+    with pytest.raises(MacroError):
+        parse_gold_api('{"symbol":"XAG","price":31}')
+    gold = next(i for i in load_indicators() if i["id"] == "xau_usd")
+    assert gold["source"] == {"kind": "gold_api"} and gold["rule"] == "none" and gold["unit"] == "USD/oz"

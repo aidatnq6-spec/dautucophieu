@@ -13,6 +13,11 @@ describe("findingText", () => {
       group: { name: "Các nhà cung cấp khác", amount: "1493" } }))
       .toContain("Công ty Wang Sea (nhà cung cấp được nêu tên trong thuyết minh trả trước) (300 tỷ năm 2021) không còn được nêu tên năm 2022");
   });
+  it("names interest piling up unpaid on a loan", () => {
+    expect(findingText({ kind: "interest_piling", year: "2021", name: "Công ty Lê Me", before: "149", now: "256", rate: "8%/năm" }))
+      .toBe("Công ty Lê Me: lãi cho vay phải thu tăng từ 149 tỷ lên 256 tỷ năm 2021 (lãi suất 8%/năm). Lãi được ghi vào doanh thu tài chính nhưng chưa thu "
+        + "được tiền: lợi nhuận \"giấy\", có thể phải trích dự phòng sau này.");
+  });
   it("names a balance not collected in its term and an unsecured interest-free one", () => {
     expect(findingText({ kind: "not_collected", year: "2020", name: "Công ty Gamma", before: "500", now: "400", promised: "12 tháng" }))
       .toBe("Công ty Gamma: hứa thu trong 12 tháng, nhưng năm 2020 vẫn còn 400 tỷ (năm trước 500 tỷ).");

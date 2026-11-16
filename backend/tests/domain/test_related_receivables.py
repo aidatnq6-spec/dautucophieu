@@ -8,6 +8,10 @@ def row(name, amount, grouped=False, related=True, secured=None, interest=None, 
             "collect_within": collect_within}
 
 
+def loan(name, amount, rate=None, accrued=None):
+    return {**row(name, amount, interest=True), "kind": "loan", "rate": rate, "accrued_interest": accrued}
+
+
 # In the shape of the VJC case in the owner's notes (11/2026); the figures here are made up.
 YEARS = {
     "2019": {"source": "BCTC hợp nhất 2019, thuyết minh 7", "rows": [
@@ -61,7 +65,7 @@ def test_a_year_needs_its_source_and_named_rows_with_amounts(source, rows, code)
 
 def test_a_valid_year_is_kept_with_names_trimmed_and_amounts_as_typed():
     year = validate_year(" BCTC 2020 ", [row(" Công ty A ", "1.234,5")])
-    assert year == {"source": "BCTC 2020", "rows": [{**row("Công ty A", "1234.5"), "kind": None}]}  # a row saved before kinds: kind unknown
+    assert year == {"source": "BCTC 2020", "rows": [{**row("Công ty A", "1234.5"), "kind": None, "rate": None, "accrued_interest": None}]}
 
 
 def test_each_row_may_say_which_receivable_it_is():
@@ -78,3 +82,23 @@ def test_a_named_supplier_dropped_the_next_year_is_found_too():
     gone = [f for f in review(years)["findings"] if f["kind"] == "vanished"]
     assert gone == [{"kind": "vanished", "year": "2022", "from_year": "2021", "name": "Công ty Wang Sea", "amount": "300", "row_kind": "prepay",
                      "group": {"name": "Các nhà cung cấp khác", "amount": "1493"}}]
+
+
+def test_a_loan_keeps_its_rate_as_written_and_its_accrued_interest_in_ty():
+    year = validate_year("BCTC 2021, TM 8 và 34", [loan("Công ty Lê Me", "4.120", rate=" 8% – 8,6%/năm ", accrued="256")])
+    assert (year["rows"][0]["rate"], year["rows"][0]["accrued_interest"]) == ("8% – 8,6%/năm", "256")
+    with pytest.raises(RelatedError) as exc:
+        validate_year("BCTC 2021", [loan("A", "1", accrued="-5")])
+    assert exc.value.code == "invalid_row"
+
+
+def test_interest_piling_up_unpaid_on_a_loan_is_found():
+    # in the shape of the HAG case in the owner's notes (11/2026); made-up figures
+    years = {"2020": {"source": "BCTC 2020", "rows": [loan("Công ty Lê Me", "3900", rate="8%/năm", accrued="149")]},
+             "2021": {"source": "BCTC 2021", "rows": [loan("Công ty Lê Me", "4120", rate="8%/năm", accrued="256")]}}
+    found = [f for f in review(years)["findings"] if f["kind"] == "interest_piling"]
+    assert found == [{"kind": "interest_piling", "year": "2021", "name": "Công ty Lê Me", "before": "149", "now": "256", "rate": "8%/năm"}]
+    calm = {**years, "2021": {"source": "BCTC 2021", "rows": [loan("Công ty Lê Me", "4120", accrued="150")]}}
+    assert not [f for f in review(calm)["findings"] if f["kind"] == "interest_piling"]  # up less than half: no finding
+    years_view = {y["year"]: y for y in review(years)["years"]}
+    assert years_view["2021"]["accrued_interest"] == "256"

@@ -254,6 +254,31 @@ def _provision(q: dict) -> tuple[Decimal | None, Decimal | None]:
     return -p, (-p / gross if net is not None and gross > 0 else None)
 
 
+OTHER_HIGH, OTHER_FLOOR = Decimal(2), Decimal("0.05")  # twice the sector's median, and 5% of total assets
+
+
+def _other_share(q: dict) -> Decimal | None:
+    """Other receivables and loans (Thông tư 99 merges the two from 2026) against total assets; loan lines missing count as none."""
+    other = _both(q, "other_receivables", "other_receivables_lt")
+    (assets,) = _get(q, "total_assets")
+    if other is None or not assets or assets <= 0:
+        return None
+    loans = sum((v for v in _get(q, "st_loans_receivable", "lt_loans_receivable") if v is not None), Decimal(0))
+    return (other + loans) / assets
+
+
+def _other_vs_sector(quarters: dict, peers: dict | None) -> dict:
+    latest = max(quarters) if quarters else None
+    share = _other_share(quarters[latest]) if latest else None
+    peer = sorted(s for s in (_other_share(qs[max(qs)]) for qs in (peers or {}).values() if qs) if s is not None)
+    median = None
+    if peer:
+        mid = len(peer) // 2
+        median = peer[mid] if len(peer) % 2 else (peer[mid - 1] + peer[mid]) / 2
+    high = None if share is None or median is None else share >= OTHER_FLOOR and share >= OTHER_HIGH * median
+    return {"quarter": latest, "share": _r(share), "sector_median": _r(median), "sector_count": len(peer), "high": high}
+
+
 def receivables_view(quarters: dict, peers: dict | None = None, n: int = 12) -> dict:
     """The last n quarters of receivables by part, the latest days to collect (with a year before and the sector's median over peers'
     latest quarters) and the latest provision. A missing line leaves its cell blank."""
@@ -282,7 +307,7 @@ def receivables_view(quarters: dict, peers: dict | None = None, n: int = 12) -> 
         kind = "none"
     elif amount is not None and before is not None and before > 0 and amount / before - 1 >= PROVISION_JUMP and part is not None and part >= PROVISION_MATERIAL:
         kind = "jump"
-    return {"rows": rows, "prepay_days": _days_view(quarters, peers, _prepay_days),
+    return {"rows": rows, "prepay_days": _days_view(quarters, peers, _prepay_days), "other_vs_sector": _other_vs_sector(quarters, peers),
             "dso": {"quarter": latest, "days": _s(days), "year_ago": _s(ago), "change": _s(days - ago) if days is not None and ago is not None else None,
                     "sector_median": _s(median), "sector_count": len(peer_days)},
             "provision": {"quarter": latest, "amount": _s(amount), "share": _r(part), "year_ago": _s(before), "kind": kind}}

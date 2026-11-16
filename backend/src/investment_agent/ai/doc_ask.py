@@ -32,10 +32,11 @@ SYSTEM_RR = ("Bạn đọc thuyết minh báo cáo tài chính công khai của 
              "khách hàng, prepay: trả trước cho người bán, other: phải thu khác, loan: cho vay; null nếu không rõ), tên đối tượng "
              "như trong tài liệu (hoặc tên dòng gộp như 'Bên liên quan khác'), số dư chép nguyên văn như trong tài liệu (amount_text), số trang, "
              "grouped=true nếu là dòng gộp không nêu tên, secured và interest chỉ điền true/false khi tài liệu nói rõ (không thì null), "
-             "collect_within là thời hạn thu hồi nếu tài liệu nói rõ (không thì null). Ghi đơn vị tính tài liệu dùng (đồng, nghìn đồng, triệu đồng, "
+             "collect_within là thời hạn thu hồi nếu tài liệu nói rõ (không thì null), rate là lãi suất chép nguyên văn nếu có (không thì null), "
+             "accrued_interest_text là lãi cho vay phải thu của khoản đó chép nguyên văn nếu thuyết minh nêu (không thì null). Ghi đơn vị tính tài liệu dùng (đồng, nghìn đồng, triệu đồng, "
              "tỷ đồng). Không tính toán, không ước lượng. Trả về JSON: "
              '{"unit": "...", "rows": [{"name": "...", "kind": null, "amount_text": "...", "page": 0, "related": true, "grouped": false, '
-             '"secured": null, "interest": null, "collect_within": null}]}.')
+             '"secured": null, "interest": null, "collect_within": null, "rate": null, "accrued_interest_text": null}]}.')
 KINDS = ("customer", "prepay", "other", "loan")
 
 
@@ -183,9 +184,18 @@ def check_rows(content: str | None, passages: list[tuple[int, str]], *, document
             dropped.append({"name": name, "reason": "amount_not_on_page"})
             continue
         ty = (amount * UNITS[unit]).normalize()
+        accrued_text, accrued = str(r.get("accrued_interest_text") or "").strip(), None
+        if accrued_text:
+            value = _to_decimal(accrued_text)
+            if value is not None and _digits(accrued_text.replace(" ", "")) in by_page[page]:
+                accrued = (value * UNITS[unit]).normalize()
+            else:
+                dropped.append({"name": name, "reason": "interest_not_on_page"})
         tri = lambda v: v if v in (True, False) else None  # noqa: E731
         rows.append({"name": name, "amount": format(ty, "f") if ty != 0 else "0", "grouped": r.get("grouped") is True,
                      "related": r.get("related") is not False, "secured": tri(r.get("secured")), "interest": tri(r.get("interest")),
                      "collect_within": (" ".join(str(r.get("collect_within")).split())[:60] or None) if r.get("collect_within") else None,
-                     "kind": r.get("kind") if r.get("kind") in KINDS else None, "page": page})
+                     "kind": r.get("kind") if r.get("kind") in KINDS else None,
+                     "rate": (" ".join(str(r.get("rate")).split())[:60] or None) if r.get("rate") else None,
+                     "accrued_interest": (format(accrued, "f") if accrued != 0 else "0") if accrued is not None else None, "page": page})
     return rows, dropped

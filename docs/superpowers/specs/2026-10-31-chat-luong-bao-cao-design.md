@@ -45,6 +45,11 @@ Không áp dụng cho ngân hàng, dịch vụ tài chính, bảo hiểm (cấu 
 - **Phải thu khác lớn** (chủ sở hữu đồng ý 15/11/2026): phải thu khác (ngắn hạn + dài hạn) năm gần nhất đạt một trong hai điều kiện dưới đây. Từ ngày 16/11/2026, phép tính cộng thêm phải thu về cho vay của cả hai năm đem so. Lý do: từ năm 2026, Thông tư 99 bỏ chỉ tiêu cho vay và gộp khoản cho vay vào phải thu khác; nếu không cộng, riêng việc chuyển dòng đã làm dấu hiệu bật sai.
   - từ 10% tổng tài sản;
   - gấp đôi năm trước, khi năm trước đã từ 1% tổng tài sản.
+- **Thu nhập tài chính chưa thu được tiền**, tức "lợi nhuận giấy" (chủ sở hữu đồng ý 16/11/2026): bật khi cả hai điều kiện dưới đây cùng đúng ở năm gần nhất.
+  - Tiền thu lãi cho vay, cổ tức và lợi nhuận được chia trên báo cáo lưu chuyển tiền tệ (mã dòng VNDirect 32700) dưới 50% doanh thu tài chính.
+  - Doanh thu tài chính từ 10% lợi nhuận trước thuế, hoặc doanh nghiệp lỗ.
+
+  Doanh thu tài chính còn gồm lãi tỷ giá và lãi bán khoản đầu tư, mà tiền của các khoản này nằm ở dòng khác, nên dấu hiệu nhắc đọc thuyết minh.
 - **Trả trước người bán lớn** (chủ sở hữu đồng ý 16/11/2026): trả trước cho người bán ngắn hạn năm gần nhất đạt một trong hai điều kiện:
   - từ 10% tổng tài sản;
   - gấp đôi năm trước, khi năm trước đã từ 1% tổng tài sản.

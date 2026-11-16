@@ -34,11 +34,13 @@ def market_view(snapshot: dict | None, *, watched: list[str], held: set[str], ne
         news = {"status": "ok", "items": pick_news(news["items"], watched=watched, held=held, sector_names=sector_names, limit=news_limit)}
     view = {k: snapshot.get(k) for k in ("session_date", "updated_at", "indices", "hose", "proprietary")}
     view["board"] = {k: v for k, v in board.items() if k != "symbols"}
-    for name in ("index_session", "hose_liquidity", "signals"):  # snapshots stored before 06/11/2026 (signals: 16/11/2026) lack them
+    for name in ("index_session", "hose_liquidity", "signals", "asia"):  # snapshots stored before 06/11/2026 (signals: 16/11/2026) lack them
         view[name] = snapshot.get(name) or {"status": "missing", "reason": "Ảnh chụp phiên này chưa có mục này"}
     view["recovery"] = recovery_checks(snapshot.get("index_session"), board)  # Bảng kiểm "Thị trường phục hồi"
     from investment_agent.notifications.render import signal_lines
-    view["signal_lines"] = signal_lines(snapshot.get("signals"))  # Tín hiệu phiên, the same lines as the Telegram brief
+    view["signal_lines"] = signal_lines(snapshot.get("signals"))
+    from investment_agent.market.asia_indices import asia_line
+    view["asia_line"] = asia_line(snapshot.get("asia"))  # Tín hiệu phiên, the same lines as the Telegram brief
     return {**view, "tickers": first + others, "news": news}
 
 

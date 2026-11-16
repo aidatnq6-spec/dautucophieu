@@ -41,7 +41,7 @@ test("the impact chain shows five links, says what is missing, and reads inflati
   await openMacro(page);
   const chain = page.getByRole("region", { name: "Chuỗi tác động vĩ mô" });
   const links = chain.getByRole("list", { name: "Các mắt xích, từ giá dầu đến VN-Index" }).locator(":scope > li");  // not the rate rows inside a link
-  await expect(links).toHaveText([/Giá dầu/, /Lạm phát Việt Nam/, /Thanh khoản và chênh lệch VND–USD/, /Lãi suất Việt Nam/, /Khối ngoại/, /VN-Index/]);
+  await expect(links).toHaveText([/Giá dầu/, /Giá xăng trong nước/, /Lạm phát Việt Nam/, /Thanh khoản và chênh lệch VND–USD/, /Lãi suất Việt Nam/, /Khối ngoại/, /VN-Index/]);
   await expect(chain.getByTestId("chain-liquidity")).toContainText("tạo áp lực");  // the synthetic spread is below zero
   await expect(chain.getByTestId("chain-liquidity")).toContainText("bơm 1.500 tỷ đ");
   await expect(chain).toContainText("không phải khuyến nghị");
@@ -198,4 +198,11 @@ test("the SJC gap section takes a threshold and turns the alert off again", asyn
   await box.getByLabel("Ngưỡng chênh lệch vàng").fill("");
   await box.getByRole("button", { name: "Tắt nhắc" }).click();
   await expect(box).toContainText("Chưa đặt ngưỡng: không nhắc.");
+});
+
+
+test("the Asian markets section and the fuel link of the chain are on the macro page", async ({ page }) => {
+  await page.goto("/macro");
+  await expect(page.getByRole("region", { name: "Chứng khoán châu Á" })).toContainText(/VNDirect/);
+  await expect(page.getByRole("region", { name: "Chuỗi tác động vĩ mô" }).getByTestId("chain-fuel")).toContainText("Giá xăng trong nước");
 });

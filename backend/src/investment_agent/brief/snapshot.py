@@ -100,7 +100,7 @@ def _signals(sections: dict, shares, store: BriefStore, sessions_before: list[da
 
 def build_snapshot(*, session_date: date, previous_session: date | None, now: datetime, listing, board, series, hose_get, rss_get,
                    store: BriefStore, earlier: list[date] = (), index_bars=lambda: {}, shares=lambda symbols: {},
-                   vn30_weights=lambda: {}) -> dict:
+                   vn30_weights=lambda: {}, asia=lambda: None) -> dict:
     """earlier: the sessions before session_date on the trading calendar, ascending; index_bars(): VN-Index daily bars by session;
     shares(symbols): shares outstanding by symbol, for Tín hiệu phiên (mã kéo chỉ số)."""
     sections: dict[str, dict] = {}
@@ -126,6 +126,10 @@ def build_snapshot(*, session_date: date, previous_session: date | None, now: da
         sections["index_session"] = index_session(index_bars(), session_date=session_date, earlier=list(earlier))
     except Exception:
         sections["index_session"] = _missing("Không đọc được nến VN-Index")
+    try:  # Chứng khoán châu Á (market.asia_indices): read with the snapshot, shown with the time it was read
+        sections["asia"] = asia() or _missing("Chưa đọc chỉ số châu Á")
+    except Exception:
+        sections["asia"] = _missing("Không đọc được chỉ số châu Á")
     try:
         sections["hose_liquidity"] = hose_liquidity(sections["hose"], earlier=list(earlier), hose_get=hose_get)
     except Exception:

@@ -315,15 +315,22 @@ def _basket_note(changes: dict, hose_info: dict | None) -> str:
     return "\n".join(lines + ["Danh sách theo dõi đã cập nhật nhóm chỉ số."])
 
 
+def _asia(data_dir: Path, now, get) -> dict:
+    from zoneinfo import ZoneInfo
+
+    from investment_agent.market.asia_indices import read_asia
+    return read_asia(data_dir, get=get, now=now.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")))
+
+
 def _vn30_weights(data_dir: Path, session) -> dict:
     """VN30's weight inputs from HOSE's notice (index-groups.json), when the notice is in effect on the session."""
     kept = _read_json(data_dir / "index-groups.json").get("vn30_weights") or {}
     return (kept.get("members") or {}) if kept.get("effective") and kept["effective"] <= session.isoformat() else {}
 
 
-def _vd_shares(symbols: list[str]) -> dict:
+def _vd_shares(symbols: list[str], get) -> dict:
     from investment_agent.market.providers.vndirect_data import outstanding_shares
-    return outstanding_shares(symbols)
+    return outstanding_shares(symbols, get=get)
 
 
 def index_groups(groups: list[str], output: Path, provider=None, today=None, get=None, hose=None, send=None) -> int:
@@ -1792,7 +1799,8 @@ def brief_snapshot_cli(data_dir: Path, calendar_path: Path, *, listing=None, boa
     snap = build_snapshot(session_date=session, previous_session=_previous_session(cal, session), now=now, listing=cached_listing,
                           board=board, series=lambda index_id: series.read(f"{index_id}-1d"), hose_get=http_get, rss_get=http_get,
                           store=BriefStore(data_dir), earlier=earlier, index_bars=index_bars,
-                          shares=lambda symbols: _vd_shares(symbols), vn30_weights=lambda: _vn30_weights(Path(data_dir), session))
+                          shares=lambda symbols: _vd_shares(symbols, http_get), vn30_weights=lambda: _vn30_weights(Path(data_dir), session),
+                          asia=lambda: _asia(Path(data_dir), now, http_get))
     print(json.dumps({"status": "ok", "session": session.isoformat(),
                       "sections": {k: v["status"] for k, v in snap.items() if isinstance(v, dict) and "status" in v}}, ensure_ascii=False))
     return 0

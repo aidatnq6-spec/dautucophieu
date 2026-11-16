@@ -1,6 +1,7 @@
 import { MacroChain } from "../../../components/macro-chain";
 import { UsChain } from "../../../components/us-chain";
 import { SjcGap } from "../../../components/sjc-gap";
+import { AsiaMarkets } from "../../../components/asia-markets";
 import { MacroView } from "../../../components/macro-view";
 import { MacroCalendar, RateSpread } from "../../../components/macro-extras";
 import { MacroLiquidity } from "../../../components/macro-liquidity";
@@ -16,6 +17,7 @@ export default function MacroPage() {
       <MacroChain />
       <UsChain />
       <SjcGap />
+      <AsiaMarkets />
       <Sensitivity />
       <RateCycle />
       <RateSpread />

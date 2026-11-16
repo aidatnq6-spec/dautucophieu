@@ -91,7 +91,7 @@ def test_macro_chain_reads_the_stored_series_and_the_vn_index(tmp_path):
     assert (n["oil"]["direction"], n["oil"]["effect"]) == ("down", "support")
     assert (n["foreign"]["direction"], n["foreign"]["latest"]["value"]) == ("buy", "420.5")
     assert (n["vnindex"]["direction"], n["vnindex"]["latest"]["value"]) == ("up", "1700")
-    assert body["missing"] == ["inflation", "liquidity", "rates"]
+    assert body["missing"] == ["fuel", "inflation", "liquidity", "rates"]
     assert body["cash_rich"] == []  # no watched ticker with statements here
 
 
@@ -173,3 +173,17 @@ def test_the_sjc_gap_history_and_the_owners_threshold(tmp_path):
     assert bad.status_code == 422
     off = call(c, clock, "PUT", "/internal/macro/sjc-gap", {"threshold": None, "expected_version": 1, "request_id": "g3"}).json()
     assert off["threshold"] is None
+
+
+def test_the_asian_markets_last_read_is_served_with_its_line(tmp_path):
+    import json
+    clock = Clock()
+    (tmp_path / "macro").mkdir(exist_ok=True)
+    (tmp_path / "macro" / "asia-indices.json").write_text(json.dumps({"status": "ok", "read_at": "2027-01-15T15:32:00+07:00", "seen": {}, "rows": [
+        {"code": "HANGSENG", "name": "Hang Seng", "price": "23637.6", "change_pct": "-0.0155", "unchanged_since": None, "fred_date": None}]}),
+        encoding="utf-8")
+    body = call(client(tmp_path, clock), clock, "GET", "/internal/macro/asia").json()
+    assert body["rows"][0]["code"] == "HANGSENG" and "seen" not in body
+    assert body["line"] == "Châu Á (VNDirect, đọc 15:32 15/01): Hang Seng −1,55%"
+    empty = call(client(tmp_path / "x", clock), clock, "GET", "/internal/macro/asia").json()
+    assert empty == {"status": "missing", "line": None}

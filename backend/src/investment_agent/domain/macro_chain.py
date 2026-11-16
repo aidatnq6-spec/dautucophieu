@@ -1,4 +1,4 @@
-"""Chuỗi tác động vĩ mô on Vĩ mô: oil → Vietnam inflation → Vietnam rates → foreign flows → VN-Index, the chain the owner saw on a
+"""Chuỗi tác động vĩ mô on Vĩ mô: oil → the fuel price ceiling (since 16/11/2026) → Vietnam inflation → Vietnam rates → foreign flows → VN-Index, the chain the owner saw on a
 war-watch page; since 11/2026 also liquidity — the VND–USD overnight spread with the latest open-market session — between
 inflation and rates. Each link reads its direction over about a month from data already stored and whether that weighs on stocks.
 Descriptive only: no recommendation, no model."""
@@ -7,10 +7,10 @@ from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 MONTH = timedelta(days=30)
-OIL_BAND, INDEX_BAND = Decimal("0.05"), Decimal("0.03")      # share moves
+OIL_BAND, INDEX_BAND, FUEL_BAND = Decimal("0.05"), Decimal("0.03"), Decimal("0.02")      # share moves
 CPI_BAND, RATE_BAND = Decimal("0.2"), Decimal("0.25")         # percentage points
 FOREIGN_SESSIONS = 20
-STALE_DAYS = {"oil": 10, "inflation": 45, "liquidity": 10, "rates": 10, "foreign": 7, "vnindex": 7}
+STALE_DAYS = {"oil": 10, "fuel": 30, "inflation": 45, "liquidity": 10, "rates": 10, "foreign": 7, "vnindex": 7}
 RATES = ("vn_interbank_on", "vn10y")
 
 Points = list[tuple[date, Decimal]]
@@ -126,6 +126,8 @@ def macro_chain(series: dict[str, Points], *, today: date, omo: dict | None = No
     vnindex (points), oldest first; omo: the latest open-market session, shown with the liquidity link."""
     nodes = [
         _share_move("oil", series.get("wti") or [], OIL_BAND, pressure_when="up", today=today),
+        # the retail ceiling of E10 RON95-III (Bộ Công Thương's periods): how the world's oil reaches Vietnam's prices
+        _share_move("fuel", series.get("vn_ron95_price") or [], FUEL_BAND, pressure_when="up", today=today),
         _inflation(series.get("vn_cpi_yoy") or [], today),
         _liquidity(series.get("vnd_usd_spread") or [], omo, today),
         _rates(series, today),

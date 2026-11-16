@@ -19,7 +19,7 @@ type IndexSession = { status: "ok"; range: { high: string; low: string; close: s
 type HoseLiquidity = { status: "ok"; today_bn: string; previous_bn: string; change_pct: string; avg20_bn: string; ratio20: string } | Missing;
 export type MarketSection = { session_date: string; updated_at: string; indices: { status: string; rows: IndexRow[] } | Missing; board: Board;
   hose: Hose; proprietary: Missing; tickers: Ticker[]; news: News; index_session?: IndexSession; hose_liquidity?: HoseLiquidity;
-  recovery?: Recovery; signal_lines?: string[] };
+  recovery?: Recovery; signal_lines?: string[]; asia_line?: string | null };
 type Check = { id: string; met: boolean | null; label: string; figure: string };
 type Recovery = { status: "ok"; met: number; known: number; total: number; checks: Check[] } | Missing;
 
@@ -92,6 +92,7 @@ export function BriefMarket({ market, session }: { market: MarketSection | null;
           : <span className="muted">chưa có số liệu ({shape.volume.reason})</span>}</p>
         <p className="caption">Nến ngày VN-Index theo KBS (vnstock); cao/thấp có thể gồm mức tham chiếu đầu phiên.</p>
       </> : <Gap what="Trong phiên" section={shape} />)}
+      {market.asia_line && <p data-testid="asia-line">{market.asia_line}</p>}
       {(market.signal_lines?.length ?? 0) > 0 && <section aria-label="Tín hiệu phiên" data-testid="signals">
         <h3>Tín hiệu phiên</h3>
         <ul className="bm-list">{market.signal_lines!.map((s) => <li key={s}>{s}</li>)}</ul>

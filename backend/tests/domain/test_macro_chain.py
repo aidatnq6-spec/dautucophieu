@@ -28,7 +28,7 @@ def full():
 def test_each_link_reads_its_one_month_direction_and_whether_it_weighs_on_stocks():
     chain = macro_chain(full(), today=TODAY)
     n = by_id(chain)
-    assert [x["id"] for x in chain["nodes"]] == ["oil", "inflation", "liquidity", "rates", "foreign", "vnindex"]
+    assert [x["id"] for x in chain["nodes"]] == ["oil", "fuel", "inflation", "liquidity", "rates", "foreign", "vnindex"]
     # oil: 108 against the last price at least a month before the latest (100 on 20/09): +8% → up, weighs on stocks
     assert (n["oil"]["direction"], n["oil"]["effect"], n["oil"]["change"], n["oil"]["from"]) == ("up", "pressure", "0.08", "2026-09-20")
     assert (n["inflation"]["direction"], n["inflation"]["effect"], n["inflation"]["change"]) == ("up", "pressure", "0.30")  # points
@@ -37,7 +37,16 @@ def test_each_link_reads_its_one_month_direction_and_whether_it_weighs_on_stocks
     assert [(p["id"], p["direction"], p["change"]) for p in rates["parts"]] == [("vn_interbank_on", "down", "-0.50"), ("vn10y", "flat", "0.05")]
     assert (n["foreign"]["direction"], n["foreign"]["effect"], n["foreign"]["latest"]["value"], n["foreign"]["sessions"]) == ("sell", "pressure", "-600", 3)
     assert (n["vnindex"]["direction"], n["vnindex"]["effect"], n["vnindex"]["change"]) == ("flat", "neutral", "-0.0291")  # −2,9% is within ±3%
-    assert chain["pressure"] == ["oil", "inflation", "foreign"] and chain["support"] == ["rates"] and chain["missing"] == ["liquidity"]
+    assert chain["pressure"] == ["oil", "inflation", "foreign"] and chain["support"] == ["rates"] and chain["missing"] == ["fuel", "liquidity"]
+
+
+def test_the_fuel_price_ceiling_sits_between_oil_and_inflation():
+    s = {**full(), "vn_ron95_price": [(date(2026, 9, 20), Decimal("26000")), (date(2026, 10, 22), Decimal("25213"))]}
+    n = by_id(macro_chain(s, today=TODAY))["fuel"]
+    # 25,213 against 26,000 a month before: −3,0% → down, which eases prices
+    assert (n["direction"], n["effect"], n["change"], n["from"], n["stale"]) == ("down", "support", "-0.0303", "2026-09-20", False)
+    old = {**full(), "vn_ron95_price": [(date(2026, 9, 1), Decimal("26000")), (date(2026, 9, 20), Decimal("26100"))]}
+    assert by_id(macro_chain(old, today=TODAY))["fuel"]["stale"] is True  # no new period for over a month
 
 
 def test_a_series_with_no_data_is_missing_and_one_younger_than_a_month_says_since_when():
@@ -50,7 +59,7 @@ def test_a_series_with_no_data_is_missing_and_one_younger_than_a_month_says_sinc
     assert (n["inflation"]["effect"], n["inflation"]["latest"]) == ("missing", None)
     assert n["rates"]["direction"] == "up" and n["rates"]["short_history"] is True
     assert [p["from"] for p in n["rates"]["parts"]] == ["2026-10-07", "2026-10-08"]
-    assert chain["missing"] == ["inflation", "liquidity"] and "rates" in chain["pressure"]
+    assert chain["missing"] == ["fuel", "inflation", "liquidity"] and "rates" in chain["pressure"]
 
 
 def test_mixed_rate_moves_read_flat_and_an_old_value_is_marked_stale():

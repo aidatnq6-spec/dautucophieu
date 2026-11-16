@@ -514,3 +514,5 @@ main h2{scroll-margin-top:16px}
   main table[data-cards] td[data-label]::before{content:attr(data-label) ": ";color:var(--muted);font-size:12px}
   main table[data-cards] tfoot{display:block}
 }
+/* Chênh lệch vàng SJC so với thế giới */
+.sg-chart{width:100%;height:auto;max-height:180px;margin:6px 0 10px}.sg-line{fill:none;stroke:var(--brand);stroke-width:2}.sg-dot{fill:var(--brand)}.sg-threshold{stroke:var(--bad);stroke-dasharray:5 4;stroke-width:1.5}.sg-axis{fill:var(--muted);font-size:11px}

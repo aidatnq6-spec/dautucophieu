@@ -1,5 +1,5 @@
 {
- "version": "macro-2026-11-16.6",
+ "version": "macro-2026-11-16.7",
  "notice": "Quy tắc đánh giá theo bảng Leading Indicator của chủ sở hữu (25/10/2026). bad_when: up = tăng là Xấu; down = giảm là Xấu; sign = âm là Xấu; pmi = Tốt khi trên 50 và không giảm.",
  "indicators": [
   {
@@ -25,6 +25,18 @@
    },
    "url": "https://gold-api.com/",
    "note": "Giá giao ngay từ gold-api.com (miễn phí, không cần khóa). Nguồn chỉ cho giá hiện tại; phần mềm tự lưu mỗi ngày một số từ 16/11/2026, nên so sánh theo tuần có đủ sau một tuần."
+  },
+  {
+   "id": "sjc_gap_pct",
+   "label": "Chênh lệch vàng miếng SJC so với giá thế giới quy đổi",
+   "unit": "%",
+   "rule": "none",
+   "max_age_days": 5,
+   "source": {
+    "kind": "sjc_gap"
+   },
+   "url": "https://gold-api.com/",
+   "note": "Giá bán vàng miếng SJC (Phú Quý) so với XAU/USD (gold-api.com) quy ra đồng/chỉ theo tỷ giá bán Vietcombank; chưa tính thuế phí. Tính mỗi lượt cập nhật, mỗi ngày giữ số cuối."
   },
   {
    "id": "wti",
@@ -63,6 +75,34 @@
    },
    "url": "https://oilprice.com/oil-price-charts/",
    "note": "Giá hợp đồng tương lai Brent kỳ gần nhất trên ICE, trễ 10 phút (oilprice.com); khi không đọc được thì lấy giá giao ngay của EIA qua FRED, chậm khoảng một tuần. Brent là giá tham chiếu cho dầu thô Việt Nam xuất khẩu và xăng dầu nhập khẩu. Lịch sử trước ngày đầu tiên lưu được lấy một lần từ giá giao ngay EIA qua FRED."
+  },
+  {
+   "id": "vn_ron95_price",
+   "label": "Giá trần xăng E10 RON95-III (đồng/lít)",
+   "unit": "đồng/lít",
+   "rule": "up",
+   "max_age_days": 21,
+   "source": {
+    "kind": "moit_fuel",
+    "field": "ron95",
+    "manual_fallback": true
+   },
+   "url": "https://moit.gov.vn/quan-ly-thi-truong",
+   "note": "Giá bán tối đa theo thông cáo điều hành giá của Bộ Công Thương, ngày áp dụng của kỳ. Bộ không đăng thông cáo mọi kỳ trên các trang này: kỳ thiếu thì nhập tay kèm nguồn (Petrolimex không cho đọc tự động)."
+  },
+  {
+   "id": "vn_diesel_price",
+   "label": "Giá trần dầu diesel 0,05S (đồng/lít)",
+   "unit": "đồng/lít",
+   "rule": "up",
+   "max_age_days": 21,
+   "source": {
+    "kind": "moit_fuel",
+    "field": "diesel",
+    "manual_fallback": true
+   },
+   "url": "https://moit.gov.vn/quan-ly-thi-truong",
+   "note": "Giá bán tối đa theo thông cáo điều hành giá của Bộ Công Thương; kỳ thiếu thì nhập tay kèm nguồn."
   },
   {
    "id": "us_cpi_yoy",

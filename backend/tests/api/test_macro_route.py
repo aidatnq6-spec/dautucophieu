@@ -21,7 +21,7 @@ def test_macro_lists_every_indicator(tmp_path):
     MacroStore(tmp_path).upsert("us10y", [(date(2026, 10, 21), "4.91"), (date(2026, 10, 23), "4.96")], entry="auto")
     body = call(client(tmp_path, clock), clock, "GET", "/internal/macro").json()
     rows = {r["id"]: r for r in body["rows"]}
-    assert len(rows) == 30 and "us_core_cpi_yoy" in rows and rows["us10y"]["assessment"] == "Xấu" and rows["vn_pmi"]["value"] is None
+    assert len(rows) == 33 and "us_core_cpi_yoy" in rows and rows["us10y"]["assessment"] == "Xấu" and rows["vn_pmi"]["value"] is None
 
 
 def test_owner_enters_a_manual_value_with_its_source(tmp_path):
@@ -158,3 +158,18 @@ def test_the_week_chain_takes_the_world_gold_price_once_a_week_of_it_is_kept_and
     gold = {n["id"]: n for n in body["nodes"]}["gold"]
     assert gold["unit"] == "USD/oz" and gold["label"] == "Giá vàng thế giới XAU/USD (gold-api.com)" and gold["direction"] == "down"
     assert gold["premium"]["world_per_chi"] == "12125065" and gold["premium"]["gap_pct"] == "0.1340"
+
+
+def test_the_sjc_gap_history_and_the_owners_threshold(tmp_path):
+    clock = Clock()
+    MacroStore(tmp_path).upsert("sjc_gap_pct", [(date(2027, 1, 14), "13.10"), (date(2027, 1, 15), "13.35")], entry="auto")
+    c = client(tmp_path, clock)
+    body = call(c, clock, "GET", "/internal/macro/sjc-gap").json()
+    assert body["points"] == [{"date": "2027-01-14", "value": "13.10"}, {"date": "2027-01-15", "value": "13.35"}]
+    assert body["threshold"] is None and body["version"] == 0
+    saved = call(c, clock, "PUT", "/internal/macro/sjc-gap", {"threshold": "12,5", "expected_version": 0, "request_id": "g1"}).json()
+    assert saved["threshold"] == "12.5" and saved["version"] == 1
+    bad = call(c, clock, "PUT", "/internal/macro/sjc-gap", {"threshold": "-3", "expected_version": 1, "request_id": "g2"})
+    assert bad.status_code == 422
+    off = call(c, clock, "PUT", "/internal/macro/sjc-gap", {"threshold": None, "expected_version": 1, "request_id": "g3"}).json()
+    assert off["threshold"] is None

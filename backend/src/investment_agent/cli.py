@@ -52,6 +52,8 @@ def main() -> int:
     ra.add_argument("--data-dir", type=Path, required=True)
     sa = commands.add_parser("source-alerts", help="one Telegram note when a public source failed three macro runs in a row, and when it is back")
     sa.add_argument("--data-dir", type=Path, required=True)
+    sg = commands.add_parser("sjc-gap-alerts", help="one Telegram note when SJC's gap to the world gold price crosses the owner's threshold")
+    sg.add_argument("--data-dir", type=Path, required=True)
     uc = commands.add_parser("us-calendar", help="read the Fed's and BLS's release calendars once a day and remind the day before")
     uc.add_argument("--data-dir", type=Path, required=True)
     cw = commands.add_parser("calendar-watch", help="from 1 December, one Telegram note when HOSE posts next year's holiday calendar")
@@ -182,6 +184,8 @@ def main() -> int:
         return receivable_alerts_cli(args.data_dir)
     if args.command == "source-alerts":
         return source_alerts_cli(args.data_dir)
+    if args.command == "sjc-gap-alerts":
+        return sjc_gap_alerts_cli(args.data_dir)
     if args.command == "us-calendar":
         return us_calendar_cli(args.data_dir)
     if args.command == "calendar-watch":
@@ -1120,6 +1124,19 @@ def source_alerts_cli(data_dir: Path) -> int:
     telegram = _scheduled_telegram(data_dir)
     out = check_sources(data_dir, send=telegram[0] if telegram else (lambda text: False), labels=macro_labels())
     print(json.dumps(out))
+    return 0
+
+
+def sjc_gap_alerts_cli(data_dir: Path) -> int:
+    """Nhắc chênh lệch vàng SJC: skipped while scheduled delivery is off or no threshold is set."""
+    from investment_agent.services.sjc_gap import check_sjc_gap, read_threshold
+    telegram = _scheduled_telegram(data_dir)
+    if telegram is None:
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
+        return 0
+    send, repo, owner = telegram
+    threshold, _ = read_threshold(repo, owner)
+    print(json.dumps(check_sjc_gap(Path(data_dir), threshold=threshold, send=send)))
     return 0
 
 

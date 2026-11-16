@@ -36,8 +36,8 @@ def test_pmi_aggregator_requires_value_and_named_publication_month():
 
 def test_indicators_config_lists_auto_and_manual_rows():
     ind = load_indicators()
-    assert len(ind) == 30 and {i["id"] for i in ind if i["source"]["kind"] != "manual"} == {
-        "dxy", "xau_usd", "wti", "brent", "us_cpi_yoy", "us_core_cpi_yoy", "usd_vnd_vcb", "usd_vnd_central", "fed_effr", "sofr", "vn_interbank_1w", "vn_interbank_1m",
+    assert len(ind) == 33 and {i["id"] for i in ind if i["source"]["kind"] != "manual"} == {
+        "dxy", "xau_usd", "sjc_gap_pct", "vn_ron95_price", "vn_diesel_price", "wti", "brent", "us_cpi_yoy", "us_core_cpi_yoy", "usd_vnd_vcb", "usd_vnd_central", "fed_effr", "sofr", "vn_interbank_1w", "vn_interbank_1m",
         "vn_trade_balance", "vn_trade_balance_ytd", "vn_fdi_disbursed", "vn_fdi_disbursed_yoy", "vn_retail_yoy", "vn_public_invest_yoy", "us10y", "usd_vnd_free", "usd_vnd_sbv", "deposit_12m",
         "foreign_net", "vnindex_value", "m2_vn", "vn10y", "vn_interbank_on", "vn_pmi", "vn_cpi_yoy"}  # us_pmi: manual since 26/10/2026 (sources block bots)
 
@@ -571,3 +571,42 @@ def test_the_world_gold_price_is_read_from_gold_api_on_the_vietnam_day_it_was_ta
         parse_gold_api('{"symbol":"XAG","price":31}')
     gold = next(i for i in load_indicators() if i["id"] == "xau_usd")
     assert gold["source"] == {"kind": "gold_api"} and gold["rule"] == "none" and gold["unit"] == "USD/oz"
+
+
+MOIT_RELEASE = """<html><body><h1>Bộ Công Thương thông tin về điều hành giá xăng dầu ngày 22/10</h1>
+<p>3.2. Giá bán xăng dầu</p><p>- Xăng E5RON92: không cao hơn 25.361 đồng/lít (giảm 1.610 đồng/lít so với giá bán tối đa hiện hành);</p>
+<p>- Xăng E10RON95-III: không cao hơn 25.213 đồng/lít (giảm 1.816 đồng/lít so với giá bán tối đa hiện hành), thấp hơn xăng E5RON92 148 đồng/lít;</p>
+<p>- Dầu điêzen 0.05S: không cao hơn 29.550 đồng/lít (tăng 444 đồng/lít so với giá bán tối đa hiện hành);</p>
+<p>4. Thời gian thực hiện</p><p>- Trích lập ... Áp dụng từ 15 giờ 00’ ngày 22 tháng 10 năm 2026.</p></body></html>"""
+
+
+def test_the_ministry_release_gives_the_fuel_price_ceilings_on_their_day():
+    from investment_agent.market.leading import parse_moit_fuel, moit_release_links
+    assert parse_moit_fuel(MOIT_RELEASE) == {"date": date(2026, 10, 22), "e5ron92": "25361", "ron95": "25213", "diesel": "29550"}
+    page = ('<a href="/quan-ly-thi-truong/bo-cong-thuong-thong-tin-ve-dieu-hanh-gia-xang-dau-ngay-22-10.html">x</a>'
+            '<a href="/tin-tuc/bao-dam-nguon-cung-xang-dau.html">y</a>')
+    assert moit_release_links(page) == ["https://moit.gov.vn/quan-ly-thi-truong/bo-cong-thuong-thong-tin-ve-dieu-hanh-gia-xang-dau-ngay-22-10.html"]
+    import pytest
+    from investment_agent.market.leading import MacroError
+    with pytest.raises(MacroError):
+        parse_moit_fuel("<p>Bộ Công Thương họp về xăng dầu</p>")
+
+
+def test_the_sjc_gap_is_kept_as_a_daily_indicator(tmp_path):
+    import json
+    from investment_agent.market.leading import fetch_auto, MacroStore, GOLD_API, VCB_XML
+    (tmp_path / "gold-price.json").write_text(json.dumps({"as_of": "2026-11-16T15:27:00+07:00", "kinds": {"Vàng miếng SJC": {"buy": "1", "sell": "13750000"}}}),
+                                              encoding="utf-8")
+    pages = {GOLD_API: '{"symbol":"XAU","currency":"USD","price":3876.62,"updatedAt":"2026-11-16T09:00:00Z"}'}
+
+    def get(url):
+        if url in pages:
+            return pages[url]
+        if url == VCB_XML:
+            return VCB
+        raise OSError(url)
+    spec = next(i for i in load_indicators() if i["id"] == "sjc_gap_pct")
+    out = fetch_auto([spec], MacroStore(tmp_path), get=get, today=date(2026, 11, 16), sleep=lambda s: None)
+    assert out == {"sjc_gap_pct": "ok"}
+    obs = MacroStore(tmp_path).read("sjc_gap_pct")
+    assert obs[-1]["date"] == "2026-11-16" and spec["unit"] == "%"

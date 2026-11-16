@@ -36,6 +36,9 @@ $macro = & $python -W ignore -m investment_agent.cli macro-sync --data-dir $data
 # Nhac loi nguon: one Telegram note when a public source failed three runs in a row, and one when it is back.
 $sa = & $python -W ignore -m investment_agent.cli source-alerts --data-dir $data 2>$null
 "$(Get-Date -Format o) source-alerts exit=$LASTEXITCODE $sa" | Add-Content -LiteralPath $log -Encoding UTF8
+# Nhac chenh lech vang SJC: one Telegram note when the gap to the world price crosses the owner's threshold, and when it is back under.
+$sg = & $python -W ignore -m investment_agent.cli sjc-gap-alerts --data-dir $data 2>$null
+"$(Get-Date -Format o) sjc-gap-alerts exit=$LASTEXITCODE $sg" | Add-Content -LiteralPath $log -Encoding UTF8
 # Lich vi mo My: the Fed's and BLS's calendars read once a day, one Telegram note an event the day before (Vietnam time).
 $uc = & $python -W ignore -m investment_agent.cli us-calendar --data-dir $data 2>$null
 "$(Get-Date -Format o) us-calendar exit=$LASTEXITCODE $uc" | Add-Content -LiteralPath $log -Encoding UTF8

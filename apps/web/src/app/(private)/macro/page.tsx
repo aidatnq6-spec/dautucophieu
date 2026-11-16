@@ -1,5 +1,6 @@
 import { MacroChain } from "../../../components/macro-chain";
 import { UsChain } from "../../../components/us-chain";
+import { SjcGap } from "../../../components/sjc-gap";
 import { MacroView } from "../../../components/macro-view";
 import { MacroCalendar, RateSpread } from "../../../components/macro-extras";
 import { MacroLiquidity } from "../../../components/macro-liquidity";
@@ -14,6 +15,7 @@ export default function MacroPage() {
       <div className="pagehead"><h1>Chỉ báo vĩ mô đang tốt hay xấu?</h1><p className="muted">Leading indicator: giá trị hiện tại, xu hướng so với kỳ trước và đánh giá theo quy tắc của bạn.</p></div>
       <MacroChain />
       <UsChain />
+      <SjcGap />
       <Sensitivity />
       <RateCycle />
       <RateSpread />

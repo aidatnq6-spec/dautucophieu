@@ -38,6 +38,19 @@ def index_pull(symbols: dict, shares: dict, *, change: Decimal, close: Decimal) 
             "without_top": {"symbols": [s for s, _ in lead], "points": _s(change - sum((p for _, p in lead), Decimal(0)))} if lead else None}
 
 
+def asia_vs_index(index_change: Decimal | None, asia: dict | None) -> dict | None:
+    """VN-Index's way against the Asian markets read with the snapshot; a market whose figure is not this session's (unchanged since an
+    earlier day, or an earlier session by FRED) is left out and named."""
+    if index_change is None or index_change == 0 or not asia or asia.get("status") != "ok":
+        return None
+    fresh = [r for r in asia["rows"] if not r.get("unchanged_since") and not r.get("fred_date")]
+    if not fresh:
+        return None
+    moves = [Decimal(r["change_pct"]) for r in fresh]
+    return {"index": "up" if index_change > 0 else "down", "up": sum(1 for m in moves if m > 0), "down": sum(1 for m in moves if m < 0),
+            "counted": len(fresh), "left_out": [r["name"] for r in asia["rows"] if r not in fresh]}
+
+
 def vn30_multipliers(weights: dict) -> dict:
     """VN30 weighs each member by its shares × free float × the cap on its weight (HOSE's notice), not by all its shares."""
     return {s: Decimal(w["shares"]) * Decimal(w["free_float"]) * Decimal(w["cap"]) for s, w in weights.items()}

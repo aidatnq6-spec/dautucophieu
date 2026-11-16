@@ -61,3 +61,29 @@ def test_the_brief_line_for_vn30():
          "pull_vn30": {"status": "ok", "computed": "-0.65", "actual": "-0.66", "up": [{"symbol": "VIC", "points": "3.85"}],
                        "down": [{"symbol": "TCB", "points": "-2.30"}, {"symbol": "FPT", "points": "-1.80"}], "without_top": None}}
     assert signal_lines(s) == ["Mã kéo VN30 (điểm): VIC +3,85 · Mã ghì: TCB −2,30; FPT −1,80"]
+
+
+def asia_rows(*moves, stale=()):
+    names = ["Nikkei 225", "KOSPI", "Thượng Hải", "Hang Seng"]
+    return {"status": "ok", "read_at": "2026-11-16T15:32:00+07:00", "rows": [
+        {"code": n, "name": n, "price": "1", "change_pct": m, "unchanged_since": "2026-11-13" if n in stale else None, "fred_date": None}
+        for n, m in zip(names, moves)]}
+
+
+def test_vn_index_against_the_asian_markets_of_the_same_session():
+    from investment_agent.brief.signals import asia_vs_index
+    out = asia_vs_index(Decimal("1.96"), asia_rows("0.0053", "-0.0098", "-0.0059", "-0.0155", stale=("Nikkei 225",)))
+    assert out == {"index": "up", "up": 0, "down": 3, "counted": 3, "left_out": ["Nikkei 225"]}
+    assert asia_vs_index(Decimal("1.96"), {"status": "missing"}) is None
+    assert asia_vs_index(Decimal("0"), asia_rows("0.01", "0.01", "0.01", "0.01")) is None  # the index flat: nothing to compare
+
+
+def test_the_asia_line_says_with_or_against_and_what_was_left_out():
+    from investment_agent.notifications.render import signal_lines
+    base = {"status": "ok", "breadth_gap": None, "liquidity": None, "pull": {"status": "missing"}}
+    against = {**base, "asia": {"index": "up", "up": 0, "down": 3, "counted": 3, "left_out": ["Nikkei 225"]}}
+    assert signal_lines(against) == ["VN-Index tăng trong khi 3/3 thị trường châu Á giảm (không tính Nikkei 225: chưa có số phiên này)"]
+    same = {**base, "asia": {"index": "down", "up": 1, "down": 3, "counted": 4, "left_out": []}}
+    assert signal_lines(same) == ["VN-Index giảm cùng chiều 3/4 thị trường châu Á"]
+    split = {**base, "asia": {"index": "up", "up": 2, "down": 2, "counted": 4, "left_out": []}}
+    assert signal_lines(split) == ["VN-Index tăng; châu Á chia đôi (2 tăng, 2 giảm)"]

@@ -102,6 +102,19 @@ def signal_lines(signals: dict | None) -> list[str]:
         part30 = lambda rows: "; ".join(f"{r['symbol']} {_num(r['points'], sign=True)}" for r in rows[:3])  # noqa: E731
         out.append("Mã kéo VN30 (điểm): " + " · ".join(x for x in ((part30(vn30["up"]) if vn30["up"] else ""),
                                                                 (f"Mã ghì: {part30(vn30['down'])}" if vn30["down"] else "")) if x))
+    if a := signals.get("asia"):
+        move = {"up": "tăng", "down": "giảm"}
+        same, other = (a["up"], a["down"]) if a["index"] == "up" else (a["down"], a["up"])
+        if same > other:
+            line = f"VN-Index {move[a['index']]} cùng chiều {same}/{a['counted']} thị trường châu Á"
+        elif other > same:
+            line = (f"VN-Index {move[a['index']]} trong khi {other}/{a['counted']} thị trường châu Á "
+                    f"{move['down' if a['index'] == 'up' else 'up']}")
+        else:
+            line = f"VN-Index {move[a['index']]}; châu Á chia đôi ({a['up']} tăng, {a['down']} giảm)"
+        if a["left_out"]:
+            line += f" (không tính {', '.join(a['left_out'])}: chưa có số phiên này)"
+        out.append(line)
     if (liq := signals.get("liquidity")) and (liq["low"] or liq["below_avg_sessions"] >= 3):
         ratio = f"khối lượng khớp bằng {_num(float(liq['ratio20']) * 100, 0)}% trung bình 20 phiên"
         prev = f" ({_pct(liq['change_pct'])} so với phiên trước)" if liq.get("change_pct") is not None else ""

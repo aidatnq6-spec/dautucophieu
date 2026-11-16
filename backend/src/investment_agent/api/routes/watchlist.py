@@ -34,6 +34,7 @@ def watchlist(request: Request):
     except RepositoryUnavailable:
         return unavailable()
     return {"provenance": request.app.state.market.provenance, "groups_as_of": wl.groups_as_of, "group_dates": wl.group_dates, "kept": list(wl.kept),
+            "group_sources": {g: {k: s.get(k) for k in ("source", "period", "effective")} for g, s in wl.group_sources.items()},
             "vn100_review": vn100_review(wl), "rows": rows}
 
 

@@ -7,15 +7,21 @@ import { formatRatio, formatVnd } from "../lib/format";
 type Row = { ticker: string; groups: string[]; held: boolean; close: string | null; date: string | null;
   change_1d: string | null; change_20d: string | null; stale: boolean };
 type Watchlist = { provenance: string; groups_as_of: string | null; group_dates?: Record<string, string>; kept?: string[];
+  group_sources?: Record<string, { source: string; period: string | null; effective: string | null }>;
   vn100_review?: { vn30_changed_on: string; vn100_as_of: string } | null; rows: Row[] };
 const dmy = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 
-/** Each group's date: VN30 from VNDirect on that day; a kept group (VN100: no public source) on the day it was last taken. */
-export function groupsCaption(w: Pick<Watchlist, "groups_as_of" | "group_dates" | "kept">): string | null {
+/** Each group's date: VN30 from VNDirect on that day; VN100 from HOSE's notice (its period and effective day); a kept group on the
+ * day it was last taken. */
+export function groupsCaption(w: Pick<Watchlist, "groups_as_of" | "group_dates" | "kept" | "group_sources">): string | null {
   const dates = w.group_dates ?? {};
-  const parts = Object.keys(dates).sort((a, b) => a.length - b.length || a.localeCompare(b)).map((g) => (w.kept ?? []).includes(g)
-    ? `${g}: danh sách lưu ngày ${dmy(dates[g])} (không có nguồn tự động, cập nhật tay sau mỗi kỳ HOSE xét lại rổ)`
-    : `${g}: theo VNDirect ngày ${dmy(dates[g])}`);
+  const parts = Object.keys(dates).sort((a, b) => a.length - b.length || a.localeCompare(b)).map((g) => {
+    const hose = w.group_sources?.[g];
+    if (hose?.source === "hose") return `${g}: theo thông báo HOSE kỳ ${hose.period ?? "?"}, hiệu lực ${dmy(hose.effective ?? dates[g])}`;
+    return (w.kept ?? []).includes(g)
+      ? `${g}: danh sách lưu ngày ${dmy(dates[g])} (chưa đọc được thông báo của HOSE, giữ danh sách cũ)`
+      : `${g}: theo VNDirect ngày ${dmy(dates[g])}`;
+  });
   if (parts.length) return `Thành phần ${parts.join("; ")}.`;
   return w.groups_as_of ? `Thành phần VN30/VN100 theo nguồn ngày ${w.groups_as_of}.` : null;
 }

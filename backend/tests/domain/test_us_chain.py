@@ -59,3 +59,12 @@ def test_a_missing_or_short_series_is_said():
     assert nodes["dxy"]["fit"] == "missing" and nodes["us_rates"]["fit"] == "missing"
     assert nodes["gold"]["short_history"] is True and nodes["gold"]["from"] == "2026-11-14"
     assert out["missing"] == ["us_rates", "dxy", "usd_vnd"]
+
+
+def test_the_sjc_price_over_the_world_price_in_dong_per_chi():
+    from investment_agent.domain.us_chain import gold_premium
+    got = gold_premium(xau=(date(2026, 11, 16), Decimal("3875.47")), usd_vnd=(date(2026, 11, 16), Decimal("25950")), sjc_sell=Decimal("13750000"),
+                       sjc_as_of="2026-11-16T18:00:00+07:00")
+    # 3,875.47 USD/oz × 25,950 đ × 3.75 g a chỉ ÷ 31.1034768 g an ounce = 12,125,065 đ a chỉ
+    assert got == {"world_per_chi": "12125065", "sjc_sell": "13750000", "gap": "1624935", "gap_pct": "0.1340",
+                   "xau_date": "2026-11-16", "fx_date": "2026-11-16", "sjc_as_of": "2026-11-16T18:00:00+07:00"}

@@ -85,6 +85,16 @@ def _share(node: str, points: Points, today: date) -> dict:
             "change": _q(change, "0.0001"), "short_history": short, "stale": _stale(points, node, today)}
 
 
+GRAMS_PER_OUNCE, GRAMS_PER_CHI = Decimal("31.1034768"), Decimal("3.75")
+
+
+def gold_premium(*, xau: tuple[date, Decimal], usd_vnd: tuple[date, Decimal], sjc_sell: Decimal, sjc_as_of: str | None) -> dict:
+    """Vàng miếng SJC's selling price against the world price turned into đồng a chỉ at the bank's USD selling rate (no tax or fee)."""
+    world = xau[1] * usd_vnd[1] * GRAMS_PER_CHI / GRAMS_PER_OUNCE
+    return {"world_per_chi": _q(world, "1"), "sjc_sell": _plain(sjc_sell), "gap": _q(sjc_sell - world, "1"), "gap_pct": _q(sjc_sell / world - 1, "0.0001"),
+            "xau_date": xau[0].isoformat(), "fx_date": usd_vnd[0].isoformat(), "sjc_as_of": sjc_as_of}
+
+
 def us_chain(series: dict[str, Points], *, today: date) -> dict:
     """series: us_cpi_yoy, us_core_cpi_yoy (monthly), fed_effr, us10y, dxy, gold (đồng per chỉ), usd_vnd_vcb, oldest first."""
     nodes = [_cpi(series.get("us_cpi_yoy") or [], series.get("us_core_cpi_yoy") or [], today), _rates(series, today),

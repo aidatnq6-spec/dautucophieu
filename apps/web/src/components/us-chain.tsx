@@ -7,11 +7,13 @@ type Mode = "tightening" | "easing" | null;
 type Point = { date: string; value: string };
 type Part = { id: string; direction: string | null; latest: Point; from: string; change: string; short_history: boolean; stale: boolean };
 type Node = { id: string; direction: string | null; fit?: Fit; latest: Point | null; from?: string | null; change?: string | null;
-  short_history?: boolean; stale: boolean; parts?: Part[]; core?: { date: string; value: string; change: string | null }; label?: string };
+  short_history?: boolean; stale: boolean; parts?: Part[]; core?: { date: string; value: string; change: string | null }; label?: string;
+  unit?: string; premium?: Premium | null };
+type Premium = { world_per_chi: string; sjc_sell: string; gap: string; gap_pct: string; xau_date: string; fx_date: string; sjc_as_of: string | null };
 type Chain = { mode: Mode; driver: string | null; nodes: Pick<Node, "id" | "direction">[] | Node[]; with: string[]; against: string[];
   flat: string[]; missing: string[] };
 
-const NAME: Record<string, string> = { us_cpi: "Lạm phát Mỹ (CPI)", us_rates: "Lãi suất Mỹ", dxy: "DXY", gold: "Vàng trong nước",
+const NAME: Record<string, string> = { us_cpi: "Lạm phát Mỹ (CPI)", us_rates: "Lãi suất Mỹ", dxy: "DXY", gold: "Vàng",
   usd_vnd: "Tỷ giá USD/VND (Vietcombank)" };
 const SHORT: Record<string, string> = { us_cpi: "CPI Mỹ", us_rates: "lãi suất Mỹ", dxy: "DXY", gold: "vàng", usd_vnd: "tỷ giá USD/VND" };
 const PART: Record<string, string> = { fed_effr: "Lãi suất Fed qua đêm (EFFR)", us10y: "Lợi suất trái phiếu Mỹ 10 năm" };
@@ -22,6 +24,14 @@ const month = (iso: string) => `tháng ${Number(iso.slice(5, 7))}/${iso.slice(0,
 const num = (v: string | number, digits = 2) => Number(v).toLocaleString("vi-VN", { maximumFractionDigits: digits });
 const signed = (v: string | number, digits = 2) => `${Number(v) > 0 ? "+" : Number(v) < 0 ? "−" : ""}${num(Math.abs(Number(v)), digits)}`;
 const since = (from: string, short?: boolean) => short ? `chỉ có số từ ${day(from)}` : `so với ${day(from)}`;
+
+/** SJC's selling price against the world price turned into đồng a chỉ. */
+export function premiumText(p: Premium): string {
+  const vnd = (v: string) => Number(v).toLocaleString("vi-VN", { maximumFractionDigits: 0 });
+  const above = Number(p.gap) >= 0;
+  return `Vàng miếng SJC bán ra ${vnd(p.sjc_sell)} đ/chỉ, ${above ? "cao" : "thấp"} hơn giá thế giới quy đổi ${vnd(p.world_per_chi)} đ/chỉ là `
+    + `${vnd(String(Math.abs(Number(p.gap))))} đ (${signed(Number(p.gap_pct) * 100, 1)}%)`;
+}
 
 /** One sentence: what set the chain's way this week, then the links with it, against it, flat, and without figures. */
 export function chainSummary(c: Chain): string {
@@ -55,10 +65,12 @@ function Figure({ n }: { n: Node }) {
       {n.core.change != null ? ` (${signed(n.core.change)} điểm % so với tháng trước)` : ""}</p>}</>;
   if (n.id === "us_rates") return <ul className="chain-parts">{n.parts!.map((p) => <li key={p.id}>{PART[p.id] ?? p.id} <strong>{num(p.latest.value)}%</strong>
     <span className="caption"> ({signed(p.change)} điểm % {since(p.from, p.short_history)})</span></li>)}</ul>;
-  const unit = n.id === "gold" ? " đ/chỉ" : n.id === "usd_vnd" ? " đ" : "";
-  return <><p><strong>{num(n.latest!.value, n.id === "dxy" ? 2 : 0)}{unit}</strong>
+  const unit = n.id === "gold" ? ` ${n.unit ?? "đ/chỉ"}` : n.id === "usd_vnd" ? " đ" : "";
+  return <><p><strong>{num(n.latest!.value, n.id === "dxy" || n.unit === "USD/oz" ? 2 : 0)}{unit}</strong>
     <span className="caption"> ({signed(Number(n.change) * 100)}% {since(n.from!, n.short_history)})</span></p>
-    {n.label && <p className="caption">{n.label}</p>}</>;
+    {n.label && <p className="caption">{n.label}</p>}
+    {n.premium && <p className="caption" data-testid="gold-premium">{premiumText(n.premium)}. Quy đổi theo giá thế giới ngày {day(n.premium.xau_date)}
+      và tỷ giá bán Vietcombank, chưa tính thuế phí.</p>}</>;
 }
 
 /** Chuỗi liên thị trường trong tuần: US CPI → US rates → DXY → gold → USD/VND, coloured by the week's real moves. */

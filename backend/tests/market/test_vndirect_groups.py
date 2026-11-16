@@ -80,8 +80,9 @@ def test_health_reminds_to_update_vn100_after_vn30_changed(tmp_path):
 
 
 def hose_baskets(effective, vn30=("MBB", "VCB"), vn100=("MBB", "NEW", "VCB")):
+    weights = {s: {"shares": "1000", "free_float": "0.50", "cap": "1.0000"} for s in vn30}
     return lambda: {"notice_id": 9, "title": "HOSE: Cập nhật danh mục cổ phiếu thành phần của Chỉ số quy mô VNAllshare kỳ tháng 10/2026",
-                    "effective": effective, "period": "10/2026", "groups": {"VN30": list(vn30), "VN100": list(vn100)}}
+                    "effective": effective, "period": "10/2026", "groups": {"VN30": list(vn30), "VN100": list(vn100), "weights": {"VN30": weights}}}
 
 
 def saved_kept(tmp_path):
@@ -103,6 +104,7 @@ def test_vn100_comes_from_the_notice_of_hose_once_in_effect_and_a_change_is_told
     saved = json.loads(out.read_text(encoding="utf-8"))
     assert saved["groups"]["VN100"] == ["MBB", "NEW", "VCB"] and saved["kept"] == {} and "pending" not in saved
     assert saved["group_sources"] == {"VN100": {"source": "hose", "notice_id": 9, "period": "10/2026", "effective": "2026-11-16"}}
+    assert saved["vn30_weights"]["effective"] == "2026-11-16" and saved["vn30_weights"]["members"]["MBB"]["free_float"] == "0.50"
     assert sent == ["Rổ chỉ số HOSE thay đổi (thông báo HOSE kỳ 10/2026, hiệu lực 16/11/2026):\n- VN100: thêm NEW; bớt OLD\n"
                     "Danh sách theo dõi đã cập nhật nhóm chỉ số."]
     index_groups(["VN30", "VN100"], out, get=get, today=date(2026, 11, 17), hose=hose_baskets(date(2026, 11, 16)), send=lambda t: sent.append(t) or True)

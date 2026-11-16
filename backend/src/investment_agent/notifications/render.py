@@ -97,6 +97,11 @@ def signal_lines(signals: dict | None) -> list[str]:
     elif pull.get("status") == "mismatch":
         out.append(f"Mã kéo chỉ số: chưa hiện vì tổng tính được ({_num(pull['computed'], sign=True)} điểm) lệch với VN-Index "
                    f"({_num(pull['actual'], sign=True)} điểm)")
+    vn30 = signals.get("pull_vn30") or {}
+    if vn30.get("status") == "ok" and (vn30["up"] or vn30["down"]):
+        part30 = lambda rows: "; ".join(f"{r['symbol']} {_num(r['points'], sign=True)}" for r in rows[:3])  # noqa: E731
+        out.append("Mã kéo VN30 (điểm): " + " · ".join(x for x in ((part30(vn30["up"]) if vn30["up"] else ""),
+                                                                (f"Mã ghì: {part30(vn30['down'])}" if vn30["down"] else "")) if x))
     if (liq := signals.get("liquidity")) and (liq["low"] or liq["below_avg_sessions"] >= 3):
         ratio = f"khối lượng khớp bằng {_num(float(liq['ratio20']) * 100, 0)}% trung bình 20 phiên"
         prev = f" ({_pct(liq['change_pct'])} so với phiên trước)" if liq.get("change_pct") is not None else ""

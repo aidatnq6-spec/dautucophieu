@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { requestId } from "../lib/api";
+import { hanoiDate } from "../lib/format";
+import { CatalystTimeline } from "./catalyst-timeline";
 
 export type QKey = "business" | "strategy" | "industry" | "valuation" | "monitoring" | "timing";
 type Status = "good" | "watch" | "bad" | null;
@@ -88,25 +90,14 @@ export function ThesisCatalysts<M extends Parts>({ model, save, busy, due, auto 
   return (
     <>
       <h3>Mốc và chất xúc tác</h3>
-      {(list.length > 0 || auto.length > 0) && <table className="fv-table" aria-label="Mốc và chất xúc tác">
-        <thead><tr><th>Thời điểm</th><th>Dấu</th><th>Nội dung</th><th>Nguồn</th><th /></tr></thead>
-        <tbody>{auto.map((c) => <tr key={c.id} className="tq-auto-row">
-          <td data-label="Thời điểm">{c.when}<div className="caption">tự động</div></td><td data-label="Dấu"><strong>?</strong></td>
-          <td data-label="Nội dung">{c.text}</td><td data-label="Nguồn">{c.source}</td>
-          <td data-label="Thao tác"><div className="ib-actions"><span className="caption">Giữ làm mốc:</span>
-            {(["+", "-", "?"] as const).map((sign) => <button key={sign} type="button" className="btn" aria-label={`Giữ mốc ${c.text} với dấu ${SIGN[sign]}`} disabled={busy}
-              onClick={() => { const { auto: _auto, ...kept } = c; void save({ ...model, catalysts: [...list, { ...kept, sign }] }); }}>{SIGN[sign]}</button>)}</div></td></tr>)}
-        {list.map((c) => <tr key={c.id} className={c.done ? "tq-done" : undefined}>
-          <td data-label="Thời điểm">{c.when || "chưa có mốc"}{c.on && <div className="caption">nhắc {c.on.split("-").reverse().join("/")}</div>}
-            {due.includes(c.id) && <span className="pill warn">đã đến mốc</span>}</td>
-          <td data-label="Dấu"><span className={c.sign === "+" ? "fd-up" : c.sign === "-" ? "fd-down" : undefined}><strong>{SIGN[c.sign]}</strong></span></td>
-          <td data-label="Nội dung">{c.text}</td><td data-label="Nguồn">{c.source || "—"}</td>
-          <td data-label="Thao tác"><div className="ib-actions">
-            <button type="button" className="btn" disabled={busy} onClick={() => void save({ ...model, catalysts: list.map((x) => (x.id === c.id ? { ...x, done: !x.done } : x)) })}>
-              {c.done ? "Mở lại" : "Đã xảy ra"}</button>
-            <button type="button" className="btn" aria-label={`Xóa mốc ${c.text}`} disabled={busy}
-              onClick={() => { if (window.confirm("Xóa mốc này?")) void save({ ...model, catalysts: list.filter((x) => x.id !== c.id) }); }}>Xóa</button></div></td></tr>)}</tbody>
-      </table>}
+      {(list.length > 0 || auto.length > 0) && <CatalystTimeline label="Mốc và chất xúc tác" today={hanoiDate()} due={due}
+        items={[...list, ...auto]} actions={(c) => c.auto ? <><span className="caption">Giữ làm mốc:</span>
+          {(["+", "-", "?"] as const).map((sign) => <button key={sign} type="button" className="btn" aria-label={`Giữ mốc ${c.text} với dấu ${SIGN[sign]}`} disabled={busy}
+            onClick={() => { const { auto: _auto, ...kept } = c; void save({ ...model, catalysts: [...list, { ...kept, sign }] }); }}>{SIGN[sign]}</button>)}</> : <>
+          <button type="button" className="btn" disabled={busy} onClick={() => void save({ ...model, catalysts: list.map((x) => (x.id === c.id ? { ...x, done: !x.done } : x)) })}>
+            {c.done ? "Mở lại" : "Đã xảy ra"}</button>
+          <button type="button" className="btn" aria-label={`Xóa mốc ${c.text}`} disabled={busy}
+            onClick={() => { if (window.confirm("Xóa mốc này?")) void save({ ...model, catalysts: list.filter((x) => x.id !== c.id) }); }}>Xóa</button></>} />}
       <form className="formgrid" aria-label="Thêm mốc" onSubmit={(e) => { e.preventDefault();
         void save({ ...model, catalysts: [...list, { ...draft, id: requestId().slice(0, 24) }] }).then(() => setDraft(BLANK)); }}>
         <label className="field">Thời điểm<input aria-label="Thời điểm mốc" placeholder="Q4/2026" maxLength={20} value={draft.when} onChange={(e) => setDraft({ ...draft, when: e.target.value })} /></label>

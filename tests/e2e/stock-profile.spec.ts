@@ -437,3 +437,12 @@ test("a ticker shows how its price moved after each report, and projects only fo
   await expect(box).toContainText("Không phải khuyến nghị");
   await expect(page.getByRole("region", { name: "Dự án và điểm rơi lợi nhuận" })).toHaveCount(0);
 });
+
+test("a question to the AI carrying an amount is blocked before anything is fetched or sent", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Hỏi AI về tài liệu" });
+  await box.getByLabel("Link tài liệu").fill("https://example.vn/fpt-bctc-2025.pdf");
+  await box.getByLabel("Câu hỏi", { exact: true }).fill("Phải thu 2.953 tỷ có thật không?");
+  await box.getByRole("button", { name: "Hỏi AI" }).click();
+  await expect(box.getByRole("alert")).toContainText("Câu hỏi có số tiền");
+});

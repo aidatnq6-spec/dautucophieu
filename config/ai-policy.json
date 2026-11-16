@@ -1,10 +1,12 @@
 {
-  "version": "ai-policy-2026-10-26.1",
+  "version": "ai-policy-2026-11-16.1",
   "status": "approved",
-  "notice": "Chủ sở hữu duyệt ngày 26/10/2026: AI chỉ đọc nội dung báo cáo vĩ mô, ngành, chiến lược công khai (ACBS, World Bank); không gửi danh mục, danh sách theo dõi hay định giá; ngân sách 2 USD/tháng.",
+  "notice": "Chủ sở hữu duyệt ngày 26/10/2026: AI chỉ đọc nội dung báo cáo vĩ mô, ngành, chiến lược công khai (ACBS, World Bank); không gửi danh mục, danh sách theo dõi hay định giá; ngân sách 2 USD/tháng. Mở rộng ngày 16/11/2026 (C5): AI đọc thêm tài liệu công khai của doanh nghiệp (BCTC, thuyết minh, nghị quyết, báo cáo thường niên, công bố thông tin); mỗi lần gửi đúng mã cổ phiếu đang hỏi, câu hỏi đã qua bộ lọc và đoạn trích tài liệu; vẫn không gửi danh mục, giá vốn, danh sách theo dõi, định giá hay số liệu cá nhân.",
   "provider": {"data_collection": "deny", "zdr": true, "require_parameters": true},
   "tasks": {
-    "insights": {"models": ["openai/gpt-6-luna", "deepseek/deepseek-v4-flash"], "required_parameters": ["response_format"], "max_tokens": 4000}
+    "insights": {"models": ["openai/gpt-6-luna", "deepseek/deepseek-v4-flash"], "required_parameters": ["response_format"], "max_tokens": 4000},
+    "doc_qa": {"models": ["openai/gpt-6-luna", "deepseek/deepseek-v4-flash"], "required_parameters": ["response_format"], "max_tokens": 1500},
+    "notes_extract": {"models": ["openai/gpt-6-luna", "deepseek/deepseek-v4-flash"], "required_parameters": ["response_format"], "max_tokens": 3000}
   },
   "budget": {
     "monthly_usd": "2",

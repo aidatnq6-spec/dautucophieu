@@ -52,6 +52,8 @@ def main() -> int:
     ra.add_argument("--data-dir", type=Path, required=True)
     sa = commands.add_parser("source-alerts", help="one Telegram note when a public source failed three macro runs in a row, and when it is back")
     sa.add_argument("--data-dir", type=Path, required=True)
+    cw = commands.add_parser("calendar-watch", help="from 1 December, one Telegram note when HOSE posts next year's holiday calendar")
+    cw.add_argument("--data-dir", type=Path, required=True)
     la = commands.add_parser("liquidity-alerts", help="one Telegram note when the overnight interbank rate jumps or the bank USD rate nears the ceiling")
     la.add_argument("--data-dir", type=Path, required=True)
     me = commands.add_parser("macro-events-remind", help="one Telegram note the day before the owner's macro events marked for a reminder")
@@ -172,6 +174,8 @@ def main() -> int:
         return receivable_alerts_cli(args.data_dir)
     if args.command == "source-alerts":
         return source_alerts_cli(args.data_dir)
+    if args.command == "calendar-watch":
+        return calendar_watch_cli(args.data_dir)
     if args.command == "liquidity-alerts":
         return liquidity_alerts_cli(args.data_dir)
     if args.command == "macro-events-remind":
@@ -1037,6 +1041,21 @@ def source_alerts_cli(data_dir: Path) -> int:
 
     telegram = _scheduled_telegram(data_dir)
     out = check_sources(data_dir, send=telegram[0] if telegram else (lambda text: False), labels=macro_labels())
+    print(json.dumps(out))
+    return 0
+
+
+def calendar_watch_cli(data_dir: Path) -> int:
+    """Dò lịch giao dịch HOSE; a note not sent (delivery off) is tried again on the next run."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from investment_agent.domain.pinned import CONFIG_DIR
+    from investment_agent.services.calendar_watch import watch_calendar
+
+    telegram = _scheduled_telegram(data_dir)
+    out = watch_calendar(Path(data_dir), CONFIG_DIR, send=telegram[0] if telegram else (lambda text: False),
+                         today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
     print(json.dumps(out))
     return 0
 

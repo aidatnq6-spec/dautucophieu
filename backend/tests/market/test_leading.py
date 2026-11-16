@@ -554,3 +554,8 @@ def test_vietnam_cpi_comes_from_the_statistics_office_with_the_news_as_fallback(
 def test_monthly_indicators_are_marked_so_hand_entry_asks_for_the_month():
     monthly = {i["id"] for i in load_indicators() if i.get("period") == "month"}
     assert monthly == {"m2_vn", "vn_trade_balance", "vn_trade_balance_ytd", "vn_fdi_disbursed", "vn_fdi_disbursed_yoy", "vn_retail_yoy", "vn_public_invest_yoy", "us_pmi", "vn_pmi", "vn_cpi_yoy"}
+
+
+
+def test_session_indicators_are_marked_so_hand_entry_skips_days_without_a_session():
+    assert {i["id"] for i in load_indicators() if i.get("period") == "session"} == {"vn10y", "vn_interbank_on", "vn_interbank_1w", "vn_interbank_1m", "foreign_net", "vnindex_value"}

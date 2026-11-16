@@ -5,7 +5,7 @@ import { formatDecimal, hanoiDate } from "../lib/format";
 
 type Row = { id: string; label: string; unit: string; auto: boolean; value: string | null; date: string | null; previous: string | null;
   trend: string | null; assessment: string | null; stale: boolean; source_url: string; note: string | null;
-  source_error: string | null; manual_allowed: boolean; period: "month" | null };
+  source_error: string | null; manual_allowed: boolean; period: "month" | "session" | null };
 
 /** The month before today's, as yyyy-mm: a monthly figure is usually entered once its month is over. */
 export function lastMonth(today: string): string {
@@ -46,7 +46,8 @@ function EntryForm({ row, onDone }: { row: Row; onDone: (saved: boolean) => void
       {monthly
         ? <label className="field">Tháng số liệu<input type="month" value={month} max={lastMonth(hanoiDate())} onChange={(e) => setMonth(e.target.value)} required />
             <span className="caption">Chọn tháng của số liệu (ví dụ PMI tháng 10), không phải ngày nhập; phần mềm ghi vào ngày cuối tháng.</span></label>
-        : <label className="field">Ngày số liệu<input type="date" value={day} onChange={(e) => setDay(e.target.value)} required /></label>}
+        : <label className="field">Ngày số liệu<input type="date" value={day} onChange={(e) => setDay(e.target.value)} required />
+            {row.period === "session" && <span className="caption">Chọn ngày có phiên giao dịch (không phải thứ Bảy, Chủ nhật hay ngày lễ HOSE).</span>}</label>}
       <label className="field">Giá trị ({row.unit})<input inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} required /></label>
       <label className="field">Link nguồn<input type="url" value={link} onChange={(e) => setLink(e.target.value)} placeholder={row.source_url} /></label>
       <div className="actions"><button className="btn primary" type="submit">Lưu</button><button className="btn" type="button" onClick={() => onDone(false)}>Hủy</button></div>

@@ -2,6 +2,7 @@
 
 import calendar
 from datetime import date as Day
+from datetime import timedelta
 from datetime import date
 from pathlib import Path
 from decimal import Decimal, InvalidOperation
@@ -31,6 +32,19 @@ from .common import WRITE_ERRORS, error, now, unavailable, write_error
 
 router = APIRouter(prefix="/internal/macro")
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
+def _is_session(day) -> bool:
+    """HOSE's official calendar of that year when the app has it; otherwise every weekday counts (nothing is guessed beyond that)."""
+    from investment_agent.cli import load_calendar
+    from investment_agent.domain.pinned import CONFIG_DIR
+    path = CONFIG_DIR / f"trading-calendar-hose-{day.year}.json"
+    if path.is_file():
+        try:
+            return load_calendar(path).is_session(day)
+        except ValueError:
+            pass
+    return day.weekday() < 5
 
 
 class ManualObservation(ContractModel):
@@ -238,6 +252,13 @@ def enter(request: Request, indicator: str, body: ManualObservation):
         day = body.date
         if day > now(request).astimezone(VN).date():
             return error(422, "future_date", "Ngày số liệu không được ở tương lai.")
+        # a figure of the trading session (rates, yields, HOSE's foreign flows and value) is never kept on a day without a session
+        if spec.get("period") == "session" and not _is_session(day):
+            back = day - timedelta(days=1)
+            while not _is_session(back):
+                back -= timedelta(days=1)
+            return error(422, "not_a_session", f"Ngày {day.strftime('%d/%m/%Y')} là ngày nghỉ, không có phiên giao dịch: chọn phiên gần nhất "
+                                                f"({back.strftime('%d/%m/%Y')}).")
     plain = format(value.normalize(), "f")
     store.upsert(indicator, [(day, plain)], entry="manual", source_url=body.source_url)
     return {"indicator": indicator, "date": day.isoformat(), "value": plain}

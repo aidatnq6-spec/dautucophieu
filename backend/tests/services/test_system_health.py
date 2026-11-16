@@ -161,3 +161,18 @@ def test_before_half_past_four_the_previous_session_is_the_one_checked(tmp_path)
     at = datetime(2026, 11, 13, 8, 0, tzinfo=timezone.utc)  # 15:00 in Vietnam
     assert not any(p["id"].startswith("brief:") for p in health_report(data, now=at, calendar=_cal())["problems"])
     assert not any(p["id"].startswith("brief:") for p in health_report(data, now=at)["problems"])  # no calendar given: not checked
+
+
+def test_next_years_hose_calendar_missing_from_december_is_a_problem_and_this_years_missing_always_is(tmp_path):
+    data, config = healthy(tmp_path), tmp_path / "config"
+    config.mkdir()
+    (config / "trading-calendar-hose-2026.json").write_text("{}", encoding="utf-8")
+    ids = lambda now: {p["id"]: p for p in health_report(data, now=now, config_dir=config)["problems"]}  # noqa: E731
+    assert "calendar:2027" not in ids(NOW)  # November: not yet
+    december = datetime(2026, 11, 30, 18, 0, tzinfo=timezone.utc)  # 01/12 01:00 in Hà Nội
+    assert ids(december)["calendar:2027"]["detail"] == ("chưa có lịch giao dịch HOSE năm 2027 (config/trading-calendar-hose-2027.json): "
+                                                         "từ 01/01/2027 giá, bản tin và kiểm tra phiên dừng; HOSE thường công bố cuối tháng 12")
+    (config / "trading-calendar-hose-2027.json").write_text("{}", encoding="utf-8")
+    assert "calendar:2027" not in ids(december)
+    (config / "trading-calendar-hose-2026.json").unlink()
+    assert ids(december)["calendar:2026"]["detail"].startswith("chưa có lịch giao dịch HOSE năm 2026")

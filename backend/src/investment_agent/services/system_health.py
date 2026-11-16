@@ -131,10 +131,28 @@ def vn100_problem(data_dir: Path) -> dict | None:
                       f"{dmy(review['vn100_as_of'])} có thể đã cũ: cập nhật từ thông báo của HOSE"}
 
 
-def health_report(data_dir: Path, *, now: datetime, calendar=None) -> dict:
+def calendar_problems(config_dir: Path, *, now: datetime) -> list[dict]:
+    """HOSE's trading calendar of this year, and of next year from 1 December: without it prices, the brief and the session checks stop
+    on 1 January. HOSE publishes the next year's calendar late in December; the file is made from that notice, never guessed."""
+    from zoneinfo import ZoneInfo
+    today = now.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date()
+    out = []
+    for year in (today.year, today.year + 1) if today.month == 12 else (today.year,):
+        name = f"trading-calendar-hose-{year}.json"
+        if (Path(config_dir) / name).is_file():
+            continue
+        when = "giá, bản tin và kiểm tra phiên đang dừng" if year == today.year else             f"từ 01/01/{year} giá, bản tin và kiểm tra phiên dừng; HOSE thường công bố cuối tháng 12"
+        out.append({"id": f"calendar:{year}", "label": f"Lịch giao dịch HOSE {year}",
+                    "detail": f"chưa có lịch giao dịch HOSE năm {year} (config/{name}): {when}"})
+    return out
+
+
+def health_report(data_dir: Path, *, now: datetime, calendar=None, config_dir: Path | None = None) -> dict:
+    from investment_agent.domain.pinned import CONFIG_DIR
     data_dir = Path(data_dir)
     root = data_dir.parent
     problems, sources = [], []
+    problems.extend(calendar_problems(CONFIG_DIR if config_dir is None else config_dir, now=now))
     for s in SOURCES:
         if s["dir"] is None:
             points = SeriesStore(data_dir / "trend-sources").read("VNINDEX-1d")

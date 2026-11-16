@@ -1358,6 +1358,7 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
                             insider=insider, today=today)
         from investment_agent.market.leading import MacroStore, load_indicators
         from investment_agent.services.receivable_signs import SIGNS, receivable_signs
+        from investment_agent.services.manual_audit import audit_manual
         from investment_agent.services.source_alerts import macro_labels, source_view
         rows = receivable_signs(Path(data_dir))
         store = MacroStore(Path(data_dir))
@@ -1374,7 +1375,8 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
         return {**got, "sessions": sessions, "theses": read_theses(repo, owner)[0], "costs": held_costs(repo, owner),
                 "shares": position_shares(repo, owner), "todo": [i["text"] for i in attention_items(repo, owner, Path(data_dir), now=now)],
                 "signs": {"before": None, "now": {r["symbol"]: sorted(k for k, v in r["signs"].items() if v) for r in rows}, "titles": dict(SIGNS)},
-                "macro": {"before": None, "now": monthly}, "sources": list(groups.values())}
+                "macro": {"before": None, "now": monthly}, "sources": list(groups.values()),
+                "manual": audit_manual(Path(data_dir), load_indicators())}
     print(json.dumps(weekly_brief_run(data_dir, inputs=inputs, send=send, now=now)))
     return 0
 

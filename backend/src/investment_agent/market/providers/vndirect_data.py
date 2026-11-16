@@ -33,6 +33,20 @@ def _data(get: Callable[[str], str], url: str) -> list[dict]:
     return json.loads(get(url)).get("data", [])
 
 
+SHARES_URL = BASE + "ratios/latest?filter=ratioCode:OUTSTANDING_SHARES&where=code:{codes}&order=reportDate&fields=code,value,reportDate"
+
+
+def outstanding_shares(symbols: list[str], get: Callable[[str], str] = default_get, *, batch: int = 200):
+    """Shares outstanding of many tickers (VNDirect ratio OUTSTANDING_SHARES), a few calls of `batch` codes; a ticker without one is left out."""
+    from decimal import Decimal
+    out = {}
+    for i in range(0, len(symbols), batch):
+        for r in _data(get, SHARES_URL.format(codes=",".join(symbols[i:i + batch]))):
+            if r.get("code") and r.get("value"):
+                out[r["code"]] = Decimal(str(int(r["value"])))
+    return out
+
+
 def hose_listing(get: Callable[[str], str] = default_get, *, known_names: dict[str, str] | None = None) -> dict:
     """HOSE stock symbols, each one's ICB level-2 code and the level-2 names. Names already known (the ones the brief has shown so
     far) are kept, so a sector keeps its name; VNDirect's name is used for a code not seen before."""

@@ -99,3 +99,17 @@ def test_company_people_holders_officers_and_the_foreign_stake():
     own = out["ownership"]
     assert own["foreign"] == "0.2643" and own["foreign_max"] == "0.49" and own["state"] is None and own["free_float"] is None
     assert out["structure"] is None
+
+
+def test_shares_outstanding_of_many_tickers_come_in_batches():
+    from decimal import Decimal
+    from investment_agent.market.providers.vndirect_data import outstanding_shares
+    seen = []
+
+    def get(url):
+        seen.append(url)
+        codes = url.split("where=code:")[1].split("&")[0].split(",")
+        return json.dumps({"data": [{"code": c, "value": 1000.0, "reportDate": "2026-12-31"} for c in codes if c != "ZZZ"]})
+    got = outstanding_shares([f"A{i:03d}" for i in range(250)] + ["ZZZ"], get=get)
+    assert len(seen) == 2 and "ratioCode:OUTSTANDING_SHARES" in seen[0]
+    assert len(got) == 250 and got["A000"] == Decimal(1000) and "ZZZ" not in got

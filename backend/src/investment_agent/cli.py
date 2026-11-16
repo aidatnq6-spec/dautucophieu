@@ -307,6 +307,11 @@ def _basket_note(changes: dict, hose_info: dict | None) -> str:
     return "\n".join(lines + ["Danh sách theo dõi đã cập nhật nhóm chỉ số."])
 
 
+def _vd_shares(symbols: list[str]) -> dict:
+    from investment_agent.market.providers.vndirect_data import outstanding_shares
+    return outstanding_shares(symbols)
+
+
 def index_groups(groups: list[str], output: Path, provider=None, today=None, get=None, hose=None, send=None) -> int:
     """VN30 from VNDirect (its listing marks VN30 members only). VN100 from HOSE's size-index notice (hose: market.providers.hose_baskets)
     from the day it takes effect; until then, or when the notice cannot be read whole, the saved members are kept with the day they were
@@ -1731,7 +1736,8 @@ def brief_snapshot_cli(data_dir: Path, calendar_path: Path, *, listing=None, boa
                 for day, (bar, _) in PriceStore(data_dir).latest("VNINDEX").items()}
     snap = build_snapshot(session_date=session, previous_session=_previous_session(cal, session), now=now, listing=cached_listing,
                           board=board, series=lambda index_id: series.read(f"{index_id}-1d"), hose_get=http_get, rss_get=http_get,
-                          store=BriefStore(data_dir), earlier=earlier, index_bars=index_bars)
+                          store=BriefStore(data_dir), earlier=earlier, index_bars=index_bars,
+                          shares=lambda symbols: _vd_shares(symbols))
     print(json.dumps({"status": "ok", "session": session.isoformat(),
                       "sections": {k: v["status"] for k, v in snap.items() if isinstance(v, dict) and "status" in v}}, ensure_ascii=False))
     return 0

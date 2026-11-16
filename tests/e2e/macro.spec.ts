@@ -25,10 +25,10 @@ test("automatic indicators show value, trend and the owner's assessment", async 
 test("the owner enters PMI values and sees the trend", async ({ page }) => {
   await openMacro(page);
   const row = () => page.getByRole("row", { name: /PMI sản xuất Việt Nam/ });
-  for (const [day, value] of [["2026-09-01", "52,4"], ["2026-10-01", "51,9"]]) {
+  for (const [month, value] of [["2026-09", "52,4"], ["2026-10", "51,9"]]) {
     await row().getByRole("button", { name: "Nhập" }).click();
     const form = page.getByRole("form", { name: "Nhập PMI sản xuất Việt Nam" });
-    await form.getByLabel("Ngày số liệu").fill(day);
+    await form.getByLabel("Tháng số liệu").fill(month);  // a monthly figure is entered by its month
     await form.getByLabel("Giá trị").fill(value);
     await form.getByLabel("Link nguồn").fill("https://example.invalid/pmi");
     await form.getByRole("button", { name: "Lưu" }).click();
@@ -46,10 +46,10 @@ test("the impact chain shows five links, says what is missing, and reads inflati
   await expect(chain.getByTestId("chain-liquidity")).toContainText("bơm 1.500 tỷ đ");
   await expect(chain).toContainText("không phải khuyến nghị");
   // Months before the 03/2026 figure performance.spec enters, so either order leaves CPI rising: 2,0 → 2,9 (→ 3,2).
-  for (const [day, value] of [["2026-01-31", "2,0"], ["2026-02-28", "2,9"]]) {
+  for (const [month, value] of [["2026-01", "2,0"], ["2026-02", "2,9"]]) {
     await page.getByRole("row", { name: /Lạm phát Việt Nam/ }).getByRole("button", { name: "Nhập" }).click();
     const form = page.getByRole("form", { name: "Nhập Lạm phát Việt Nam (CPI, so cùng kỳ)" });
-    await form.getByLabel("Ngày số liệu").fill(day);
+    await form.getByLabel("Tháng số liệu").fill(month);
     await form.getByLabel("Giá trị").fill(value);
     await form.getByRole("button", { name: "Lưu" }).click();
     await expect(form).toHaveCount(0);
@@ -99,6 +99,9 @@ test("automated rows with a manual fallback, and US PMI entered by hand", async 
   const us = page.getByRole("row", { name: /PMI sản xuất Mỹ/ });
   await expect(us).toContainText("Nhập tay");
   await expect(us.getByRole("button", { name: "Nhập" })).toBeVisible();
+  await us.getByRole("button", { name: "Nhập" }).click();
+  await expect(page.getByLabel("Tháng số liệu")).toBeVisible();  // a monthly figure asks for its month, not the day it is typed
+  await expect(page.getByLabel("Ngày số liệu")).toHaveCount(0);
 });
 
 test("the rate cycle line says which rates it reads and waits for six months of Vietnam data", async ({ page }) => {

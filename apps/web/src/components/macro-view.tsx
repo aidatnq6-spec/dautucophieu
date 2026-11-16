@@ -5,7 +5,13 @@ import { formatDecimal, hanoiDate } from "../lib/format";
 
 type Row = { id: string; label: string; unit: string; auto: boolean; value: string | null; date: string | null; previous: string | null;
   trend: string | null; assessment: string | null; stale: boolean; source_url: string; note: string | null;
-  source_error: string | null; manual_allowed: boolean };
+  source_error: string | null; manual_allowed: boolean; period: "month" | null };
+
+/** The month before today's, as yyyy-mm: a monthly figure is usually entered once its month is over. */
+export function lastMonth(today: string): string {
+  const y = +today.slice(0, 4), m = +today.slice(5, 7);
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+}
 
 /** Keeps the value's own precision (at most two places) with Vietnamese grouping. */
 const show = (v: string) => formatDecimal(v, Math.min((v.split(".")[1] ?? "").length, 2));
@@ -21,13 +27,15 @@ export function updatedLabel(day: string | null, today: string): { day: string; 
 
 function EntryForm({ row, onDone }: { row: Row; onDone: (saved: boolean) => void }) {
   const [day, setDay] = useState(hanoiDate());
+  const [month, setMonth] = useState(lastMonth(hanoiDate()));
+  const monthly = row.period === "month";
   const [value, setValue] = useState("");
   const [link, setLink] = useState("");
   const [error, setError] = useState<string | null>(null);
   const save = async () => {
     setError(null);
     try {
-      await api(`macro/${row.id}/observations`, { method: "POST", body: { date: day, value, source_url: link.trim() || null } });
+      await api(`macro/${row.id}/observations`, { method: "POST", body: { ...(monthly ? { month } : { date: day }), value, source_url: link.trim() || null } });
       onDone(true);
     } catch (e) {
       setError(e instanceof ApiError ? (e.failure.fields.includes("source_url") ? "Link nguồn phải bắt đầu bằng http:// hoặc https://." : e.failure.message) : "Lỗi lưu.");
@@ -35,7 +43,10 @@ function EntryForm({ row, onDone }: { row: Row; onDone: (saved: boolean) => void
   };
   return (
     <form aria-label={`Nhập ${row.label}`} className="formgrid" onSubmit={(e) => { e.preventDefault(); void save(); }}>
-      <label className="field">Ngày số liệu<input type="date" value={day} onChange={(e) => setDay(e.target.value)} required /></label>
+      {monthly
+        ? <label className="field">Tháng số liệu<input type="month" value={month} max={lastMonth(hanoiDate())} onChange={(e) => setMonth(e.target.value)} required />
+            <span className="caption">Chọn tháng của số liệu (ví dụ PMI tháng 10), không phải ngày nhập; phần mềm ghi vào ngày cuối tháng.</span></label>
+        : <label className="field">Ngày số liệu<input type="date" value={day} onChange={(e) => setDay(e.target.value)} required /></label>}
       <label className="field">Giá trị ({row.unit})<input inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} required /></label>
       <label className="field">Link nguồn<input type="url" value={link} onChange={(e) => setLink(e.target.value)} placeholder={row.source_url} /></label>
       <div className="actions"><button className="btn primary" type="submit">Lưu</button><button className="btn" type="button" onClick={() => onDone(false)}>Hủy</button></div>

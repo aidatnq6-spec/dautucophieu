@@ -996,7 +996,7 @@ def macro_rows(indicators: list[dict], store: MacroStore, *, today: date) -> lis
         status = statuses.get(ind["id"], {}).get("status")
         last = obs[-1] if obs else None
         trend, assessment = evaluate(ind["rule"], [o["value"] for o in obs[-2:]])
-        rows.append({"id": ind["id"], "label": ind["label"], "unit": ind["unit"], "auto": ind["source"]["kind"] != "manual",
+        rows.append({"id": ind["id"], "label": ind["label"], "unit": ind["unit"], "auto": ind["source"]["kind"] != "manual", "period": ind.get("period"),
                      "value": last["value"] if last else None, "date": last["date"] if last else None,
                      "previous": obs[-2]["value"] if len(obs) >= 2 else None, "trend": trend, "assessment": assessment,
                      "stale": last is not None and (today - date.fromisoformat(last["date"])).days > ind["max_age_days"],

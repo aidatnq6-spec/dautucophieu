@@ -1,5 +1,5 @@
 {
- "version": "macro-2026-11-16.2",
+ "version": "macro-2026-11-16.3",
  "notice": "Quy tắc đánh giá theo bảng Leading Indicator của chủ sở hữu (25/10/2026). bad_when: up = tăng là Xấu; down = giảm là Xấu; sign = âm là Xấu; pmi = Tốt khi trên 50 và không giảm.",
  "indicators": [
   {
@@ -126,6 +126,7 @@
    "unit": "tỷ đồng",
    "rule": "down",
    "max_age_days": 80,
+   "period": "month",
    "source": {
     "kind": "sbv_m2",
     "fallback": {
@@ -145,6 +146,7 @@
    "unit": "tỷ USD",
    "rule": "sign",
    "max_age_days": 45,
+   "period": "month",
    "source": {
     "kind": "nso_report",
     "field": "trade_month",
@@ -159,6 +161,7 @@
    "unit": "tỷ USD",
    "rule": "sign",
    "max_age_days": 45,
+   "period": "month",
    "source": {
     "kind": "nso_report",
     "field": "trade_ytd",
@@ -173,6 +176,7 @@
    "unit": "tỷ USD",
    "rule": "none",
    "max_age_days": 45,
+   "period": "month",
    "source": {
     "kind": "nso_report",
     "field": "fdi_ytd",
@@ -187,6 +191,7 @@
    "unit": "%",
    "rule": "down",
    "max_age_days": 45,
+   "period": "month",
    "source": {
     "kind": "nso_report",
     "field": "fdi_yoy",
@@ -201,6 +206,7 @@
    "unit": "%",
    "rule": "down",
    "max_age_days": 45,
+   "period": "month",
    "source": {
     "kind": "nso_report",
     "field": "retail_yoy",
@@ -215,6 +221,7 @@
    "unit": "%",
    "rule": "down",
    "max_age_days": 75,
+   "period": "month",
    "source": {
     "kind": "nso_report",
     "field": "public_invest_yoy",
@@ -242,6 +249,7 @@
    "unit": "điểm",
    "rule": "pmi",
    "max_age_days": 35,
+   "period": "month",
    "source": {
     "kind": "manual"
    },
@@ -254,6 +262,7 @@
    "unit": "điểm",
    "rule": "pmi",
    "max_age_days": 35,
+   "period": "month",
    "source": {
     "kind": "cafef_pmi",
     "fallback": {
@@ -270,6 +279,7 @@
    "unit": "%",
    "rule": "up",
    "max_age_days": 40,
+   "period": "month",
    "source": {
     "kind": "nso_cpi",
     "fallback": {

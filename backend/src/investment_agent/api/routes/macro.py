@@ -1,5 +1,7 @@
 """Leading macro indicators: automatic values from free feeds plus the owner's entries."""
 
+import calendar
+from datetime import date as Day
 from datetime import date
 from pathlib import Path
 from decimal import Decimal, InvalidOperation
@@ -32,7 +34,8 @@ VN = ZoneInfo("Asia/Ho_Chi_Minh")
 
 
 class ManualObservation(ContractModel):
-    date: date
+    date: Day | None = None  # a daily figure: its day (Day: the date type, as the field takes its name)
+    month: str | None = Field(default=None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$")  # a monthly figure: its month, kept at the month's end
     value: str = Field(min_length=1, max_length=32)
     source_url: str | None = Field(default=None, max_length=500, pattern=r"^https?://\S+$")
 
@@ -221,8 +224,20 @@ def enter(request: Request, indicator: str, body: ManualObservation):
         value = None
     if value is None or not value.is_finite():
         return error(422, "invalid_value", "Giá trị phải là một số.")
-    if body.date > now(request).astimezone(VN).date():
-        return error(422, "future_date", "Ngày số liệu không được ở tương lai.")
+    # a monthly figure is kept at its month's end, never at the day it was typed (that mixed months up in the trend)
+    if spec.get("period") == "month":
+        if body.month is None:
+            return error(422, "month_required", "Chỉ số theo tháng: chọn tháng của số liệu.")
+        y, m = (int(x) for x in body.month.split("-"))
+        day = date(y, m, calendar.monthrange(y, m)[1])
+        if day > now(request).astimezone(VN).date():
+            return error(422, "future_date", "Tháng số liệu chưa kết thúc.")
+    else:
+        if body.date is None:
+            return error(422, "date_required", "Chọn ngày của số liệu.")
+        day = body.date
+        if day > now(request).astimezone(VN).date():
+            return error(422, "future_date", "Ngày số liệu không được ở tương lai.")
     plain = format(value.normalize(), "f")
-    store.upsert(indicator, [(body.date, plain)], entry="manual", source_url=body.source_url)
-    return {"indicator": indicator, "date": body.date.isoformat(), "value": plain}
+    store.upsert(indicator, [(day, plain)], entry="manual", source_url=body.source_url)
+    return {"indicator": indicator, "date": day.isoformat(), "value": plain}

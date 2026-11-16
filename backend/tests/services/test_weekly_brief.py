@@ -106,3 +106,36 @@ def test_the_note_ends_with_what_needs_looking_at_and_says_nothing_when_there_is
     assert "VIỆC CẦN XEM\n- KDH: đang -50,0% so với giá vốn" in text
     assert "VIỆC CẦN XEM" not in compose(series=[], index=[], briefs={}, closes={}, insider={}, events=[], alerts=[], held=set(), watched=set(), today=SAT, todo=[])
 
+
+
+TITLES = {"paper_income": "Thu nhập tài chính chưa thu tiền", "other_receivables": "Phải thu khác lớn"}
+
+
+def test_the_week_s_new_receivable_signs_macro_figures_and_failing_sources_are_listed():
+    text = compose(**INPUTS, held={"HPG"}, watched={"HPG", "VCG"}, today=SAT,
+                   signs={"before": {"VCG": ["other_receivables"], "HPG": ["paper_income"]}, "now": {"VCG": ["other_receivables", "paper_income"], "HPG": []},
+                          "titles": TITLES},
+                   macro={"before": {"vn_pmi": "2026-09-30"}, "now": {"vn_pmi": {"date": "2026-10-31", "value": "52.3", "label": "PMI sản xuất Việt Nam",
+                                                                                   "unit": "điểm"},
+                                                                        "wti": {"date": "2026-10-30", "value": "61.2", "label": "Giá dầu WTI", "unit": "USD/thùng"}}},
+                   sources=[{"source": "Cục Thống kê (nso.gov.vn)", "labels": ["Bán lẻ", "FDI"], "fails": 5}])
+    assert "DẤU HIỆU PHẢI THU TRONG TUẦN\n- Bật: VCG — Thu nhập tài chính chưa thu tiền\n- Tắt: HPG (đang nắm) — Thu nhập tài chính chưa thu tiền" in text
+    assert "SỐ VĨ MÔ MỚI\n- PMI sản xuất Việt Nam: 52,3 điểm (kỳ 31/10/2026)" in text and "Giá dầu WTI" not in text  # a daily series is not news
+    assert "NGUỒN SỐ LIỆU\n- Cục Thống kê (nso.gov.vn) lỗi 5 lượt liên tiếp: Bán lẻ, FDI" in text
+
+
+def test_the_first_week_has_no_mark_to_compare_and_says_so():
+    text = compose(**INPUTS, held=set(), watched={"VCG"}, today=SAT, signs={"before": None, "now": {"VCG": ["paper_income"]}, "titles": TITLES},
+                   macro={"before": None, "now": {}}, sources=[])
+    assert "DẤU HIỆU PHẢI THU TRONG TUẦN\nTuần đầu: phần mềm ghi mốc hôm nay, từ tuần sau sẽ báo dấu hiệu bật hoặc tắt." in text
+    assert "NGUỒN SỐ LIỆU\nMọi nguồn đều lấy được ở lượt gần nhất." in text
+
+
+def test_the_marks_are_kept_once_the_note_is_sent(tmp_path):
+    import json
+    got = lambda: INPUTS | {"held": set(), "watched": {"VCG"}, "signs": {"before": None, "now": {"VCG": ["paper_income"]}, "titles": TITLES},  # noqa: E731
+                            "macro": {"before": None, "now": {"vn_pmi": {"date": "2026-10-31", "value": "52.3", "label": "PMI", "unit": "điểm"}}},
+                            "sources": []}
+    weekly_brief_run(tmp_path, inputs=got, send=lambda t: True, now=datetime(2026, 10, 31, 1, 30, tzinfo=timezone.utc))
+    state = json.loads((tmp_path / "alerts" / "weekly.json").read_text(encoding="utf-8"))
+    assert state["signs"] == {"VCG": ["paper_income"]} and state["macro"] == {"vn_pmi": "2026-10-31"}

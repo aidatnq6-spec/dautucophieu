@@ -1,7 +1,9 @@
 """Bản tin tuần: one Telegram note on the weekend about the Monday–Friday just past — the portfolio's time-weighted return against
 VN-Index, foreign net trading on HOSE summed over the session snapshots, each held ticker's weekly change, insider notices of held
-tickers, known corporate events of the next seven days, and price alerts that fired. Built from data the app already keeps; a
-missing piece is named, never estimated. Sent once per week (data/alerts/weekly.json), retried until it goes out.
+tickers, known corporate events of the next seven days, and price alerts that fired; then the receivable signs that came on or
+went off since last week's note, the monthly macro figures with a new period, and the public sources failing now. Built from data the
+app already keeps; a missing piece is named, never estimated. Sent once per week (data/alerts/weekly.json, which also keeps the marks
+the next week compares with), retried until it goes out.
 """
 
 import json
@@ -135,9 +137,34 @@ def _theses(theses: list[dict], closes: dict, costs: dict[str, str], shares: dic
     return out
 
 
+def _plain(value: str) -> str:
+    d = Decimal(value)
+    return _num(d, 0) if d == d.to_integral_value() else format(d.normalize(), "f").replace(".", ",")
+
+
+def _signs(signs: dict, held: set[str]) -> list[str]:
+    if signs.get("before") is None:
+        return ["Tuần đầu: phần mềm ghi mốc hôm nay, từ tuần sau sẽ báo dấu hiệu bật hoặc tắt."]
+    before, now, titles = signs["before"], signs["now"], signs.get("titles", {})
+    mark = lambda s: f"{s}{' (đang nắm)' if s in held else ''}"  # noqa: E731
+    on = [f"- Bật: {mark(s)} — {titles.get(k, k)}" for s in sorted(now) for k in now[s] if k not in before.get(s, [])]
+    off = [f"- Tắt: {mark(s)} — {titles.get(k, k)}" for s in sorted(before) for k in before[s] if k not in now.get(s, [])]
+    return on + off or ["Không có dấu hiệu nào bật hay tắt trong tuần."]
+
+
+def _macro(macro: dict) -> list[str]:
+    before = macro.get("before")
+    if before is None:
+        return ["Tuần đầu: phần mềm ghi mốc hôm nay."]
+    new = [(k, v) for k, v in sorted(macro["now"].items()) if k in before and v["date"] > before[k]]
+    return [f"- {v['label']}: {_plain(v['value'])} {v['unit']} (kỳ {date.fromisoformat(v['date']).strftime('%d/%m/%Y')})" for _, v in new] \
+        or ["Không có chỉ số tháng nào có kỳ mới trong tuần."]
+
+
 def compose(*, series, index, briefs, closes, insider, events, alerts, held: set[str], watched: set[str], today: date,
             sessions: list[date] | None = None, theses: list[dict] | None = None, costs: dict[str, str] | None = None,
-            shares: dict[str, int] | None = None, todo: list[str] | None = None) -> str:
+            shares: dict[str, int] | None = None, todo: list[str] | None = None, signs: dict | None = None, macro: dict | None = None,
+            sources: list[dict] | None = None) -> str:
     start, end = week_of(today)
     sessions = sessions if sessions is not None else [start + timedelta(days=i) for i in range(5)]
     lines = [f"BẢN TIN TUẦN {_dm(start)}–{_dm(end)}/{end.year}", "",
@@ -169,6 +196,13 @@ def compose(*, series, index, briefs, closes, insider, events, alerts, held: set
                      f"{_dm(datetime.fromisoformat(a['triggered_at']).astimezone(VN).date())} ở {_num(Decimal(a['triggered_price']))}")
     waiting = sum(1 for a in alerts if not a.get("triggered_at"))
     lines.append(f"{'Không có cảnh báo nào kích hoạt trong tuần. ' if not fired else ''}{waiting} cảnh báo đang chờ.")
+    if signs is not None:
+        lines += ["", "DẤU HIỆU PHẢI THU TRONG TUẦN", *_signs(signs, held)]
+    if macro is not None:
+        lines += ["", "SỐ VĨ MÔ MỚI", *_macro(macro)]
+    if sources is not None:
+        lines += ["", "NGUỒN SỐ LIỆU", *([f"- {g['source']} lỗi {g['fails']} lượt liên tiếp: {', '.join(g['labels'])}" for g in sources]
+                                        or ["Mọi nguồn đều lấy được ở lượt gần nhất."])]
     if todo:
         lines += ["", "VIỆC CẦN XEM", *[f"- {t}" for t in todo]]
     lines += ["", "Nguồn: dữ liệu phần mềm đã lưu (Vnstock, VNDirect). Chỉ để theo dõi. Không phải khuyến nghị."]
@@ -185,13 +219,23 @@ def weekly_brief_run(data_dir: Path, *, inputs: Callable[[], dict], send: Callab
         return {"status": "skipped", "reason": "weekday"}
     _, friday = week_of(today)
     path = _state(data_dir)
-    sent_for = json.loads(path.read_text(encoding="utf-8")).get("week") if path.is_file() else None
+    state = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    sent_for = state.get("week")
     if sent_for == friday.isoformat():
         return {"status": "already_sent", "week": sent_for}
-    if not send(compose(**inputs(), today=today)):
+    got = inputs()
+    # last week's marks, so the note says what changed since
+    if got.get("signs") is not None:
+        got["signs"] = {**got["signs"], "before": state.get("signs")}
+    if got.get("macro") is not None:
+        got["macro"] = {**got["macro"], "before": state.get("macro")}
+    if not send(compose(**got, today=today)):
         return {"status": "ok", "week": friday.isoformat(), "sent": False}
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps({"week": friday.isoformat(), "sent_at": now.isoformat()}), encoding="utf-8")
+    keep = {"week": friday.isoformat(), "sent_at": now.isoformat(),
+            "signs": got["signs"]["now"] if got.get("signs") is not None else state.get("signs"),
+            "macro": {k: v["date"] for k, v in got["macro"]["now"].items()} if got.get("macro") is not None else state.get("macro")}
+    tmp.write_text(json.dumps(keep, ensure_ascii=False), encoding="utf-8")
     os.replace(tmp, path)
     return {"status": "ok", "week": friday.isoformat(), "sent": True}

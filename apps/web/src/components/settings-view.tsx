@@ -4,6 +4,7 @@ import { Save } from "lucide-react";
 import { ApiError, api, requestId, type ApiFailure } from "../lib/api";
 import { formatRatio, percentToRatio } from "../lib/format";
 import { AiStatusSection } from "./ai-status";
+import { SourceStatusSection } from "./source-status";
 import { CapmSettings } from "./capm";
 import { FormErrors } from "./form-errors";
 import { PortfolioSettingsSection } from "./portfolio-settings";
@@ -95,6 +96,7 @@ export function SettingsView() {
         <p className="notice">Máy tắt hoặc ngủ thì không bảo đảm chạy đúng giờ. Đăng ký lịch bằng <code>scripts\windows\register-tasks.ps1 -Register</code> sau khi cấu hình xong.</p>
       </section>
       <AiStatusSection />
+      <SourceStatusSection />
     </>
   );
 }

@@ -107,6 +107,19 @@ def put_portfolio(request: Request, body: PortfolioRequest):
     return {"version": record.version, "settings": record.payload}
 
 
+@router.get("/sources")
+def sources(request: Request):
+    """Tình trạng nguồn số liệu for Cài đặt: the last macro run and the public sources failing since, with how many runs in a row."""
+    from pathlib import Path
+
+    from investment_agent.services.source_alerts import THRESHOLD, macro_labels, source_view
+    require_owner(request)
+    data_dir = request.app.state.data_dir
+    if data_dir is None:
+        return {"last_run": None, "checked": 0, "failing": [], "threshold": THRESHOLD}
+    return {**source_view(Path(data_dir), labels=macro_labels()), "threshold": THRESHOLD}
+
+
 @router.get("/ai")
 def ai_status(request: Request):
     """Read-only AI status for the Cài đặt page: key presence (last 4 characters only), approved policy, this month's spend."""

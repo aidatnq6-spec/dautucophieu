@@ -191,11 +191,17 @@ def compose(*, series, index, briefs, closes, insider, events, alerts, held: set
             sessions: list[date] | None = None, theses: list[dict] | None = None, costs: dict[str, str] | None = None,
             shares: dict[str, int] | None = None, todo: list[str] | None = None, signs: dict | None = None, macro: dict | None = None,
             sources: list[dict] | None = None, manual: list[dict] | None = None, catalysts: list[dict] | None = None,
-            us_events: list[dict] | None = None, us_chain: dict | None = None) -> str:
+            us_events: list[dict] | None = None, us_chain: dict | None = None, week_signals: dict | None = None) -> str:
     start, end = week_of(today)
     sessions = sessions if sessions is not None else [start + timedelta(days=i) for i in range(5)]
     lines = [f"BẢN TIN TUẦN {_dm(start)}–{_dm(end)}/{end.year}", "",
              f"{_portfolio(series, start, end)} · {_vnindex(index, briefs, start, end)}", _foreign(briefs, sessions)]
+    if week_signals:
+        w = week_signals
+        gaps = f"{w['green_over_red']} phiên xanh vỏ đỏ lòng" + (f", {w['red_over_green']} phiên đỏ vỏ xanh lòng" if w["red_over_green"] else "")
+        asia = (f"{w['asia_against']}/{w['asia_sessions']} phiên VN-Index ngược chiều châu Á" if w["asia_sessions"]
+                else "chưa có số châu Á cùng phiên")
+        lines += [f"Tín hiệu trong tuần ({w['sessions']} phiên có số): {gaps} · {w['low_liquidity']} phiên thanh khoản thấp · {asia}"]
     if held:
         lines += ["Mã đang nắm trong tuần: " + "; ".join(_holdings(closes, held, start, end))]
     lines += ["", "GIAO DỊCH NỘI BỘ (mã đang nắm)"]

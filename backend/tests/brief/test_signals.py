@@ -87,3 +87,15 @@ def test_the_asia_line_says_with_or_against_and_what_was_left_out():
     assert signal_lines(same) == ["VN-Index giảm cùng chiều 3/4 thị trường châu Á"]
     split = {**base, "asia": {"index": "up", "up": 2, "down": 2, "counted": 4, "left_out": []}}
     assert signal_lines(split) == ["VN-Index tăng; châu Á chia đôi (2 tăng, 2 giảm)"]
+
+
+def test_the_week_counts_the_sessions_of_each_signal():
+    from investment_agent.brief.signals import week_signals
+    def snap(gap=None, low=False, asia=None):
+        return {"signals": {"status": "ok", "breadth_gap": gap and {"kind": gap, "up": 1, "down": 2},
+                            "liquidity": {"ratio20": "0.7", "change_pct": None, "low": low, "below_avg_sessions": 1}, "asia": asia}}
+    against = {"index": "up", "up": 0, "down": 3, "counted": 3, "left_out": []}
+    along = {"index": "up", "up": 3, "down": 1, "counted": 4, "left_out": []}
+    week = [snap("green_over_red", True, against), snap(None, True, along), snap("green_over_red"), {"board": {}}, snap("red_over_green")]
+    assert week_signals(week) == {"sessions": 4, "green_over_red": 2, "red_over_green": 1, "low_liquidity": 2, "asia_sessions": 2, "asia_against": 1}
+    assert week_signals([{"board": {}}]) is None

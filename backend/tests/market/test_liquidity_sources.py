@@ -3,7 +3,7 @@ from datetime import date
 
 import pytest
 
-from investment_agent.market.leading import MacroError, evaluate, parse_nso_report, parse_sbv_central
+from investment_agent.market.leading import MacroError, evaluate, parse_nso_report, parse_sbv_central, parse_sbv_m2
 from investment_agent.market.omo import OmoStore, parse_omo
 
 # Synthetic pages in the shape of sbv.gov.vn and nso.gov.vn (11/2026); every figure is made up.
@@ -36,6 +36,18 @@ REPORTS = json.dumps([
            "3,2 tỷ USD. Vốn đầu tư trực tiếp nước ngoài thực hiện tại Việt Nam 6 tháng đầu năm 2026 ước đạt 11 tỷ USD, giảm 2,0% so với cùng kỳ.",
            day="2026-07-03T09:00:00"),
 ])
+
+
+# In the shape of NHNN's Tổng phương tiện thanh toán page (11/2026): only the latest month; made-up figures.
+M2_PAGE = """<h3>Tháng 8 năm 2026</h3><table><tr><td colspan="3">THÁNG 08 NĂM 2026</td></tr><tr><td>Chỉ tiêu</td><td>Số dư(Tỷ đồng)</td>
+<td>Tốc động tăng (Giảm) so với cuối năm trước đó (%)</td></tr><tr><td>Tổng phương tiện thanh toán (*)</td><td>20.100.200</td><td>6,84</td></tr>
+<tr><td>- Tiền gửi của các TCKT</td><td>6.337.186</td><td>2,54</td></tr></table>"""
+
+
+def test_nhnn_money_supply_page_gives_the_months_total_at_the_month_end():
+    assert parse_sbv_m2(M2_PAGE) == [(date(2026, 8, 31), "20100200")]
+    with pytest.raises(MacroError):
+        parse_sbv_m2("<p>Tổng phương tiện thanh toán</p>")
 
 
 def test_the_central_rate_is_dated_on_the_day_it_applies_to():

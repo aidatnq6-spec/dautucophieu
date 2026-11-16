@@ -1,5 +1,5 @@
 {
- "version": "macro-2026-11-15.4",
+ "version": "macro-2026-11-16.1",
  "notice": "Quy tắc đánh giá theo bảng Leading Indicator của chủ sở hữu (25/10/2026). bad_when: up = tăng là Xấu; down = giảm là Xấu; sign = âm là Xấu; pmi = Tốt khi trên 50 và không giảm.",
  "indicators": [
   {
@@ -127,14 +127,17 @@
    "rule": "down",
    "max_age_days": 80,
    "source": {
-    "kind": "stockbiz",
-    "page": "money-supply-m2",
-    "monthly": true,
-    "scale": "1000",
+    "kind": "sbv_m2",
+    "fallback": {
+     "kind": "stockbiz",
+     "page": "money-supply-m2",
+     "monthly": true,
+     "scale": "1000"
+    },
     "manual_fallback": true
    },
-   "url": "https://www.sbv.gov.vn",
-   "note": "Ngân hàng Nhà nước công bố trong 45 ngày sau khi hết tháng (số tháng 9 chậm nhất giữa tháng 11). Từ 11/2026 stockbiz chỉ còn số theo năm và trang thống kê của Ngân hàng Nhà nước chặn đọc tự động, nên số tháng mới cần nhập tay kèm link nguồn; phần mềm vẫn thử stockbiz mỗi lần chạy."
+   "url": "https://sbv.gov.vn/vi/thong-ke-mot-so-chi-tieu-co-ban",
+   "note": "Tổng phương tiện thanh toán, đọc từ trang thống kê của Ngân hàng Nhà nước (chỉ hiện tháng mới nhất, nên lịch sử tích dần qua mỗi lượt chạy); không đọc được thì thử stockbiz, rồi nhập tay kèm link nguồn. Ngân hàng Nhà nước công bố chậm khoảng 2–3 tháng (số tháng 8 có vào tháng 11). Từ kỳ tháng 10/2025 số liệu đổi phương pháp (phân tổ lại khu vực, loại giấy tờ có giá do TCTD khác mua)."
   },
   {
    "id": "vn_trade_balance",

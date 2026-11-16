@@ -87,7 +87,7 @@ def source_view(data_dir: Path, *, labels: dict[str, tuple[str, str]]) -> dict:
     return {"last_run": run.get("at"), "checked": len(run.get("results", {})), "failing": failing}
 
 
-SOURCES = {"nso_report": "Cục Thống kê (nso.gov.vn)", "nso_cpi": "Cục Thống kê (nso.gov.vn)", "sbv_central": "NHNN (sbv.gov.vn)",
+SOURCES = {"sbv_m2": "NHNN (sbv.gov.vn)", "nso_report": "Cục Thống kê (nso.gov.vn)", "nso_cpi": "Cục Thống kê (nso.gov.vn)", "sbv_central": "NHNN (sbv.gov.vn)",
            "sbv_interbank": "NHNN (sbv.gov.vn)", "fred": "FRED", "oilprice": "OilPrice", "topi": "Topi", "vcb": "Vietcombank", "hose": "HOSE",
            "stockbiz": "Stockbiz", "treasury": "Bộ Tài chính Mỹ", "ecb_dxy": "ECB", "cafef_pmi": "CafeF", "news_pmi": "Tin RSS", "news_cpi": "Tin RSS"}
 

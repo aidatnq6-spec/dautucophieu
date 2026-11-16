@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { CashRanking } from "../../../components/cash-ranking";
+import { ReceivableSigns } from "../../../components/receivable-signs";
 import { SectorsView } from "../../../components/sectors-view";
 
 export default async function SectorsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -10,6 +11,7 @@ export default async function SectorsPage({ searchParams }: { searchParams: Prom
       <div className="pagehead"><h1>Ngành theo quý</h1><p className="muted">Bản đồ nhiệt kết quả theo quý và định giá P/B của cả ngành, trên các mã trong danh sách theo dõi.</p></div>
       <Suspense fallback={<p className="muted fx-loading" role="status">Đang tải…</p>}><SectorsView /></Suspense>
       <CashRanking />
+      <ReceivableSigns />
     </>
   );
 }

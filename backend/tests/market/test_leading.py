@@ -356,7 +356,8 @@ def test_fetch_auto_does_not_retry_a_permanent_answer(tmp_path):
 def test_fetch_auto_skips_the_rest_of_a_host_that_stays_down(tmp_path):
     """Three stockbiz pages behind one unreachable host cost one round of tries, not three; other hosts still update."""
     import httpx
-    stockbiz = {i["id"] for i in load_indicators() if i["source"]["kind"] == "stockbiz"}
+    stockbiz = {i["id"] for i in load_indicators()  # stockbiz first, or as the fallback (M2: NHNN first since 16/11/2026)
+                if "stockbiz" in (i["source"]["kind"], (i["source"].get("fallback") or {}).get("kind"))}
     calls, waits = [], []
 
     def get(url):

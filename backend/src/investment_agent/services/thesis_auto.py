@@ -62,6 +62,9 @@ def _tidy(text: str) -> str:
     return re.sub(r"(?<=\d),(?=\d{3}\b)", ".", text)
 
 
+REPORT_SOURCE = "Thông tư 96/2020 Điều 14"
+
+
 def _short_id(raw: str) -> str:
     return "ev" + hashlib.sha1(raw.encode("utf-8")).hexdigest()[:20]
 
@@ -88,7 +91,7 @@ def catalysts(data_dir: Path, symbol: str, quarters: dict, *, today: date) -> li
         due = end + timedelta(days=REPORT_DAYS)
         if due >= today - timedelta(days=60):
             out.append({"id": _short_id(f"report-{y}-Q{q}"), "when": _ql(f"{y}-Q{q}"), "on": due.isoformat(), "sign": "?",
-                        "text": f"Hạn công bố báo cáo tài chính {_ql(f'{y}-Q{q}')} (20 ngày sau khi hết quý)", "source": "Thông tư 96/2020 Điều 14",
+                        "text": f"Hạn công bố báo cáo tài chính {_ql(f'{y}-Q{q}')} (20 ngày sau khi hết quý)", "source": REPORT_SOURCE,
                         "done": False, "auto": True})
     return sorted(out, key=lambda c: c["on"])
 

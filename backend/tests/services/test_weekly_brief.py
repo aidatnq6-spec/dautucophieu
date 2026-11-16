@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from investment_agent.services.weekly_brief import compose, week_of, weekly_brief_run
 
@@ -146,3 +146,20 @@ def test_hand_entries_to_look_at_are_listed_or_the_note_says_there_are_none():
     text = compose(**INPUTS, held=set(), watched=set(), today=SAT, manual=issues)
     assert "DỮ LIỆU NHẬP TAY CẦN XEM\n- Lợi suất TPCP 10 năm, 25/10/2026 = 4,58: ngày không có phiên giao dịch" in text
     assert "DỮ LIỆU NHẬP TAY CẦN XEM\nKhông có dòng nhập tay bất thường." in compose(**INPUTS, held=set(), watched=set(), today=SAT, manual=[])
+
+
+def test_the_owners_catalysts_due_in_the_coming_week_and_those_already_due_are_listed():
+    cats = [{"symbol": "PHP", "id": "c1", "when": "Q4/2026", "on": (SAT - timedelta(days=5)).isoformat(), "sign": "+", "text": "Bàn giao hạ tầng đợt 3",
+             "source": "ĐHĐCĐ", "done": False, "auto": False, "due": True},
+            {"symbol": "FPT", "id": "c2", "when": "", "on": (SAT + timedelta(days=3)).isoformat(), "sign": "-", "text": "Hết ưu đãi thuế", "source": "",
+             "done": False, "auto": False, "due": False},
+            {"symbol": "FPT", "id": "r", "when": "Q4/2026", "on": (SAT + timedelta(days=6)).isoformat(), "sign": "?",
+             "text": "Hạn công bố báo cáo tài chính Q4/2026 (20 ngày sau khi hết quý)", "source": "", "done": False, "auto": True, "due": False}]
+    text = compose(**INPUTS, held={"FPT"}, watched={"FPT", "PHP"}, today=SAT, catalysts=cats)
+    d = lambda n: (SAT + timedelta(days=n)).strftime("%d/%m")  # noqa: E731
+    assert (f"MỐC TRONG LUẬN ĐIỂM ({d(0)}–{d(7)})\n"
+            f"- PHP · {d(-5)} (+): Bàn giao hạ tầng đợt 3 — đã đến mốc, chưa đánh dấu đã xảy ra\n"
+            f"- FPT (đang nắm) · {d(3)} (−): Hết ưu đãi thuế\n"
+            f"- FPT (đang nắm) · {d(6)}: Hạn công bố báo cáo tài chính Q4/2026 (20 ngày sau khi hết quý)") in text
+    assert f"MỐC TRONG LUẬN ĐIỂM ({d(0)}–{d(7)})\nKhông có mốc nào trong 7 ngày tới." in compose(**INPUTS, held=set(), watched=set(), today=SAT, catalysts=[])
+    assert "MỐC TRONG LUẬN ĐIỂM" not in compose(**INPUTS, held=set(), watched=set(), today=SAT)

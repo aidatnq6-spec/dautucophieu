@@ -1358,8 +1358,12 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
                             insider=insider, today=today)
         from investment_agent.market.leading import MacroStore, load_indicators
         from investment_agent.services.receivable_signs import SIGNS, receivable_signs
+        from investment_agent.market.watchlist import load_watchlist
         from investment_agent.services.manual_audit import audit_manual
         from investment_agent.services.source_alerts import macro_labels, source_view
+        from investment_agent.services.thesis_auto import REPORT_SOURCE
+        from investment_agent.services.thesis_model import coming_catalysts, read_models
+        from investment_agent.services.weekly_brief import NEXT_DAYS
         rows = receivable_signs(Path(data_dir))
         store = MacroStore(Path(data_dir))
         monthly = {}
@@ -1376,7 +1380,10 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
                 "shares": position_shares(repo, owner), "todo": [i["text"] for i in attention_items(repo, owner, Path(data_dir), now=now)],
                 "signs": {"before": None, "now": {r["symbol"]: sorted(k for k, v in r["signs"].items() if v) for r in rows}, "titles": dict(SIGNS)},
                 "macro": {"before": None, "now": monthly}, "sources": list(groups.values()),
-                "manual": audit_manual(Path(data_dir), load_indicators())}
+                "manual": audit_manual(Path(data_dir), load_indicators()),
+                "catalysts": [c for c in coming_catalysts(read_models(repo, owner)[0], Path(data_dir), load_watchlist(Path(data_dir)).symbols,
+                                                          today=today, days=NEXT_DAYS)
+                              if c["on"] and (not c["auto"] or c["source"] == REPORT_SOURCE)]}
     print(json.dumps(weekly_brief_run(data_dir, inputs=inputs, send=send, now=now)))
     return 0
 

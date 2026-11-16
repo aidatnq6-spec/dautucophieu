@@ -1,6 +1,6 @@
 """Bản tin tuần: one Telegram note on the weekend about the Monday–Friday just past — the portfolio's time-weighted return against
 VN-Index, foreign net trading on HOSE summed over the session snapshots, each held ticker's weekly change, insider notices of held
-tickers, known corporate events of the next seven days, and price alerts that fired; then the receivable signs that came on or
+tickers, known corporate events of the next seven days, the owner's own catalysts due that week (or already due), and price alerts that fired; then the receivable signs that came on or
 went off since last week's note, the monthly macro figures with a new period, and the public sources failing now. Built from data the
 app already keeps; a missing piece is named, never estimated. Sent once per week (data/alerts/weekly.json, which also keeps the marks
 the next week compares with), retried until it goes out.
@@ -161,10 +161,22 @@ def _macro(macro: dict) -> list[str]:
         or ["Không có chỉ số tháng nào có kỳ mới trong tuần."]
 
 
+SIGN = {"+": " (+)", "-": " (−)", "?": ""}
+
+
+def _catalysts(items: list[dict], held: set[str]) -> list[str]:
+    """The owner's catalysts with a day up to a week ahead or already due, and the report deadlines; the corporate events are in LỊCH TUẦN TỚI."""
+    out = []
+    for c in sorted((c for c in items if c.get("on")), key=lambda c: (c["on"], c["symbol"])):
+        late = " — đã đến mốc, chưa đánh dấu đã xảy ra" if c.get("due") else ""
+        out.append(f"- {c['symbol']}{' (đang nắm)' if c['symbol'] in held else ''} · {_dm(c['on'])}{SIGN.get(c['sign'], '')}: {c['text']}{late}")
+    return out or [f"Không có mốc nào trong {NEXT_DAYS} ngày tới."]
+
+
 def compose(*, series, index, briefs, closes, insider, events, alerts, held: set[str], watched: set[str], today: date,
             sessions: list[date] | None = None, theses: list[dict] | None = None, costs: dict[str, str] | None = None,
             shares: dict[str, int] | None = None, todo: list[str] | None = None, signs: dict | None = None, macro: dict | None = None,
-            sources: list[dict] | None = None, manual: list[dict] | None = None) -> str:
+            sources: list[dict] | None = None, manual: list[dict] | None = None, catalysts: list[dict] | None = None) -> str:
     start, end = week_of(today)
     sessions = sessions if sessions is not None else [start + timedelta(days=i) for i in range(5)]
     lines = [f"BẢN TIN TUẦN {_dm(start)}–{_dm(end)}/{end.year}", "",
@@ -187,6 +199,8 @@ def compose(*, series, index, briefs, closes, insider, events, alerts, held: set
         lines.append(f"- {e['symbol']}{' (đang nắm)' if e['symbol'] in held else ''}: {describe(e)}")
     if not upcoming:
         lines.append("Không có sự kiện đã biết.")
+    if catalysts is not None:
+        lines += ["", f"MỐC TRONG LUẬN ĐIỂM ({_dm(today)}–{_dm(today + timedelta(days=NEXT_DAYS))})", *_catalysts(catalysts, held)]
     if held and theses is not None:
         lines += ["", "LUẬN ĐIỂM ĐẦU TƯ (đã bị phá mà vẫn đang giữ)", *_theses(theses, closes, costs or {}, shares or {}, held, today)]
     lines += ["", "CẢNH BÁO GIÁ"]

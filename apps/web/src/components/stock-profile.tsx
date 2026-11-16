@@ -22,6 +22,7 @@ import { AnnualPlans } from "./annual-plans";
 import { OperatingFigures } from "./operating-figures";
 import { BalanceWatch } from "./balance-watch";
 import { RelatedReceivables } from "./related-receivables";
+import { DocAsk } from "./doc-ask";
 import { ReportReaction } from "./report-reaction";
 import { ProfitBridge } from "./profit-bridge";
 import { ThesisModel } from "./thesis-model";
@@ -95,6 +96,7 @@ export function StockProfile({ symbol }: { symbol: string }) {
 
       {p.watched && <BalanceWatch symbol={p.symbol} />}
       {p.watched && <RelatedReceivables symbol={p.symbol} />}
+      {p.watched && <DocAsk symbol={p.symbol} />}
 
       {p.watched && <PropertyProjects symbol={p.symbol} />}
 

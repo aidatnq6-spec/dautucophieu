@@ -10,6 +10,20 @@ export type Finding =
   | { kind: "not_collected"; year: string; name: string; before: string; now: string; promised: string }
   | { kind: "unsecured_free"; year: string; name: string; amount: string };
 type View = { symbol: string; version: number; years: Year[]; findings: Finding[] };
+type Proposal = { status: "ok" | "unverified" | "no_passages"; reason?: string; rows: (RrRow & { page: number })[];
+  dropped: { name: string; reason: string }[]; url: string; cost_usd: string };
+const DROPPED: Record<string, string> = { amount_not_on_page: "số dư không có trên trang AI ghi", page_not_sent: "trang không thuộc phần đã đọc",
+  no_name: "thiếu tên" };
+
+/** The note after an AI proposal: what was filled in and what was left out, and why. */
+export function proposalNote(p: Proposal): string {
+  if (p.status === "no_passages") return "Tài liệu không có đoạn nào về phải thu bên liên quan; chưa gửi gì cho AI.";
+  if (p.status === "unverified") return "AI không ghi đúng đơn vị tính của tài liệu, nên không điền gì.";
+  const kept = p.rows.length ? `Đã điền ${p.rows.length} dòng (trang ${[...new Set(p.rows.map((r) => r.page))].join(", ")}): đọc lại từng dòng rồi mới lưu.` : "AI không tìm thấy khoản nào.";
+  const left = p.dropped.length ? ` Bỏ ${p.dropped.length} dòng: ${p.dropped.map((d) => `${d.name || "—"} (${DROPPED[d.reason] ?? d.reason})`).join("; ")}.` : "";
+  return `${kept}${left} Chi phí ${p.cost_usd} USD.`;
+}
+
 type Draft = { name: string; amount: string; grouped: boolean; related: boolean; secured: "" | "yes" | "no"; interest: "" | "yes" | "no"; collect_within: string };
 
 export const ty = (v: string) => `${Number(v).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tỷ`;
@@ -42,6 +56,8 @@ export function RelatedReceivables({ symbol }: { symbol: string }) {
   const [source, setSource] = useState("");
   const [rows, setRows] = useState<Draft[]>([{ ...EMPTY }]);
   const [busy, setBusy] = useState(false);
+  const [aiUrl, setAiUrl] = useState("");
+  const [note, setNote] = useState<string | null>(null);
   useEffect(() => { api<View>(`related-receivables/${symbol}`).then(setView, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, [symbol]);
   if (!view) return error ? <section className="surface" aria-label="Phải thu bên liên quan"><h2>Phải thu bên liên quan</h2><p className="muted">{error}</p></section> : null;
 
@@ -53,6 +69,18 @@ export function RelatedReceivables({ symbol }: { symbol: string }) {
       setView(await api<View>(path, { method: path.endsWith("/delete") ? "POST" : "PUT", body: { ...body, expected_version: view!.version, request_id: requestId() } }));
       return true;
     } catch (e) { setError(e instanceof ApiError ? e.failure.message : "Không lưu được."); return false; } finally { setBusy(false); }
+  }
+  async function propose() {
+    if (!/^20\d{2}$/.test(year.trim())) { setError("Nhập năm trước, dạng 2020."); return; }
+    setBusy(true); setError(null); setNote(null);
+    try {
+      const p = await api<Proposal>(`ai-docs/${symbol}/related-receivables`, { method: "POST", body: { url: aiUrl, year: year.trim() } });
+      if (p.rows.length) {
+        setRows(p.rows.map(toDraft));
+        setSource((s) => s || `BCTC năm ${year.trim()}, thuyết minh bên liên quan (AI đề xuất, đã đối chiếu): ${p.url}`);
+      }
+      setNote(proposalNote(p));
+    } catch (e) { setError(e instanceof ApiError ? e.failure.message : "AI chưa đề xuất được."); } finally { setBusy(false); }
   }
   async function save() {
     if (!/^20\d{2}$/.test(year.trim())) { setError("Năm theo dạng 2020."); return; }
@@ -111,6 +139,12 @@ export function RelatedReceivables({ symbol }: { symbol: string }) {
               onChange={(e) => setRow(i, { collect_within: e.target.value })} /></label>
             {rows.length > 1 && <button type="button" className="btn text" onClick={() => setRows(rows.filter((_, k) => k !== i))}>Bỏ dòng {i + 1}</button>}
           </fieldset>))}
+        <div className="actions rr-ai">
+          <label className="field">Link BCTC để AI đề xuất<input aria-label="Link BCTC cho AI" type="url" maxLength={500} placeholder="https://…/bctc-2020.pdf"
+            value={aiUrl} onChange={(e) => setAiUrl(e.target.value)} /></label>
+          <button type="button" className="btn" disabled={busy || !aiUrl.trim()} onClick={() => void propose()}>AI đề xuất từ BCTC</button>
+        </div>
+        {note && <p className="notice" data-testid="rr-ai-note">{note}</p>}
         <div className="actions">
           <button type="button" className="btn" onClick={() => setRows([...rows, { ...EMPTY }])}>Thêm dòng</button>
           <button type="submit" className="btn primary" disabled={busy}>Lưu năm</button>

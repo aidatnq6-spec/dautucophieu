@@ -1470,6 +1470,7 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
         from investment_agent.services.thesis_model import coming_catalysts, read_models
         from investment_agent.services.weekly_brief import NEXT_DAYS
         from investment_agent.market.us_calendar import upcoming as us_upcoming
+        from investment_agent.services.us_week import us_week
         rows = receivable_signs(Path(data_dir))
         store = MacroStore(Path(data_dir))
         monthly = {}
@@ -1490,7 +1491,8 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
                 "catalysts": [c for c in coming_catalysts(read_models(repo, owner)[0], Path(data_dir), load_watchlist(Path(data_dir)).symbols,
                                                           today=today, days=NEXT_DAYS)
                               if c["on"] and (not c["auto"] or c["source"] == REPORT_SOURCE)],
-                "us_events": us_upcoming(Path(data_dir), today=today, days=NEXT_DAYS)}
+                "us_events": us_upcoming(Path(data_dir), today=today, days=NEXT_DAYS),
+                "us_chain": us_week(Path(data_dir), today=today)}
     print(json.dumps(weekly_brief_run(data_dir, inputs=inputs, send=send, now=now)))
     return 0
 

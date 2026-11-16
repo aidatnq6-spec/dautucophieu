@@ -191,7 +191,7 @@ def compose(*, series, index, briefs, closes, insider, events, alerts, held: set
             sessions: list[date] | None = None, theses: list[dict] | None = None, costs: dict[str, str] | None = None,
             shares: dict[str, int] | None = None, todo: list[str] | None = None, signs: dict | None = None, macro: dict | None = None,
             sources: list[dict] | None = None, manual: list[dict] | None = None, catalysts: list[dict] | None = None,
-            us_events: list[dict] | None = None) -> str:
+            us_events: list[dict] | None = None, us_chain: dict | None = None) -> str:
     start, end = week_of(today)
     sessions = sessions if sessions is not None else [start + timedelta(days=i) for i in range(5)]
     lines = [f"BẢN TIN TUẦN {_dm(start)}–{_dm(end)}/{end.year}", "",
@@ -214,6 +214,11 @@ def compose(*, series, index, briefs, closes, insider, events, alerts, held: set
         lines.append(f"- {e['symbol']}{' (đang nắm)' if e['symbol'] in held else ''}: {describe(e)}")
     if not upcoming:
         lines.append("Không có sự kiện đã biết.")
+    if us_chain is not None:
+        from investment_agent.domain.us_chain import chain_summary, premium_text
+        gold = next((n for n in us_chain["nodes"] if n["id"] == "gold"), {})
+        lines += ["", "CHUỖI LIÊN THỊ TRƯỜNG TRONG TUẦN", f"- {chain_summary(us_chain)}",
+                  *([f"- {premium_text(gold['premium'])}"] if gold.get("premium") else [])]
     if us_events is not None:
         lines += ["", f"LỊCH VĨ MÔ MỸ ({_dm(today)}–{_dm(today + timedelta(days=NEXT_DAYS))}, giờ Việt Nam)",
                   *([f"- {_dm(e['on'])} {e['at']}: {e['text']}" for e in us_events] or ["Không có lịch công bố nào của Fed hay CPI Mỹ."])]

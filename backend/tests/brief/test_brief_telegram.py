@@ -95,3 +95,26 @@ def test_the_recovery_checklist_is_one_line_after_the_sectors_count():
             "chưa có số (x) · Số mã tăng > số mã giảm: chưa (107 tăng · 205 giảm) · Trung bình cộng các mã tăng: đạt (+0,30%)")
     assert line in text and text.index("Ngành tăng") < text.index("Bảng kiểm phục hồi") < text.index("Khối ngoại")
     assert "Bảng kiểm phục hồi" not in render_report(REPORT, market=MARKET)
+
+
+def test_the_session_signals_follow_the_index_lines():
+    up = {**MARKET["indices"], "rows": [{"id": "VNINDEX", "status": "ok", "close": "1736.89", "change": "1.96", "pct": "0.0011"}]}
+    signals = {"status": "ok", "breadth_gap": {"kind": "green_over_red", "up": 101, "down": 220},
+               "pull": {"status": "ok", "computed": "1.93", "actual": "1.96",
+                        "up": [{"symbol": "VIC", "points": "7.96"}, {"symbol": "MCH", "points": "1.76"}, {"symbol": "DMX", "points": "0.63"},
+                               {"symbol": "LPB", "points": "0.56"}],
+                        "down": [{"symbol": "TCB", "points": "-1.21"}, {"symbol": "VCB", "points": "-1.04"}, {"symbol": "VPB", "points": "-0.83"}],
+                        "without_top": {"symbols": ["VIC", "MCH", "DMX"], "points": "-8.39"}},
+               "liquidity": {"ratio20": "0.69", "change_pct": "-0.1050", "low": True, "below_avg_sessions": 3}}
+    text = render_report(REPORT, market={**MARKET, "indices": up, "signals": signals})
+    assert ("TÍN HIỆU PHIÊN\n"
+            "- Xanh vỏ đỏ lòng: VN-Index tăng nhưng 220 mã giảm, chỉ 101 mã tăng\n"
+            "- Mã kéo chỉ số (điểm): VIC +7,96; MCH +1,76; DMX +0,63 · Mã ghì: TCB −1,21; VCB −1,04; VPB −0,83\n"
+            "- Trừ phần của VIC, MCH, DMX, VN-Index −8,39 điểm\n"
+            "- Thanh khoản thấp: khối lượng khớp bằng 69% trung bình 20 phiên (−10,50% so với phiên trước), 3 phiên liền dưới trung bình") in text
+    assert text.index("VN-Index 1.736,89") < text.index("TÍN HIỆU PHIÊN") < text.index("Giá trị khớp lệnh")
+    odd = {**signals, "breadth_gap": None, "liquidity": {"ratio20": "1.05", "change_pct": "0.1", "low": False, "below_avg_sessions": 0},
+           "pull": {"status": "mismatch", "computed": "3.10", "actual": "1.96", "reason": "x"}}
+    text = render_report(REPORT, market={**MARKET, "indices": up, "signals": odd})
+    assert "- Mã kéo chỉ số: chưa hiện vì tổng tính được (+3,10 điểm) lệch với VN-Index (+1,96 điểm)" in text and "Thanh khoản" not in text
+    assert "TÍN HIỆU PHIÊN" not in render_report(REPORT, market=MARKET)

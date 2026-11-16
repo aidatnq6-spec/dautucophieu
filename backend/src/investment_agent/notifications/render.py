@@ -78,6 +78,34 @@ def _spread_line(spread: dict | None, indices: dict | None) -> str | None:
     return line
 
 
+def signal_lines(signals: dict | None) -> list[str]:
+    """Tín hiệu phiên (brief.signals): a green index over falling stocks, the stocks that moved it, thin trading; nothing when calm."""
+    if not signals or signals.get("status") != "ok":
+        return []
+    out = []
+    if gap := signals.get("breadth_gap"):
+        out.append(f"Xanh vỏ đỏ lòng: VN-Index tăng nhưng {gap['down']} mã giảm, chỉ {gap['up']} mã tăng" if gap["kind"] == "green_over_red"
+                   else f"Đỏ vỏ xanh lòng: VN-Index giảm nhưng {gap['up']} mã tăng, chỉ {gap['down']} mã giảm")
+    pull = signals.get("pull") or {}
+    if pull.get("status") == "ok" and (pull["up"] or pull["down"]):
+        part = lambda rows: "; ".join(f"{r['symbol']} {_num(r['points'], sign=True)}" for r in rows[:3])  # noqa: E731
+        out.append("Mã kéo chỉ số (điểm): " + " · ".join(x for x in ((part(pull["up"]) if pull["up"] else ""),
+                                                                     (f"Mã ghì: {part(pull['down'])}" if pull["down"] else "")) if x))
+        top = pull.get("without_top")
+        if top and float(top["points"]) * float(pull["actual"]) < 0:  # the move is the few stocks', the rest went the other way
+            out.append(f"Trừ phần của {', '.join(top['symbols'])}, VN-Index {_num(top['points'], sign=True)} điểm")
+    elif pull.get("status") == "mismatch":
+        out.append(f"Mã kéo chỉ số: chưa hiện vì tổng tính được ({_num(pull['computed'], sign=True)} điểm) lệch với VN-Index "
+                   f"({_num(pull['actual'], sign=True)} điểm)")
+    if (liq := signals.get("liquidity")) and (liq["low"] or liq["below_avg_sessions"] >= 3):
+        ratio = f"khối lượng khớp bằng {_num(float(liq['ratio20']) * 100, 0)}% trung bình 20 phiên"
+        prev = f" ({_pct(liq['change_pct'])} so với phiên trước)" if liq.get("change_pct") is not None else ""
+        run = f", {liq['below_avg_sessions']} phiên liền dưới trung bình" if liq["below_avg_sessions"] >= 2 else ""
+        out.append(f"Thanh khoản thấp: {ratio}{prev}{run}" if liq["low"]
+                   else f"Thanh khoản dưới trung bình {liq['below_avg_sessions']} phiên liền ({ratio})")
+    return out
+
+
 def _recovery_line(r: dict) -> str:
     """Bảng kiểm "Thị trường phục hồi" in one line: the count met, then each condition with its figure (brief.recovery)."""
     unknown = r["total"] - r["known"]
@@ -96,6 +124,8 @@ def render_market_brief(report: dict, market: dict) -> str:
         lines.append(f"{name} {_num(row['close'])} ({_num(row['change'], sign=True)} điểm, {_pct(row['pct'])})" if row["status"] == "ok"
                      else _missing(name, row))
     lines += _session_lines(market.get("index_session"))
+    if signal := signal_lines(market.get("signals")):
+        lines += ["", "TÍN HIỆU PHIÊN", *[f"- {s}" for s in signal], ""]
     board, hose = market.get("board") or {}, market.get("hose") or {}
     if board.get("status") == "ok":
         b, f = board["breadth"], board["foreign"]

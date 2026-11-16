@@ -102,3 +102,18 @@ def test_the_session_shape_and_hose_value_are_added_and_a_good_one_is_kept(tmp_p
 def test_without_bars_the_session_shape_is_named_missing(tmp_path):
     snap = build_snapshot(**deps(tmp_path))
     assert snap["index_session"] == {"status": "missing", "reason": "Chưa có nến VN-Index phiên này"}
+
+
+def test_the_signals_are_built_with_the_shares_and_the_earlier_sessions(tmp_path):
+    from decimal import Decimal
+    store = BriefStore(tmp_path)
+    for day, ratio in ((date(2026, 10, 22), "1.1"), (date(2026, 10, 23), "0.9")):
+        store.write({"session_date": day.isoformat(), "index_session": {"status": "ok", "volume": {"status": "ok", "ratio20": ratio}}})
+    snap = build_snapshot(**deps(tmp_path, store=store, earlier=[date(2026, 10, 22), date(2026, 10, 23)],
+                                 shares=lambda symbols: {"FPT": Decimal(1_000_000)} if symbols == ["FPT"] else {}))
+    signals = snap["signals"]
+    assert signals["status"] == "ok"
+    assert signals["pull"]["status"] == "mismatch"  # one stock is not the whole index: said, not shown
+    assert signals["breadth_gap"] is None
+    plain = build_snapshot(**deps(tmp_path, now=datetime(2026, 10, 26, 16, 0, tzinfo=VN)))
+    assert plain["signals"]["pull"]["status"] == "mismatch"  # a later run without shares keeps nothing worse than it had

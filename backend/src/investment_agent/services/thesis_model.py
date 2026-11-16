@@ -17,6 +17,28 @@ def read_models(repo, owner) -> tuple[dict, int]:
     return (dict(record.payload.get("models", {})), record.version) if record else ({}, 0)
 
 
+def coming_catalysts(models: dict, data_dir: Path, symbols, *, today: date, days: int) -> list[dict]:
+    """Mốc sắp tới of the watched tickers: the owner's catalysts not yet happened (dated up to `days` ahead, overdue ones marked due,
+    undated ones too) and the automatic ones (coming corporate events, the next report deadline) not already kept, nearest first."""
+    from datetime import timedelta
+
+    from investment_agent.market.statements import StatementStore
+    from investment_agent.services import thesis_auto
+    until, items = (today + timedelta(days=days)).isoformat(), []
+    for symbol in symbols:
+        own = (models.get(symbol) or {}).get("catalysts") or []
+        for c in own:
+            if c.get("done") or (c.get("on") and c["on"] > until):
+                continue
+            items.append({**c, "symbol": symbol, "auto": False, "due": bool(c.get("on")) and c["on"] <= today.isoformat()})
+        record = StatementStore(Path(data_dir) / "statements").read(symbol) or StatementStore(Path(data_dir) / "statements-financial").read(symbol) or {}
+        kept = {c["id"] for c in own}
+        for c in thesis_auto.catalysts(Path(data_dir), symbol, record.get("quarters") or {}, today=today):
+            if c["id"] not in kept and c["on"] <= until:
+                items.append({**c, "symbol": symbol, "auto": True, "due": False})
+    return sorted(items, key=lambda c: (c["on"] or "9999", c["symbol"], c["text"]))
+
+
 def public_figures(data_dir: Path | None, symbol: str, *, today: date, multiples: dict | None = None) -> tuple[Decimal | None, str | None, dict]:
     """(latest close in đồng, its day, {metric: (period, value)}) from stored public data; a metric without a figure is left out.
     multiples: filled with the monthly P/E and P/B series (oldest first) when given."""

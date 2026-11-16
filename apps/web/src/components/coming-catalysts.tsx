@@ -6,7 +6,15 @@ import { hanoiDate } from "../lib/format";
 import { CatalystTimeline } from "./catalyst-timeline";
 import type { Catalyst } from "./thesis-questions";
 
-export type Coming = Catalyst & { symbol: string; auto: boolean; due: boolean; symbols?: string[] };
+export type Coming = Catalyst & { symbol: string; auto: boolean; due: boolean; held?: boolean; symbols?: string[] };
+export type Show = "all" | "held" | "own";
+const SHOW: [Show, string][] = [["all", "Tất cả"], ["held", "Mã đang nắm"], ["own", "Mốc tự ghi"]];
+const SHOW_KEY = "coming-catalysts-show";
+
+/** Mã đang nắm: only the held tickers; Mốc tự ghi: only the owner's own catalysts; applied before the deadlines are put together. */
+export function filtered(items: Coming[], show: Show): Coming[] {
+  return show === "held" ? items.filter((c) => c.held) : show === "own" ? items.filter((c) => !c.auto) : items;
+}
 const REPORT_SOURCE = "Thông tư 96/2020 Điều 14";
 
 /** The report deadlines falling on the same day (often dozens of tickers on the 20th after a quarter) become one line naming how many. */
@@ -46,7 +54,12 @@ export function ComingTimeline({ items, today }: { items: Coming[]; today: strin
 export function ComingCatalysts() {
   const [d, setD] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { api<Data>("theses/catalysts").then(setD, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
+  const [show, setShow] = useState<Show>("all");
+  const choose = (s: Show) => { setShow(s); try { window.localStorage.setItem(SHOW_KEY, s); } catch { /* not kept */ } };
+  useEffect(() => { api<Data>("theses/catalysts").then((data) => {
+    try { const kept = window.localStorage.getItem(SHOW_KEY); if (kept === "held" || kept === "own") setShow(kept); } catch { /* no storage: show all */ }
+    setD(data);
+  }, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
   if (error) return <p className="errors" role="alert">{error}</p>;
   if (!d) return <p className="muted fx-loading" role="status">Đang tải…</p>;
   return (
@@ -54,7 +67,9 @@ export function ComingCatalysts() {
       <h2>Mốc sắp tới ({d.days} ngày)</h2>
       <p className="caption">Mốc bạn ghi trong luận điểm của từng mã (chưa xảy ra, kể cả mốc chưa có ngày) cùng mốc tự động: sự kiện doanh nghiệp và hạn
         công bố báo cáo. Sửa hoặc đánh dấu đã xảy ra trên trang của mã.</p>
-      <ComingTimeline items={d.items} today={hanoiDate()} />
+      <div className="actions" role="radiogroup" aria-label="Lọc mốc">{SHOW.map(([id, label]) => (
+        <label key={id} className="choice"><input type="radio" name="cc-show" checked={show === id} onChange={() => choose(id)} />{label}</label>))}</div>
+      <ComingTimeline items={filtered(d.items, show)} today={hanoiDate()} />
     </section>
   );
 }

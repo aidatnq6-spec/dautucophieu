@@ -124,3 +124,19 @@ test("a catalyst written on a ticker's page shows on the events page's shared ti
   const item = page.getByRole("list", { name: "Mốc sắp tới của các mã theo dõi" }).getByRole("listitem").filter({ hasText: text });
   await expect(item.getByRole("link", { name: "FPT" })).toHaveAttribute("href", "/research/FPT");
 });
+
+
+test("the shared timeline can show only the owner's own catalysts", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Kịch bản và chỉ báo luận điểm" });
+  const text = `Mốc lọc ${Date.now()}`;
+  await box.getByLabel("Nội dung mốc").fill(text);
+  await box.getByRole("button", { name: "Thêm mốc" }).click();
+  await expect(box.getByRole("list", { name: "Mốc và chất xúc tác" })).toContainText(text);
+  await page.goto("/events");
+  const list = page.getByRole("list", { name: "Mốc sắp tới của các mã theo dõi" });
+  await page.getByRole("radiogroup", { name: "Lọc mốc" }).getByLabel("Mốc tự ghi").check();
+  await expect(list).toContainText(text);
+  await expect(list.getByText("tự động", { exact: true })).toHaveCount(0);
+  await page.getByRole("radiogroup", { name: "Lọc mốc" }).getByLabel("Tất cả").check();
+});

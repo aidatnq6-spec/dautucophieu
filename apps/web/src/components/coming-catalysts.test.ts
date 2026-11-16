@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { describe, expect, it } from "vitest";
-import { ComingTimeline, grouped, keyed } from "./coming-catalysts";
+import { ComingTimeline, filtered, grouped, keyed } from "./coming-catalysts";
 
 const item = (symbol: string, id: string, on: string | null, extra = {}) =>
   ({ symbol, id, when: "", on, sign: "?" as const, text: `${symbol} ${id}`, source: "", done: false, auto: false, due: false, ...extra });
@@ -36,5 +36,15 @@ describe("report deadlines of the same day", () => {
   });
   it("a single ticker's deadline stays as it is", () => {
     expect(grouped([report("PHP"), report("FPT", "2027-01-21")]).every((c) => !c.symbols)).toBe(true);
+  });
+});
+
+describe("the filter", () => {
+  const rows = [item("FPT", "c1", "2027-01-20", { held: true }), item("PHP", "c2", "2027-01-21"),
+    item("FPT", "r1", "2027-01-20", { auto: true, held: true }), item("HPG", "r2", "2027-01-20", { auto: true })];
+  it("keeps the held tickers, the owner's own catalysts, or everything", () => {
+    expect(filtered(rows, "held").map((c) => c.id)).toEqual(["c1", "r1"]);
+    expect(filtered(rows, "own").map((c) => c.id)).toEqual(["c1", "c2"]);
+    expect(filtered(rows, "all")).toHaveLength(4);
   });
 });

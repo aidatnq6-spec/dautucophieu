@@ -1,5 +1,5 @@
 from investment_agent.domain.balance_watch import (
-    borrowing_flag, carry, liquidity_rows, net_debt_rows, property_cash, receivables_view, sector_debt,
+    borrowing_flag, carry, liquidity_rows, net_debt_rows, property_cash, raise_prepay, receivables_view, sector_debt,
 )
 
 B = 10**9
@@ -149,7 +149,8 @@ def test_receivable_rows_add_short_and_long_term_parts_and_their_share_of_total_
     qs = quarters_from(2025, [ar_quarter() for _ in range(8)])
     row = receivables_view(qs)["rows"][-1]
     assert row == {"quarter": "2026-Q4", "customers": str(100 * B), "prepay": str(20 * B), "loans": str(0), "other": str(80 * B),
-                   "provision": str(-10 * B), "total": str(190 * B), "total_share": "0.1900", "other_share": "0.0800", "dso": "100"}
+                   "provision": str(-10 * B), "total": str(190 * B), "total_share": "0.1900", "other_share": "0.0800", "dso": "100",
+                   "prepay_days": None}
 
 
 # R2 Số ngày thu tiền: short-term customer receivables at the quarter's end against the last four quarters' revenue, × 365.
@@ -178,3 +179,39 @@ def test_missing_receivable_lines_leave_their_cells_blank():
     row = v["rows"][-1]
     assert (row["customers"], row["other"], row["total"], row["dso"]) == (None, None, None, None)
     assert v["provision"]["amount"] is None and v["dso"]["days"] is None
+
+
+def with_cogs(rows, cogs=73):
+    return [{**r, "cogs": str(cogs * B)} for r in rows]
+
+
+# P2 Số ngày ứng trước: prepayments to suppliers at the quarter's end against the last four quarters' cost of sales, × 365.
+def test_days_of_prepayment_on_four_quarters_of_cost_of_sales_and_against_the_sector():
+    qs = quarters_from(2025, with_cogs([ar_quarter(prepay=20 + 2 * i) for i in range(8)]))  # cost of sales 73 a quarter: 292 a year
+    v = receivables_view(qs, peers={"AAA": quarters_from(2025, with_cogs([ar_quarter(prepay=8)] * 8)),
+                                    "BBB": quarters_from(2025, with_cogs([ar_quarter(prepay=16)] * 8))})
+    assert v["prepay_days"] == {"quarter": "2026-Q4", "days": "43", "year_ago": "33", "change": "10", "sector_median": "15", "sector_count": 2}
+    assert v["rows"][-1]["prepay_days"] == "43"  # 34 of 292 × 365
+    assert receivables_view(quarters_from(2025, [ar_quarter()] * 8))["prepay_days"]["days"] is None  # no cost of sales kept
+
+
+def cap_quarters(charter, prepay):
+    return quarters_from(2025, [q(charter_capital=c, prepay_suppliers=p, total_assets=1000) for c, p in zip(charter, prepay)])
+
+
+# P1 Trả trước tăng cùng đợt huy động vốn: money raised that goes straight back out as prepayments to suppliers.
+def test_prepayments_rising_by_half_the_capital_just_raised_are_flagged():
+    qs = cap_quarters([100, 100, 150, 150, 150], [10, 10, 25, 40, 40])  # 50 raised in 2025-Q3; prepayments 10 → 40 by the next quarter
+    r = raise_prepay(qs, [{"date": "2025-08-20", "kind": "raise"}, {"date": "2025-08-20", "kind": "raise"}])
+    assert r == {"flag": True, "events": [{"issue_date": "2025-08-20", "quarter": "2025-Q3", "capital_added": str(50 * B),
+                                           "prepay_before": str(10 * B), "prepay_after": str(40 * B), "after_quarter": "2025-Q4",
+                                           "prepay_added": str(30 * B), "flag": True}]}
+
+
+def test_a_raise_spent_elsewhere_a_bonus_issue_or_old_raises_are_not_flagged():
+    qs = cap_quarters([100, 100, 150, 150, 150], [10, 10, 11, 12, 12])
+    assert raise_prepay(qs, [{"date": "2025-08-20", "kind": "raise"}])["events"][0]["flag"] is False
+    assert raise_prepay(qs, [{"date": "2025-08-20", "kind": "bonus"}]) == {"flag": False, "events": []}  # bonus shares bring no money
+    late = cap_quarters([100, 100, 100, 150, 150], [10, 10, 10, 10, 40])  # booked the quarter after the issue date
+    assert raise_prepay(late, [{"date": "2025-09-29", "kind": "raise"}])["events"][0]["quarter"] == "2025-Q4"
+    assert raise_prepay(qs, [{"date": "2020-03-01", "kind": "raise"}])["events"] == []  # outside the stored quarters

@@ -17,7 +17,12 @@ the one than it pays on the other (borrowing cheap to deposit dear).
 Phải thu: receivables by part, short and long term added (customers, prepayments to suppliers, loans, other receivables, the
 bad-debt provision) and their share of total assets; số ngày thu tiền = short-term customer receivables at the quarter's end ÷ the
 last four quarters' revenue × 365, against a year before and the median of the sector's watched tickers; dự phòng phải thu khó đòi
-(short term) as a share of gross short-term receivables, "jump" when it grew by half or more in a year and is at least 1% of them."""
+(short term) as a share of gross short-term receivables, "jump" when it grew by half or more in a year and is at least 1% of them.
+
+Trả trước cho người bán is paid back in goods or services, never in money: số ngày ứng trước = prepayments to suppliers at the quarter's
+end ÷ the last four quarters' cost of sales × 365, against a year before and the sector. Trả trước tăng cùng đợt huy động vốn: in the
+quarter a share issue that raised money (not bonus shares) entered the charter capital, and the quarter after, prepayments to suppliers
+grew by at least half of the capital added, a way money just raised can leave the company (to related parties above all)."""
 
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -180,12 +185,64 @@ def _both(q: dict, st: str, lt: str) -> Decimal | None:
     return a + b if a is not None and b is not None else None
 
 
-def _dso(quarters: dict, period: str) -> Decimal | None:
-    flows = [_get(quarters.get(_back(period, k), {}), "revenue")[0] for k in range(4)]
-    (ar,) = _get(quarters.get(period, {}), "ar_customers")
-    if ar is None or None in flows or sum(flows) <= 0:
+def _days(quarters: dict, period: str, stock: str, flow: str) -> Decimal | None:
+    flows = [_get(quarters.get(_back(period, k), {}), flow)[0] for k in range(4)]
+    (balance,) = _get(quarters.get(period, {}), stock)
+    if balance is None or None in flows or sum(flows) <= 0:
         return None
-    return (ar / sum(flows) * 365).quantize(Decimal(1), ROUND_HALF_UP)
+    return (balance * 365 / sum(flows)).quantize(Decimal(1), ROUND_HALF_UP)  # multiplied first: no rounding before the halves
+
+
+def _dso(quarters: dict, period: str) -> Decimal | None:
+    return _days(quarters, period, "ar_customers", "revenue")
+
+
+def _prepay_days(quarters: dict, period: str) -> Decimal | None:
+    return _days(quarters, period, "prepay_suppliers", "cogs")
+
+
+def _median(values: list[Decimal]) -> Decimal | None:
+    if not values:
+        return None
+    v, mid = sorted(values), len(values) // 2
+    return v[mid] if len(v) % 2 else ((v[mid - 1] + v[mid]) / 2).quantize(Decimal(1), ROUND_HALF_UP)
+
+
+def _days_view(quarters: dict, peers: dict | None, days_of) -> dict:
+    latest = max(quarters) if quarters else None
+    days = days_of(quarters, latest) if latest else None
+    ago = days_of(quarters, _back(latest, 4)) if latest else None
+    peer_days = [d for d in (days_of(qs, max(qs)) for qs in (peers or {}).values() if qs) if d is not None]
+    return {"quarter": latest, "days": _s(days), "year_ago": _s(ago), "change": _s(days - ago) if days is not None and ago is not None else None,
+            "sector_median": _s(_median(peer_days)), "sector_count": len(peer_days)}
+
+
+RAISE_SHARE = Decimal("0.50")  # prepayments added against the charter capital a money-raising issue added
+
+
+def _quarter_of(day: str) -> str:
+    return f"{day[:4]}-Q{(int(day[5:7]) + 2) // 3}"
+
+
+def raise_prepay(quarters: dict, share_issues: list[dict] | None) -> dict:
+    """Each money-raising issue within the stored quarters: the quarter its capital was booked (that of the issue date, or the next), the
+    capital added, prepayments to suppliers before it and at the quarter after, and whether they grew by half the capital or more."""
+    events = []
+    for day in sorted({i["date"] for i in (share_issues or []) if i.get("kind") == "raise" and i.get("date")}):
+        q = _quarter_of(day)
+        if q not in quarters:
+            continue
+        cap = lambda p: _get(quarters.get(p, {}), "charter_capital")[0]  # noqa: E731
+        booked = next((p for p in (q, _back(q, -1)) if cap(p) is not None and cap(_back(p, 1)) is not None and cap(p) > cap(_back(p, 1))), None)
+        if booked is None:
+            continue
+        after_q = _back(booked, -1) if _back(booked, -1) in quarters else booked
+        added = cap(booked) - cap(_back(booked, 1))
+        (before,), (after,) = _get(quarters.get(_back(booked, 1), {}), "prepay_suppliers"), _get(quarters.get(after_q, {}), "prepay_suppliers")
+        grew = after - before if before is not None and after is not None else None
+        events.append({"issue_date": day, "quarter": booked, "capital_added": _s(added), "prepay_before": _s(before), "prepay_after": _s(after),
+                       "after_quarter": after_q, "prepay_added": _s(grew), "flag": grew is not None and grew >= RAISE_SHARE * added})
+    return {"flag": any(e["flag"] for e in events), "events": events}
 
 
 def _provision(q: dict) -> tuple[Decimal | None, Decimal | None]:
@@ -209,7 +266,7 @@ def receivables_view(quarters: dict, peers: dict | None = None, n: int = 12) -> 
         rows.append({"quarter": period, "customers": _s(_both(q, "ar_customers", "ar_customers_lt")), "prepay": _s(_get(q, "prepay_suppliers")[0]),
                      "loans": _s(_both(q, "st_loans_receivable", "lt_loans_receivable")), "other": _s(other),
                      "provision": _s(_both(q, "bad_debt_st", "bad_debt_lt")), "total": _s(total), "total_share": share(total),
-                     "other_share": share(other), "dso": _s(_dso(quarters, period))})
+                     "other_share": share(other), "dso": _s(_dso(quarters, period)), "prepay_days": _s(_prepay_days(quarters, period))})
     latest = max(quarters) if quarters else None
     days = _dso(quarters, latest) if latest else None
     ago = _dso(quarters, _back(latest, 4)) if latest else None
@@ -225,7 +282,7 @@ def receivables_view(quarters: dict, peers: dict | None = None, n: int = 12) -> 
         kind = "none"
     elif amount is not None and before is not None and before > 0 and amount / before - 1 >= PROVISION_JUMP and part is not None and part >= PROVISION_MATERIAL:
         kind = "jump"
-    return {"rows": rows,
+    return {"rows": rows, "prepay_days": _days_view(quarters, peers, _prepay_days),
             "dso": {"quarter": latest, "days": _s(days), "year_ago": _s(ago), "change": _s(days - ago) if days is not None and ago is not None else None,
                     "sector_median": _s(median), "sector_count": len(peer_days)},
             "provision": {"quarter": latest, "amount": _s(amount), "share": _r(part), "year_ago": _s(before), "kind": kind}}

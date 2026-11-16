@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { advancesText, borrowingText, carryText, dsoText, provisionText, sectorText, type Carry } from "./balance-watch";
+import { advancesText, borrowingText, carryText, dsoText, prepayDaysText, provisionText, raiseText, sectorText, type Carry } from "./balance-watch";
+
+describe("prepayment readings", () => {
+  it("sets the days of prepayment against a year before and the sector", () => {
+    expect(prepayDaysText({ quarter: "2026-Q3", days: "477", year_ago: "160", change: "317", sector_median: "236", sector_count: 5 }))
+      .toBe("Số ngày ứng trước nhà cung cấp Q3/2026: 477 ngày, dài hơn 317 ngày so với cùng kỳ năm trước (160 ngày); trung vị ngành 236 ngày (5 mã theo dõi khác).");
+  });
+  it("names a raise whose money went out as prepayments, and one that did not", () => {
+    const e = { issue_date: "2025-08-20", quarter: "2025-Q3", capital_added: "50000000000", prepay_before: "10000000000", prepay_after: "40000000000",
+      after_quarter: "2025-Q4", prepay_added: "30000000000", flag: true };
+    expect(raiseText(e)).toContain("Đợt huy động vốn ngày 20/08/2025 thêm 50 tỷ vốn điều lệ (Q3/2025); ngay sau đó trả trước người bán từ 10 tỷ (trước đợt) lên 40 tỷ (Q4/2025), tăng 30 tỷ");
+    expect(raiseText({ ...e, prepay_after: "11000000000", prepay_added: "1000000000", flag: false })).toContain("thấp hơn một nửa số vốn vừa góp");
+  });
+});
 
 describe("dsoText", () => {
   it("sets the days to collect against a year before and the sector", () => {

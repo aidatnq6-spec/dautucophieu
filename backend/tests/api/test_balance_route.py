@@ -45,6 +45,7 @@ def test_a_company_outside_property_has_no_advances_block_and_net_cash_shows(tmp
     assert fpt["property"] is None and fpt["sector_debt"]["members"] == 1
     assert fpt["liquidity"][-1]["cover"] == "0.2000" and (fpt["carry"]["quarter"], fpt["carry"]["yield"]) == (None, None)  # no financial income stored: nothing read
     assert fpt["receivables"]["rows"][-1]["customers"] is None and fpt["receivables"]["dso"]["sector_count"] == 0  # lines not stored
+    assert fpt["raise_prepay"] == {"flag": False, "events": []}  # no fundamentals record: no raises known
 
 
 def test_banks_and_unwatched_tickers_are_not_read_this_way(tmp_path):

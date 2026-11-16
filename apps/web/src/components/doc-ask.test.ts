@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { pageLink, spendText } from "./doc-ask";
+import { PRESETS, pageLink, spendText } from "./doc-ask";
+
+describe("preset questions", () => {
+  it("carry no number and no word the server's filter blocks, so they are never refused", () => {
+    for (const p of PRESETS) {
+      expect(p.length).toBeLessThanOrEqual(300);
+      expect(p).not.toMatch(/\d/);
+      expect(p.toLowerCase()).not.toMatch(/\b(tôi|mình|danh mục|đang nắm|đang giữ|giá vốn|lãi lỗ|tài khoản|sổ tiết kiệm)\b/u);
+    }
+  });
+});
 import { proposalNote } from "./related-receivables";
 
 describe("doc ask helpers", () => {

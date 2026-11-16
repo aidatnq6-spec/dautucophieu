@@ -445,4 +445,6 @@ test("a question to the AI carrying an amount is blocked before anything is fetc
   await box.getByLabel("Câu hỏi", { exact: true }).fill("Phải thu 2.953 tỷ có thật không?");
   await box.getByRole("button", { name: "Hỏi AI" }).click();
   await expect(box.getByRole("alert")).toContainText("Câu hỏi có số tiền");
+  await box.getByRole("group", { name: "Câu hỏi mẫu" }).getByRole("button", { name: /hoàn lại bằng tiền/ }).click();
+  await expect(box.getByLabel("Câu hỏi", { exact: true })).toHaveValue("Có khoản trả trước cho người bán nào được hoàn lại bằng tiền không?");
 });

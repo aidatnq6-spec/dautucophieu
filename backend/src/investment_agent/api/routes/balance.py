@@ -6,8 +6,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, Request
 
-from investment_agent.domain.balance_watch import borrowing_flag, carry, liquidity_rows, net_debt_rows, property_cash, receivables_view, sector_debt
+from investment_agent.domain.balance_watch import borrowing_flag, carry, liquidity_rows, net_debt_rows, property_cash, raise_prepay, receivables_view, sector_debt
 from investment_agent.market.financial_ratios import kind_of
+from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.sectors import load_sectors
 from investment_agent.market.statements import StatementStore
 from investment_agent.market.watchlist import load_watchlist
@@ -47,4 +48,5 @@ def balance(symbol: str, request: Request):
             "sector_debt": {**sector_debt(peers), "members": len(peers)} if sector else None,
             "property": property_cash(quarters) if sector == PROPERTY else None,
             "liquidity": liquidity_rows(quarters), "carry": carry(quarters),
-            "receivables": receivables_view(quarters, {s: qs for s, qs in peers.items() if s != symbol})}
+            "receivables": receivables_view(quarters, {s: qs for s, qs in peers.items() if s != symbol}),
+            "raise_prepay": raise_prepay(quarters, (FundamentalsStore(data_dir / "fundamentals").read(symbol) or {}).get("share_issues"))}

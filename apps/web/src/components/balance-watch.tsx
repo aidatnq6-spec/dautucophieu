@@ -13,12 +13,14 @@ type LiquidityRow = { quarter: string; cash: string | null; st_investments: stri
 export type Carry = { quarter: string | null; kind: "carry" | "no_debt" | "unusual_income" | "low_interest" | null; missing: string[]; fin_income: string | null; interest: string | null;
   net: string | null; avg_cash_like: string | null; avg_debt: string | null; yield: string | null; cost: string | null; spread: string | null };
 type ArRow = { quarter: string; customers: string | null; prepay: string | null; loans: string | null; other: string | null; provision: string | null;
-  total: string | null; total_share: string | null; other_share: string | null; dso: string | null };
+  total: string | null; total_share: string | null; other_share: string | null; dso: string | null; prepay_days: string | null };
 export type Dso = { quarter: string | null; days: string | null; year_ago: string | null; change: string | null; sector_median: string | null; sector_count: number };
+export type RaiseEvent = { issue_date: string; quarter: string; capital_added: string; prepay_before: string | null; prepay_after: string | null;
+  after_quarter: string; prepay_added: string | null; flag: boolean };
 export type Provision = { quarter: string | null; amount: string | null; share: string | null; year_ago: string | null; kind: "jump" | "none" | null };
 type Balance = { symbol: string; sector: string | null; debt: { rows: DebtRow[]; flag: Flag }; sector_debt: SectorDebt | null;
   property: { rows: CashRow[]; signal: Signal } | null; liquidity: LiquidityRow[]; carry: Carry;
-  receivables: { rows: ArRow[]; dso: Dso; provision: Provision } };
+  receivables: { rows: ArRow[]; dso: Dso; provision: Provision; prepay_days: Dso }; raise_prepay: { flag: boolean; events: RaiseEvent[] } };
 
 const SHOWN = 8;  // quarters in each table
 const q = (p: string) => `Q${p.slice(-1)}/${p.slice(0, 4)}`;
@@ -79,6 +81,27 @@ export function dsoText(d: Dso): string {
     : "";
   const peers = d.sector_median !== null ? `; trung vị ngành ${d.sector_median} ngày (${d.sector_count} mã theo dõi khác)` : "";
   return `Số ngày thu tiền ${q(d.quarter)}: ${d.days} ngày${ago}${peers}.`;
+}
+
+/** Số ngày ứng trước nhà cung cấp of the latest quarter, against a year before and the sector. */
+export function prepayDaysText(d: Dso): string {
+  if (!d.quarter || d.days === null) return "Chưa đủ trả trước người bán và giá vốn bốn quý để tính số ngày ứng trước.";
+  const ago = d.change !== null
+    ? Number(d.change) === 0 ? ", bằng cùng kỳ năm trước" : `, ${Number(d.change) > 0 ? "dài hơn" : "ngắn hơn"} ${Math.abs(Number(d.change))} ngày so với cùng kỳ năm trước (${d.year_ago} ngày)`
+    : "";
+  const peers = d.sector_median !== null ? `; trung vị ngành ${d.sector_median} ngày (${d.sector_count} mã theo dõi khác)` : "";
+  return `Số ngày ứng trước nhà cung cấp ${q(d.quarter)}: ${d.days} ngày${ago}${peers}.`;
+}
+
+/** One money-raising issue and what prepayments to suppliers did around it. */
+export function raiseText(e: RaiseEvent): string {
+  const day = e.issue_date.split("-").reverse().join("/");
+  if (e.prepay_added === null) return `Đợt huy động vốn ngày ${day} (vốn điều lệ thêm ${ty(e.capital_added)}, ${q(e.quarter)}): thiếu số trả trước người bán để so.`;
+  const moved = `trả trước người bán từ ${ty(e.prepay_before)} (trước đợt) lên ${ty(e.prepay_after)} (${q(e.after_quarter)})`;
+  return e.flag
+    ? `Đợt huy động vốn ngày ${day} thêm ${ty(e.capital_added)} vốn điều lệ (${q(e.quarter)}); ngay sau đó ${moved}, tăng ${ty(e.prepay_added)}, từ một nửa số vốn vừa góp. `
+      + "Tiền vừa huy động có thể đã chuyển ra ngoài dưới danh nghĩa ứng trước: đọc thuyết minh xem trả trước cho ai, có phải bên liên quan không, và đã nhận hàng chưa."
+    : `Đợt huy động vốn ngày ${day} thêm ${ty(e.capital_added)} vốn điều lệ (${q(e.quarter)}); ${moved}, thấp hơn một nửa số vốn vừa góp.`;
 }
 
 /** The bad-debt provision of the latest quarter, in words. */
@@ -164,12 +187,15 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
       <section className="surface" aria-label="Phải thu">
         <h2>Phải thu</h2>
         <p data-testid="dso">{dsoText(data.receivables.dso)}</p>
+        <p data-testid="prepay-days">{prepayDaysText(data.receivables.prepay_days)}</p>
+        {data.raise_prepay.events.map((e) => <p key={e.issue_date} data-testid="raise-prepay" className={e.flag ? "notice" : undefined}>
+          {e.flag && <><span className="pill warn">Trả trước tăng sau huy động vốn</span> </>}{raiseText(e)}</p>)}
         <p data-testid="provision">{data.receivables.provision.kind === "jump" && <><span className="pill warn">Dự phòng tăng mạnh</span> </>}
           {provisionText(data.receivables.provision)}</p>
         <div className="tablewrap"><table className="fv-table" aria-label={`Phải thu ${symbol}`}>
           <thead><tr><th>Quý</th><th className="num">Khách hàng</th><th className="num">Trả trước người bán</th><th className="num">Cho vay</th>
             <th className="num">Phải thu khác</th><th className="num">Dự phòng</th><th className="num">Tổng phải thu</th><th className="num">Trên tổng tài sản</th>
-            <th className="num">Số ngày thu tiền</th></tr></thead>
+            <th className="num">Số ngày thu tiền</th><th className="num">Số ngày ứng trước</th></tr></thead>
           <tbody>{data.receivables.rows.slice(-SHOWN).reverse().map((r) => (
             <tr key={r.quarter}>
               <td data-label="Quý">{q(r.quarter)}</td>
@@ -181,12 +207,15 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
               <td className="num" data-label="Tổng phải thu">{ty(r.total)}</td>
               <td className="num" data-label="Trên tổng tài sản">{r.total_share === null ? "—" : rate(r.total_share)}</td>
               <td className="num" data-label="Số ngày thu tiền">{r.dso === null ? "—" : `${r.dso} ngày`}</td>
+              <td className="num" data-label="Số ngày ứng trước">{r.prepay_days === null ? "—" : `${r.prepay_days} ngày`}</td>
             </tr>))}
           </tbody>
         </table></div>
         <p className="caption">Mỗi cột cộng phần ngắn hạn và dài hạn (trả trước người bán: ngắn hạn); dự phòng mang dấu âm, đã trừ trong tổng. Số ngày thu tiền = phải
           thu khách hàng ngắn hạn cuối quý ÷ doanh thu bốn quý gần nhất × 365; trung vị ngành trên các mã theo dõi cùng ngành. Dự phòng được ghi là tăng mạnh khi
-          tăng từ 50% so với cùng kỳ và bằng từ 1% phải thu ngắn hạn. Phải thu từ bên liên quan và tên từng khách hàng chỉ có trong thuyết minh, không có ở đây.
+          tăng từ 50% so với cùng kỳ và bằng từ 1% phải thu ngắn hạn. Số ngày ứng trước = trả trước người bán cuối quý ÷ giá vốn bốn quý × 365: khoản này
+          được thu hồi bằng hàng hóa, dịch vụ chứ không bằng tiền. Đợt huy động vốn (không tính cổ phiếu thưởng) được ghi nhận khi trả trước tăng từ một
+          nửa số vốn điều lệ vừa thêm, trong quý ghi nhận vốn và quý kế tiếp. Phải thu từ bên liên quan và tên từng khách hàng chỉ có trong thuyết minh, không có ở đây.
           Báo cáo công khai (VNDirect); ô thiếu số để trống. Không phải khuyến nghị.</p>
       </section>
       {data.property && <section className="surface" aria-label="Tiền khách trả trước">

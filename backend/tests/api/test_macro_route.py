@@ -93,3 +93,22 @@ def test_macro_chain_reads_the_stored_series_and_the_vn_index(tmp_path):
     assert (n["vnindex"]["direction"], n["vnindex"]["latest"]["value"]) == ("up", "1700")
     assert body["missing"] == ["inflation", "liquidity", "rates"]
     assert body["cash_rich"] == []  # no watched ticker with statements here
+
+
+
+def test_a_session_figure_is_refused_on_a_day_without_a_session_with_the_nearest_one_named(tmp_path):
+    clock = Clock()  # 2027-01-15
+    c = client(tmp_path, clock)
+    sunday = call(c, clock, "POST", "/internal/macro/vn10y/observations", {"date": "2026-10-25", "value": "4,58"})
+    assert sunday.status_code == 422 and sunday.json()["code"] == "not_a_session"
+    assert sunday.json()["message"] == "Ngày 25/10/2026 là ngày nghỉ, không có phiên giao dịch: chọn phiên gần nhất (23/10/2026)."
+    holiday = call(c, clock, "POST", "/internal/macro/vn_interbank_on/observations", {"date": "2026-09-02", "value": "4"})
+    assert holiday.json()["code"] == "not_a_session" and "28/08/2026" in holiday.json()["message"]  # 31/8–2/9 off on HOSE's calendar
+    assert call(c, clock, "POST", "/internal/macro/vn10y/observations", {"date": "2026-10-23", "value": "4,49"}).status_code == 200
+    # a year without HOSE's calendar: weekends only
+    assert call(c, clock, "POST", "/internal/macro/vn10y/observations", {"date": "2027-01-09", "value": "4"}).json()["message"].endswith("(08/01/2027).")
+    assert call(c, clock, "POST", "/internal/macro/vn10y/observations", {"date": "2027-01-11", "value": "4"}).status_code == 200
+    # the central rate is published on weekends too: not checked
+    assert call(c, clock, "POST", "/internal/macro/usd_vnd_central/observations", {"date": "2026-10-25", "value": "25100"}).status_code == 200
+    rows = {r["id"]: r for r in call(c, clock, "GET", "/internal/macro").json()["rows"]}
+    assert rows["vn10y"]["period"] == "session" and rows["usd_vnd_central"]["period"] is None

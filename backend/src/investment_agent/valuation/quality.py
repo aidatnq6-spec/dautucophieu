@@ -194,6 +194,21 @@ def _signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:
     else:
         signs.append({"id": "other_receivables", "label": label, "flag": None,
                       "detail": f"Thiếu phải thu khác hoặc tổng tài sản năm {y} (có sau lần cập nhật báo cáo tới)"})
+    # Trả trước cho người bán: paid back in goods or services, never in money; large or doubling, it asks to whom and what was delivered
+    label = "Trả trước người bán lớn"
+    if "prepay_suppliers" in cur and cur.get("total_assets", Decimal(0)) > 0:
+        now = cur["prepay_suppliers"]
+        share = now / cur["total_assets"]
+        before = prev.get("prepay_suppliers")
+        material = before is not None and prev.get("total_assets", Decimal(0)) > 0 and before >= OTHER_RECEIVABLES_FLOOR * prev["total_assets"]
+        signs.append({"id": "prepay_suppliers", "label": label, "flag": share >= OTHER_RECEIVABLES_SHARE or (material and now >= 2 * before),
+                      "rule": f"trả trước cho người bán (ngắn hạn) từ {_num(OTHER_RECEIVABLES_SHARE * 100, 0)}% tổng tài sản, hoặc gấp đôi năm trước khi "
+                              f"năm trước đã từ {_num(OTHER_RECEIVABLES_FLOOR * 100, 0)}% tổng tài sản; khoản này thu hồi bằng hàng hóa, dịch vụ chứ không bằng tiền",
+                      "detail": f"Năm {y}: trả trước cho người bán {_bn(now)}, bằng {_pct(share)} tổng tài sản {_bn(cur['total_assets'])}"
+                                + (f"; so với {_bn(before)} năm {y - 1}" if before is not None else "")})
+    else:
+        signs.append({"id": "prepay_suppliers", "label": label, "flag": None,
+                      "detail": f"Thiếu trả trước cho người bán hoặc tổng tài sản năm {y} (có sau lần cập nhật báo cáo tới)"})
     return signs
 
 

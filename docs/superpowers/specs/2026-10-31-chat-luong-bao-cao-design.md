@@ -45,6 +45,11 @@ Không áp dụng cho ngân hàng, dịch vụ tài chính, bảo hiểm (cấu 
 - **Phải thu khác lớn** (chủ sở hữu đồng ý 15/11/2026): phải thu khác (ngắn hạn + dài hạn) năm gần nhất đạt một trong hai điều kiện:
   - từ 10% tổng tài sản;
   - gấp đôi năm trước, khi năm trước đã từ 1% tổng tài sản.
+- **Trả trước người bán lớn** (chủ sở hữu đồng ý 16/11/2026): trả trước cho người bán ngắn hạn năm gần nhất đạt một trong hai điều kiện:
+  - từ 10% tổng tài sản;
+  - gấp đôi năm trước, khi năm trước đã từ 1% tổng tài sản.
+
+  Khoản này được thu hồi bằng hàng hóa hoặc dịch vụ, không thu hồi bằng tiền.
 
 Mỗi dấu hiệu hiện số thật của các năm liên quan. Không gộp thành một điểm.
 

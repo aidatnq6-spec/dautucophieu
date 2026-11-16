@@ -20,7 +20,8 @@ from investment_agent.ai.doc_ask import (
 DOCS_DIR = "ai-docs"
 MAX_PAGES, MAX_BYTES, MAX_SECONDS = 300, 20 * 1024 * 1024, 120
 USER_AGENT = "investment-agent/0.1 (personal use)"
-RR_QUERY = "phải thu bên liên quan giao dịch số dư các bên liên quan công ty liên kết related parties receivables"
+RR_QUERY = ("phải thu bên liên quan giao dịch số dư các bên liên quan công ty liên kết trả trước cho người bán nhà cung cấp "
+            "related parties receivables advances to suppliers")
 JSON_FORMAT = {"type": "json_object"}
 
 

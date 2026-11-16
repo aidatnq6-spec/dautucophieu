@@ -23,7 +23,8 @@ def test_all_nine_criteria_pass_for_a_company_improving_on_every_line():
     assert [c["passed"] for c in f["criteria"]] == [True] * 9
     assert f["criteria"][0]["detail"] == "ROA 9,0% (lợi nhuận 9 tỷ / tài sản đầu kỳ 100 tỷ)"
     assert f["criteria"][6]["detail"] == "Không có đợt huy động vốn bằng cổ phiếu năm 2025 (cổ phiếu thưởng, cổ tức bằng cổ phiếu không tính)"
-    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None]  # financial income, other receivables, prepayments: not kept
+    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None, None]  # financial income and its cash, other receivables,
+    # prepayments: not kept
 
 
 def test_a_capital_raise_and_worse_lines_fail_and_the_signs_show_their_numbers():
@@ -242,3 +243,30 @@ def test_loans_merged_into_other_receivables_from_2026_do_not_read_as_doubling()
     assert s["flag"] is False
     assert s["detail"] == ("Năm 2025: phải thu khác và cho vay 8 tỷ (phải thu khác ngắn hạn 7 tỷ, dài hạn 1 tỷ), bằng 7,6% tổng tài sản 105 tỷ; "
                            "so với 8 tỷ năm 2024 (gồm 5 tỷ cho vay)")
+
+
+def paper(income, received, pbt, before=None):
+    rec = {"annual": {k: dict(v) for k, v in STRONG["annual"].items()}, "share_issues": STRONG["share_issues"]}
+    rec["annual"]["2025"].update(fin_income=str(income * BN), interest_received=str(received * BN), pbt=str(pbt * BN))
+    if before:
+        rec["annual"]["2024"].update(fin_income=str(before[0] * BN), interest_received=str(before[1] * BN))
+    return next(s for s in report_quality(rec, "Công nghệ Thông tin")["signs"] if s["id"] == "paper_income")
+
+
+def test_financial_income_mostly_not_received_in_cash_is_a_sign():
+    s = paper(37.66, 3.47, 48.76, before=(3.33, 3.84))  # VCG-like: 9% of the income came in as cash
+    assert (s["flag"], s["label"]) == (True, "Thu nhập tài chính chưa thu được tiền")
+    assert s["detail"] == ("Năm 2025: doanh thu tài chính 37,7 tỷ, tiền thu lãi, cổ tức và lợi nhuận được chia 3,5 tỷ (9,2%); lợi nhuận trước thuế 48,8 tỷ; "
+                           "năm 2024: 3,3 tỷ và 3,8 tỷ (115,3%)")
+    assert s["rule"] == ("tiền thu lãi cho vay, cổ tức và lợi nhuận được chia dưới 50% doanh thu tài chính, khi doanh thu tài chính từ 10% lợi nhuận "
+                         "trước thuế (hoặc doanh nghiệp lỗ); doanh thu tài chính còn gồm lãi tỷ giá và lãi bán khoản đầu tư, thu tiền ở dòng khác: "
+                         "đọc thuyết minh")
+    assert paper(29.77, 20.01, 130.44)["flag"] is False      # FPT-like: two thirds received
+    assert paper(5, 1, 100)["flag"] is False                 # 5% of profit before tax: not material
+    assert paper(5, 1, -20)["flag"] is True                  # a loss-making company booking interest it does not collect
+
+
+def test_without_the_cash_line_or_financial_income_the_sign_is_not_read():
+    assert next(s for s in report_quality(STRONG, "Công nghệ Thông tin")["signs"] if s["id"] == "paper_income")["flag"] is None
+    none = paper(0, 0, 50)
+    assert none["flag"] is None and "không có doanh thu tài chính" in none["detail"]

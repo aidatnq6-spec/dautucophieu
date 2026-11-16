@@ -16,6 +16,7 @@ MIN_EVALUATED = 7
 RECEIVABLES_GAP = Decimal("0.20")  # receivables growth above revenue growth, in share points
 ACCRUAL_SHARE = Decimal("0.10")  # three years of (profit − operating cash flow) against latest total assets
 FIN_PROFIT_SHARE = Decimal("0.30")  # financial income less financial expenses against profit before tax, latest year
+PAPER_RECEIVED, PAPER_MATERIAL = Decimal("0.50"), Decimal("0.10")  # cash received against financial income; income against profit before tax
 OTHER_RECEIVABLES_SHARE, OTHER_RECEIVABLES_FLOOR = Decimal("0.10"), Decimal("0.01")  # of total assets; doubling counts above the floor
 BN = Decimal(1_000_000_000)
 # Sector context shown with the signs, where a sign is usual for the business rather than a warning by itself.
@@ -204,6 +205,29 @@ def _signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:
     else:
         signs.append({"id": "other_receivables", "label": label, "flag": None,
                       "detail": f"Thiếu phải thu khác hoặc tổng tài sản năm {y} (có sau lần cập nhật báo cáo tới)"})
+    # Lợi nhuận giấy: interest and dividends booked as financial income but not received in cash (a lender to related parties books
+    # interest it does not collect); financial income also holds exchange gains and gains on selling investments, cashed on other lines
+    label = "Thu nhập tài chính chưa thu được tiền"
+    if all(k in cur for k in ("fin_income", "interest_received", "pbt")):
+        income, received, pbt = cur["fin_income"], cur["interest_received"], cur["pbt"]
+        if income <= 0:
+            signs.append({"id": "paper_income", "label": label, "flag": None, "detail": f"Năm {y}: không có doanh thu tài chính"})
+        else:
+            part = received / income
+            material = pbt <= 0 or income >= PAPER_MATERIAL * pbt
+            then = ""
+            if all(k in prev for k in ("fin_income", "interest_received")) and prev["fin_income"] > 0:
+                then = (f"; năm {y - 1}: {_bn(prev['fin_income'])} và {_bn(prev['interest_received'])} "
+                        f"({_pct(prev['interest_received'] / prev['fin_income'])})")
+            signs.append({"id": "paper_income", "label": label, "flag": material and part < PAPER_RECEIVED,
+                          "rule": f"tiền thu lãi cho vay, cổ tức và lợi nhuận được chia dưới {_num(PAPER_RECEIVED * 100, 0)}% doanh thu tài chính, khi doanh "
+                                  f"thu tài chính từ {_num(PAPER_MATERIAL * 100, 0)}% lợi nhuận trước thuế (hoặc doanh nghiệp lỗ); doanh thu tài chính còn "
+                                  "gồm lãi tỷ giá và lãi bán khoản đầu tư, thu tiền ở dòng khác: đọc thuyết minh",
+                          "detail": f"Năm {y}: doanh thu tài chính {_bn(income)}, tiền thu lãi, cổ tức và lợi nhuận được chia {_bn(received)} "
+                                    f"({_pct(part)}); lợi nhuận trước thuế {_bn(pbt)}{then}"})
+    else:
+        signs.append({"id": "paper_income", "label": label, "flag": None,
+                      "detail": f"Thiếu doanh thu tài chính, tiền thu lãi và cổ tức hoặc lợi nhuận trước thuế năm {y} (có sau lần cập nhật báo cáo tới)"})
     # Trả trước cho người bán: paid back in goods or services, never in money; large or doubling, it asks to whom and what was delivered
     label = "Trả trước người bán lớn"
     if "prepay_suppliers" in cur and cur.get("total_assets", Decimal(0)) > 0:

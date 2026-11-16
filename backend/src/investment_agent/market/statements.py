@@ -34,7 +34,7 @@ PRICE_URL = "https://api-finfo.vndirect.com.vn/v4/stock_prices?sort=date&q=code:
 FIRST_START, REFRESH_DAYS, MAX_AGE_DAYS, PACE_SECONDS = "2010-01-01", 730, 7, 1.0
 # Raised when LINES gains lines: a non-financial ticker kept with an older version is due and takes its whole history once, so the new
 # lines reach back as far as the old ones. 2: customer advances and inventory.
-LINES_VERSION = 4  # 3: current assets, receivables, current and long-term liabilities, EPS; 4: the parts of receivables
+LINES_VERSION = 5  # 3: current assets, receivables, current and long-term liabilities, EPS; 4: the parts of receivables; 5: interest received
 FIN_LINES_VERSION = 2  # banks, securities firms and insurers: 2: basic EPS (23001 in each of their layouts)
 # (model, item code) → line. Model 1 balance sheet, 2 income statement, 3 cash flow (indirect); the general layout (TT200).
 LINES = {
@@ -56,6 +56,9 @@ LINES = {
     (1, 11310): "ar_customers", (1, 11320): "prepay_suppliers", (1, 11345): "st_loans_receivable", (1, 11350): "other_receivables",
     (1, 11390): "bad_debt_st", (1, 12100): "receivables_lt", (1, 12110): "ar_customers_lt", (1, 12140): "lt_loans_receivable",
     (1, 12180): "other_receivables_lt", (1, 12190): "bad_debt_lt",
+    # Tiền thu lãi cho vay, cổ tức và lợi nhuận được chia (investing cash flow), against financial income for Lợi nhuận giấy; checked
+    # in v4/financial_models (modelType 3) on 16/11/2026
+    (3, 32700): "interest_received",
     (3, 22230): "depreciation", (3, 32000): "cfo", (3, 32100): "capex", (3, 33000): "cfi", (3, 34000): "cff", (3, 33600): "dividends_paid",
 }
 # Banks (TT49 layout: models 101 balance sheet, 102 income statement) and securities firms (TT334: 89, 90): only what their scale

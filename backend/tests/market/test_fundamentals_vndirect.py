@@ -12,7 +12,8 @@ def statements():
             "selling": str(2000 * B), "admin": str(3500 * B), "npat": str(10000 * B), "total_assets": str(80000 * B), "current_assets": str(50000 * B),
             "current_liabilities": str(30000 * B), "long_liabilities": str(5000 * B), "receivables": str(15000 * B), "cfo": str(11000 * B),
             "fin_income": str(1500 * B), "fin_expense": str(700 * B), "pbt": str(12000 * B), "other_receivables": str(800 * B),
-            "other_receivables_lt": str(200 * B), "prepay_suppliers": str(300 * B), "st_loans_receivable": str(40 * B), "lt_loans_receivable": str(60 * B)}
+            "other_receivables_lt": str(200 * B), "prepay_suppliers": str(300 * B), "st_loans_receivable": str(40 * B), "lt_loans_receivable": str(60 * B),
+            "interest_received": str(900 * B)}
     return {"symbol": "FPT", "years": {"2025": year}, "quarters": {"2026-Q3": {"npat_parent": str(2600 * B), "equity": str(45000 * B)}}}
 
 
@@ -36,6 +37,7 @@ def test_the_record_has_the_shape_and_signs_the_valuation_reads():
     assert (annual["other_receivables"], annual["other_receivables_lt"]) == (str(800 * B), str(200 * B))  # for Phải thu khác lớn
     assert annual["prepay_suppliers"] == str(300 * B)  # for Trả trước người bán lớn
     assert (annual["st_loans_receivable"], annual["lt_loans_receivable"]) == (str(40 * B), str(60 * B))  # cho vay, merged into other from 2026
+    assert annual["interest_received"] == str(900 * B)  # for Thu nhập tài chính chưa thu được tiền
     assert rec["dividends"] == [{"date": "2026-05-28", "cash": "1000"}]
     assert rec["issues"] == [{"date": "2025-06-10", "ratio": "0.1"}, {"date": "2026-05-25", "ratio": "0.15"}]
     assert rec["share_issues"] == [{"date": "2024-04-04", "kind": "raise", "ratio": "0.02"}, {"date": "2025-06-10", "kind": "bonus", "ratio": "0.1"},

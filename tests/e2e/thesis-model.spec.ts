@@ -47,9 +47,12 @@ test("a question gets its answer and a gap, a catalyst is added and marked as ha
   const text = `Ký hợp đồng lớn ${Date.now()}`;
   await box.getByLabel("Nội dung mốc").fill(text);
   await box.getByRole("button", { name: "Thêm mốc" }).click();
-  const row = box.getByRole("table", { name: "Mốc và chất xúc tác" }).getByRole("row", { name: new RegExp(text) });
+  // the editor shows its catalysts as the same timeline as the one-page thesis, each with its buttons
+  const row = box.getByRole("list", { name: "Mốc và chất xúc tác" }).getByRole("listitem").filter({ hasText: text });
+  await expect(row).toContainText("Q1/2027");
   await row.getByRole("button", { name: "Đã xảy ra" }).click();
   await expect(row.getByRole("button", { name: "Mở lại" })).toBeVisible();
+  await expect(row).toContainText("đã xảy ra");
 });
 
 

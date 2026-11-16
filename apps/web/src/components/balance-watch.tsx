@@ -216,7 +216,8 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
           tăng từ 50% so với cùng kỳ và bằng từ 1% phải thu ngắn hạn. Số ngày ứng trước = trả trước người bán cuối quý ÷ giá vốn bốn quý × 365: khoản này
           được thu hồi bằng hàng hóa, dịch vụ chứ không bằng tiền. Đợt huy động vốn (không tính cổ phiếu thưởng) được ghi nhận khi trả trước tăng từ một
           nửa số vốn điều lệ vừa thêm, trong quý ghi nhận vốn và quý kế tiếp. Phải thu từ bên liên quan và tên từng khách hàng chỉ có trong thuyết minh, không có ở đây.
-          Báo cáo công khai (VNDirect); ô thiếu số để trống. Không phải khuyến nghị.</p>
+          Từ năm 2026, Thông tư 99 bỏ chỉ tiêu phải thu về cho vay và gộp khoản cho vay vào phải thu khác: cột Cho vay về 0, cột Phải thu khác tăng
+          tương ứng; khi so qua năm hãy cộng hai cột. Báo cáo công khai (VNDirect); ô thiếu số để trống. Không phải khuyến nghị.</p>
       </section>
       {data.property && <section className="surface" aria-label="Tiền khách trả trước">
         <h2>Tiền khách trả trước</h2>

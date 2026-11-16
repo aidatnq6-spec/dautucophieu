@@ -27,7 +27,7 @@ ANNUAL = {"revenue": "revenue", "gross_profit": "gross_profit", "selling": "sell
           "current_assets": "current_assets", "current_liabilities": "current_liabilities", "long_liabilities": "long_liabilities",
           "receivables": "receivables", "cfo": "cfo", "fin_income": "fin_income", "fin_expense": "fin_expense", "pbt": "pbt",
           "other_receivables": "other_receivables", "other_receivables_lt": "other_receivables_lt",
-          "prepay_suppliers": "prepay_suppliers"}
+          "prepay_suppliers": "prepay_suppliers", "st_loans_receivable": "st_loans_receivable", "lt_loans_receivable": "lt_loans_receivable"}
 COSTS = ("selling", "admin")  # VNDirect: positive; Vnstock (and Chất lượng báo cáo): negative
 BONUS, RAISE = ("STOCKDIV", "KINDDIV"), ("ISSUE",)
 

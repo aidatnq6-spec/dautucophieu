@@ -42,7 +42,7 @@ Không áp dụng cho ngân hàng, dịch vụ tài chính, bảo hiểm (cấu 
 - **Phải thu tăng nhanh hơn doanh thu:** năm gần nhất, tăng trưởng phải thu cao hơn tăng trưởng doanh thu từ 20 điểm % trở lên.
 - **Lợi nhuận dồn tích lớn:** tổng (lợi nhuận − dòng tiền kinh doanh) 3 năm gần nhất lớn hơn 10% tổng tài sản cuối kỳ.
 - **Lợi nhuận phụ thuộc thu nhập tài chính** (chủ sở hữu đồng ý 15/11/2026): lãi tài chính ròng (doanh thu tài chính − chi phí tài chính) năm gần nhất từ 30% lợi nhuận trước thuế. Năm lỗ trước thuế thì không đánh giá.
-- **Phải thu khác lớn** (chủ sở hữu đồng ý 15/11/2026): phải thu khác (ngắn hạn + dài hạn) năm gần nhất đạt một trong hai điều kiện:
+- **Phải thu khác lớn** (chủ sở hữu đồng ý 15/11/2026): phải thu khác (ngắn hạn + dài hạn) năm gần nhất đạt một trong hai điều kiện dưới đây. Từ ngày 16/11/2026, phép tính cộng thêm phải thu về cho vay của cả hai năm đem so. Lý do: từ năm 2026, Thông tư 99 bỏ chỉ tiêu cho vay và gộp khoản cho vay vào phải thu khác; nếu không cộng, riêng việc chuyển dòng đã làm dấu hiệu bật sai.
   - từ 10% tổng tài sản;
   - gấp đôi năm trước, khi năm trước đã từ 1% tổng tài sản.
 - **Trả trước người bán lớn** (chủ sở hữu đồng ý 16/11/2026): trả trước cho người bán ngắn hạn năm gần nhất đạt một trong hai điều kiện:

@@ -111,3 +111,16 @@ test("the scenarios can start from a draft worked out from five years of P/E", a
     await expect(box).toContainText("Ba kịch bản");  // the synthetic ticker may have under 24 months of P/E
   }
 });
+
+
+test("a catalyst written on a ticker's page shows on the events page's shared timeline with its ticker", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Kịch bản và chỉ báo luận điểm" });
+  const text = `Mốc chung ${Date.now()}`;
+  await box.getByLabel("Nội dung mốc").fill(text);
+  await box.getByRole("button", { name: "Thêm mốc" }).click();
+  await expect(box.getByRole("list", { name: "Mốc và chất xúc tác" })).toContainText(text);
+  await page.goto("/events");
+  const item = page.getByRole("list", { name: "Mốc sắp tới của các mã theo dõi" }).getByRole("listitem").filter({ hasText: text });
+  await expect(item.getByRole("link", { name: "FPT" })).toHaveAttribute("href", "/research/FPT");
+});

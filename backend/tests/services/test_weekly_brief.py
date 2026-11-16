@@ -184,3 +184,18 @@ def test_the_us_macro_events_of_the_coming_week_are_listed():
             f"- {d} 02:00: Fed công bố quyết định lãi suất (họp 8–9/12)\n- {d} 20:30: Mỹ công bố CPI tháng 11/2026") in text
     assert "Không có lịch công bố nào" in compose(**INPUTS, held=set(), watched=set(), today=SAT, us_events=[])
     assert "LỊCH VĨ MÔ MỸ" not in compose(**INPUTS, held=set(), watched=set(), today=SAT)
+
+
+def test_the_week_chain_and_the_sjc_gap_are_one_short_section():
+    chain = {"mode": "tightening", "driver": "us_cpi", "nodes": [
+        {"id": "us_cpi", "direction": "up"},
+        {"id": "gold", "direction": "flat", "premium": {"world_per_chi": "12128663", "sjc_sell": "13750000", "gap": "1621337", "gap_pct": "0.1337"}}],
+        "with": ["us_rates", "dxy", "usd_vnd"], "against": [], "flat": ["gold"], "missing": []}
+    text = compose(**INPUTS, held=set(), watched=set(), today=SAT, us_chain=chain)
+    assert ("CHUỖI LIÊN THỊ TRƯỜNG TRONG TUẦN\n"
+            "- CPI Mỹ tăng nên chuỗi đang theo chiều thắt chặt. Khớp chuỗi: lãi suất Mỹ, DXY, tỷ giá USD/VND. Đi ngang: vàng.\n"
+            "- Vàng miếng SJC bán ra 13.750.000 đ/chỉ, cao hơn giá thế giới quy đổi 12.128.663 đ/chỉ là 1.621.337 đ (+13,4%)") in text
+    calm = {"mode": None, "driver": None, "nodes": [], "with": [], "against": [], "flat": [], "missing": []}
+    assert "- Tuần này CPI Mỹ và lãi suất Mỹ đều đi ngang: chuỗi chưa có chiều rõ." in compose(**INPUTS, held=set(), watched=set(), today=SAT,
+                                                                                          us_chain=calm)
+    assert "CHUỖI LIÊN THỊ TRƯỜNG" not in compose(**INPUTS, held=set(), watched=set(), today=SAT)

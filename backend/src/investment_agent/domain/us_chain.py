@@ -95,6 +95,33 @@ def gold_premium(*, xau: tuple[date, Decimal], usd_vnd: tuple[date, Decimal], sj
             "xau_date": xau[0].isoformat(), "fx_date": usd_vnd[0].isoformat(), "sjc_as_of": sjc_as_of}
 
 
+SHORT = {"us_cpi": "CPI Mỹ", "us_rates": "lãi suất Mỹ", "dxy": "DXY", "gold": "vàng", "usd_vnd": "tỷ giá USD/VND"}
+MOVE = {"up": "tăng", "down": "giảm", "flat": "đi ngang"}
+
+
+def _vn(v: Decimal, places: int = 0) -> str:
+    text = f"{abs(v):,.{places}f}".replace(",", " ").replace(".", ",").replace(" ", ".")
+    return ("−" if v < 0 else "") + text
+
+
+def chain_summary(out: dict) -> str:
+    """The same sentence as the page (us-chain.tsx chainSummary)."""
+    if not out.get("mode") or not out.get("driver"):
+        return "Tuần này CPI Mỹ và lãi suất Mỹ đều đi ngang: chuỗi chưa có chiều rõ."
+    driver = next((n for n in out["nodes"] if n["id"] == out["driver"]), {})
+    name = SHORT[out["driver"]]
+    head = f"{name[0].upper()}{name[1:]} {MOVE.get(driver.get('direction') or 'flat')} nên chuỗi đang theo chiều "            f"{'thắt chặt' if out['mode'] == 'tightening' else 'nới lỏng'}."
+    part = lambda label, ids: f" {label}: {', '.join(SHORT[i] for i in ids)}." if ids else ""  # noqa: E731
+    return head + part("Khớp chuỗi", out["with"]) + part("Ngược chuỗi", out["against"]) + part("Đi ngang", out["flat"])         + part("Chưa có số", out["missing"])
+
+
+def premium_text(p: dict) -> str:
+    gap = Decimal(p["gap"])
+    pct = Decimal(p["gap_pct"]) * 100
+    return (f"Vàng miếng SJC bán ra {_vn(Decimal(p['sjc_sell']))} đ/chỉ, {'cao' if gap >= 0 else 'thấp'} hơn giá thế giới quy đổi "
+            f"{_vn(Decimal(p['world_per_chi']))} đ/chỉ là {_vn(abs(gap))} đ ({'+' if pct > 0 else ''}{_vn(pct, 1)}%)")
+
+
 def us_chain(series: dict[str, Points], *, today: date) -> dict:
     """series: us_cpi_yoy, us_core_cpi_yoy (monthly), fed_effr, us10y, dxy, gold (đồng per chỉ), usd_vnd_vcb, oldest first."""
     nodes = [_cpi(series.get("us_cpi_yoy") or [], series.get("us_core_cpi_yoy") or [], today), _rates(series, today),

@@ -162,6 +162,37 @@ def _macro(macro: dict) -> list[str]:
 
 
 SIGN = {"+": " (+)", "-": " (−)", "?": ""}
+FUEL = ("vn_ron95_price", "vn_diesel_price")
+
+
+def fuel_periods(data_dir, specs: list[dict], *, today: date) -> list[dict]:
+    """Giá xăng dầu: each fuel ceiling period that began in the last seven days, with the period before it (entered by hand or read)."""
+    from pathlib import Path
+
+    from investment_agent.market.leading import MacroStore
+    store, since, out = MacroStore(Path(data_dir)), (today - timedelta(days=7)).isoformat(), []
+    for spec in specs:
+        obs = store.read(spec["id"])
+        for i, o in enumerate(obs):
+            if since < o["date"] <= today.isoformat():
+                out.append({"label": spec["label"].replace(" (đồng/lít)", ""), "date": o["date"], "value": o["value"],
+                            "previous": {"date": obs[i - 1]["date"], "value": obs[i - 1]["value"]} if i else None})
+    return out
+
+
+def _fuel(rows: list[dict]) -> list[str]:
+    out = []
+    for r in rows:
+        line = f"- {r['label']}: {_num(Decimal(r['value']), 0)} đ/lít từ {_dm(r['date'])}"
+        if r["previous"]:
+            new, old = Decimal(r["value"]), Decimal(r["previous"]["value"])
+            pct = ((new / old - 1) * 100).quantize(Decimal("0.01"), ROUND_HALF_UP)
+            change = new - old
+            sign = "+" if change > 0 else "−" if change < 0 else ""
+            line += (f" ({sign}{_num(abs(change), 0)} đ, {sign}{_num(abs(pct), 2)}% so với kỳ {_dm(r['previous']['date'])})"
+                     if change else f" (không đổi so với kỳ {_dm(r['previous']['date'])})")
+        out.append(line)
+    return out
 
 
 def _count(text: str, n: int) -> str:
@@ -191,7 +222,8 @@ def compose(*, series, index, briefs, closes, insider, events, alerts, held: set
             sessions: list[date] | None = None, theses: list[dict] | None = None, costs: dict[str, str] | None = None,
             shares: dict[str, int] | None = None, todo: list[str] | None = None, signs: dict | None = None, macro: dict | None = None,
             sources: list[dict] | None = None, manual: list[dict] | None = None, catalysts: list[dict] | None = None,
-            us_events: list[dict] | None = None, us_chain: dict | None = None, week_signals: dict | None = None) -> str:
+            us_events: list[dict] | None = None, us_chain: dict | None = None, week_signals: dict | None = None,
+            fuel: list[dict] | None = None) -> str:
     start, end = week_of(today)
     sessions = sessions if sessions is not None else [start + timedelta(days=i) for i in range(5)]
     lines = [f"BẢN TIN TUẦN {_dm(start)}–{_dm(end)}/{end.year}", "",
@@ -220,6 +252,8 @@ def compose(*, series, index, briefs, closes, insider, events, alerts, held: set
         lines.append(f"- {e['symbol']}{' (đang nắm)' if e['symbol'] in held else ''}: {describe(e)}")
     if not upcoming:
         lines.append("Không có sự kiện đã biết.")
+    if fuel:
+        lines += ["", "GIÁ XĂNG DẦU (kỳ điều hành mới)", *_fuel(fuel)]
     if us_chain is not None:
         from investment_agent.domain.us_chain import chain_summary, premium_text
         gold = next((n for n in us_chain["nodes"] if n["id"] == "gold"), {})

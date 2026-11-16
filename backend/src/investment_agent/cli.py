@@ -1503,7 +1503,7 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
         from investment_agent.services.source_alerts import macro_labels, source_view
         from investment_agent.services.thesis_auto import REPORT_SOURCE
         from investment_agent.services.thesis_model import coming_catalysts, read_models
-        from investment_agent.services.weekly_brief import NEXT_DAYS
+        from investment_agent.services.weekly_brief import FUEL, NEXT_DAYS, fuel_periods
         from investment_agent.market.us_calendar import upcoming as us_upcoming
         from investment_agent.services.us_week import us_week
         from datetime import timedelta
@@ -1531,6 +1531,7 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
                               if c["on"] and (not c["auto"] or c["source"] == REPORT_SOURCE)],
                 "us_events": us_upcoming(Path(data_dir), today=today, days=NEXT_DAYS),
                 "us_chain": us_week(Path(data_dir), today=today),
+                "fuel": fuel_periods(Path(data_dir), [i for i in load_indicators() if i["id"] in FUEL], today=today),
                 "week_signals": week_signals([BriefStore(Path(data_dir)).read(d) or {} for d in
                                               (sessions if sessions is not None else [start + timedelta(days=i) for i in range(5)])])}
     print(json.dumps(weekly_brief_run(data_dir, inputs=inputs, send=send, now=now)))

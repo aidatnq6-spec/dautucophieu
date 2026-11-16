@@ -64,7 +64,7 @@ def _signals(sections: dict, shares, store: BriefStore, sessions_before: list[da
     """Tín hiệu phiên (brief.signals) from this snapshot's board, index row and volume, and the volume ratios of the sessions before."""
     from decimal import Decimal
 
-    from .signals import index_pull, session_signals, vn30_multipliers
+    from .signals import asia_vs_index, index_pull, session_signals, vn30_multipliers
     board = sections.get("board") or {}
     vn = next((r for r in (sections.get("indices") or {}).get("rows", []) if r.get("id") == "VNINDEX" and r.get("status") == "ok"), None)
     change = Decimal(vn["change"]) if vn else None
@@ -95,7 +95,7 @@ def _signals(sections: dict, shares, store: BriefStore, sessions_before: list[da
                                    change=Decimal(vn30["change"]), close=Decimal(vn30["close"]))
     if pull_vn30["status"] == "missing" and previous and (previous.get("pull_vn30") or {}).get("status") in ("ok", "mismatch"):
         pull_vn30 = previous["pull_vn30"]
-    return {"status": "ok", "pull": pull, "pull_vn30": pull_vn30, **rest}
+    return {"status": "ok", "pull": pull, "pull_vn30": pull_vn30, "asia": asia_vs_index(change, sections.get("asia")), **rest}
 
 
 def build_snapshot(*, session_date: date, previous_session: date | None, now: datetime, listing, board, series, hose_get, rss_get,

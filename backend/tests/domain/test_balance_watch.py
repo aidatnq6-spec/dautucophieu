@@ -215,3 +215,16 @@ def test_a_raise_spent_elsewhere_a_bonus_issue_or_old_raises_are_not_flagged():
     late = cap_quarters([100, 100, 100, 150, 150], [10, 10, 10, 10, 40])  # booked the quarter after the issue date
     assert raise_prepay(late, [{"date": "2025-09-29", "kind": "raise"}])["events"][0]["quarter"] == "2025-Q4"
     assert raise_prepay(qs, [{"date": "2020-03-01", "kind": "raise"}])["events"] == []  # outside the stored quarters
+
+
+# L3 Phải thu khác so với ngành: other receivables and loans (merged by Thông tư 99 from 2026) against total assets, latest quarter,
+# against the median of the sector's watched tickers; "high" at twice the median or more and 5% of total assets or more.
+def test_other_receivables_and_loans_against_the_sector_median():
+    def one(other, loans=0):
+        return {"2026-Q3": q(other_receivables=other, other_receivables_lt=0, st_loans_receivable=loans, lt_loans_receivable=0, total_assets=1000)}
+    v = receivables_view(one(150, loans=50), peers={"A": one(40), "B": one(60), "C": one(90)})
+    assert v["other_vs_sector"] == {"quarter": "2026-Q3", "share": "0.2000", "sector_median": "0.0600", "sector_count": 3, "high": True}
+    usual = receivables_view(one(70), peers={"A": one(40), "B": one(60), "C": one(90)})["other_vs_sector"]
+    assert (usual["share"], usual["high"]) == ("0.0700", False)
+    alone = receivables_view(one(70))["other_vs_sector"]
+    assert (alone["sector_median"], alone["sector_count"], alone["high"]) == (None, 0, None)

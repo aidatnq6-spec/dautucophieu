@@ -46,14 +46,18 @@ def validate_year(source: str, rows: list[dict]) -> dict:
         term = " ".join(str(r.get("collect_within") or "").split()) or None
         flags = [r.get(k) for k in ("secured", "interest")]
         kind = r.get("kind") or None
+        rate = " ".join(str(r.get("rate") or "").split()) or None
+        accrued_raw = str(r.get("accrued_interest") or "").strip()
+        accrued = _amount(accrued_raw) if accrued_raw else None
         if not name or len(name) > NAME_MAX or amount is None or (term and len(term) > TERM_MAX) or kind not in (None, *KINDS) \
+                or (rate and len(rate) > TERM_MAX) or (accrued_raw and accrued is None) \
                 or not isinstance(r.get("grouped"), bool) or not isinstance(r.get("related"), bool) or any(f not in (True, False, None) for f in flags):
             raise RelatedError("invalid_row", f"Dòng {i}: cần tên đối tượng và số dư (tỷ đồng, không âm).")
         if _key(name) in seen:
             raise RelatedError("duplicate_name", f"Dòng {i}: {name} đã có trong năm này.")
         seen.add(_key(name))
         out.append({"name": name, "amount": amount, "grouped": r["grouped"], "related": r["related"], "secured": flags[0], "interest": flags[1],
-                    "collect_within": term, "kind": kind})
+                    "collect_within": term, "kind": kind, "rate": rate, "accrued_interest": accrued})
     return {"source": source, "rows": out}
 
 
@@ -76,6 +80,11 @@ def review(years: dict[str, dict]) -> dict:
                 group = next((g for g in fits if Decimal(g["amount"]) * 2 >= amount), None)
                 findings.append({"kind": "vanished", "year": y, "from_year": before_y, "name": r["name"].strip(), "amount": r["amount"],
                                  "row_kind": kind, "group": {"name": group["name"], "amount": group["amount"]} if group else None})
+            # Lãi treo: interest accrued on a loan and not paid, grown by half or more in a year (profit booked, no cash)
+            was, now_acc = r.get("accrued_interest"), (named_now.get(key) or {}).get("accrued_interest")
+            if was and now_acc and Decimal(was) > 0 and Decimal(now_acc) * 2 >= Decimal(was) * 3:
+                findings.append({"kind": "interest_piling", "year": y, "name": r["name"].strip(), "before": was, "now": now_acc,
+                                 "rate": named_now[key].get("rate") or r.get("rate")})
             if r["collect_within"] and key in named_now and amount > 0 and Decimal(named_now[key]["amount"]) * 2 >= amount:
                 findings.append({"kind": "not_collected", "year": y, "name": r["name"].strip(), "before": r["amount"], "now": named_now[key]["amount"],
                                  "promised": r["collect_within"]})
@@ -88,6 +97,7 @@ def review(years: dict[str, dict]) -> dict:
         rows = years[y]["rows"]
         related = [Decimal(r["amount"]) for r in rows if r["related"]]
         named = [Decimal(r["amount"]) for r in rows if r["related"] and not r["grouped"]]
+        accrued = [Decimal(r["accrued_interest"]) for r in rows if r.get("accrued_interest")]
         view.append({"year": y, "source": years[y]["source"], "rows": rows, "related_total": _s(sum(related, Decimal(0))),
-                     "named_related": _s(sum(named, Decimal(0)))})
+                     "named_related": _s(sum(named, Decimal(0))), "accrued_interest": _s(sum(accrued, Decimal(0))) if accrued else None})
     return {"years": view, "findings": findings}

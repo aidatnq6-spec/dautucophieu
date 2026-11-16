@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { advancesText, borrowingText, carryText, dsoText, prepayDaysText, provisionText, raiseText, sectorText, type Carry } from "./balance-watch";
+import { advancesText, borrowingText, carryText, dsoText, otherSectorText, prepayDaysText, provisionText, raiseText, sectorText, type Carry } from "./balance-watch";
+
+describe("otherSectorText", () => {
+  it("sets the ticker's other receivables and loans against the sector, and says when it stands out", () => {
+    expect(otherSectorText({ quarter: "2026-Q3", share: "0.2700", sector_median: "0.0600", sector_count: 3, high: true }))
+      .toBe("Phải thu khác và cho vay Q3/2026 bằng 27,0% tổng tài sản; trung vị ngành 6,0% (3 mã theo dõi khác). Cao hơn hẳn các mã cùng ngành: "
+        + "không phải đặc thù ngành, nên đọc thuyết minh xem phải thu của ai.");
+    expect(otherSectorText({ quarter: "2026-Q3", share: "0.1900", sector_median: null, sector_count: 0, high: null })).toContain("chưa có mã cùng ngành");
+  });
+});
 
 describe("prepayment readings", () => {
   it("sets the days of prepayment against a year before and the sector", () => {

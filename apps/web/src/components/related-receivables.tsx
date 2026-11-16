@@ -3,14 +3,15 @@ import { useEffect, useState } from "react";
 import { ApiError, api, requestId } from "../lib/api";
 
 export type RrRow = { name: string; amount: string; grouped: boolean; related: boolean; secured: boolean | null; interest: boolean | null;
-  collect_within: string | null; kind?: RrKind | null };
+  collect_within: string | null; kind?: RrKind | null; rate?: string | null; accrued_interest?: string | null };
 export type RrKind = "customer" | "prepay" | "other" | "loan";
 export const KIND: Record<RrKind, string> = { customer: "Phải thu khách hàng", prepay: "Trả trước người bán", other: "Phải thu khác", loan: "Cho vay" };
-type Year = { year: string; source: string; rows: RrRow[]; related_total: string; named_related: string };
+type Year = { year: string; source: string; rows: RrRow[]; related_total: string; named_related: string; accrued_interest?: string | null };
 export type Finding =
   | { kind: "vanished"; year: string; from_year: string; name: string; amount: string; row_kind?: RrKind | null; group: { name: string; amount: string } | null }
   | { kind: "not_collected"; year: string; name: string; before: string; now: string; promised: string }
-  | { kind: "unsecured_free"; year: string; name: string; amount: string };
+  | { kind: "unsecured_free"; year: string; name: string; amount: string }
+  | { kind: "interest_piling"; year: string; name: string; before: string; now: string; rate: string | null };
 type View = { symbol: string; version: number; years: Year[]; findings: Finding[] };
 type Proposal = { status: "ok" | "unverified" | "no_passages"; reason?: string; rows: (RrRow & { page: number })[];
   dropped: { name: string; reason: string }[]; url: string; cost_usd: string };
@@ -27,11 +28,11 @@ export function proposalNote(p: Proposal): string {
 }
 
 type Draft = { name: string; amount: string; grouped: boolean; related: boolean; secured: "" | "yes" | "no"; interest: "" | "yes" | "no"; collect_within: string;
-  kind: "" | RrKind };
+  kind: "" | RrKind; rate: string; accrued_interest: string };
 
 export const ty = (v: string) => `${Number(v).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tỷ`;
 const tri = (v: boolean | null) => (v === null ? "—" : v ? "có" : "không");
-const EMPTY: Draft = { name: "", amount: "", grouped: false, related: true, secured: "", interest: "", collect_within: "", kind: "" };
+const EMPTY: Draft = { name: "", amount: "", grouped: false, related: true, secured: "", interest: "", collect_within: "", kind: "", rate: "", accrued_interest: "" };
 
 /** One finding in words. */
 export function findingText(f: Finding): string {
@@ -44,13 +45,19 @@ export function findingText(f: Finding): string {
   if (f.kind === "not_collected") {
     return `${f.name}: hứa thu trong ${f.promised}, nhưng năm ${f.year} vẫn còn ${ty(f.now)} (năm trước ${ty(f.before)}).`;
   }
+  if (f.kind === "interest_piling") {
+    return `${f.name}: lãi cho vay phải thu tăng từ ${ty(f.before)} lên ${ty(f.now)} năm ${f.year}${f.rate ? ` (lãi suất ${f.rate})` : ""}. `
+      + "Lãi được ghi vào doanh thu tài chính nhưng chưa thu được tiền: lợi nhuận \"giấy\", có thể phải trích dự phòng sau này.";
+  }
   return `${f.name}: phải thu bên liên quan ${ty(f.amount)} năm ${f.year}, không có bảo đảm và không tính lãi.`;
 }
 
 const toDraft = (r: RrRow): Draft => ({ name: r.name, amount: r.amount.replace(".", ","), grouped: r.grouped, related: r.related,
-  secured: r.secured === null ? "" : r.secured ? "yes" : "no", interest: r.interest === null ? "" : r.interest ? "yes" : "no", collect_within: r.collect_within ?? "", kind: r.kind ?? "" });
+  secured: r.secured === null ? "" : r.secured ? "yes" : "no", interest: r.interest === null ? "" : r.interest ? "yes" : "no", collect_within: r.collect_within ?? "", kind: r.kind ?? "",
+  rate: r.rate ?? "", accrued_interest: (r.accrued_interest ?? "").replace(".", ",") });
 const fromDraft = (d: Draft) => ({ name: d.name, amount: d.amount, grouped: d.grouped, related: d.related,
-  secured: d.secured === "" ? null : d.secured === "yes", interest: d.interest === "" ? null : d.interest === "yes", collect_within: d.collect_within || null, kind: d.kind || null });
+  secured: d.secured === "" ? null : d.secured === "yes", interest: d.interest === "" ? null : d.interest === "yes", collect_within: d.collect_within || null, kind: d.kind || null,
+  rate: d.rate || null, accrued_interest: d.accrued_interest || null });
 
 /** Sổ phải thu bên liên quan: the owner copies each year's notes; the app sets the years side by side and says what a later year stops naming. */
 export function RelatedReceivables({ symbol }: { symbol: string }) {
@@ -100,13 +107,13 @@ export function RelatedReceivables({ symbol }: { symbol: string }) {
         và báo khi một đối tượng có tên năm trước không còn được nêu năm sau, khi khoản hứa thu trong hạn vẫn còn từ một nửa, và khoản bên liên quan không bảo đảm,
         không lãi. Số do bạn nhập; lưu trên máy, không gửi đi đâu.</p>
       {view.findings.length > 0 && <ul className="quality-list" data-testid="rr-findings">{view.findings.map((f, i) => (
-        <li key={i}><span className="pill warn">{f.kind === "vanished" ? "Không còn nêu tên" : f.kind === "not_collected" ? "Chưa thu" : "Không bảo đảm, không lãi"}</span> {findingText(f)}</li>))}
+        <li key={i}><span className="pill warn">{f.kind === "vanished" ? "Không còn nêu tên" : f.kind === "not_collected" ? "Chưa thu" : f.kind === "interest_piling" ? "Lãi treo tăng" : "Không bảo đảm, không lãi"}</span> {findingText(f)}</li>))}
       </ul>}
       {view.years.map((y) => (
         <div key={y.year} className="rr-year">
           <h3>Năm {y.year} <span className="caption">— {y.source}</span></h3>
           <div className="tablewrap"><table className="fv-table" aria-label={`Phải thu bên liên quan năm ${y.year}`}>
-            <thead><tr><th>Đối tượng</th><th>Loại</th><th className="num">Số dư</th><th>Bên liên quan</th><th>Bảo đảm</th><th>Có lãi</th><th>Hạn thu</th></tr></thead>
+            <thead><tr><th>Đối tượng</th><th>Loại</th><th className="num">Số dư</th><th>Bên liên quan</th><th>Bảo đảm</th><th>Có lãi</th><th>Lãi suất</th><th className="num">Lãi phải thu</th><th>Hạn thu</th></tr></thead>
             <tbody>{y.rows.map((r) => (
               <tr key={r.name}>
                 <td data-label="Đối tượng">{r.name}{r.grouped && <span className="caption"> (dòng gộp)</span>}</td>
@@ -115,11 +122,14 @@ export function RelatedReceivables({ symbol }: { symbol: string }) {
                 <td data-label="Bên liên quan">{r.related ? "có" : "không"}</td>
                 <td data-label="Bảo đảm">{tri(r.secured)}</td>
                 <td data-label="Có lãi">{tri(r.interest)}</td>
+                <td data-label="Lãi suất">{r.rate ?? "—"}</td>
+                <td className="num" data-label="Lãi phải thu">{r.accrued_interest ? ty(r.accrued_interest) : "—"}</td>
                 <td data-label="Hạn thu">{r.collect_within ?? "—"}</td>
               </tr>))}
             </tbody>
           </table></div>
-          <p className="caption">Phải thu bên liên quan {ty(y.related_total)}, trong đó nêu tên {ty(y.named_related)}.{" "}
+          <p className="caption">Phải thu bên liên quan {ty(y.related_total)}, trong đó nêu tên {ty(y.named_related)}.
+            {y.accrued_interest ? ` Lãi cho vay phải thu ${ty(y.accrued_interest)}.` : ""}{" "}
             <button type="button" className="btn text" disabled={busy} onClick={() => edit(y)}>Sửa năm {y.year}</button>{" "}
             <button type="button" className="btn text" disabled={busy} onClick={() => send(`related-receivables/${symbol}/${y.year}/delete`, {})}>Xóa năm {y.year}</button></p>
         </div>))}
@@ -142,6 +152,10 @@ export function RelatedReceivables({ symbol }: { symbol: string }) {
               <option value="">Không rõ</option><option value="yes">Có</option><option value="no">Không</option></select></label>
             <label className="field">Loại<select aria-label={`Loại dòng ${i + 1}`} value={r.kind} onChange={(e) => setRow(i, { kind: e.target.value as Draft["kind"] })}>
               <option value="">Không rõ</option>{(Object.keys(KIND) as RrKind[]).map((k) => <option key={k} value={k}>{KIND[k]}</option>)}</select></label>
+            <label className="field">Lãi suất<input aria-label={`Lãi suất dòng ${i + 1}`} maxLength={60} placeholder="8%–8,6%/năm" value={r.rate}
+              onChange={(e) => setRow(i, { rate: e.target.value })} /></label>
+            <label className="field">Lãi phải thu (tỷ)<input aria-label={`Lãi phải thu dòng ${i + 1}`} inputMode="decimal" value={r.accrued_interest}
+              onChange={(e) => setRow(i, { accrued_interest: e.target.value })} /></label>
             <label className="field">Hạn thu<input aria-label={`Hạn thu dòng ${i + 1}`} maxLength={60} placeholder="6–12 tháng" value={r.collect_within}
               onChange={(e) => setRow(i, { collect_within: e.target.value })} /></label>
             {rows.length > 1 && <button type="button" className="btn text" onClick={() => setRows(rows.filter((_, k) => k !== i))}>Bỏ dòng {i + 1}</button>}

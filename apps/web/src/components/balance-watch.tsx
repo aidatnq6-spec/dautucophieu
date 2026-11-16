@@ -15,12 +15,13 @@ export type Carry = { quarter: string | null; kind: "carry" | "no_debt" | "unusu
 type ArRow = { quarter: string; customers: string | null; prepay: string | null; loans: string | null; other: string | null; provision: string | null;
   total: string | null; total_share: string | null; other_share: string | null; dso: string | null; prepay_days: string | null };
 export type Dso = { quarter: string | null; days: string | null; year_ago: string | null; change: string | null; sector_median: string | null; sector_count: number };
+export type OtherVsSector = { quarter: string | null; share: string | null; sector_median: string | null; sector_count: number; high: boolean | null };
 export type RaiseEvent = { issue_date: string; quarter: string; capital_added: string; prepay_before: string | null; prepay_after: string | null;
   after_quarter: string; prepay_added: string | null; flag: boolean };
 export type Provision = { quarter: string | null; amount: string | null; share: string | null; year_ago: string | null; kind: "jump" | "none" | null };
 type Balance = { symbol: string; sector: string | null; debt: { rows: DebtRow[]; flag: Flag }; sector_debt: SectorDebt | null;
   property: { rows: CashRow[]; signal: Signal } | null; liquidity: LiquidityRow[]; carry: Carry;
-  receivables: { rows: ArRow[]; dso: Dso; provision: Provision; prepay_days: Dso }; raise_prepay: { flag: boolean; events: RaiseEvent[] } };
+  receivables: { rows: ArRow[]; dso: Dso; provision: Provision; prepay_days: Dso; other_vs_sector: OtherVsSector }; raise_prepay: { flag: boolean; events: RaiseEvent[] } };
 
 const SHOWN = 8;  // quarters in each table
 const q = (p: string) => `Q${p.slice(-1)}/${p.slice(0, 4)}`;
@@ -91,6 +92,15 @@ export function prepayDaysText(d: Dso): string {
     : "";
   const peers = d.sector_median !== null ? `; trung vị ngành ${d.sector_median} ngày (${d.sector_count} mã theo dõi khác)` : "";
   return `Số ngày ứng trước nhà cung cấp ${q(d.quarter)}: ${d.days} ngày${ago}${peers}.`;
+}
+
+/** Other receivables and loans against total assets, set against the sector's median. */
+export function otherSectorText(o: OtherVsSector): string {
+  if (!o.quarter || o.share === null) return "Chưa đủ phải thu khác và tổng tài sản để so với ngành.";
+  const own = `Phải thu khác và cho vay ${q(o.quarter)} bằng ${rate(o.share)} tổng tài sản`;
+  if (o.sector_median === null) return `${own}; chưa có mã cùng ngành nào trong danh sách theo dõi để so.`;
+  const verdict = o.high ? " Cao hơn hẳn các mã cùng ngành: không phải đặc thù ngành, nên đọc thuyết minh xem phải thu của ai." : "";
+  return `${own}; trung vị ngành ${rate(o.sector_median)} (${o.sector_count} mã theo dõi khác).${verdict}`;
 }
 
 /** One money-raising issue and what prepayments to suppliers did around it. */
@@ -187,6 +197,8 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
       <section className="surface" aria-label="Phải thu">
         <h2>Phải thu</h2>
         <p data-testid="dso">{dsoText(data.receivables.dso)}</p>
+        <p data-testid="other-sector">{data.receivables.other_vs_sector.high && <><span className="pill warn">Cao hơn hẳn ngành</span> </>}
+          {otherSectorText(data.receivables.other_vs_sector)}</p>
         <p data-testid="prepay-days">{prepayDaysText(data.receivables.prepay_days)}</p>
         {data.raise_prepay.events.map((e) => <p key={e.issue_date} data-testid="raise-prepay" className={e.flag ? "notice" : undefined}>
           {e.flag && <><span className="pill warn">Trả trước tăng sau huy động vốn</span> </>}{raiseText(e)}</p>)}

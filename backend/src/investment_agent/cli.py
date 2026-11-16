@@ -1356,8 +1356,25 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
             return insider_deals(store, symbol, get=_http_text, now=now)["deals"]
         got = weekly_inputs(data_dir, ledger_events=events, held=held_from_repo(repo, owner), alerts=read_alerts(repo, owner)[0],
                             insider=insider, today=today)
+        from investment_agent.market.leading import MacroStore, load_indicators
+        from investment_agent.services.receivable_signs import SIGNS, receivable_signs
+        from investment_agent.services.source_alerts import macro_labels, source_view
+        rows = receivable_signs(Path(data_dir))
+        store = MacroStore(Path(data_dir))
+        monthly = {}
+        for ind in load_indicators():  # monthly and quarterly figures only: a daily series would fill the note
+            obs = store.read(ind["id"])
+            if obs and ind.get("max_age_days", 0) >= 30:
+                monthly[ind["id"]] = {"date": obs[-1]["date"], "value": obs[-1]["value"], "label": ind["label"], "unit": ind["unit"]}
+        groups: dict[str, dict] = {}
+        for f in source_view(Path(data_dir), labels=macro_labels())["failing"]:
+            g = groups.setdefault(f["source"], {"source": f["source"], "labels": [], "fails": 0})
+            g["labels"].append(f["label"])
+            g["fails"] = max(g["fails"], f["fails"])
         return {**got, "sessions": sessions, "theses": read_theses(repo, owner)[0], "costs": held_costs(repo, owner),
-                "shares": position_shares(repo, owner), "todo": [i["text"] for i in attention_items(repo, owner, Path(data_dir), now=now)]}
+                "shares": position_shares(repo, owner), "todo": [i["text"] for i in attention_items(repo, owner, Path(data_dir), now=now)],
+                "signs": {"before": None, "now": {r["symbol"]: sorted(k for k, v in r["signs"].items() if v) for r in rows}, "titles": dict(SIGNS)},
+                "macro": {"before": None, "now": monthly}, "sources": list(groups.values())}
     print(json.dumps(weekly_brief_run(data_dir, inputs=inputs, send=send, now=now)))
     return 0
 

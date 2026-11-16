@@ -1,5 +1,5 @@
 {
- "version": "macro-2026-11-16.1",
+ "version": "macro-2026-11-16.2",
  "notice": "Quy tắc đánh giá theo bảng Leading Indicator của chủ sở hữu (25/10/2026). bad_when: up = tăng là Xấu; down = giảm là Xấu; sign = âm là Xấu; pmi = Tốt khi trên 50 và không giảm.",
  "indicators": [
   {
@@ -246,7 +246,7 @@
     "kind": "manual"
    },
    "url": "https://vn.investing.com/economic-calendar/manufacturing-pmi-829",
-   "note": "Nhập tay: S&P Global, ISM và TradingEconomics đều chặn đọc tự động (yêu cầu đăng nhập hoặc trả lỗi 403). Giữ một loại PMI cho cả chuỗi (S&P Global hoặc ISM) để xu hướng có ý nghĩa. Chưa tự động được: ISM chỉ công bố cho thành viên đăng nhập, S&P Global và Trading Economics chặn đọc tự động (kiểm tra 15/11/2026)."
+   "note": "Nhập tay: PMI sản xuất Mỹ của S&P Global (mã 829 trên lịch Investing). Chưa tự động được, kiểm tra lại 16/11/2026: pmi.spglobal.com và spglobal.com trả 403, ISM bắt đăng nhập, Trading Economics trả 403; FXStreet, InvestingLive, ForexLive và PR Newswire từ chối kết nối từ máy này; báo Việt không đăng số này theo mẫu cố định. Khi nhập, chọn ngày cuối tháng của kỳ số liệu (ví dụ số tháng 10 ghi ngày 31/10), không phải ngày nhập, để xu hướng so đúng tháng với tháng."
   },
   {
    "id": "vn_pmi",

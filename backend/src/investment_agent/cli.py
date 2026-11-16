@@ -142,7 +142,13 @@ def main() -> int:
     if args.command == "vnstock-audit":
         return vnstock_audit(_symbols(args.symbols), args.output_dir)
     if args.command == "index-groups":
-        return index_groups([g.strip().upper() for g in args.groups.split(",") if g.strip()], args.output)
+        from investment_agent.market.providers.hose_baskets import latest_size_baskets
+        try:
+            telegram = _scheduled_telegram(args.output.parent)
+        except Exception:  # personal settings not loaded: the groups are still refreshed, the note waits in the file
+            telegram = None
+        return index_groups([g.strip().upper() for g in args.groups.split(",") if g.strip()], args.output, hose=latest_size_baskets,
+                            send=telegram[0] if telegram else None)
     if args.command == "market-sync":
         return market_sync(_symbols(args.symbols), args.data_dir, args.calendar, args.days, index=args.index)
     if args.command == "index-history":
@@ -291,32 +297,84 @@ def _read_json(path: Path) -> dict:
         return {}
 
 
-def index_groups(groups: list[str], output: Path, provider=None, today=None, get=None) -> int:
-    """VN30 from VNDirect (its listing marks VN30 members only); the other groups have no public source since Vnstock 6.0.0, so their
-    saved members are kept with the day they were taken ("kept"), never worked out."""
+def _basket_note(changes: dict, hose_info: dict | None) -> str:
+    when = (f" (thông báo HOSE kỳ {hose_info['period']}, hiệu lực {hose_info['effective'].strftime('%d/%m/%Y')})"
+            if hose_info else " (theo VNDirect)")
+    lines = [f"Rổ chỉ số HOSE thay đổi{when}:"]
+    for g, (added, removed) in changes.items():
+        parts = ([f"thêm {', '.join(added)}"] if added else []) + ([f"bớt {', '.join(removed)}"] if removed else [])
+        lines.append(f"- {g}: {'; '.join(parts)}")
+    return "\n".join(lines + ["Danh sách theo dõi đã cập nhật nhóm chỉ số."])
+
+
+def index_groups(groups: list[str], output: Path, provider=None, today=None, get=None, hose=None, send=None) -> int:
+    """VN30 from VNDirect (its listing marks VN30 members only). VN100 from HOSE's size-index notice (hose: market.providers.hose_baskets)
+    from the day it takes effect; until then, or when the notice cannot be read whole, the saved members are kept with the day they were
+    taken ("kept"), never worked out. A change of members is told once over Telegram (send), kept to retry when it did not go out."""
     from datetime import date
     if provider is None:
         from investment_agent.market.providers import vndirect_data as vd
         today = today or date.today()
         saved = _read_json(output)
         members, kept = {}, {}
+        sources = dict(saved.get("group_sources") or {})
         for g in groups:
             fresh = vd.index_members(g, get=get or vd.default_get)
             if fresh:
                 members[g] = fresh
+                sources.pop(g, None)
             elif g in saved.get("groups", {}):
                 members[g] = saved["groups"][g]
-                kept[g] = (saved.get("kept") or {}).get(g) or saved.get("as_of")
+                if g not in sources:  # a list read from HOSE stays HOSE's, dated by its notice
+                    kept[g] = (saved.get("kept") or {}).get(g) or saved.get("as_of")
         payload = {"as_of": today.isoformat(), "source": "vndirect:finfo", "groups": members, "kept": kept}
-        # VN30 changing is HOSE's review of its baskets: VN100, which has no public source, may have changed the same day.
+        hose_info, hose_status = None, None
+        if hose is not None and "VN100" in groups:
+            try:
+                hose_info = hose()
+                hose_status = {"status": "ok", "notice_id": hose_info["notice_id"], "effective": hose_info["effective"].isoformat()}
+            except Exception as exc:  # the source down or the notice not whole: the saved list stays, the reason is said
+                hose_status = {"status": "error", "reason": str(exc)[:200]}
+        if hose_info is not None:
+            vn100 = sorted(hose_info["groups"]["VN100"])
+            if hose_info["effective"] <= today:
+                members["VN100"] = vn100
+                kept.pop("VN100", None)
+                sources["VN100"] = {"source": "hose", "notice_id": hose_info["notice_id"], "period": hose_info["period"],
+                                    "effective": hose_info["effective"].isoformat()}
+                if "VN30" in members and sorted(hose_info["groups"]["VN30"]) != sorted(members["VN30"]):
+                    payload["vn30_check"] = {"hose": sorted(hose_info["groups"]["VN30"]), "vndirect": sorted(members["VN30"]),
+                                             "notice_id": hose_info["notice_id"]}
+            elif sorted(members.get("VN100") or []) != vn100:
+                payload["pending"] = {"VN100": {"effective": hose_info["effective"].isoformat(), "notice_id": hose_info["notice_id"],
+                                                "members": vn100}}
+        if sources:
+            payload["group_sources"] = sources
+        # VN30 changing is HOSE's review of its baskets.
         before = saved.get("groups", {}).get("VN30")
         if "VN30" in members and before is not None and sorted(before) != sorted(members["VN30"]):
             payload["vn30_changed_on"] = today.isoformat()
         elif saved.get("vn30_changed_on"):
             payload["vn30_changed_on"] = saved["vn30_changed_on"]
+        changes = {}
+        for g in ("VN30", "VN100"):
+            old, new = set(saved.get("groups", {}).get(g) or []), set(members.get(g) or [])
+            if old and new and old != new:
+                changes[g] = (sorted(new - old), sorted(old - new))
+        notes = [n for n in (saved.get("note_pending"), _basket_note(changes, hose_info if "VN100" in changes else None) if changes else None) if n]
+        sent = 0
+        for note in notes:
+            if send is not None and send(note):
+                sent += 1
+            else:
+                payload["note_pending"] = note if "note_pending" not in payload else payload["note_pending"] + "\n\n" + note
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(payload, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-        print(json.dumps({"status": "ok", "groups": {g: len(m) for g, m in members.items()}, "kept": kept}))
+        out = {"status": "ok", "groups": {g: len(m) for g, m in members.items()}, "kept": kept, "changes": {g: {"added": a, "removed": r}
+                                                                                                          for g, (a, r) in changes.items()}, "sent": sent}
+        if hose_status:
+            out["hose"] = hose_status
+        print(json.dumps(out, ensure_ascii=False))
         return 0
     from investment_agent.market.providers.vnstock_adapter import SOURCE, ProviderUnavailable
     try:

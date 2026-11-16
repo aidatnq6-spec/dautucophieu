@@ -30,7 +30,7 @@ test("filters by index group", async ({ page }) => {
 
 test("each index group shows its own date, and VN100 is flagged after VN30 changed", async ({ page }) => {
   await openWatchlist(page);
-  await expect(page.getByTestId("groups-caption")).toContainText("VN100: danh sách lưu ngày 20/10/2026 (không có nguồn tự động");
+  await expect(page.getByTestId("groups-caption")).toContainText("VN100: danh sách lưu ngày 20/10/2026 (chưa đọc được thông báo của HOSE");
   await expect(page.getByTestId("vn100-review")).toContainText("VN30 đổi thành phần ngày 25/10/2026");
 });
 

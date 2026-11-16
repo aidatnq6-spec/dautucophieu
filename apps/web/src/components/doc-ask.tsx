@@ -5,6 +5,16 @@ import { ApiError, api } from "../lib/api";
 export type Spend = { month: string; used_usd: string; monthly_usd: string };
 type Answer = { status: "ok" | "unverified" | "no_passages"; answer: string | null; pages: number[]; url: string; cost_usd: string; spend: Spend };
 
+/** Questions from the owner's reading notes on financial statements; none carries a number or a word about the owner. */
+export const PRESETS = [
+  "Phải thu bên liên quan gồm những đối tượng nào, có bảo đảm và có tính lãi không?",
+  "Thuyết minh trả trước cho người bán nêu tên những nhà cung cấp nào?",
+  "Có khoản trả trước cho người bán nào được hoàn lại bằng tiền không?",
+  "Phải thu khác gồm những khoản gì, của những đối tượng nào?",
+  "Doanh thu tài chính gồm những khoản gì: lãi tiền gửi, lãi tỷ giá, cổ tức hay lãi bán khoản đầu tư?",
+  "Ý kiến kiểm toán có ngoại trừ hay nhấn mạnh vấn đề gì không?",
+];
+
 /** A link straight to a page of the document (PDF viewers honour #page=). */
 export function pageLink(url: string, page: number): string {
   return `${url.split("#")[0]}#page=${page}`;
@@ -44,6 +54,8 @@ export function DocAsk({ symbol }: { symbol: string }) {
       <form className="formgrid" aria-label="Câu hỏi về tài liệu" onSubmit={(e) => { e.preventDefault(); void ask(); }}>
         <label className="field">Link tài liệu<input aria-label="Link tài liệu" type="url" maxLength={500} placeholder="https://…/bctc-2025.pdf" value={url}
           onChange={(e) => setUrl(e.target.value)} /></label>
+        <div className="doc-presets" role="group" aria-label="Câu hỏi mẫu">{PRESETS.map((p) => (
+          <button key={p} type="button" className="btn text" onClick={() => setQuestion(p)}>{p}</button>))}</div>
         <label className="field">Câu hỏi<textarea aria-label="Câu hỏi" maxLength={300} rows={2} placeholder="Thuyết minh nói gì về phải thu bên liên quan?"
           value={question} onChange={(e) => setQuestion(e.target.value)} /></label>
         <div className="actions"><button type="submit" className="btn primary" disabled={busy || !url.trim() || !question.trim()}>{busy ? "Đang hỏi…" : "Hỏi AI"}</button></div>

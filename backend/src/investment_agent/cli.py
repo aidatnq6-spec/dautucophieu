@@ -52,6 +52,8 @@ def main() -> int:
     ra.add_argument("--data-dir", type=Path, required=True)
     sa = commands.add_parser("source-alerts", help="one Telegram note when a public source failed three macro runs in a row, and when it is back")
     sa.add_argument("--data-dir", type=Path, required=True)
+    sr = commands.add_parser("signal-runs-alerts", help="one Telegram note when a session signal has held several sessions in a row")
+    sr.add_argument("--data-dir", type=Path, required=True)
     sg = commands.add_parser("sjc-gap-alerts", help="one Telegram note when SJC's gap to the world gold price crosses the owner's threshold")
     sg.add_argument("--data-dir", type=Path, required=True)
     uc = commands.add_parser("us-calendar", help="read the Fed's and BLS's release calendars once a day and remind the day before")
@@ -184,6 +186,8 @@ def main() -> int:
         return receivable_alerts_cli(args.data_dir)
     if args.command == "source-alerts":
         return source_alerts_cli(args.data_dir)
+    if args.command == "signal-runs-alerts":
+        return signal_runs_alerts_cli(args.data_dir)
     if args.command == "sjc-gap-alerts":
         return sjc_gap_alerts_cli(args.data_dir)
     if args.command == "us-calendar":
@@ -1131,6 +1135,17 @@ def source_alerts_cli(data_dir: Path) -> int:
     telegram = _scheduled_telegram(data_dir)
     out = check_sources(data_dir, send=telegram[0] if telegram else (lambda text: False), labels=macro_labels())
     print(json.dumps(out))
+    return 0
+
+
+def signal_runs_alerts_cli(data_dir: Path) -> int:
+    """Nhắc chuỗi tín hiệu; a note not sent (delivery off) is tried again on the next run."""
+    from investment_agent.services.signal_runs import check_runs
+    try:
+        telegram = _scheduled_telegram(data_dir)
+    except Exception:
+        telegram = None
+    print(json.dumps(check_runs(Path(data_dir), send=telegram[0] if telegram else (lambda text: False))))
     return 0
 
 

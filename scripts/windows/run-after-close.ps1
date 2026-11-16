@@ -93,6 +93,9 @@ $trend = & $python -W ignore -m investment_agent.cli trend-run --data-dir $data 
 # Public market snapshot of the latest session for the brief (whole-HOSE board, indices, HOSE statistics, news RSS).
 $brief = & $python -W ignore -m investment_agent.cli brief-snapshot --data-dir $data --calendar $calendar 2>$null
 "$(Get-Date -Format o) brief-snapshot exit=$LASTEXITCODE $brief" | Add-Content -LiteralPath $log -Encoding UTF8
+# Nhac chuoi tin hieu: one Telegram note when thin trading, a green index over falling stocks or VN-Index against Asia has run for days.
+$sr = & $python -W ignore -m investment_agent.cli signal-runs-alerts --data-dir $data 2>$null
+"$(Get-Date -Format o) signal-runs-alerts exit=$LASTEXITCODE $sr" | Add-Content -LiteralPath $log -Encoding UTF8
 # Corporate events of watched tickers (dividends, issues, shareholder meetings): refreshed daily, reminder 5 days ahead.
 $events = & $python -W ignore -m investment_agent.cli events-sync --data-dir $data 2>$null
 "$(Get-Date -Format o) events-sync exit=$LASTEXITCODE $events" | Add-Content -LiteralPath $log -Encoding UTF8

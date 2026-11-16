@@ -1,5 +1,5 @@
 {
- "version": "macro-2026-11-16.4",
+ "version": "macro-2026-11-16.5",
  "notice": "Quy tắc đánh giá theo bảng Leading Indicator của chủ sở hữu (25/10/2026). bad_when: up = tăng là Xấu; down = giảm là Xấu; sign = âm là Xấu; pmi = Tốt khi trên 50 và không giảm.",
  "indicators": [
   {
@@ -65,6 +65,20 @@
    },
    "url": "https://fred.stlouisfed.org/series/CPIAUCNS",
    "note": "Chỉ số giá chưa điều chỉnh mùa vụ, như con số tiêu đề của Cục Thống kê Lao động Mỹ (BLS). Tháng 10/2026 không có số so cùng kỳ: Mỹ không thu thập CPI tháng 10/2025 khi chính phủ đóng cửa nên BLS không công bố mức này; tháng 11/2026 có lại bình thường."
+  },
+  {
+   "id": "us_core_cpi_yoy",
+   "label": "Lạm phát CPI lõi của Mỹ (bỏ lương thực, năng lượng; so cùng kỳ)",
+   "unit": "%",
+   "rule": "up",
+   "max_age_days": 75,
+   "source": {
+    "kind": "fred",
+    "series": "CPILFENS",
+    "transform": "yoy"
+   },
+   "url": "https://fred.stlouisfed.org/series/CPILFENS",
+   "note": "CPI bỏ lương thực và năng lượng, chưa điều chỉnh mùa vụ, cùng cách tính với CPI chính ở dòng trên (BLS qua FRED). Tháng 10/2026 không có số so cùng kỳ vì BLS không công bố CPI tháng 10/2025 (chính phủ Mỹ đóng cửa)."
   },
   {
    "id": "usd_vnd_free",

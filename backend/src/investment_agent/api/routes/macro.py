@@ -165,6 +165,29 @@ def sensitivity_span(request: Request, span: str):
             "rows": [{"symbol": s, "held": s in costs, **results[s]} for s in symbols], "exposure": exposure(results, costs)}
 
 
+GOLD_KIND = "Vàng miếng SJC"
+
+
+@router.get("/us-chain")
+def us_week_chain(request: Request):
+    """Chuỗi liên thị trường trong tuần: US CPI → US rates → DXY → gold → USD/VND, each link's move over the last week (domain.us_chain)."""
+    from investment_agent.domain.us_chain import us_chain
+    from investment_agent.market.gold_price import gold_history
+    require_owner(request)
+    store = _store(request)
+    if store is None:
+        return unavailable()
+    series = {i: [(date.fromisoformat(o["date"]), Decimal(o["value"])) for o in store.read(i)]
+              for i in ("us_cpi_yoy", "us_core_cpi_yoy", "fed_effr", "us10y", "dxy", "usd_vnd_vcb")}
+    gold = gold_history(Path(request.app.state.data_dir)).get(GOLD_KIND) or {}
+    series["gold"] = sorted((date.fromisoformat(d), Decimal(v)) for d, v in gold.items())
+    out = us_chain(series, today=now(request).astimezone(VN).date())
+    for n in out["nodes"]:
+        if n["id"] == "gold":
+            n["label"] = f"{GOLD_KIND} (giá mua vào của Phú Quý, đồng/chỉ)"
+    return out
+
+
 @router.get("/us-calendar")
 def us_calendar(request: Request):
     """Lịch vĩ mô Mỹ: the Fed's decisions and minutes and the CPI releases of the coming 60 days, in Vietnam time (market.us_calendar)."""

@@ -51,6 +51,18 @@ def asia_vs_index(index_change: Decimal | None, asia: dict | None) -> dict | Non
             "counted": len(fresh), "left_out": [r["name"] for r in asia["rows"] if r not in fresh]}
 
 
+def week_signals(snapshots: list[dict]) -> dict | None:
+    """Bản tin tuần: how many of the week's sessions had each signal, out of the sessions whose snapshot has them (from 16/11/2026)."""
+    kept = [s["signals"] for s in snapshots if (s.get("signals") or {}).get("status") == "ok"]
+    if not kept:
+        return None
+    asia = [s["asia"] for s in kept if s.get("asia")]
+    against = sum(1 for a in asia if (a["down"] if a["index"] == "up" else a["up"]) > (a["up"] if a["index"] == "up" else a["down"]))
+    gap = lambda kind: sum(1 for s in kept if (s.get("breadth_gap") or {}).get("kind") == kind)  # noqa: E731
+    return {"sessions": len(kept), "green_over_red": gap("green_over_red"), "red_over_green": gap("red_over_green"),
+            "low_liquidity": sum(1 for s in kept if (s.get("liquidity") or {}).get("low")), "asia_sessions": len(asia), "asia_against": against}
+
+
 def vn30_multipliers(weights: dict) -> dict:
     """VN30 weighs each member by its shares × free float × the cap on its weight (HOSE's notice), not by all its shares."""
     return {s: Decimal(w["shares"]) * Decimal(w["free_float"]) * Decimal(w["cap"]) for s, w in weights.items()}

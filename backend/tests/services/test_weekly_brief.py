@@ -199,3 +199,15 @@ def test_the_week_chain_and_the_sjc_gap_are_one_short_section():
     assert "- Tuần này CPI Mỹ và lãi suất Mỹ đều đi ngang: chuỗi chưa có chiều rõ." in compose(**INPUTS, held=set(), watched=set(), today=SAT,
                                                                                           us_chain=calm)
     assert "CHUỖI LIÊN THỊ TRƯỜNG" not in compose(**INPUTS, held=set(), watched=set(), today=SAT)
+
+
+def test_the_week_line_counts_the_session_signals():
+    counts = {"sessions": 4, "green_over_red": 2, "red_over_green": 1, "low_liquidity": 2, "asia_sessions": 2, "asia_against": 1}
+    text = compose(**INPUTS, held=set(), watched=set(), today=SAT, week_signals=counts)
+    assert ("Tín hiệu trong tuần (4 phiên có số): 2 phiên xanh vỏ đỏ lòng, 1 phiên đỏ vỏ xanh lòng · 2 phiên thanh khoản thấp · "
+            "1/2 phiên VN-Index ngược chiều châu Á") in text
+    assert text.index("Tín hiệu trong tuần") < text.index("GIAO DỊCH NỘI BỘ")
+    quiet = {"sessions": 5, "green_over_red": 0, "red_over_green": 0, "low_liquidity": 0, "asia_sessions": 0, "asia_against": 0}
+    assert ("Tín hiệu trong tuần (5 phiên có số): 0 phiên xanh vỏ đỏ lòng · 0 phiên thanh khoản thấp · chưa có số châu Á cùng phiên"
+            in compose(**INPUTS, held=set(), watched=set(), today=SAT, week_signals=quiet))
+    assert "Tín hiệu trong tuần" not in compose(**INPUTS, held=set(), watched=set(), today=SAT)

@@ -361,9 +361,9 @@ legend{font-weight:600;padding:0 6px}
 .page-jumps button{border:1px solid var(--line);background:var(--paper);color:var(--link);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer}
 .page-jumps button:hover,.page-jumps button[aria-current="true"]{border-color:var(--brand);background:var(--nav-on-bg)}
 /* On a computer the strip stays at the top while the page scrolls (one row that scrolls sideways); on a phone the menu bar already does. */
-@media(min-width:651px){.page-jumps{position:sticky;top:0;z-index:15;background:var(--bg);padding:8px 0;margin-top:-8px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}.page-jumps button{white-space:nowrap}main h2{scroll-margin-top:64px}}
+@media(min-width:651px){.page-jumps{position:sticky;top:0;z-index:15;background:var(--bg);padding:8px 0;margin-top:-8px}.page-jumps button{white-space:nowrap}main h2{scroll-margin-top:110px}}
 main h2{scroll-margin-top:16px}
-@media(max-width:650px){.page-jumps{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}.page-jumps button{white-space:nowrap}main h2{scroll-margin-top:120px}}
+@media(max-width:650px){.page-jumps{padding-bottom:4px}.page-jumps button{white-space:nowrap;padding:3px 10px;font-size:12px}main h2{scroll-margin-top:16px}}
 /* Chênh lệch lãi suất VND–USD */
 .band-bar{position:relative;height:10px;max-width:520px;margin:10px 0 28px;border-radius:5px;background:linear-gradient(90deg,var(--good),var(--soft) 50%,var(--bad))}.band-mid{position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;background:var(--ink)}.band-dot{position:absolute;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:var(--brand);border:2px solid var(--paper)}.band-lab{position:absolute;top:14px;font-size:12px;color:var(--muted)}.band-l{left:0}.band-c{left:50%;transform:translateX(-50%)}.band-r{right:0}
 .sp-chart{width:100%;max-width:640px;height:auto;display:block;margin:6px 0}.sp-zero{stroke:var(--line);stroke-dasharray:4 3}.sp-line{stroke:var(--brand);stroke-width:2;vector-effect:non-scaling-stroke}
@@ -494,7 +494,7 @@ main h2{scroll-margin-top:16px}
 .theme-pick{display:flex;gap:4px;margin:16px 12px 0;padding-top:14px;border-top:1px solid var(--line)}  /* under the menu, after Cài đặt */
 .theme-pick button{flex:1;padding:6px 4px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;white-space:nowrap}
 .theme-pick button:hover{border-color:var(--brand)}.theme-pick button[aria-pressed=true]{background:var(--nav-on-bg);color:var(--nav-on-ink);border-color:var(--nav-on-ink);font-weight:600}
-.tabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--line);margin-bottom:18px}
+.tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line);margin-bottom:18px}
 .tabs button{padding:10px 16px;background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);cursor:pointer;white-space:nowrap}.tabs button:hover{color:var(--ink)}.tabs button[aria-selected=true]{color:var(--ink);font-weight:600;border-bottom-color:var(--brand)}
 .theme-mobile{display:none}
 @media(max-width:650px){.theme-pick{margin:4px 0 6px;max-width:260px}.side .theme-pick{display:none}.theme-mobile{display:block}
@@ -503,3 +503,14 @@ main h2{scroll-margin-top:16px}
 .rs-list{list-style:none;margin:8px 0;padding:0}.rs-item{padding:10px 0;border-bottom:1px solid var(--line);min-width:0}.rs-item:last-child{border-bottom:0}
 .rs-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px}.rs-head .muted{font-size:13px}
 .rs-signs{margin:6px 0 2px;padding-left:18px;font-size:13px}.rs-signs li{margin:3px 0;overflow-wrap:anywhere}
+/* No sideways scroll on a phone: a table with headings (labelled by TableLabels) reads as one card a row, "Cột: giá trị" */
+@media (max-width:650px){
+  main table[data-cards]{display:block;width:100%;min-width:0}
+  main table[data-cards] thead{display:none}
+  main table[data-cards] tbody,main table[data-cards] tr{display:block;width:100%}
+  main table[data-cards] tr{border:1px solid var(--line);border-radius:8px;margin:0 0 10px;padding:6px 10px}
+  main table[data-cards] td,main table[data-cards] tbody th{display:block;width:100%;border:0;padding:3px 0;text-align:left;white-space:normal;overflow-wrap:anywhere}
+  main table[data-cards] tbody th{font-weight:600}
+  main table[data-cards] td[data-label]::before{content:attr(data-label) ": ";color:var(--muted);font-size:12px}
+  main table[data-cards] tfoot{display:block}
+}

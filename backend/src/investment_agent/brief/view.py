@@ -44,6 +44,35 @@ def market_view(snapshot: dict | None, *, watched: list[str], held: set[str], ne
     return {**view, "tickers": first + others, "news": news}
 
 
+RECENT = 5
+
+
+def _signal_row(snapshot: dict) -> dict:
+    """One session of the "5 phiên gần nhất" table: VN-Index's move and that session's signals (None where the snapshot had none)."""
+    vn = next((r for r in (snapshot.get("indices") or {}).get("rows", []) if r.get("id") == "VNINDEX" and r.get("status") == "ok"), {})
+    s = snapshot.get("signals") or {}
+    known = s.get("status") == "ok"
+    asia, liq, pull = s.get("asia"), s.get("liquidity") or {}, s.get("pull") or {}
+    way = None
+    if asia:
+        same, other = (asia["up"], asia["down"]) if asia["index"] == "up" else (asia["down"], asia["up"])
+        way = "with" if same > other else "against" if other > same else "split"
+    top = None
+    if pull.get("status") == "ok":
+        lead = pull["up"] if Decimal(pull["actual"]) >= 0 else pull["down"]
+        top = lead[0] if lead else None
+    return {"date": snapshot["session_date"], "change": vn.get("change"), "pct": vn.get("pct"), "known": known,
+            "breadth": (s.get("breadth_gap") or {}).get("kind") if known else None, "low_liquidity": liq.get("low") if known and liq else None,
+            "ratio20": liq.get("ratio20") if known and liq else None, "asia": way, "asia_counted": asia["counted"] if asia else None, "top": top}
+
+
+def recent_signals(data_dir: Path, session, n: int = RECENT) -> list[dict]:
+    """The session and the ones stored before it, newest first, n of them."""
+    store = BriefStore(Path(data_dir))
+    days = sorted((p.stem for p in store.root.glob("*.json") if p.stem <= str(session)), reverse=True)[:n]
+    return [_signal_row(snap) for d in days if (snap := store.read(d))]
+
+
 def market_for_session(data_dir: Path | None, held: set[str]):
     """session date (ISO) -> market view, reading data/brief on demand; None when there is no data dir or snapshot."""
     if data_dir is None:
@@ -53,7 +82,10 @@ def market_for_session(data_dir: Path | None, held: set[str]):
         # The market section is an extra: a corrupt watchlist or snapshot only drops it, never the brief or its delivery.
         try:
             watched = list(load_watchlist(Path(data_dir)).symbols)
-            return market_view(BriefStore(Path(data_dir)).read(session), watched=watched, held=held) if session else None
+            out = market_view(BriefStore(Path(data_dir)).read(session), watched=watched, held=held) if session else None
+            if out is not None:
+                out["recent_signals"] = recent_signals(Path(data_dir), session)  # 5 phiên gần nhất, for runs of days
+            return out
         except Exception:
             return None
     return view

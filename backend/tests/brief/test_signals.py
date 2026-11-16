@@ -99,3 +99,26 @@ def test_the_week_counts_the_sessions_of_each_signal():
     week = [snap("green_over_red", True, against), snap(None, True, along), snap("green_over_red"), {"board": {}}, snap("red_over_green")]
     assert week_signals(week) == {"sessions": 4, "green_over_red": 2, "red_over_green": 1, "low_liquidity": 2, "asia_sessions": 2, "asia_against": 1}
     assert week_signals([{"board": {}}]) is None
+
+
+def test_the_last_five_sessions_each_with_their_signals(tmp_path):
+    from datetime import date as day
+    from investment_agent.brief.snapshot import BriefStore
+    from investment_agent.brief.view import recent_signals
+    store = BriefStore(tmp_path)
+    for i, d in enumerate(["2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13", "2026-11-16"]):
+        snap = {"session_date": d, "indices": {"status": "ok", "rows": [{"id": "VNINDEX", "status": "ok", "close": "1736.89", "change": "1.96",
+                                                                          "pct": "0.0011"}]}}
+        if d >= "2026-11-13":
+            snap["signals"] = {"status": "ok", "breadth_gap": {"kind": "green_over_red", "up": 100, "down": 220},
+                               "liquidity": {"ratio20": "0.69", "change_pct": "-0.1", "low": True, "below_avg_sessions": 2},
+                               "pull": {"status": "ok", "computed": "1.93", "actual": "1.96", "up": [{"symbol": "VIC", "points": "7.96"}], "down": [],
+                                        "without_top": None},
+                               "asia": {"index": "up", "up": 0, "down": 3, "counted": 3, "left_out": ["Nikkei 225"]}}
+        store.write(snap)
+    rows = recent_signals(tmp_path, day(2026, 11, 16))
+    assert [r["date"] for r in rows] == ["2026-11-16", "2026-11-13", "2026-11-12", "2026-11-11", "2026-11-10"]
+    assert rows[0] == {"date": "2026-11-16", "change": "1.96", "pct": "0.0011", "known": True, "breadth": "green_over_red", "low_liquidity": True,
+                       "ratio20": "0.69", "asia": "against", "asia_counted": 3, "top": {"symbol": "VIC", "points": "7.96"}}
+    assert rows[2]["known"] is False and rows[2]["breadth"] is None  # before 16/11 the snapshots had no signals
+    assert recent_signals(tmp_path, day(2026, 11, 12))[0]["date"] == "2026-11-12"  # an older session: its own five

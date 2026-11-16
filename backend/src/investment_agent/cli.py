@@ -52,6 +52,8 @@ def main() -> int:
     ra.add_argument("--data-dir", type=Path, required=True)
     sa = commands.add_parser("source-alerts", help="one Telegram note when a public source failed three macro runs in a row, and when it is back")
     sa.add_argument("--data-dir", type=Path, required=True)
+    uc = commands.add_parser("us-calendar", help="read the Fed's and BLS's release calendars once a day and remind the day before")
+    uc.add_argument("--data-dir", type=Path, required=True)
     cw = commands.add_parser("calendar-watch", help="from 1 December, one Telegram note when HOSE posts next year's holiday calendar")
     cw.add_argument("--data-dir", type=Path, required=True)
     la = commands.add_parser("liquidity-alerts", help="one Telegram note when the overnight interbank rate jumps or the bank USD rate nears the ceiling")
@@ -180,6 +182,8 @@ def main() -> int:
         return receivable_alerts_cli(args.data_dir)
     if args.command == "source-alerts":
         return source_alerts_cli(args.data_dir)
+    if args.command == "us-calendar":
+        return us_calendar_cli(args.data_dir)
     if args.command == "calendar-watch":
         return calendar_watch_cli(args.data_dir)
     if args.command == "liquidity-alerts":
@@ -1108,6 +1112,25 @@ def source_alerts_cli(data_dir: Path) -> int:
     return 0
 
 
+def us_calendar_cli(data_dir: Path) -> int:
+    """Lịch vĩ mô Mỹ: the Fed and BLS calendars read once a day (public pages), then one Telegram note an event the day before."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from investment_agent.market.us_calendar import FILE, refresh_us_calendar, remind_us_calendar
+    today = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date()
+    path = Path(data_dir).joinpath(*FILE)
+    fresh = (json.loads(path.read_text(encoding="utf-8")).get("updated_on") == today.isoformat()) if path.is_file() else False
+    out = {"refresh": "today" if fresh else refresh_us_calendar(Path(data_dir), today=today)}
+    try:
+        telegram = _scheduled_telegram(data_dir)
+    except Exception:
+        telegram = None
+    out["remind"] = remind_us_calendar(Path(data_dir), send=telegram[0] if telegram else (lambda text: False), today=today)
+    print(json.dumps(out, ensure_ascii=False))
+    return 0
+
+
 def calendar_watch_cli(data_dir: Path) -> int:
     """Dò lịch giao dịch HOSE; a note not sent (delivery off) is tried again on the next run."""
     from datetime import datetime
@@ -1446,6 +1469,7 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
         from investment_agent.services.thesis_auto import REPORT_SOURCE
         from investment_agent.services.thesis_model import coming_catalysts, read_models
         from investment_agent.services.weekly_brief import NEXT_DAYS
+        from investment_agent.market.us_calendar import upcoming as us_upcoming
         rows = receivable_signs(Path(data_dir))
         store = MacroStore(Path(data_dir))
         monthly = {}
@@ -1465,7 +1489,8 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
                 "manual": audit_manual(Path(data_dir), load_indicators()),
                 "catalysts": [c for c in coming_catalysts(read_models(repo, owner)[0], Path(data_dir), load_watchlist(Path(data_dir)).symbols,
                                                           today=today, days=NEXT_DAYS)
-                              if c["on"] and (not c["auto"] or c["source"] == REPORT_SOURCE)]}
+                              if c["on"] and (not c["auto"] or c["source"] == REPORT_SOURCE)],
+                "us_events": us_upcoming(Path(data_dir), today=today, days=NEXT_DAYS)}
     print(json.dumps(weekly_brief_run(data_dir, inputs=inputs, send=send, now=now)))
     return 0
 

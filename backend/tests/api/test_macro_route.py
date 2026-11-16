@@ -112,3 +112,17 @@ def test_a_session_figure_is_refused_on_a_day_without_a_session_with_the_nearest
     assert call(c, clock, "POST", "/internal/macro/usd_vnd_central/observations", {"date": "2026-10-25", "value": "25100"}).status_code == 200
     rows = {r["id"]: r for r in call(c, clock, "GET", "/internal/macro").json()["rows"]}
     assert rows["vn10y"]["period"] == "session" and rows["usd_vnd_central"]["period"] is None
+
+
+def test_the_us_macro_calendar_lists_the_coming_events_in_vietnam_time(tmp_path):
+    import json
+    clock = Clock()  # 2027-01-15
+    (tmp_path / "macro").mkdir(exist_ok=True)
+    (tmp_path / "macro" / "us-calendar.json").write_text(json.dumps({"updated_on": "2027-01-15", "errors": [], "events": [
+        {"kind": "fomc", "et": "2027-01-27T14:00:00-05:00", "detail": "Two-day meeting, January 26 - 27",
+         "source": "https://www.federalreserve.gov/newsevents/2027-january.htm"},
+        {"kind": "cpi", "et": "2027-01-13T08:30:00-05:00", "detail": "December 2026", "source": "https://www.bls.gov/schedule/news_release/cpi.htm"}]}),
+        encoding="utf-8")
+    body = call(client(tmp_path, clock), clock, "GET", "/internal/macro/us-calendar").json()
+    assert body["updated_on"] == "2027-01-15"
+    assert [(e["on"], e["at"], e["text"]) for e in body["events"]] == [("2027-01-28", "02:00", "Fed công bố quyết định lãi suất (họp 26–27/1)")]

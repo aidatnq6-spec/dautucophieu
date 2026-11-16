@@ -168,3 +168,13 @@ test("the central rate shows its band, the open market its latest session, and t
   await expect(ext).toContainText("nhập siêu 1,5 tỷ USD");
   await expect(ext).toContainText("20 tỷ USD (+8,5% so cùng kỳ)");
 });
+
+
+test("the US macro calendar of the Fed and BLS sits above the owner's own macro calendar", async ({ page }) => {
+  await page.goto("/macro");
+  const us = page.getByRole("region", { name: "Lịch vĩ mô Mỹ" });
+  await expect(us).toContainText("giờ Việt Nam");
+  await expect(us.getByRole("status")).toHaveCount(0);
+  const box = await us.boundingBox(), own = await page.getByRole("region", { name: "Lịch và nhật ký vĩ mô" }).boundingBox();
+  expect(box!.y).toBeLessThan(own!.y);
+});

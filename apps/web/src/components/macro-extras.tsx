@@ -110,7 +110,8 @@ export function MacroCalendar() {
     <section className="surface" id="lich-vi-mo" aria-label="Lịch và nhật ký vĩ mô">
       <h2>Lịch và nhật ký vĩ mô</h2>
       <p className="caption">Ghi các cuộc họp Fed, nghiệp vụ của NHNN (hoán đổi, OMO, điều chỉnh tỷ giá trung tâm) và ngày công bố số liệu, kèm nguồn.
-        Ứng dụng không tự điền ngày; sự kiện có đánh dấu nhắc được báo qua Telegram một lần, trước một ngày.</p>
+        Họp Fed và ngày công bố CPI Mỹ đã có tự động ở mục Lịch vĩ mô Mỹ phía trên; ở đây ghi thêm những gì bạn muốn theo dõi. Sự kiện có đánh
+        dấu nhắc được báo qua Telegram một lần, trước một ngày.</p>
       {error && <p className="errors" role="alert">{error}</p>}
       {!ev && !error && <p className="muted fx-loading" role="status">Đang tải…</p>}
       {ev && <>

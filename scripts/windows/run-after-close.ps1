@@ -36,6 +36,9 @@ $macro = & $python -W ignore -m investment_agent.cli macro-sync --data-dir $data
 # Nhac loi nguon: one Telegram note when a public source failed three runs in a row, and one when it is back.
 $sa = & $python -W ignore -m investment_agent.cli source-alerts --data-dir $data 2>$null
 "$(Get-Date -Format o) source-alerts exit=$LASTEXITCODE $sa" | Add-Content -LiteralPath $log -Encoding UTF8
+# Lich vi mo My: the Fed's and BLS's calendars read once a day, one Telegram note an event the day before (Vietnam time).
+$uc = & $python -W ignore -m investment_agent.cli us-calendar --data-dir $data 2>$null
+"$(Get-Date -Format o) us-calendar exit=$LASTEXITCODE $uc" | Add-Content -LiteralPath $log -Encoding UTF8
 # Do lich HOSE: from 1 December while next year's trading calendar file is missing, one Telegram note when HOSE posts its holiday notice.
 $cw = & $python -W ignore -m investment_agent.cli calendar-watch --data-dir $data 2>$null
 "$(Get-Date -Format o) calendar-watch exit=$LASTEXITCODE $cw" | Add-Content -LiteralPath $log -Encoding UTF8

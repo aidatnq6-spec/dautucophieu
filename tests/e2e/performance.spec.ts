@@ -26,7 +26,7 @@ test("portfolio vs VN-Index rebased to 100, monthly returns and gains by ticker"
 test("saving and inflation over the same period, and the real return after inflation", async ({ page }) => {
   await seedOwner(page);
   // Entered by hand here; in use CPI comes from news headlines and the deposit rate from Topi.
-  expect((await call(page, "POST", "macro/vn_cpi_yoy/observations", { date: "2026-03-31", value: "3,2" })).ok()).toBe(true);
+  expect((await call(page, "POST", "macro/vn_cpi_yoy/observations", { month: "2026-03", value: "3,2" })).ok()).toBe(true);
   expect((await call(page, "POST", "macro/deposit_12m/observations", { date: "2026-04-30", value: "5,6" })).ok()).toBe(true);
   const box = await openPerf(page);
   const rows = box.getByRole("list", { name: "So với gửi tiết kiệm và lạm phát" });

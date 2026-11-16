@@ -27,9 +27,22 @@ def test_macro_lists_every_indicator(tmp_path):
 def test_owner_enters_a_manual_value_with_its_source(tmp_path):
     clock = Clock()
     c = client(tmp_path, clock)
-    r = call(c, clock, "POST", "/internal/macro/vn_pmi/observations", {"date": "2026-10-01", "value": "51,9", "source_url": "https://example.vn/pmi"})
-    assert r.status_code == 200 and r.json()["value"] == "51.9"
+    r = call(c, clock, "POST", "/internal/macro/vn_pmi/observations", {"month": "2026-10", "value": "51,9", "source_url": "https://example.vn/pmi"})
+    assert r.status_code == 200 and r.json() == {"indicator": "vn_pmi", "date": "2026-10-31", "value": "51.9"}  # a monthly figure: the month's end
     assert MacroStore(tmp_path).read("vn_pmi")[-1]["entry"] == "manual"
+
+
+def test_a_monthly_figure_is_entered_by_month_never_by_the_day_it_was_typed(tmp_path):
+    clock = Clock()  # 2027-01-15
+    c = client(tmp_path, clock)
+    by_day = call(c, clock, "POST", "/internal/macro/vn_pmi/observations", {"date": "2026-10-25", "value": "51,9"})
+    assert by_day.status_code == 422 and by_day.json()["code"] == "month_required"
+    assert call(c, clock, "POST", "/internal/macro/vn_pmi/observations", {"month": "2027-01", "value": "51"}).json()["code"] == "future_date"  # not over yet
+    assert call(c, clock, "POST", "/internal/macro/vn_pmi/observations", {"month": "2026-13", "value": "51"}).status_code == 422
+    daily = call(c, clock, "POST", "/internal/macro/deposit_12m/observations", {"month": "2026-10", "value": "5"})
+    assert daily.status_code == 422 and daily.json()["code"] == "date_required"  # a daily figure keeps its day
+    rows = {r["id"]: r for r in call(c, clock, "GET", "/internal/macro").json()["rows"]}
+    assert rows["vn_pmi"]["period"] == "month" and rows["deposit_12m"]["period"] is None
 
 
 def test_manual_entry_is_refused_for_automatic_or_unknown_indicators_and_bad_input(tmp_path):
@@ -37,10 +50,10 @@ def test_manual_entry_is_refused_for_automatic_or_unknown_indicators_and_bad_inp
     c = client(tmp_path, clock)
     assert call(c, clock, "POST", "/internal/macro/us10y/observations", {"date": "2026-10-01", "value": "4"}).status_code == 409
     assert call(c, clock, "POST", "/internal/macro/nope/observations", {"date": "2026-10-01", "value": "4"}).status_code == 404
-    assert call(c, clock, "POST", "/internal/macro/vn_pmi/observations", {"date": "2099-01-01", "value": "4"}).status_code == 422
-    assert call(c, clock, "POST", "/internal/macro/vn_pmi/observations", {"date": "2026-10-01", "value": "abc"}).status_code == 422
+    assert call(c, clock, "POST", "/internal/macro/vn_pmi/observations", {"month": "2099-01", "value": "4"}).status_code == 422
+    assert call(c, clock, "POST", "/internal/macro/vn_pmi/observations", {"month": "2026-10", "value": "abc"}).status_code == 422
     assert call(c, clock, "POST", "/internal/macro/vn_pmi/observations",
-                {"date": "2026-10-01", "value": "4", "source_url": "javascript:alert(1)"}).status_code == 422
+                {"month": "2026-10", "value": "4", "source_url": "javascript:alert(1)"}).status_code == 422
 
 
 def test_macro_without_personal_store_is_unavailable(tmp_path):

@@ -178,3 +178,12 @@ test("the US macro calendar of the Fed and BLS sits above the owner's own macro 
   const box = await us.boundingBox(), own = await page.getByRole("region", { name: "Lịch và nhật ký vĩ mô" }).boundingBox();
   expect(box!.y).toBeLessThan(own!.y);
 });
+
+
+test("the week chain from US inflation to the dong sits below the domestic chain, each link labelled", async ({ page }) => {
+  await page.goto("/macro");
+  const box = page.getByRole("region", { name: "Chuỗi liên thị trường trong tuần" });
+  await expect(box.getByTestId("us-chain-us_cpi")).toBeVisible();
+  await expect(box.getByTestId("us-chain-usd_vnd")).toContainText(/khớp chuỗi|ngược chuỗi|đi ngang|chưa có số|chưa có chiều|mở đầu chuỗi/);
+  await expect(box.getByTestId("us-chain-summary")).not.toBeEmpty();
+});

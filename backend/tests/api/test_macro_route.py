@@ -21,7 +21,7 @@ def test_macro_lists_every_indicator(tmp_path):
     MacroStore(tmp_path).upsert("us10y", [(date(2026, 10, 21), "4.91"), (date(2026, 10, 23), "4.96")], entry="auto")
     body = call(client(tmp_path, clock), clock, "GET", "/internal/macro").json()
     rows = {r["id"]: r for r in body["rows"]}
-    assert len(rows) == 28 and rows["us10y"]["assessment"] == "Xấu" and rows["vn_pmi"]["value"] is None
+    assert len(rows) == 29 and "us_core_cpi_yoy" in rows and rows["us10y"]["assessment"] == "Xấu" and rows["vn_pmi"]["value"] is None
 
 
 def test_owner_enters_a_manual_value_with_its_source(tmp_path):
@@ -126,3 +126,19 @@ def test_the_us_macro_calendar_lists_the_coming_events_in_vietnam_time(tmp_path)
     body = call(client(tmp_path, clock), clock, "GET", "/internal/macro/us-calendar").json()
     assert body["updated_on"] == "2027-01-15"
     assert [(e["on"], e["at"], e["text"]) for e in body["events"]] == [("2027-01-28", "02:00", "Fed công bố quyết định lãi suất (họp 26–27/1)")]
+
+
+def test_the_week_chain_reads_us_inflation_rates_dxy_gold_and_the_dong(tmp_path):
+    import json
+    from datetime import timedelta
+    clock = Clock()  # 2027-01-15
+    store, today = MacroStore(tmp_path), date(2027, 1, 15)
+    store.upsert("us_cpi_yoy", [(date(2026, 11, 1), "3.4"), (date(2026, 12, 1), "3.7")], entry="auto")
+    store.upsert("us10y", [(today - timedelta(days=8), "4.1"), (today, "4.3")], entry="auto")
+    store.upsert("dxy", [(today - timedelta(days=8), "101"), (today, "103.38")], entry="auto")
+    store.upsert("usd_vnd_vcb", [(today - timedelta(days=8), "26300"), (today, "26302")], entry="auto")
+    (tmp_path / "gold-price-history.json").write_text(json.dumps({"Vàng miếng SJC": {"2027-01-07": "13900000", "2027-01-15": "13450000"}}),
+                                                     encoding="utf-8")
+    body = call(client(tmp_path, clock), clock, "GET", "/internal/macro/us-chain").json()
+    assert body["mode"] == "tightening" and body["with"] == ["us_rates", "dxy", "gold"] and body["flat"] == ["usd_vnd"]
+    assert {n["id"]: n.get("label") for n in body["nodes"]}["gold"] == "Vàng miếng SJC (giá mua vào của Phú Quý, đồng/chỉ)"

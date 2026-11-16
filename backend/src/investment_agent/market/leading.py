@@ -15,6 +15,7 @@ not feed.
 """
 
 import html as html_lib
+import html
 import json
 import os
 import re
@@ -44,6 +45,12 @@ OILPRICE_PAGE = "https://oilprice.com/oil-price-charts/"
 # gold-api.com: the live price endpoint is free, without a key or a rate limit (terms of 10/09/2026; no robots.txt); its history needs a
 # paid key, so the app keeps its own daily series from the live price.
 GOLD_API = "https://api.gold-api.com/price/XAU"
+# Bộ Công Thương's own releases on each fuel price period (robots.txt allows; checked 16/11/2026). Not every period gets a release
+# on these pages: the missing ones are entered by hand. Petrolimex's price service is closed to robots (robots.txt: Disallow /).
+MOIT = "https://moit.gov.vn"
+MOIT_PAGES = (MOIT + "/", MOIT + "/quan-ly-thi-truong")
+MOIT_PER_RUN = 3
+SJC_KIND = "Vàng miếng SJC"
 SBV_INTERBANK = "https://sbv.gov.vn/o/headless-delivery/v1.0/content-structures/3450260/structured-contents?pageSize=30&sort=datePublished:desc"
 TREASURY_CSV = ("https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/{year}/all"
                 "?type=daily_treasury_yield_curve&field_tdr_date_value={year}&page&_format=csv")
@@ -169,6 +176,33 @@ def _grouped(raw: str) -> str:
     if re.fullmatch(r"\d{1,3}(?:[.,]\d{3})+", raw):
         return re.sub(r"[.,]", "", raw)
     return raw.replace(".", "").replace(",", ".") if raw.count(",") == 1 else raw
+
+
+def moit_release_links(page: str) -> list[str]:
+    """Links to Bộ Công Thương's fuel price releases ("…điều hành giá xăng dầu…"), newest first as the page lists them."""
+    out = []
+    for href in re.findall(r'href="([^"]*dieu-hanh-gia-xang-dau[^"]*\.html)"', page):
+        url = href if href.startswith("http") else MOIT + href
+        if url not in out:
+            out.append(url)
+    return out
+
+
+_MOIT_ITEMS = {"e5ron92": r"Xăng E5\s*RON\s*92(?:-II)?", "ron95": r"Xăng E10\s*RON\s*95-III", "diesel": r"Dầu điêzen 0[.,]05S"}
+
+
+def parse_moit_fuel(page: str) -> dict:
+    """The ceilings of one period (section 3.2, "không cao hơn … đồng/lít") and the day it applies from (section 4)."""
+    text = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", page)))
+    out = {}
+    for key, name in _MOIT_ITEMS.items():
+        m = re.search(name + r"\s*:\s*không cao hơn ([\d.]+) đồng/lít", text)
+        if m:
+            out[key] = m.group(1).replace(".", "")
+    when = re.search(r"Thời gian thực hiện.*?ngày (\d{1,2}) tháng (\d{1,2}) năm (\d{4})", text)
+    if not out.get("ron95") or not when:
+        raise MacroError("moit_fuel_unreadable")
+    return {"date": date(int(when.group(3)), int(when.group(2)), int(when.group(1))), **out}
 
 
 def parse_gold_api(text: str) -> list[tuple[date, str]]:
@@ -683,6 +717,22 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
             points = parse_oilprice(page(OILPRICE_PAGE), blend=src["blend"])
         elif src["kind"] == "gold_api":
             points = parse_gold_api(page(GOLD_API))
+        elif src["kind"] == "moit_fuel":
+            links = []
+            for listing in MOIT_PAGES:
+                links += [u for u in moit_release_links(page(listing)) if u not in links]
+            found = [parse_moit_fuel(page(u)) for u in links[:MOIT_PER_RUN]]
+            points = sorted({f["date"]: f[src["field"]] for f in found if f.get(src["field"]) and f["date"].isoformat() not in known}.items())
+            return points or None  # no new period published: nothing new, not a failure
+        elif src["kind"] == "sjc_gap":
+            from investment_agent.market.gold_price import gold_prices
+            sjc = (((gold_prices(store.root.parent).get("kinds") or {}).get(SJC_KIND) or {}).get("sell"))
+            if not sjc:
+                raise MacroError("no_sjc_price")
+            xau = Decimal(parse_gold_api(page(GOLD_API))[0][1])
+            fx = Decimal(str(parse_vcb_xml(page(VCB_XML), currency="USD", field="Sell")[1]).replace(",", ""))
+            world = xau * fx * Decimal("3.75") / Decimal("31.1034768")  # đồng a chỉ
+            points = [(today, str(((Decimal(sjc) / world - 1) * 100).quantize(Decimal("0.01"), ROUND_HALF_UP)))]
         elif src["kind"] == "sbv_interbank":
             points = parse_sbv_interbank(page(SBV_INTERBANK), term=src["term"])
         elif src["kind"] == "treasury":

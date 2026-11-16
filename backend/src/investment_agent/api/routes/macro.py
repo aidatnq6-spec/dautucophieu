@@ -175,6 +175,49 @@ def us_week_chain(request: Request):
     return us_week(Path(request.app.state.data_dir), today=now(request).astimezone(VN).date())
 
 
+class SjcGapRequest(ContractModel):
+    threshold: str | None = Field(default=None, max_length=12)
+    expected_version: int = Field(strict=True, ge=0)
+    request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
+
+
+def _sjc_gap_view(request: Request, threshold, version: int) -> dict:
+    store = _store(request)
+    points = [{"date": o["date"], "value": o["value"]} for o in (store.read("sjc_gap_pct") if store else [])][-365:]
+    return {"points": points, "threshold": None if threshold is None else format(threshold, "f"), "version": version}
+
+
+@router.get("/sjc-gap")
+def sjc_gap(request: Request):
+    """Chênh lệch vàng SJC so với thế giới: the kept daily gap and the owner's alert threshold."""
+    from investment_agent.services.sjc_gap import read_threshold
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None or request.app.state.data_dir is None:
+        return unavailable()
+    try:
+        return _sjc_gap_view(request, *read_threshold(repo, owner))
+    except RepositoryUnavailable:
+        return unavailable()
+
+
+@router.put("/sjc-gap")
+def put_sjc_gap(request: Request, body: SjcGapRequest):
+    from investment_agent.services.sjc_gap import RECORD, parse_threshold
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None or request.app.state.data_dir is None:
+        return unavailable()
+    try:
+        threshold = parse_threshold(body.threshold)
+    except ValueError:
+        return error(422, "bad_threshold", "Ngưỡng là một số phần trăm lớn hơn 0 và nhỏ hơn 100, hoặc để trống để tắt nhắc.")
+    try:
+        record = repo.write(owner, *RECORD, {"threshold": None if threshold is None else format(threshold, "f")},
+                            expected_version=body.expected_version, request_id=body.request_id)
+        return _sjc_gap_view(request, threshold, record.version)
+    except WRITE_ERRORS as exc:
+        return write_error(exc)
+
+
 @router.get("/us-calendar")
 def us_calendar(request: Request):
     """Lịch vĩ mô Mỹ: the Fed's decisions and minutes and the CPI releases of the coming 60 days, in Vietnam time (market.us_calendar)."""

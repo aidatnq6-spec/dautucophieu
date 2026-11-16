@@ -187,3 +187,15 @@ test("the week chain from US inflation to the dong sits below the domestic chain
   await expect(box.getByTestId("us-chain-usd_vnd")).toContainText(/khớp chuỗi|ngược chuỗi|đi ngang|chưa có số|chưa có chiều|mở đầu chuỗi/);
   await expect(box.getByTestId("us-chain-summary")).not.toBeEmpty();
 });
+
+
+test("the SJC gap section takes a threshold and turns the alert off again", async ({ page }) => {
+  await page.goto("/macro");
+  const box = page.getByRole("region", { name: "Chênh lệch vàng SJC so với thế giới" });
+  await box.getByLabel("Ngưỡng chênh lệch vàng").fill("12,5");
+  await box.getByRole("button", { name: "Lưu ngưỡng" }).click();
+  await expect(box).toContainText("Đang nhắc khi từ 12,5% trở lên.");
+  await box.getByLabel("Ngưỡng chênh lệch vàng").fill("");
+  await box.getByRole("button", { name: "Tắt nhắc" }).click();
+  await expect(box).toContainText("Chưa đặt ngưỡng: không nhắc.");
+});

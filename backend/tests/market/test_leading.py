@@ -107,6 +107,7 @@ def test_cli_macro_sync_writes_automatic_indicators(tmp_path, capsys):
     import json
     last = json.loads((tmp_path / "macro" / "_last_run.json").read_text(encoding="utf-8"))  # for Nhắc lỗi nguồn: every source of the run
     assert last["results"]["us10y"] == "ok" and last["results"]["omo"] == "error:OSError" and last["at"]
+    assert "central_baseline" in last["results"]  # the start-of-year central rate is looked up in every run until found
 
 
 def test_backup_includes_macro_observations(tmp_path):

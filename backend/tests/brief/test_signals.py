@@ -43,3 +43,21 @@ def test_the_page_gets_the_same_signal_lines_as_the_telegram_brief():
                         "liquidity": None}}
     assert market_view(snap, watched=[], held=set())["signal_lines"] == ["Xanh vỏ đỏ lòng: VN-Index tăng nhưng 220 mã giảm, chỉ 101 mã tăng"]
     assert market_view({"session_date": "2026-11-13", "board": {"status": "missing"}}, watched=[], held=set())["signal_lines"] == []
+
+
+def test_vn30_pull_uses_its_free_float_and_capped_weights():
+    from investment_agent.brief.signals import vn30_multipliers
+    weights = {"VIC": {"shares": "1000", "free_float": "0.50", "cap": "1.0000"}, "TCB": {"shares": "1000", "free_float": "1.00", "cap": "0.5000"}}
+    m = vn30_multipliers(weights)
+    assert m == {"VIC": Decimal("500.0000"), "TCB": Decimal("500.0000")}
+    symbols = {"VIC": {"ref": 100, "change": 10}, "TCB": {"ref": 100, "change": -2}, "AAA": {"ref": 10, "change": 1}}
+    pull = index_pull(symbols, m, change=Decimal("40"), close=Decimal("1040"))  # AAA is not in VN30: left out
+    assert pull["status"] == "ok" and pull["up"] == [{"symbol": "VIC", "points": "50.00"}] and pull["down"] == [{"symbol": "TCB", "points": "-10.00"}]
+
+
+def test_the_brief_line_for_vn30():
+    from investment_agent.notifications.render import signal_lines
+    s = {"status": "ok", "breadth_gap": None, "liquidity": None, "pull": {"status": "missing"},
+         "pull_vn30": {"status": "ok", "computed": "-0.65", "actual": "-0.66", "up": [{"symbol": "VIC", "points": "3.85"}],
+                       "down": [{"symbol": "TCB", "points": "-2.30"}, {"symbol": "FPT", "points": "-1.80"}], "without_top": None}}
+    assert signal_lines(s) == ["Mã kéo VN30 (điểm): VIC +3,85 · Mã ghì: TCB −2,30; FPT −1,80"]

@@ -311,6 +311,12 @@ def _basket_note(changes: dict, hose_info: dict | None) -> str:
     return "\n".join(lines + ["Danh sách theo dõi đã cập nhật nhóm chỉ số."])
 
 
+def _vn30_weights(data_dir: Path, session) -> dict:
+    """VN30's weight inputs from HOSE's notice (index-groups.json), when the notice is in effect on the session."""
+    kept = _read_json(data_dir / "index-groups.json").get("vn30_weights") or {}
+    return (kept.get("members") or {}) if kept.get("effective") and kept["effective"] <= session.isoformat() else {}
+
+
 def _vd_shares(symbols: list[str]) -> dict:
     from investment_agent.market.providers.vndirect_data import outstanding_shares
     return outstanding_shares(symbols)
@@ -351,6 +357,9 @@ def index_groups(groups: list[str], output: Path, provider=None, today=None, get
                 kept.pop("VN100", None)
                 sources["VN100"] = {"source": "hose", "notice_id": hose_info["notice_id"], "period": hose_info["period"],
                                     "effective": hose_info["effective"].isoformat()}
+                if (hose_info["groups"].get("weights") or {}).get("VN30"):  # for Tín hiệu phiên: mã kéo VN30
+                    payload["vn30_weights"] = {"effective": hose_info["effective"].isoformat(), "notice_id": hose_info["notice_id"],
+                                               "period": hose_info["period"], "members": hose_info["groups"]["weights"]["VN30"]}
                 if "VN30" in members and sorted(hose_info["groups"]["VN30"]) != sorted(members["VN30"]):
                     payload["vn30_check"] = {"hose": sorted(hose_info["groups"]["VN30"]), "vndirect": sorted(members["VN30"]),
                                              "notice_id": hose_info["notice_id"]}
@@ -359,6 +368,8 @@ def index_groups(groups: list[str], output: Path, provider=None, today=None, get
                                                 "members": vn100}}
         if sources:
             payload["group_sources"] = sources
+        if "vn30_weights" not in payload and saved.get("vn30_weights"):
+            payload["vn30_weights"] = saved["vn30_weights"]
         # VN30 changing is HOSE's review of its baskets.
         before = saved.get("groups", {}).get("VN30")
         if "VN30" in members and before is not None and sorted(before) != sorted(members["VN30"]):
@@ -1764,7 +1775,7 @@ def brief_snapshot_cli(data_dir: Path, calendar_path: Path, *, listing=None, boa
     snap = build_snapshot(session_date=session, previous_session=_previous_session(cal, session), now=now, listing=cached_listing,
                           board=board, series=lambda index_id: series.read(f"{index_id}-1d"), hose_get=http_get, rss_get=http_get,
                           store=BriefStore(data_dir), earlier=earlier, index_bars=index_bars,
-                          shares=lambda symbols: _vd_shares(symbols))
+                          shares=lambda symbols: _vd_shares(symbols), vn30_weights=lambda: _vn30_weights(Path(data_dir), session))
     print(json.dumps({"status": "ok", "session": session.isoformat(),
                       "sections": {k: v["status"] for k, v in snap.items() if isinstance(v, dict) and "status" in v}}, ensure_ascii=False))
     return 0

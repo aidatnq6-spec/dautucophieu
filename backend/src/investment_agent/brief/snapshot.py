@@ -59,11 +59,12 @@ def _missing(reason: str) -> dict:
     return {"status": "missing", "reason": reason}
 
 
-def _signals(sections: dict, shares, store: BriefStore, sessions_before: list[date], previous: dict | None) -> dict:
+def _signals(sections: dict, shares, store: BriefStore, sessions_before: list[date], previous: dict | None,
+             vn30_weights=lambda: {}) -> dict:
     """Tín hiệu phiên (brief.signals) from this snapshot's board, index row and volume, and the volume ratios of the sessions before."""
     from decimal import Decimal
 
-    from .signals import index_pull, session_signals
+    from .signals import index_pull, session_signals, vn30_multipliers
     board = sections.get("board") or {}
     vn = next((r for r in (sections.get("indices") or {}).get("rows", []) if r.get("id") == "VNINDEX" and r.get("status") == "ok"), None)
     change = Decimal(vn["change"]) if vn else None
@@ -82,11 +83,24 @@ def _signals(sections: dict, shares, store: BriefStore, sessions_before: list[da
         ratios.append(Decimal(volume["ratio20"]) if volume.get("status") == "ok" and volume.get("ratio20") else None)
     rest = session_signals(index_change=change, breadth=board.get("breadth") if board.get("status") == "ok" else None,
                            volume=((sections.get("index_session") or {}).get("volume")), earlier_ratios=ratios)
-    return {"status": "ok", "pull": pull, **rest}
+    vn30 = next((r for r in (sections.get("indices") or {}).get("rows", []) if r.get("id") == "VN30" and r.get("status") == "ok"), None)
+    pull_vn30 = {"status": "missing", "reason": "Chưa có trọng số VN30 từ thông báo của HOSE"}
+    if board.get("status") == "ok" and vn30:
+        try:
+            weights = vn30_multipliers(vn30_weights())
+        except Exception:
+            weights = {}
+        if weights:
+            pull_vn30 = index_pull({s: r for s, r in board["symbols"].items() if s in weights}, weights,
+                                   change=Decimal(vn30["change"]), close=Decimal(vn30["close"]))
+    if pull_vn30["status"] == "missing" and previous and (previous.get("pull_vn30") or {}).get("status") in ("ok", "mismatch"):
+        pull_vn30 = previous["pull_vn30"]
+    return {"status": "ok", "pull": pull, "pull_vn30": pull_vn30, **rest}
 
 
 def build_snapshot(*, session_date: date, previous_session: date | None, now: datetime, listing, board, series, hose_get, rss_get,
-                   store: BriefStore, earlier: list[date] = (), index_bars=lambda: {}, shares=lambda symbols: {}) -> dict:
+                   store: BriefStore, earlier: list[date] = (), index_bars=lambda: {}, shares=lambda symbols: {},
+                   vn30_weights=lambda: {}) -> dict:
     """earlier: the sessions before session_date on the trading calendar, ascending; index_bars(): VN-Index daily bars by session;
     shares(symbols): shares outstanding by symbol, for Tín hiệu phiên (mã kéo chỉ số)."""
     sections: dict[str, dict] = {}
@@ -135,7 +149,7 @@ def build_snapshot(*, session_date: date, previous_session: date | None, now: da
     for name, section in sections.items():
         if section.get("status") != "ok" and (previous.get(name) or {}).get("status") == "ok":
             sections[name] = previous[name]  # keep what an earlier wake-up already had
-    sections["signals"] = _signals(sections, shares, store, sessions_before, previous.get("signals"))
+    sections["signals"] = _signals(sections, shares, store, sessions_before, previous.get("signals"), vn30_weights)
     snapshot = {"session_date": session_date.isoformat(), "updated_at": now.isoformat(), **sections}
     store.write(snapshot)
     return snapshot

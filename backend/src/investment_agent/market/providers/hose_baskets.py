@@ -7,6 +7,7 @@ import html
 import json
 import re
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Callable
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
@@ -22,6 +23,7 @@ _PERIOD = re.compile(r"kỳ tháng (\d{1,2}/\d{4})", re.IGNORECASE)
 _EFFECTIVE = re.compile(r"hiệu lực (?:vào|từ) ngày (\d{1,2})/(\d{1,2})/(\d{4})", re.IGNORECASE)
 _HEADING = re.compile(r"CỔ PHIẾU THÀNH PHẦN (?:CỦA )?CHỈ SỐ (VN30|VNMIDCAP|VN100|VNSMALLCAP)\b")
 _ROW = re.compile(r"^(\d{1,3})\s+([A-Z0-9]{3})\s")
+_WEIGHT = re.compile(r"([\d,]{4,})\s+(\d{1,3})%\s+([\d.]+)%")
 
 
 class BasketError(Exception):
@@ -32,6 +34,7 @@ def parse_size_notice(pages: list[str]) -> dict[str, list[str]]:
     """Each page belongs to the index named on it (the heading is printed at its foot), or to the one before when it names none;
     a table's rows run 1, 2, 3…; a row numbered 1 again opens the reserve list, which is left out."""
     tables: dict[str, list[str]] = {}
+    weights: dict[str, dict] = {}
     closed: set[str] = set()
     current = None
     for page in pages:
@@ -47,6 +50,11 @@ def parse_size_notice(pages: list[str]) -> dict[str, list[str]]:
             members = tables.setdefault(current, [])
             if number == len(members) + 1:
                 members.append(code)
+                w = _WEIGHT.search(line) if current == "VN30" else None
+                if w:  # shares counted by the index, free float, the cap on its weight
+                    weights[code] = {"shares": w.group(1).replace(",", ""),
+                                     "free_float": str((Decimal(w.group(2)) / 100).quantize(Decimal("0.01"))),
+                                     "cap": str((Decimal(w.group(3)) / 100).quantize(Decimal("0.0001")))}
             elif number == 1 and members:
                 closed.add(current)  # the reserve list
             else:
@@ -57,7 +65,10 @@ def parse_size_notice(pages: list[str]) -> dict[str, list[str]]:
             raise BasketError(f"{name} có {got} mã, cần {size}")
     if sorted(tables["VN100"]) != sorted(tables["VN30"] + tables.get("VNMIDCAP", [])):
         raise BasketError("VN100 không đúng bằng VN30 và VNMidcap trong cùng thông báo")
-    return {name: tables[name] for name in ("VN30", "VNMIDCAP", "VN100") if name in tables}
+    out = {name: tables[name] for name in ("VN30", "VNMIDCAP", "VN100") if name in tables}
+    if set(weights) == set(tables["VN30"]):  # every member's weight read, or none kept
+        out["weights"] = {"VN30": weights}
+    return out
 
 
 def default_get_text(url: str) -> str:

@@ -27,6 +27,8 @@ def pages(vn100=None, vn30=VN30):
 def test_the_size_notice_gives_vn30_and_vn100_without_the_reserve_lists():
     got = parse_size_notice(pages())
     assert got["VN30"] == VN30 and len(got["VN100"]) == 100 and got["VNMIDCAP"] == MID
+    # each VN30 member's weight inputs: shares counted by the index, free float and the cap on its weight
+    assert got["weights"]["VN30"]["A01"] == {"shares": "1000000", "free_float": "0.50", "cap": "1.0000"} and len(got["weights"]["VN30"]) == 30
 
 
 def test_a_vn100_that_is_not_vn30_and_vnmidcap_or_not_a_hundred_is_refused():

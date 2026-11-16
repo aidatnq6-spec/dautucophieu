@@ -38,6 +38,11 @@ def index_pull(symbols: dict, shares: dict, *, change: Decimal, close: Decimal) 
             "without_top": {"symbols": [s for s, _ in lead], "points": _s(change - sum((p for _, p in lead), Decimal(0)))} if lead else None}
 
 
+def vn30_multipliers(weights: dict) -> dict:
+    """VN30 weighs each member by its shares × free float × the cap on its weight (HOSE's notice), not by all its shares."""
+    return {s: Decimal(w["shares"]) * Decimal(w["free_float"]) * Decimal(w["cap"]) for s, w in weights.items()}
+
+
 def session_signals(*, index_change: Decimal | None, breadth: dict | None, volume: dict | None, earlier_ratios: list) -> dict:
     """earlier_ratios: the matched-volume ratio to its 20-session average of the sessions before, oldest first (None when unknown)."""
     gap = None

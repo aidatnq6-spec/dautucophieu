@@ -190,7 +190,8 @@ def _catalysts(items: list[dict], held: set[str]) -> list[str]:
 def compose(*, series, index, briefs, closes, insider, events, alerts, held: set[str], watched: set[str], today: date,
             sessions: list[date] | None = None, theses: list[dict] | None = None, costs: dict[str, str] | None = None,
             shares: dict[str, int] | None = None, todo: list[str] | None = None, signs: dict | None = None, macro: dict | None = None,
-            sources: list[dict] | None = None, manual: list[dict] | None = None, catalysts: list[dict] | None = None) -> str:
+            sources: list[dict] | None = None, manual: list[dict] | None = None, catalysts: list[dict] | None = None,
+            us_events: list[dict] | None = None) -> str:
     start, end = week_of(today)
     sessions = sessions if sessions is not None else [start + timedelta(days=i) for i in range(5)]
     lines = [f"BẢN TIN TUẦN {_dm(start)}–{_dm(end)}/{end.year}", "",
@@ -213,6 +214,9 @@ def compose(*, series, index, briefs, closes, insider, events, alerts, held: set
         lines.append(f"- {e['symbol']}{' (đang nắm)' if e['symbol'] in held else ''}: {describe(e)}")
     if not upcoming:
         lines.append("Không có sự kiện đã biết.")
+    if us_events is not None:
+        lines += ["", f"LỊCH VĨ MÔ MỸ ({_dm(today)}–{_dm(today + timedelta(days=NEXT_DAYS))}, giờ Việt Nam)",
+                  *([f"- {_dm(e['on'])} {e['at']}: {e['text']}" for e in us_events] or ["Không có lịch công bố nào của Fed hay CPI Mỹ."])]
     if catalysts is not None:
         lines += ["", f"MỐC TRONG LUẬN ĐIỂM ({_dm(today)}–{_dm(today + timedelta(days=NEXT_DAYS))})", *_catalysts(catalysts, held)]
     if held and theses is not None:

@@ -165,6 +165,23 @@ def sensitivity_span(request: Request, span: str):
             "rows": [{"symbol": s, "held": s in costs, **results[s]} for s in symbols], "exposure": exposure(results, costs)}
 
 
+@router.get("/us-calendar")
+def us_calendar(request: Request):
+    """Lịch vĩ mô Mỹ: the Fed's decisions and minutes and the CPI releases of the coming 60 days, in Vietnam time (market.us_calendar)."""
+    import json as _json
+
+    from investment_agent.market.us_calendar import FILE, upcoming
+    require_owner(request)
+    data_dir = request.app.state.data_dir
+    if data_dir is None:
+        return unavailable()
+    path = Path(data_dir).joinpath(*FILE)
+    saved = _json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    today = now(request).astimezone(VN).date()
+    return {"updated_on": saved.get("updated_on"), "events": [{k: e[k] for k in ("kind", "on", "at", "text", "source")}
+                                                              for e in upcoming(Path(data_dir), today=today, days=60)]}
+
+
 @router.get("/spread")
 def spread(request: Request):
     """Chênh lệch lãi suất VND–USD: the State Bank's overnight interbank average less SOFR (else EFFR), each stored day."""

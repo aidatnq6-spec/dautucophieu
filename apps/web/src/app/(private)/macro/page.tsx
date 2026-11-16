@@ -4,6 +4,8 @@ import { MacroCalendar, RateSpread } from "../../../components/macro-extras";
 import { MacroLiquidity } from "../../../components/macro-liquidity";
 import { Sensitivity } from "../../../components/sensitivity";
 import { RateCycle } from "../../../components/rate-cycle";
+import { UsCalendar } from "../../../components/us-calendar";
+import { hanoiDate } from "../../../lib/format";
 
 export default function MacroPage() {
   return (
@@ -14,6 +16,7 @@ export default function MacroPage() {
       <RateCycle />
       <RateSpread />
       <MacroLiquidity />
+      <UsCalendar today={hanoiDate()} />
       <MacroCalendar />
       <MacroView />
     </>

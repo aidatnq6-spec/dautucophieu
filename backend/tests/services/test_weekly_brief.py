@@ -173,3 +173,14 @@ def test_report_deadlines_of_the_same_day_are_one_line_with_the_held_tickers_nam
     d = (SAT + timedelta(days=4)).strftime("%d/%m")
     assert f"- {d}: Hạn công bố báo cáo tài chính Q4/2026 của 3 mã (20 ngày sau khi hết quý); đang nắm: FPT" in text
     assert text.count("Hạn công bố") == 1
+
+
+def test_the_us_macro_events_of_the_coming_week_are_listed():
+    events = [{"on": (SAT + timedelta(days=4)).isoformat(), "at": "02:00", "text": "Fed công bố quyết định lãi suất (họp 8–9/12)"},
+              {"on": (SAT + timedelta(days=4)).isoformat(), "at": "20:30", "text": "Mỹ công bố CPI tháng 11/2026"}]
+    d = (SAT + timedelta(days=4)).strftime("%d/%m")
+    text = compose(**INPUTS, held=set(), watched=set(), today=SAT, us_events=events)
+    assert (f"LỊCH VĨ MÔ MỸ ({SAT.strftime('%d/%m')}–{(SAT + timedelta(days=7)).strftime('%d/%m')}, giờ Việt Nam)\n"
+            f"- {d} 02:00: Fed công bố quyết định lãi suất (họp 8–9/12)\n- {d} 20:30: Mỹ công bố CPI tháng 11/2026") in text
+    assert "Không có lịch công bố nào" in compose(**INPUTS, held=set(), watched=set(), today=SAT, us_events=[])
+    assert "LỊCH VĨ MÔ MỸ" not in compose(**INPUTS, held=set(), watched=set(), today=SAT)

@@ -163,3 +163,13 @@ def test_the_owners_catalysts_due_in_the_coming_week_and_those_already_due_are_l
             f"- FPT (đang nắm) · {d(6)}: Hạn công bố báo cáo tài chính Q4/2026 (20 ngày sau khi hết quý)") in text
     assert f"MỐC TRONG LUẬN ĐIỂM ({d(0)}–{d(7)})\nKhông có mốc nào trong 7 ngày tới." in compose(**INPUTS, held=set(), watched=set(), today=SAT, catalysts=[])
     assert "MỐC TRONG LUẬN ĐIỂM" not in compose(**INPUTS, held=set(), watched=set(), today=SAT)
+
+
+def test_report_deadlines_of_the_same_day_are_one_line_with_the_held_tickers_named():
+    on = (SAT + timedelta(days=4)).isoformat()
+    cats = [{"symbol": s, "id": f"r{s}", "when": "Q4/2026", "on": on, "sign": "?", "text": "Hạn công bố báo cáo tài chính Q4/2026 (20 ngày sau khi hết quý)",
+             "source": "Thông tư 96/2020 Điều 14", "done": False, "auto": True, "due": False} for s in ("PHP", "FPT", "HPG")]
+    text = compose(**INPUTS, held={"FPT"}, watched={"FPT", "PHP", "HPG"}, today=SAT, catalysts=cats)
+    d = (SAT + timedelta(days=4)).strftime("%d/%m")
+    assert f"- {d}: Hạn công bố báo cáo tài chính Q4/2026 của 3 mã (20 ngày sau khi hết quý); đang nắm: FPT" in text
+    assert text.count("Hạn công bố") == 1

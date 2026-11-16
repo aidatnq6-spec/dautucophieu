@@ -164,12 +164,26 @@ def _macro(macro: dict) -> list[str]:
 SIGN = {"+": " (+)", "-": " (−)", "?": ""}
 
 
+def _count(text: str, n: int) -> str:
+    """'Hạn công bố … Q4/2026 (20 ngày …)' → 'Hạn công bố … Q4/2026 của n mã (20 ngày …)'."""
+    head, sep, tail = text.partition(" (")
+    return f"{head} của {n} mã{sep}{tail}"
+
+
 def _catalysts(items: list[dict], held: set[str]) -> list[str]:
     """The owner's catalysts with a day up to a week ahead or already due, and the report deadlines; the corporate events are in LỊCH TUẦN TỚI."""
-    out = []
-    for c in sorted((c for c in items if c.get("on")), key=lambda c: (c["on"], c["symbol"])):
+    out, groups = [], {}
+    for c in (c for c in items if c.get("on") and c.get("auto")):
+        groups.setdefault((c["on"], c["text"]), []).append(c["symbol"])
+    lines = [(on, "", f"- {_dm(on)}: {_count(text, len(syms))}" + (f"; đang nắm: {', '.join(sorted(s for s in syms if s in held))}"
+                                                                   if any(s in held for s in syms) else ""))
+             for (on, text), syms in groups.items() if len(syms) > 1]
+    alone = {k for k, syms in groups.items() if len(syms) == 1}
+    for c in sorted((c for c in items if c.get("on") and (not c.get("auto") or (c["on"], c["text"]) in alone)), key=lambda c: (c["on"], c["symbol"])):
         late = " — đã đến mốc, chưa đánh dấu đã xảy ra" if c.get("due") else ""
-        out.append(f"- {c['symbol']}{' (đang nắm)' if c['symbol'] in held else ''} · {_dm(c['on'])}{SIGN.get(c['sign'], '')}: {c['text']}{late}")
+        lines.append((c["on"], c["symbol"], f"- {c['symbol']}{' (đang nắm)' if c['symbol'] in held else ''} · {_dm(c['on'])}{SIGN.get(c['sign'], '')}: "
+                                             f"{c['text']}{late}"))
+    out = [line for _, _, line in sorted(lines, key=lambda x: (x[0], x[1]))]
     return out or [f"Không có mốc nào trong {NEXT_DAYS} ngày tới."]
 
 

@@ -33,7 +33,7 @@ export function CatalystTimeline({ items, today, label, due = [], actions, lead 
           {due.includes(c.id) && <span className="pill warn">đã đến mốc</span>}</div>
         <p className="ct-text">{c.text}</p>
         {c.source && <p className="caption">Nguồn: {c.source}</p>}
-        {actions && <div className="ib-actions ct-actions">{actions(c)}</div>}
+        {actions?.(c) != null && <div className="ib-actions ct-actions">{actions(c)}</div>}
       </div>
     </li>)}</ol>
   );

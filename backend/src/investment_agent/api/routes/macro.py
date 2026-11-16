@@ -79,7 +79,7 @@ def chain(request: Request):
     store = _store(request)
     if store is None:
         return unavailable()
-    series = {i: [(date.fromisoformat(o["date"]), Decimal(o["value"])) for o in store.read(i)] for i in ("wti", "vn_cpi_yoy", *RATES, "foreign_net")}
+    series = {i: [(date.fromisoformat(o["date"]), Decimal(o["value"])) for o in store.read(i)] for i in ("wti", "vn_ron95_price", "vn_cpi_yoy", *RATES, "foreign_net")}
     index = SeriesStore(Path(request.app.state.data_dir) / "trend-sources").read("VNINDEX-1d")
     series["vnindex"] = [(t.date(), Decimal(str(v))) for t, v in index]
     raw = lambda i: [(date.fromisoformat(o["date"]), o["value"]) for o in store.read(i)]  # noqa: E731
@@ -216,6 +216,17 @@ def put_sjc_gap(request: Request, body: SjcGapRequest):
         return _sjc_gap_view(request, threshold, record.version)
     except WRITE_ERRORS as exc:
         return write_error(exc)
+
+
+@router.get("/asia")
+def asia(request: Request):
+    """Chứng khoán châu Á: the last read of Nikkei, KOSPI, Shanghai and Hang Seng (market.asia_indices), with the brief's line."""
+    from investment_agent.market.asia_indices import asia_line, latest_asia
+    require_owner(request)
+    if request.app.state.data_dir is None:
+        return unavailable()
+    out = latest_asia(Path(request.app.state.data_dir))
+    return {**out, "line": asia_line(out)} if out else {"status": "missing", "line": None}
 
 
 @router.get("/us-calendar")

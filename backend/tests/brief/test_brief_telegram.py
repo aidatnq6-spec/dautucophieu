@@ -118,3 +118,12 @@ def test_the_session_signals_follow_the_index_lines():
     text = render_report(REPORT, market={**MARKET, "indices": up, "signals": odd})
     assert "- Mã kéo chỉ số: chưa hiện vì tổng tính được (+3,10 điểm) lệch với VN-Index (+1,96 điểm)" in text and "Thanh khoản" not in text
     assert "TÍN HIỆU PHIÊN" not in render_report(REPORT, market=MARKET)
+
+
+def test_the_asian_markets_line_follows_the_index_lines():
+    asia = {"status": "ok", "read_at": "2026-11-16T15:32:00+07:00", "rows": [
+        {"code": "KOSPI", "name": "KOSPI", "price": "5290.53", "change_pct": "-0.0098", "unchanged_since": None, "fred_date": None}]}
+    text = render_report(REPORT, market={**MARKET, "asia": asia})
+    assert "Châu Á (VNDirect, đọc 15:32 16/11): KOSPI −0,98%" in text
+    assert text.index("VN-Index") < text.index("Châu Á") < text.index("Giá trị khớp lệnh")
+    assert "Châu Á" not in render_report(REPORT, market=MARKET)

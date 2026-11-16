@@ -129,6 +129,9 @@ def render_market_brief(report: dict, market: dict) -> str:
         lines.append(f"{name} {_num(row['close'])} ({_num(row['change'], sign=True)} điểm, {_pct(row['pct'])})" if row["status"] == "ok"
                      else _missing(name, row))
     lines += _session_lines(market.get("index_session"))
+    from investment_agent.market.asia_indices import asia_line
+    if asia := asia_line(market.get("asia")):
+        lines.append(asia)
     if signal := signal_lines(market.get("signals")):
         lines += ["", "TÍN HIỆU PHIÊN", *[f"- {s}" for s in signal], ""]
     board, hose = market.get("board") or {}, market.get("hose") or {}

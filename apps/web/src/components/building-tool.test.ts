@@ -46,3 +46,20 @@ describe("broker commission as months of rent per contract", async () => {
     expect(typed && "plan" in typed && Math.round(typed.plan.costs.commission)).toBe(581_000);
   });
 });
+
+describe("boxes that cannot be right are refused, not worked out", async () => {
+  const { readPlan } = await import("./building-tool");
+  const blank = { rooms: "", hiMonths: "", hiRent: "", hiOcc: "", loMonths: "", loRent: "", loOcc: "", peakRent: "", brokerPct: "", brokerMonths: "",
+    contractMonths: "", otaPct: "", otaShare: "", vatPct: "", pitPct: "", otherPct: "", reservePct: "", cleaning: "", common: "", staff: "", internet: "",
+    insurance: "", fixedOther: "", pcccCost: "", pcccYears: "", price: "", buyCosts: "", renovation: "", own: "", loanRate: "", termYears: "", leaseRent: "",
+    deposit: "", setup: "", leaseMonths: "", badOcc: "", badRent: "", goodOcc: "", goodRent: "" };
+  const room = { ...blank, rooms: "1", hiMonths: "12", hiRent: "7.000.000", hiOcc: "100" };
+  it("a sum of money typed as the months of rent paid to the broker", () => {
+    expect(readPlan({ ...room, brokerMonths: "7000000", contractMonths: "12" }, [], "annuity"))
+      .toEqual({ error: "Hoa hồng môi giới nhập theo số tháng tiền thuê (ví dụ 1), không phải số tiền; số tháng phải nhỏ hơn thời hạn hợp đồng." });
+  });
+  it("shares of revenue that add up to all of it or more", () => {
+    expect(readPlan({ ...room, brokerPct: "60", vatPct: "30", pitPct: "10" }, [], "annuity"))
+      .toEqual({ error: "Các khoản tính theo % doanh thu cộng lại đã từ 100% trở lên: kiểm tra lại các ô % ở mục 2." });
+  });
+});

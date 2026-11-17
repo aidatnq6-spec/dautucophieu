@@ -78,39 +78,63 @@ export function gapText(y: number, rate: number): string {
 }
 
 /** B7: the owner's named plans (settings/building_plans), saved as typed, reopened, and compared side by side. */
-function SavedPlans({ current, hasPlan, open }: { current: { f: typeof EMPTY; rows: Row[]; method: Method }; hasPlan: boolean; open: (s: Saved) => void }) {
+type Store = { data: { version: number; plans: Saved[] } | null; busy: boolean; error: string | null; write: (plans: Saved[]) => Promise<boolean> };
+
+/** The owner's named plans (settings/building_plans): read once, written whole with the version read. */
+function useSavedPlans(): Store {
   const [data, setData] = useState<{ version: number; plans: Saved[] } | null>(null);
-  const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { api<{ version: number; plans: Saved[] }>("settings/building-plans").then(setData, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
   const write = async (plans: Saved[]) => {
-    if (!data) return;
+    if (!data) return false;
     setBusy(true); setError(null);
-    try { setData(await api("settings/building-plans", { method: "PUT", body: { plans, expected_version: data.version, request_id: requestId() } })); setName(""); }
-    catch (e) { setError(e instanceof ApiError ? e.failure.message : "Không lưu được."); } finally { setBusy(false); }
+    try { setData(await api("settings/building-plans", { method: "PUT", body: { plans, expected_version: data.version, request_id: requestId() } })); return true; }
+    catch (e) { setError(e instanceof ApiError ? e.failure.message : "Không lưu được."); return false; } finally { setBusy(false); }
   };
-  const save = () => {
+  return { data, busy, error, write };
+}
+
+/** Lưu right in the result panel: a new plan under a name, or the opened one again ("Lưu thay đổi"). */
+function SaveBox({ store, current, hasPlan, initialName, onSaved }: { store: Store; current: { f: typeof EMPTY; rows: Row[]; method: Method }; hasPlan: boolean;
+  initialName: string; onSaved: (name: string) => void }) {
+  const [name, setName] = useState(initialName);
+  const [done, setDone] = useState<string | null>(null);
+  const { data, busy, error, write } = store;
+  const same = data?.plans.find((x) => x.name === name.trim());
+  const save = async () => {
     if (!data || !name.trim()) return;
     const form = Object.fromEntries(Object.entries(current.f).filter(([, v]) => v.trim())) as Partial<Record<Key, string>>;
-    const item: Saved = { id: data.plans.find((x) => x.name === name.trim())?.id ?? requestId().slice(0, 24), name: name.trim(), saved_on: hanoiDate(),
-      method: current.method, form, rows: current.rows.filter((r) => r.count.trim() || r.price.trim() || r.name.trim()) };
-    void write([...data.plans.filter((x) => x.id !== item.id), item]);
+    const item: Saved = { id: same?.id ?? requestId().slice(0, 24), name: name.trim(), saved_on: hanoiDate(), method: current.method, form,
+      rows: current.rows.filter((r) => r.count.trim() || r.price.trim() || r.name.trim()) };
+    if (await write([...data.plans.filter((x) => x.id !== item.id), item])) {
+      setDone(`Đã lưu "${item.name}" lúc ${new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}.`);
+      onSaved(item.name);
+    }
   };
+  return (
+    <form className="bt-save" aria-label="Lưu phương án" onSubmit={(e) => { e.preventDefault(); void save(); }}>
+      <label className="field">Tên phương án<input aria-label="Tên phương án" maxLength={60} value={name} onChange={(e) => { setName(e.target.value); setDone(null); }}
+        placeholder="ví dụ Tòa 10 phòng gần biển" /></label>
+      <button type="submit" className="btn primary" disabled={busy || !data || !name.trim() || !hasPlan}>{same ? "Lưu thay đổi" : "Lưu phương án"}</button>
+      {same && !done && <span className="caption">Đã có phương án tên này: lưu sẽ thay số cũ.</span>}
+      {!hasPlan && <span className="caption">Nhập đủ số phòng và giá thuê để lưu.</span>}
+      {done && <span className="caption" role="status">{done}</span>}
+      {error && <span className="errors" role="alert">{error}</span>}
+    </form>
+  );
+}
+
+/** The saved plans compared side by side, each to reopen or delete. */
+function SavedPlans({ store, open }: { store: Store; open: (s: Saved) => void }) {
+  const { data, busy, write } = store;
   const rowsOf = data?.plans.map((s) => ({ s, out: readPlan({ ...EMPTY, ...s.form }, s.rows, s.method) })) ?? [];
   const money2 = (v: number | null | undefined) => (v === null || v === undefined ? "—" : <span className={v < 0 ? "negative" : undefined}>{vnd(v)}</span>);
   return (
     <section className="surface" aria-label="Các phương án đã lưu">
       <h2>Các phương án đã lưu</h2>
-      <p className="caption">Lưu số đã nhập dưới một tên để mở lại và so các tòa cạnh nhau (tối đa 20). Lưu trong thiết lập cá nhân trên máy, không gửi đi đâu.</p>
-      {error && <p className="errors" role="alert">{error}</p>}
-      <form className="formgrid" aria-label="Lưu phương án" onSubmit={(e) => { e.preventDefault(); save(); }}>
-        <label className="field">Tên phương án<input aria-label="Tên phương án" maxLength={60} value={name} onChange={(e) => setName(e.target.value)}
-          placeholder="ví dụ Tòa 10 phòng gần biển" /></label>
-        <button type="submit" className="btn" disabled={busy || !data || !name.trim() || !hasPlan}>Lưu phương án này</button>
-        {data && data.plans.some((x) => x.name === name.trim()) && <span className="caption">Đã có phương án tên này: lưu sẽ thay số cũ.</span>}
-      </form>
-      {data && (rowsOf.length ? <div className="tablewrap"><table className="fv-table" aria-label="So sánh các phương án">
+      <p className="caption">Lưu bằng nút trong khung Kết quả; mở lại và so các tòa cạnh nhau ở đây (tối đa 20). Lưu trong thiết lập cá nhân trên máy, không gửi đi đâu.</p>
+      {data && (rowsOf.length ? <div className="tablewrap"><table className="fv-table cc-table" aria-label="So sánh các phương án">
         <thead><tr><th>Phương án</th><th className="num">Doanh thu/tháng</th><th className="num">Chi phí % doanh thu</th><th className="num">Lợi nhuận vận hành/tháng</th>
           <th className="num">Mua: dòng tiền/tháng</th><th className="num">Mua: lợi suất vốn tự có</th><th className="num">Thuê lại: lợi nhuận/tháng</th>
           <th className="num">Thuê lại: có khách tối thiểu</th><th /></tr></thead>
@@ -217,6 +241,9 @@ export function BuildingTool() {
   const [rows, setRows] = useState<Row[]>([{ name: "", count: "", price: "", life: "" }]);
   const [method, setMethod] = useState<Method>("annuity");
   const [restored, setRestored] = useState(false);
+  const store = useSavedPlans();
+  const [opened, setOpened] = useState<string | null>(null);
+  const [openCount, setOpenCount] = useState(0);  // the save box starts afresh, with the plan's name, each time a plan is opened
   const [depositRate, setDepositRate] = useState<number | null>(null);
   useEffect(() => {
     api<{ default_rate: string | null }>("passive-income").then((v) => setDepositRate(v.default_rate ? Number(v.default_rate) / 100 : null), () => undefined);
@@ -306,6 +333,7 @@ export function BuildingTool() {
       </div>
       <aside className="surface bt-result" aria-label="Kết quả lợi nhuận tòa nhà" aria-live="polite">
         <h2>Kết quả</h2>
+        <SaveBox key={openCount} store={store} current={{ f, rows, method }} hasPlan={!!p} initialName={opened ?? ""} onSaved={setOpened} />
         {!out && <p className="muted">Nhập số phòng và giá thuê để bắt đầu tính.</p>}
         {out && "error" in out && <p className="errors" role="alert">{out.error}</p>}
         {p && <>
@@ -360,8 +388,8 @@ export function BuildingTool() {
       </aside>
     </div>
     {input && p && <Scenarios input={input} base={p} f={f} set={set} />}
-    <SavedPlans current={{ f, rows, method }} hasPlan={!!p} open={(s) => { setF({ ...EMPTY, ...s.form }); setRows(s.rows.length ? s.rows : [{ name: "", count: "", price: "", life: "" }]);
-      setMethod(s.method); window.scrollTo({ top: 0 }); }} />
+    <SavedPlans store={store} open={(s) => { setF({ ...EMPTY, ...s.form }); setRows(s.rows.length ? s.rows : [{ name: "", count: "", price: "", life: "" }]);
+      setMethod(s.method); setOpened(s.name); setOpenCount((n) => n + 1); window.scrollTo({ top: 0 }); }} />
     </>
   );
 }

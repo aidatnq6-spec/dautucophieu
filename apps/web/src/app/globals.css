@@ -522,3 +522,4 @@ main h2{scroll-margin-top:16px}
 .bt-list{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;margin:8px 0}.bt-list dt{color:var(--muted)}.bt-list dd{margin:0;text-align:right}
 @media(max-width:650px){.bt-list{grid-template-columns:minmax(0,1fr)}.bt-list dd{text-align:left;margin-bottom:6px}}
 .bt-hint{display:block;margin-top:2px;font-weight:400}.bt-article{margin-bottom:12px}.bt-article p{margin:0 0 8px}
+.bt-save{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 10px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--line)}.bt-save .field{flex:1 1 200px;margin:0}.bt-save .caption,.bt-save .errors{flex-basis:100%}

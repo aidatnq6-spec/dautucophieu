@@ -50,14 +50,22 @@ test("a plan is saved under a name, compared with the others, reopened and delet
   const fill = async (label: string, value: string) => page.getByLabel(label, { exact: true }).fill(value);
   await fill("Số phòng", "8"); await fill("Mùa cao điểm: số tháng", "12"); await fill("Giá (đ/phòng/tháng)", "9000000"); await fill("Có khách (%)", "75");
   const name = `Tòa thử ${Date.now() % 100000}`;  // unique: the store is shared and a retry runs again
+  // the Lưu button sits at the top of the result panel, right after the boxes are filled
+  const result = page.getByRole("complementary", { name: "Kết quả lợi nhuận tòa nhà" });
+  await result.getByLabel("Tên phương án").fill(name);
+  await result.getByRole("button", { name: "Lưu phương án" }).click();
+  await expect(result.getByRole("status")).toContainText(`Đã lưu "${name}"`);
   const saved = page.getByRole("region", { name: "Các phương án đã lưu" });
-  await saved.getByLabel("Tên phương án").fill(name);
-  await saved.getByRole("button", { name: "Lưu phương án này" }).click();
   const row = saved.getByRole("table", { name: "So sánh các phương án" }).getByRole("row", { name: new RegExp(name) });
   await expect(row).toContainText("54.000.000");   // 8 × 9m × 75%
   await fill("Số phòng", "20");
   await row.getByRole("button", { name: "Mở" }).click();
   await expect(page.getByLabel("Số phòng", { exact: true })).toHaveValue("8");
+  // the opened plan is saved again under its own name
+  await expect(result.getByLabel("Tên phương án")).toHaveValue(name);
+  await fill("Số phòng", "10");
+  await result.getByRole("button", { name: "Lưu thay đổi" }).click();
+  await expect(row).toContainText("67.500.000");   // 10 × 9m × 75%
   page.once("dialog", (d) => void d.accept());
   await row.getByRole("button", { name: `Xóa phương án ${name}` }).click();
   await expect(saved.getByRole("row", { name: new RegExp(name) })).toHaveCount(0);

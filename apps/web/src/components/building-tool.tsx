@@ -121,9 +121,45 @@ function SavedPlans({ current, hasPlan, open }: { current: { f: typeof EMPTY; ro
   );
 }
 
+/** What the recording of 17/11/2026 (căn hộ dịch vụ Đà Nẵng, a personal account) says for each line; "Bài không nêu số" where it gave none. */
+export const ARTICLE_HINTS: Partial<Record<Key, string>> = {
+  peakRent: "Bài: môi giới hay lấy giá ngày cao điểm nhân cả năm",
+  hiOcc: "Bài không nêu số",
+  loOcc: "Bài: trống phòng mùa thấp điểm mất 15–20% doanh thu (tòa vận hành tốt khoảng 10%)",
+  brokerPct: "Bài: 8,3–10% (môi giới cá nhân, mạng xã hội)",
+  otaPct: "Bài: khoảng 15%",
+  otaShare: "Bài không nêu số",
+  vatPct: "Bài: 5%",
+  pitPct: "Bài: 2–5% (tùy cho thuê ngắn hạn hay dài hạn)",
+  otherPct: "Bài không nêu số",
+  reservePct: "Bài không nêu số (rủi ro phạt khi khách không khai báo tạm trú)",
+  cleaning: "Bài: 2.000.000 đ/lần, 1 lần/tuần ≈ 8.000.000 đ/tháng",
+  common: "Bài không nêu số (thang máy, đèn hành lang, máy bơm, sảnh)",
+  staff: "Bài không nêu số",
+  internet: "Bài không nêu số",
+  insurance: "Bài không nêu số",
+  fixedOther: "Bài không nêu số",
+  pcccCost: "Bài không nêu số (bên thuê tự làm, không được hoàn khi trả nhà)",
+  leaseRent: "Bài: hòa vốn ở 1,5–1,6 lần tiền thuê nếu vận hành tốt, 1,7–1,8 lần nếu mới vào nghề",
+};
+/** Only the figures the recording gives as one value; a range (8,3–10%, 2–5%) is left for the owner to choose within. */
+const ARTICLE_FILL: Partial<Record<Key, string>> = { otaPct: "15", vatPct: "5", cleaning: "8.000.000" };
+const ARTICLE_EQUIPMENT = ["Đèn chiếu sáng", "Thiết bị vệ sinh (bồn cầu, vòi)", "Bình nóng lạnh", "Điều hòa"];
+
+/** The single figures into the boxes still empty, and the equipment the recording names (without numbers) after any already typed. */
+export function fillFromArticle<F extends Record<string, string>>(f: F, rows: Row[]): { f: F; rows: Row[] } {
+  const filled = { ...f };
+  for (const [k, v] of Object.entries(ARTICLE_FILL)) if (k in filled && !filled[k].trim()) (filled as Record<string, string>)[k] = v!;
+  const kept = rows.filter((r) => r.name.trim() || r.count.trim() || r.price.trim() || r.life.trim());
+  const have = new Set(kept.map((r) => r.name.trim()));
+  return { f: filled, rows: [...kept, ...ARTICLE_EQUIPMENT.filter((n) => !have.has(n)).map((name) => ({ name, count: "", price: "", life: "" }))] };
+}
+
 function Field({ k, label, f, set, hint }: { k: Key; label: string; f: typeof EMPTY; set: (k: Key, v: string) => void; hint?: string }) {
+  const note = ARTICLE_HINTS[k];
   return <label className="field">{label}<input aria-label={label} inputMode={MONEY.has(k) ? "numeric" : "decimal"} value={f[k]} placeholder={hint}
-    onChange={(e) => set(k, MONEY.has(k) ? groupDigitsInput(e.target.value) : e.target.value)} /></label>;
+    onChange={(e) => set(k, MONEY.has(k) ? groupDigitsInput(e.target.value) : e.target.value)} />
+    {note && <span className="caption bt-hint">{note}</span>}</label>;
 }
 
 function Scenarios({ input, base, f, set }: { input: BuildingInput; base: BuildingPlan; f: typeof EMPTY; set: (k: Key, v: string) => void }) {
@@ -197,6 +233,14 @@ export function BuildingTool() {
     <>
     <div className="bt">
       <div className="bt-inputs">
+        <div className="notice bt-article">
+          <p>Gợi ý dưới mỗi ô lấy từ bài ghi âm ngày 17/11/2026 về căn hộ dịch vụ cao cấp ở Đà Nẵng (chia sẻ cá nhân, không phải số liệu thống kê). Bài ước tổng
+            chi phí bán phòng và thuế 22–25%, tổng chi phí vận hành 33–43% doanh thu.</p>
+          <button type="button" className="btn" onClick={() => { const out = fillFromArticle(f, rows); setF(out.f); setRows(out.rows); }}>
+            Điền gợi ý từ bài vào ô còn trống</button>
+          <p className="caption">Chỉ điền những số bài nêu một giá trị (hoa hồng OTA 15%, thuế GTGT 5%, vệ sinh 8.000.000 đ/tháng) và tên các thiết bị bài nhắc;
+            dòng bài nêu khoảng (môi giới 8,3–10%, TNCN 2–5%) bạn tự chọn. Không đè số bạn đã nhập.</p>
+        </div>
         <section className="surface" aria-label="Doanh thu theo mùa">
           <h2>1. Doanh thu theo mùa</h2>
           <p className="caption">Giá thuê một phòng mỗi tháng và tỷ lệ phòng có khách trong từng mùa. Hai mùa cộng lại nên đủ 12 tháng.</p>

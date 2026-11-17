@@ -62,3 +62,16 @@ test("a plan is saved under a name, compared with the others, reopened and delet
   await row.getByRole("button", { name: `Xóa phương án ${name}` }).click();
   await expect(saved.getByRole("row", { name: new RegExp(name) })).toHaveCount(0);
 });
+
+
+test("the recording's figures show under each line and fill only the empty single-value boxes", async ({ page }) => {
+  await page.goto("/building");
+  await expect(page.getByText("Bài: 8,3–10% (môi giới cá nhân, mạng xã hội)")).toBeVisible();
+  await page.getByLabel("Thuế GTGT (%)", { exact: true }).fill("8");
+  await page.getByRole("button", { name: "Điền gợi ý từ bài vào ô còn trống" }).click();
+  await expect(page.getByLabel("Hoa hồng OTA (%)", { exact: true })).toHaveValue("15");
+  await expect(page.getByLabel("Thuế GTGT (%)", { exact: true })).toHaveValue("8");             // typed: kept
+  await expect(page.getByLabel("Vệ sinh tổng thể", { exact: true })).toHaveValue("8.000.000");
+  await expect(page.getByLabel("Hoa hồng môi giới, mạng xã hội (%)", { exact: true })).toHaveValue("");  // a range: left to the owner
+  await expect(page.getByLabel("Tên thiết bị 4")).toHaveValue("Điều hòa");
+});

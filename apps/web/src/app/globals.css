@@ -527,7 +527,7 @@ main h2{scroll-margin-top:16px}
 .print-only{display:none}
 @media print{
   .print-only{display:block}
-  .bt-inputs,.bt-save,section[aria-label="Các phương án đã lưu"],.bt .notice,.pagehead p{display:none!important}
+  .bt-inputs,.bt-save,section[aria-label="Các phương án đã lưu"],.bt .notice,.pagehead p,[role=tablist]{display:none!important}
   .bt{display:block}.bt-result{position:static!important;max-height:none!important;overflow:visible!important}
   section[aria-label="Kịch bản và độ nhạy"] .formgrid,section[aria-label="Kịch bản và độ nhạy"] [role=radiogroup],.bt-result .caption,
   section[aria-label="Kịch bản và độ nhạy"] .caption,.bt-result-head .btn{display:none!important}

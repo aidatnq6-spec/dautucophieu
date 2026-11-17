@@ -141,14 +141,14 @@ test("Vay & bất động sản keeps the loan, the rent-or-deposit check and th
   await page.goto("/loan");
   const tabs = page.getByRole("tablist", { name: "Các phần của Vay & bất động sản" });
   await expect(tabs.getByRole("tab", { name: "Khoản vay" })).toHaveAttribute("aria-selected", "true");
-  await tabs.getByRole("tab", { name: "Tòa nhà cho thuê" }).click();
+  await tabs.getByRole("tab", { name: "Tòa nhà cho thuê: lợi nhuận vận hành" }).click();
   await expect(page).toHaveURL(/tab=toa-nha/);
   await page.getByLabel("Số phòng", { exact: true }).fill("7");
-  await tabs.getByRole("tab", { name: "Mua nhà cho thuê" }).click();
+  await tabs.getByRole("tab", { name: "Căn hộ lẻ: mua hay gửi tiết kiệm" }).click();
   await expect(page.getByRole("region", { name: "Mua nhà cho thuê hay giữ tiền gửi" })).toBeVisible();
   await expect(page.getByLabel("Số phòng", { exact: true })).toBeHidden();
-  await tabs.getByRole("tab", { name: "Tòa nhà cho thuê" }).click();
+  await tabs.getByRole("tab", { name: "Tòa nhà cho thuê: lợi nhuận vận hành" }).click();
   await expect(page.getByLabel("Số phòng", { exact: true })).toHaveValue("7");   // kept while away
   await page.reload();
-  await expect(tabs.getByRole("tab", { name: "Tòa nhà cho thuê" })).toHaveAttribute("aria-selected", "true");
+  await expect(tabs.getByRole("tab", { name: "Tòa nhà cho thuê: lợi nhuận vận hành" })).toHaveAttribute("aria-selected", "true");
 });

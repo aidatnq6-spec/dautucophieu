@@ -3,13 +3,13 @@ import { signIn } from "./helpers";
 
 test.beforeEach(async ({ context }) => signIn(context));
 // the building tab only: the other tabs stay on the page (hidden) and share some labels
-const tab = (page: import("@playwright/test").Page) => page.getByRole("tabpanel", { name: "Tòa nhà cho thuê" });
+const tab = (page: import("@playwright/test").Page) => page.getByRole("tabpanel", { name: "Tòa nhà cho thuê: lợi nhuận vận hành" });
 
 // Made-up figures only: 10 rooms, 5 high months at 10m 90% let, 7 low months at 8m 70% let.
 test("a building's revenue by season, its costs and the profit of buying or leasing it", async ({ page }) => {
   await page.goto("/building");
   await expect(page).toHaveURL(/\/loan\?tab=toa-nha/);   // the old address arrives at the tab
-  await expect(page.getByRole("tab", { name: "Tòa nhà cho thuê" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Tòa nhà cho thuê: lợi nhuận vận hành" })).toHaveAttribute("aria-selected", "true");
   const fill = async (label: string, value: string) => tab(page).getByLabel(label, { exact: true }).fill(value);
   await fill("Số phòng", "10");
   await fill("Mùa cao điểm: số tháng", "5"); await fill("Giá (đ/phòng/tháng)", "10000000"); await fill("Có khách (%)", "90");

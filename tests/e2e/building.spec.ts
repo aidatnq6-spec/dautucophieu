@@ -2,12 +2,15 @@ import { expect, test } from "@playwright/test";
 import { signIn } from "./helpers";
 
 test.beforeEach(async ({ context }) => signIn(context));
+// the building tab only: the other tabs stay on the page (hidden) and share some labels
+const tab = (page: import("@playwright/test").Page) => page.getByRole("tabpanel", { name: "Tòa nhà cho thuê" });
 
 // Made-up figures only: 10 rooms, 5 high months at 10m 90% let, 7 low months at 8m 70% let.
 test("a building's revenue by season, its costs and the profit of buying or leasing it", async ({ page }) => {
   await page.goto("/building");
-  await expect(page.getByRole("link", { name: "Lợi nhuận tòa nhà" })).toBeVisible();
-  const fill = async (label: string, value: string) => page.getByLabel(label, { exact: true }).fill(value);
+  await expect(page).toHaveURL(/\/loan\?tab=toa-nha/);   // the old address arrives at the tab
+  await expect(page.getByRole("tab", { name: "Tòa nhà cho thuê" })).toHaveAttribute("aria-selected", "true");
+  const fill = async (label: string, value: string) => tab(page).getByLabel(label, { exact: true }).fill(value);
   await fill("Số phòng", "10");
   await fill("Mùa cao điểm: số tháng", "5"); await fill("Giá (đ/phòng/tháng)", "10000000"); await fill("Có khách (%)", "90");
   await fill("Mùa thấp điểm: số tháng", "7"); await fill("Giá thấp điểm (đ/phòng/tháng)", "8000000"); await fill("Có khách thấp điểm (%)", "70");
@@ -23,13 +26,13 @@ test("a building's revenue by season, its costs and the profit of buying or leas
   await fill("Giá mua (đ)", "5000000000"); await fill("Vốn tự có (đ)", "5000000000");
   await expect(result.getByRole("region", { name: "Kết quả nếu mua tòa" })).toContainText("Lợi suất ròng trên tổng tiền bỏ ra");
   await page.reload();  // the draft is kept in this browser
-  await expect(page.getByLabel("Số phòng", { exact: true })).toHaveValue("10");
+  await expect(tab(page).getByLabel("Số phòng", { exact: true })).toHaveValue("10");
 });
 
 
 test("scenarios and the sensitivity table follow the entered building", async ({ page }) => {
   await page.goto("/building");
-  const fill = async (label: string, value: string) => page.getByLabel(label, { exact: true }).fill(value);
+  const fill = async (label: string, value: string) => tab(page).getByLabel(label, { exact: true }).fill(value);
   await fill("Số phòng", "10");
   await fill("Mùa cao điểm: số tháng", "12"); await fill("Giá (đ/phòng/tháng)", "10000000"); await fill("Có khách (%)", "80");
   await fill("Mùa thấp điểm: số tháng", ""); await fill("Giá thấp điểm (đ/phòng/tháng)", ""); await fill("Có khách thấp điểm (%)", "");
@@ -47,7 +50,7 @@ test("scenarios and the sensitivity table follow the entered building", async ({
 
 test("a plan is saved under a name, compared with the others, reopened and deleted", async ({ page }) => {
   await page.goto("/building");
-  const fill = async (label: string, value: string) => page.getByLabel(label, { exact: true }).fill(value);
+  const fill = async (label: string, value: string) => tab(page).getByLabel(label, { exact: true }).fill(value);
   await fill("Số phòng", "8"); await fill("Mùa cao điểm: số tháng", "12"); await fill("Giá (đ/phòng/tháng)", "9000000"); await fill("Có khách (%)", "75");
   const name = `Tòa thử ${Date.now() % 100000}`;  // unique: the store is shared and a retry runs again
   // the Lưu button sits at the top of the result panel, right after the boxes are filled
@@ -63,7 +66,7 @@ test("a plan is saved under a name, compared with the others, reopened and delet
   await expect(bars.locator("rect").first()).toBeVisible();
   await fill("Số phòng", "20");
   await row.getByRole("button", { name: "Mở" }).click();
-  await expect(page.getByLabel("Số phòng", { exact: true })).toHaveValue("8");
+  await expect(tab(page).getByLabel("Số phòng", { exact: true })).toHaveValue("8");
   // the opened plan is saved again under its own name
   await expect(result.getByLabel("Tên phương án")).toHaveValue(name);
   await fill("Số phòng", "10");
@@ -78,19 +81,19 @@ test("a plan is saved under a name, compared with the others, reopened and delet
 test("the recording's figures show under each line and fill only the empty single-value boxes", async ({ page }) => {
   await page.goto("/building");
   await expect(page.getByText("Bài: 8,3–10% (môi giới cá nhân, mạng xã hội)")).toBeVisible();
-  await page.getByLabel("Thuế GTGT (%)", { exact: true }).fill("8");
+  await tab(page).getByLabel("Thuế GTGT (%)", { exact: true }).fill("8");
   await page.getByRole("button", { name: "Điền gợi ý từ bài vào ô còn trống" }).click();
-  await expect(page.getByLabel("Hoa hồng OTA (%)", { exact: true })).toHaveValue("15");
-  await expect(page.getByLabel("Thuế GTGT (%)", { exact: true })).toHaveValue("8");             // typed: kept
-  await expect(page.getByLabel("Vệ sinh tổng thể", { exact: true })).toHaveValue("8.000.000");
-  await expect(page.getByLabel("Hoa hồng môi giới, mạng xã hội (%)", { exact: true })).toHaveValue("");  // a range: left to the owner
-  await expect(page.getByLabel("Tên thiết bị 4")).toHaveValue("Điều hòa");
+  await expect(tab(page).getByLabel("Hoa hồng OTA (%)", { exact: true })).toHaveValue("15");
+  await expect(tab(page).getByLabel("Thuế GTGT (%)", { exact: true })).toHaveValue("8");             // typed: kept
+  await expect(tab(page).getByLabel("Vệ sinh tổng thể", { exact: true })).toHaveValue("8.000.000");
+  await expect(tab(page).getByLabel("Hoa hồng môi giới, mạng xã hội (%)", { exact: true })).toHaveValue("");  // a range: left to the owner
+  await expect(tab(page).getByLabel("Tên thiết bị 4")).toHaveValue("Điều hòa");
 });
 
 
 test("commission typed as one month of rent on a one-year lease is 583.333 đ a month for a 7m room", async ({ page }) => {
   await page.goto("/building");
-  const fill = async (label: string, value: string) => page.getByLabel(label, { exact: true }).fill(value);
+  const fill = async (label: string, value: string) => tab(page).getByLabel(label, { exact: true }).fill(value);
   await fill("Số phòng", "1"); await fill("Mùa cao điểm: số tháng", "12"); await fill("Giá (đ/phòng/tháng)", "7000000"); await fill("Có khách (%)", "100");
   await fill("Hoa hồng môi giới: số tháng tiền thuê mỗi hợp đồng", "1"); await fill("Thời hạn hợp đồng bình quân (tháng)", "12");
   await expect(page.getByTestId("broker-share")).toContainText("= 8,333% doanh thu mỗi tháng");
@@ -101,7 +104,7 @@ test("commission typed as one month of rent on a one-year lease is 583.333 đ a 
 
 test("a sum of money typed in the broker's months is refused with what to type instead", async ({ page }) => {
   await page.goto("/building");
-  const fill = async (label: string, value: string) => page.getByLabel(label, { exact: true }).fill(value);
+  const fill = async (label: string, value: string) => tab(page).getByLabel(label, { exact: true }).fill(value);
   await fill("Số phòng", "1"); await fill("Mùa cao điểm: số tháng", "12"); await fill("Giá (đ/phòng/tháng)", "7000000"); await fill("Có khách (%)", "100");
   await fill("Hoa hồng môi giới: số tháng tiền thuê mỗi hợp đồng", "7000000"); await fill("Thời hạn hợp đồng bình quân (tháng)", "12");
   const result = page.getByRole("complementary", { name: "Kết quả lợi nhuận tòa nhà" });
@@ -112,7 +115,7 @@ test("a sum of money typed in the broker's months is refused with what to type i
 
 test("the breakeven occupancy sits above the table, and the printed page keeps the result and the figures, not the boxes", async ({ page }) => {
   await page.goto("/building");
-  const fill = async (label: string, value: string) => page.getByLabel(label, { exact: true }).fill(value);
+  const fill = async (label: string, value: string) => tab(page).getByLabel(label, { exact: true }).fill(value);
   await fill("Số phòng", "10"); await fill("Mùa cao điểm: số tháng", "12"); await fill("Giá (đ/phòng/tháng)", "10000000"); await fill("Có khách (%)", "80");
   await fill("Vệ sinh tổng thể", "8000000"); await fill("Tiền thuê nguyên tòa (đ/tháng)", "50000000");
   await expect(page.getByTestId("breakeven")).toContainText("vận hành 8,0%");            // 8m of 100m full
@@ -121,7 +124,7 @@ test("the breakeven occupancy sits above the table, and the printed page keeps t
   await page.emulateMedia({ media: "print" });
   await expect(page.getByRole("region", { name: "Bản in phương án" })).toContainText("Phương án chưa lưu");
   await expect(page.getByRole("table", { name: "Số đầu vào" })).toContainText("Tiền thuê nguyên tòa (đ/tháng)");
-  await expect(page.getByLabel("Số phòng", { exact: true })).toBeHidden();
+  await expect(tab(page).getByLabel("Số phòng", { exact: true })).toBeHidden();
   await expect(page.getByRole("complementary", { name: "Kết quả lợi nhuận tòa nhà" })).toBeVisible();
   await page.emulateMedia({ media: "screen" });
   await expect(page.getByRole("region", { name: "Bản in phương án" })).toBeHidden();
@@ -130,7 +133,7 @@ test("the breakeven occupancy sits above the table, and the printed page keeps t
 
 test("the profit chart draws one line a model with its breakeven", async ({ page }) => {
   await page.goto("/building");
-  const fill = async (label: string, value: string) => page.getByLabel(label, { exact: true }).fill(value);
+  const fill = async (label: string, value: string) => tab(page).getByLabel(label, { exact: true }).fill(value);
   await fill("Số phòng", "10"); await fill("Mùa cao điểm: số tháng", "12"); await fill("Giá (đ/phòng/tháng)", "10000000"); await fill("Có khách (%)", "80");
   await fill("Vệ sinh tổng thể", "8000000"); await fill("Tiền thuê nguyên tòa (đ/tháng)", "50000000");
   const chart = page.getByRole("img", { name: "Lợi nhuận mỗi tháng theo tỷ lệ có khách" });

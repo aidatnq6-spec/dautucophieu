@@ -6,7 +6,7 @@ const region = (page: import("@playwright/test").Page) => page.getByRole("region
 
 // Worked by hand: 2 tỷ all from own money, 5 tr rent less 1 tr costs, deposit 6%, held 1 year.
 test("the growth a home needs to match the deposit is worked out from what is typed", async ({ page }) => {
-  await page.goto("/loan");
+  await page.goto("/loan?tab=mua-nha-cho-thue");
   const box = region(page);
   await expect(box.getByTestId("rc-empty")).toBeVisible();
   await box.getByLabel("Giá nhà (đ)").fill("2000000000");
@@ -23,7 +23,7 @@ test("the growth a home needs to match the deposit is worked out from what is ty
 });
 
 test("own money above the price and costs is refused", async ({ page }) => {
-  await page.goto("/loan");
+  await page.goto("/loan?tab=mua-nha-cho-thue");
   const box = region(page);
   await box.getByLabel("Giá nhà (đ)").fill("1000000000");
   await box.getByLabel("Vốn tự có (đ)").fill("2000000000");
@@ -37,7 +37,7 @@ test("own money above the price and costs is refused", async ({ page }) => {
 
 test("the section adds no sideways scroll at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 800 });
-  await page.goto("/loan");
+  await page.goto("/loan?tab=mua-nha-cho-thue");
   await expect(region(page).getByLabel("Giá nhà (đ)")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });

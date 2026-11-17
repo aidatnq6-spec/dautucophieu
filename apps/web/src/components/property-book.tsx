@@ -148,7 +148,7 @@ export function PropertyBook({ refresh, onSaved }: { refresh?: string; onSaved?:
   const locked = !view || busy || editing !== null;
   const p = view?.picture;
   const actions = (list: List, row: Row) => <td className="db-actions">
-    {list === "loans" && p?.loans[row.id] && <Link className="btn" aria-label={`Mở ${row.name} ở Tính khoản vay`} href={`/loan?loan=${row.id}`}><Calculator size={14} aria-hidden="true" />Tính</Link>}
+    {list === "loans" && p?.loans[row.id] && <Link className="btn" aria-label={`Mở ${row.name} ở tab Khoản vay`} href={`/loan?loan=${row.id}`}><Calculator size={14} aria-hidden="true" />Tính</Link>}
     <button type="button" className="btn" disabled={locked} aria-label={`Sửa ${row.name}`} onClick={() => start(list, row)}><Pencil size={14} aria-hidden="true" />Sửa</button>
     <button type="button" className="btn" disabled={locked} aria-label={`Xóa ${row.name}`} onClick={() => void remove(list, row)}><Trash2 size={14} aria-hidden="true" />Xóa</button></td>;
   const form = (list: List) => editing?.list === list && <RowForm fields={fieldsOf(list)} draft={editing.draft} busy={busy} error={message}

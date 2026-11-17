@@ -6,7 +6,7 @@ test.beforeEach(async ({ context }) => signIn(context));
 
 test("Tính khoản vay gives the first payment, totals, schedule, grace and early repayment", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Điều hướng chính" }).getByRole("link", { name: "Tính khoản vay" }).click();
+  await page.getByRole("navigation", { name: "Điều hướng chính" }).getByRole("link", { name: "Vay & bất động sản" }).click();
   await expect(page).toHaveURL(/\/loan$/);
   const result = page.getByRole("complementary", { name: "Kết quả khoản vay" });
   await expect(result.getByTestId("ln-first")).toHaveText("19.166.667 đ");
@@ -134,4 +134,21 @@ test("no horizontal page scroll on Tính khoản vay at 375px", async ({ page })
   await page.goto("/loan");
   await expect(page.getByRole("complementary", { name: "Kết quả khoản vay" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+});
+
+
+test("Vay & bất động sản keeps the loan, the rent-or-deposit check and the building in three tabs that remember what is typed", async ({ page }) => {
+  await page.goto("/loan");
+  const tabs = page.getByRole("tablist", { name: "Các phần của Vay & bất động sản" });
+  await expect(tabs.getByRole("tab", { name: "Khoản vay" })).toHaveAttribute("aria-selected", "true");
+  await tabs.getByRole("tab", { name: "Tòa nhà cho thuê" }).click();
+  await expect(page).toHaveURL(/tab=toa-nha/);
+  await page.getByLabel("Số phòng", { exact: true }).fill("7");
+  await tabs.getByRole("tab", { name: "Mua nhà cho thuê" }).click();
+  await expect(page.getByRole("region", { name: "Mua nhà cho thuê hay giữ tiền gửi" })).toBeVisible();
+  await expect(page.getByLabel("Số phòng", { exact: true })).toBeHidden();
+  await tabs.getByRole("tab", { name: "Tòa nhà cho thuê" }).click();
+  await expect(page.getByLabel("Số phòng", { exact: true })).toHaveValue("7");   // kept while away
+  await page.reload();
+  await expect(tabs.getByRole("tab", { name: "Tòa nhà cho thuê" })).toHaveAttribute("aria-selected", "true");
 });

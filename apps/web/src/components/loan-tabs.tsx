@@ -5,7 +5,7 @@ import { BuildingTool } from "./building-tool";
 import { LoanTool } from "./loan-tool";
 import { RentalCompare } from "./rental-compare";
 
-export const TABS = [["khoan-vay", "Khoản vay"], ["mua-nha-cho-thue", "Mua nhà cho thuê"], ["toa-nha", "Tòa nhà cho thuê"]] as const;
+export const TABS = [["khoan-vay", "Khoản vay"], ["mua-nha-cho-thue", "Căn hộ lẻ: mua hay gửi tiết kiệm"], ["toa-nha", "Tòa nhà cho thuê: lợi nhuận vận hành"]] as const;
 
 /** Vay & bất động sản in three parts, one shown at a time. All stay mounted, so what is typed in a part survives leaving it; the open part is in the address. */
 export function LoanTabs() {

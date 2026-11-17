@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatRatio, formatVnd, groupDigitsInput, hanoiDate, parseMoneyInput } from "../lib/format";
 import { buildingPlan, measureOf, scenario, sensitivity, type BuildingInput, type BuildingPlan, type Measure } from "./building-calc";
@@ -20,6 +20,18 @@ const EMPTY = {
   badOcc: "", badRent: "", goodOcc: "", goodRent: "",
 };
 type Key = keyof typeof EMPTY;
+const LABELS: Partial<Record<Key, string>> = {
+  rooms: "Số phòng", hiMonths: "Mùa cao điểm (tháng)", hiRent: "Giá mùa cao điểm (đ/phòng/tháng)", hiOcc: "Có khách mùa cao điểm (%)",
+  loMonths: "Mùa thấp điểm (tháng)", loRent: "Giá mùa thấp điểm (đ/phòng/tháng)", loOcc: "Có khách mùa thấp điểm (%)", peakRent: "Giá cao nhất môi giới đưa",
+  brokerMonths: "Hoa hồng môi giới (tháng tiền thuê/hợp đồng)", contractMonths: "Thời hạn hợp đồng bình quân (tháng)", brokerPct: "Hoa hồng môi giới (%)",
+  otaPct: "Hoa hồng OTA (%)", otaShare: "Doanh thu qua OTA (%)", vatPct: "Thuế GTGT (%)", pitPct: "Thuế TNCN (%)", otherPct: "Chi phí khác (%)",
+  reservePct: "Dự phòng rủi ro (%)", cleaning: "Vệ sinh (đ/tháng)", common: "Điện nước khu vực chung (đ/tháng)", staff: "Nhân sự (đ/tháng)",
+  internet: "Internet, truyền hình (đ/tháng)", insurance: "Bảo hiểm (đ/tháng)", fixedOther: "Cố định khác (đ/tháng)", pcccCost: "Giấy PCCC (đ)",
+  pcccYears: "Giấy PCCC dùng trong (năm)", price: "Giá mua (đ)", buyCosts: "Thuế phí sang tên (đ)", renovation: "Sửa sang, nội thất (đ)", own: "Vốn tự có (đ)",
+  loanRate: "Lãi vay (%/năm)", termYears: "Thời hạn vay (năm)", leaseRent: "Tiền thuê nguyên tòa (đ/tháng)", deposit: "Tiền cọc (đ)",
+  setup: "Chi phí setup (đ)", leaseMonths: "Thời hạn hợp đồng thuê tòa (tháng)", badOcc: "Kịch bản xấu: có khách ± (điểm %)",
+  badRent: "Kịch bản xấu: giá ± (%)", goodOcc: "Kịch bản tốt: có khách ± (điểm %)", goodRent: "Kịch bản tốt: giá ± (%)",
+};
 const MONEY = new Set<Key>(["hiRent", "loRent", "peakRent", "cleaning", "common", "staff", "internet", "insurance", "fixedOther", "pcccCost",
   "price", "buyCosts", "renovation", "own", "leaseRent", "deposit", "setup"]);
 
@@ -198,6 +210,30 @@ function Field({ k, label, f, set, hint }: { k: Key; label: string; f: typeof EM
     {note && <span className="caption bt-hint">{note}</span>}</label>;
 }
 
+/** "vận hành 41,2% · mua tòa 63,0% · thuê lại 58,4%"; a model that cannot break even even full says so. */
+export function breakevenText(p: BuildingPlan): string {
+  const one = (v: number) => (Number.isFinite(v) && v <= 1 ? pct(v) : "kín phòng cũng chưa hòa vốn");
+  return [`vận hành ${one(p.breakevenOccupancy)}`, ...(p.buy ? [`mua tòa (sau trả nợ) ${one(p.buy.breakevenOccupancy)}`] : []),
+    ...(p.lease ? [`thuê lại (sau tiền thuê tòa) ${one(p.lease.breakevenOccupancy)}`] : [])].join(" · ");
+}
+
+/** Shown only when printed: the plan's name, the day, and the figures it was worked out from. */
+function PrintHead({ name, f, rows }: { name: string | null; f: typeof EMPTY; rows: Row[] }) {
+  const shown = (Object.keys(LABELS) as Key[]).filter((k) => f[k].trim());
+  const kit = rows.filter((r) => r.name.trim() || r.count.trim());
+  const items: [string, string][] = [...shown.map((k) => [LABELS[k]!, f[k]] as [string, string]),
+    ...kit.map((r) => [`Thiết bị: ${r.name || "—"}`, [r.count && `${r.count} cái`, r.price && `${r.price} đ`, r.life && `${r.life} năm`].filter(Boolean).join(" · ")] as [string, string])];
+  const pairs = (list: [string, string][]) => list.reduce<[string, string][][]>((out, x, i) => (i % 2 ? out[out.length - 1].push(x) : out.push([x]), out), []);
+  return (
+    <section className="print-only bt-print" aria-label="Bản in phương án">
+      <h2>{name ?? "Phương án chưa lưu"}</h2>
+      <p className="caption">In ngày {hanoiDate().split("-").reverse().join("/")} · phép tính trên số đã nhập, không phải khuyến nghị.</p>
+      <table className="fv-table" aria-label="Số đầu vào"><tbody>{pairs(items).map((two, i) => <tr key={i}>{two.map(([label, value]) =>
+        <Fragment key={label}><td>{label}</td><td className="num">{value}</td></Fragment>)}</tr>)}</tbody></table>
+    </section>
+  );
+}
+
 function Scenarios({ input, base, f, set }: { input: BuildingInput; base: BuildingPlan; f: typeof EMPTY; set: (k: Key, v: string) => void }) {
   const [measure, setMeasure] = useState<Measure>("noi");
   const shown = MEASURES.filter(([m]) => measureOf(base, m) !== null);
@@ -224,6 +260,7 @@ function Scenarios({ input, base, f, set }: { input: BuildingInput; base: Buildi
         <th className="num">{MEASURES.find(([x]) => x === m)![1]} (mỗi tháng)</th></tr></thead>
         <tbody>{[...cases.filter(([n]) => n === "Xấu"), ["Cơ sở", base] as const, ...cases.filter(([n]) => n === "Tốt")].map(([name, plan]) => (
           <tr key={name}><td>{name}</td><td className="num">{vnd(plan.revenueMonth)}</td><td className="num">{cell(measureOf(plan, m))}</td></tr>))}</tbody></table>
+      <p data-testid="breakeven"><strong>Tỷ lệ có khách hòa vốn</strong> (áp cho cả năm, giá như đã nhập): {breakevenText(base)}</p>
       <h3>Độ nhạy: {MEASURES.find(([x]) => x === m)![1].toLowerCase()} mỗi tháng</h3>
       <p className="caption">Mỗi hàng là một tỷ lệ có khách áp cho cả năm; mỗi cột là giá thuê thay đổi so với giá đã nhập. Ô đỏ là âm.</p>
       <div className="tablewrap"><table className="fv-table" aria-label="Bảng độ nhạy theo tỷ lệ có khách và giá thuê">
@@ -270,6 +307,7 @@ export function BuildingTool() {
   const F = (k: Key, label: string, hint?: string) => <Field k={k} label={label} f={f} set={set} hint={hint} />;
   return (
     <>
+    <PrintHead name={opened} f={f} rows={rows} />
     <div className="bt">
       <div className="bt-inputs">
         <div className="notice bt-article">
@@ -332,7 +370,8 @@ export function BuildingTool() {
         </section>
       </div>
       <aside className="surface bt-result" aria-label="Kết quả lợi nhuận tòa nhà" aria-live="polite">
-        <h2>Kết quả</h2>
+        <div className="bt-result-head"><h2>Kết quả</h2>
+          {p && <button type="button" className="btn" onClick={() => window.print()}>In bản 1 trang</button>}</div>
         <SaveBox key={openCount} store={store} current={{ f, rows, method }} hasPlan={!!p} initialName={opened ?? ""} onSaved={setOpened} />
         {!out && <p className="muted">Nhập số phòng và giá thuê để bắt đầu tính.</p>}
         {out && "error" in out && <p className="errors" role="alert">{out.error}</p>}

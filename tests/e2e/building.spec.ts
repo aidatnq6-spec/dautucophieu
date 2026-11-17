@@ -105,3 +105,21 @@ test("a sum of money typed in the broker's months is refused with what to type i
   await expect(result.getByRole("alert")).toContainText("không phải số tiền");
   await expect(result.getByRole("table", { name: "Chi phí vận hành mỗi tháng" })).toHaveCount(0);
 });
+
+
+test("the breakeven occupancy sits above the table, and the printed page keeps the result and the figures, not the boxes", async ({ page }) => {
+  await page.goto("/building");
+  const fill = async (label: string, value: string) => page.getByLabel(label, { exact: true }).fill(value);
+  await fill("Số phòng", "10"); await fill("Mùa cao điểm: số tháng", "12"); await fill("Giá (đ/phòng/tháng)", "10000000"); await fill("Có khách (%)", "80");
+  await fill("Vệ sinh tổng thể", "8000000"); await fill("Tiền thuê nguyên tòa (đ/tháng)", "50000000");
+  await expect(page.getByTestId("breakeven")).toContainText("vận hành 8,0%");            // 8m of 100m full
+  await expect(page.getByTestId("breakeven")).toContainText("thuê lại (sau tiền thuê tòa) 58,0%");  // (8m + 50m) of 100m
+  await expect(page.getByRole("button", { name: "In bản 1 trang" })).toBeVisible();
+  await page.emulateMedia({ media: "print" });
+  await expect(page.getByRole("region", { name: "Bản in phương án" })).toContainText("Phương án chưa lưu");
+  await expect(page.getByRole("table", { name: "Số đầu vào" })).toContainText("Tiền thuê nguyên tòa (đ/tháng)");
+  await expect(page.getByLabel("Số phòng", { exact: true })).toBeHidden();
+  await expect(page.getByRole("complementary", { name: "Kết quả lợi nhuận tòa nhà" })).toBeVisible();
+  await page.emulateMedia({ media: "screen" });
+  await expect(page.getByRole("region", { name: "Bản in phương án" })).toBeHidden();
+});

@@ -137,6 +137,45 @@ function SaveBox({ store, current, hasPlan, initialName, onSaved }: { store: Sto
   );
 }
 
+/** Each saved plan's monthly results by model (operating, buying after the loan, leasing after the rent), and the range holding them and zero. */
+export function compareBars(items: { name: string; plan: BuildingPlan | null }[]) {
+  const groups = items.map(({ name, plan }) => ({ name, bars: plan ? ([["noi", plan.noiMonth], ["buy", plan.buy?.cashMonth ?? null],
+    ["lease", plan.lease?.profitMonth ?? null]] as [Measure, number | null][]).filter((b): b is [Measure, number] => b[1] !== null)
+    .map(([id, value]) => ({ id, value })) : [] }));
+  const all = groups.flatMap((g) => g.bars.map((b) => b.value)).concat(0);
+  return { groups, lo: Math.min(...all), hi: Math.max(...all) };
+}
+
+const BAR_CLASS: Record<Measure, string> = { noi: "bt-line-noi", buy: "bt-line-buy", lease: "bt-line-lease" };
+
+/** The saved plans side by side: one group a plan, one bar a model, losses to the left of zero. */
+function CompareChart({ items }: { items: { name: string; plan: BuildingPlan | null }[] }) {
+  const { groups, lo, hi } = compareBars(items);
+  const W = 640, L = 150, R = 90, BAR = 12, GAP = 3, PAD = 10;
+  const heights = groups.map((g) => Math.max(g.bars.length, 1) * (BAR + GAP) + PAD);
+  const H = heights.reduce((s, h) => s + h, 0) + 18;
+  const span = hi - lo || 1;
+  const x = (v: number) => L + ((v - lo) / span) * (W - L - R);
+  const short = (v: number) => `${v < 0 ? "−" : ""}${Math.abs(v / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tr`;
+  const tops = heights.map((_, i) => 4 + heights.slice(0, i).reduce((s, h) => s + h, 0));
+  return (
+    <figure className="bt-chart">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="So sánh lợi nhuận mỗi tháng của các phương án">
+        <line x1={x(0)} x2={x(0)} y1={0} y2={H - 14} className="bt-zero" />
+        <text x={x(0)} y={H - 2} textAnchor="middle" className="bt-axis">0</text>
+        {groups.map((g, i) => { const y0 = tops[i]; return <g key={g.name}>
+          <text x={L - 8} y={y0 + BAR} textAnchor="end" className="bt-axis bt-name">{g.name.length > 24 ? `${g.name.slice(0, 23)}…` : g.name}</text>
+          {g.bars.length ? g.bars.map((b, j) => { const y = y0 + j * (BAR + GAP), a = x(Math.min(0, b.value)), w = Math.abs(x(b.value) - x(0));
+            return <g key={b.id}><rect x={a} y={y} width={Math.max(w, 1)} height={BAR} className={`bt-bar ${BAR_CLASS[b.id]}`} />
+              <text x={b.value < 0 ? a - 4 : a + w + 4} y={y + BAR - 2} textAnchor={b.value < 0 ? "end" : "start"} className="bt-axis">{short(b.value)}</text></g>; })
+            : <text x={x(0) + 6} y={y0 + BAR} className="bt-axis">chưa đủ số để tính</text>}
+        </g>; })}
+      </svg>
+      <figcaption className="bt-legend">{(["noi", "buy", "lease"] as Measure[]).map((m) => <span key={m}><i className={`bt-key ${BAR_CLASS[m]}`} />{LINE[m][0]}</span>)}</figcaption>
+    </figure>
+  );
+}
+
 /** The saved plans compared side by side, each to reopen or delete. */
 function SavedPlans({ store, open }: { store: Store; open: (s: Saved) => void }) {
   const { data, busy, write } = store;
@@ -146,6 +185,8 @@ function SavedPlans({ store, open }: { store: Store; open: (s: Saved) => void })
     <section className="surface" aria-label="Các phương án đã lưu">
       <h2>Các phương án đã lưu</h2>
       <p className="caption">Lưu bằng nút trong khung Kết quả; mở lại và so các tòa cạnh nhau ở đây (tối đa 20). Lưu trong thiết lập cá nhân trên máy, không gửi đi đâu.</p>
+      {data && rowsOf.length > 0 && <><h3>Lợi nhuận mỗi tháng của các tòa</h3>
+        <CompareChart items={rowsOf.map(({ s, out }) => ({ name: s.name, plan: out && "plan" in out ? out.plan : null }))} /></>}
       {data && (rowsOf.length ? <div className="tablewrap"><table className="fv-table cc-table" aria-label="So sánh các phương án">
         <thead><tr><th>Phương án</th><th className="num">Doanh thu/tháng</th><th className="num">Chi phí % doanh thu</th><th className="num">Lợi nhuận vận hành/tháng</th>
           <th className="num">Mua: dòng tiền/tháng</th><th className="num">Mua: lợi suất vốn tự có</th><th className="num">Thuê lại: lợi nhuận/tháng</th>

@@ -26,7 +26,7 @@ a{color:var(--link)}
 .nav-group[class*=nav-tone-] .nav-head::before{content:"";width:4px;height:14px;border-radius:2px;background:var(--nav-tone)}
 .nav-tone-assets{--nav-tone:var(--good)}.nav-tone-market{--nav-tone:var(--brand)}.nav-tone-stocks{--nav-tone:var(--orange)}
 .nav-tone-news{--nav-tone:var(--rsi)}.nav-tone-sectors{--nav-tone:var(--brand-2)}.nav-tone-tools{--nav-tone:var(--muted)}
-@media(min-width:651px){.side{padding-top:20px}.side .nav a{padding-top:4px;padding-bottom:4px}.side .brand{margin-bottom:10px}.side .nav-group[class*=nav-tone-]{margin-top:4px}.side .nav-group[class*=nav-tone-] .nav-head{margin-top:4px}}  /* eighteen links and six headings fit a 900px-high screen */
+@media(min-width:651px){.side{padding-top:20px}.side .nav a{padding-top:3px;padding-bottom:3px}.side .brand{margin-bottom:10px}.side .nav-group[class*=nav-tone-]{margin-top:4px}.side .nav-group[class*=nav-tone-] .nav-head{margin-top:4px}}  /* nineteen links and six headings fit a 900px-high screen */
 @media(max-width:650px){.nav-group[class*=nav-tone-] .nav-head{display:none}}  /* the phone's one-row menu has no headings */
 .nav a{text-decoration:none;color:var(--ink);padding:8px 12px;border-radius:7px;display:flex;gap:12px;align-items:center;white-space:nowrap}
 .nav a[aria-current=page]{background:var(--nav-on-bg);color:var(--nav-on-ink);font-weight:600}
@@ -516,3 +516,8 @@ main h2{scroll-margin-top:16px}
 }
 /* Chênh lệch vàng SJC so với thế giới */
 .sg-chart{width:100%;height:auto;max-height:180px;margin:6px 0 10px}.sg-line{fill:none;stroke:var(--brand);stroke-width:2}.sg-dot{fill:var(--brand)}.sg-threshold{stroke:var(--bad);stroke-dasharray:5 4;stroke-width:1.5}.sg-axis{fill:var(--muted);font-size:11px}
+/* Lợi nhuận tòa nhà cho thuê: the inputs, and the result beside them on a wide screen */
+.bt{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+@media(min-width:1100px){.bt{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)}.bt-result{position:sticky;top:12px;align-self:start;max-height:calc(100vh - 24px);overflow-y:auto}}
+.bt-list{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;margin:8px 0}.bt-list dt{color:var(--muted)}.bt-list dd{margin:0;text-align:right}
+@media(max-width:650px){.bt-list{grid-template-columns:minmax(0,1fr)}.bt-list dd{text-align:left;margin-bottom:6px}}

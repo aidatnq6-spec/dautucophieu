@@ -192,3 +192,21 @@ test("an offer rate first: the cash after it is shown and the loan tab gets the 
   const loan = page.getByRole("tabpanel", { name: "Khoản vay" });
   await expect(loan.getByRole("complementary", { name: "Kết quả khoản vay" })).toContainText("6%/năm");
 });
+
+
+test("a saved plan's comparison row carries the cash after the offer and the yearly rise held against the deposit", async ({ page }) => {
+  await page.goto("/loan?tab=toa-nha");
+  const fill = async (label: string, value: string) => tab(page).getByLabel(label, { exact: true }).fill(value);
+  await fill("Số phòng", "10"); await fill("Mùa cao điểm: số tháng", "12"); await fill("Giá (đ/phòng/tháng)", "10000000"); await fill("Có khách (%)", "80");
+  await fill("Giá mua (đ)", "8000000000"); await fill("Vốn tự có (đ)", "3000000000"); await fill("Lãi vay (%/năm)", "10"); await fill("Thời hạn vay (năm)", "20");
+  await fill("Lãi ưu đãi (%/năm)", "6"); await fill("Thời gian ưu đãi (tháng)", "12");
+  await fill("Số năm nắm giữ (để so với gửi tiết kiệm)", "10"); await fill("Lãi tiền gửi để so (%/năm)", "6");
+  const name = `Tòa so sánh ${Date.now() % 100000}`;
+  const result = page.getByRole("complementary", { name: "Kết quả lợi nhuận tòa nhà" });
+  await result.getByLabel("Tên phương án").fill(name);
+  await result.getByRole("button", { name: "Lưu phương án" }).click();
+  const row = page.getByRole("table", { name: "So sánh các phương án" }).getByRole("row", { name: new RegExp(name) });
+  await expect(row).toContainText("(10 năm)");
+  page.once("dialog", (d) => void d.accept());
+  await row.getByRole("button", { name: `Xóa phương án ${name}` }).click();
+});

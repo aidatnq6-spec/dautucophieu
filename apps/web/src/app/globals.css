@@ -540,8 +540,8 @@ main h2{scroll-margin-top:16px}
     padding:1px 6px!important;line-height:1.2!important;border-bottom:1px solid var(--line)!important}
   .bt-print td::before,.bt-result td::before,section[aria-label="Kịch bản và độ nhạy"] td::before{content:none!important}
   .bt-print,.bt-result,section[aria-label="Kịch bản và độ nhạy"]{padding:4px 0!important;margin:0 0 6px!important;box-shadow:none!important;border:0!important}
-  .bt-print h2,.bt-result h2,section[aria-label="Kịch bản và độ nhạy"] h2{font-size:14px;margin:4px 0}.bt-result h3,section[aria-label="Kịch bản và độ nhạy"] h3{font-size:12px;margin:6px 0 2px}
-  .bt-list{font-size:10.5px;gap:0 12px;margin:2px 0;line-height:1.3}.pagehead{margin:0!important}.pagehead h1{font-size:16px;margin:0}
+  .bt-print h2,.bt-result h2,section[aria-label="Kịch bản và độ nhạy"] h2{font-size:13px;margin:2px 0}.bt-result h3,section[aria-label="Kịch bản và độ nhạy"] h3{font-size:11px;margin:3px 0 1px}
+  .bt-list{font-size:10px;gap:0 12px;margin:1px 0;line-height:1.15}.pagehead{margin:0!important}.pagehead h1{font-size:16px;margin:0}
   .bt-print .caption{font-size:10px;margin:0 0 4px}.bt-result h3,section[aria-label="Kịch bản và độ nhạy"] p{font-size:11px;margin:4px 0}
   .bt-print td.num,.bt-result td.num,section[aria-label="Kịch bản và độ nhạy"] td.num,section[aria-label="Kịch bản và độ nhạy"] th.num{text-align:right!important}
   @page{size:A4;margin:10mm}
@@ -553,5 +553,5 @@ main h2{scroll-margin-top:16px}
 .bt-line-lease{stroke:var(--good);fill:var(--good)}polyline.bt-line{fill:none}.bt-dot{stroke:var(--paper);stroke-width:1.5}
 .bt-legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px}.bt-key{display:inline-block;width:14px;height:3px;margin:0 6px 3px 0;vertical-align:middle}
 .bt-key.bt-line-noi{background:var(--brand)}.bt-key.bt-line-buy{background:var(--orange)}.bt-key.bt-line-lease{background:var(--good)}
-@media print{.bt-chart{margin:2px 0 4px}.bt-chart svg{max-height:125px}.bt-legend{font-size:9.5px}}
+@media print{.bt-chart{margin:1px 0 2px}.bt-chart svg{max-height:90px}.bt-legend{font-size:9px}}
 .bt-bar.bt-line-noi{fill:var(--brand)}.bt-bar.bt-line-buy{fill:var(--orange)}.bt-bar.bt-line-lease{fill:var(--good)}.bt-name{fill:var(--ink)}

@@ -181,9 +181,9 @@ function CompareChart({ items }: { items: { name: string; plan: BuildingPlan | n
 }
 
 /** The saved plans compared side by side, each to reopen or delete. */
-function SavedPlans({ store, open }: { store: Store; open: (s: Saved) => void }) {
+function SavedPlans({ store, open, depositRate }: { store: Store; open: (s: Saved) => void; depositRate: number | null }) {
   const { data, busy, write } = store;
-  const rowsOf = data?.plans.map((s) => ({ s, out: readPlan({ ...EMPTY, ...s.form }, s.rows, s.method) })) ?? [];
+  const rowsOf = data?.plans.map((s) => ({ s, out: readPlan({ ...EMPTY, ...s.form }, s.rows, s.method, depositRate === null ? null : depositRate * 100) })) ?? [];
   const money2 = (v: number | null | undefined) => (v === null || v === undefined ? "—" : <span className={v < 0 ? "negative" : undefined}>{vnd(v)}</span>);
   return (
     <section className="surface" aria-label="Các phương án đã lưu">
@@ -193,16 +193,19 @@ function SavedPlans({ store, open }: { store: Store; open: (s: Saved) => void })
         <CompareChart items={rowsOf.map(({ s, out }) => ({ name: s.name, plan: out && "plan" in out ? out.plan : null }))} /></>}
       {data && (rowsOf.length ? <div className="tablewrap"><table className="fv-table cc-table" aria-label="So sánh các phương án">
         <thead><tr><th>Phương án</th><th className="num">Doanh thu/tháng</th><th className="num">Chi phí % doanh thu</th><th className="num">Lợi nhuận vận hành/tháng</th>
-          <th className="num">Mua: dòng tiền/tháng</th><th className="num">Mua: lợi suất vốn tự có</th><th className="num">Thuê lại: lợi nhuận/tháng</th>
+          <th className="num">Mua: dòng tiền/tháng</th><th className="num">Mua: sau ưu đãi/tháng</th><th className="num">Mua: lợi suất vốn tự có</th>
+          <th className="num">Mua: giá cần tăng/năm</th><th className="num">Thuê lại: lợi nhuận/tháng</th>
           <th className="num">Thuê lại: có khách tối thiểu</th><th /></tr></thead>
         <tbody>{rowsOf.map(({ s, out }) => { const pl = out && "plan" in out ? out.plan : null; return <tr key={s.id}>
           <td><strong>{s.name}</strong><div className="caption">lưu {s.saved_on.split("-").reverse().join("/")}</div></td>
           {pl ? <>
             <td className="num">{vnd(pl.revenueMonth)}</td><td className="num">{pct(pl.costShare)}</td><td className="num">{money2(pl.noiMonth)}</td>
-            <td className="num">{money2(pl.buy?.cashMonth)}</td><td className="num">{pl.buy?.cashOnCash != null ? pct(pl.buy.cashOnCash) : "—"}</td>
+            <td className="num">{money2(pl.buy?.cashMonth)}</td><td className="num">{money2(pl.buy?.afterOffer?.cashMonth)}</td>
+            <td className="num">{pl.buy?.cashOnCash != null ? pct(pl.buy.cashOnCash) : "—"}</td>
+            <td className="num">{pl.buy?.hold ? (pl.buy.hold.neededGrowth === null ? "không cần" : `${pct(pl.buy.hold.neededGrowth)} (${pl.buy.hold.years} năm)`) : "—"}</td>
             <td className="num">{money2(pl.lease?.profitMonth)}</td>
             <td className="num">{pl.lease && Number.isFinite(pl.lease.breakevenOccupancy) ? pct(pl.lease.breakevenOccupancy) : "—"}</td>
-          </> : <td colSpan={7} className="muted">{out && "error" in out ? out.error : "chưa đủ số để tính"}</td>}
+          </> : <td colSpan={9} className="muted">{out && "error" in out ? out.error : "chưa đủ số để tính"}</td>}
           <td><div className="ib-actions"><button type="button" className="btn" onClick={() => open(s)}>Mở</button>
             <button type="button" className="btn text" aria-label={`Xóa phương án ${s.name}`} disabled={busy}
               onClick={() => { if (window.confirm(`Xóa phương án "${s.name}"?`)) void write(data.plans.filter((x) => x.id !== s.id)); }}>Xóa</button></div></td>
@@ -210,6 +213,13 @@ function SavedPlans({ store, open }: { store: Store; open: (s: Saved) => void })
         : <p className="muted">Chưa lưu phương án nào.</p>)}
     </section>
   );
+}
+
+/** The yearly price change holding needs to match the deposit; a fall means the rent alone already beats it. */
+export function growthText(g: number | null): string {
+  if (g === null) return "không cần giá trị còn lại (dòng tiền đã bù đủ)";
+  if (g < 0) return `không cần tăng: giá có thể giảm đến ${pct(-g)} một năm mà vẫn bằng gửi tiết kiệm`;
+  return `${pct(g)} một năm`;
 }
 
 /** Opens the building's purchase loan in the Khoản vay tab, its figures filled in. */
@@ -275,7 +285,7 @@ function PrintHead({ name, f, rows }: { name: string | null; f: typeof EMPTY; ro
   const kit = rows.filter((r) => r.name.trim() || r.count.trim());
   const items: [string, string][] = [...shown.map((k) => [LABELS[k]!, f[k]] as [string, string]),
     ...kit.map((r) => [`Thiết bị: ${r.name || "—"}`, [r.count && `${r.count} cái`, r.price && `${r.price} đ`, r.life && `${r.life} năm`].filter(Boolean).join(" · ")] as [string, string])];
-  const pairs = (list: [string, string][]) => list.reduce<[string, string][][]>((out, x, i) => (i % 2 ? out[out.length - 1].push(x) : out.push([x]), out), []);
+  const pairs = (list: [string, string][]) => list.reduce<[string, string][][]>((out, x, i) => (i % 3 ? out[out.length - 1].push(x) : out.push([x]), out), []);
   return (
     <section className="print-only bt-print" aria-label="Bản in phương án">
       <h2>{name ?? "Phương án chưa lưu"}</h2>
@@ -513,7 +523,7 @@ export function BuildingTool() {
               <dt>Nếu giữ vốn tự có ở tiền gửi {p.buy.hold.years} năm</dt><dd>{vnd(p.buy.hold.keep)}</dd>
               <dt>Giá tòa cần đạt sau {p.buy.hold.years} năm để bằng gửi tiết kiệm</dt><dd><strong>{vnd(p.buy.hold.neededPrice)}</strong></dd>
               <dt>Giá tòa cần tăng mỗi năm</dt><dd className={p.buy.hold.neededGrowth !== null && p.buy.hold.neededGrowth > 0 ? "negative" : undefined}>
-                {p.buy.hold.neededGrowth === null ? "không cần tăng (dòng tiền đã bù đủ)" : `${pct(p.buy.hold.neededGrowth)} một năm`}</dd>
+                {growthText(p.buy.hold.neededGrowth)}</dd>
             </>}
             <dt>Hoàn vốn tự có</dt><dd>{p.buy.paybackYears !== null ? `khoảng ${p.buy.paybackYears.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} năm` : "không hoàn vốn (dòng tiền âm)"}</dd>
             <dt>Tỷ lệ có khách tối thiểu để không âm tiền</dt><dd>{Number.isFinite(p.buy.breakevenOccupancy) ? pct(p.buy.breakevenOccupancy) : "không đạt được"}</dd>
@@ -540,7 +550,7 @@ export function BuildingTool() {
       </aside>
     </div>
     {input && p && <Scenarios input={input} base={p} f={f} set={set} />}
-    <SavedPlans store={store} open={(s) => { setF({ ...EMPTY, ...s.form }); setRows(s.rows.length ? s.rows : [{ name: "", count: "", price: "", life: "" }]);
+    <SavedPlans store={store} depositRate={depositRate} open={(s) => { setF({ ...EMPTY, ...s.form }); setRows(s.rows.length ? s.rows : [{ name: "", count: "", price: "", life: "" }]);
       setMethod(s.method); setOpened(s.name); setOpenCount((n) => n + 1); window.scrollTo({ top: 0 }); }} />
     </>
   );

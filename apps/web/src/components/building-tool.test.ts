@@ -101,3 +101,12 @@ describe("the bars comparing saved plans", async () => {
     expect([out.lo, out.hi]).toEqual([-5e6, 55e6]);
   });
 });
+
+describe("growthText", async () => {
+  const { growthText } = await import("./building-tool");
+  it("says a needed fall as room to fall, not as a rise of a negative share", () => {
+    expect(growthText(0.042)).toBe("4,2% một năm");
+    expect(growthText(-0.173)).toBe("không cần tăng: giá có thể giảm đến 17,3% một năm mà vẫn bằng gửi tiết kiệm");
+    expect(growthText(null)).toBe("không cần giá trị còn lại (dòng tiền đã bù đủ)");
+  });
+});

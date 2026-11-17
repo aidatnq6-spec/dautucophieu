@@ -178,3 +178,17 @@ test("the purchase loan opens in the Khoản vay tab with its figures filled in"
   await expect(loan).toContainText("Đang xem khoản vay mua tòa đang tính (vay 2.500.000.000 đ, 9,5%/năm, 15 năm)");
   await expect(loan.getByRole("complementary", { name: "Kết quả khoản vay" })).toContainText("2.500.000.000");
 });
+
+
+test("an offer rate first: the cash after it is shown and the loan tab gets the offer", async ({ page }) => {
+  await page.goto("/loan?tab=toa-nha");
+  const fill = async (label: string, value: string) => tab(page).getByLabel(label, { exact: true }).fill(value);
+  await fill("Số phòng", "10"); await fill("Mùa cao điểm: số tháng", "12"); await fill("Giá (đ/phòng/tháng)", "10000000"); await fill("Có khách (%)", "80");
+  await fill("Giá mua (đ)", "5000000000"); await fill("Vốn tự có (đ)", "2000000000"); await fill("Lãi vay (%/năm)", "10"); await fill("Thời hạn vay (năm)", "20");
+  await fill("Lãi ưu đãi (%/năm)", "6"); await fill("Thời gian ưu đãi (tháng)", "12");
+  const buy = page.getByRole("region", { name: "Kết quả nếu mua tòa" });
+  await expect(buy).toContainText("Sau ưu đãi (từ tháng 13): trả ngân hàng mỗi tháng");
+  await page.getByRole("button", { name: "Xem lịch trả nợ chi tiết" }).click();
+  const loan = page.getByRole("tabpanel", { name: "Khoản vay" });
+  await expect(loan.getByRole("complementary", { name: "Kết quả khoản vay" })).toContainText("6%/năm");
+});

@@ -148,3 +148,57 @@ def ai_status(request: Request):
             "policy": {"version": policy.version, "status": policy.status, "monthly_usd": str(policy.budget.monthly_usd),
                        "models": list(task.models) if task else []},
             "spend": {"month": month, "used_usd": str(used.quantize(Decimal("0.0001"), ROUND_HALF_UP)), "calls": calls}}
+
+
+# Lợi nhuận tòa nhà: the owner's saved building plans, each the boxes as typed (strings), so the page can reopen and compare them.
+class BuildingRow(ContractModel):
+    name: str = Field(default="", max_length=60)
+    count: str = Field(default="", max_length=20)
+    price: str = Field(default="", max_length=30)
+    life: str = Field(default="", max_length=10)
+
+
+class BuildingPlanItem(ContractModel):
+    id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,40}$")
+    name: str = Field(min_length=1, max_length=60, pattern=r"\S")
+    saved_on: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    method: str = Field(pattern=r"^(annuity|declining)$")
+    form: dict[str, str] = Field(max_length=60)
+    rows: list[BuildingRow] = Field(default_factory=list, max_length=30)
+
+    def model_post_init(self, __context) -> None:
+        import re
+        for key, value in self.form.items():
+            if not re.fullmatch(r"[A-Za-z][A-Za-z0-9]{0,39}", key) or len(value) > 30:
+                raise ValueError("bad form box")
+
+
+class BuildingPlansRequest(ContractModel):
+    plans: list[BuildingPlanItem] = Field(max_length=20)
+    expected_version: int = Field(strict=True, ge=0)
+    request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
+
+
+@router.get("/building-plans")
+def get_building_plans(request: Request):
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None:
+        return unavailable()
+    try:
+        record = read_version(repo, owner, "settings", "building_plans", None)
+    except RepositoryUnavailable:
+        return unavailable()
+    return {"version": record.version if record else 0, "plans": (record.payload.get("plans") if record else None) or []}
+
+
+@router.put("/building-plans")
+def put_building_plans(request: Request, body: BuildingPlansRequest):
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None:
+        return unavailable()
+    try:
+        record = repo.write(owner, "settings", "building_plans", {"plans": [p.model_dump(mode="json") for p in body.plans]},
+                            expected_version=body.expected_version, request_id=body.request_id)
+    except WRITE_ERRORS as exc:
+        return write_error(exc)
+    return {"version": record.version, "plans": record.payload["plans"]}

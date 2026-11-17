@@ -123,3 +123,14 @@ test("the breakeven occupancy sits above the table, and the printed page keeps t
   await page.emulateMedia({ media: "screen" });
   await expect(page.getByRole("region", { name: "Bản in phương án" })).toBeHidden();
 });
+
+
+test("the profit chart draws one line a model with its breakeven", async ({ page }) => {
+  await page.goto("/building");
+  const fill = async (label: string, value: string) => page.getByLabel(label, { exact: true }).fill(value);
+  await fill("Số phòng", "10"); await fill("Mùa cao điểm: số tháng", "12"); await fill("Giá (đ/phòng/tháng)", "10000000"); await fill("Có khách (%)", "80");
+  await fill("Vệ sinh tổng thể", "8000000"); await fill("Tiền thuê nguyên tòa (đ/tháng)", "50000000");
+  const chart = page.getByRole("img", { name: "Lợi nhuận mỗi tháng theo tỷ lệ có khách" });
+  await expect(chart.locator("polyline")).toHaveCount(2);
+  await expect(page.locator(".bt-legend")).toContainText("Thuê lại (sau tiền thuê tòa) (hòa vốn 58,0%)");
+});

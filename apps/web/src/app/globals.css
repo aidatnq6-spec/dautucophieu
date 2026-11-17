@@ -537,7 +537,7 @@ main h2{scroll-margin-top:16px}
   .bt-print tbody,.bt-result tbody,section[aria-label="Kịch bản và độ nhạy"] tbody{display:table-row-group!important}
   .bt-print tr,.bt-result tr,section[aria-label="Kịch bản và độ nhạy"] tr{display:table-row!important;border:0!important;margin:0!important;padding:0!important}
   .bt-print td,.bt-result td,section[aria-label="Kịch bản và độ nhạy"] td,section[aria-label="Kịch bản và độ nhạy"] th{display:table-cell!important;width:auto!important;
-    padding:2px 6px!important;border-bottom:1px solid var(--line)!important}
+    padding:1px 6px!important;line-height:1.2!important;border-bottom:1px solid var(--line)!important}
   .bt-print td::before,.bt-result td::before,section[aria-label="Kịch bản và độ nhạy"] td::before{content:none!important}
   .bt-print,.bt-result,section[aria-label="Kịch bản và độ nhạy"]{padding:4px 0!important;margin:0 0 6px!important;box-shadow:none!important;border:0!important}
   .bt-print h2,.bt-result h2,section[aria-label="Kịch bản và độ nhạy"] h2{font-size:14px;margin:4px 0}.bt-result h3,section[aria-label="Kịch bản và độ nhạy"] h3{font-size:12px;margin:6px 0 2px}
@@ -546,3 +546,11 @@ main h2{scroll-margin-top:16px}
   .bt-print td.num,.bt-result td.num,section[aria-label="Kịch bản và độ nhạy"] td.num,section[aria-label="Kịch bản và độ nhạy"] th.num{text-align:right!important}
   @page{size:A4;margin:10mm}
 }
+/* Lợi nhuận theo tỷ lệ có khách */
+.bt-chart{margin:6px 0 10px}.bt-chart svg{width:100%;height:auto;max-height:220px}
+.bt-grid{stroke:var(--chart-grid);stroke-width:1}.bt-zero{stroke:var(--muted);stroke-width:1.5;stroke-dasharray:4 3}.bt-axis{fill:var(--muted);font-size:11px}
+.bt-line{fill:none;stroke-width:2.5}.bt-line-noi{stroke:var(--brand);fill:var(--brand)}.bt-line-buy{stroke:var(--orange);fill:var(--orange)}
+.bt-line-lease{stroke:var(--good);fill:var(--good)}polyline.bt-line{fill:none}.bt-dot{stroke:var(--paper);stroke-width:1.5}
+.bt-legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px}.bt-key{display:inline-block;width:14px;height:3px;margin:0 6px 3px 0;vertical-align:middle}
+.bt-key.bt-line-noi{background:var(--brand)}.bt-key.bt-line-buy{background:var(--orange)}.bt-key.bt-line-lease{background:var(--good)}
+@media print{.bt-chart{margin:2px 0 4px}.bt-chart svg{max-height:125px}.bt-legend{font-size:9.5px}}

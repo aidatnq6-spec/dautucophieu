@@ -75,3 +75,14 @@ test("the recording's figures show under each line and fill only the empty singl
   await expect(page.getByLabel("Hoa hồng môi giới, mạng xã hội (%)", { exact: true })).toHaveValue("");  // a range: left to the owner
   await expect(page.getByLabel("Tên thiết bị 4")).toHaveValue("Điều hòa");
 });
+
+
+test("commission typed as one month of rent on a one-year lease is 583.333 đ a month for a 7m room", async ({ page }) => {
+  await page.goto("/building");
+  const fill = async (label: string, value: string) => page.getByLabel(label, { exact: true }).fill(value);
+  await fill("Số phòng", "1"); await fill("Mùa cao điểm: số tháng", "12"); await fill("Giá (đ/phòng/tháng)", "7000000"); await fill("Có khách (%)", "100");
+  await fill("Hoa hồng môi giới: số tháng tiền thuê mỗi hợp đồng", "1"); await fill("Thời hạn hợp đồng bình quân (tháng)", "12");
+  await expect(page.getByTestId("broker-share")).toContainText("= 8,333% doanh thu mỗi tháng");
+  const costs = page.getByRole("table", { name: "Chi phí vận hành mỗi tháng" });
+  await expect(costs.getByRole("row", { name: /Hoa hồng bán phòng/ })).toContainText("583.333");
+});

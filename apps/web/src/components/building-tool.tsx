@@ -13,7 +13,7 @@ export type Row = { name: string; count: string; price: string; life: string };
 type Saved = { id: string; name: string; saved_on: string; method: Method; form: Partial<Record<Key, string>>; rows: Row[] };
 const EMPTY = {
   rooms: "", hiMonths: "", hiRent: "", hiOcc: "", loMonths: "", loRent: "", loOcc: "", peakRent: "",
-  brokerPct: "", otaPct: "", otaShare: "", vatPct: "", pitPct: "", otherPct: "", reservePct: "",
+  brokerPct: "", brokerMonths: "", contractMonths: "", otaPct: "", otaShare: "", vatPct: "", pitPct: "", otherPct: "", reservePct: "",
   cleaning: "", common: "", staff: "", internet: "", insurance: "", fixedOther: "", pcccCost: "", pcccYears: "",
   price: "", buyCosts: "", renovation: "", own: "", loanRate: "", termYears: "",
   leaseRent: "", deposit: "", setup: "", leaseMonths: "",
@@ -29,6 +29,11 @@ const money = (s: string) => (s.trim() ? Number(parseMoneyInput(s) ?? NaN) : 0);
 const num = (s: string) => (s.trim() ? Number(s.trim().replace(/\./g, "").replace(",", ".")) : 0);
 const vnd = (v: number) => formatVnd(String(Math.round(v)));
 const pct = (v: number) => formatRatio(v.toFixed(6), 1);
+
+/** Commission as months of rent for each lease (1 month on a 12-month lease = 8,333…%); null when either box is empty. */
+export function brokerShare(v: { brokerMonths: number; contractMonths: number }): number | null {
+  return v.brokerMonths > 0 && v.contractMonths > 0 ? (v.brokerMonths / v.contractMonths) * 100 : null;
+}
 
 /** The boxes as typed → the plan, or what is wrong with them; null until the rooms and a rent are in. */
 export function readPlan(f: typeof EMPTY, rows: Row[], method: Method): { error: string } | { plan: BuildingPlan; input: BuildingInput } | null {
@@ -46,7 +51,7 @@ export function readPlan(f: typeof EMPTY, rows: Row[], method: Method): { error:
     rooms, peakRent: values.peakRent || null,
     seasons: [{ months: values.hiMonths, rent: values.hiRent, occupancy: values.hiOcc }, { months: values.loMonths, rent: values.loRent, occupancy: values.loOcc }]
       .filter((s) => s.months > 0),
-    brokerPct: values.brokerPct, otaPct: values.otaPct, otaShare: values.otaShare, vatPct: values.vatPct, pitPct: values.pitPct, otherPct: values.otherPct,
+    brokerPct: brokerShare(values) ?? values.brokerPct, otaPct: values.otaPct, otaShare: values.otaShare, vatPct: values.vatPct, pitPct: values.pitPct, otherPct: values.otherPct,
     reservePct: values.reservePct,
     fixed: { cleaning: values.cleaning, common: values.common, staff: values.staff, internet: values.internet, insurance: values.insurance, other: values.fixedOther },
     equipment, pccc: { cost: values.pcccCost, years: values.pcccYears },
@@ -126,7 +131,9 @@ export const ARTICLE_HINTS: Partial<Record<Key, string>> = {
   peakRent: "Bài: môi giới hay lấy giá ngày cao điểm nhân cả năm",
   hiOcc: "Bài không nêu số",
   loOcc: "Bài: trống phòng mùa thấp điểm mất 15–20% doanh thu (tòa vận hành tốt khoảng 10%)",
-  brokerPct: "Bài: 8,3–10% (môi giới cá nhân, mạng xã hội)",
+  brokerPct: "Bài: 8,3–10% (môi giới cá nhân, mạng xã hội); 8,3% là 1 tháng tiền thuê cho hợp đồng 12 tháng",
+  brokerMonths: "Ví dụ 1 tháng tiền thuê mỗi lần môi giới tìm được khách",
+  contractMonths: "Bài: khách nước ngoài thường thuê 3–6 tháng",
   otaPct: "Bài: khoảng 15%",
   otaShare: "Bài không nêu số",
   vatPct: "Bài: 5%",
@@ -250,7 +257,15 @@ export function BuildingTool() {
         </section>
         <section className="surface" aria-label="Chi phí theo doanh thu">
           <h2>2. Chi phí tính theo % doanh thu</h2>
-          <div className="formgrid">{F("brokerPct", "Hoa hồng môi giới, mạng xã hội (%)")}{F("otaPct", "Hoa hồng OTA (%)")}{F("otaShare", "Phần doanh thu qua OTA (%)")}</div>
+          <div className="formgrid">{F("brokerMonths", "Hoa hồng môi giới: số tháng tiền thuê mỗi hợp đồng")}{F("contractMonths", "Thời hạn hợp đồng bình quân (tháng)")}
+            {F("brokerPct", "Hoa hồng môi giới, mạng xã hội (%)")}</div>
+          {(() => {
+            const share = brokerShare({ brokerMonths: num(f.brokerMonths), contractMonths: num(f.contractMonths) });
+            return share !== null && Number.isFinite(share) ? <p className="caption" data-testid="broker-share">Hoa hồng môi giới tính theo hợp đồng: {f.brokerMonths} tháng tiền thuê
+              / hợp đồng {f.contractMonths} tháng = {share.toLocaleString("vi-VN", { maximumFractionDigits: 3 })}% doanh thu mỗi tháng (dùng số này thay ô %).</p>
+              : <p className="caption">Nhập số tháng tiền thuê và thời hạn hợp đồng để tính hoa hồng đúng theo hợp đồng; hoặc nhập thẳng % ở ô bên cạnh.</p>;
+          })()}
+          <div className="formgrid">{F("otaPct", "Hoa hồng OTA (%)")}{F("otaShare", "Phần doanh thu qua OTA (%)")}</div>
           <div className="formgrid">{F("vatPct", "Thuế GTGT (%)")}{F("pitPct", "Thuế TNCN (%)")}{F("otherPct", "Chi phí khác (%)")}{F("reservePct", "Dự phòng rủi ro (%)")}</div>
           <p className="caption">Thuế cho thuê tùy hình thức kinh doanh và mức doanh thu: nhập theo trường hợp của bạn.</p>
         </section>

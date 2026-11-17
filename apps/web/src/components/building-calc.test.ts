@@ -74,3 +74,22 @@ describe("leasing the whole building to run it", () => {
     expect(l.setupPaybackMonths).toBeNull();
   });
 });
+
+describe("scenarios and sensitivity", () => {
+  it("moves occupancy by points and rent by a share, within 0–100%", async () => {
+    const { scenario } = await import("./building-calc");
+    const bad = scenario(BASE, -15, -10);
+    // 10 × (5 × 9m × 0.75 + 7 × 7.2m × 0.55) = 10 × (33.75m + 27.72m) = 614.7m a year
+    expect(Math.round(bad.revenueYear)).toBe(614_700_000);
+    expect(scenario(BASE, 50, 0).revenueYear).toBe(10 * (5 * 10_000_000 + 7 * 8_000_000));  // capped at full
+  });
+  it("tabulates the chosen result over occupancy levels for the whole year and rent changes", async () => {
+    const { sensitivity } = await import("./building-calc");
+    const t = sensitivity({ ...BASE, lease: { rent: 20_000_000, deposit: 0, setup: 0, months: 12 } }, [50, 100], [-10, 0], "lease");
+    expect(t.length).toBe(2);
+    expect(t[1][1]).toBeCloseTo(buildingPlan({ ...BASE, seasons: BASE.seasons.map((s) => ({ ...s, occupancy: 100 })),
+      lease: { rent: 20_000_000, deposit: 0, setup: 0, months: 12 } }).lease!.profitMonth, 6);
+    expect(t[0][0]!).toBeLessThan(t[1][1]!);
+    expect(sensitivity(BASE, [80], [0], "buy")).toEqual([[null]]);  // no purchase entered: nothing to show
+  });
+});

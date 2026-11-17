@@ -25,3 +25,21 @@ test("a building's revenue by season, its costs and the profit of buying or leas
   await page.reload();  // the draft is kept in this browser
   await expect(page.getByLabel("Số phòng", { exact: true })).toHaveValue("10");
 });
+
+
+test("scenarios and the sensitivity table follow the entered building", async ({ page }) => {
+  await page.goto("/building");
+  const fill = async (label: string, value: string) => page.getByLabel(label, { exact: true }).fill(value);
+  await fill("Số phòng", "10");
+  await fill("Mùa cao điểm: số tháng", "12"); await fill("Giá (đ/phòng/tháng)", "10000000"); await fill("Có khách (%)", "80");
+  await fill("Mùa thấp điểm: số tháng", ""); await fill("Giá thấp điểm (đ/phòng/tháng)", ""); await fill("Có khách thấp điểm (%)", "");
+  await fill("Vệ sinh tổng thể", "8000000");
+  const box = page.getByRole("region", { name: "Kịch bản và độ nhạy" });
+  await fill("Kịch bản xấu: có khách ± (điểm %)", "-20");
+  await fill("Kịch bản xấu: giá thuê ± (%)", "-10");
+  const cases = box.getByRole("table", { name: "Ba kịch bản" });
+  await expect(cases.getByRole("row", { name: /Xấu/ })).toContainText("54.000.000");   // 10 × 9m × 60%
+  await expect(cases.getByRole("row", { name: /Cơ sở/ })).toContainText("80.000.000");
+  const grid = box.getByRole("table", { name: "Bảng độ nhạy theo tỷ lệ có khách và giá thuê" });
+  await expect(grid.getByRole("row", { name: /^100%/ })).toContainText("92.000.000");   // 100m full, less 8m cleaning
+});

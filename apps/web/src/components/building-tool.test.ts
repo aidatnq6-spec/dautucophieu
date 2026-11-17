@@ -71,3 +71,21 @@ describe("breakevenText", async () => {
     expect(breakevenText(p)).toBe("vận hành 41,2% · mua tòa (sau trả nợ) kín phòng cũng chưa hòa vốn · thuê lại (sau tiền thuê tòa) 58,4%");
   });
 });
+
+describe("the profit chart", async () => {
+  const { chartLines, OCC_STEPS } = await import("./building-tool");
+  const { buildingPlan } = await import("./building-calc");
+  const input = { rooms: 10, seasons: [{ months: 12, rent: 10_000_000, occupancy: 80 }], peakRent: null, brokerPct: 0, otaPct: 0, otaShare: 0, vatPct: 0,
+    pitPct: 0, otherPct: 0, reservePct: 0, fixed: { cleaning: 8_000_000, common: 0, staff: 0, internet: 0, insurance: 0, other: 0 }, equipment: [],
+    pccc: { cost: 0, years: 0 }, lease: { rent: 50_000_000, deposit: 0, setup: 0, months: 12 } };
+  it("draws each model from empty to full rooms with the range to fit them and zero", () => {
+    const c = chartLines(input, buildingPlan(input));
+    expect(OCC_STEPS[0]).toBe(0); expect(OCC_STEPS.at(-1)).toBe(100);
+    expect(c.series.map((s) => s.id)).toEqual(["noi", "lease"]);   // no purchase entered: no line for it
+    const noi = c.series[0];
+    expect(noi.values[0]).toBe(-8_000_000);                        // empty: the fixed cost
+    expect(noi.values.at(-1)).toBe(92_000_000);                    // full: 100m less 8m
+    expect(c.series[1].breakeven).toBeCloseTo(0.58, 10);           // (8m + 50m) of 100m
+    expect(c.lo).toBe(-58_000_000); expect(c.hi).toBe(92_000_000);
+  });
+});

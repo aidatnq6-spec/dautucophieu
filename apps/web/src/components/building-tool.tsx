@@ -234,6 +234,46 @@ function PrintHead({ name, f, rows }: { name: string | null; f: typeof EMPTY; ro
   );
 }
 
+export const OCC_STEPS = Array.from({ length: 21 }, (_, i) => i * 5);
+const LINE: Record<Measure, [string, string]> = { noi: ["Vận hành", "bt-line-noi"], buy: ["Mua tòa (sau trả nợ)", "bt-line-buy"],
+  lease: ["Thuê lại (sau tiền thuê tòa)", "bt-line-lease"] };
+
+/** Each model's monthly result from empty to full rooms (rents as entered), its breakeven occupancy, and the range that fits them and zero. */
+export function chartLines(input: BuildingInput, base: BuildingPlan) {
+  const series = (["noi", "buy", "lease"] as Measure[]).filter((m) => measureOf(base, m) !== null).map((m) => ({
+    id: m, label: LINE[m][0], cls: LINE[m][1], values: sensitivity(input, OCC_STEPS, [0], m).map((row) => row[0] as number),
+    breakeven: m === "noi" ? base.breakevenOccupancy : m === "buy" ? base.buy!.breakevenOccupancy : base.lease!.breakevenOccupancy }));
+  const all = series.flatMap((s) => s.values).concat(0);
+  return { series, lo: Math.min(...all), hi: Math.max(...all) };
+}
+
+/** Lợi nhuận theo tỷ lệ có khách: one line a model, zero marked, each breakeven point dotted. */
+function ProfitChart({ input, base }: { input: BuildingInput; base: BuildingPlan }) {
+  const { series, lo, hi } = chartLines(input, base);
+  const W = 640, H = 200, L = 70, B = 22, span = hi - lo || 1;
+  const x = (occ: number) => L + (occ / 100) * (W - L - 8);
+  const y = (v: number) => 8 + (1 - (v - lo) / span) * (H - B - 8);
+  const short = (v: number) => `${(v / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 0 })} tr`;
+  return (
+    <figure className="bt-chart">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Lợi nhuận mỗi tháng theo tỷ lệ có khách">
+        {[0, 25, 50, 75, 100].map((o) => <g key={o}><line x1={x(o)} x2={x(o)} y1={8} y2={H - B} className="bt-grid" />
+          <text x={x(o)} y={H - 6} textAnchor="middle" className="bt-axis">{o}%</text></g>)}
+        <line x1={L} x2={W - 8} y1={y(0)} y2={y(0)} className="bt-zero" />
+        <text x={L - 6} y={y(hi) + 4} textAnchor="end" className="bt-axis">{short(hi)}</text>
+        <text x={L - 6} y={y(0) + 4} textAnchor="end" className="bt-axis">0</text>
+        <text x={L - 6} y={y(lo) + 4} textAnchor="end" className="bt-axis">{short(lo)}</text>
+        {series.map((s) => <g key={s.id}>
+          <polyline points={s.values.map((v, i) => `${x(OCC_STEPS[i])},${y(v)}`).join(" ")} className={`bt-line ${s.cls}`} />
+          {Number.isFinite(s.breakeven) && s.breakeven <= 1 && <circle cx={x(s.breakeven * 100)} cy={y(0)} r={4} className={`bt-dot ${s.cls}`} />}
+        </g>)}
+      </svg>
+      <figcaption className="bt-legend">{series.map((s) => <span key={s.id}><i className={`bt-key ${s.cls}`} />{s.label}
+        {Number.isFinite(s.breakeven) && s.breakeven <= 1 ? ` (hòa vốn ${pct(s.breakeven)})` : " (kín phòng cũng chưa hòa vốn)"}</span>)}</figcaption>
+    </figure>
+  );
+}
+
 function Scenarios({ input, base, f, set }: { input: BuildingInput; base: BuildingPlan; f: typeof EMPTY; set: (k: Key, v: string) => void }) {
   const [measure, setMeasure] = useState<Measure>("noi");
   const shown = MEASURES.filter(([m]) => measureOf(base, m) !== null);
@@ -261,6 +301,8 @@ function Scenarios({ input, base, f, set }: { input: BuildingInput; base: Buildi
         <tbody>{[...cases.filter(([n]) => n === "Xấu"), ["Cơ sở", base] as const, ...cases.filter(([n]) => n === "Tốt")].map(([name, plan]) => (
           <tr key={name}><td>{name}</td><td className="num">{vnd(plan.revenueMonth)}</td><td className="num">{cell(measureOf(plan, m))}</td></tr>))}</tbody></table>
       <p data-testid="breakeven"><strong>Tỷ lệ có khách hòa vốn</strong> (áp cho cả năm, giá như đã nhập): {breakevenText(base)}</p>
+      <h3>Lợi nhuận mỗi tháng theo tỷ lệ có khách (giá như đã nhập)</h3>
+      <ProfitChart input={input} base={base} />
       <h3>Độ nhạy: {MEASURES.find(([x]) => x === m)![1].toLowerCase()} mỗi tháng</h3>
       <p className="caption">Mỗi hàng là một tỷ lệ có khách áp cho cả năm; mỗi cột là giá thuê thay đổi so với giá đã nhập. Ô đỏ là âm.</p>
       <div className="tablewrap"><table className="fv-table" aria-label="Bảng độ nhạy theo tỷ lệ có khách và giá thuê">

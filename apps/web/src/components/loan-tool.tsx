@@ -54,6 +54,17 @@ function Donut({ parts, total, center }: { parts: { label: string; value: number
   );
 }
 
+export type LoanPrefill = { principal: number; rate: number; years: number; method: Method; note?: string };
+/** The event the building tab sends to open its purchase loan here. */
+export const PREFILL_EVENT = "loan:prefill";
+
+/** A loan handed over from another tab, as this tab's boxes: in millions (to keep the đồng), one rate for the whole term, no offer, no grace. */
+export function prefillFields(p: LoanPrefill) {
+  const dec = (v: number) => String(Math.round(v * 1000) / 1000).replace(".", ",");
+  return { mode: "loan" as const, loan: dec(p.principal / 1e6), loanUnit: "trieu" as Unit, term: dec(p.years), termUnit: "year" as Span, promoRate: dec(p.rate),
+    afterRate: dec(p.rate), promo: "0", promoUnit: "year" as Span, method: p.method, grace: "0", prepayOn: false };
+}
+
 /** Estimate of a loan's monthly payments. Runs in the browser; nothing is saved or sent anywhere. */
 export function LoanTool() {
   const [f, setF] = useState<Form>(DEFAULTS);
@@ -70,6 +81,17 @@ export function LoanTool() {
       setF((old) => ({ ...old, ...filled.fields }));
       setFromBook(`Đang xem "${row.name}" từ sổ khoản vay, theo dư nợ hiện tại. Thay đổi ở đây không ghi lại vào sổ.${filled.noAfterRate ? " Chưa nhập lãi sau ưu đãi nên tạm dùng lãi hiện tại." : ""}`);
     }, () => setFromBook("Không đọc được sổ khoản vay."));
+  }, []);
+  // a loan handed over from the building tab (Xem lịch trả nợ chi tiết)
+  useEffect(() => {
+    const take = (e: Event) => {
+      const p = (e as CustomEvent<LoanPrefill>).detail;
+      setF((old) => ({ ...old, ...prefillFields(p) }));
+      setFromBook(p.note ?? null);
+      setOpen(true);
+    };
+    window.addEventListener(PREFILL_EVENT, take);
+    return () => window.removeEventListener(PREFILL_EVENT, take);
   }, []);
   const set = <K extends keyof Form>(key: K) => (value: Form[K]) => setF((old) => ({ ...old, [key]: value }));
   const result = useMemo<Blocked | Ready>(() => {

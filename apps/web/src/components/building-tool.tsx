@@ -4,6 +4,7 @@ import { ApiError, api, requestId } from "../lib/api";
 import { formatRatio, formatVnd, groupDigitsInput, hanoiDate, parseMoneyInput } from "../lib/format";
 import { buildingPlan, measureOf, scenario, sensitivity, type BuildingInput, type BuildingPlan, type Measure } from "./building-calc";
 import type { Method } from "./loan-calc";
+import { PREFILL_EVENT, type LoanPrefill } from "./loan-tool";
 
 const DRAFT_KEY = "building-tool-draft-v1";
 const OCCUPANCIES = [50, 60, 70, 80, 90, 100];
@@ -208,6 +209,13 @@ function SavedPlans({ store, open }: { store: Store; open: (s: Saved) => void })
         : <p className="muted">Chưa lưu phương án nào.</p>)}
     </section>
   );
+}
+
+/** Opens the building's purchase loan in the Khoản vay tab, its figures filled in. */
+function openLoan(p: LoanPrefill) {
+  window.dispatchEvent(new CustomEvent<LoanPrefill>(PREFILL_EVENT, { detail: p }));
+  window.history.replaceState(null, "", "/loan?tab=khoan-vay");
+  window.scrollTo({ top: 0 });
 }
 
 /** What the recording of 17/11/2026 (căn hộ dịch vụ Đà Nẵng, a personal account) says for each line; "Bài không nêu số" where it gave none. */
@@ -483,7 +491,10 @@ export function BuildingTool() {
             <dd><strong className={p.noiMonth < 0 ? "negative" : undefined}>{vnd(p.noiMonth)}</strong></dd></dl>
           {p.buy && <section aria-label="Kết quả nếu mua tòa"><h3>Nếu mua tòa</h3><dl className="bt-list">
             <dt>Tổng tiền bỏ ra</dt><dd>{vnd(p.buy.invested)}{p.buy.loan > 0 && <> (vay {vnd(p.buy.loan)})</>}</dd>
-            {p.buy.loan > 0 && <><dt>Trả ngân hàng mỗi tháng (bình quân năm đầu)</dt><dd>{vnd(p.buy.loanPaymentMonth)}</dd></>}
+            {p.buy.loan > 0 && <><dt>Trả ngân hàng mỗi tháng (bình quân năm đầu)</dt><dd>{vnd(p.buy.loanPaymentMonth)}
+              {input?.buy && <div><button type="button" className="btn text" onClick={() => openLoan({ principal: p.buy!.loan, rate: input.buy!.loanRate,
+                years: input.buy!.termYears, method: input.buy!.method, note: `Đang xem khoản vay mua tòa ${opened ? `"${opened}"` : "đang tính"} (vay ${vnd(p.buy!.loan)}, ${input.buy!.loanRate
+                .toLocaleString("vi-VN")}%/năm, ${input.buy!.termYears} năm). Thay đổi ở đây không đổi số ở tab Tòa nhà.` })}>Xem lịch trả nợ chi tiết</button></div>}</dd></>}
             <dt>Dòng tiền còn lại mỗi tháng</dt><dd><strong className={p.buy.cashMonth < 0 ? "negative" : undefined}>{vnd(p.buy.cashMonth)}</strong></dd>
             <dt>Lợi suất ròng trên tổng tiền bỏ ra</dt><dd>{pct(p.buy.netYield)} một năm</dd>
             {p.buy.cashOnCash !== null && <><dt>Lợi suất trên vốn tự có</dt><dd>{pct(p.buy.cashOnCash)} một năm</dd></>}

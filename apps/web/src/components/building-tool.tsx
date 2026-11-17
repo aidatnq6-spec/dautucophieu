@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { formatRatio, formatVnd, groupDigitsInput, parseMoneyInput } from "../lib/format";
+import { ApiError, api, requestId } from "../lib/api";
+import { formatRatio, formatVnd, groupDigitsInput, hanoiDate, parseMoneyInput } from "../lib/format";
 import { buildingPlan, measureOf, scenario, sensitivity, type BuildingInput, type BuildingPlan, type Measure } from "./building-calc";
 import type { Method } from "./loan-calc";
 
@@ -8,7 +9,8 @@ const DRAFT_KEY = "building-tool-draft-v1";
 const OCCUPANCIES = [50, 60, 70, 80, 90, 100];
 const RENT_PCTS = [-20, -10, 0, 10];
 const MEASURES: [Measure, string][] = [["noi", "Lợi nhuận vận hành"], ["buy", "Nếu mua: dòng tiền sau trả nợ"], ["lease", "Nếu thuê lại: lợi nhuận sau tiền thuê tòa"]];
-type Row = { name: string; count: string; price: string; life: string };
+export type Row = { name: string; count: string; price: string; life: string };
+type Saved = { id: string; name: string; saved_on: string; method: Method; form: Partial<Record<Key, string>>; rows: Row[] };
 const EMPTY = {
   rooms: "", hiMonths: "", hiRent: "", hiOcc: "", loMonths: "", loRent: "", loOcc: "", peakRent: "",
   brokerPct: "", otaPct: "", otaShare: "", vatPct: "", pitPct: "", otherPct: "", reservePct: "",
@@ -27,6 +29,97 @@ const money = (s: string) => (s.trim() ? Number(parseMoneyInput(s) ?? NaN) : 0);
 const num = (s: string) => (s.trim() ? Number(s.trim().replace(/\./g, "").replace(",", ".")) : 0);
 const vnd = (v: number) => formatVnd(String(Math.round(v)));
 const pct = (v: number) => formatRatio(v.toFixed(6), 1);
+
+/** The boxes as typed → the plan, or what is wrong with them; null until the rooms and a rent are in. */
+export function readPlan(f: typeof EMPTY, rows: Row[], method: Method): { error: string } | { plan: BuildingPlan; input: BuildingInput } | null {
+  const rooms = num(f.rooms);
+  if (!rooms || (!f.hiRent.trim() && !f.loRent.trim())) return null;
+  const values = Object.fromEntries((Object.keys(EMPTY) as Key[]).filter((k) => !SIGNED.has(k))
+    .map((k) => [k, MONEY.has(k) ? money(f[k]) : num(f[k])])) as Record<Key, number>;
+  if (Object.values(values).some((v) => Number.isNaN(v) || v < 0)) return { error: "Các ô chỉ nhận số không âm." };
+  if (!Number.isInteger(rooms)) return { error: "Số phòng là số nguyên." };
+  for (const k of ["hiOcc", "loOcc", "brokerPct", "otaPct", "otaShare", "vatPct", "pitPct", "otherPct", "reservePct"] as Key[])
+    if (values[k] > 100) return { error: "Các tỷ lệ % từ 0 đến 100." };
+  const equipment = rows.filter((r) => r.count.trim() || r.price.trim()).map((r) => ({ name: r.name, count: num(r.count), price: money(r.price), lifeYears: num(r.life) }));
+  if (equipment.some((e) => Number.isNaN(e.count) || Number.isNaN(e.price) || !e.lifeYears)) return { error: "Mỗi thiết bị cần số lượng, giá và tuổi thọ (năm)." };
+  const input: BuildingInput = {
+    rooms, peakRent: values.peakRent || null,
+    seasons: [{ months: values.hiMonths, rent: values.hiRent, occupancy: values.hiOcc }, { months: values.loMonths, rent: values.loRent, occupancy: values.loOcc }]
+      .filter((s) => s.months > 0),
+    brokerPct: values.brokerPct, otaPct: values.otaPct, otaShare: values.otaShare, vatPct: values.vatPct, pitPct: values.pitPct, otherPct: values.otherPct,
+    reservePct: values.reservePct,
+    fixed: { cleaning: values.cleaning, common: values.common, staff: values.staff, internet: values.internet, insurance: values.insurance, other: values.fixedOther },
+    equipment, pccc: { cost: values.pcccCost, years: values.pcccYears },
+    buy: values.price > 0 ? { price: values.price, buyCosts: values.buyCosts, renovation: values.renovation, own: values.own, loanRate: values.loanRate,
+      termYears: values.termYears, method } : undefined,
+    lease: values.leaseRent > 0 ? { rent: values.leaseRent, deposit: values.deposit, setup: values.setup, months: values.leaseMonths } : undefined,
+  };
+  if (!input.seasons.length) return { error: "Nhập số tháng của ít nhất một mùa." };
+  if (input.buy && input.buy.own > input.buy.price + input.buy.buyCosts + input.buy.renovation) return { error: "Vốn tự có lớn hơn tổng tiền mua và sửa sang." };
+  if (input.buy && input.buy.price + input.buy.buyCosts + input.buy.renovation > input.buy.own && (!input.buy.termYears || !Number.isInteger(input.buy.termYears)))
+    return { error: "Có vay thì nhập thời hạn vay (số năm nguyên)." };
+  return { plan: buildingPlan(input), input };
+}
+
+/** "cao hơn 3,2 điểm %" or "thấp hơn …": a yield against the deposit rate. */
+export function gapText(y: number, rate: number): string {
+  const d = (y - rate) * 100;
+  return `${d >= 0 ? "cao" : "thấp"} hơn ${Math.abs(d).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} điểm %`;
+}
+
+/** B7: the owner's named plans (settings/building_plans), saved as typed, reopened, and compared side by side. */
+function SavedPlans({ current, hasPlan, open }: { current: { f: typeof EMPTY; rows: Row[]; method: Method }; hasPlan: boolean; open: (s: Saved) => void }) {
+  const [data, setData] = useState<{ version: number; plans: Saved[] } | null>(null);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => { api<{ version: number; plans: Saved[] }>("settings/building-plans").then(setData, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
+  const write = async (plans: Saved[]) => {
+    if (!data) return;
+    setBusy(true); setError(null);
+    try { setData(await api("settings/building-plans", { method: "PUT", body: { plans, expected_version: data.version, request_id: requestId() } })); setName(""); }
+    catch (e) { setError(e instanceof ApiError ? e.failure.message : "Không lưu được."); } finally { setBusy(false); }
+  };
+  const save = () => {
+    if (!data || !name.trim()) return;
+    const form = Object.fromEntries(Object.entries(current.f).filter(([, v]) => v.trim())) as Partial<Record<Key, string>>;
+    const item: Saved = { id: data.plans.find((x) => x.name === name.trim())?.id ?? requestId().slice(0, 24), name: name.trim(), saved_on: hanoiDate(),
+      method: current.method, form, rows: current.rows.filter((r) => r.count.trim() || r.price.trim() || r.name.trim()) };
+    void write([...data.plans.filter((x) => x.id !== item.id), item]);
+  };
+  const rowsOf = data?.plans.map((s) => ({ s, out: readPlan({ ...EMPTY, ...s.form }, s.rows, s.method) })) ?? [];
+  const money2 = (v: number | null | undefined) => (v === null || v === undefined ? "—" : <span className={v < 0 ? "negative" : undefined}>{vnd(v)}</span>);
+  return (
+    <section className="surface" aria-label="Các phương án đã lưu">
+      <h2>Các phương án đã lưu</h2>
+      <p className="caption">Lưu số đã nhập dưới một tên để mở lại và so các tòa cạnh nhau (tối đa 20). Lưu trong thiết lập cá nhân trên máy, không gửi đi đâu.</p>
+      {error && <p className="errors" role="alert">{error}</p>}
+      <form className="formgrid" aria-label="Lưu phương án" onSubmit={(e) => { e.preventDefault(); save(); }}>
+        <label className="field">Tên phương án<input aria-label="Tên phương án" maxLength={60} value={name} onChange={(e) => setName(e.target.value)}
+          placeholder="ví dụ Tòa 10 phòng gần biển" /></label>
+        <button type="submit" className="btn" disabled={busy || !data || !name.trim() || !hasPlan}>Lưu phương án này</button>
+        {data && data.plans.some((x) => x.name === name.trim()) && <span className="caption">Đã có phương án tên này: lưu sẽ thay số cũ.</span>}
+      </form>
+      {data && (rowsOf.length ? <div className="tablewrap"><table className="fv-table" aria-label="So sánh các phương án">
+        <thead><tr><th>Phương án</th><th className="num">Doanh thu/tháng</th><th className="num">Chi phí % doanh thu</th><th className="num">Lợi nhuận vận hành/tháng</th>
+          <th className="num">Mua: dòng tiền/tháng</th><th className="num">Mua: lợi suất vốn tự có</th><th className="num">Thuê lại: lợi nhuận/tháng</th>
+          <th className="num">Thuê lại: có khách tối thiểu</th><th /></tr></thead>
+        <tbody>{rowsOf.map(({ s, out }) => { const pl = out && "plan" in out ? out.plan : null; return <tr key={s.id}>
+          <td><strong>{s.name}</strong><div className="caption">lưu {s.saved_on.split("-").reverse().join("/")}</div></td>
+          {pl ? <>
+            <td className="num">{vnd(pl.revenueMonth)}</td><td className="num">{pct(pl.costShare)}</td><td className="num">{money2(pl.noiMonth)}</td>
+            <td className="num">{money2(pl.buy?.cashMonth)}</td><td className="num">{pl.buy?.cashOnCash != null ? pct(pl.buy.cashOnCash) : "—"}</td>
+            <td className="num">{money2(pl.lease?.profitMonth)}</td>
+            <td className="num">{pl.lease && Number.isFinite(pl.lease.breakevenOccupancy) ? pct(pl.lease.breakevenOccupancy) : "—"}</td>
+          </> : <td colSpan={7} className="muted">{out && "error" in out ? out.error : "chưa đủ số để tính"}</td>}
+          <td><div className="ib-actions"><button type="button" className="btn" onClick={() => open(s)}>Mở</button>
+            <button type="button" className="btn text" aria-label={`Xóa phương án ${s.name}`} disabled={busy}
+              onClick={() => { if (window.confirm(`Xóa phương án "${s.name}"?`)) void write(data.plans.filter((x) => x.id !== s.id)); }}>Xóa</button></div></td>
+        </tr>; })}</tbody></table></div>
+        : <p className="muted">Chưa lưu phương án nào.</p>)}
+    </section>
+  );
+}
 
 function Field({ k, label, f, set, hint }: { k: Key; label: string; f: typeof EMPTY; set: (k: Key, v: string) => void; hint?: string }) {
   return <label className="field">{label}<input aria-label={label} inputMode={MONEY.has(k) ? "numeric" : "decimal"} value={f[k]} placeholder={hint}
@@ -76,6 +169,10 @@ export function BuildingTool() {
   const [rows, setRows] = useState<Row[]>([{ name: "", count: "", price: "", life: "" }]);
   const [method, setMethod] = useState<Method>("annuity");
   const [restored, setRestored] = useState(false);
+  const [depositRate, setDepositRate] = useState<number | null>(null);
+  useEffect(() => {
+    api<{ default_rate: string | null }>("passive-income").then((v) => setDepositRate(v.default_rate ? Number(v.default_rate) / 100 : null), () => undefined);
+  }, []);
   useEffect(() => {
     void Promise.resolve().then(() => {  // the draft kept in this browser, once, after the first paint
       try {
@@ -92,36 +189,7 @@ export function BuildingTool() {
   const set = (k: Key, v: string) => setF((old) => ({ ...old, [k]: v }));
   const setRow = (i: number, k: keyof Row, v: string) => setRows((old) => old.map((r, j) => (j === i ? { ...r, [k]: k === "price" ? groupDigitsInput(v) : v } : r)));
 
-  const compute = (): { error: string } | { plan: BuildingPlan; input: BuildingInput } | null => {
-    const rooms = num(f.rooms);
-    if (!rooms || (!f.hiRent.trim() && !f.loRent.trim())) return null;
-    const values = Object.fromEntries((Object.keys(EMPTY) as Key[]).filter((k) => !SIGNED.has(k))
-      .map((k) => [k, MONEY.has(k) ? money(f[k]) : num(f[k])])) as Record<Key, number>;
-    if (Object.values(values).some((v) => Number.isNaN(v) || v < 0)) return { error: "Các ô chỉ nhận số không âm." };
-    if (!Number.isInteger(rooms)) return { error: "Số phòng là số nguyên." };
-    for (const k of ["hiOcc", "loOcc", "brokerPct", "otaPct", "otaShare", "vatPct", "pitPct", "otherPct", "reservePct"] as Key[])
-      if (values[k] > 100) return { error: "Các tỷ lệ % từ 0 đến 100." };
-    const equipment = rows.filter((r) => r.count.trim() || r.price.trim()).map((r) => ({ name: r.name, count: num(r.count), price: money(r.price), lifeYears: num(r.life) }));
-    if (equipment.some((e) => Number.isNaN(e.count) || Number.isNaN(e.price) || !e.lifeYears)) return { error: "Mỗi thiết bị cần số lượng, giá và tuổi thọ (năm)." };
-    const input: BuildingInput = {
-      rooms, peakRent: values.peakRent || null,
-      seasons: [{ months: values.hiMonths, rent: values.hiRent, occupancy: values.hiOcc }, { months: values.loMonths, rent: values.loRent, occupancy: values.loOcc }]
-        .filter((s) => s.months > 0),
-      brokerPct: values.brokerPct, otaPct: values.otaPct, otaShare: values.otaShare, vatPct: values.vatPct, pitPct: values.pitPct, otherPct: values.otherPct,
-      reservePct: values.reservePct,
-      fixed: { cleaning: values.cleaning, common: values.common, staff: values.staff, internet: values.internet, insurance: values.insurance, other: values.fixedOther },
-      equipment, pccc: { cost: values.pcccCost, years: values.pcccYears },
-      buy: values.price > 0 ? { price: values.price, buyCosts: values.buyCosts, renovation: values.renovation, own: values.own, loanRate: values.loanRate,
-        termYears: values.termYears, method } : undefined,
-      lease: values.leaseRent > 0 ? { rent: values.leaseRent, deposit: values.deposit, setup: values.setup, months: values.leaseMonths } : undefined,
-    };
-    if (!input.seasons.length) return { error: "Nhập số tháng của ít nhất một mùa." };
-    if (input.buy && input.buy.own > input.buy.price + input.buy.buyCosts + input.buy.renovation) return { error: "Vốn tự có lớn hơn tổng tiền mua và sửa sang." };
-    if (input.buy && input.buy.price + input.buy.buyCosts + input.buy.renovation > input.buy.own && (!input.buy.termYears || !Number.isInteger(input.buy.termYears)))
-      return { error: "Có vay thì nhập thời hạn vay (số năm nguyên)." };
-    return { plan: buildingPlan(input), input };
-  };
-  const out = compute();  // light arithmetic: worked out on each render
+  const out = readPlan(f, rows, method);  // light arithmetic: worked out on each render
   const p = out && "plan" in out ? out.plan : null;
   const input = out && "input" in out ? out.input : null;
   const F = (k: Key, label: string, hint?: string) => <Field k={k} label={label} f={f} set={set} hint={hint} />;
@@ -201,6 +269,8 @@ export function BuildingTool() {
             <dt>Dòng tiền còn lại mỗi tháng</dt><dd><strong className={p.buy.cashMonth < 0 ? "negative" : undefined}>{vnd(p.buy.cashMonth)}</strong></dd>
             <dt>Lợi suất ròng trên tổng tiền bỏ ra</dt><dd>{pct(p.buy.netYield)} một năm</dd>
             {p.buy.cashOnCash !== null && <><dt>Lợi suất trên vốn tự có</dt><dd>{pct(p.buy.cashOnCash)} một năm</dd></>}
+            {p.buy.cashOnCash !== null && depositRate !== null && <><dt>So với gửi tiết kiệm 12 tháng ({pct(depositRate)})</dt>
+              <dd className={p.buy.cashOnCash < depositRate ? "negative" : undefined}>{gapText(p.buy.cashOnCash, depositRate)}</dd></>}
             <dt>Hoàn vốn tự có</dt><dd>{p.buy.paybackYears !== null ? `khoảng ${p.buy.paybackYears.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} năm` : "không hoàn vốn (dòng tiền âm)"}</dd>
             <dt>Tỷ lệ có khách tối thiểu để không âm tiền</dt><dd>{Number.isFinite(p.buy.breakevenOccupancy) ? pct(p.buy.breakevenOccupancy) : "không đạt được"}</dd>
           </dl></section>}
@@ -211,6 +281,14 @@ export function BuildingTool() {
               {Number.isFinite(p.lease.breakevenOccupancy) ? pct(p.lease.breakevenOccupancy) : "không đạt được"}{p.lease.breakevenOccupancy > 1 && " — kín phòng cũng chưa hòa vốn"}</dd>
             <dt>Lợi nhuận mỗi tháng</dt><dd><strong className={p.lease.profitMonth < 0 ? "negative" : undefined}>{vnd(p.lease.profitMonth)}</strong></dd>
             <dt>Lợi nhuận cả hợp đồng (trừ chi phí setup)</dt><dd className={p.lease.contractProfit < 0 ? "negative" : undefined}>{vnd(p.lease.contractProfit)}</dd>
+            {(() => {
+              const capital = (input?.lease?.setup ?? 0) + (input?.lease?.deposit ?? 0);
+              if (!capital) return null;
+              const y = (p.lease.profitMonth * 12) / capital;
+              return <><dt>Lợi nhuận một năm trên tiền bỏ ra (setup + cọc)</dt><dd>{pct(y)}</dd>
+                {depositRate !== null && <><dt>So với gửi tiết kiệm 12 tháng ({pct(depositRate)})</dt>
+                  <dd className={y < depositRate ? "negative" : undefined}>{gapText(y, depositRate)}</dd></>}</>;
+            })()}
             <dt>Thu hồi chi phí setup</dt><dd>{p.lease.setupPaybackMonths !== null ? `khoảng ${p.lease.setupPaybackMonths.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tháng` : "không thu hồi được"}</dd>
           </dl><p className="caption">Bài ghi âm nói đơn vị vận hành tốt hòa vốn ở khoảng 1,5–1,6 lần tiền thuê tòa, đơn vị mới vào nghề 1,7–1,8 lần (tham khảo).</p></section>}
           <p className="caption">Chỉ là phép tính trên số bạn nhập, không phải khuyến nghị. Bản nháp được nhớ trên trình duyệt này.</p>
@@ -218,6 +296,8 @@ export function BuildingTool() {
       </aside>
     </div>
     {input && p && <Scenarios input={input} base={p} f={f} set={set} />}
+    <SavedPlans current={{ f, rows, method }} hasPlan={!!p} open={(s) => { setF({ ...EMPTY, ...s.form }); setRows(s.rows.length ? s.rows : [{ name: "", count: "", price: "", life: "" }]);
+      setMethod(s.method); window.scrollTo({ top: 0 }); }} />
     </>
   );
 }

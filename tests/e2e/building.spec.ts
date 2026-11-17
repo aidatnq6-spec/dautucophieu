@@ -43,3 +43,22 @@ test("scenarios and the sensitivity table follow the entered building", async ({
   const grid = box.getByRole("table", { name: "Bảng độ nhạy theo tỷ lệ có khách và giá thuê" });
   await expect(grid.getByRole("row", { name: /^100%/ })).toContainText("92.000.000");   // 100m full, less 8m cleaning
 });
+
+
+test("a plan is saved under a name, compared with the others, reopened and deleted", async ({ page }) => {
+  await page.goto("/building");
+  const fill = async (label: string, value: string) => page.getByLabel(label, { exact: true }).fill(value);
+  await fill("Số phòng", "8"); await fill("Mùa cao điểm: số tháng", "12"); await fill("Giá (đ/phòng/tháng)", "9000000"); await fill("Có khách (%)", "75");
+  const name = `Tòa thử ${Date.now() % 100000}`;  // unique: the store is shared and a retry runs again
+  const saved = page.getByRole("region", { name: "Các phương án đã lưu" });
+  await saved.getByLabel("Tên phương án").fill(name);
+  await saved.getByRole("button", { name: "Lưu phương án này" }).click();
+  const row = saved.getByRole("table", { name: "So sánh các phương án" }).getByRole("row", { name: new RegExp(name) });
+  await expect(row).toContainText("54.000.000");   // 8 × 9m × 75%
+  await fill("Số phòng", "20");
+  await row.getByRole("button", { name: "Mở" }).click();
+  await expect(page.getByLabel("Số phòng", { exact: true })).toHaveValue("8");
+  page.once("dialog", (d) => void d.accept());
+  await row.getByRole("button", { name: `Xóa phương án ${name}` }).click();
+  await expect(saved.getByRole("row", { name: new RegExp(name) })).toHaveCount(0);
+});

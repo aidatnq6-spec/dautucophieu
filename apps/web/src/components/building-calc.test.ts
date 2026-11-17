@@ -104,3 +104,23 @@ describe("the occupancy that breaks even with the rents as entered", () => {
     expect(Math.abs(at.noiMonth)).toBeLessThan(1);
   });
 });
+
+describe("holding the building against keeping the money on deposit", () => {
+  it("gives the same price to reach as the one-flat check for one fully let flat", async () => {
+    const { rentalCompare } = await import("./rental-calc");
+    const one: BuildingInput = { rooms: 1, seasons: [{ months: 12, rent: 12_000_000, occupancy: 100 }], peakRent: null, brokerPct: 0, otaPct: 0, otaShare: 0,
+      vatPct: 0, pitPct: 0, otherPct: 0, reservePct: 0, fixed: { cleaning: 0, common: 0, staff: 0, internet: 0, insurance: 0, other: 2_000_000 }, equipment: [],
+      pccc: { cost: 0, years: 0 }, buy: { price: 3_000_000_000, buyCosts: 100_000_000, renovation: 0, own: 1_600_000_000, loanRate: 9, termYears: 15,
+        method: "annuity", holdYears: 10, depositRate: 6 } };
+    const hold = buildingPlan(one).buy!.hold!;
+    const flat = rentalCompare({ price: 3_000_000_000, own: 1_600_000_000, upfront: 100_000_000, rent: 12_000_000, running: 2_000_000, loanRate: 9,
+      termYears: 15, method: "annuity", depositRate: 6, years: 10 });
+    expect(hold.neededPrice).toBeCloseTo(flat.neededPrice, 0);
+    expect(hold.neededGrowth!).toBeCloseTo(flat.neededGrowth!, 10);
+    expect(hold.keep).toBeCloseTo(flat.keep, 0);
+  });
+  it("is left out until the years and the deposit rate are both given", () => {
+    const b = buildingPlan({ ...BASE, buy: { price: 5e9, buyCosts: 0, renovation: 0, own: 5e9, loanRate: 0, termYears: 0, method: "annuity" } }).buy!;
+    expect(b.hold).toBeNull();
+  });
+});

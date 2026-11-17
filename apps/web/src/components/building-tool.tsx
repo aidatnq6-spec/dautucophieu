@@ -15,7 +15,7 @@ const EMPTY = {
   rooms: "", hiMonths: "", hiRent: "", hiOcc: "", loMonths: "", loRent: "", loOcc: "", peakRent: "",
   brokerPct: "", brokerMonths: "", contractMonths: "", otaPct: "", otaShare: "", vatPct: "", pitPct: "", otherPct: "", reservePct: "",
   cleaning: "", common: "", staff: "", internet: "", insurance: "", fixedOther: "", pcccCost: "", pcccYears: "",
-  price: "", buyCosts: "", renovation: "", own: "", loanRate: "", termYears: "",
+  price: "", buyCosts: "", renovation: "", own: "", loanRate: "", termYears: "", holdYears: "", holdRate: "",
   leaseRent: "", deposit: "", setup: "", leaseMonths: "",
   badOcc: "", badRent: "", goodOcc: "", goodRent: "",
 };
@@ -28,7 +28,7 @@ const LABELS: Partial<Record<Key, string>> = {
   reservePct: "Dự phòng rủi ro (%)", cleaning: "Vệ sinh (đ/tháng)", common: "Điện nước khu vực chung (đ/tháng)", staff: "Nhân sự (đ/tháng)",
   internet: "Internet, truyền hình (đ/tháng)", insurance: "Bảo hiểm (đ/tháng)", fixedOther: "Cố định khác (đ/tháng)", pcccCost: "Giấy PCCC (đ)",
   pcccYears: "Giấy PCCC dùng trong (năm)", price: "Giá mua (đ)", buyCosts: "Thuế phí sang tên (đ)", renovation: "Sửa sang, nội thất (đ)", own: "Vốn tự có (đ)",
-  loanRate: "Lãi vay (%/năm)", termYears: "Thời hạn vay (năm)", leaseRent: "Tiền thuê nguyên tòa (đ/tháng)", deposit: "Tiền cọc (đ)",
+  loanRate: "Lãi vay (%/năm)", termYears: "Thời hạn vay (năm)", holdYears: "Số năm nắm giữ", holdRate: "Lãi tiền gửi để so (%/năm)", leaseRent: "Tiền thuê nguyên tòa (đ/tháng)", deposit: "Tiền cọc (đ)",
   setup: "Chi phí setup (đ)", leaseMonths: "Thời hạn hợp đồng thuê tòa (tháng)", badOcc: "Kịch bản xấu: có khách ± (điểm %)",
   badRent: "Kịch bản xấu: giá ± (%)", goodOcc: "Kịch bản tốt: có khách ± (điểm %)", goodRent: "Kịch bản tốt: giá ± (%)",
 };
@@ -48,7 +48,8 @@ export function brokerShare(v: { brokerMonths: number; contractMonths: number })
 }
 
 /** The boxes as typed → the plan, or what is wrong with them; null until the rooms and a rent are in. */
-export function readPlan(f: typeof EMPTY, rows: Row[], method: Method): { error: string } | { plan: BuildingPlan; input: BuildingInput } | null {
+export function readPlan(f: typeof EMPTY, rows: Row[], method: Method, defaultDepositRate: number | null = null):
+  { error: string } | { plan: BuildingPlan; input: BuildingInput } | null {
   const rooms = num(f.rooms);
   if (!rooms || (!f.hiRent.trim() && !f.loRent.trim())) return null;
   const values = Object.fromEntries((Object.keys(EMPTY) as Key[]).filter((k) => !SIGNED.has(k))
@@ -70,7 +71,8 @@ export function readPlan(f: typeof EMPTY, rows: Row[], method: Method): { error:
     fixed: { cleaning: values.cleaning, common: values.common, staff: values.staff, internet: values.internet, insurance: values.insurance, other: values.fixedOther },
     equipment, pccc: { cost: values.pcccCost, years: values.pcccYears },
     buy: values.price > 0 ? { price: values.price, buyCosts: values.buyCosts, renovation: values.renovation, own: values.own, loanRate: values.loanRate,
-      termYears: values.termYears, method } : undefined,
+      termYears: values.termYears, method, holdYears: values.holdYears || undefined,
+      depositRate: (f.holdRate ?? "").trim() ? values.holdRate : defaultDepositRate ?? undefined } : undefined,
     lease: values.leaseRent > 0 ? { rent: values.leaseRent, deposit: values.deposit, setup: values.setup, months: values.leaseMonths } : undefined,
   };
   if (!input.seasons.length) return { error: "Nhập số tháng của ít nhất một mùa." };
@@ -384,7 +386,7 @@ export function BuildingTool() {
   const set = (k: Key, v: string) => setF((old) => ({ ...old, [k]: v }));
   const setRow = (i: number, k: keyof Row, v: string) => setRows((old) => old.map((r, j) => (j === i ? { ...r, [k]: k === "price" ? groupDigitsInput(v) : v } : r)));
 
-  const out = readPlan(f, rows, method);  // light arithmetic: worked out on each render
+  const out = readPlan(f, rows, method, depositRate === null ? null : depositRate * 100);  // light arithmetic: worked out on each render
   const p = out && "plan" in out ? out.plan : null;
   const input = out && "input" in out ? out.input : null;
   const F = (k: Key, label: string, hint?: string) => <Field k={k} label={label} f={f} set={set} hint={hint} />;
@@ -443,6 +445,8 @@ export function BuildingTool() {
         <section className="surface" aria-label="Nếu mua tòa">
           <h2>5. Nếu mua tòa nhà</h2>
           <div className="formgrid">{F("price", "Giá mua (đ)")}{F("buyCosts", "Thuế phí sang tên (đ)")}{F("renovation", "Sửa sang, nội thất (đ)")}{F("own", "Vốn tự có (đ)")}</div>
+          <div className="formgrid">{F("holdYears", "Số năm nắm giữ (để so với gửi tiết kiệm)")}
+            {F("holdRate", "Lãi tiền gửi để so (%/năm)", depositRate !== null ? `để trống: ${(depositRate * 100).toLocaleString("vi-VN", { maximumFractionDigits: 2 })}` : undefined)}</div>
           <div className="formgrid">{F("loanRate", "Lãi vay (%/năm)")}{F("termYears", "Thời hạn vay (năm)")}
             <label className="field">Cách trả<select aria-label="Cách trả khoản vay mua tòa" value={method} onChange={(e) => setMethod(e.target.value as Method)}>
               <option value="annuity">Trả đều hàng tháng</option><option value="declining">Dư nợ giảm dần</option></select></label></div>
@@ -485,6 +489,12 @@ export function BuildingTool() {
             {p.buy.cashOnCash !== null && <><dt>Lợi suất trên vốn tự có</dt><dd>{pct(p.buy.cashOnCash)} một năm</dd></>}
             {p.buy.cashOnCash !== null && depositRate !== null && <><dt>So với gửi tiết kiệm 12 tháng ({pct(depositRate)})</dt>
               <dd className={p.buy.cashOnCash < depositRate ? "negative" : undefined}>{gapText(p.buy.cashOnCash, depositRate)}</dd></>}
+            {p.buy.hold && <>
+              <dt>Nếu giữ vốn tự có ở tiền gửi {p.buy.hold.years} năm</dt><dd>{vnd(p.buy.hold.keep)}</dd>
+              <dt>Giá tòa cần đạt sau {p.buy.hold.years} năm để bằng gửi tiết kiệm</dt><dd><strong>{vnd(p.buy.hold.neededPrice)}</strong></dd>
+              <dt>Giá tòa cần tăng mỗi năm</dt><dd className={p.buy.hold.neededGrowth !== null && p.buy.hold.neededGrowth > 0 ? "negative" : undefined}>
+                {p.buy.hold.neededGrowth === null ? "không cần tăng (dòng tiền đã bù đủ)" : `${pct(p.buy.hold.neededGrowth)} một năm`}</dd>
+            </>}
             <dt>Hoàn vốn tự có</dt><dd>{p.buy.paybackYears !== null ? `khoảng ${p.buy.paybackYears.toLocaleString("vi-VN", { maximumFractionDigits: 1 })} năm` : "không hoàn vốn (dòng tiền âm)"}</dd>
             <dt>Tỷ lệ có khách tối thiểu để không âm tiền</dt><dd>{Number.isFinite(p.buy.breakevenOccupancy) ? pct(p.buy.breakevenOccupancy) : "không đạt được"}</dd>
           </dl></section>}

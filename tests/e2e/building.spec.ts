@@ -140,3 +140,28 @@ test("the profit chart draws one line a model with its breakeven", async ({ page
   await expect(chart.locator("polyline")).toHaveCount(2);
   await expect(page.locator(".bt-legend")).toContainText("Thuê lại (sau tiền thuê tòa) (hòa vốn 58,0%)");
 });
+
+
+test("buying is weighed against the deposit over the years held: the price the building must reach and its yearly rise", async ({ page }) => {
+  await page.goto("/loan?tab=toa-nha");
+  const fill = async (label: string, value: string) => tab(page).getByLabel(label, { exact: true }).fill(value);
+  await fill("Số phòng", "1"); await fill("Mùa cao điểm: số tháng", "12"); await fill("Giá (đ/phòng/tháng)", "12000000"); await fill("Có khách (%)", "100");
+  await fill("Khác", "2000000");
+  await fill("Giá mua (đ)", "3000000000"); await fill("Thuế phí sang tên (đ)", "100000000"); await fill("Vốn tự có (đ)", "1600000000");
+  await fill("Lãi vay (%/năm)", "9"); await fill("Thời hạn vay (năm)", "15");
+  await fill("Số năm nắm giữ (để so với gửi tiết kiệm)", "10"); await fill("Lãi tiền gửi để so (%/năm)", "6");
+  const buy = page.getByRole("region", { name: "Kết quả nếu mua tòa" });
+  await expect(buy).toContainText("Giá tòa cần đạt sau 10 năm để bằng gửi tiết kiệm");
+  await expect(buy).toContainText("Nếu giữ vốn tự có ở tiền gửi 10 năm");
+  // the same figures as the one-flat tab for the same flat
+  const flat = page.getByRole("region", { name: "Mua nhà cho thuê hay giữ tiền gửi" });
+  await page.getByRole("tab", { name: "Căn hộ lẻ: mua hay gửi tiết kiệm" }).click();
+  for (const [label, value] of [["Giá nhà (đ)", "3000000000"], ["Vốn tự có (đ)", "1600000000"], ["Chi phí mua ban đầu (đ)", "100000000"],
+    ["Tiền thuê mỗi tháng (đ)", "12000000"], ["Chi phí giữ nhà mỗi tháng (đ)", "2000000"], ["Lãi vay (%/năm)", "9"], ["Thời hạn vay (năm)", "15"],
+    ["Lãi tiền gửi (%/năm)", "6"], ["Số năm nắm giữ", "10"]]) await flat.getByLabel(label, { exact: true }).fill(value);
+  await flat.getByLabel("Cách trả khoản vay mua nhà").selectOption("annuity");
+  const flatText = await flat.textContent();
+  await page.getByRole("tab", { name: "Tòa nhà cho thuê: lợi nhuận vận hành" }).click();
+  const needed = (await buy.locator("dt:has-text('Giá tòa cần đạt') + dd").textContent())!.trim();
+  expect(flatText).toContain(needed);
+});

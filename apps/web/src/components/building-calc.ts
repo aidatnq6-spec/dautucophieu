@@ -16,6 +16,8 @@ export type Costs = { commission: number; tax: number; other: number; reserve: n
 export type BuildingPlan = {
   monthsCheck: number; revenueYear: number; revenueMonth: number; potentialYear: number; vacancyLossYear: number; vacancyShare: number;
   peakOverstates: number | null; costs: Costs; costShare: number; noiMonth: number;
+  /** the share of rooms let, all year at the rents entered, where operating profit is nil (Infinity when no occupancy reaches it) */
+  breakevenOccupancy: number;
   buy: { loan: number; invested: number; loanPaymentMonth: number; cashMonth: number; netYield: number; cashOnCash: number | null;
     paybackYears: number | null; breakevenOccupancy: number } | null;
   lease: { breakevenRevenue: number; multiple: number; breakevenOccupancy: number; profitMonth: number; contractProfit: number;
@@ -67,7 +69,8 @@ export function buildingPlan(i: BuildingInput): BuildingPlan {
   return { monthsCheck, revenueYear, revenueMonth, potentialYear, vacancyLossYear: potentialYear - revenueYear,
     vacancyShare: potentialYear > 0 ? (potentialYear - revenueYear) / potentialYear : 0,
     peakOverstates: i.peakRent && revenueYear > 0 ? (i.peakRent * 12 * i.rooms) / revenueYear - 1 : null,
-    costs, costShare: revenueMonth > 0 ? costs.total / revenueMonth : 0, noiMonth, buy, lease };
+    costs, costShare: revenueMonth > 0 ? costs.total / revenueMonth : 0, noiMonth,
+    breakevenOccupancy: potentialMonth > 0 ? needed(0) / potentialMonth : Infinity, buy, lease };
 }
 
 /** A scenario: occupancy moved by points (kept within 0–100%) and rent by a share (%), in every season. */

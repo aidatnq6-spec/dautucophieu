@@ -63,3 +63,11 @@ describe("boxes that cannot be right are refused, not worked out", async () => {
       .toEqual({ error: "Các khoản tính theo % doanh thu cộng lại đã từ 100% trở lên: kiểm tra lại các ô % ở mục 2." });
   });
 });
+
+describe("breakevenText", async () => {
+  const { breakevenText } = await import("./building-tool");
+  it("names each model's breakeven occupancy, or that even full rooms do not reach it", () => {
+    const p = { breakevenOccupancy: 0.412, buy: { breakevenOccupancy: 1.2 }, lease: { breakevenOccupancy: 0.584 } } as never;
+    expect(breakevenText(p)).toBe("vận hành 41,2% · mua tòa (sau trả nợ) kín phòng cũng chưa hòa vốn · thuê lại (sau tiền thuê tòa) 58,4%");
+  });
+});

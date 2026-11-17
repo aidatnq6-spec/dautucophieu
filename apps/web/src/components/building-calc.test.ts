@@ -93,3 +93,14 @@ describe("scenarios and sensitivity", () => {
     expect(sensitivity(BASE, [80], [0], "buy")).toEqual([[null]]);  // no purchase entered: nothing to show
   });
 });
+
+describe("the occupancy that breaks even with the rents as entered", () => {
+  it("is where operating profit is zero, before any loan or lease", () => {
+    const r = buildingPlan(BASE);
+    const share = 0.12 + 0.10 + 0.02, fixedish = 23_000_000 + 1_250_000 + 1_000_000;
+    expect(r.breakevenOccupancy).toBeCloseTo(fixedish / (1 - share) / (1_060_000_000 / 12), 10);
+    // checked: at that occupancy all year the operating profit is nil
+    const at = buildingPlan({ ...BASE, seasons: BASE.seasons.map((s) => ({ ...s, occupancy: r.breakevenOccupancy * 100 })) });
+    expect(Math.abs(at.noiMonth)).toBeLessThan(1);
+  });
+});

@@ -11,7 +11,9 @@ export type BuildingInput = {
   equipment: Equipment[]; pccc: { cost: number; years: number }; reservePct: number;
   /** holdYears and depositRate (%/year): the building held that long against the own money kept on deposit */
   buy?: { price: number; buyCosts: number; renovation: number; own: number; loanRate: number; termYears: number; method: Method;
-    holdYears?: number; depositRate?: number };
+    holdYears?: number; depositRate?: number;
+    /** an offer rate (%/year) for the first months; loanRate applies after them */
+    promoRate?: number; promoMonths?: number };
   lease?: { rent: number; deposit: number; setup: number; months: number };
 };
 export type Costs = { commission: number; tax: number; other: number; reserve: number; fixed: number; equipment: number; pccc: number; total: number };
@@ -22,6 +24,8 @@ export type BuildingPlan = {
   breakevenOccupancy: number;
   buy: { loan: number; invested: number; loanPaymentMonth: number; cashMonth: number; netYield: number; cashOnCash: number | null;
     paybackYears: number | null; breakevenOccupancy: number;
+    /** with an offer rate: the first month after it, its payment, the cash left then and the occupancy that covers it */
+    afterOffer: { month: number; payment: number; cashMonth: number; breakevenOccupancy: number } | null;
     /** the deposit the own money would grow to, the monthly cash carried on the same deposit, the loan left, and the price the
      * building must reach for holding it to match the deposit (the same arithmetic as the one-flat check, rental-calc) */
     hold: { years: number; keep: number; flowsValue: number; balance: number; neededPrice: number; neededGrowth: number | null } | null } | null;
@@ -55,8 +59,10 @@ export function buildingPlan(i: BuildingInput): BuildingPlan {
   let buy: BuildingPlan["buy"] = null;
   if (i.buy) {
     const b = i.buy, invested = b.price + b.buyCosts + b.renovation, loan = Math.max(invested - b.own, 0);
+    const offerMonths = b.promoMonths && b.promoMonths > 0 && b.promoRate !== undefined ? Math.min(Math.round(b.promoMonths), b.termYears * 12) : 0;
     const rows = loan > 0 && b.termYears > 0
-      ? loanSchedule({ principal: loan, months: b.termYears * 12, promoMonths: 0, promoRate: b.loanRate, afterRate: b.loanRate, method: b.method }).rows : [];
+      ? loanSchedule({ principal: loan, months: b.termYears * 12, promoMonths: offerMonths, promoRate: offerMonths ? b.promoRate! : b.loanRate,
+        afterRate: b.loanRate, method: b.method }).rows : [];
     const firstYear = rows.slice(0, 12);
     const loanPaymentMonth = firstYear.length ? firstYear.reduce((s, r) => s + r.payment, 0) / firstYear.length : 0;
     const cashMonth = noiMonth - loanPaymentMonth;
@@ -71,7 +77,9 @@ export function buildingPlan(i: BuildingInput): BuildingPlan {
     }
     buy = { loan, invested, loanPaymentMonth, cashMonth, netYield: invested > 0 ? (noiMonth * 12) / invested : 0,
       cashOnCash: b.own > 0 ? (cashMonth * 12) / b.own : null, paybackYears: cashMonth > 0 && b.own > 0 ? b.own / (cashMonth * 12) : null,
-      breakevenOccupancy: potentialMonth > 0 ? needed(loanPaymentMonth) / potentialMonth : Infinity, hold };
+      breakevenOccupancy: potentialMonth > 0 ? needed(loanPaymentMonth) / potentialMonth : Infinity, hold,
+      afterOffer: offerMonths && rows[offerMonths] ? { month: offerMonths + 1, payment: rows[offerMonths].payment, cashMonth: noiMonth - rows[offerMonths].payment,
+        breakevenOccupancy: potentialMonth > 0 ? needed(rows[offerMonths].payment) / potentialMonth : Infinity } : null };
   }
   let lease: BuildingPlan["lease"] = null;
   if (i.lease) {

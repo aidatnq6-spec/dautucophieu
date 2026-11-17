@@ -54,15 +54,17 @@ function Donut({ parts, total, center }: { parts: { label: string; value: number
   );
 }
 
-export type LoanPrefill = { principal: number; rate: number; years: number; method: Method; note?: string };
+export type LoanPrefill = { principal: number; rate: number; years: number; method: Method; note?: string; promoRate?: number; promoMonths?: number };
 /** The event the building tab sends to open its purchase loan here. */
 export const PREFILL_EVENT = "loan:prefill";
 
 /** A loan handed over from another tab, as this tab's boxes: in millions (to keep the đồng), one rate for the whole term, no offer, no grace. */
 export function prefillFields(p: LoanPrefill) {
   const dec = (v: number) => String(Math.round(v * 1000) / 1000).replace(".", ",");
-  return { mode: "loan" as const, loan: dec(p.principal / 1e6), loanUnit: "trieu" as Unit, term: dec(p.years), termUnit: "year" as Span, promoRate: dec(p.rate),
-    afterRate: dec(p.rate), promo: "0", promoUnit: "year" as Span, method: p.method, grace: "0", prepayOn: false };
+  const offer = p.promoMonths && p.promoMonths > 0 && p.promoRate !== undefined;
+  return { mode: "loan" as const, loan: dec(p.principal / 1e6), loanUnit: "trieu" as Unit, term: dec(p.years), termUnit: "year" as Span,
+    promoRate: dec(offer ? p.promoRate! : p.rate), afterRate: dec(p.rate), promo: offer ? String(p.promoMonths) : "0", promoUnit: (offer ? "month" : "year") as Span,
+    method: p.method, grace: "0", prepayOn: false };
 }
 
 /** Estimate of a loan's monthly payments. Runs in the browser; nothing is saved or sent anywhere. */

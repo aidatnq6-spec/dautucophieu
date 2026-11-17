@@ -10,3 +10,10 @@ describe("prefillFields", () => {
     expect(parseAmount(f.loan, f.loanUnit)).toBe(2_537_500_000);
   });
 });
+
+describe("prefillFields with an offer", () => {
+  it("carries the offer rate and months over, the loan rate after them", () => {
+    const f = prefillFields({ principal: 3e9, rate: 10, years: 20, method: "annuity", promoRate: 6, promoMonths: 12 });
+    expect([f.promoRate, f.promo, f.promoUnit, f.afterRate]).toEqual(["6", "12", "month", "10"]);
+  });
+});

@@ -16,7 +16,7 @@ const EMPTY = {
   rooms: "", hiMonths: "", hiRent: "", hiOcc: "", loMonths: "", loRent: "", loOcc: "", peakRent: "",
   brokerPct: "", brokerMonths: "", contractMonths: "", otaPct: "", otaShare: "", vatPct: "", pitPct: "", otherPct: "", reservePct: "",
   cleaning: "", common: "", staff: "", internet: "", insurance: "", fixedOther: "", pcccCost: "", pcccYears: "",
-  price: "", buyCosts: "", renovation: "", own: "", loanRate: "", termYears: "", holdYears: "", holdRate: "",
+  price: "", buyCosts: "", renovation: "", own: "", loanRate: "", termYears: "", holdYears: "", holdRate: "", promoRate: "", promoMonths: "",
   leaseRent: "", deposit: "", setup: "", leaseMonths: "",
   badOcc: "", badRent: "", goodOcc: "", goodRent: "",
 };
@@ -29,7 +29,7 @@ const LABELS: Partial<Record<Key, string>> = {
   reservePct: "Dự phòng rủi ro (%)", cleaning: "Vệ sinh (đ/tháng)", common: "Điện nước khu vực chung (đ/tháng)", staff: "Nhân sự (đ/tháng)",
   internet: "Internet, truyền hình (đ/tháng)", insurance: "Bảo hiểm (đ/tháng)", fixedOther: "Cố định khác (đ/tháng)", pcccCost: "Giấy PCCC (đ)",
   pcccYears: "Giấy PCCC dùng trong (năm)", price: "Giá mua (đ)", buyCosts: "Thuế phí sang tên (đ)", renovation: "Sửa sang, nội thất (đ)", own: "Vốn tự có (đ)",
-  loanRate: "Lãi vay (%/năm)", termYears: "Thời hạn vay (năm)", holdYears: "Số năm nắm giữ", holdRate: "Lãi tiền gửi để so (%/năm)", leaseRent: "Tiền thuê nguyên tòa (đ/tháng)", deposit: "Tiền cọc (đ)",
+  loanRate: "Lãi vay (%/năm)", termYears: "Thời hạn vay (năm)", holdYears: "Số năm nắm giữ", holdRate: "Lãi tiền gửi để so (%/năm)", promoRate: "Lãi ưu đãi (%/năm)", promoMonths: "Thời gian ưu đãi (tháng)", leaseRent: "Tiền thuê nguyên tòa (đ/tháng)", deposit: "Tiền cọc (đ)",
   setup: "Chi phí setup (đ)", leaseMonths: "Thời hạn hợp đồng thuê tòa (tháng)", badOcc: "Kịch bản xấu: có khách ± (điểm %)",
   badRent: "Kịch bản xấu: giá ± (%)", goodOcc: "Kịch bản tốt: có khách ± (điểm %)", goodRent: "Kịch bản tốt: giá ± (%)",
 };
@@ -73,6 +73,7 @@ export function readPlan(f: typeof EMPTY, rows: Row[], method: Method, defaultDe
     equipment, pccc: { cost: values.pcccCost, years: values.pcccYears },
     buy: values.price > 0 ? { price: values.price, buyCosts: values.buyCosts, renovation: values.renovation, own: values.own, loanRate: values.loanRate,
       termYears: values.termYears, method, holdYears: values.holdYears || undefined,
+      promoRate: (f.promoRate ?? "").trim() ? values.promoRate : undefined, promoMonths: values.promoMonths || undefined,
       depositRate: (f.holdRate ?? "").trim() ? values.holdRate : defaultDepositRate ?? undefined } : undefined,
     lease: values.leaseRent > 0 ? { rent: values.leaseRent, deposit: values.deposit, setup: values.setup, months: values.leaseMonths } : undefined,
   };
@@ -455,6 +456,8 @@ export function BuildingTool() {
           <div className="formgrid">{F("price", "Giá mua (đ)")}{F("buyCosts", "Thuế phí sang tên (đ)")}{F("renovation", "Sửa sang, nội thất (đ)")}{F("own", "Vốn tự có (đ)")}</div>
           <div className="formgrid">{F("holdYears", "Số năm nắm giữ (để so với gửi tiết kiệm)")}
             {F("holdRate", "Lãi tiền gửi để so (%/năm)", depositRate !== null ? `để trống: ${(depositRate * 100).toLocaleString("vi-VN", { maximumFractionDigits: 2 })}` : undefined)}</div>
+          <div className="formgrid">{F("promoRate", "Lãi ưu đãi (%/năm)", "nếu có")}{F("promoMonths", "Thời gian ưu đãi (tháng)", "ví dụ 12")}</div>
+          {(f.promoRate ?? "").trim() && <p className="caption">Có ưu đãi: ô &ldquo;Lãi vay&rdquo; dưới đây là lãi sau khi hết ưu đãi.</p>}
           <div className="formgrid">{F("loanRate", "Lãi vay (%/năm)")}{F("termYears", "Thời hạn vay (năm)")}
             <label className="field">Cách trả<select aria-label="Cách trả khoản vay mua tòa" value={method} onChange={(e) => setMethod(e.target.value as Method)}>
               <option value="annuity">Trả đều hàng tháng</option><option value="declining">Dư nợ giảm dần</option></select></label></div>
@@ -492,9 +495,15 @@ export function BuildingTool() {
           {p.buy && <section aria-label="Kết quả nếu mua tòa"><h3>Nếu mua tòa</h3><dl className="bt-list">
             <dt>Tổng tiền bỏ ra</dt><dd>{vnd(p.buy.invested)}{p.buy.loan > 0 && <> (vay {vnd(p.buy.loan)})</>}</dd>
             {p.buy.loan > 0 && <><dt>Trả ngân hàng mỗi tháng (bình quân năm đầu)</dt><dd>{vnd(p.buy.loanPaymentMonth)}
-              {input?.buy && <div><button type="button" className="btn text" onClick={() => openLoan({ principal: p.buy!.loan, rate: input.buy!.loanRate,
+              {input?.buy && <div><button type="button" className="btn text" onClick={() => openLoan({ principal: p.buy!.loan, rate: input.buy!.loanRate, promoRate: input.buy!.promoRate, promoMonths: input.buy!.promoMonths,
                 years: input.buy!.termYears, method: input.buy!.method, note: `Đang xem khoản vay mua tòa ${opened ? `"${opened}"` : "đang tính"} (vay ${vnd(p.buy!.loan)}, ${input.buy!.loanRate
                 .toLocaleString("vi-VN")}%/năm, ${input.buy!.termYears} năm). Thay đổi ở đây không đổi số ở tab Tòa nhà.` })}>Xem lịch trả nợ chi tiết</button></div>}</dd></>}
+            {p.buy.afterOffer && <>
+              <dt>Sau ưu đãi (từ tháng {p.buy.afterOffer.month}): trả ngân hàng mỗi tháng</dt><dd>{vnd(p.buy.afterOffer.payment)}</dd>
+              <dt>Sau ưu đãi: dòng tiền còn lại mỗi tháng</dt><dd><strong className={p.buy.afterOffer.cashMonth < 0 ? "negative" : undefined}>{vnd(p.buy.afterOffer.cashMonth)}</strong></dd>
+              <dt>Sau ưu đãi: tỷ lệ có khách tối thiểu để không âm tiền</dt><dd>{Number.isFinite(p.buy.afterOffer.breakevenOccupancy) && p.buy.afterOffer.breakevenOccupancy <= 1
+                ? pct(p.buy.afterOffer.breakevenOccupancy) : "kín phòng cũng chưa đủ"}</dd>
+            </>}
             <dt>Dòng tiền còn lại mỗi tháng</dt><dd><strong className={p.buy.cashMonth < 0 ? "negative" : undefined}>{vnd(p.buy.cashMonth)}</strong></dd>
             <dt>Lợi suất ròng trên tổng tiền bỏ ra</dt><dd>{pct(p.buy.netYield)} một năm</dd>
             {p.buy.cashOnCash !== null && <><dt>Lợi suất trên vốn tự có</dt><dd>{pct(p.buy.cashOnCash)} một năm</dd></>}

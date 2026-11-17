@@ -124,3 +124,20 @@ describe("holding the building against keeping the money on deposit", () => {
     expect(b.hold).toBeNull();
   });
 });
+
+describe("a loan with an offer rate first", () => {
+  it("pays less in the offer year and shows what the cash and breakeven become after it", async () => {
+    const { loanSchedule } = await import("./loan-calc");
+    const buy = { price: 5_000_000_000, buyCosts: 0, renovation: 0, own: 2_000_000_000, loanRate: 10, termYears: 20, method: "annuity" as const };
+    const plain = buildingPlan({ ...BASE, buy }).buy!;
+    const offer = buildingPlan({ ...BASE, buy: { ...buy, promoRate: 6, promoMonths: 12 } }).buy!;
+    const rows = loanSchedule({ principal: 3e9, months: 240, promoMonths: 12, promoRate: 6, afterRate: 10, method: "annuity" }).rows;
+    expect(offer.loanPaymentMonth).toBeCloseTo(rows.slice(0, 12).reduce((s, r) => s + r.payment, 0) / 12, 6);
+    expect(offer.loanPaymentMonth).toBeLessThan(plain.loanPaymentMonth);
+    expect(offer.afterOffer!.month).toBe(13);
+    expect(offer.afterOffer!.payment).toBeCloseTo(rows[12].payment, 6);
+    expect(offer.afterOffer!.cashMonth).toBeCloseTo(offer.cashMonth + offer.loanPaymentMonth - rows[12].payment, 6);
+    expect(offer.afterOffer!.breakevenOccupancy).toBeGreaterThan(offer.breakevenOccupancy);
+    expect(plain.afterOffer).toBeNull();
+  });
+});

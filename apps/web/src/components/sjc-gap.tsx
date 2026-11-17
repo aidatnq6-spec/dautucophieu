@@ -28,8 +28,10 @@ export function SjcGap() {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    api<Data>("macro/sjc-gap").then((x) => { setD(x); setDraft(x.threshold ? x.threshold.replace(".", ",") : ""); },
-      (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải."));
+    let live = true;  // a load that was cancelled (React runs effects twice in development) never overwrites what is being typed
+    api<Data>("macro/sjc-gap").then((x) => { if (!live) return; setD(x); setDraft(x.threshold ? x.threshold.replace(".", ",") : ""); },
+      (e) => { if (live) setError(e instanceof ApiError ? e.failure.message : "Lỗi tải."); });
+    return () => { live = false; };
   }, []);
   const save = async () => {
     if (!d) return;

@@ -45,6 +45,8 @@ export function readPlan(f: typeof EMPTY, rows: Row[], method: Method): { error:
   if (!Number.isInteger(rooms)) return { error: "Số phòng là số nguyên." };
   for (const k of ["hiOcc", "loOcc", "brokerPct", "otaPct", "otaShare", "vatPct", "pitPct", "otherPct", "reservePct"] as Key[])
     if (values[k] > 100) return { error: "Các tỷ lệ % từ 0 đến 100." };
+  if (values.brokerMonths > 0 && values.contractMonths > 0 && values.brokerMonths >= values.contractMonths)
+    return { error: "Hoa hồng môi giới nhập theo số tháng tiền thuê (ví dụ 1), không phải số tiền; số tháng phải nhỏ hơn thời hạn hợp đồng." };
   const equipment = rows.filter((r) => r.count.trim() || r.price.trim()).map((r) => ({ name: r.name, count: num(r.count), price: money(r.price), lifeYears: num(r.life) }));
   if (equipment.some((e) => Number.isNaN(e.count) || Number.isNaN(e.price) || !e.lifeYears)) return { error: "Mỗi thiết bị cần số lượng, giá và tuổi thọ (năm)." };
   const input: BuildingInput = {
@@ -60,6 +62,9 @@ export function readPlan(f: typeof EMPTY, rows: Row[], method: Method): { error:
     lease: values.leaseRent > 0 ? { rent: values.leaseRent, deposit: values.deposit, setup: values.setup, months: values.leaseMonths } : undefined,
   };
   if (!input.seasons.length) return { error: "Nhập số tháng của ít nhất một mùa." };
+  const shareOfRevenue = ((100 - input.otaShare) * input.brokerPct + input.otaShare * input.otaPct) / 100 + input.vatPct + input.pitPct + input.otherPct
+    + input.reservePct;
+  if (shareOfRevenue >= 100) return { error: "Các khoản tính theo % doanh thu cộng lại đã từ 100% trở lên: kiểm tra lại các ô % ở mục 2." };
   if (input.buy && input.buy.own > input.buy.price + input.buy.buyCosts + input.buy.renovation) return { error: "Vốn tự có lớn hơn tổng tiền mua và sửa sang." };
   if (input.buy && input.buy.price + input.buy.buyCosts + input.buy.renovation > input.buy.own && (!input.buy.termYears || !Number.isInteger(input.buy.termYears)))
     return { error: "Có vay thì nhập thời hạn vay (số năm nguyên)." };
@@ -257,11 +262,11 @@ export function BuildingTool() {
         </section>
         <section className="surface" aria-label="Chi phí theo doanh thu">
           <h2>2. Chi phí tính theo % doanh thu</h2>
-          <div className="formgrid">{F("brokerMonths", "Hoa hồng môi giới: số tháng tiền thuê mỗi hợp đồng")}{F("contractMonths", "Thời hạn hợp đồng bình quân (tháng)")}
+          <div className="formgrid">{F("brokerMonths", "Hoa hồng môi giới: số tháng tiền thuê mỗi hợp đồng", "ví dụ 1")}{F("contractMonths", "Thời hạn hợp đồng bình quân (tháng)")}
             {F("brokerPct", "Hoa hồng môi giới, mạng xã hội (%)")}</div>
           {(() => {
             const share = brokerShare({ brokerMonths: num(f.brokerMonths), contractMonths: num(f.contractMonths) });
-            return share !== null && Number.isFinite(share) ? <p className="caption" data-testid="broker-share">Hoa hồng môi giới tính theo hợp đồng: {f.brokerMonths} tháng tiền thuê
+            return share !== null && Number.isFinite(share) && share < 100 ? <p className="caption" data-testid="broker-share">Hoa hồng môi giới tính theo hợp đồng: {f.brokerMonths} tháng tiền thuê
               / hợp đồng {f.contractMonths} tháng = {share.toLocaleString("vi-VN", { maximumFractionDigits: 3 })}% doanh thu mỗi tháng (dùng số này thay ô %).</p>
               : <p className="caption">Nhập số tháng tiền thuê và thời hạn hợp đồng để tính hoa hồng đúng theo hợp đồng; hoặc nhập thẳng % ở ô bên cạnh.</p>;
           })()}

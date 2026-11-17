@@ -86,3 +86,14 @@ test("commission typed as one month of rent on a one-year lease is 583.333 đ a 
   const costs = page.getByRole("table", { name: "Chi phí vận hành mỗi tháng" });
   await expect(costs.getByRole("row", { name: /Hoa hồng bán phòng/ })).toContainText("583.333");
 });
+
+
+test("a sum of money typed in the broker's months is refused with what to type instead", async ({ page }) => {
+  await page.goto("/building");
+  const fill = async (label: string, value: string) => page.getByLabel(label, { exact: true }).fill(value);
+  await fill("Số phòng", "1"); await fill("Mùa cao điểm: số tháng", "12"); await fill("Giá (đ/phòng/tháng)", "7000000"); await fill("Có khách (%)", "100");
+  await fill("Hoa hồng môi giới: số tháng tiền thuê mỗi hợp đồng", "7000000"); await fill("Thời hạn hợp đồng bình quân (tháng)", "12");
+  const result = page.getByRole("complementary", { name: "Kết quả lợi nhuận tòa nhà" });
+  await expect(result.getByRole("alert")).toContainText("không phải số tiền");
+  await expect(result.getByRole("table", { name: "Chi phí vận hành mỗi tháng" })).toHaveCount(0);
+});

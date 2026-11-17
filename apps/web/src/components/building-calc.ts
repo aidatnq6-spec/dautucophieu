@@ -69,3 +69,22 @@ export function buildingPlan(i: BuildingInput): BuildingPlan {
     peakOverstates: i.peakRent && revenueYear > 0 ? (i.peakRent * 12 * i.rooms) / revenueYear - 1 : null,
     costs, costShare: revenueMonth > 0 ? costs.total / revenueMonth : 0, noiMonth, buy, lease };
 }
+
+/** A scenario: occupancy moved by points (kept within 0–100%) and rent by a share (%), in every season. */
+export function scenario(i: BuildingInput, occupancyPoints: number, rentPct: number): BuildingPlan {
+  return buildingPlan({ ...i, seasons: i.seasons.map((s) => ({ ...s, occupancy: Math.min(100, Math.max(0, s.occupancy + occupancyPoints)),
+    rent: s.rent * (1 + rentPct / 100) })) });
+}
+
+export type Measure = "noi" | "buy" | "lease";
+const pick = (p: BuildingPlan, m: Measure): number | null => (m === "noi" ? p.noiMonth : m === "buy" ? p.buy?.cashMonth ?? null : p.lease?.profitMonth ?? null);
+
+/** Rows: one occupancy for the whole year (%); columns: rent moved by a share (%); each cell the chosen monthly result. */
+export function sensitivity(i: BuildingInput, occupancies: number[], rentPcts: number[], measure: Measure): (number | null)[][] {
+  return occupancies.map((o) => rentPcts.map((r) => pick(buildingPlan({ ...i, seasons: i.seasons.map((s) => ({ ...s, occupancy: o,
+    rent: s.rent * (1 + r / 100) })) }), measure)));
+}
+
+export function measureOf(p: BuildingPlan, m: Measure): number | null {
+  return pick(p, m);
+}

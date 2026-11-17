@@ -1,10 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import { formatRatio, formatVnd, groupDigitsInput, parseMoneyInput } from "../lib/format";
-import { buildingPlan, type BuildingInput, type BuildingPlan } from "./building-calc";
+import { buildingPlan, measureOf, scenario, sensitivity, type BuildingInput, type BuildingPlan, type Measure } from "./building-calc";
 import type { Method } from "./loan-calc";
 
 const DRAFT_KEY = "building-tool-draft-v1";
+const OCCUPANCIES = [50, 60, 70, 80, 90, 100];
+const RENT_PCTS = [-20, -10, 0, 10];
+const MEASURES: [Measure, string][] = [["noi", "Lợi nhuận vận hành"], ["buy", "Nếu mua: dòng tiền sau trả nợ"], ["lease", "Nếu thuê lại: lợi nhuận sau tiền thuê tòa"]];
 type Row = { name: string; count: string; price: string; life: string };
 const EMPTY = {
   rooms: "", hiMonths: "", hiRent: "", hiOcc: "", loMonths: "", loRent: "", loOcc: "", peakRent: "",
@@ -12,11 +15,14 @@ const EMPTY = {
   cleaning: "", common: "", staff: "", internet: "", insurance: "", fixedOther: "", pcccCost: "", pcccYears: "",
   price: "", buyCosts: "", renovation: "", own: "", loanRate: "", termYears: "",
   leaseRent: "", deposit: "", setup: "", leaseMonths: "",
+  badOcc: "", badRent: "", goodOcc: "", goodRent: "",
 };
 type Key = keyof typeof EMPTY;
 const MONEY = new Set<Key>(["hiRent", "loRent", "peakRent", "cleaning", "common", "staff", "internet", "insurance", "fixedOther", "pcccCost",
   "price", "buyCosts", "renovation", "own", "leaseRent", "deposit", "setup"]);
 
+const SIGNED = new Set<Key>(["badOcc", "badRent", "goodOcc", "goodRent"]);
+const signedNum = (s: string) => (s.trim() ? Number(s.trim().replace(/\s/g, "").replace("−", "-").replace(",", ".")) : null);
 const money = (s: string) => (s.trim() ? Number(parseMoneyInput(s) ?? NaN) : 0);
 const num = (s: string) => (s.trim() ? Number(s.trim().replace(/\./g, "").replace(",", ".")) : 0);
 const vnd = (v: number) => formatVnd(String(Math.round(v)));
@@ -25,6 +31,42 @@ const pct = (v: number) => formatRatio(v.toFixed(6), 1);
 function Field({ k, label, f, set, hint }: { k: Key; label: string; f: typeof EMPTY; set: (k: Key, v: string) => void; hint?: string }) {
   return <label className="field">{label}<input aria-label={label} inputMode={MONEY.has(k) ? "numeric" : "decimal"} value={f[k]} placeholder={hint}
     onChange={(e) => set(k, MONEY.has(k) ? groupDigitsInput(e.target.value) : e.target.value)} /></label>;
+}
+
+function Scenarios({ input, base, f, set }: { input: BuildingInput; base: BuildingPlan; f: typeof EMPTY; set: (k: Key, v: string) => void }) {
+  const [measure, setMeasure] = useState<Measure>("noi");
+  const shown = MEASURES.filter(([m]) => measureOf(base, m) !== null);
+  const m = shown.some(([x]) => x === measure) ? measure : "noi";
+  const cases = ([["Xấu", "badOcc", "badRent"], ["Tốt", "goodOcc", "goodRent"]] as [string, Key, Key][])
+    .map(([name, o, r]) => [name, signedNum(f[o]), signedNum(f[r])] as const)
+    .filter(([, o, r]) => o !== null || r !== null)
+    .filter(([, o, r]) => !Number.isNaN(o ?? 0) && !Number.isNaN(r ?? 0))
+    .map(([name, o, r]) => [name, scenario(input, o ?? 0, r ?? 0)] as const);
+  const table = sensitivity(input, OCCUPANCIES, RENT_PCTS, m);
+  const box = (k: Key, label: string) => <label className="field">{label}<input aria-label={label} inputMode="decimal" placeholder="ví dụ −10"
+    value={f[k]} onChange={(e) => set(k, e.target.value)} /></label>;
+  const cell = (v: number | null) => v === null ? "—" : <span className={v < 0 ? "negative" : undefined}>{vnd(v)}</span>;
+  return (
+    <section className="surface" aria-label="Kịch bản và độ nhạy">
+      <h2>Kịch bản và độ nhạy</h2>
+      <div className="actions" role="radiogroup" aria-label="Kết quả để so">{shown.map(([id, label]) => (
+        <label key={id} className="choice"><input type="radio" name="bt-measure" checked={m === id} onChange={() => setMeasure(id)} />{label}</label>))}</div>
+      <p className="caption">Kịch bản điều chỉnh so với số đã nhập ở trên: tỷ lệ có khách cộng/trừ điểm % ở mọi mùa (giữ trong 0–100%), giá thuê tăng/giảm %. Để trống thì
+        không có kịch bản đó.</p>
+      <div className="formgrid">{box("badOcc", "Kịch bản xấu: có khách ± (điểm %)")}{box("badRent", "Kịch bản xấu: giá thuê ± (%)")}
+        {box("goodOcc", "Kịch bản tốt: có khách ± (điểm %)")}{box("goodRent", "Kịch bản tốt: giá thuê ± (%)")}</div>
+      <table className="fv-table" aria-label="Ba kịch bản"><thead><tr><th>Kịch bản</th><th className="num">Doanh thu/tháng</th>
+        <th className="num">{MEASURES.find(([x]) => x === m)![1]} (mỗi tháng)</th></tr></thead>
+        <tbody>{[...cases.filter(([n]) => n === "Xấu"), ["Cơ sở", base] as const, ...cases.filter(([n]) => n === "Tốt")].map(([name, plan]) => (
+          <tr key={name}><td>{name}</td><td className="num">{vnd(plan.revenueMonth)}</td><td className="num">{cell(measureOf(plan, m))}</td></tr>))}</tbody></table>
+      <h3>Độ nhạy: {MEASURES.find(([x]) => x === m)![1].toLowerCase()} mỗi tháng</h3>
+      <p className="caption">Mỗi hàng là một tỷ lệ có khách áp cho cả năm; mỗi cột là giá thuê thay đổi so với giá đã nhập. Ô đỏ là âm.</p>
+      <div className="tablewrap"><table className="fv-table" aria-label="Bảng độ nhạy theo tỷ lệ có khách và giá thuê">
+        <thead><tr><th>Có khách cả năm</th>{RENT_PCTS.map((r) => <th key={r} className="num">Giá {r === 0 ? "như đã nhập" : `${r > 0 ? "+" : "−"}${Math.abs(r)}%`}</th>)}</tr></thead>
+        <tbody>{OCCUPANCIES.map((o, i) => <tr key={o}><td>{o}%</td>{table[i].map((v, j) => <td key={j} className="num">{cell(v)}</td>)}</tr>)}</tbody>
+      </table></div>
+    </section>
+  );
 }
 
 /** Tính lợi nhuận tòa nhà cho thuê: revenue by season, the costs that follow it, the fixed and hidden ones, then buying or leasing the
@@ -50,10 +92,11 @@ export function BuildingTool() {
   const set = (k: Key, v: string) => setF((old) => ({ ...old, [k]: v }));
   const setRow = (i: number, k: keyof Row, v: string) => setRows((old) => old.map((r, j) => (j === i ? { ...r, [k]: k === "price" ? groupDigitsInput(v) : v } : r)));
 
-  const compute = (): { error: string } | { plan: BuildingPlan } | null => {
+  const compute = (): { error: string } | { plan: BuildingPlan; input: BuildingInput } | null => {
     const rooms = num(f.rooms);
     if (!rooms || (!f.hiRent.trim() && !f.loRent.trim())) return null;
-    const values = Object.fromEntries((Object.keys(EMPTY) as Key[]).map((k) => [k, MONEY.has(k) ? money(f[k]) : num(f[k])])) as Record<Key, number>;
+    const values = Object.fromEntries((Object.keys(EMPTY) as Key[]).filter((k) => !SIGNED.has(k))
+      .map((k) => [k, MONEY.has(k) ? money(f[k]) : num(f[k])])) as Record<Key, number>;
     if (Object.values(values).some((v) => Number.isNaN(v) || v < 0)) return { error: "Các ô chỉ nhận số không âm." };
     if (!Number.isInteger(rooms)) return { error: "Số phòng là số nguyên." };
     for (const k of ["hiOcc", "loOcc", "brokerPct", "otaPct", "otaShare", "vatPct", "pitPct", "otherPct", "reservePct"] as Key[])
@@ -76,12 +119,14 @@ export function BuildingTool() {
     if (input.buy && input.buy.own > input.buy.price + input.buy.buyCosts + input.buy.renovation) return { error: "Vốn tự có lớn hơn tổng tiền mua và sửa sang." };
     if (input.buy && input.buy.price + input.buy.buyCosts + input.buy.renovation > input.buy.own && (!input.buy.termYears || !Number.isInteger(input.buy.termYears)))
       return { error: "Có vay thì nhập thời hạn vay (số năm nguyên)." };
-    return { plan: buildingPlan(input) };
+    return { plan: buildingPlan(input), input };
   };
   const out = compute();  // light arithmetic: worked out on each render
   const p = out && "plan" in out ? out.plan : null;
+  const input = out && "input" in out ? out.input : null;
   const F = (k: Key, label: string, hint?: string) => <Field k={k} label={label} f={f} set={set} hint={hint} />;
   return (
+    <>
     <div className="bt">
       <div className="bt-inputs">
         <section className="surface" aria-label="Doanh thu theo mùa">
@@ -172,5 +217,7 @@ export function BuildingTool() {
         </>}
       </aside>
     </div>
+    {input && p && <Scenarios input={input} base={p} f={f} set={set} />}
+    </>
   );
 }

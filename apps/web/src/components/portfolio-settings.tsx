@@ -14,10 +14,12 @@ export function PortfolioSettingsSection() {
   const [drawdown, setDrawdown] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => {
+    let live = true;  // a cancelled load (React runs effects twice in development) never overwrites what is being typed
     const percent = (r: string) => formatRatio(r, 1).replace("%", "").replace(/,0$/, "");
-    api<PortfolioSettings>("settings/portfolio").then((d) => { setData(d); setValue(percent(d.settings.concentration_limit)); setReview(percent(d.settings.journal_review_threshold));
-      setDrawdown(percent(d.settings.drawdown_threshold)); },
-      (e) => setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải."));
+    api<PortfolioSettings>("settings/portfolio").then((d) => { if (!live) return; setData(d); setValue(percent(d.settings.concentration_limit));
+      setReview(percent(d.settings.journal_review_threshold)); setDrawdown(percent(d.settings.drawdown_threshold)); },
+      (e) => { if (live) setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải."); });
+    return () => { live = false; };
   }, []);
   async function save() {
     if (!data) return;

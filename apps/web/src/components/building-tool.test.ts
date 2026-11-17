@@ -89,3 +89,15 @@ describe("the profit chart", async () => {
     expect(c.lo).toBe(-58_000_000); expect(c.hi).toBe(92_000_000);
   });
 });
+
+describe("the bars comparing saved plans", async () => {
+  const { compareBars } = await import("./building-tool");
+  it("gives each plan its models' monthly results and a range that holds them and zero", () => {
+    const plan = (noi: number, buy: number | null, lease: number | null) =>
+      ({ noiMonth: noi, buy: buy === null ? null : { cashMonth: buy }, lease: lease === null ? null : { profitMonth: lease } }) as never;
+    const out = compareBars([{ name: "Tòa A", plan: plan(55e6, 22e6, null) }, { name: "Tòa B", plan: plan(30e6, null, -5e6) }, { name: "Tòa C", plan: null }]);
+    expect(out.groups.map((g) => [g.name, g.bars.map((b) => [b.id, b.value])])).toEqual([
+      ["Tòa A", [["noi", 55e6], ["buy", 22e6]]], ["Tòa B", [["noi", 30e6], ["lease", -5e6]]], ["Tòa C", []]]);
+    expect([out.lo, out.hi]).toEqual([-5e6, 55e6]);
+  });
+});

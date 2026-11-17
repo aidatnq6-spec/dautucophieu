@@ -554,3 +554,4 @@ main h2{scroll-margin-top:16px}
 .bt-legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px}.bt-key{display:inline-block;width:14px;height:3px;margin:0 6px 3px 0;vertical-align:middle}
 .bt-key.bt-line-noi{background:var(--brand)}.bt-key.bt-line-buy{background:var(--orange)}.bt-key.bt-line-lease{background:var(--good)}
 @media print{.bt-chart{margin:2px 0 4px}.bt-chart svg{max-height:125px}.bt-legend{font-size:9.5px}}
+.bt-bar.bt-line-noi{fill:var(--brand)}.bt-bar.bt-line-buy{fill:var(--orange)}.bt-bar.bt-line-lease{fill:var(--good)}.bt-name{fill:var(--ink)}

@@ -58,6 +58,9 @@ test("a plan is saved under a name, compared with the others, reopened and delet
   const saved = page.getByRole("region", { name: "Các phương án đã lưu" });
   const row = saved.getByRole("table", { name: "So sánh các phương án" }).getByRole("row", { name: new RegExp(name) });
   await expect(row).toContainText("54.000.000");   // 8 × 9m × 75%
+  const bars = saved.getByRole("img", { name: "So sánh lợi nhuận mỗi tháng của các phương án" });
+  await expect(bars).toContainText(name.slice(0, 23));
+  await expect(bars.locator("rect").first()).toBeVisible();
   await fill("Số phòng", "20");
   await row.getByRole("button", { name: "Mở" }).click();
   await expect(page.getByLabel("Số phòng", { exact: true })).toHaveValue("8");

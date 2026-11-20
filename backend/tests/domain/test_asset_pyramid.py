@@ -81,3 +81,25 @@ def test_when_short_layers_take_the_whole_surplus_nothing_is_left_for_stocks():
     f = p["funding"]
     assert f["pool"] == "20000000" and f["fills"] == [{"id": "gold", "amount": "20000000"}]  # gold is short 100, only 20 to give
     assert f["left_for_stocks"] == "0" and f["stock_room"] == "20000000" and f["buyable"] == "0"
+
+
+# --- Tái cân bằng lớp Vàng trong Việc cần xem (chủ sở hữu chọn, 20/11/2026) ---
+D = Decimal
+
+
+def test_a_gold_layer_outside_its_range_reads_as_a_rebalancing_line():
+    from investment_agent.domain.asset_pyramid import gold_rebalance_line
+    short = asset_pyramid({"reserve": D(0), "cash": D(0), "deposit": D("940000000"), "gold": D("60000000")}, deductions=D(0), stock_ratio=D("0"))
+    assert gold_rebalance_line(short) == ("Vàng chiếm 6,0% phần tài sản sau dự phòng, dưới khoảng 10–15% của Tháp: thiếu 40.000.000 đ. "
+                                          "Tái cân bằng theo tỷ trọng, không theo giá; Tiền mới tháng này đi đâu chia vào các lớp thiếu, lớp thấp trước.")
+    over = asset_pyramid({"reserve": D(0), "cash": D(0), "deposit": D("800000000"), "gold": D("200000000")}, deductions=D(0), stock_ratio=D("0"))
+    assert gold_rebalance_line(over) == ("Vàng chiếm 20,0% phần tài sản sau dự phòng, trên khoảng 10–15% của Tháp: vượt 50.000.000 đ. "
+                                         "Tái cân bằng là đưa về khoảng này, không phải bán hết.")
+
+
+def test_a_gold_layer_in_range_or_a_pyramid_without_figures_needs_nothing():
+    from investment_agent.domain.asset_pyramid import gold_rebalance_line
+    ok = asset_pyramid({"reserve": D(0), "cash": D(0), "deposit": D("880000000"), "gold": D("120000000")}, deductions=D(0), stock_ratio=D("0"))
+    assert gold_rebalance_line(ok) is None
+    empty = asset_pyramid({"reserve": D("100"), "cash": D(0)}, deductions=D("100"), stock_ratio=D("0"))  # nothing after the reserve
+    assert gold_rebalance_line(empty) is None and gold_rebalance_line(None) is None

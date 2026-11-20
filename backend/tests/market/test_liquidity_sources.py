@@ -111,3 +111,31 @@ def test_the_omo_page_gives_each_session_by_kind_and_tenor(tmp_path):
     assert [x["total"] for x in store.sessions()] == ["1"]
     with pytest.raises(MacroError):
         parse_omo("<p>Kết quả đấu thầu</p>")
+
+
+def test_macro_sync_asks_an_unreachable_nso_again_after_the_pause(tmp_path, capsys):
+    """nso.gov.vn's name servers fail for seconds to a minute at a time (11/2026): getaddrinfo raises ConnectError for every retry
+    of the first pass, so the six NSO indicators were missing on about half the runs. Like a timed-out source, an unreachable one is
+    asked once more after the pause."""
+    import httpx
+
+    from investment_agent.cli import macro_sync
+    from investment_agent.market.leading import MacroStore
+    waits, slow_calls = [], []
+
+    def fast(url):
+        if "nso.gov.vn" in url:
+            raise httpx.ConnectError("[Errno 11001] getaddrinfo failed")
+        raise httpx.HTTPStatusError("404", request=httpx.Request("GET", url), response=httpx.Response(404))
+
+    def slow(url):
+        slow_calls.append(url)
+        if "nso.gov.vn" in url:
+            return REPORTS
+        raise httpx.HTTPStatusError("404", request=httpx.Request("GET", url), response=httpx.Response(404))
+    macro_sync(tmp_path, get=fast, slow_get=slow, sleep=waits.append)
+    results = json.loads(capsys.readouterr().out.strip().splitlines()[-1])["results"]
+    assert results["vn_trade_balance"] == results["vn_fdi_disbursed"] == "ok"
+    assert MacroStore(tmp_path).read("vn_trade_balance")[-1]["value"] == "2.5"
+    assert any("nso.gov.vn" in u for u in slow_calls) and 30 in waits  # after the pause; the NSO CPI's news fallback comes with it
+    assert not any("fred.stlouisfed.org" in u for u in slow_calls)  # a source that answered (here 404) is not asked again

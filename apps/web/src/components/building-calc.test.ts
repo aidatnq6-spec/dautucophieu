@@ -141,3 +141,18 @@ describe("a loan with an offer rate first", () => {
     expect(plain.afterOffer).toBeNull();
   });
 });
+
+describe("a loan with a grace on the principal", () => {
+  it("pays interest only at first and shows what the cash and breakeven become once the principal starts", async () => {
+    const { loanSchedule } = await import("./loan-calc");
+    const buy = { price: 5_000_000_000, buyCosts: 0, renovation: 0, own: 2_000_000_000, loanRate: 10, termYears: 20, method: "declining" as const, graceMonths: 6 };
+    const b = buildingPlan({ ...BASE, buy }).buy!;
+    const rows = loanSchedule({ principal: 3e9, months: 240, promoMonths: 0, promoRate: 10, afterRate: 10, method: "declining", graceMonths: 6 }).rows;
+    expect(b.loanPaymentMonth).toBeCloseTo(rows.slice(0, 12).reduce((s, r) => s + r.payment, 0) / 12, 6);
+    expect(b.afterGrace!.month).toBe(7);
+    expect(b.afterGrace!.payment).toBeCloseTo(rows[6].payment, 6);
+    expect(b.afterGrace!.payment).toBeGreaterThan(rows[5].payment);   // the principal starts
+    expect(b.afterGrace!.breakevenOccupancy).toBeGreaterThan(0);
+    expect(buildingPlan({ ...BASE, buy: { ...buy, graceMonths: 0 } }).buy!.afterGrace).toBeNull();
+  });
+});

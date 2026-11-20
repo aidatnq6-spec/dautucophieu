@@ -105,3 +105,47 @@ def test_accumulation_reminder_runs_on_every_wake_up():
     ls = lines()
     step = next(i for i, l in enumerate(ls) if "investment_agent.cli accumulation-remind" in l)
     assert step < next(i for i, l in enumerate(ls) if "investment_agent.cli scheduled-run" in l)
+
+
+# On 2026-11-21 the 06:08 logon run ended with exit 1 after "start" and logged no step: under common.ps1's
+# $ErrorActionPreference = 'Stop', Windows PowerShell 5.1 turns any stderr line of a native command into a terminating
+# NativeCommandError, even with 2>$null, so one warning from one step stopped every step after it.
+def _continue_line(ls):
+    return next(i for i, l in enumerate(ls) if l.replace(" ", "").lower() == "$erroractionpreference='continue'")
+
+
+def test_steps_run_with_continue_after_the_setup_that_must_stop():
+    ls = lines()
+    at = _continue_line(ls)
+    assert next(i for i, l in enumerate(ls) if l.startswith("$python = Get-RepoPython")) < at
+    assert at < next(i for i, l in enumerate(ls) if "investment_agent.cli" in l)
+
+
+def test_a_step_writing_to_stderr_does_not_stop_the_run(tmp_path):
+    import shutil
+    import subprocess
+    import sys
+
+    if shutil.which("powershell.exe") is None:
+        import pytest
+        pytest.skip("Windows PowerShell only")
+    common = SCRIPT.parent / "common.ps1"
+    probe = tmp_path / "probe.ps1"
+    probe.write_text("\n".join([
+        f". '{common}'",
+        lines()[_continue_line(lines())],
+        f"$out = & '{sys.executable}' -c \"import sys; sys.stderr.write('warn'); print('ok')\" 2>$null",
+        "\"after exit=$LASTEXITCODE $out\"",
+    ]), encoding="utf-8")
+    run = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", str(probe)],
+                         capture_output=True, text=True, timeout=60)
+    assert run.returncode == 0, run.stderr
+    assert "after exit=0 ok" in run.stdout
+
+
+def test_price_alert_steps_also_run_with_continue():
+    alerts = SCRIPT.parent / "run-alerts.ps1"
+    ls = [l.strip() for l in alerts.read_text(encoding="utf-8-sig").splitlines() if l.strip() and not l.strip().startswith("#")]
+    at = _continue_line(ls)
+    assert next(i for i, l in enumerate(ls) if l.startswith("$python = Get-RepoPython")) < at
+    assert at < next(i for i, l in enumerate(ls) if "investment_agent.cli" in l)

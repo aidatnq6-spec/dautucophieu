@@ -116,3 +116,11 @@ def test_the_committed_config_gives_every_watched_ticker_one_chain():
     chains = load_value_chains().chains
     owned = [s for c in chains for s in c.symbols]
     assert len(WATCHED_2026_10_30) == 50 and sorted(owned) == sorted(WATCHED_2026_10_30)
+
+
+def test_hydrology_dairy_and_container_freight_are_read_from_their_series():
+    by = {(c.id, f.id): f.indicator for c in load_value_chains().chains for f in c.factors}
+    hydro = [k for k, v in by.items() if k[1] == "hydrology"]
+    assert len(hydro) == 2 and all(by[k] == "vn_hydro_inflow_yoy" for k in hydro)
+    assert by[next(k for k in by if k[1] == "milk_input")] == "com_dairy"
+    assert by[next(k for k in by if k[1] == "freight_container")] == "com_container_wci"

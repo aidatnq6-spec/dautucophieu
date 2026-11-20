@@ -90,3 +90,13 @@ def test_trading_value_compares_twenty_session_averages_not_one_session():
     values[-1] = "40000"  # a single block-deal session doubles turnover
     r = read_indicator("vnindex_value", [(d, Decimal(v)) for d, v in zip(days, values)], today=TODAY, max_age_days=4)
     assert r["direction"] == "flat" and r["change"] == "0.05"  # (19×20,000 + 40,000)/20 = 21,000 against 20,000
+
+
+def test_hydro_inflow_reads_its_week_against_the_same_days_a_year_before():
+    """Inflow follows the seasons, so it is read against the same days a year before (the stored % per day), averaged over a week,
+    with a ten-point band: more water than last year is up."""
+    days = lambda *v: [(date(2026, 11, 14 + i), Decimal(x)) for i, x in enumerate(v)]  # noqa: E731
+    r = read_indicator("vn_hydro_inflow_yoy", days("30", "10", "20", "5", "15", "25", "-5"), today=date(2026, 11, 20), max_age_days=7)
+    assert (r["direction"], r["change"], r["kind"], r["from"], r["date"]) == ("up", "14.29", "yoy", "2026-11-14", "2026-11-20")
+    assert read_indicator("vn_hydro_inflow_yoy", days("-12", "-14"), today=date(2026, 11, 20), max_age_days=7)["direction"] == "down"
+    assert read_indicator("vn_hydro_inflow_yoy", days("8"), today=date(2026, 11, 20), max_age_days=7)["direction"] == "flat"  # one day reads

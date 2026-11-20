@@ -11,7 +11,8 @@ from pydantic import Field
 from investment_agent.domain.models import ContractModel
 from investment_agent.domain.value_chain import factor_status, label, read_indicator, score
 from investment_agent.market.leading import MacroStore, load_indicators
-from investment_agent.market.value_chains import COMMODITY_LABELS, COMMODITY_MAX_AGE_DAYS, VALUE_CHAINS_PATH, fingerprint, load_value_chains
+from investment_agent.market.value_chains import (CHAIN_MAX_AGE_DAYS, COMMODITY_LABELS, COMMODITY_MAX_AGE_DAYS, VALUE_CHAINS_PATH, fingerprint,
+                                                  load_value_chains)
 from investment_agent.services import value_chain_approvals as approvals
 from investment_agent.market.watchlist import load_watchlist
 from investment_agent.repositories.personal import RepositoryUnavailable
@@ -82,7 +83,7 @@ def scored_chains(data_dir: Path, config, *, today: date, held: set[str]) -> lis
     in the config, or in the app for its current content; an app approval of earlier content shows as stale."""
     indicators = {i["id"]: i for i in load_indicators()}
     store, readings, approved_in_app = MacroStore(data_dir), {}, approvals.read_approvals(data_dir)
-    max_age = lambda series: indicators[series]["max_age_days"] if series in indicators else COMMODITY_MAX_AGE_DAYS  # noqa: E731
+    max_age = lambda series: indicators[series]["max_age_days"] if series in indicators else CHAIN_MAX_AGE_DAYS.get(series, COMMODITY_MAX_AGE_DAYS)  # noqa: E731
 
     def reading(series: str | None) -> dict | None:
         if series is None:

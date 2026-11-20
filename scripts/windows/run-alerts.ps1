@@ -5,6 +5,8 @@ $log = Join-Path $script:RepoRoot 'logs\scheduler.log'
 New-Item -ItemType Directory -Force -Path (Split-Path $log) | Out-Null
 Import-LocalEnv
 $python = Get-RepoPython
+# Steps must not stop on a stderr line (Windows PowerShell 5.1 under 'Stop'); see run-after-close.ps1.
+$ErrorActionPreference = 'Continue'
 $data = Join-Path $script:RepoRoot 'data'
 $out = & $python -W ignore -m investment_agent.cli price-alerts --data-dir $data 2>$null
 "$(Get-Date -Format o) price-alerts exit=$LASTEXITCODE $out" | Add-Content -LiteralPath $log -Encoding UTF8

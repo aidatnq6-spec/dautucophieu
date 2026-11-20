@@ -7,6 +7,9 @@ New-Item -ItemType Directory -Force -Path (Split-Path $log) | Out-Null
 "$(Get-Date -Format o) start pid=$PID" | Add-Content -LiteralPath $log -Encoding UTF8
 Import-LocalEnv
 $python = Get-RepoPython
+# The setup above stops on error; the steps below must not. Under 'Stop', Windows PowerShell 5.1 turns any stderr line of a step
+# into a terminating error even with 2>$null, so one warning stopped every later step unlogged (06:08 logon run, 2026-11-21).
+$ErrorActionPreference = 'Continue'
 $data = Join-Path $script:RepoRoot 'data'
 New-Item -ItemType Directory -Force -Path $data | Out-Null
 $calendar = Join-Path $data 'trading-calendar.json'

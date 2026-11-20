@@ -46,7 +46,9 @@ test("the owner approves a chain in the app and can withdraw it", async ({ page 
 
 test("a factor without a stored series says so instead of guessing", async ({ page }) => {
   const section = await openSection(page);
-  await section.getByRole("button", { name: /^Thép/ }).click();
+  const card = section.getByRole("button", { name: /^Thép/ });
+  await expect(card).toContainText(/Thiếu: .*Giá than luyện thép \(chưa có nguồn số liệu\)/);  // the card says what is missing before it opens
+  await card.click();
   const steel = page.getByRole("region", { name: "Chuỗi giá trị Thép" });
   await expect(steel).toContainText("Giá than luyện thép: chưa đánh giá được");
   await expect(steel).toContainText("Ứng dụng chưa có chuỗi số liệu cho yếu tố này.");

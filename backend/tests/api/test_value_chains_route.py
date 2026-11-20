@@ -122,3 +122,28 @@ def test_value_chains_are_read_against_stored_series_and_ordered(tmp_path):
     assert bank["factors"][1]["status"] == "unknown" and bank["factors"][1]["reading"] is None
     assert bank["symbols"] == [{"symbol": "VCB", "held": False}]
     assert body["uncovered"] == ["FPT"] and body["sources"]["acbs-ht1"]["publisher"] == "ACBS"
+
+
+def test_each_factor_that_cannot_be_read_says_why(tmp_path):
+    """The card names what is missing: no series in the app, no stored figure, a figure older than its limit, or a single figure."""
+    (tmp_path / "market-symbols.txt").write_text("HPG\n", encoding="utf-8")
+    store = MacroStore(tmp_path)
+    store.upsert("com_iron_ore", [(date(2026, 9, 1), "100"), (date(2026, 10, 1), "101")], entry="auto")   # 106 days before TODAY: past 75
+    store.upsert("port_container_yoy", [(date(2026, 12, 31), "8.4")], entry="auto")                        # one month only
+    store.upsert("wti", [(TODAY - timedelta(days=35), "60"), (TODAY - timedelta(days=1), "66")], entry="auto")
+    doc = {"version": "t", "sources": {"acbs-ht1": SOURCE}, "chains": [chain("steel", ["HPG"], "approved", [
+        ("coke", None, "bad", "major"), ("ore", "com_iron_ore", "bad", "major"), ("port", "port_container_yoy", "good", "minor"),
+        ("sugar", "com_sugar", "bad", "small"), ("oil", "wti", "bad", "small")])]}
+    path = tmp_path / "value-chains.json"
+    path.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+    clock = Clock()
+    app = create_app(InternalAuthSettings("owner-1", TOKEN, SECRET), clock=clock, personal_repository=PersonalRepository("owner-1", MemoryDocumentStore()),
+                     data_dir=tmp_path)
+    app.state.value_chains_path = path
+    client = TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000))
+    factors = {f["id"]: f for f in call(client, clock, "GET", "/internal/market/value-chains").json()["chains"][0]["factors"]}
+    assert factors["coke"]["missing"] == {"reason": "no_series", "max_age_days": None}
+    assert factors["ore"]["missing"] == {"reason": "stale", "max_age_days": 75}
+    assert factors["port"]["missing"]["reason"] == "one_point"
+    assert factors["sugar"]["missing"]["reason"] == "no_data"
+    assert factors["oil"]["missing"] is None

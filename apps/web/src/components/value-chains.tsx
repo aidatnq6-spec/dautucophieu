@@ -10,8 +10,9 @@ type Stage = "input" | "middle" | "output";
 type Status = "good" | "bad" | "neutral" | "unknown";
 type FactorStatus = Status | "event";
 type Reading = { direction: "up" | "down" | "flat" | null; change: string | null; kind: "ratio" | "points" | "net" | null; from: string | null; date: string; value: string; stale: boolean };
+type Missing = { reason: "no_series" | "no_data" | "stale" | "one_point"; max_age_days: number | null };
 type Factor = { id: string; label: string; stage: Stage; kind: "series" | "event"; indicator: string | null; indicator_label: string | null; when_up: "good" | "bad";
-  weight: "major" | "minor" | "small"; share: string | null; why: string; refs: Ref[]; status: FactorStatus; reading: Reading | null };
+  weight: "major" | "minor" | "small"; share: string | null; why: string; refs: Ref[]; status: FactorStatus; reading: Reading | null; missing: Missing | null };
 type Label = "tailwind" | "neutral" | "headwind" | "insufficient" | null;
 type Approval = { on: string | null; note: string | null; by: "app" | "config"; stale: boolean };
 type Chain = { id: string; name: string; icb: string; status: "draft" | "approved"; fingerprint: string; approval: Approval | null; label: Label; score: Record<Status, string>; measured: number;
@@ -40,6 +41,24 @@ function move(r: Reading) {
   if (r.kind === "net") return `${r.direction === "up" ? "mua ròng" : r.direction === "down" ? "bán ròng" : "cân bằng"} ${formatDecimal(size, 0)} tỷ đồng (20 phiên)`;
   const word = r.direction === "up" ? "tăng" : r.direction === "down" ? "giảm" : "đi ngang";
   return `${word} ${r.kind === "ratio" ? formatRatio(size, 1) : `${formatDecimal(size, 2)} điểm`}`;
+}
+
+/** Why a factor reads "chưa đánh giá được", in a few words. */
+export function missingReason(f: Pick<Factor, "missing" | "reading">): string | null {
+  const m = f.missing;
+  if (!m) return null;
+  if (m.reason === "no_series") return "chưa có nguồn số liệu";
+  if (m.reason === "no_data") return "chưa tải được số liệu";
+  if (m.reason === "stale") return `số mới nhất ${f.reading ? day(f.reading.date) : "—"}, quá ${m.max_age_days} ngày`;
+  return "mới có một kỳ số liệu, chưa so được";
+}
+
+/** The card's line on what keeps factors unread, the heaviest first: "Thiếu: Giá quặng sắt (số mới nhất 01/09/2026, quá 75 ngày); …". */
+export function missingLine(factors: Pick<Factor, "label" | "status" | "weight" | "missing" | "reading">[]): string | null {
+  const rank = { major: 0, minor: 1, small: 2 };
+  const out = factors.filter((f) => f.status === "unknown" && f.missing).sort((a, b) => rank[a.weight] - rank[b.weight])
+    .map((f) => `${f.label} (${missingReason(f)})`);
+  return out.length ? `Thiếu: ${out.join("; ")}` : null;
 }
 
 function Refs({ refs, sources }: { refs: Ref[]; sources: Record<string, Source> }) {
@@ -111,7 +130,8 @@ function Diagram({ chain, sources, onChange }: { chain: Chain; sources: Record<s
             <li key={f.id} className={`vc-factor vc-${f.status}`}>
               <strong>{f.label}</strong>: <span className="vc-status">{STATUS[f.status]}</span> · mức {WEIGHT[f.weight]}{f.share ? ` (${share(f.share)})` : ""}
               <div className="caption">{f.reading ? <>{f.indicator_label}: {move(f.reading)} từ {f.reading.from ? day(f.reading.from) : "—"} đến {day(f.reading.date)}
-                {f.reading.stale && " (số liệu cũ)"}</> : "Ứng dụng chưa có chuỗi số liệu cho yếu tố này."}
+                {f.reading.stale && ` (số liệu cũ: quá ${f.missing?.max_age_days ?? "—"} ngày)`}</> : f.missing?.reason === "no_data"
+                  ? `${f.indicator_label ?? "Chỉ số"}: chưa tải được số liệu.` : "Ứng dụng chưa có chuỗi số liệu cho yếu tố này."}
                 {" "}Khi tăng thì {f.when_up === "good" ? "tốt" : "xấu"} cho ngành: {f.why}</div>
               <Refs refs={f.refs} sources={sources} /></li>))}
           </ul>
@@ -145,6 +165,7 @@ export function ValueChains() {
           <span className="vc-card-head"><strong>{c.name}</strong>
             {c.label ? <span className={`pill ${LABEL[c.label].tone}`}>{LABEL[c.label].text}</span> : <span className="pill warn">Chưa duyệt</span>}</span>
           <Bar score={c.score} measured={c.measured} />
+          {missingLine(c.factors) && <span className="caption vc-missing">{missingLine(c.factors)}</span>}
           <span className="caption">{c.symbols.map((s) => s.symbol).join(", ")}{c.symbols.some((s) => s.held) && " · có mã đang nắm"}</span>
         </button>
         {open === c.id && <Diagram chain={c} sources={data.sources} onChange={setData} />}

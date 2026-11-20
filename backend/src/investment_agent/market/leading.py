@@ -660,9 +660,10 @@ class MacroStore:
         path = self._path(indicator)
         return json.loads(path.read_text(encoding="utf-8"))["observations"] if path.is_file() else []
 
-    def upsert(self, indicator: str, points: list[tuple[date, str]], *, entry: str, source_url: str | None = None) -> None:
+    def upsert(self, indicator: str, points: list[tuple[date, str]], *, entry: str, source_url: str | None = None, replace: bool = False) -> None:
+        """Adds or overwrites the points by date; with replace, the stored points are dropped first (a series moved to a source in other units)."""
         now = datetime.now(timezone.utc).isoformat()
-        by_date = {o["date"]: o for o in self.read(indicator)}
+        by_date = {} if replace else {o["date"]: o for o in self.read(indicator)}
         for day, value in points:
             by_date[day.isoformat()] = {"date": day.isoformat(), "value": value, "entry": entry, "source_url": source_url, "recorded_at": now}
         self.root.mkdir(parents=True, exist_ok=True)
@@ -834,11 +835,10 @@ def fetch_factors(store: MacroStore, *, get: Callable[[str], str], today: date |
     return results
 
 
-# Monthly world prices (IMF Primary Commodity Prices on FRED, checked 2026-10-30) for Chuỗi giá trị's input and output costs;
-# kept under data/macro/ but outside macro-indicators.json, so they never show on Vĩ mô. FRED has no urea series.
-COMMODITIES = {"com_coal": "PCOALAUUSDM", "com_iron_ore": "PIORECRUSDM", "com_rubber": "PRUBBUSDM", "com_sugar": "PSUGAISAUSDM",
-               "com_shrimp": "PSHRIUSDM", "com_lng": "PNGASJPUSDM", "com_aluminium": "PALUMUSDM", "com_copper": "PCOPPUSDM",
-               "com_wheat": "PWHEAMTUSDM", "com_soybean": "PSOYBUSDM"}
+# Monthly world prices for Chuỗi giá trị's input and output costs, kept under data/macro/ but outside macro-indicators.json, so they never
+# show on Vĩ mô. FRED's copy of the IMF prices ran two to three months behind (20/11/2026: September last), so the others moved to the
+# World Bank's sheet (WB_COMMODITIES, fetch_chain_series); only shrimp, which the sheet dropped in 2023, is still read here.
+COMMODITIES = {"com_shrimp": "PSHRIUSDM"}
 COMMODITY_YEARS = 3
 
 
@@ -880,7 +880,12 @@ VASEP_PAGES, VASEP_FULL_HISTORY = 4, 6
 _VASEP_ROBOTS = ("print-", "xodpqbox", "【", "news-", ".tag", ".shtml", "betgg8", "xsn", "zop", "android", "vietlott", "ban-ca", "games", "gods",
                  "Gov", "ios", "iphone", "jun", "king", "kwin", "muv", "poc", "poker", "qsj", "rna", "mac", "soft", "store", "tig", "vn/2024",
                  "Wap", "xiazai", "Xoilac", "Zop", "bóng", "bắn")
-CHAIN_SERIES = ("com_urea", "port_container_yoy", "vn_pangasius_export_yoy")
+# Columns of the sheet's "Monthly Prices", the same goods as the IMF series they replace (rubber: RSS3, as IMF's PRUBBUSDM; sugar: the
+# world price, as PSUGAISAUSDM; wheat: US hard red winter, as PWHEAMTUSDM). Units are the World Bank's.
+WB_COMMODITIES = {"com_urea": "Urea", "com_coal": "Coal, Australian", "com_iron_ore": "Iron ore, cfr spot", "com_rubber": "Rubber, RSS3",
+                  "com_sugar": "Sugar, world", "com_lng": "Liquefied natural gas, Japan", "com_aluminium": "Aluminum", "com_copper": "Copper",
+                  "com_wheat": "Wheat, US HRW", "com_soybean": "Soybeans"}
+CHAIN_SERIES = (*WB_COMMODITIES, "port_container_yoy", "vn_pangasius_export_yoy")
 _XL = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 _XL_REL = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 _EN_MONTHS = {m: i for i, m in enumerate(("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
@@ -1006,19 +1011,30 @@ def parse_vasep_article(page: str, *, month: int, year: int | None) -> tuple[dat
 
 def fetch_chain_series(store: MacroStore, *, get: Callable[[str], str], get_bytes: Callable[[str], bytes] | None, today: date | None = None,
                        sleep: Callable[[float], None] = time.sleep) -> dict[str, str]:
-    """Urea (only with a bytes fetcher, and only while last month's price is missing) and container throughput; each reported apart."""
+    """The World Bank's world prices (only with a bytes fetcher, and only while one lacks last month or still holds points from another
+    source; each series is then replaced whole), container throughput and cá tra exports; each reported apart."""
     today = today or datetime.now(VN).date()
     results = {}
     if get_bytes is not None:
+        last_month = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+
+        def due(key: str) -> bool:
+            have = store.read(key)
+            return not have or date.fromisoformat(have[-1]["date"]) < last_month or any(o.get("source_url") != WB_COMMODITY_PAGE for o in have)
         try:
-            have = store.read("com_urea")
-            last_month = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
-            if not have or date.fromisoformat(have[-1]["date"]) < last_month:
-                url = parse_wb_link(_get_with_retry(get, WB_COMMODITY_PAGE, sleep))
-                store.upsert("com_urea", parse_wb_monthly(get_bytes(url), column="Urea")[-COMMODITY_YEARS * 12:], entry="auto")
-            results["com_urea"] = "ok"
+            sheet = None
+            if any(due(k) for k in WB_COMMODITIES):
+                sheet = get_bytes(parse_wb_link(_get_with_retry(get, WB_COMMODITY_PAGE, sleep)))
+            for key, column in WB_COMMODITIES.items():
+                try:
+                    if sheet is not None and due(key):
+                        store.upsert(key, parse_wb_monthly(sheet, column=column)[-COMMODITY_YEARS * 12:], entry="auto",
+                                     source_url=WB_COMMODITY_PAGE, replace=True)
+                    results[key] = "ok"
+                except Exception as exc:
+                    results[key] = f"error:{type(exc).__name__}"
         except Exception as exc:
-            results["com_urea"] = f"error:{type(exc).__name__}"
+            results.update({k: f"error:{type(exc).__name__}" for k in WB_COMMODITIES})
     try:
         store.upsert("port_container_yoy", parse_vpa_container(_get_with_retry(get, VPA_POSTS, sleep)), entry="auto")
         results["port_container_yoy"] = "ok"

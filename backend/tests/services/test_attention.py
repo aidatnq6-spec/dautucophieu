@@ -58,3 +58,17 @@ def test_a_problem_with_the_unattended_work_is_listed_and_sent_to_settings(tmp_p
     system = [i for i in items if i["kind"] == "system"]
     assert system and all(i["level"] == "high" and i["href"] == "/settings" for i in system) and any("Lịch sau phiên" in i["text"] for i in system)
     json.dumps(items)  # plain values, ready for the page and the weekly note
+
+
+def test_a_gold_layer_outside_its_range_is_listed_with_a_link_to_the_pyramid(tmp_path, monkeypatch):
+    from decimal import Decimal
+    from investment_agent.domain.asset_pyramid import asset_pyramid
+    import investment_agent.services.attention as attention
+    repo, data = setup(tmp_path)
+    pyramid = asset_pyramid({"reserve": Decimal(0), "cash": Decimal(0), "deposit": Decimal("940000000"), "gold": Decimal("60000000")},
+                            deductions=Decimal(0), stock_ratio=Decimal(0))  # synthetic figures
+    monkeypatch.setattr(attention, "budget_view", lambda repo, owner, quotes: ({"status": "ok", "pyramid": pyramid}, 0))
+    gold = [i for i in attention_items(repo, OWNER, data, now=NOW) if i["kind"] == "gold_rebalance"]
+    assert len(gold) == 1 and gold[0]["level"] == "low" and gold[0]["href"] == "/profile?tab=tai-san" and gold[0]["text"].startswith("Vàng chiếm 6,0%")
+    monkeypatch.setattr(attention, "budget_view", lambda repo, owner, quotes: ({"status": "no_total"}, 0))
+    assert not [i for i in attention_items(repo, OWNER, data, now=NOW) if i["kind"] == "gold_rebalance"]

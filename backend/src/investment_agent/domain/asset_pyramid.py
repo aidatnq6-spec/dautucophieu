@@ -106,3 +106,25 @@ def new_money(amounts: dict[str, Decimal], *, deductions: Decimal, stock_ratio: 
     place("deposit", left, "rest")
     after = asset_pyramid(held, deductions=deductions, stock_ratio=stock_ratio)["layers"]
     return {"amount": format(amount, "f"), "allocated": format(amount - left, "f"), "steps": steps, "after": after}
+
+
+def _dong(value: str) -> str:
+    return f"{int(Decimal(value)):,}".replace(",", ".") + " đ"
+
+
+def _percent(ratio: str, digits: int = 1) -> str:
+    return f"{(Decimal(ratio) * 100).quantize(Decimal(1).scaleb(-digits), ROUND_HALF_UP)}".replace(".", ",") + "%"
+
+
+def gold_rebalance_line(pyramid: dict | None) -> str | None:
+    """Việc cần xem: the gold layer outside its 10–15% share of what is left after the reserve, with the gap in đồng; None when inside,
+    or when there is nothing after the reserve. Rebalancing is by share, not by price (owner's choice, 20/11/2026)."""
+    gold = next((l for l in (pyramid or {}).get("layers", ()) if l["id"] == "gold"), None)
+    if gold is None or gold["share"] is None or gold["status"] not in ("short", "over"):
+        return None
+    span = f"{_percent(gold['target_min'], 0)[:-1]}–{_percent(gold['target_max'], 0)}"
+    head = f"Vàng chiếm {_percent(gold['share'])} phần tài sản sau dự phòng"
+    if gold["status"] == "short":
+        return (f"{head}, dưới khoảng {span} của Tháp: thiếu {_dong(gold['gap'])}. "
+                "Tái cân bằng theo tỷ trọng, không theo giá; Tiền mới tháng này đi đâu chia vào các lớp thiếu, lớp thấp trước.")
+    return f"{head}, trên khoảng {span} của Tháp: vượt {_dong(gold['gap'])}. Tái cân bằng là đưa về khoảng này, không phải bán hết."

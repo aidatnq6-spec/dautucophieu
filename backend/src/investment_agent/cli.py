@@ -550,13 +550,15 @@ def trend_run(data_dir: Path, calendar_path: Path, now=None, provider=None, get=
 
 
 MACRO_TIMEOUTS = ("error:ReadTimeout", "error:ConnectTimeout", "error:WriteTimeout", "error:PoolTimeout")
+# also asked again after the pause: a host that could not be reached at all (nso.gov.vn's name servers fail for up to a minute)
+MACRO_ASK_AGAIN = (*MACRO_TIMEOUTS, "error:ConnectError")
 MACRO_SLOW_PAUSE = 30  # seconds before asking a slow source again
 MACRO_SLOW_TIMEOUT = 90
 
 
 def macro_sync(data_dir: Path, get=None, slow_get=None, sleep=None, get_bytes=None) -> int:
     """Exit 0 when every automatic indicator updated, 1 when some failed (each is reported). Indicators whose source timed out are
-    asked once more after a pause, with a longer wait (stockbiz is often slow)."""
+    asked once more after a pause, with a longer wait (stockbiz is often slow), and so are those whose host could not be reached."""
     import time
     from investment_agent.market.leading import (MacroStore, fetch_auto, fetch_chain_extras, fetch_chain_markets, fetch_chain_series,
                                                  fetch_commodities, fetch_factors, load_indicators)
@@ -600,7 +602,7 @@ def macro_sync(data_dir: Path, get=None, slow_get=None, sleep=None, get_bytes=No
     from investment_agent.market.omo import OmoStore, omo_sync
     # Nghiệp vụ thị trường mở: the page shows only the latest session, so each run keeps it (Thanh khoản hệ thống)
     results["omo"] = omo_sync(OmoStore(data_dir), get=lambda url: _get_with_retry(get, url, sleep))
-    slow = [i for i in indicators if results.get(i["id"]) in MACRO_TIMEOUTS]
+    slow = [i for i in indicators if results.get(i["id"]) in MACRO_ASK_AGAIN]
     if slow:
         sleep(MACRO_SLOW_PAUSE)
         results.update(fetch_auto(slow, MacroStore(data_dir), get=slow_get, sleep=sleep))

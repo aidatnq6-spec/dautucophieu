@@ -117,7 +117,8 @@ Hiện ứng dụng đã có các mảnh rời: 17 chỉ số vĩ mô đã lưu,
    - khối ngoại đọc theo dấu của tổng ròng 20 phiên;
    - lượng nước về các hồ thủy điện lớn (EVN) đọc theo mức so cùng ngày năm trước, bình quân 7 ngày, ngưỡng ±10 điểm: nước về theo mùa nên so với một tháng trước sẽ đọc mùa khô thành "xấu" (chủ sở hữu duyệt, 20/11/2026). Số liệu quá 7 ngày là cũ;
    - sản lượng container qua cảng (VPA) đọc theo mức so cùng kỳ của tháng mới nhất, ngưỡng ±2 điểm (chủ sở hữu duyệt, 20/11/2026);
-   - cước container SCFI (theo tuần, quá 14 ngày là cũ), cước tàu dầu CTFI (theo ngày, quá 7 ngày là cũ) của Sở Giao dịch Vận tải biển Thượng Hải và giá thép cuộn cán nóng trên sàn SHFE (quá 10 ngày là cũ) đọc theo mục 2; khi chuỗi chưa đủ một tháng thì so với điểm sớm nhất và ghi rõ từ ngày nào.
+   - cước container SCFI (theo tuần, quá 14 ngày là cũ), cước tàu dầu CTFI (theo ngày, quá 7 ngày là cũ) của Sở Giao dịch Vận tải biển Thượng Hải và giá thép cuộn cán nóng trên sàn SHFE (quá 10 ngày là cũ) đọc theo mục 2; khi chuỗi chưa đủ một tháng thì so với điểm sớm nhất và ghi rõ từ ngày nào;
+   - nhu cầu CNTT ở thị trường chính dùng số đại diện là đầu tư phần mềm của doanh nghiệp Mỹ theo quý (FRED/BEA), so quý trước, ngưỡng ±1%, quá 220 ngày là cũ (quý ghi ngày đầu quý, ra sau khoảng 4 tháng và là số mới nhất tới khoảng 7 tháng); trang ghi rõ là số đại diện (chủ sở hữu duyệt, 20/11/2026).
    Các chỉ số khác đọc theo mục 2.
 2. **Chiều đi của chỉ số:** dùng lại cách của "Chuỗi tác động vĩ mô" (`domain/macro_chain.py`): so điểm mới nhất với điểm cách khoảng một tháng; trong một ngưỡng nhỏ thì coi là "đi ngang". Mỗi chỉ số cần ngưỡng riêng (biến động theo tỷ lệ cho giá, theo điểm phần trăm cho lãi suất và CPI). Chọn ngưỡng cụ thể cho từng chỉ số là việc của người làm, ghi rõ trong code, hiện được trên trang.
 3. **Kết quả của từng yếu tố** là một trong bốn:

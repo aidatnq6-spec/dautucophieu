@@ -30,9 +30,11 @@ COMMODITY_LABELS = {"com_coal": "Giá than thế giới (Úc)", "com_iron_ore": 
                     "com_dairy": "Chỉ số giá sữa thế giới (FAO)", "com_container_scfi": "Cước container xuất khẩu từ Thượng Hải (SCFI, Sở Giao dịch Vận tải biển Thượng Hải)",
                     "com_tanker_ctfi": "Cước tàu dầu thô chở về Trung Quốc (CTFI, Sở Giao dịch Vận tải biển Thượng Hải)",
                     "com_steel_hrc": "Giá thép cuộn cán nóng Trung Quốc (hợp đồng tương lai SHFE, CNY/tấn)",
+                    "us_software_invest": "Đầu tư phần mềm của doanh nghiệp Mỹ theo quý (FRED/BEA; số đại diện, không có số của Nhật)",
                     "vn_hydro_inflow_yoy": "Lượng nước về các hồ thủy điện lớn so cùng kỳ năm trước (EVN)"}
 COMMODITY_MAX_AGE_DAYS = 75  # monthly averages, published with about a month's lag
-CHAIN_MAX_AGE_DAYS = {"vn_hydro_inflow_yoy": 7, "com_container_scfi": 14, "com_tanker_ctfi": 7, "com_steel_hrc": 10}  # daily and weekly series
+CHAIN_MAX_AGE_DAYS = {"vn_hydro_inflow_yoy": 7, "com_container_scfi": 14, "com_tanker_ctfi": 7, "com_steel_hrc": 10,
+                      "us_software_invest": 220}  # daily and weekly series; a quarter (dated to its first day) is the latest until ~7 months on
 
 
 class Source(ContractModel):

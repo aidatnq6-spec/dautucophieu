@@ -109,3 +109,10 @@ def test_port_throughput_reads_its_level_against_a_year_before():
     r = read("8.4")
     assert (r["direction"], r["change"], r["kind"], r["from"], r["date"]) == ("up", "8.40", "yoy_month", "2026-09-30", "2026-09-30")
     assert read("9", "-3")["direction"] == "down" and read("-3", "1.5")["direction"] == "flat"
+
+
+def test_us_software_investment_reads_quarter_on_quarter_with_a_one_percent_band():
+    read = lambda a, b: read_indicator("us_software_invest", [(date(2026, 4, 1), Decimal(a)), (date(2026, 7, 1), Decimal(b))],  # noqa: E731
+                                       today=date(2026, 11, 20), max_age_days=220)
+    assert (read("1000", "1015")["direction"], read("1000", "1015")["change"]) == ("up", "0.015")
+    assert read("1000", "1008")["direction"] == "flat" and read("1000", "985")["direction"] == "down"

@@ -187,3 +187,27 @@ def test_the_asian_markets_last_read_is_served_with_its_line(tmp_path):
     assert body["line"] == "Châu Á (VNDirect, đọc 15:32 15/01): Hang Seng −1,55%"
     empty = call(client(tmp_path / "x", clock), clock, "GET", "/internal/macro/asia").json()
     assert empty == {"status": "missing", "line": None}
+
+
+def test_the_sjc_gap_section_carries_the_gold_drawdowns_and_the_thirty_day_pass_through(tmp_path):
+    import json
+    from investment_agent.market.series import SeriesStore
+    clock = Clock()  # 15/01/2027
+    from datetime import datetime
+    SeriesStore(tmp_path / "trend-sources").upsert("GOLD-1d", [(datetime(2026, 1, 28), "5534.2"), (datetime(2027, 1, 14), "3600")])
+    (tmp_path / "gold-price-history.json").write_text(json.dumps({"Vàng miếng SJC": {"2026-12-14": "15000000", "2027-01-15": "14000000"},
+                                                                  "Nhẫn tròn Phú Quý 999.9": {"2027-01-15": "1"}}), encoding="utf-8")
+    store = MacroStore(tmp_path)
+    store.upsert("xau_usd", [(date(2026, 12, 14), "4000"), (date(2027, 1, 15), "3600")], entry="auto")
+    store.upsert("usd_vnd_vcb", [(date(2026, 12, 12), "26000"), (date(2027, 1, 15), "26000")], entry="auto")
+    moves = call(client(tmp_path, clock), clock, "GET", "/internal/macro/sjc-gap").json()["moves"]
+    assert (moves["world"]["peak"], moves["world"]["peak_date"], moves["world"]["change"], moves["world"]["stale"]) == ("5534.2", "2026-01-28", "-0.3495", False)
+    assert (moves["sjc"]["since"], moves["sjc"]["peak"], moves["sjc"]["change"]) == ("2026-12-14", "15000000", "-0.0667")
+    assert (moves["pass_through"]["from"], moves["pass_through"]["to"], moves["pass_through"]["sjc_change"],
+            moves["pass_through"]["world_change"]) == ("2026-12-14", "2027-01-15", "-0.0667", "-0.1000")
+
+
+def test_the_gold_moves_say_what_is_missing(tmp_path):
+    clock = Clock()
+    moves = call(client(tmp_path, clock), clock, "GET", "/internal/macro/sjc-gap").json()["moves"]
+    assert moves["world"]["missing"] == moves["sjc"]["missing"] == moves["pass_through"]["missing"] == "no_data"

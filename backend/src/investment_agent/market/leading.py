@@ -839,7 +839,9 @@ def fetch_factors(store: MacroStore, *, get: Callable[[str], str], today: date |
 # Monthly world prices for Chuỗi giá trị's input and output costs, kept under data/macro/ but outside macro-indicators.json, so they never
 # show on Vĩ mô. FRED's copy of the IMF prices ran two to three months behind (20/11/2026: September last), so the others moved to the
 # World Bank's sheet (WB_COMMODITIES, fetch_chain_series); only shrimp, which the sheet dropped in 2023, is still read here.
-COMMODITIES = {"com_shrimp": "PSHRIUSDM"}
+# US private investment in software (BEA, quarterly, billions a year) is the owner's chosen stand-in for IT demand abroad (20/11/2026):
+# FPT's largest market is Japan, which has no such public series, so it is labelled a stand-in on the page.
+COMMODITIES = {"com_shrimp": "PSHRIUSDM", "us_software_invest": "B985RC1Q027SBEA"}
 COMMODITY_YEARS = 3
 
 

@@ -2376,7 +2376,7 @@
      "id": "overseas_demand",
      "label": "Nhu cầu CNTT ở thị trường chính",
      "stage": "output",
-     "indicator": null,
+     "indicator": "us_software_invest",
      "when_up": "good",
      "weight": "major",
      "share": null,

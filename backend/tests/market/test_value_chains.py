@@ -126,3 +126,4 @@ def test_hydrology_dairy_and_container_freight_are_read_from_their_series():
     assert by[next(k for k in by if k[1] == "freight_container")] == "com_container_scfi"
     assert by[next(k for k in by if k[1] == "freight_tanker")] == "com_tanker_ctfi"
     assert by[next(k for k in by if k[1] == "steel_price")] == "com_steel_hrc"
+    assert by[next(k for k in by if k[1] == "overseas_demand")] == "us_software_invest"

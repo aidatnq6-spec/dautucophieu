@@ -32,7 +32,7 @@ describe("broker commission as months of rent per contract", async () => {
   const { readPlan } = await import("./building-tool");
   const blank = { rooms: "", hiMonths: "", hiRent: "", hiOcc: "", loMonths: "", loRent: "", loOcc: "", peakRent: "", brokerPct: "", brokerMonths: "",
     contractMonths: "", otaPct: "", otaShare: "", vatPct: "", pitPct: "", otherPct: "", reservePct: "", cleaning: "", common: "", staff: "", internet: "",
-    insurance: "", fixedOther: "", pcccCost: "", pcccYears: "", price: "", buyCosts: "", renovation: "", own: "", loanRate: "", termYears: "", holdYears: "", holdRate: "", promoRate: "", promoMonths: "", leaseRent: "",
+    insurance: "", fixedOther: "", pcccCost: "", pcccYears: "", price: "", buyCosts: "", renovation: "", own: "", loanRate: "", termYears: "", holdYears: "", holdRate: "", promoRate: "", promoMonths: "", graceMonths: "", leaseRent: "",
     deposit: "", setup: "", leaseMonths: "", badOcc: "", badRent: "", goodOcc: "", goodRent: "" };
   const room = { ...blank, rooms: "1", hiMonths: "12", hiRent: "7.000.000", hiOcc: "100" };
   it("one month of rent on a one-year lease of a 7m room is 583,333 đ a month", () => {
@@ -51,7 +51,7 @@ describe("boxes that cannot be right are refused, not worked out", async () => {
   const { readPlan } = await import("./building-tool");
   const blank = { rooms: "", hiMonths: "", hiRent: "", hiOcc: "", loMonths: "", loRent: "", loOcc: "", peakRent: "", brokerPct: "", brokerMonths: "",
     contractMonths: "", otaPct: "", otaShare: "", vatPct: "", pitPct: "", otherPct: "", reservePct: "", cleaning: "", common: "", staff: "", internet: "",
-    insurance: "", fixedOther: "", pcccCost: "", pcccYears: "", price: "", buyCosts: "", renovation: "", own: "", loanRate: "", termYears: "", holdYears: "", holdRate: "", promoRate: "", promoMonths: "", leaseRent: "",
+    insurance: "", fixedOther: "", pcccCost: "", pcccYears: "", price: "", buyCosts: "", renovation: "", own: "", loanRate: "", termYears: "", holdYears: "", holdRate: "", promoRate: "", promoMonths: "", graceMonths: "", leaseRent: "",
     deposit: "", setup: "", leaseMonths: "", badOcc: "", badRent: "", goodOcc: "", goodRent: "" };
   const room = { ...blank, rooms: "1", hiMonths: "12", hiRent: "7.000.000", hiOcc: "100" };
   it("a sum of money typed as the months of rent paid to the broker", () => {

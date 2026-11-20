@@ -210,3 +210,18 @@ test("a saved plan's comparison row carries the cash after the offer and the yea
   page.once("dialog", (d) => void d.accept());
   await row.getByRole("button", { name: `Xóa phương án ${name}` }).click();
 });
+
+
+test("a grace on the principal: the cash once it ends is shown and the loan tab gets the grace", async ({ page }) => {
+  await page.goto("/loan?tab=toa-nha");
+  const fill = async (label: string, value: string) => tab(page).getByLabel(label, { exact: true }).fill(value);
+  await fill("Số phòng", "10"); await fill("Mùa cao điểm: số tháng", "12"); await fill("Giá (đ/phòng/tháng)", "10000000"); await fill("Có khách (%)", "80");
+  await fill("Giá mua (đ)", "5000000000"); await fill("Vốn tự có (đ)", "2000000000"); await fill("Lãi vay (%/năm)", "10"); await fill("Thời hạn vay (năm)", "20");
+  await fill("Ân hạn nợ gốc (tháng)", "6");
+  const buy = page.getByRole("region", { name: "Kết quả nếu mua tòa" });
+  await expect(buy).toContainText("Hết ân hạn (từ tháng 7): trả ngân hàng mỗi tháng");
+  await page.getByRole("button", { name: "Xem lịch trả nợ chi tiết" }).click();
+  const loan = page.getByRole("tabpanel", { name: "Khoản vay" });
+  // interest only in the first month: 3 tỷ × 10% ÷ 12
+  await expect(loan.getByRole("complementary", { name: "Kết quả khoản vay" })).toContainText("Thanh toán tháng đầu25.000.000 đ");
+});

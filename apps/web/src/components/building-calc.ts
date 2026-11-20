@@ -13,7 +13,9 @@ export type BuildingInput = {
   buy?: { price: number; buyCosts: number; renovation: number; own: number; loanRate: number; termYears: number; method: Method;
     holdYears?: number; depositRate?: number;
     /** an offer rate (%/year) for the first months; loanRate applies after them */
-    promoRate?: number; promoMonths?: number };
+    promoRate?: number; promoMonths?: number;
+    /** months paying interest only before the principal starts */
+    graceMonths?: number };
   lease?: { rent: number; deposit: number; setup: number; months: number };
 };
 export type Costs = { commission: number; tax: number; other: number; reserve: number; fixed: number; equipment: number; pccc: number; total: number };
@@ -26,6 +28,8 @@ export type BuildingPlan = {
     paybackYears: number | null; breakevenOccupancy: number;
     /** with an offer rate: the first month after it, its payment, the cash left then and the occupancy that covers it */
     afterOffer: { month: number; payment: number; cashMonth: number; breakevenOccupancy: number } | null;
+    /** with a grace on the principal: the first month paying it, its payment, the cash left then and the occupancy that covers it */
+    afterGrace: { month: number; payment: number; cashMonth: number; breakevenOccupancy: number } | null;
     /** the deposit the own money would grow to, the monthly cash carried on the same deposit, the loan left, and the price the
      * building must reach for holding it to match the deposit (the same arithmetic as the one-flat check, rental-calc) */
     hold: { years: number; keep: number; flowsValue: number; balance: number; neededPrice: number; neededGrowth: number | null } | null } | null;
@@ -59,9 +63,10 @@ export function buildingPlan(i: BuildingInput): BuildingPlan {
   let buy: BuildingPlan["buy"] = null;
   if (i.buy) {
     const b = i.buy, invested = b.price + b.buyCosts + b.renovation, loan = Math.max(invested - b.own, 0);
+    const grace = b.graceMonths && b.graceMonths > 0 ? Math.min(Math.round(b.graceMonths), b.termYears * 12 - 1) : 0;
     const offerMonths = b.promoMonths && b.promoMonths > 0 && b.promoRate !== undefined ? Math.min(Math.round(b.promoMonths), b.termYears * 12) : 0;
     const rows = loan > 0 && b.termYears > 0
-      ? loanSchedule({ principal: loan, months: b.termYears * 12, promoMonths: offerMonths, promoRate: offerMonths ? b.promoRate! : b.loanRate,
+      ? loanSchedule({ principal: loan, months: b.termYears * 12, promoMonths: offerMonths, promoRate: offerMonths ? b.promoRate! : b.loanRate, graceMonths: grace,
         afterRate: b.loanRate, method: b.method }).rows : [];
     const firstYear = rows.slice(0, 12);
     const loanPaymentMonth = firstYear.length ? firstYear.reduce((s, r) => s + r.payment, 0) / firstYear.length : 0;
@@ -79,7 +84,9 @@ export function buildingPlan(i: BuildingInput): BuildingPlan {
       cashOnCash: b.own > 0 ? (cashMonth * 12) / b.own : null, paybackYears: cashMonth > 0 && b.own > 0 ? b.own / (cashMonth * 12) : null,
       breakevenOccupancy: potentialMonth > 0 ? needed(loanPaymentMonth) / potentialMonth : Infinity, hold,
       afterOffer: offerMonths && rows[offerMonths] ? { month: offerMonths + 1, payment: rows[offerMonths].payment, cashMonth: noiMonth - rows[offerMonths].payment,
-        breakevenOccupancy: potentialMonth > 0 ? needed(rows[offerMonths].payment) / potentialMonth : Infinity } : null };
+        breakevenOccupancy: potentialMonth > 0 ? needed(rows[offerMonths].payment) / potentialMonth : Infinity } : null,
+      afterGrace: grace && rows[grace] ? { month: grace + 1, payment: rows[grace].payment, cashMonth: noiMonth - rows[grace].payment,
+        breakevenOccupancy: potentialMonth > 0 ? needed(rows[grace].payment) / potentialMonth : Infinity } : null };
   }
   let lease: BuildingPlan["lease"] = null;
   if (i.lease) {

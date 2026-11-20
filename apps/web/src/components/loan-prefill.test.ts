@@ -17,3 +17,9 @@ describe("prefillFields with an offer", () => {
     expect([f.promoRate, f.promo, f.promoUnit, f.afterRate]).toEqual(["6", "12", "month", "10"]);
   });
 });
+
+describe("prefillFields with a grace", () => {
+  it("carries the grace months over", () => {
+    expect(prefillFields({ principal: 3e9, rate: 10, years: 20, method: "declining", graceMonths: 6 }).grace).toBe("6");
+  });
+});

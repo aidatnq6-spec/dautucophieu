@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { ApiError, api, requestId } from "../lib/api";
+import { GoldMoves, type GoldMovesData } from "./gold-moves";
 
-type Data = { points: { date: string; value: string }[]; threshold: string | null; version: number };
+type Data = { points: { date: string; value: string }[]; threshold: string | null; version: number; moves: GoldMovesData | null };
 
 /** The y range: the lowest and highest of the values and the threshold, one point of room each side. */
 export function yRange(values: number[], threshold: number | null): [number, number] {
@@ -68,6 +69,7 @@ export function SjcGap() {
           <button type="submit" className="btn" disabled={busy}>{draft.trim() ? "Lưu ngưỡng" : "Tắt nhắc"}</button>
           <span className="caption">{threshold !== null ? `Đang nhắc khi từ ${vn(threshold)}% trở lên.` : "Chưa đặt ngưỡng: không nhắc."}</span>
         </form>
+        {d.moves && <GoldMoves moves={d.moves} />}
       </>}
     </section>
   );

@@ -181,10 +181,28 @@ class SjcGapRequest(ContractModel):
     request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
 
 
+WORLD_GOLD_MAX_AGE_DAYS = 7  # PAXG-USD, daily
+
+
+def _gold_moves(data_dir: Path, store: MacroStore, today: date) -> dict:
+    """Sụt từ đỉnh (world gold by PAXG-USD, SJC by Phú Quý's buying price as kept from 14/11/2026) and the 30-day pass-through."""
+    from investment_agent.domain.deposit_book import GOLD_STALE_DAYS
+    from investment_agent.domain.gold_moves import drawdown, pass_through
+    from investment_agent.market.gold_price import gold_history
+    from investment_agent.market.leading import SJC_KIND
+    series = lambda key: [(date.fromisoformat(o["date"]), Decimal(o["value"])) for o in store.read(key)]  # noqa: E731
+    world = [(date.fromisoformat(t[:10]), Decimal(v)) for t, v in SeriesStore(data_dir / "trend-sources").points("GOLD-1d")]
+    sjc = [(date.fromisoformat(d), Decimal(v)) for d, v in gold_history(data_dir).get(SJC_KIND, {}).items()]
+    return {"world": drawdown(world, today=today, max_age_days=WORLD_GOLD_MAX_AGE_DAYS),
+            "sjc": drawdown(sjc, today=today, max_age_days=GOLD_STALE_DAYS),
+            "pass_through": pass_through(sjc, series("xau_usd"), series("usd_vnd_vcb"), today=today)}
+
+
 def _sjc_gap_view(request: Request, threshold, version: int) -> dict:
     store = _store(request)
     points = [{"date": o["date"], "value": o["value"]} for o in (store.read("sjc_gap_pct") if store else [])][-365:]
-    return {"points": points, "threshold": None if threshold is None else format(threshold, "f"), "version": version}
+    moves = _gold_moves(Path(request.app.state.data_dir), store, now(request).astimezone(VN).date()) if store else None
+    return {"points": points, "threshold": None if threshold is None else format(threshold, "f"), "version": version, "moves": moves}
 
 
 @router.get("/sjc-gap")

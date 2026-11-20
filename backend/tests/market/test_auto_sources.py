@@ -7,7 +7,7 @@ import pytest
 
 from investment_agent.market.leading import (
     MacroError, MacroStore, fetch_auto, fetch_chain_series, parse_cafef_pmi_article, parse_cafef_pmi_links, parse_vasep_article, parse_vasep_links,
-    parse_vpa_container, parse_wb_link, parse_wb_monthly,
+    parse_vpa_container, parse_wb_link, parse_wb_monthly, WB_COMMODITIES, WB_COMMODITY_PAGE,
 )
 
 # Synthetic pages in the shape of cafef.vn's PMI topic page and articles (11/2026); the figures are made up.
@@ -89,8 +89,14 @@ def pink_sheet(rows):
     return buf.getvalue()
 
 
-PINK = pink_sheet([{"A": "World Bank Commodity Price Data (The Pink Sheet)"}, {"B": "Crude oil, Brent", "C": "Urea "}, {"B": "($/bbl)", "C": "($/mt)"},
-                   {"A": "2026M08", "B": 70.1, "C": "…"}, {"A": "2026M09", "B": 71, "C": 407.5}, {"A": "2026M10", "B": 72, "C": 420}])
+# Brent, urea, then the world prices Chuỗi giá trị reads (columns D onward, as the sheet names them)
+WB_NAMES = ["Iron ore, cfr spot", "Coal, Australian", "Rubber, RSS3", "Sugar, world", "Liquefied natural gas, Japan", "Aluminum", "Copper",
+            "Wheat, US HRW", "Soybeans"]
+_WB_COLS = "DEFGHIJKL"
+PINK = pink_sheet([{"A": "World Bank Commodity Price Data (The Pink Sheet)"}, {"B": "Crude oil, Brent", "C": "Urea ", **dict(zip(_WB_COLS, WB_NAMES))},
+                   {"B": "($/bbl)", "C": "($/mt)"},
+                   {"A": "2026M08", "B": 70.1, "C": "…", **{c: 99 for c in _WB_COLS}}, {"A": "2026M09", "B": 71, "C": 407.5, **{c: 100 for c in _WB_COLS}},
+                   {"A": "2026M10", "B": 72, "C": 420, **{c: 90.8 for c in _WB_COLS}}])
 WB_PAGE = '<a href="https://thedocs.worldbank.org/en/doc/abc-0050012026/related/CMO-Historical-Data-Annual.xlsx">Annual</a>' \
           '<a href="https://thedocs.worldbank.org/en/doc/abc-0050012026/related/CMO-Historical-Data-Monthly.xlsx">Monthly prices</a>'
 VPA = json.dumps([{"date": "2026-11-13T10:00:00", "title": {"rendered": "OCTOBER 2026 CONTAINER THROUGHPUT REACHES 2.70 MILLION TEU, UP 8.4% YEAR ON YEAR"}},
@@ -120,7 +126,7 @@ def test_urea_is_asked_only_when_last_months_price_is_missing(tmp_path):
         asked.append(url)
         return PINK
     assert fetch_chain_series(store, get=get, get_bytes=get_bytes, today=date(2026, 11, 15)) == {
-        "com_urea": "ok", "port_container_yoy": "ok", "vn_pangasius_export_yoy": "ok"}
+        "com_urea": "ok", **{k: "ok" for k in WB_COMMODITIES}, "port_container_yoy": "ok", "vn_pangasius_export_yoy": "ok"}
     assert [o["value"] for o in store.read("com_urea")] == ["407.5", "420"] and store.read("port_container_yoy")[-1]["value"] == "8.4"
     asked.clear()
     fetch_chain_series(store, get=get, get_bytes=get_bytes, today=date(2026, 11, 20))  # October is stored: the sheet is not fetched again
@@ -131,6 +137,42 @@ def test_urea_is_asked_only_when_last_months_price_is_missing(tmp_path):
     # without a bytes fetcher (tests of macro-sync), urea is not asked at all
     assert "com_urea" not in fetch_chain_series(MacroStore(tmp_path / "x"), get=get, get_bytes=None, today=date(2026, 11, 15))
 
+
+
+def test_world_prices_come_from_the_world_bank_sheet_replacing_the_earlier_source(tmp_path):
+    """FRED's copy of the IMF prices runs two to three months behind; the World Bank's sheet has last month early in the month. Its units
+    differ from the IMF's, so a series is replaced whole, never joined to the older points."""
+    store, asked = MacroStore(tmp_path), []
+    store.upsert("com_iron_ore", [(date(2026, 8, 1), "104.2"), (date(2026, 9, 1), "105.1")], entry="auto")  # from FRED, in other units
+
+    def get(url):
+        asked.append(url)
+        return WB_PAGE if "worldbank.org/en" in url else VPA if "vpa.org.vn" in url else VASEP_PAGES.get(url, VASEP_LIST)
+
+    def get_bytes(url):
+        asked.append(url)
+        return PINK
+    assert WB_COMMODITIES["com_iron_ore"] == "Iron ore, cfr spot" and "com_shrimp" not in WB_COMMODITIES  # the sheet dropped shrimp in 2023
+    result = fetch_chain_series(store, get=get, get_bytes=get_bytes, today=date(2026, 11, 15))
+    assert all(result[k] == "ok" for k in WB_COMMODITIES)
+    iron = store.read("com_iron_ore")
+    assert [(o["date"], o["value"]) for o in iron] == [("2026-08-01", "99"), ("2026-09-01", "100"), ("2026-10-01", "90.8")]
+    assert all(o["source_url"] == WB_COMMODITY_PAGE for o in iron)
+    asked.clear()
+    fetch_chain_series(store, get=get, get_bytes=get_bytes, today=date(2026, 11, 28))  # October is stored for every price: not asked again
+    assert not any("xlsx" in u or "worldbank" in u for u in asked)
+    store.upsert("com_rubber", [(date(2026, 7, 1), "1.5")], entry="auto")  # a point left from the earlier source asks for the sheet again
+    fetch_chain_series(store, get=get, get_bytes=get_bytes, today=date(2026, 11, 28))
+    assert [o["date"] for o in store.read("com_rubber")] == ["2026-08-01", "2026-09-01", "2026-10-01"]
+
+
+def test_a_price_missing_from_the_sheet_is_reported_and_the_others_still_update(tmp_path):
+    store = MacroStore(tmp_path)
+    sheet = pink_sheet([{"B": "Urea ", "C": "Iron ore, cfr spot"}, {"A": "2026M10", "B": 420, "C": 90.8}])
+    get = lambda url: WB_PAGE if "worldbank.org/en" in url else VPA if "vpa.org.vn" in url else VASEP_PAGES.get(url, VASEP_LIST)  # noqa: E731
+    result = fetch_chain_series(store, get=get, get_bytes=lambda url: sheet, today=date(2026, 11, 15))
+    assert result["com_iron_ore"] == "ok" and result["com_urea"] == "ok" and result["com_copper"] == "error:MacroError"
+    assert store.read("com_iron_ore")[-1]["value"] == "90.8" and store.read("com_copper") == []
 
 # Synthetic pages in the shape of VASEP's public cá tra news (11/2026); the figures are made up.
 VASEP_LIST = """<a href="/san-pham-xuat-khau/ca-tra/xuat-nhap-khau/xuat-khau-ca-tra-8-thang-duy-tri-da-tang-38249.html" title="Xuất khẩu cá tra 8 tháng Duy trì đà tăng">x</a>

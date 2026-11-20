@@ -394,14 +394,12 @@ def test_commodity_series_are_kept_under_their_own_keys_for_three_years(tmp_path
 
     def get(url):
         asked.append(url)
-        if "PRUBBUSDM" in url:
-            raise OSError("offline")
         return "observation_date,X\n2026-08-01,150.5\n2026-09-01,153.84\n"
     store = MacroStore(tmp_path)
     result = fetch_commodities(store, get=get, today=date(2026, 10, 30), sleep=lambda s: None)
-    assert COMMODITIES["com_coal"] == "PCOALAUUSDM" and len(COMMODITIES) == 10
-    assert result["com_rubber"] == "error:OSError" and result["com_coal"] == "ok"
-    assert store.read("com_coal")[-1]["value"] == "153.84" and store.read("com_rubber") == []
+    # the other world prices come from the World Bank's sheet (fetch_chain_series); FRED keeps only shrimp, which the sheet dropped
+    assert COMMODITIES == {"com_shrimp": "PSHRIUSDM"} and result == {"com_shrimp": "ok"}
+    assert store.read("com_shrimp")[-1]["value"] == "153.84"
     assert all("cosd=2023-10-30" in u for u in asked)
     assert not any(i["id"].startswith("com_") for i in load_indicators())
 

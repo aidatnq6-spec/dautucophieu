@@ -129,10 +129,10 @@ def test_each_factor_that_cannot_be_read_says_why(tmp_path):
     (tmp_path / "market-symbols.txt").write_text("HPG\n", encoding="utf-8")
     store = MacroStore(tmp_path)
     store.upsert("com_iron_ore", [(date(2026, 9, 1), "100"), (date(2026, 10, 1), "101")], entry="auto")   # 106 days before TODAY: past 75
-    store.upsert("port_container_yoy", [(date(2026, 12, 31), "8.4")], entry="auto")                        # one month only
+    store.upsert("vn_retail_yoy", [(date(2026, 12, 31), "8.4")], entry="auto")                             # one month only
     store.upsert("wti", [(TODAY - timedelta(days=35), "60"), (TODAY - timedelta(days=1), "66")], entry="auto")
     doc = {"version": "t", "sources": {"acbs-ht1": SOURCE}, "chains": [chain("steel", ["HPG"], "approved", [
-        ("coke", None, "bad", "major"), ("ore", "com_iron_ore", "bad", "major"), ("port", "port_container_yoy", "good", "minor"),
+        ("coke", None, "bad", "major"), ("ore", "com_iron_ore", "bad", "major"), ("port", "vn_retail_yoy", "good", "minor"),
         ("sugar", "com_sugar", "bad", "small"), ("oil", "wti", "bad", "small")])]}
     path = tmp_path / "value-chains.json"
     path.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
@@ -151,5 +151,5 @@ def test_each_factor_that_cannot_be_read_says_why(tmp_path):
 
 def test_daily_and_weekly_chain_series_get_their_own_age_limits():
     from investment_agent.market.value_chains import CHAIN_MAX_AGE_DAYS, COMMODITY_LABELS
-    assert CHAIN_MAX_AGE_DAYS == {"vn_hydro_inflow_yoy": 7, "com_container_wci": 14}
-    assert all(k in COMMODITY_LABELS for k in ("vn_hydro_inflow_yoy", "com_dairy", "com_container_wci"))
+    assert CHAIN_MAX_AGE_DAYS == {"vn_hydro_inflow_yoy": 7, "com_container_scfi": 14, "com_tanker_ctfi": 7, "com_steel_hrc": 10}
+    assert all(k in COMMODITY_LABELS for k in ("vn_hydro_inflow_yoy", "com_dairy", "com_container_scfi", "com_tanker_ctfi", "com_steel_hrc"))

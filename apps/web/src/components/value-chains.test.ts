@@ -30,3 +30,12 @@ describe("a series read against the same days a year before", () => {
     expect(move({ ...r, direction: "flat", change: "4.00" })).toBe("gần bằng cùng kỳ năm trước (+4%, bình quân 7 ngày)");
   });
 });
+
+describe("a month read against the same month a year before", () => {
+  it("says higher or lower than a year before, for the month", () => {
+    const r = { direction: "up" as const, change: "8.40", kind: "yoy_month" as const, from: "2026-10-31", date: "2026-10-31", value: "8.4", stale: false };
+    expect(move(r)).toBe("cao hơn cùng kỳ năm trước 8,4%");
+    expect(move({ ...r, direction: "down", change: "-3.00" })).toBe("thấp hơn cùng kỳ năm trước 3%");
+    expect(move({ ...r, direction: "flat", change: "1.50" })).toBe("gần bằng cùng kỳ năm trước (+1,5%)");
+  });
+});

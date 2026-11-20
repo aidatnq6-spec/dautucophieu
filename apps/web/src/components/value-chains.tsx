@@ -9,7 +9,7 @@ type Item = { name: string; note: string | null; share: string | null; basis: st
 type Stage = "input" | "middle" | "output";
 type Status = "good" | "bad" | "neutral" | "unknown";
 type FactorStatus = Status | "event";
-type Reading = { direction: "up" | "down" | "flat" | null; change: string | null; kind: "ratio" | "points" | "net" | "yoy" | null; from: string | null; date: string; value: string; stale: boolean };
+type Reading = { direction: "up" | "down" | "flat" | null; change: string | null; kind: "ratio" | "points" | "net" | "yoy" | "yoy_month" | null; from: string | null; date: string; value: string; stale: boolean };
 type Missing = { reason: "no_series" | "no_data" | "stale" | "one_point"; max_age_days: number | null };
 type Factor = { id: string; label: string; stage: Stage; kind: "series" | "event"; indicator: string | null; indicator_label: string | null; when_up: "good" | "bad";
   weight: "major" | "minor" | "small"; share: string | null; why: string; refs: Ref[]; status: FactorStatus; reading: Reading | null; missing: Missing | null };
@@ -38,6 +38,11 @@ function share(s: string) {
 export function move(r: Reading) {
   if (r.direction === null || r.change === null) return "chưa đủ điểm số liệu";
   const size = r.change.replace("-", "");
+  if (r.kind === "yoy_month") {
+    const pctText = `${formatDecimal(size, 1).replace(/,0$/, "")}%`;
+    return r.direction === "flat" ? `gần bằng cùng kỳ năm trước (${r.change.startsWith("-") ? "−" : "+"}${pctText})`
+      : `${r.direction === "up" ? "cao hơn" : "thấp hơn"} cùng kỳ năm trước ${pctText}`;
+  }
   if (r.kind === "yoy") {
     const pctText = `${formatDecimal(size, 1).replace(/,0$/, "")}%`;
     return r.direction === "flat" ? `gần bằng cùng kỳ năm trước (${r.change.startsWith("-") ? "−" : "+"}${pctText}, bình quân 7 ngày)`

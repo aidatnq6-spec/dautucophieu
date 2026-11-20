@@ -123,4 +123,6 @@ def test_hydrology_dairy_and_container_freight_are_read_from_their_series():
     hydro = [k for k, v in by.items() if k[1] == "hydrology"]
     assert len(hydro) == 2 and all(by[k] == "vn_hydro_inflow_yoy" for k in hydro)
     assert by[next(k for k in by if k[1] == "milk_input")] == "com_dairy"
-    assert by[next(k for k in by if k[1] == "freight_container")] == "com_container_wci"
+    assert by[next(k for k in by if k[1] == "freight_container")] == "com_container_scfi"
+    assert by[next(k for k in by if k[1] == "freight_tanker")] == "com_tanker_ctfi"
+    assert by[next(k for k in by if k[1] == "steel_price")] == "com_steel_hrc"

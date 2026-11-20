@@ -27,10 +27,12 @@ COMMODITY_LABELS = {"com_coal": "Giá than thế giới (Úc)", "com_iron_ore": 
                     "com_soybean": "Giá đậu tương thế giới", "com_urea": "Giá urê thế giới (Trung Đông, World Bank)",
                     "port_container_yoy": "Sản lượng container qua cảng Việt Nam so cùng kỳ (VPA)",
                     "vn_pangasius_export_yoy": "Kim ngạch xuất khẩu cá tra tháng so cùng kỳ (VASEP)",
-                    "com_dairy": "Chỉ số giá sữa thế giới (FAO)", "com_container_wci": "Cước container thế giới (Drewry WCI, USD/container 40ft)",
+                    "com_dairy": "Chỉ số giá sữa thế giới (FAO)", "com_container_scfi": "Cước container xuất khẩu từ Thượng Hải (SCFI, Sở Giao dịch Vận tải biển Thượng Hải)",
+                    "com_tanker_ctfi": "Cước tàu dầu thô chở về Trung Quốc (CTFI, Sở Giao dịch Vận tải biển Thượng Hải)",
+                    "com_steel_hrc": "Giá thép cuộn cán nóng Trung Quốc (hợp đồng tương lai SHFE, CNY/tấn)",
                     "vn_hydro_inflow_yoy": "Lượng nước về các hồ thủy điện lớn so cùng kỳ năm trước (EVN)"}
 COMMODITY_MAX_AGE_DAYS = 75  # monthly averages, published with about a month's lag
-CHAIN_MAX_AGE_DAYS = {"vn_hydro_inflow_yoy": 7, "com_container_wci": 14}  # a daily and a weekly series
+CHAIN_MAX_AGE_DAYS = {"vn_hydro_inflow_yoy": 7, "com_container_scfi": 14, "com_tanker_ctfi": 7, "com_steel_hrc": 10}  # daily and weekly series
 
 
 class Source(ContractModel):

@@ -38,7 +38,7 @@ def test_foreign_flows_read_the_sign_of_twenty_sessions():
     assert (r["direction"], r["change"], r["kind"]) == ("down", "-2000", "net")  # the five early buying days are outside the 20 sessions
 
 
-@pytest.mark.parametrize("indicator", ["vn_retail_yoy", "vn_public_invest_yoy", "vn_fdi_disbursed_yoy", "port_container_yoy", "vn_pangasius_export_yoy"])
+@pytest.mark.parametrize("indicator", ["vn_retail_yoy", "vn_public_invest_yoy", "vn_fdi_disbursed_yoy", "vn_pangasius_export_yoy"])
 def test_growth_rates_move_in_points_with_a_one_point_band(indicator):
     read = lambda a, b: read_indicator(indicator, [(date(2026, 9, 30), Decimal(a)), (date(2026, 10, 31), Decimal(b))],  # noqa: E731
                                        today=date(2026, 11, 10), max_age_days=75)
@@ -100,3 +100,12 @@ def test_hydro_inflow_reads_its_week_against_the_same_days_a_year_before():
     assert (r["direction"], r["change"], r["kind"], r["from"], r["date"]) == ("up", "14.29", "yoy", "2026-11-14", "2026-11-20")
     assert read_indicator("vn_hydro_inflow_yoy", days("-12", "-14"), today=date(2026, 11, 20), max_age_days=7)["direction"] == "down"
     assert read_indicator("vn_hydro_inflow_yoy", days("8"), today=date(2026, 11, 20), max_age_days=7)["direction"] == "flat"  # one day reads
+
+
+def test_port_throughput_reads_its_level_against_a_year_before():
+    """VPA gives the month against a year before; more than two points above is up, more than two below is down (owner, 20/11/2026)."""
+    read = lambda *v: read_indicator("port_container_yoy", [(date(2026, 9 + i, 30 if i == 0 else 31), Decimal(x)) for i, x in enumerate(v)],  # noqa: E731
+                                     today=date(2026, 11, 20), max_age_days=75)
+    r = read("8.4")
+    assert (r["direction"], r["change"], r["kind"], r["from"], r["date"]) == ("up", "8.40", "yoy_month", "2026-09-30", "2026-09-30")
+    assert read("9", "-3")["direction"] == "down" and read("-3", "1.5")["direction"] == "flat"

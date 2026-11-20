@@ -889,17 +889,22 @@ WB_COMMODITIES = {"com_urea": "Urea", "com_coal": "Coal, Australian", "com_iron_
 # More Chuỗi giá trị series (checked 20/11/2026, robots.txt read first), fetched by fetch_chain_extras:
 # - the FAO Dairy Price Index (2014-2016 = 100), monthly, in FAO's public food price index file (fao.org allows /media/docs/); read only
 #   while last month is missing;
-# - Drewry's World Container Index, the composite cost of a 40ft container, weekly, from the description of its public page (robots.txt
-#   allows it with a 10-second crawl delay; one page a run, at most once in six days); the page holds the latest week only, so the
-#   series grows week by week;
 # - the water flowing into Vietnam's large hydropower reservoirs (EVN's public reservoir page, no robots.txt), each day at 00:00 against
 #   the same day a year before, over the reservoirs reported on both days: inflow follows the seasons, so a month-on-month move would
 #   read every dry season as bad. The last seven days are kept (two pages a missing day).
 FAO_INDICES = "https://www.fao.org/media/docs/worldfoodsituationlibraries/wfs-library/food_price_indices_data.csv"
-DREWRY_WCI = "https://www.drewry.co.uk/supply-chain-advisors/supply-chain-expertise/world-container-index-assessed-by-drewry"
 EVN_RESERVOIRS = "https://hochuathuydien.evn.com.vn/PageHoChuaThuyDienEmbedEVN.aspx"
-WCI_EVERY_DAYS, HYDRO_DAYS, HYDRO_MIN_RESERVOIRS = 6, 7, 10
-CHAIN_SERIES = (*WB_COMMODITIES, "port_container_yoy", "vn_pangasius_export_yoy", "com_dairy", "com_container_wci", "vn_hydro_inflow_yoy")
+HYDRO_DAYS, HYDRO_MIN_RESERVOIRS = 7, 10
+# Freight and steel from China's exchanges (checked 20/11/2026; neither site has a robots.txt), fetched by fetch_chain_markets:
+# - the Shanghai Shipping Exchange's public current index (no login): the composite of SCFI (container freight out of Shanghai, weekly)
+#   and CTFI (crude tankers into China, daily), each with the period before, so a move reads from the first run;
+# - the Shanghai Futures Exchange's public daily data: the settlement price of the hot-rolled coil contract most held (CNY a tonne),
+#   for the last week's weekdays and, once, the first trading day found a month back. Days without trading (holidays) are skipped.
+SSE_INDEX = "https://en.sse.net.cn/currentIndex"
+SSE_SERIES = {"com_container_scfi": ("scfi", "SCFI_T"), "com_tanker_ctfi": ("ctfi", "CTFI_T")}
+SHFE_DAILY = "https://www.shfe.com.cn/data/tradedata/future/dailydata/kx{day}.dat"
+SHFE_WEEK, SHFE_MONTH_BACK, SHFE_RECENT = 7, (30, 37), 10
+CHAIN_SERIES = (*WB_COMMODITIES, "port_container_yoy", "vn_pangasius_export_yoy", "com_dairy", "vn_hydro_inflow_yoy", *SSE_SERIES, "com_steel_hrc")
 _XL = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 _XL_REL = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 _EN_MONTHS = {m: i for i, m in enumerate(("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
@@ -1097,15 +1102,6 @@ def parse_fao_dairy(text: str) -> list[tuple[date, str]]:
     return out
 
 
-def parse_drewry_wci(page: str) -> tuple[date, str]:
-    """"19 Nov 2026: Drewry's World Container Index (WCI) decreased 3% to $4,176 per 40ft container." → that day and the dollars."""
-    m = re.search(r"(\d{1,2}) ([A-Z][a-z]{2})[a-z]* (\d{4}): Drewry\S{0,2}s World Container Index[^$<]{0,120}\$([\d,]+(?:\.\d+)?) per 40ft", page)
-    months = {k[:3]: v for k, v in _EN_MONTHS.items()}
-    if not m or m.group(2).lower() not in months:
-        raise MacroError("wci_unreadable")
-    return date(int(m.group(3)), months[m.group(2).lower()], int(m.group(1))), _plain(Decimal(m.group(4).replace(",", "")))
-
-
 def parse_evn_inflow(page: str) -> dict[str, Decimal]:
     """Each reservoir's inflow (m3/s, the "Lưu lượng đến hồ" column) on EVN's reservoir page; blank or dashed cells are skipped."""
     out = {}
@@ -1125,7 +1121,7 @@ def parse_evn_inflow(page: str) -> dict[str, Decimal]:
 
 def fetch_chain_extras(store: MacroStore, *, get: Callable[[str], str], today: date | None = None,
                        sleep: Callable[[float], None] = time.sleep) -> dict[str, str]:
-    """FAO's dairy index, Drewry's container index and the hydropower inflow against a year before; each reported apart."""
+    """FAO's dairy index and the hydropower inflow against a year before; each reported apart."""
     today = today or datetime.now(VN).date()
     results = {}
     try:
@@ -1137,13 +1133,6 @@ def fetch_chain_extras(store: MacroStore, *, get: Callable[[str], str], today: d
         results["com_dairy"] = "ok"
     except Exception as exc:
         results["com_dairy"] = f"error:{type(exc).__name__}"
-    try:
-        have = store.read("com_container_wci")
-        if not have or (today - date.fromisoformat(have[-1]["date"])).days > WCI_EVERY_DAYS:
-            store.upsert("com_container_wci", [parse_drewry_wci(_get_with_retry(get, DREWRY_WCI, sleep))], entry="auto", source_url=DREWRY_WCI)
-        results["com_container_wci"] = "ok"
-    except Exception as exc:
-        results["com_container_wci"] = f"error:{type(exc).__name__}"
     points = []
     try:
         known = {o["date"] for o in store.read("vn_hydro_inflow_yoy")}
@@ -1167,6 +1156,69 @@ def fetch_chain_extras(store: MacroStore, *, get: Callable[[str], str], today: d
         if points:
             store.upsert("vn_hydro_inflow_yoy", points, entry="auto", source_url=EVN_RESERVOIRS)
         results["vn_hydro_inflow_yoy"] = f"error:{type(exc).__name__}"
+    return results
+
+
+def parse_sse_index(text: str, item: str) -> list[tuple[date, str]]:
+    """The composite (item, e.g. SCFI_T) of the period before and this one, from the exchange's current index."""
+    data = json.loads(text).get("data") or {}
+    line = next((x for x in data.get("lineDataList") or [] if x.get("dataItemTypeName") == item), None)
+    if line is None or line.get("currentContent") is None:
+        raise MacroError("sse_index_missing")
+    out = [(date.fromisoformat(data["lastDate"]), line.get("lastContent")), (date.fromisoformat(data["currentDate"]), line["currentContent"])]
+    return [(d, _plain(Decimal(str(v)))) for d, v in out if v is not None]
+
+
+def parse_shfe_hrc(text: str) -> str:
+    """The settlement price of the hot-rolled coil contract (hc) with the most open interest that day."""
+    rows = [r for r in json.loads(text).get("o_curinstrument") or []
+            if str(r.get("PRODUCTID", "")).strip() == "hc_f" and re.fullmatch(r"\d{4}", str(r.get("DELIVERYMONTH", "")).strip())
+            and isinstance(r.get("SETTLEMENTPRICE"), (int, float)) and r["SETTLEMENTPRICE"] > 0]
+    if not rows:
+        raise MacroError("shfe_no_hrc")
+    return _plain(Decimal(str(max(rows, key=lambda r: r.get("OPENINTEREST") or 0)["SETTLEMENTPRICE"])))
+
+
+def fetch_chain_markets(store: MacroStore, *, get: Callable[[str], str], today: date | None = None,
+                        sleep: Callable[[float], None] = time.sleep) -> dict[str, str]:
+    """Container and tanker freight from the Shanghai Shipping Exchange and the hot-rolled coil price from the Shanghai Futures Exchange;
+    each reported apart."""
+    today = today or datetime.now(VN).date()
+    results = {}
+    for key, (name, item) in SSE_SERIES.items():
+        try:
+            store.upsert(key, parse_sse_index(_get_with_retry(get, f"{SSE_INDEX}?indexName={name}", sleep), item), entry="auto",
+                         source_url=SSE_INDEX)
+            results[key] = "ok"
+        except Exception as exc:
+            results[key] = f"error:{type(exc).__name__}"
+
+    def day_price(day: date) -> str | None:
+        try:
+            return parse_shfe_hrc(get(SHFE_DAILY.format(day=f"{day:%Y%m%d}")))
+        except Exception:  # no trading that day (or the page failed): the day is simply missing
+            return None
+    try:
+        known = {o["date"] for o in store.read("com_steel_hrc")}
+        points = []
+        for back in range(SHFE_WEEK - 1, -1, -1):
+            day = today - timedelta(days=back)
+            if day.weekday() < 5 and day.isoformat() not in known and (price := day_price(day)):
+                points.append((day, price))
+        if not any(d <= (today - timedelta(days=SHFE_MONTH_BACK[0])).isoformat() for d in known):
+            for back in range(SHFE_MONTH_BACK[0], SHFE_MONTH_BACK[1] + 1):
+                day = today - timedelta(days=back)
+                if day.weekday() < 5 and (price := day_price(day)):
+                    points.append((day, price))
+                    break
+        if points:
+            store.upsert("com_steel_hrc", points, entry="auto", source_url=SHFE_DAILY.format(day=""))
+        have = store.read("com_steel_hrc")
+        if not have or (today - date.fromisoformat(have[-1]["date"])).days > SHFE_RECENT:
+            raise MacroError("shfe_no_recent")
+        results["com_steel_hrc"] = "ok"
+    except Exception as exc:
+        results["com_steel_hrc"] = f"error:{type(exc).__name__}"
     return results
 
 

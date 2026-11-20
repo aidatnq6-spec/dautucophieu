@@ -5,6 +5,7 @@ import { ApiError, api, requestId } from "../lib/api";
 import { formatVnd, groupDigitsInput, parseMoneyInput } from "../lib/format";
 import { FundCheck } from "./funds-view";
 import { type Purpose, type PurposesView, PurposeSelect } from "./money-purposes";
+import { GoldPriceNotes, type GoldPriceMoves } from "./gold-price-note";
 
 type Account = { id: string; name: string; amount: string; liquid: boolean };
 type Deposit = { id: string; bank: string; matures: string; principal: string; rate: string | null; interest: string | null;
@@ -26,7 +27,7 @@ type Ladder = { rows: LadderRow[]; total: string; cash_equivalent: string; withi
 type View = { version: number; ladder: Ladder; book: { accounts: Account[]; deposits: Deposit[]; count_ledger_cash: boolean; reserve: string | null } & Holdings;
   calendar: { months: Month[]; due_soon: string[]; overdue: string[] }; liquidity: Liquidity; profile_reserve: string;
   bond_values: BondValue[]; nav_source: string | null; gold_values: GoldValue[]; gold_kinds: string[]; gold_source: string | null;
-  gold_as_of: string | null };
+  gold_as_of: string | null; gold_moves?: GoldPriceMoves };
 
 const dmy = (iso: string) => iso.split("-").reverse().join("/");
 
@@ -420,6 +421,7 @@ export function DepositBook({ onSaved, refresh }: { onSaved?: () => void; refres
         {view && !view.gold_kinds.length && " Chưa có bảng giá: lượt chạy theo lịch sẽ tải."}</p>
       {table("gold", { label: "Giá trị hiện tại", cell: (id) => <GoldValueCell v={view?.gold_values.find((x) => x.id === id)} source={view?.gold_source ?? null} /> },
         view?.gold_kinds)}
+      {editing?.list === "gold" && <GoldPriceNotes moves={view?.gold_moves} kinds={[(editing.draft as GoldDraft).kind || null]} />}
       <h3>Tiền số</h3>
       {table("crypto")}
       {!editing && reserveDraft === null && alert}

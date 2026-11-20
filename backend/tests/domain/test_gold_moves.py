@@ -54,3 +54,33 @@ def test_a_day_without_a_recent_exchange_rate_is_left_out():
     xau = [(start, D("4000")), (start + timedelta(days=31), D("3600"))]
     fx = [(start - timedelta(days=10), D("26000"))]  # older than 7 days on both days
     assert pass_through(sjc, xau, fx, today=start + timedelta(days=31))["missing"] == "no_data"
+
+
+# --- Nhắc "đừng hành động theo giá" khi ghi vàng (chủ sở hữu chọn, 20/11/2026): ±10% trong 30 ngày, giá loại vàng hoặc tạm giá thế giới ---
+def test_a_thirty_day_move_of_ten_percent_or_more_either_way_is_strong():
+    from investment_agent.domain.gold_moves import recent_move
+    pts = [(date(2026, 10, 1), D("100")), (date(2026, 10, 20), D("105")), (date(2026, 11, 1), D("111"))]
+    assert recent_move(pts, today=date(2026, 11, 2), max_age_days=3) == {"from": "2026-10-01", "to": "2026-11-01", "days": 31,
+                                                                         "change": "0.1100", "strong": True}
+    assert recent_move([(date(2026, 10, 1), D("100")), (date(2026, 11, 1), D("90.5"))], today=date(2026, 11, 1), max_age_days=3)["strong"] is False
+    assert recent_move([(date(2026, 10, 1), D("100")), (date(2026, 11, 1), D("90"))], today=date(2026, 11, 1), max_age_days=3)["strong"] is True
+
+
+def test_no_move_from_too_short_a_history_a_gap_or_an_old_price():
+    from investment_agent.domain.gold_moves import recent_move
+    assert recent_move([(date(2026, 10, 20), D("100")), (date(2026, 11, 1), D("120"))], today=date(2026, 11, 1), max_age_days=3) is None
+    assert recent_move([(date(2026, 9, 1), D("100")), (date(2026, 11, 1), D("120"))], today=date(2026, 11, 1), max_age_days=3) is None  # 61 days
+    assert recent_move([(date(2026, 10, 1), D("100")), (date(2026, 11, 1), D("120"))], today=date(2026, 11, 10), max_age_days=3) is None
+
+
+def test_each_kind_uses_its_own_price_once_it_has_thirty_days_else_the_world_price():
+    from investment_agent.domain.gold_moves import price_moves
+    world = [(date(2026, 10, 1), D("4000")), (date(2026, 11, 1), D("3500"))]
+    kinds = {"Vàng miếng SJC": [(date(2026, 10, 25), D("15000000")), (date(2026, 11, 1), D("14000000"))],
+             "Nhẫn tròn": [(date(2026, 10, 1), D("14000000")), (date(2026, 11, 1), D("14200000"))]}
+    r = price_moves(kinds, world, today=date(2026, 11, 2))
+    assert r["threshold"] == "0.10"
+    assert (r["world"]["basis"], r["world"]["change"], r["world"]["strong"]) == ("world", "-0.1250", True)
+    assert r["kinds"]["Vàng miếng SJC"] == r["world"]  # 7 days of its own: the world price, said so on the page
+    assert (r["kinds"]["Nhẫn tròn"]["basis"], r["kinds"]["Nhẫn tròn"]["strong"]) == ("kind", False)
+    assert price_moves({}, [], today=date(2026, 11, 2)) == {"threshold": "0.10", "world": None, "kinds": {}}

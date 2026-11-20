@@ -199,9 +199,9 @@ test("the SJC gap section takes a threshold and turns the alert off again", asyn
   await box.getByLabel("Ngưỡng chênh lệch vàng").fill("");
   await box.getByRole("button", { name: "Tắt nhắc" }).click();
   await expect(box).toContainText("Chưa đặt ngưỡng: không nhắc.");
-  // no gold history in the fixture: each row and the 30-day line say so rather than show a number
+  // the fixture has a world gold series (PAXG) but no SJC history: that row and the 30-day line say so rather than show a number
   const moves = box.getByRole("group", { name: "Vàng: sụt từ đỉnh và độ truyền giá" });
-  await expect(moves.getByRole("row", { name: /Vàng thế giới/ })).toContainText("Chưa có số liệu.");
+  await expect(moves.getByRole("row", { name: /Vàng thế giới/ })).toContainText("−12,5%");  // PAXG 4000 → 3500 in the fixture
   await expect(moves.getByRole("row", { name: /Vàng miếng SJC/ })).toContainText("Chưa có số liệu.");
   await expect(moves).toContainText("Chưa có ngày nào có cả giá SJC và giá thế giới quy ra đồng.");
 });

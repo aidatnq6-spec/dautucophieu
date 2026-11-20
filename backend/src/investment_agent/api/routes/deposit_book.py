@@ -8,7 +8,7 @@ from pydantic import Field
 
 from investment_agent.domain.deposit_book import DepositBook
 from investment_agent.repositories.personal import RepositoryUnavailable
-from investment_agent.services.deposit_book import RECORD, book_quotes, book_view
+from investment_agent.services.deposit_book import RECORD, book_quotes, book_view, gold_price_moves
 from investment_agent.services.equity_budget import protected_deductions
 
 from ..auth import require_owner
@@ -25,8 +25,9 @@ class BookRequest(DepositBook):
 
 def _view(request: Request, repo, owner) -> dict:
     reserve, from_profile, _ = protected_deductions(repo, owner)
-    return book_view(repo, owner, reserve=reserve, profile_reserve=from_profile, quotes=book_quotes(request.app.state.data_dir),
-                     today=now(request).astimezone(VN).date())
+    today = now(request).astimezone(VN).date()
+    return {**book_view(repo, owner, reserve=reserve, profile_reserve=from_profile, quotes=book_quotes(request.app.state.data_dir), today=today),
+            "gold_moves": gold_price_moves(request.app.state.data_dir, today=today)}
 
 
 @router.get("/deposit-book")

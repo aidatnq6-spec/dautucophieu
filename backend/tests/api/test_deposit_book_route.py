@@ -188,3 +188,17 @@ def test_a_gold_row_is_valued_at_chi_times_the_buying_price_in_the_book_and_the_
     bad = call(c, clock, "PUT", "/internal/deposit-book", {"deposits": [], "accounts": [], "expected_version": 1, "request_id": "db2",
                                                           "gold": [{"id": "g", "name": "Vàng", "amount": "1", "kind": ring}]})
     assert bad.status_code == 422
+
+
+def test_the_book_and_the_accumulation_plans_carry_the_thirty_day_gold_moves(tmp_path):
+    import json
+    from datetime import datetime
+    from investment_agent.market.series import SeriesStore
+    SeriesStore(tmp_path / "trend-sources").upsert("GOLD-1d", [(datetime(2026, 12, 14), "4000"), (datetime(2027, 1, 14), "3500")])
+    (tmp_path / "gold-price-history.json").write_text(json.dumps({"Vàng miếng SJC": {"2027-01-10": "15000000", "2027-01-15": "14000000"}}),
+                                                      encoding="utf-8")
+    c, clock = client(tmp_path)  # today 15/01/2027
+    for path in ("/internal/deposit-book", "/internal/accumulation"):
+        moves = call(c, clock, "GET", path).json()["gold_moves"]
+        assert moves["threshold"] == "0.10" and (moves["world"]["basis"], moves["world"]["change"], moves["world"]["strong"]) == ("world", "-0.1250", True)
+        assert moves["kinds"]["Vàng miếng SJC"]["basis"] == "world"  # five days of its own price

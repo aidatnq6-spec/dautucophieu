@@ -10,7 +10,7 @@ from investment_agent.domain.accumulation import Accumulation, PostRefused, post
 from investment_agent.domain.models import ContractModel
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.accumulation import RECORD, accumulation_view, read_data
-from investment_agent.services.deposit_book import RECORD as BOOK_RECORD, book_quotes, read_book
+from investment_agent.services.deposit_book import RECORD as BOOK_RECORD, book_quotes, gold_price_moves, read_book
 
 from ..auth import require_owner
 from .common import WRITE_ERRORS, error, now, unavailable, write_error
@@ -32,7 +32,9 @@ class PostRequest(ContractModel):
 
 
 def _view(request: Request, repo, owner) -> dict:
-    return accumulation_view(repo, owner, quotes=book_quotes(request.app.state.data_dir), today=now(request).astimezone(VN).date())
+    today = now(request).astimezone(VN).date()
+    return {**accumulation_view(repo, owner, quotes=book_quotes(request.app.state.data_dir), today=today),
+            "gold_moves": gold_price_moves(request.app.state.data_dir, today=today)}
 
 
 @router.get("/accumulation")

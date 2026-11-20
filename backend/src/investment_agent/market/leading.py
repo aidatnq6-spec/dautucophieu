@@ -24,6 +24,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 import io
 import calendar
+import csv
 import time
 from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
@@ -885,7 +886,20 @@ _VASEP_ROBOTS = ("print-", "xodpqbox", "【", "news-", ".tag", ".shtml", "betgg8
 WB_COMMODITIES = {"com_urea": "Urea", "com_coal": "Coal, Australian", "com_iron_ore": "Iron ore, cfr spot", "com_rubber": "Rubber, RSS3",
                   "com_sugar": "Sugar, world", "com_lng": "Liquefied natural gas, Japan", "com_aluminium": "Aluminum", "com_copper": "Copper",
                   "com_wheat": "Wheat, US HRW", "com_soybean": "Soybeans"}
-CHAIN_SERIES = (*WB_COMMODITIES, "port_container_yoy", "vn_pangasius_export_yoy")
+# More Chuỗi giá trị series (checked 20/11/2026, robots.txt read first), fetched by fetch_chain_extras:
+# - the FAO Dairy Price Index (2014-2016 = 100), monthly, in FAO's public food price index file (fao.org allows /media/docs/); read only
+#   while last month is missing;
+# - Drewry's World Container Index, the composite cost of a 40ft container, weekly, from the description of its public page (robots.txt
+#   allows it with a 10-second crawl delay; one page a run, at most once in six days); the page holds the latest week only, so the
+#   series grows week by week;
+# - the water flowing into Vietnam's large hydropower reservoirs (EVN's public reservoir page, no robots.txt), each day at 00:00 against
+#   the same day a year before, over the reservoirs reported on both days: inflow follows the seasons, so a month-on-month move would
+#   read every dry season as bad. The last seven days are kept (two pages a missing day).
+FAO_INDICES = "https://www.fao.org/media/docs/worldfoodsituationlibraries/wfs-library/food_price_indices_data.csv"
+DREWRY_WCI = "https://www.drewry.co.uk/supply-chain-advisors/supply-chain-expertise/world-container-index-assessed-by-drewry"
+EVN_RESERVOIRS = "https://hochuathuydien.evn.com.vn/PageHoChuaThuyDienEmbedEVN.aspx"
+WCI_EVERY_DAYS, HYDRO_DAYS, HYDRO_MIN_RESERVOIRS = 6, 7, 10
+CHAIN_SERIES = (*WB_COMMODITIES, "port_container_yoy", "vn_pangasius_export_yoy", "com_dairy", "com_container_wci", "vn_hydro_inflow_yoy")
 _XL = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 _XL_REL = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 _EN_MONTHS = {m: i for i, m in enumerate(("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
@@ -1060,6 +1074,99 @@ def fetch_chain_series(store: MacroStore, *, get: Callable[[str], str], get_byte
         results["vn_pangasius_export_yoy"] = "ok"
     except Exception as exc:
         results["vn_pangasius_export_yoy"] = f"error:{type(exc).__name__}"
+    return results
+
+
+def parse_fao_dairy(text: str) -> list[tuple[date, str]]:
+    """The Dairy column of FAO's food price indices, dated to the month's first day; blank months are skipped."""
+    rows = list(csv.reader(io.StringIO(text.lstrip("\ufeff"))))
+    head = next((i for i, r in enumerate(rows) if r and r[0].strip() == "Date"), None)
+    if head is None or "Dairy" not in [c.strip() for c in rows[head]]:
+        raise MacroError("fao_column_missing")
+    col, out = [c.strip() for c in rows[head]].index("Dairy"), []
+    for r in rows[head + 1:]:
+        m = re.fullmatch(r"(\d{4})-(\d{2})", (r[0] if r else "").strip())
+        try:
+            value = Decimal(r[col].strip()) if m and len(r) > col else None
+        except InvalidOperation:
+            value = None
+        if m and value is not None and value > 0:
+            out.append((date(int(m.group(1)), int(m.group(2)), 1), _plain(value)))
+    if not out:
+        raise MacroError("fao_no_observations")
+    return out
+
+
+def parse_drewry_wci(page: str) -> tuple[date, str]:
+    """"19 Nov 2026: Drewry's World Container Index (WCI) decreased 3% to $4,176 per 40ft container." → that day and the dollars."""
+    m = re.search(r"(\d{1,2}) ([A-Z][a-z]{2})[a-z]* (\d{4}): Drewry\S{0,2}s World Container Index[^$<]{0,120}\$([\d,]+(?:\.\d+)?) per 40ft", page)
+    months = {k[:3]: v for k, v in _EN_MONTHS.items()}
+    if not m or m.group(2).lower() not in months:
+        raise MacroError("wci_unreadable")
+    return date(int(m.group(3)), months[m.group(2).lower()], int(m.group(1))), _plain(Decimal(m.group(4).replace(",", "")))
+
+
+def parse_evn_inflow(page: str) -> dict[str, Decimal]:
+    """Each reservoir's inflow (m3/s, the "Lưu lượng đến hồ" column) on EVN's reservoir page; blank or dashed cells are skipped."""
+    out = {}
+    for row in re.findall(r"(?s)<tr[^>]*>(.*?)</tr>", page):
+        cells = [html_lib.unescape(re.sub(r"<[^>]+>", "", c)).strip() for c in re.findall(r"(?s)<td[^>]*>(.*?)</td>", row)]
+        if len(cells) < 6 or "Mực nước" in cells[0]:
+            continue
+        name = re.split(r"Đồng bộ lúc", unicodedata.normalize("NFC", cells[0]))[0].strip()
+        try:
+            flow = Decimal(cells[5].replace(",", ""))
+        except InvalidOperation:
+            continue
+        if name and flow >= 0:
+            out[name] = flow
+    return out
+
+
+def fetch_chain_extras(store: MacroStore, *, get: Callable[[str], str], today: date | None = None,
+                       sleep: Callable[[float], None] = time.sleep) -> dict[str, str]:
+    """FAO's dairy index, Drewry's container index and the hydropower inflow against a year before; each reported apart."""
+    today = today or datetime.now(VN).date()
+    results = {}
+    try:
+        have = store.read("com_dairy")
+        last_month = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+        if not have or date.fromisoformat(have[-1]["date"]) < last_month:
+            store.upsert("com_dairy", parse_fao_dairy(_get_with_retry(get, FAO_INDICES, sleep))[-COMMODITY_YEARS * 12:], entry="auto",
+                         source_url=FAO_INDICES)
+        results["com_dairy"] = "ok"
+    except Exception as exc:
+        results["com_dairy"] = f"error:{type(exc).__name__}"
+    try:
+        have = store.read("com_container_wci")
+        if not have or (today - date.fromisoformat(have[-1]["date"])).days > WCI_EVERY_DAYS:
+            store.upsert("com_container_wci", [parse_drewry_wci(_get_with_retry(get, DREWRY_WCI, sleep))], entry="auto", source_url=DREWRY_WCI)
+        results["com_container_wci"] = "ok"
+    except Exception as exc:
+        results["com_container_wci"] = f"error:{type(exc).__name__}"
+    points = []
+    try:
+        known = {o["date"] for o in store.read("vn_hydro_inflow_yoy")}
+        for back in range(HYDRO_DAYS - 1, -1, -1):
+            day = today - timedelta(days=back)
+            if day.isoformat() in known:
+                continue
+            before = day.replace(year=day.year - 1, day=28 if day.month == 2 and day.day == 29 else day.day)
+            page = lambda d: parse_evn_inflow(_get_with_retry(get, f"{EVN_RESERVOIRS}?td={d:%d/%m/%Y}%2000:00&vm=&lv=&hc=", sleep))  # noqa: E731
+            now, then = page(day), page(before)
+            shared = [n for n in now if n in then]
+            total_then = sum((then[n] for n in shared), Decimal(0))
+            if len(shared) < HYDRO_MIN_RESERVOIRS or total_then <= 0:
+                raise MacroError("evn_too_few_reservoirs")
+            change = (sum((now[n] for n in shared), Decimal(0)) / total_then - 1) * 100
+            points.append((day, str(change.quantize(Decimal("0.1"), ROUND_HALF_UP))))
+        if points:
+            store.upsert("vn_hydro_inflow_yoy", points, entry="auto", source_url=EVN_RESERVOIRS)
+        results["vn_hydro_inflow_yoy"] = "ok"
+    except Exception as exc:
+        if points:
+            store.upsert("vn_hydro_inflow_yoy", points, entry="auto", source_url=EVN_RESERVOIRS)
+        results["vn_hydro_inflow_yoy"] = f"error:{type(exc).__name__}"
     return results
 
 

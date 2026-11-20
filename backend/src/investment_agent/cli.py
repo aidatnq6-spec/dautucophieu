@@ -558,7 +558,8 @@ def macro_sync(data_dir: Path, get=None, slow_get=None, sleep=None, get_bytes=No
     """Exit 0 when every automatic indicator updated, 1 when some failed (each is reported). Indicators whose source timed out are
     asked once more after a pause, with a longer wait (stockbiz is often slow)."""
     import time
-    from investment_agent.market.leading import MacroStore, fetch_auto, fetch_chain_series, fetch_commodities, fetch_factors, load_indicators
+    from investment_agent.market.leading import (MacroStore, fetch_auto, fetch_chain_extras, fetch_chain_series, fetch_commodities, fetch_factors,
+                                                 load_indicators)
 
     def fetcher(timeout):
         import httpx
@@ -584,6 +585,8 @@ def macro_sync(data_dir: Path, get=None, slow_get=None, sleep=None, get_bytes=No
     results.update(fetch_factors(MacroStore(data_dir), get=get, sleep=sleep))  # long oil and US dollar history for the sensitivity reading
     results.update(fetch_commodities(MacroStore(data_dir), get=get, sleep=sleep))  # monthly world prices for Chuỗi giá trị
     results.update(fetch_chain_series(MacroStore(data_dir), get=get, get_bytes=get_bytes, sleep=sleep))  # urea, container throughput
+    if get_bytes is not None:  # dairy, container freight, hydropower inflow: live runs only, like the World Bank sheet
+        results.update(fetch_chain_extras(MacroStore(data_dir), get=get, sleep=sleep))
     from investment_agent.market.leading import fetch_central_baseline
     try:  # Tỷ giá trung tâm đầu năm, once a year
         from datetime import datetime as _dt

@@ -147,3 +147,9 @@ def test_each_factor_that_cannot_be_read_says_why(tmp_path):
     assert factors["port"]["missing"]["reason"] == "one_point"
     assert factors["sugar"]["missing"]["reason"] == "no_data"
     assert factors["oil"]["missing"] is None
+
+
+def test_daily_and_weekly_chain_series_get_their_own_age_limits():
+    from investment_agent.market.value_chains import CHAIN_MAX_AGE_DAYS, COMMODITY_LABELS
+    assert CHAIN_MAX_AGE_DAYS == {"vn_hydro_inflow_yoy": 7, "com_container_wci": 14}
+    assert all(k in COMMODITY_LABELS for k in ("vn_hydro_inflow_yoy", "com_dairy", "com_container_wci"))

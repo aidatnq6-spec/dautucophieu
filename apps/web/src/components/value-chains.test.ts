@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { missingLine, missingReason } from "./value-chains";
+import { missingLine, missingReason, move } from "./value-chains";
 
 const reading = { direction: "flat" as const, change: "0", kind: "ratio" as const, from: "2026-08-01", date: "2026-09-01", value: "100", stale: true };
 
@@ -19,5 +19,14 @@ describe("what keeps a chain's factors unread", () => {
       f("Chính", "major", "unknown", { reason: "no_series", max_age_days: null })]))
       .toBe("Thiếu: Chính (chưa có nguồn số liệu); Nhỏ (chưa có nguồn số liệu)");
     expect(missingLine([f("Đọc được", "major", "good", null)])).toBeNull();
+  });
+});
+
+describe("a series read against the same days a year before", () => {
+  it("says more or less water than a year before, over the week", () => {
+    const r = { direction: "up" as const, change: "14.29", kind: "yoy" as const, from: "2026-11-14", date: "2026-11-20", value: "-5", stale: false };
+    expect(move(r)).toBe("nhiều hơn cùng kỳ năm trước 14,3% (bình quân 7 ngày)");
+    expect(move({ ...r, direction: "down", change: "-12.00" })).toBe("ít hơn cùng kỳ năm trước 12% (bình quân 7 ngày)");
+    expect(move({ ...r, direction: "flat", change: "4.00" })).toBe("gần bằng cùng kỳ năm trước (+4%, bình quân 7 ngày)");
   });
 });

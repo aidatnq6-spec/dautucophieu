@@ -23,6 +23,8 @@ GROWTH = ("vn_retail_yoy", "vn_public_invest_yoy", "vn_fdi_disbursed_yoy", "port
 POINT_BANDS = {**{r: Decimal("0.25") for r in RATES}, "vn_cpi_yoy": Decimal("0.2"), "us_cpi_yoy": Decimal("0.2"), **{g: Decimal("1") for g in GROWTH}}
 PMI = ("vn_pmi", "us_pmi")
 AVERAGED = {"vnindex_value": 20}  # sessions averaged on each side of the month-long comparison
+# Read against the same days a year before (the stored % per day), averaged over the last week; a ten-point band (inflow is noisy)
+YOY_WEEK, YOY_WEEK_BAND = ("vn_hydro_inflow_yoy",), Decimal("10")
 
 Points = list[tuple[date, Decimal]]
 
@@ -48,6 +50,10 @@ def read_indicator(indicator: str, points: Points, *, today: date, max_age_days:
         net = sum((v for _, v in window), Decimal(0))
         return {**out, "direction": "up" if net > 0 else "down" if net < 0 else "flat", "change": _plain(net), "kind": "net",
                 "from": window[0][0].isoformat()}
+    if indicator in YOY_WEEK:
+        window = [(d, v) for d, v in points if (last_day - d).days < 7]
+        mean = sum((v for _, v in window), Decimal(0)) / len(window)
+        return {**out, "direction": _direction(mean, YOY_WEEK_BAND), "change": _pp(mean), "kind": "yoy", "from": window[0][0].isoformat()}
     if len(points) < 2:
         return {**out, "direction": None, "change": None, "kind": None, "from": None}
     if indicator in PMI:

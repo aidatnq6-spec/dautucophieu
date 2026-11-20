@@ -225,3 +225,24 @@ test("a grace on the principal: the cash once it ends is shown and the loan tab 
   // interest only in the first month: 3 tỷ × 10% ÷ 12
   await expect(loan.getByRole("complementary", { name: "Kết quả khoản vay" })).toContainText("Thanh toán tháng đầu25.000.000 đ");
 });
+
+
+test("the saved plans download as a spreadsheet, one row a plan", async ({ page }) => {
+  await page.goto("/loan?tab=toa-nha");
+  const fill = async (label: string, value: string) => tab(page).getByLabel(label, { exact: true }).fill(value);
+  await fill("Số phòng", "6"); await fill("Mùa cao điểm: số tháng", "12"); await fill("Giá (đ/phòng/tháng)", "9000000"); await fill("Có khách (%)", "75");
+  const name = `Tòa xuất ${Date.now() % 100000}`;
+  const result = page.getByRole("complementary", { name: "Kết quả lợi nhuận tòa nhà" });
+  await result.getByLabel("Tên phương án").fill(name);
+  await result.getByRole("button", { name: "Lưu phương án" }).click();
+  const saved = page.getByRole("region", { name: "Các phương án đã lưu" });
+  await expect(saved.getByRole("row", { name: new RegExp(name) })).toBeVisible();
+  const [file] = await Promise.all([page.waitForEvent("download"), saved.getByRole("button", { name: "Tải bảng tính (.xls)" }).click()]);
+  expect(file.suggestedFilename()).toMatch(/^phuong-an-toa-nha-\d{4}-\d{2}-\d{2}\.xls$/);
+  const text = (await (await import("node:fs/promises")).readFile(await file.path())).toString("utf-8");
+  expect(text).toContain(name);
+  expect(text).toContain("Doanh thu bình quân mỗi tháng (đ)");
+  expect(text).toContain("40500000");   // 6 × 9m × 75%
+  page.once("dialog", (d) => void d.accept());
+  await saved.getByRole("button", { name: `Xóa phương án ${name}` }).click();
+});

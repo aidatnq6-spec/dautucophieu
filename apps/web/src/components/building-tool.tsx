@@ -4,6 +4,7 @@ import { ApiError, api, requestId } from "../lib/api";
 import { formatRatio, formatVnd, groupDigitsInput, hanoiDate, parseMoneyInput } from "../lib/format";
 import { buildingPlan, measureOf, scenario, sensitivity, type BuildingInput, type BuildingPlan, type Measure } from "./building-calc";
 import type { Method } from "./loan-calc";
+import { download, spreadsheet } from "./journal-tools";
 import { PREFILL_EVENT, type LoanPrefill } from "./loan-tool";
 
 const DRAFT_KEY = "building-tool-draft-v1";
@@ -181,6 +182,39 @@ function CompareChart({ items }: { items: { name: string; plan: BuildingPlan | n
   );
 }
 
+type Cell = string | number | null;
+const money0 = (v: number | null | undefined): Cell => (v === null || v === undefined || !Number.isFinite(v) ? null : Math.round(v));
+const pct1 = (v: number | null | undefined): Cell => (v === null || v === undefined || !Number.isFinite(v) ? null : Math.round(v * 1000) / 10);
+const RESULT_COLUMNS: [string, (p: BuildingPlan) => Cell][] = [
+  ["Doanh thu bình quân mỗi tháng (đ)", (p) => money0(p.revenueMonth)], ["Mất vì trống phòng một năm (đ)", (p) => money0(p.vacancyLossYear)],
+  ["Tổng chi phí mỗi tháng (đ)", (p) => money0(p.costs.total)], ["Chi phí trên doanh thu (%)", (p) => pct1(p.costShare)],
+  ["Lợi nhuận vận hành mỗi tháng (đ)", (p) => money0(p.noiMonth)], ["Có khách hòa vốn vận hành (%)", (p) => pct1(p.breakevenOccupancy)],
+  ["Mua: tổng tiền bỏ ra (đ)", (p) => money0(p.buy?.invested)], ["Mua: tiền vay (đ)", (p) => money0(p.buy?.loan)],
+  ["Mua: trả ngân hàng bình quân năm đầu (đ/tháng)", (p) => money0(p.buy?.loanPaymentMonth)], ["Mua: dòng tiền mỗi tháng (đ)", (p) => money0(p.buy?.cashMonth)],
+  ["Mua: dòng tiền sau ưu đãi (đ/tháng)", (p) => money0(p.buy?.afterOffer?.cashMonth)], ["Mua: dòng tiền hết ân hạn (đ/tháng)", (p) => money0(p.buy?.afterGrace?.cashMonth)],
+  ["Mua: lợi suất ròng (%/năm)", (p) => pct1(p.buy?.netYield)], ["Mua: lợi suất vốn tự có (%/năm)", (p) => pct1(p.buy?.cashOnCash)],
+  ["Mua: hoàn vốn tự có (năm)", (p) => (p.buy?.paybackYears == null ? null : Math.round(p.buy.paybackYears * 10) / 10)],
+  ["Mua: có khách tối thiểu (%)", (p) => pct1(p.buy?.breakevenOccupancy)], ["Mua: giá cần đạt sau N năm (đ)", (p) => money0(p.buy?.hold?.neededPrice)],
+  ["Mua: giá cần tăng mỗi năm (%)", (p) => pct1(p.buy?.hold?.neededGrowth)], ["Mua: số năm nắm giữ", (p) => p.buy?.hold?.years ?? null],
+  ["Thuê lại: doanh thu hòa vốn (đ/tháng)", (p) => money0(p.lease?.breakevenRevenue)],
+  ["Thuê lại: gấp lần tiền thuê tòa", (p) => (p.lease && Number.isFinite(p.lease.multiple) ? Math.round(p.lease.multiple * 100) / 100 : null)],
+  ["Thuê lại: có khách tối thiểu (%)", (p) => pct1(p.lease?.breakevenOccupancy)], ["Thuê lại: lợi nhuận mỗi tháng (đ)", (p) => money0(p.lease?.profitMonth)],
+  ["Thuê lại: lợi nhuận cả hợp đồng (đ)", (p) => money0(p.lease?.contractProfit)],
+];
+
+/** The saved plans as one sheet: a row a plan, its name and day, the boxes any plan used (as typed), then its results as numbers. */
+export function plansSheet(plans: Saved[], depositRate: number | null): { headers: string[]; rows: Cell[][] } {
+  const used = (Object.keys(LABELS) as Key[]).filter((k) => plans.some((s) => (s.form[k] ?? "").trim()));
+  const headers = ["Phương án", "Ngày lưu", ...used.map((k) => LABELS[k]!), ...RESULT_COLUMNS.map(([h]) => h), "Ghi chú"];
+  const rows = plans.map((s) => {
+    const out = readPlan({ ...EMPTY, ...s.form }, s.rows, s.method, depositRate === null ? null : depositRate * 100);
+    const p = out && "plan" in out ? out.plan : null;
+    return [s.name, s.saved_on.split("-").reverse().join("/"), ...used.map((k) => s.form[k] ?? null), ...RESULT_COLUMNS.map(([, f]) => (p ? f(p) : null)),
+      p ? null : out && "error" in out ? out.error : "chưa đủ số để tính"];
+  });
+  return { headers, rows };
+}
+
 /** The saved plans compared side by side, each to reopen or delete. */
 function SavedPlans({ store, open, depositRate }: { store: Store; open: (s: Saved) => void; depositRate: number | null }) {
   const { data, busy, write } = store;
@@ -190,6 +224,10 @@ function SavedPlans({ store, open, depositRate }: { store: Store; open: (s: Save
     <section className="surface" aria-label="Các phương án đã lưu">
       <h2>Các phương án đã lưu</h2>
       <p className="caption">Lưu bằng nút trong khung Kết quả; mở lại và so các tòa cạnh nhau ở đây (tối đa 20). Lưu trong thiết lập cá nhân trên máy, không gửi đi đâu.</p>
+      {data && data.plans.length > 0 && <div className="actions"><button type="button" className="btn" onClick={() => {
+        const sheet = plansSheet(data.plans, depositRate);
+        download(spreadsheet("PhuongAn", sheet.headers, sheet.rows), `phuong-an-toa-nha-${hanoiDate()}.xls`);
+      }}>Tải bảng tính (.xls)</button></div>}
       {data && rowsOf.length > 0 && <><h3>Lợi nhuận mỗi tháng của các tòa</h3>
         <CompareChart items={rowsOf.map(({ s, out }) => ({ name: s.name, plan: out && "plan" in out ? out.plan : null }))} /></>}
       {data && (rowsOf.length ? <div className="tablewrap"><table className="fv-table cc-table" aria-label="So sánh các phương án">

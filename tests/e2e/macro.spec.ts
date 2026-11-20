@@ -16,7 +16,8 @@ test("automatic indicators show value, trend and the owner's assessment", async 
   for (const text of ["4,96", "Tăng", "Xấu", "Tự động"]) await expect(row).toContainText(text);
   await expect(page.getByRole("row", { name: /PMI sản xuất Việt Nam/ })).toContainText("Chưa có số liệu");
   // Read from a web page, so a manual value stays possible when the page changes.
-  const deposit = page.getByRole("row", { name: /Lãi suất tiền gửi VND 12 tháng/ });
+  // by its own name: the real deposit rate row names it in its note
+  const deposit = page.getByRole("row").filter({ has: page.getByText("Lãi suất tiền gửi VND 12 tháng (NHTM khác)", { exact: true }) });
   await expect(deposit).toContainText("Tự động");
   await expect(deposit.getByRole("button", { name: "Nhập" })).toBeVisible();
   await expect(page.getByRole("row", { name: /Lợi suất trái phiếu 10 năm của Mỹ/ }).getByRole("button", { name: "Nhập" })).toHaveCount(0);

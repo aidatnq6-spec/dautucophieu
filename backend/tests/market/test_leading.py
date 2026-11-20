@@ -36,10 +36,10 @@ def test_pmi_aggregator_requires_value_and_named_publication_month():
 
 def test_indicators_config_lists_auto_and_manual_rows():
     ind = load_indicators()
-    assert len(ind) == 33 and {i["id"] for i in ind if i["source"]["kind"] != "manual"} == {
+    assert len(ind) == 35 and {i["id"] for i in ind if i["source"]["kind"] != "manual"} == {
         "dxy", "xau_usd", "sjc_gap_pct", "vn_ron95_price", "vn_diesel_price", "wti", "brent", "us_cpi_yoy", "us_core_cpi_yoy", "usd_vnd_vcb", "usd_vnd_central", "fed_effr", "sofr", "vn_interbank_1w", "vn_interbank_1m",
         "vn_trade_balance", "vn_trade_balance_ytd", "vn_fdi_disbursed", "vn_fdi_disbursed_yoy", "vn_retail_yoy", "vn_public_invest_yoy", "us10y", "usd_vnd_free", "usd_vnd_sbv", "deposit_12m",
-        "foreign_net", "vnindex_value", "m2_vn", "vn10y", "vn_interbank_on", "vn_pmi", "vn_cpi_yoy"}  # us_pmi: manual since 26/10/2026 (sources block bots)
+        "foreign_net", "vnindex_value", "m2_vn", "vn10y", "vn_interbank_on", "vn_pmi", "vn_cpi_yoy", "us10y_real", "vn_real_deposit"}  # us_pmi: manual since 26/10/2026 (sources block bots)
 
 
 def test_fred_csv_skips_missing_values_and_cpi_becomes_year_on_year():
@@ -610,3 +610,52 @@ def test_the_sjc_gap_is_kept_as_a_daily_indicator(tmp_path):
     assert out == {"sjc_gap_pct": "ok"}
     obs = MacroStore(tmp_path).read("sjc_gap_pct")
     assert obs[-1]["date"] == "2026-11-16" and spec["unit"] == "%"
+
+
+# --- Lợi suất thực của Mỹ (TIPS 10 năm) và lãi suất tiền gửi thực của Việt Nam (chủ sở hữu chọn, 20/11/2026) ---
+TREASURY_REAL = 'Date,"5 YR","7 YR","10 YR","20 YR","30 YR"\n11/19/2026,2.64,2.76,2.88,3.12,3.24\n11/18/2026,2.66,2.76,2.87,3.12,3.25\n'
+
+
+def test_the_us_real_yield_is_read_from_the_treasury_real_curve_with_fred_as_fallback(tmp_path):
+    spec = next(i for i in load_indicators() if i["id"] == "us10y_real")
+    assert spec["source"] == {"kind": "treasury", "curve": "real", "column": "10 YR", "fallback": {"kind": "fred", "series": "DFII10"}}
+    assert spec["rule"] == "up" and spec["unit"] == "%"
+    asked = []
+
+    def get(url):
+        asked.append(url)
+        return TREASURY_REAL
+    assert fetch_auto([spec], MacroStore(tmp_path), get=get, today=date(2026, 11, 20), sleep=lambda s: None) == {"us10y_real": "ok"}
+    assert asked and all("type=daily_treasury_real_yield_curve" in u for u in asked)
+    assert MacroStore(tmp_path).read("us10y_real")[-1] == {**MacroStore(tmp_path).read("us10y_real")[-1], "date": "2026-11-19", "value": "2.88"}
+    # the nominal curve is still asked for us10y
+    nominal = next(i for i in load_indicators() if i["id"] == "us10y")
+    fetch_auto([nominal], MacroStore(tmp_path), get=get, today=date(2026, 11, 20), sleep=lambda s: None)
+    assert any("type=daily_treasury_yield_curve&" in u for u in asked)
+
+
+def _real_deposit(tmp_path, deposit, cpi, today=date(2026, 11, 20)):
+    store = MacroStore(tmp_path)
+    if deposit:
+        store.upsert("deposit_12m", [deposit], entry="auto")
+    if cpi:
+        store.upsert("vn_cpi_yoy", [cpi], entry="auto")
+    spec = next(i for i in load_indicators() if i["id"] == "vn_real_deposit")
+    return spec, fetch_auto([spec], store, get=lambda u: (_ for _ in ()).throw(OSError(u)), today=today, sleep=lambda s: None), store
+
+
+def test_the_real_deposit_rate_is_the_deposit_rate_less_inflation_while_both_are_fresh(tmp_path):
+    spec, out, store = _real_deposit(tmp_path, (date(2026, 11, 19), "5.2"), (date(2026, 10, 31), "3.25"))
+    assert spec["source"] == {"kind": "real_rate", "rate": "deposit_12m", "inflation": "vn_cpi_yoy"} and spec["rule"] == "up"
+    assert out == {"vn_real_deposit": "ok"}
+    assert [(o["date"], o["value"]) for o in store.read("vn_real_deposit")] == [("2026-11-20", "1.95")]
+    # computed after both inputs in a run, so it uses the figures fetched in that run
+    ids = [i["id"] for i in load_indicators()]
+    assert ids.index("vn_real_deposit") > max(ids.index("deposit_12m"), ids.index("vn_cpi_yoy"))
+
+
+def test_the_real_deposit_rate_is_not_computed_from_a_missing_or_old_input(tmp_path):
+    _, out, store = _real_deposit(tmp_path / "a", (date(2026, 11, 19), "5.2"), None)
+    assert out["vn_real_deposit"].startswith("error:") and store.read("vn_real_deposit") == []
+    _, out, store = _real_deposit(tmp_path / "b", (date(2026, 11, 19), "5.2"), (date(2026, 9, 30), "3.25"))  # CPI past its 40 days
+    assert out["vn_real_deposit"].startswith("error:") and store.read("vn_real_deposit") == []

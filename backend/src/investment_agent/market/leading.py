@@ -54,7 +54,9 @@ MOIT_PER_RUN = 3
 SJC_KIND = "Vàng miếng SJC"
 SBV_INTERBANK = "https://sbv.gov.vn/o/headless-delivery/v1.0/content-structures/3450260/structured-contents?pageSize=30&sort=datePublished:desc"
 TREASURY_CSV = ("https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/{year}/all"
-                "?type=daily_treasury_yield_curve&field_tdr_date_value={year}&page&_format=csv")
+                "?type={curve}&field_tdr_date_value={year}&page&_format=csv")
+# the nominal par yield curve, and the real (TIPS) one for the US real yield (robots.txt allows all; checked 20/11/2026)
+TREASURY_CURVES = {"nominal": "daily_treasury_yield_curve", "real": "daily_treasury_real_yield_curve"}
 # ECB euro reference rates, last 90 days (public, robots.txt allows); DXY is computed from them with ICE's published formula.
 ECB_90D = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
 # Cục Thống kê's own site (WordPress): its public posts API, category 94 (Dữ liệu và số liệu thống kê); robots.txt disallows only
@@ -694,6 +696,7 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
     today = today or datetime.now(VN).date()
     pages: dict[str, str] = {}
     down: dict[str, Exception] = {}
+    specs = {**{i["id"]: i for i in load_indicators()}, **{i["id"]: i for i in indicators}}
 
     def page(url):
         host = urlsplit(url).hostname
@@ -735,10 +738,23 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
             fx = Decimal(str(parse_vcb_xml(page(VCB_XML), currency="USD", field="Sell")[1]).replace(",", ""))
             world = xau * fx * Decimal("3.75") / Decimal("31.1034768")  # đồng a chỉ
             points = [(today, str(((Decimal(sjc) / world - 1) * 100).quantize(Decimal("0.01"), ROUND_HALF_UP)))]
+        elif src["kind"] == "real_rate":
+            # a rate less inflation, from the two stored series (fetched earlier in the run: the config lists them first); never from a
+            # missing or out-of-date figure, each judged by its own update rhythm
+            values = []
+            for key in (src["rate"], src["inflation"]):
+                last = (store.read(key) or [None])[-1]
+                if last is None:
+                    raise MacroError(f"real_rate_missing:{key}")
+                if (today - date.fromisoformat(last["date"])).days > specs[key]["max_age_days"]:
+                    raise MacroError(f"real_rate_stale:{key}")
+                values.append(Decimal(last["value"]))
+            points = [(today, _plain((values[0] - values[1]).quantize(Decimal("0.01"), ROUND_HALF_UP)))]
         elif src["kind"] == "sbv_interbank":
             points = parse_sbv_interbank(page(SBV_INTERBANK), term=src["term"])
         elif src["kind"] == "treasury":
-            points = parse_treasury_csv(page(TREASURY_CSV.format(year=today.year)), column=src["column"])
+            curve = TREASURY_CURVES[src.get("curve", "nominal")]
+            points = parse_treasury_csv(page(TREASURY_CSV.format(year=today.year, curve=curve)), column=src["column"])
         elif src["kind"] == "fred":
             points = parse_fred_csv(page(FRED_CSV.format(series=src["series"])), transform=src.get("transform"))
         elif src["kind"] == "vcb":

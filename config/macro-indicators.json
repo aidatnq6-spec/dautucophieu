@@ -1,5 +1,5 @@
 {
- "version": "macro-2026-11-16.7",
+ "version": "macro-2026-11-20.1",
  "notice": "Quy tắc đánh giá theo bảng Leading Indicator của chủ sở hữu (25/10/2026). bad_when: up = tăng là Xấu; down = giảm là Xấu; sign = âm là Xấu; pmi = Tốt khi trên 50 và không giảm.",
  "indicators": [
   {
@@ -398,6 +398,20 @@
    "url": "https://online.topi.vn/market/lai-suat"
   },
   {
+   "id": "vn_real_deposit",
+   "label": "Lãi suất tiền gửi 12 tháng thực (trừ lạm phát)",
+   "unit": "%/năm",
+   "rule": "up",
+   "max_age_days": 45,
+   "source": {
+    "kind": "real_rate",
+    "rate": "deposit_12m",
+    "inflation": "vn_cpi_yoy"
+   },
+   "url": "https://online.topi.vn/market/lai-suat",
+   "note": "Lãi suất tiền gửi VND 12 tháng (NHTM khác) trừ thẳng lạm phát Việt Nam so cùng kỳ của tháng mới nhất (Cục Thống kê). Chỉ tính khi cả hai số còn mới theo nhịp cập nhật của chúng; thiếu hoặc cũ thì không tính và báo lỗi nguồn. Tính mỗi lượt cập nhật, mỗi ngày giữ số cuối. Là chi phí cơ hội của việc giữ vàng ở Việt Nam."
+  },
+  {
    "id": "us10y",
    "label": "Lợi suất trái phiếu 10 năm của Mỹ",
    "unit": "%",
@@ -413,6 +427,24 @@
    },
    "url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve",
    "note": "Lợi suất danh nghĩa 10 năm do Bộ Tài chính Mỹ công bố cuối mỗi ngày giao dịch; khi không đọc được thì lấy FRED (DGS10), chậm 1–2 ngày."
+  },
+  {
+   "id": "us10y_real",
+   "label": "Lợi suất thực trái phiếu 10 năm của Mỹ (TIPS)",
+   "unit": "%",
+   "rule": "up",
+   "max_age_days": 7,
+   "source": {
+    "kind": "treasury",
+    "curve": "real",
+    "column": "10 YR",
+    "fallback": {
+     "kind": "fred",
+     "series": "DFII10"
+    }
+   },
+   "url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_real_yield_curve",
+   "note": "Lợi suất thực 10 năm (trái phiếu chống lạm phát TIPS) do Bộ Tài chính Mỹ công bố cuối mỗi ngày giao dịch; khi không đọc được thì lấy FRED (DFII10), chậm 1–2 ngày. Là chi phí cơ hội của tài sản không sinh lời như vàng: tăng là bất lợi cho vàng."
   },
   {
    "id": "vn10y",

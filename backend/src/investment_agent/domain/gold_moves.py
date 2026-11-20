@@ -54,3 +54,38 @@ def pass_through(sjc: list[tuple[date, Decimal]], xau: list[tuple[date, Decimal]
     return {"missing": None, "since": common[0].isoformat(), "ready_on": None, "days": (end - start).days, "from": start.isoformat(),
             "to": end.isoformat(), "sjc_from": str(local[start]), "sjc_to": str(local[end]), "world_from": str(world[start]),
             "world_to": str(world[end]), "sjc_change": _ratio(local[end], local[start]), "world_change": _ratio(world[end], world[start])}
+
+
+# Nhắc "đừng hành động theo giá" (owner's choice, 20/11/2026): a move of 10% or more either way over about 30 days, shown where gold is
+# recorded. Each kind's own buying price once it has 30 days; before that the world price (PAXG-USD), said so on the page.
+STRONG_MOVE = Decimal("0.10")
+WINDOW_SLACK_DAYS = 7  # the earlier price may be up to a week older than 30 days (days the price was not read); never more
+
+
+def recent_move(points: list[tuple[date, Decimal]], *, today: date, max_age_days: int) -> dict | None:
+    """The latest price against the latest one at least 30 days before it; None when the latest is old or there is no such price."""
+    if not points:
+        return None
+    points = sorted(points)
+    end, last = points[-1]
+    if (today - end).days > max_age_days:
+        return None
+    start = next(((d, v) for d, v in reversed(points) if d <= end - timedelta(days=WINDOW_DAYS)), None)
+    if start is None or (end - start[0]).days > WINDOW_DAYS + WINDOW_SLACK_DAYS:
+        return None
+    change = last / start[1] - 1
+    return {"from": start[0].isoformat(), "to": end.isoformat(), "days": (end - start[0]).days, "change": _ratio(last, start[1]),
+            "strong": abs(change) >= STRONG_MOVE}
+
+
+def price_moves(kinds: dict[str, list[tuple[date, Decimal]]], world: list[tuple[date, Decimal]], *, today: date,
+                kind_max_age: int = 3, world_max_age: int = 7) -> dict:
+    """{"threshold", "world": move or None, "kinds": {kind: move}}; each move says its basis ("kind" or "world")."""
+    w = recent_move(world, today=today, max_age_days=world_max_age)
+    w = {"basis": "world", **w} if w else None
+    out = {}
+    for kind, points in kinds.items():
+        own = recent_move(points, today=today, max_age_days=kind_max_age)
+        if own or w:
+            out[kind] = {"basis": "kind", **own} if own else w
+    return {"threshold": str(STRONG_MOVE), "world": w, "kinds": out}

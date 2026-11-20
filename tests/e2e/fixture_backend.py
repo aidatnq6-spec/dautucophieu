@@ -178,6 +178,9 @@ if __name__ == "__main__":
                     fetched_at="2026-10-26T15:40:00+07:00")
     EventStore(data).save("VCB", [_ev(1, "VCB", "meeting", 10, "VCB - Tổ chức ĐHĐCĐ bất thường 2026")], fetched_at="2026-10-26T15:40:00+07:00")
     MacroStore(data).upsert("us10y", [(date(2026, 10, 21), "4.91"), (date(2026, 10, 23), "4.96")], entry="auto")
+    # world gold (PAXG-USD): 4000 31 days ago, 3500 yesterday, so the note where gold is recorded says it fell 12,5%
+    SeriesStore(os.path.join(data, "trend-sources")).upsert("GOLD-1d", [(datetime.combine(date.today() - timedelta(days=d), datetime.min.time()), v)
+                                                                         for d, v in ((31, "4000"), (1, "3500"))])
     # CAPM hint and the people block: a stored bond yield and beta, and cached shareholders so the page never calls VNDirect.
     MacroStore(data).upsert("vn10y", [(date.today() - timedelta(days=1), "4.49")], entry="auto")
     from investment_agent.market.beta import BetaStore

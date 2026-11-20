@@ -19,6 +19,8 @@ test("a plan is set, a buy is recorded and the average cost is worked out", asyn
   await box.getByRole("button", { name: "Lưu kế hoạch tích sản" }).click();
   const card = box.getByRole("article", { name: "Vàng thử" });
   await expect(card).toBeVisible();
+  // the world gold price fell 12,5% in 30 days (fixture): a note beside the buy, which still records
+  await expect(card.getByRole("note", { name: "Nhắc về giá vàng" })).toContainText("Giá vàng thế giới (PAXG-USD) đã giảm 12,5% trong 30 ngày");
   await card.getByLabel("Ngày mua", { exact: true }).fill("2026-01-06");
   await card.getByLabel("Tiền bỏ ra (đ)").fill("20000000");
   await card.getByLabel("Số chỉ mua").fill("2");
@@ -58,4 +60,13 @@ test("a buy is sent to the chosen row of the book after a confirmation, and is t
   await expect(card.getByText("đã cộng vào Sổ")).toBeVisible();
   await expect(card.getByRole("button", { name: "Cộng vào Sổ tài sản" })).toHaveCount(0);
   expect(sent).toMatchObject({ buy: "b1", row: "r1" });
+});
+
+test("a gold row being added in Sổ tài sản carries the note on a strong 30-day move", async ({ page }) => {
+  await seedOwner(page);
+  await page.goto("/profile?tab=tai-san");
+  const book = page.getByRole("region", { name: "Sổ tài sản" });
+  await expect(book.getByRole("note", { name: "Nhắc về giá vàng" })).toHaveCount(0);  // only while recording gold
+  await book.getByRole("button", { name: "Thêm dòng vàng" }).click();
+  await expect(book.getByRole("note", { name: "Nhắc về giá vàng" })).toContainText("không theo giá");
 });

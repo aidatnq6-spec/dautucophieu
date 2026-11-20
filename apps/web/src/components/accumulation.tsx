@@ -3,13 +3,14 @@ import { useEffect, useState } from "react";
 import { CalendarCheck, Pencil, Plus, Trash2, X } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatVnd, groupDigitsInput, hanoiDate, parseMoneyInput } from "../lib/format";
+import { GoldPriceNotes, type GoldPriceMoves } from "./gold-price-note";
 
 type Plan = { id: string; name: string; asset: "gold" | "fund"; day: number; start: string; chi: string | null; amount: string | null; kind: string | null; fund: string | null };
 type Buy = { id: string; plan: string; on: string; amount: string; quantity: string; book_row?: string | null };
 type Month = { month: string; got: string; status: "met" | "short" | "none" | "pending"; short_by: string | null };
 type Status = { id: string; months: Month[]; streak: number; cost: string; quantity: string; average: string | null; price: string | null; price_on: string | null; stale: boolean; value: string | null; change: string | null;
   price_reason: "no_buys" | "no_kind" | "no_price" | null; before_start: number; book_rows: { id: string; name: string }[] };
-type View = { version: number; book_exists: boolean; data: { plans: Plan[]; buys: Buy[] }; plans: Status[]; gold_kinds: string[]; gold_source: string | null; nav_source: string | null };
+type View = { version: number; book_exists: boolean; data: { plans: Plan[]; buys: Buy[] }; plans: Status[]; gold_kinds: string[]; gold_source: string | null; nav_source: string | null; gold_moves?: GoldPriceMoves };
 type Draft = { id: string | null; name: string; asset: "gold" | "fund"; day: string; start: string; size: string; kind: string; fund: string };
 
 const BLANK: Draft = { id: null, name: "", asset: "gold", day: "", start: "", size: "", kind: "", fund: "" };
@@ -19,7 +20,7 @@ const day = (d: string) => `${d.slice(8)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
 const qty = (v: string) => { const [i, f] = v.split("."); return formatVnd(i, { unit: false }) + (f ? `,${f}` : ""); };
 const quantity = (raw: string) => { const v = parseMoneyInput(raw); return v !== null && Number(v) > 0 && (v.split(".")[1] ?? "").length <= 4 ? v : null; };
 
-function PlanCard({ plan, status, buys, busy, onBuy, onDelete, onEdit, onRemove, source, bookExists, onPost }: { plan: Plan; status: Status; buys: Buy[]; busy: boolean; source: string | null; onBuy: (b: Omit<Buy, "id" | "plan">) => Promise<boolean>;
+function PlanCard({ plan, status, buys, busy, onBuy, onDelete, onEdit, onRemove, source, bookExists, onPost, moves }: { plan: Plan; status: Status; buys: Buy[]; busy: boolean; source: string | null; moves?: GoldPriceMoves; onBuy: (b: Omit<Buy, "id" | "plan">) => Promise<boolean>;
   bookExists: boolean; onPost: (b: Buy, row: string | null) => void;
   onDelete: (b: Buy) => void; onEdit: () => void; onRemove: () => void }) {
   const [on, setOn] = useState(hanoiDate());
@@ -60,6 +61,7 @@ function PlanCard({ plan, status, buys, busy, onBuy, onDelete, onEdit, onRemove,
       </dl>
       {status.price_reason && status.price_reason !== "no_buys" && <p className="caption">{why[status.price_reason]}</p>}
       {status.before_start > 0 && <p className="caption">{status.before_start} lần mua trước tháng bắt đầu: có tính vào giá vốn, không hiện ở tháng nào.</p>}
+      {gold && <GoldPriceNotes moves={moves} kinds={[plan.kind]} />}
       <form className="eb-form" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
         <label className="field">Ngày mua<input type="date" max={hanoiDate()} value={on} disabled={busy} onChange={(e) => setOn(e.target.value)} /></label>
         <label className="field">Tiền bỏ ra (đ)<input inputMode="numeric" value={amount} disabled={busy} onChange={(e) => setAmount(groupDigitsInput(e.target.value))} /></label>
@@ -148,7 +150,7 @@ export function Accumulation({ onPosted }: { onPosted?: () => void } = {}) {
       </form>
       {message && <p className="errors" role="alert">{message}</p>}
       {view && view.data.plans.length === 0 && <p className="muted">Chưa có kế hoạch nào.</p>}
-      {view?.data.plans.map((p) => <PlanCard key={p.id} plan={p} status={view.plans.find((s) => s.id === p.id)!} buys={view.data.buys.filter((b) => b.plan === p.id)} busy={busy} source={p.asset === "gold" ? view.gold_source : view.nav_source} bookExists={view.book_exists} onPost={(b, row) => void post(b, row)}
+      {view?.data.plans.map((p) => <PlanCard key={p.id} plan={p} status={view.plans.find((s) => s.id === p.id)!} buys={view.data.buys.filter((b) => b.plan === p.id)} busy={busy} source={p.asset === "gold" ? view.gold_source : view.nav_source} moves={view.gold_moves} bookExists={view.book_exists} onPost={(b, row) => void post(b, row)}
         onBuy={(b) => put(view.data.plans, [...view.data.buys, { ...b, id: requestId(), plan: p.id }])} onDelete={removeBuy} onEdit={() => edit(p)} onRemove={() => removePlan(p)} />)}
     </section>
   );

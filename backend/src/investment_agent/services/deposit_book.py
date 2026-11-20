@@ -50,6 +50,19 @@ def book_quotes(data_dir: Path | None) -> dict:
     return {"funds": fund_navs(data_dir), "gold": gold_prices(data_dir)}
 
 
+def gold_price_moves(data_dir: Path | None, *, today: date) -> dict:
+    """Each gold kind's move over about 30 days (its own buying price, else the world price by PAXG-USD), for the note where gold is
+    recorded (domain.gold_moves.price_moves). Public prices only."""
+    from investment_agent.domain.gold_moves import price_moves
+    from investment_agent.market.gold_price import gold_history
+    from investment_agent.market.series import SeriesStore
+    if data_dir is None:
+        return price_moves({}, [], today=today)
+    world = [(date.fromisoformat(t[:10]), Decimal(v)) for t, v in SeriesStore(Path(data_dir) / "trend-sources").points("GOLD-1d")]
+    kinds = {k: [(date.fromisoformat(d), Decimal(v)) for d, v in days.items()] for k, days in gold_history(Path(data_dir)).items()}
+    return price_moves(kinds, world, today=today)
+
+
 def book_view(repo, owner, *, reserve: Decimal, profile_reserve: Decimal, quotes: dict, today: date) -> dict:
     """reserve: the deductions Tháp tài sản uses (services.equity_budget.protected_deductions); profile_reserve: the confirmed profile's
     figure, used when the book's reserve is blank; quotes: book_quotes()."""

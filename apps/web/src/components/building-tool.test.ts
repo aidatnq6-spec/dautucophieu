@@ -110,3 +110,27 @@ describe("growthText", async () => {
     expect(growthText(null)).toBe("không cần giá trị còn lại (dòng tiền đã bù đủ)");
   });
 });
+
+describe("plansSheet", async () => {
+  const { plansSheet } = await import("./building-tool");
+  it("gives one row a plan: its name, the boxes it was saved with and its results as numbers", () => {
+    const saved = [
+      { id: "a", name: "Tòa A", saved_on: "2026-11-20", method: "annuity" as const, rows: [],
+        form: { rooms: "10", hiMonths: "12", hiRent: "10.000.000", hiOcc: "80", price: "5.000.000.000", own: "5.000.000.000" } },
+      { id: "b", name: "Tòa B", saved_on: "2026-11-19", method: "annuity" as const, rows: [], form: { rooms: "4" } },
+    ];
+    const { headers, rows } = plansSheet(saved, null);
+    expect(headers.slice(0, 2)).toEqual(["Phương án", "Ngày lưu"]);
+    expect(headers).toContain("Số phòng");
+    expect(headers).not.toContain("Lãi ưu đãi (%/năm)");                 // a box no plan used is left out
+    const a = Object.fromEntries(headers.map((h, i) => [h, rows[0][i]]));
+    expect(a["Phương án"]).toBe("Tòa A");
+    expect(a["Ngày lưu"]).toBe("20/11/2026");
+    expect(a["Giá mùa cao điểm (đ/phòng/tháng)"]).toBe("10.000.000");
+    expect(a["Doanh thu bình quân mỗi tháng (đ)"]).toBe(80_000_000);
+    expect(a["Mua: lợi suất ròng (%/năm)"]).toBe(19.2);                  // 80m × 12 ÷ 5bn
+    const b = Object.fromEntries(headers.map((h, i) => [h, rows[1][i]]));
+    expect(b["Doanh thu bình quân mỗi tháng (đ)"]).toBeNull();            // not enough figures to work out
+    expect(b["Ghi chú"]).toBe("chưa đủ số để tính");
+  });
+});

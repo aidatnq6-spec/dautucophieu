@@ -52,6 +52,9 @@ def book_quotes(data_dir: Path | None, market=None) -> dict:
     return {"funds": fund_navs(data_dir), "gold": gold_prices(data_dir), "stocks": market.price if market is not None else _stored_prices(data_dir)}
 
 
+_PRICE_STORES: dict[Path, object] = {}  # one per data folder: its merged views are kept while the files are unchanged
+
+
 def _stored_prices(data_dir: Path | None):
     if data_dir is None or not (Path(data_dir) / "prices").exists():
         return lambda symbol: None
@@ -59,7 +62,9 @@ def _stored_prices(data_dir: Path | None):
     from zoneinfo import ZoneInfo
     from investment_agent.market.prices import PriceStore
     from investment_agent.market.view import StoreMarket
-    return StoreMarket(PriceStore(Path(data_dir)), None, today=lambda: datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date()).price
+    root = Path(data_dir).resolve()
+    store = _PRICE_STORES.setdefault(root, PriceStore(root))
+    return StoreMarket(store, None, today=lambda: datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date()).price
 
 
 def gold_price_moves(data_dir: Path | None, *, today: date) -> dict:

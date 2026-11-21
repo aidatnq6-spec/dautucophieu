@@ -7,6 +7,7 @@ import { Assistant } from "../../components/assistant";
 import { PageJumps } from "../../components/page-jumps";
 import { TableLabels } from "../../components/table-labels";
 import { ThemeToggle } from "../../components/theme-toggle";
+import { UsageBeacon } from "../../components/usage-view";
 import { sessionAuth } from "../../lib/server/firebase-admin";
 import { SESSION_COOKIE, sessionConfig, verifyOwnerSession } from "../../lib/server/session";
 
@@ -25,7 +26,7 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
         <AppNav />
         <ThemeToggle />
       </aside>
-      <main className="content" id="main"><PageJumps />{children}<TableLabels /></main>
+      <main className="content" id="main"><PageJumps />{children}<TableLabels /><UsageBeacon /></main>
       <Assistant />
       <ToBottom />
       <BackToTop />

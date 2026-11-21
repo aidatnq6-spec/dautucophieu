@@ -66,6 +66,82 @@ function Scatter({ pe }: { pe: PeStats }) {
   );
 }
 
+type Condition = { id: string; label: string; kind: "monthly" | "daily"; state: boolean | null; known_on: string | null; figure_date: string | null; from: string | null };
+type StateRow = Summary & { a: boolean; b: boolean };
+export type States = { h: number; rows: StateRow[]; all: Summary; today: { a: boolean; b: boolean } | null; from: string | null; runs: [string, string][];
+  a: { id: string; label: string }; b: { id: string; label: string }; fx: string; conditions: Condition[]; line: { date: string; close: string }[] };
+
+/** The figure a condition stands on: a month for the World Bank series, a day for the daily ones. */
+export function figureText(c: Condition): string {
+  if (!c.figure_date) return "chưa có số";
+  return c.kind === "monthly" ? `số tháng ${c.figure_date.slice(5, 7)}/${c.figure_date.slice(0, 4)}` : `số ngày ${dmy(c.figure_date)}`;
+}
+
+function StateChart({ s }: { s: States }) {
+  if (s.line.length < 3) return null;
+  const W = 900, H = 220, L = 46, R = 10, T = 8, B = 22;
+  const t0 = Date.parse(s.line[0].date), t1 = Date.parse(s.line[s.line.length - 1].date);
+  const ys = s.line.map((p) => Number(p.close)), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const X = (iso: string) => L + ((Date.parse(iso) - t0) / (t1 - t0 || 1)) * (W - L - R), Y = (v: number) => T + (1 - (v - y0) / (y1 - y0 || 1)) * (H - T - B);
+  return (
+    <svg className="hs-scatter" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Giai đoạn cả hai điều kiện cùng đúng, trên VN-Index">
+      {s.runs.filter(([a]) => a >= s.line[0].date).map(([a, b]) => <rect key={a} x={X(a)} y={T} width={Math.max(1, X(b) - X(a))} height={H - T - B} className="hs-run" />)}
+      <polyline points={s.line.map((p) => `${X(p.date)},${Y(Number(p.close))}`).join(" ")} className="hs-line" />
+      {[y0, y1].map((v) => <text key={v} x={L - 6} y={Y(v) + 4} className="hs-tick" textAnchor="end">{num(v, 0)}</text>)}
+      {[s.line[0].date, s.line[s.line.length - 1].date].map((d, i) => <text key={d} x={X(d)} y={H - 6} className="hs-tick" textAnchor={i ? "end" : "start"}>{d.slice(0, 4)}</text>)}
+    </svg>
+  );
+}
+
+const FX = ["0.5", "1", "2", "3"];
+
+/** Trạng thái vĩ mô 2×2: two conditions chosen by the owner, VN-Index h sessions later in the four combinations. */
+function StatesView({ h }: { h: number }) {
+  const [a, setA] = useState("cpi_up"), [b, setB] = useState("fx_up"), [fx, setFx] = useState("1");
+  const [loaded, setData] = useState<States | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    api<States>(`history-stats/states/${h}/${a}/${b}/${fx}`).then((d) => { if (live) setData(d); }, (e) => { if (live) setError(e instanceof ApiError ? e.failure.message : "Lỗi tải."); });
+    return () => { live = false; };
+  }, [h, a, b, fx]);
+  const s = loaded && loaded.h === h && loaded.a.id === a && loaded.b.id === b && loaded.fx === fx ? loaded : null;
+  const options = (loaded?.conditions ?? []).map((c) => <option key={c.id} value={c.id}>{c.label}</option>);
+  const yes = (v: boolean) => (v ? "có" : "không");
+  return (
+    <section className="surface" aria-label="Trạng thái vĩ mô hai điều kiện">
+      <h2>Trạng thái vĩ mô: hai điều kiện</h2>
+      <p className="caption">Mỗi điều kiện chỉ tính từ khi số đã công bố: CPI, sản xuất công nghiệp, xuất khẩu tháng M (World Bank, từ 2010) từ ngày 10 tháng sau;
+        tỷ giá bình quân tháng từ ngày 1 tháng sau; số ngày của FRED từ hôm sau. Lãi suất trong nước chưa có nguồn lịch sử công khai nên chưa có điều kiện này;
+        lợi suất Mỹ 10 năm là của Mỹ, không thay thế lãi suất Việt Nam.</p>
+      {error && <p className="errors" role="alert">{error}</p>}
+      {loaded && <div className="formgrid">
+        <label className="field">Điều kiện A<select value={a} onChange={(e) => setA(e.target.value)}>{options}</select></label>
+        <label className="field">Điều kiện B<select value={b} onChange={(e) => setB(e.target.value)}>{options}</select></label>
+        <div className="field">Ngưỡng tỷ giá trong 3 tháng<div className="chips" role="radiogroup" aria-label="Ngưỡng tỷ giá">{FX.map((x) =>
+          <button key={x} type="button" role="radio" aria-checked={fx === x} className={`chip${fx === x ? " on" : ""}`} onClick={() => setFx(x)}>{x.replace(".", ",")}%</button>)}</div></div>
+      </div>}
+      {a === b && <p className="notice">Chọn hai điều kiện khác nhau.</p>}
+      {!s && !error && a !== b && <p className="muted fx-loading" role="status">Đang tính…</p>}
+      {s && <>
+        <table className="fv-table" aria-label="Vĩ mô hôm nay">
+          <thead><tr><th>Điều kiện</th><th>Hôm nay</th><th>Số liệu</th><th>Có từ</th></tr></thead>
+          <tbody>{s.conditions.map((c) => <tr key={c.id}><td data-label="Điều kiện">{c.label}</td>
+            <td data-label="Hôm nay">{c.state === null ? <span className="muted">chưa biết</span> : <strong>{c.state ? "Đúng" : "Không"}</strong>}</td>
+            <td data-label="Số liệu" className="caption">{figureText(c)}</td><td data-label="Có từ" className="caption">{c.from ? dmy(c.from) : "—"}</td></tr>)}</tbody>
+        </table>
+        <table className="fv-table" aria-label="VN-Index sau đó theo hai điều kiện">{HEAD}
+          <tbody>{s.rows.map((r) => <Row key={`${r.a}${r.b}`} label={`A ${yes(r.a)}, B ${yes(r.b)}`} s={r} mark={!!s.today && s.today.a === r.a && s.today.b === r.b} />)}
+            <Row label="Mọi lúc" s={s.all} /></tbody>
+        </table>
+        <p className="caption">A: {s.a.label}. B: {s.b.label}. Có từ {s.from ? dmy(s.from) : "—"}.{s.today ? "" : " Hôm nay chưa biết đủ cả hai điều kiện."}</p>
+        <StateChart s={s} />
+        <p className="caption">Vùng tô là các giai đoạn cả A và B cùng đúng; đường là VN-Index theo tuần.</p>
+      </>}
+    </section>
+  );
+}
+
 /** Thống kê lịch sử: VN-Index some sessions later by P/E group and by the macro lights' levels, with the evidence each rests on. */
 export function HistoryStatsView() {
   const [h, setH] = useState(250);
@@ -106,6 +182,7 @@ export function HistoryStatsView() {
               <Row label="Mọi lúc" s={data.pe.all} /></tbody>
           </table>
         </section>
+        <StatesView h={h} />
         <section className="surface" aria-label="Kiểm tra ngưỡng đèn bằng lịch sử">
           <h2>Kiểm tra ngưỡng Đèn tín hiệu rủi ro vĩ mô</h2>
           <p className="caption">Mức của mỗi đèn tính đúng như trên trang Vĩ mô với ngưỡng bạn đã duyệt, cho từng ngày trong quá khứ. Một ngưỡng có ích khi

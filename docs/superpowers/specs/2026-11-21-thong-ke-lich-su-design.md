@@ -25,7 +25,22 @@ Chủ sở hữu duyệt ngày 21/11/2026 (kaizen từ FireAnt Quant AI). Trang 
 - Kết quả đầu tiên (21/11/2026, H = 60): đèn dầu đỏ đi kèm VN-Index **tăng** trung bình 11,2% (28 khoảng độc lập); đèn USD đỏ đi kèm
   −5,7% (11 khoảng). Chủ sở hữu tự quyết có chỉnh ngưỡng hay không.
 
-## Chưa làm (nhánh sau)
-- Lịch sử dài của lợi suất Mỹ 10 năm (hiện từ 04/2025) và các chuỗi vĩ mô Việt Nam theo tháng của World Bank (CPI, sản xuất công
-  nghiệp, tỷ giá, xuất khẩu, từ 2010), để làm bảng trạng thái 2×2 như FireAnt.
-- Lãi suất trong nước: chưa có nguồn lịch sử công khai (NHNN từ chối, IMF lỗi 502 lúc kiểm); thiếu thì ghi thiếu, không thay thế.
+## Lịch sử vĩ mô dài (nguồn đã kiểm 21/11/2026)
+- **World Bank, Global Economic Monitor** (API mở, không khóa; robots.txt 404): theo tháng từ 01/2010, chậm khoảng 4 tháng —
+  CPI Việt Nam % so cùng kỳ, sản xuất công nghiệp (điều chỉnh mùa vụ), tỷ giá USD/VND bình quân tháng, xuất khẩu hàng hóa (điều chỉnh
+  mùa vụ). Lưu `wb_vn_*` trong kho vĩ mô.
+- **FRED DGS10**: lợi suất Mỹ 10 năm từ 1962 (`us10y_long`), ghép với chuỗi gần đây (trùng khớp trên các ngày chung).
+- `macro-sync` đọc các chuỗi này **mỗi tuần một lần**; lỗi thì lượt sau đọc lại. Đọc lỗi mà còn số trong hạn (tháng: 200 ngày,
+  DGS10: 10 ngày) là "trễ".
+- **Lãi suất trong nước: không có nguồn lịch sử công khai** (NHNN trả 403, IMF trả 502 lúc kiểm). Không lưu, không thay thế; trang ghi rõ.
+
+## Trạng thái vĩ mô: hai điều kiện (2×2)
+- 8 điều kiện có/không: lạm phát (CPI) tăng so với 3 tháng trước; tỷ giá USD/VND tăng hơn X% trong 3 tháng (X: 0,5 / 1 / 2 / 3%);
+  sản xuất công nghiệp tăng (so cùng kỳ) nhanh hơn trung bình 12 tháng; xuất khẩu 3 tháng tăng so cùng kỳ; giá dầu, USD rộng, lợi suất
+  Mỹ 10 năm tăng trong 3 tháng; P/E VN-Index trên trung vị 5 năm.
+- **Biết từ khi nào:** CPI, sản xuất công nghiệp, xuất khẩu tháng M từ ngày 10 tháng sau (lịch công bố của Tổng cục Thống kê); tỷ giá
+  bình quân tháng từ ngày 1 tháng sau; số ngày của FRED từ hôm sau; P/E cùng ngày. Một phiên lấy trạng thái mới nhất đã biết, nếu
+  không cũ quá 130 ngày (số tháng, vì World Bank chậm khoảng 4 tháng) hoặc 10 ngày (số ngày).
+- Chủ sở hữu chọn A và B; bảng 4 ô (A có/không × B có/không) và "Mọi lúc"; ô của hôm nay tô đậm, chỉ khi phiên mới nhất biết đủ cả
+  hai. Bảng "Vĩ mô hôm nay" ghi từng điều kiện, số liệu tháng hay ngày nào, có từ khi nào. Biểu đồ VN-Index theo tuần, tô các giai
+  đoạn cả A và B cùng đúng.

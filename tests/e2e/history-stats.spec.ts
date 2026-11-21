@@ -14,3 +14,15 @@ test("Thống kê lịch sử shows the P/E groups and the lights' check, and th
   await expect(page.getByRole("region", { name: "Số phiên nhìn tới" })).toContainText("VN-Index 60 phiên sau");
   await expect(page.getByRole("navigation", { name: "Điều hướng chính" }).getByRole("link", { name: "Thống kê lịch sử" })).toBeVisible();
 });
+
+test("two conditions can be chosen and the four combinations are shown with today's conditions", async ({ page }) => {
+  await page.goto("/history");
+  const box = page.getByRole("region", { name: "Trạng thái vĩ mô hai điều kiện" });
+  await expect(box.getByRole("table", { name: "Vĩ mô hôm nay" })).toContainText("Lạm phát (CPI) tăng so với 3 tháng trước");
+  await box.getByLabel("Điều kiện B").selectOption("oil_up");
+  const table = box.getByRole("table", { name: "VN-Index sau đó theo hai điều kiện" });
+  await expect(table.getByRole("row")).toHaveCount(6);  // header, four combinations, every day
+  await expect(box).toContainText("B: Giá dầu tăng trong 3 tháng");
+  await box.getByRole("radio", { name: "2%" }).click();
+  await expect(box.getByRole("table", { name: "Vĩ mô hôm nay" })).toContainText("Tỷ giá USD/VND tăng hơn 2% trong 3 tháng");
+});

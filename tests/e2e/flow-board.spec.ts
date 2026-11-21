@@ -13,6 +13,15 @@ test("Theo dõi shows the flow board with its quick filters, held tickers marked
   await expect(box).toContainText("không phải khuyến nghị");
 });
 
+test("Chuỗi giá trị shows each chain's valuation against its five years", async ({ page }) => {
+  await page.goto("/value-chains");
+  const box = page.getByRole("region", { name: "Định giá chuỗi so với 5 năm" });
+  const table = box.getByRole("table", { name: "Định giá chuỗi" });
+  await expect(table.getByRole("columnheader", { name: "Vị trí P/E" })).toBeVisible();
+  await expect(table.getByRole("row").nth(1)).toContainText("mã");
+  await expect(box).toContainText("không phải khuyến nghị");
+});
+
 test("Chuỗi giá trị shows each chain's change over the periods", async ({ page }) => {
   await page.goto("/value-chains");
   const box = page.getByRole("region", { name: "Hiệu suất theo kỳ" });

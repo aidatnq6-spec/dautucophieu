@@ -53,6 +53,32 @@ def value_chain_returns(request: Request):
     return {"chains": chain_board(data_dir, chains, today=now(request).astimezone(VN).date())}
 
 
+_VALUATION_CACHE: dict = {}  # (data dir, day) -> (computed at, rows): about 2 s to compute, figures change once a day
+VALUATION_TTL_SECONDS = 3600
+
+
+@router.get("/value-chains/valuation")
+def value_chain_valuation(request: Request):
+    """Định giá chuỗi so với 5 năm: each chain's median P/E and P/B now against its five years (domain.chain_valuation)."""
+    import time
+
+    from investment_agent.services.chain_valuation import chain_valuation_board
+    require_owner(request)
+    data_dir = request.app.state.data_dir
+    if data_dir is None:
+        return unavailable()
+    today = now(request).astimezone(VN).date()
+    key = (str(data_dir), today)
+    hit = _VALUATION_CACHE.get(key)
+    if hit and time.monotonic() - hit[0] < VALUATION_TTL_SECONDS:
+        return {"chains": hit[1]}
+    config = load_value_chains(getattr(request.app.state, "value_chains_path", VALUE_CHAINS_PATH))
+    rows = chain_valuation_board(Path(data_dir), [{"id": c.id, "name": c.name, "symbols": list(c.symbols)} for c in config.chains], today=today)
+    _VALUATION_CACHE.clear()
+    _VALUATION_CACHE[key] = (time.monotonic(), rows)
+    return {"chains": rows}
+
+
 @router.put("/value-chains/{chain_id}/approval")
 def set_approval(request: Request, chain_id: str, body: ApprovalRequest):
     """Duyệt or bỏ duyệt one chain; the approval holds for the content the page showed (its fingerprint) and nothing else."""

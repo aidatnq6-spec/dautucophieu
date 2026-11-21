@@ -28,7 +28,8 @@ STATE_FILE = ("alerts", "lights.json")
 STATES = {"bad": "Xấu", "watch": "Theo dõi", "good": "Tốt"}
 _COMMODITIES = {"com_coal": "Giá than", "com_iron_ore": "Giá quặng sắt", "com_rubber": "Giá cao su", "com_sugar": "Giá đường", "com_lng": "Giá LNG",
                 "com_aluminium": "Giá nhôm", "com_copper": "Giá đồng", "com_wheat": "Giá lúa mì", "com_soybean": "Giá đậu tương",
-                "com_cotton": "Giá bông"}
+                "com_cotton": "Giá bông", "crack_321_us": "Biên lọc dầu (crack 3-2-1 Mỹ)",
+                "us_apparel_inv_ratio": "Tồn kho/doanh số cửa hàng quần áo Mỹ"}
 _VALUATION = {"pe", "pb", "ev_ebitda", "pe_now", "pb_now"}
 _BANK_NOTE = {"CASA": "casa", "GROUP2_RATIO": "group2_ratio"}
 

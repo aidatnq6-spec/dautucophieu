@@ -79,7 +79,7 @@ export function MacroView() {
           const when = updatedLabel(r.date, today);
           return (
             <Fragment key={r.id}>
-              <tr className={r.auto ? undefined : "macro-manual"}>
+              <tr id={`chi-so-${r.id}`} className={r.auto ? undefined : "macro-manual"}>
                 <td className="mt-n">{i + 1}</td>
                 <td className="mt-name"><strong>{r.label}</strong>{r.note && <div className="caption mt-note">{r.note}</div>}</td>
                 <td className="num" data-label="Hiện tại">{r.value ? <><strong>{show(r.value)}</strong> <span className="caption">{r.unit}</span></> : <span className="muted">Chưa có số liệu</span>}

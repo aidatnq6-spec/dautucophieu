@@ -1,8 +1,9 @@
 """Lịch vĩ mô Mỹ: the Fed's rate decisions and FOMC minutes (the Fed's own monthly calendar pages, federalreserve.gov/newsevents/
 <year>-<month>.htm: no robots.txt, checked 16/11/2026) and the CPI release dates (BLS schedule, bls.gov/schedule/news_release/cpi.htm,
 robots.txt allows). Times are the publishers' Eastern times, turned into Vietnam time (summer time counted). Read once a day into
-data/macro/us-calendar.json; a source that fails keeps the events it gave before. Nothing is worked out: a minutes date appears only once
-the Fed's calendar lists it."""
+data/macro/us-calendar.json; a source that fails keeps the events it gave before. A later month's Fed page that answers 404 is not posted
+yet (the Fed puts each month up a few weeks ahead): listed as not_published, not as an error; this month's page or the BLS page at 404 is
+still an error. Nothing is worked out: a minutes date appears only once the Fed's calendar lists it."""
 
 import calendar as _cal
 import html
@@ -31,9 +32,15 @@ def fed_month_url(year: int, month: int) -> str:
     return f"https://www.federalreserve.gov/newsevents/{year}-{_cal.month_name[month].lower()}.htm"
 
 
+class NotPublished(Exception):
+    """The page answered 404."""
+
+
 def default_get(url: str) -> str:
     import httpx
     response = httpx.get(url, timeout=60, follow_redirects=False, headers={"User-Agent": USER_AGENT})
+    if response.status_code == 404:
+        raise NotPublished(url)
     response.raise_for_status()
     return response.text
 
@@ -98,19 +105,22 @@ def refresh_us_calendar(data_dir: Path, *, get: Callable[[str], str] = default_g
     path = Path(data_dir).joinpath(*FILE)
     saved = _read(path, {"events": []})
     months = [((today.year * 12 + today.month - 1 + i) // 12, (today.month - 1 + i) % 12 + 1) for i in range(MONTHS_AHEAD)]
+    later = {fed_month_url(y, m) for y, m in months[1:]}
     sources = [(fed_month_url(y, m), lambda page, y=y, m=m: parse_fed_month(page, y, m)) for y, m in months] + [(BLS_CPI, parse_bls_cpi)]
-    fresh, errors, read = [], [], set()
+    fresh, errors, not_published, read = [], [], [], set()
     for url, parse in sources:
         try:
             fresh += [{**e, "source": url} for e in parse(get(url))]
             read.add(url)
+        except NotPublished:
+            (not_published if url in later else errors).append(url)
         except Exception:
             errors.append(url)
     keep_from = (today - timedelta(days=60)).isoformat()
     events = [e for e in saved["events"] if e["source"] not in read and e["et"][:10] >= keep_from] + fresh
     events = sorted({(e["kind"], e["et"]): e for e in events}.values(), key=lambda e: e["et"])
-    _write(path, {"updated_on": today.isoformat(), "events": events, "errors": errors})
-    return {"status": "ok" if read else "error", "events": len(events), "errors": errors}
+    _write(path, {"updated_on": today.isoformat(), "events": events, "errors": errors, "not_published": not_published})
+    return {"status": "ok" if read else "error", "events": len(events), "errors": errors, "not_published": not_published}
 
 
 def _span(detail: str) -> str:

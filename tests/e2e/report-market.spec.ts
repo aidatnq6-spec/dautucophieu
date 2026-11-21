@@ -34,6 +34,18 @@ test("the brief opens with the session's market: indices, liquidity, breadth, fo
   await expect(page.getByRole("columnheader", { name: "Phạm vi" })).toHaveCount(0);
 });
 
+test("the brief shows the stocks that moved VN-Index and the session's heat map, held stocks marked", async ({ page }) => {
+  await openBrief(page);
+  const impact = page.getByRole("region", { name: "Tác động lên VN-Index" });
+  await expect(impact.getByRole("list", { name: "Mã kéo lên" })).toContainText("FPT");
+  await expect(impact.getByRole("list", { name: "Mã kéo lên" })).toContainText("đang nắm");
+  await expect(impact.getByRole("list", { name: "Mã kéo xuống" })).toContainText("VHM");
+  await expect(impact).toContainText("VN-Index thực tế +12,30 điểm");
+  const map = page.getByRole("region", { name: "Bản đồ nhiệt phiên" });
+  await expect(map.getByRole("img", { name: "Bản đồ nhiệt các mã HOSE theo ngành" })).toBeVisible();
+  await expect(map.locator("rect.hm-held")).toHaveCount(1);
+});
+
 test("no horizontal scroll on the brief at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 900 });
   await openBrief(page);

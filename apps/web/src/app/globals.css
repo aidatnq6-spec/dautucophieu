@@ -570,3 +570,13 @@ main h2{scroll-margin-top:16px}
 .chip:disabled{opacity:.45;cursor:default}.chip:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .fb-range{position:relative;display:inline-block;width:72px;height:6px;border-radius:3px;background:var(--line);vertical-align:middle}
 .fb-range span{position:absolute;top:-3px;width:4px;height:12px;margin-left:-2px;border-radius:2px;background:var(--brand)}
+/* Tác động lên VN-Index and Bản đồ nhiệt phiên (brief) */
+.im-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.im-bars{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.im-bars li{display:grid;grid-template-columns:92px 1fr 52px;align-items:center;gap:8px;font-size:13px}
+.im-sym{font-weight:600;white-space:nowrap}.im-pts{text-align:right;font-variant-numeric:tabular-nums}
+.im-track{height:10px;background:var(--line);border-radius:3px;overflow:hidden}
+.im-bar{display:block;height:100%}.im-up{background:var(--good)}.im-down{background:var(--bad)}
+.hm{width:100%;height:auto;display:block}.hm-sector{font-size:10px;fill:var(--muted);font-weight:600}
+.hm-sym{font-size:11px;font-weight:700;fill:var(--ink);text-anchor:middle}.hm-pct{font-size:10px;fill:var(--ink);text-anchor:middle}
+.hm-held{stroke:var(--ink);stroke-width:2.5}

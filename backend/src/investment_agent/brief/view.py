@@ -41,7 +41,28 @@ def market_view(snapshot: dict | None, *, watched: list[str], held: set[str], ne
     view["signal_lines"] = signal_lines(snapshot.get("signals"))
     from investment_agent.market.asia_indices import asia_line
     view["asia_line"] = asia_line(snapshot.get("asia"))  # Tín hiệu phiên, the same lines as the Telegram brief
+    view["impact"] = _impact((snapshot.get("signals") or {}).get("pull") or {}, held)
+    view["heatmap"] = _heatmap(symbols, held) if priced else {"status": "missing", "reason": board.get("reason") or "Chưa có bảng giá cả sàn"}
     return {**view, "tickers": first + others, "news": news}
+
+
+def _impact(pull: dict, held: set[str]) -> dict:
+    """Tác động lên VN-Index (21/11/2026): the stocks' points as Tín hiệu phiên worked them out, held ones marked; only when the sum
+    matched VN-Index's move."""
+    if pull.get("status") != "ok":
+        return {"status": "missing", "reason": pull.get("reason") or "Chưa tính được điểm kéo chỉ số cho phiên này"}
+    mark = lambda rows: [{**r, "held": r["symbol"] in held} for r in rows]  # noqa: E731
+    return {"status": "ok", "computed": pull["computed"], "actual": pull["actual"], "up": mark(pull["up"]), "down": mark(pull["down"])}
+
+
+def _heatmap(symbols: dict, held: set[str]) -> dict:
+    """Bản đồ nhiệt phiên (21/11/2026): every traded stock with its sector, change and matched value, held ones marked."""
+    rows = [{"symbol": s, "sector": r.get("sector"), "pct": r["pct"], "value_mn": r["value_mn"], "held": s in held}
+            for s, r in symbols.items() if r.get("pct") is not None and r.get("value_mn") and Decimal(r["value_mn"]) > 0]
+    if not rows:
+        return {"status": "missing", "reason": "Ảnh chụp phiên này chưa có giá trị giao dịch từng mã (lưu từ 21/11/2026)"}
+    rows.sort(key=lambda r: -Decimal(r["value_mn"]))
+    return {"status": "ok", "rows": rows}
 
 
 RECENT = 5

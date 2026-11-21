@@ -35,7 +35,7 @@ def test_breadth_totals_foreign_and_sectors():
     assert [x["symbol"] for x in f["top_buy"]] == ["VCB"]  # zero-net ACB skipped
     assert [(s["sector"], s["pct"], s["count"]) for s in out["sectors"]] == [("Ngân hàng", "0.0000", 3), ("Công nghệ Thông tin", "-0.0175", 1)]
     assert out["symbols"]["FPT"] == {"price": 56000, "ref": 57000, "change": -1000, "pct": "-0.0175", "sector": "Công nghệ Thông tin",
-                                     "foreign_net_bn": "-78.14"}  # per ticker, for the 20-session screen
+                                     "foreign_net_bn": "-78.14", "value_mn": "572175.08"}  # per ticker: the screen, and the heat map's size (21/11/2026)
     assert out["symbols"]["ACB"]["foreign_net_bn"] == "0.00"
     assert out["symbols"]["XYZ"]["pct"] is None and out["symbols"]["XYZ"]["sector"] == "Khác"
 

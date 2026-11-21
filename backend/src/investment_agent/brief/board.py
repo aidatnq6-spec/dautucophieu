@@ -55,7 +55,9 @@ def summarise_board(records: list[dict], *, session_date: date, icb_names: dict[
         symbols[r["symbol"]] = {"price": int(price) if traded else None, "ref": int(ref) if ref else None,
                                 "change": int(price - ref) if traded else None, "pct": _s(pct, _Q4) if traded else None,
                                 "sector": sector, "foreign_net_bn": None if r.get("foreign_buy_value") is None and r.get("foreign_sell_value") is None
-                                else _s((buy - sell) / Decimal(1_000_000_000), _Q2)}
+                                else _s((buy - sell) / Decimal(1_000_000_000), _Q2),
+                                # matched value (million đồng): the size of the stock's cell on Bản đồ nhiệt (21/11/2026)
+                                "value_mn": _s(_d(r.get("accumulated_value")), _Q2) if r.get("accumulated_value") is not None else None}
     bn = Decimal(1_000_000_000)
     top = lambda items: [{"symbol": s, "net_value_bn": _s(n / bn, _Q2)} for s, n in items[:3]]
     sectors = [{"sector": name, "pct": _s(sum(p) / len(p), _Q4), "count": len(p)} for name, p in groups.items()]

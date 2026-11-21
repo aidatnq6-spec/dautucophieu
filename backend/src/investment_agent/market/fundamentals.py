@@ -183,9 +183,10 @@ def sync_fundamentals(store: "FundamentalsStore", series, symbols: list[str], *,
     todo = store.stale(symbols, now=now, max_age_days=max_age_days)
     todo = todo if limit is None else todo[:limit]
     updated, errors, today, conflicts = [], {}, now.date(), []
+    pace = getattr(provider, "pace_seconds", PACE_SECONDS)  # a source without a rate limit asks for less (VNDirect: 1 s)
     for i, sym in enumerate(todo):
         if i:
-            sleep(PACE_SECONDS)
+            sleep(pace)
         try:
             built = (_with_retry(lambda: provider.record(sym, now), sleep) if hasattr(provider, "record")  # VNDirect since 11/2026
                      else build_record(sym, _with_retry(lambda: provider.fundamentals_frames(sym), sleep), now))

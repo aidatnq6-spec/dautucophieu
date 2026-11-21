@@ -87,6 +87,33 @@ def test_sync_uses_a_source_that_builds_the_record_itself(tmp_path):
     assert store.read("FPT")["latest_quarter_seen"]["quarter"] == "2026-Q3"
 
 
+def test_a_source_paces_the_sync_with_its_own_pause(tmp_path):
+    """The 15 s pause was Vnstock's rate limit; VNDirect's public API has none, so its source asks for 1 s (17 tickers: 255 s of waiting
+    became 16 s, 21/11/2026). A source without its own pause keeps the old one."""
+    from investment_agent.market.fundamentals import PACE_SECONDS, FundamentalsStore, sync_fundamentals
+    from investment_agent.market.fundamentals_vndirect import VndirectFundamentals
+    from investment_agent.market.series import SeriesStore
+
+    class Source:
+        pace_seconds = 1
+
+        def record(self, sym, now):
+            return build_record(sym, statements(), EVENTS, shares="1885727648", now=now)
+
+        def fetch_closes(self, sym, start, end, *, interval, index):
+            return [(datetime(2026, 11, 13), "50.1")]
+    waits = []
+    sync_fundamentals(FundamentalsStore(tmp_path / "f"), SeriesStore(tmp_path / "t"), ["FPT", "VNM", "HPG"], provider=Source(), now=NOW, limit=None,
+                      sleep=waits.append)
+    assert waits == [1, 1]
+    old = Source()
+    del Source.pace_seconds
+    waits.clear()
+    sync_fundamentals(FundamentalsStore(tmp_path / "g"), SeriesStore(tmp_path / "u"), ["FPT", "VNM"], provider=old, now=NOW, limit=None, sleep=waits.append)
+    assert waits == [PACE_SECONDS]
+    assert VndirectFundamentals.pace_seconds == 1
+
+
 def test_figures_vndirect_lacks_stay_as_fetched_before(tmp_path):
     from investment_agent.market.fundamentals import FundamentalsStore, sync_fundamentals
     from investment_agent.market.series import SeriesStore

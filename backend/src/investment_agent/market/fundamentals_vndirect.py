@@ -77,6 +77,10 @@ def build_record(symbol: str, statements: dict, events: list[dict], *, shares: s
 class VndirectFundamentals:
     """record(symbol, now) for sync_fundamentals; daily closes keep coming from the price provider."""
 
+    # VNDirect's public finfo API has no rate limit like Vnstock's (which the 15 s pause was for): one second between tickers is
+    # enough to stay polite (21/11/2026).
+    pace_seconds = 1
+
     def __init__(self, data_dir: Path, get: Callable[[str], str] = default_get, prices=None, hose_get: Callable[[str], str] | None = None):
         self.data_dir, self.get, self.prices, self.hose_get = Path(data_dir), get, prices, hose_get
 

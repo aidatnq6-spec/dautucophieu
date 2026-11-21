@@ -132,6 +132,8 @@ def main() -> int:
     deposits.add_argument("--data-dir", type=Path, required=True)
     tower = commands.add_parser("pyramid-alerts", help="Tháp tài sản: Telegram once when a layer turns short, back in range or over")
     tower.add_argument("--data-dir", type=Path, required=True)
+    wealth = commands.add_parser("wealth-alerts", help="Việc tài chính hôm nay: the personal reminders of this run in one Telegram note")
+    wealth.add_argument("--data-dir", type=Path, required=True)
     loans = commands.add_parser("loan-alerts", help="Khoản vay and bảo hiểm: Telegram once per loan 90 days before its promotion ends, and per premium 30 days before it is due")
     loans.add_argument("--data-dir", type=Path, required=True)
     contrib = commands.add_parser("contribution-remind", help="Góp vốn đều: Telegram once a month from the contribution day until it is met")
@@ -249,6 +251,8 @@ def main() -> int:
         return deposit_alerts_cli(args.data_dir)
     if args.command == "pyramid-alerts":
         return pyramid_alerts_cli(args.data_dir)
+    if args.command == "wealth-alerts":
+        return wealth_alerts_cli(args.data_dir)
     if args.command == "loan-alerts":
         return loan_alerts_cli(args.data_dir)
     if args.command == "contribution-remind":
@@ -1492,6 +1496,44 @@ def deposit_alerts_cli(data_dir: Path) -> int:
     book, _ = read_book(repo, owner)
     out = deposit_alerts_run(data_dir, book=book, send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
     print(json.dumps(out))  # counts only, never the book
+    return 0
+
+
+def wealth_alerts_cli(data_dir: Path) -> int:
+    """Việc tài chính hôm nay: the personal reminders of this run in one Telegram note; skipped (nothing personal is read) while
+    scheduled delivery is off. Prints counts only."""
+    import uuid
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from investment_agent.services import accumulation, contributions
+    from investment_agent.services.deposit_alerts import deposit_alerts_run
+    from investment_agent.services.deposit_book import book_quotes, read_book
+    from investment_agent.services.equity_budget import budget_view
+    from investment_agent.services.insurance_alerts import insurance_alerts_run
+    from investment_agent.services.loan_alerts import loan_alerts_run, read_property_book
+    from investment_agent.services.pyramid_alerts import pyramid_alerts_run
+    from investment_agent.services.rental_alerts import read_rental_book, rental_alerts_run
+    from investment_agent.services.wealth_alerts import wealth_alerts_run
+
+    telegram = _scheduled_telegram(data_dir)
+    if telegram is None:
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
+        return 0
+    send, repo, owner = telegram
+    today = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date()
+    rid = lambda name: f"{name}-{uuid.uuid4().hex[:16]}"  # noqa: E731
+    runs = [
+        ("deposits", lambda s: deposit_alerts_run(data_dir, book=read_book(repo, owner)[0], send=s, today=today)),
+        ("loans", lambda s: loan_alerts_run(data_dir, book=read_property_book(repo, owner), send=s, today=today)),
+        ("insurance", lambda s: insurance_alerts_run(data_dir, book=read_property_book(repo, owner), send=s, today=today)),
+        ("rental", lambda s: rental_alerts_run(data_dir, book=read_rental_book(repo, owner), send=s, today=today)),
+        ("tower", lambda s: pyramid_alerts_run(data_dir, pyramid=budget_view(repo, owner, quotes=book_quotes(data_dir))[0].get("pyramid"),
+                                               send=s, today=today)),
+        ("contribution", lambda s: contributions.remind_run(repo, owner, today=today, send=s, request_id=rid("contribution"))),
+        ("accumulation", lambda s: accumulation.remind_run(repo, owner, today=today, send=s, request_id=rid("accumulation"))),
+    ]
+    print(json.dumps(wealth_alerts_run(runs, send=send, today=today)))  # counts only, never the books
     return 0
 
 

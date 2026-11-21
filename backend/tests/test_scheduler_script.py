@@ -51,19 +51,19 @@ def test_drawdown_check_runs_on_every_wake_up():
 
 def test_contribution_reminder_runs_on_every_wake_up():
     ls = lines()
-    step = next(i for i, l in enumerate(ls) if "investment_agent.jobs.step contribution-remind" in l)
+    step = next(i for i, l in enumerate(ls) if "investment_agent.jobs.step wealth-alerts" in l)
     assert step < next(i for i, l in enumerate(ls) if "investment_agent.jobs.step scheduled-run" in l)
 
 
 def test_deposit_reminder_runs_on_every_wake_up():
     ls = lines()
-    step = next(i for i, l in enumerate(ls) if "investment_agent.jobs.step deposit-alerts" in l)
+    step = next(i for i, l in enumerate(ls) if "investment_agent.jobs.step wealth-alerts" in l)
     assert step < next(i for i, l in enumerate(ls) if "investment_agent.jobs.step scheduled-run" in l)
 
 
 def test_the_tower_is_checked_after_prices_and_fund_navs_are_synced():
     ls = lines()
-    step = next(i for i, l in enumerate(ls) if "investment_agent.jobs.step pyramid-alerts" in l)
+    step = next(i for i, l in enumerate(ls) if "investment_agent.jobs.step wealth-alerts" in l)
     assert step > next(i for i, l in enumerate(ls) if "market-sync --symbols" in l)
     assert step > next(i for i, l in enumerate(ls) if "investment_agent.jobs.step fund-nav-sync" in l)
     assert step > next(i for i, l in enumerate(ls) if "investment_agent.jobs.step gold-price-sync" in l)
@@ -113,7 +113,7 @@ def test_gold_prices_are_synced_on_every_wake_up():
 
 def test_accumulation_reminder_runs_on_every_wake_up():
     ls = lines()
-    step = next(i for i, l in enumerate(ls) if "investment_agent.jobs.step accumulation-remind" in l)
+    step = next(i for i, l in enumerate(ls) if "investment_agent.jobs.step wealth-alerts" in l)
     assert step < next(i for i, l in enumerate(ls) if "investment_agent.jobs.step scheduled-run" in l)
 
 
@@ -206,3 +206,9 @@ def test_the_five_minute_steps_are_quiet_and_log_only_what_they_print():
         call = next(l for l in text.splitlines() if f"investment_agent.jobs.step --timeout 240 --quiet {step}" in l)
         assert call.strip().startswith("$")
     assert text.count("if ($") >= 3 and "Add-Content" in text
+
+def test_the_personal_reminders_go_out_as_one_step():
+    ls = lines()
+    assert sum("investment_agent.jobs.step wealth-alerts" in l for l in ls) == 1
+    for old in ("deposit-alerts", "pyramid-alerts", "loan-alerts", "contribution-remind", "accumulation-remind"):
+        assert not any(f"investment_agent.jobs.step {old}" in l for l in ls), old

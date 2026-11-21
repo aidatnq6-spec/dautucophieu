@@ -1,4 +1,4 @@
-"""Concentration on the Danh mục page: weight of each held ticker and sector (at cost) on the stock budget or investable capital, with a what-if."""
+"""Concentration on the Danh mục page: weight of each held ticker and sector (at market price) on the stock budget or investable capital, with a what-if."""
 
 from decimal import Decimal, InvalidOperation
 
@@ -48,9 +48,12 @@ def concentration_view(request: Request, symbol: str | None = None, amount: str 
         investable = budget["budget"]
     data_dir = request.app.state.data_dir
     sectors = load_sectors(data_dir)[0] if data_dir is not None else {}
-    # Valued at cost (what was put in), as the owner chose, so "Còn trống" matches the Hồ sơ page.
-    at_cost = [{**h, "market_value": h["total_cost"]} for h in view["holdings"] if h["quantity"] + h["pending_quantity"] > 0]
-    base = {**concentration(at_cost, capital=investable, sectors=sectors, limit=settings.concentration_limit), "basis": basis, "valued_at": "cost"}
+    # At market price like Tháp tài sản (owner, 21/11/2026), so "Còn trống" matches the Hồ sơ page; a ticker without a recent close
+    # counts at cost and is named, never priced by guess.
+    held = [h for h in view["holdings"] if h["quantity"] + h["pending_quantity"] > 0]
+    valued = [{**h, "market_value": h["market_value"] if h["market_value"] is not None else h["total_cost"]} for h in held]
+    base = {**concentration(valued, capital=investable, sectors=sectors, limit=settings.concentration_limit), "basis": basis, "valued_at": "market",
+            "at_cost": sorted(h["security_id"] for h in held if h["market_value"] is None)}
     if not symbol or amount is None or base["status"] != "ok":
         return base
     try:

@@ -24,9 +24,9 @@ def client(tmp_path):
 
 def test_a_large_buy_after_a_run_up_is_flagged_with_numbers(tmp_path):
     c, clock = client(tmp_path)
-    body = call(c, clock, "GET", "/internal/buy-check/fpt/300000000").json()  # 5 tr + 300 tr on 1 tỷ capital
+    body = call(c, clock, "GET", "/internal/buy-check/fpt/300000000").json()  # 6 tr at market + 300 tr on 1 tỷ capital
     kinds = {f["kind"]: f for f in body["flags"]}
-    assert kinds["ticker"]["weight"] == "0.3050" and kinds["ticker"]["limit"] == "0.25"
+    assert kinds["ticker"]["weight"] == "0.3060" and kinds["ticker"]["limit"] == "0.25"
     assert kinds["fomo"]["change"] == "0.5000"
     assert body["symbol"] == "FPT" and body["amount"] == "300000000"
 

@@ -46,8 +46,6 @@ def main() -> int:
     fn.add_argument("--data-dir", type=Path, required=True)
     tl = commands.add_parser("thesis-lights", help="after the close, one Telegram note for thesis indicators newly at their bad level and scenario reviews due")
     tl.add_argument("--data-dir", type=Path, required=True)
-    bp = commands.add_parser("buy-plan-check", help="after the close, one Telegram note for the planned tranches whose condition is now met")
-    bp.add_argument("--data-dir", type=Path, required=True)
     ra = commands.add_parser("receivable-alerts", help="one Telegram note when a held ticker shows a receivable sign it did not show before")
     ra.add_argument("--data-dir", type=Path, required=True)
     sa = commands.add_parser("source-alerts", help="one Telegram note when a public source failed three macro runs in a row, and when it is back")
@@ -62,10 +60,6 @@ def main() -> int:
     cw.add_argument("--data-dir", type=Path, required=True)
     ma = commands.add_parser("macro-alerts", help="Nhắc vĩ mô: the lights' changes and Nhắc thanh khoản và tỷ giá in one Telegram note")
     ma.add_argument("--data-dir", type=Path, required=True)
-    ms = commands.add_parser("macro-signals", help="Đèn tín hiệu rủi ro vĩ mô: one Telegram note when a light changes level")
-    ms.add_argument("--data-dir", type=Path, required=True)
-    la = commands.add_parser("liquidity-alerts", help="one Telegram note when the overnight interbank rate jumps or the bank USD rate nears the ceiling")
-    la.add_argument("--data-dir", type=Path, required=True)
     me = commands.add_parser("macro-events-remind", help="one Telegram note the day before the owner's macro events marked for a reminder")
     me.add_argument("--data-dir", type=Path, required=True)
     fh = commands.add_parser("fund-holdings-sync", help="every open-ended fund's published top holdings from Fmarket into data/fund-holdings.json, "
@@ -80,8 +74,6 @@ def main() -> int:
     wb.add_argument("--data-dir", type=Path, required=True)
     wb.add_argument("--calendar", type=Path, required=True)
     wb.add_argument("--resend", action="store_true", help="send this week's note again (owner's request), on the weekend only")
-    ia = commands.add_parser("insider-alerts", help="Telegram note for new insider or major-shareholder notices of held tickers")
-    ia.add_argument("--data-dir", type=Path, required=True)
     pa = commands.add_parser("price-alerts", help="during the session, Telegram note for the owner's price levels crossed")
     pa.add_argument("--data-dir", type=Path, required=True)
     sc = commands.add_parser("screen-check", help="Bộ lọc tín hiệu: Telegram note for tickers new to a saved screen, after the close")
@@ -128,23 +120,11 @@ def main() -> int:
     sectors = commands.add_parser("industries", help="save ICB level-2 sectors of the synced tickers for the market page")
     sectors.add_argument("--symbols", required=True, help="comma-separated tickers, or @file with one ticker per line")
     sectors.add_argument("--output", type=Path, required=True)
-    deposits = commands.add_parser("deposit-alerts", help="Sổ tiết kiệm: Telegram once per sổ from the day before it matures")
-    deposits.add_argument("--data-dir", type=Path, required=True)
-    tower = commands.add_parser("pyramid-alerts", help="Tháp tài sản: Telegram once when a layer turns short, back in range or over")
-    tower.add_argument("--data-dir", type=Path, required=True)
     wealth = commands.add_parser("wealth-alerts", help="Việc tài chính hôm nay: the personal reminders of this run in one Telegram note")
     wealth.add_argument("--data-dir", type=Path, required=True)
     folio = commands.add_parser("portfolio-alerts", help="Danh mục hôm nay: buy plan, insider notices, drawdowns and theses in one Telegram note")
     folio.add_argument("--data-dir", type=Path, required=True)
     folio.add_argument("--calendar", type=Path, required=True)
-    loans = commands.add_parser("loan-alerts", help="Khoản vay and bảo hiểm: Telegram once per loan 90 days before its promotion ends, and per premium 30 days before it is due")
-    loans.add_argument("--data-dir", type=Path, required=True)
-    contrib = commands.add_parser("contribution-remind", help="Góp vốn đều: Telegram once a month from the contribution day until it is met")
-    contrib.add_argument("--data-dir", type=Path, required=True)
-    accumulation = commands.add_parser("accumulation-remind", help="Kế hoạch tích sản: Telegram once per plan and month from its day until it is met")
-    accumulation.add_argument("--data-dir", type=Path, required=True)
-    drawdown = commands.add_parser("drawdown-check", help="full price history for drawdowns; Telegram when a holding falls past the threshold")
-    drawdown.add_argument("--data-dir", type=Path, required=True)
     journal = commands.add_parser("journal-review", help="Nhật ký: Telegram reminder when a price moved another threshold step")
     journal.add_argument("--data-dir", type=Path, required=True)
     events = commands.add_parser("events-sync", help="corporate events of watched tickers; Telegram reminder 5 days ahead")
@@ -192,8 +172,6 @@ def main() -> int:
         return fund_nav_sync_cli(args.data_dir)
     if args.command == "thesis-lights":
         return thesis_lights_cli(args.data_dir)
-    if args.command == "buy-plan-check":
-        return buy_plan_cli(args.data_dir)
     if args.command == "receivable-alerts":
         return receivable_alerts_cli(args.data_dir)
     if args.command == "source-alerts":
@@ -208,10 +186,6 @@ def main() -> int:
         return calendar_watch_cli(args.data_dir)
     if args.command == "macro-alerts":
         return macro_alerts_cli(args.data_dir)
-    if args.command == "macro-signals":
-        return macro_signals_cli(args.data_dir)
-    if args.command == "liquidity-alerts":
-        return liquidity_alerts_cli(args.data_dir)
     if args.command == "macro-events-remind":
         return macro_events_cli(args.data_dir)
     if args.command == "fund-holdings-sync":
@@ -230,8 +204,6 @@ def main() -> int:
         return quarter_alerts_cli(args.data_dir)
     if args.command == "weekly-brief":
         return weekly_brief_cli(args.data_dir, args.calendar, resend=args.resend)
-    if args.command == "insider-alerts":
-        return insider_alerts_cli(args.data_dir)
     if args.command == "price-alerts":
         return price_alerts_cli(args.data_dir)
     if args.command == "screen-check":
@@ -250,22 +222,10 @@ def main() -> int:
         return run_backup(args.data_dir, args.backup_dir, args.kind)
     if args.command == "scheduled-run":
         return scheduled_run(args.calendar, args.data_dir)
-    if args.command == "deposit-alerts":
-        return deposit_alerts_cli(args.data_dir)
-    if args.command == "pyramid-alerts":
-        return pyramid_alerts_cli(args.data_dir)
     if args.command == "wealth-alerts":
         return wealth_alerts_cli(args.data_dir)
     if args.command == "portfolio-alerts":
         return portfolio_alerts_cli(args.data_dir, args.calendar)
-    if args.command == "loan-alerts":
-        return loan_alerts_cli(args.data_dir)
-    if args.command == "contribution-remind":
-        return contribution_cli(args.data_dir)
-    if args.command == "accumulation-remind":
-        return accumulation_cli(args.data_dir)
-    if args.command == "drawdown-check":
-        return drawdown_cli(args.data_dir)
     if args.command == "journal-review":
         return journal_cli(args.data_dir)
     if args.command == "events-sync":
@@ -946,29 +906,6 @@ def scheduled_run(calendar_path: Path, data_dir: Path) -> int:
     return 0
 
 
-def accumulation_cli(data_dir: Path) -> int:
-    """Remind once per plan and month, from the plan's day, while the month's purchases are below the plan."""
-    from investment_agent.services.accumulation import remind_run
-    send, repo, owner = _owner_send(data_dir)
-    print(json.dumps(remind_run(repo, owner, today=_today(), send=send, request_id=_rid("accumulation"))))
-    return 0
-
-
-def contribution_cli(data_dir: Path) -> int:
-    """Remind once a month, from the plan's day, while this month's deposits are below the planned contribution."""
-    from investment_agent.services.contributions import remind_run
-    send, repo, owner = _owner_send(data_dir)
-    print(json.dumps(remind_run(repo, owner, today=_today(), send=send, request_id=_rid("contribution"))))
-    return 0
-
-
-def drawdown_cli(data_dir: Path) -> int:
-    """Fill full daily history for VN-Index and held tickers (once each, paced for Vnstock), then remind once per threshold crossing."""
-    send, repo, owner = _owner_send(data_dir)
-    print(json.dumps(_drawdown_run(data_dir, repo, owner, send=send)))
-    return 0
-
-
 def _drawdown_run(data_dir: Path, repo, owner, *, send) -> dict:
     """Kế hoạch sụt giảm: the price history is filled whatever send does; send returning False leaves the reminders due."""
     import time
@@ -1102,39 +1039,11 @@ def _telegram_step(data_dir: Path, body) -> int:
     return 0
 
 
-def _owner_send(data_dir: Path):
-    """(send, repo, owner) for a step that reads and records even while scheduled delivery is off: send then returns False, so what
-    it would have said stays due. Delivery is checked when a note is sent, as each such step did on its own before."""
-    import httpx
-
-    from investment_agent.notifications.telegram import TelegramSender
-    from investment_agent.services.records import notification_settings
-    from investment_agent.settings import Settings
-
-    settings = Settings.from_env()
-    repo, owner = _scheduler_owner()
-    chosen, _ = notification_settings(repo, owner)
-
-    def send(text):
-        if not (settings.telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):
-            return False
-        sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
-        return _part_sender(sender, chosen.chat_id, data_dir)(text)
-    return send, repo, owner
-
-
 def thesis_lights_cli(data_dir: Path) -> int:
     """Chỉ báo luận điểm after the close; skipped (nothing is read) while scheduled delivery is off."""
     from investment_agent.services.thesis_model import check_lights
     return _telegram_step(data_dir, lambda send, repo, owner: check_lights(repo, owner, data_dir, send=send, today=_today(),
                                                                            request_id=_rid("thesis-lights")))
-
-
-def buy_plan_cli(data_dir: Path) -> int:
-    """Kế hoạch giải ngân after the close; skipped (the plan is not read) while scheduled delivery is off. Counts only, never the plan."""
-    from investment_agent.services.buy_plan import check_plan
-    return _telegram_step(data_dir, lambda send, repo, owner: check_plan(repo, owner, data_dir, send=send, today=_today(),
-                                                                         request_id=_rid("buy-plan")))
 
 
 def receivable_alerts_cli(data_dir: Path) -> int:
@@ -1211,18 +1120,6 @@ def macro_alerts_cli(data_dir: Path) -> int:
     """Nhắc vĩ mô: Đèn tín hiệu rủi ro vĩ mô and Nhắc thanh khoản và tỷ giá in one note; skipped while scheduled delivery is off."""
     from investment_agent.services.macro_alerts import macro_alerts_run
     return _telegram_step(data_dir, lambda send, repo, owner: macro_alerts_run(data_dir, today=_today(), send=send))
-
-
-def macro_signals_cli(data_dir: Path) -> int:
-    """Đèn tín hiệu rủi ro vĩ mô: one Telegram note when a light changes level; skipped while scheduled delivery is off. Public figures."""
-    from investment_agent.services.macro_signals import signals_run
-    return _telegram_step(data_dir, lambda send, repo, owner: signals_run(data_dir, today=_today(), send=send))
-
-
-def liquidity_alerts_cli(data_dir: Path) -> int:
-    """Nhắc thanh khoản và tỷ giá; skipped while scheduled delivery is off. Public figures only."""
-    from investment_agent.services.liquidity_alerts import check_liquidity
-    return _telegram_step(data_dir, lambda send, repo, owner: check_liquidity(data_dir, send=send, today=_today()))
 
 
 def macro_events_cli(data_dir: Path) -> int:
@@ -1363,13 +1260,6 @@ def _http_text(url: str) -> str:
     return response.text
 
 
-def deposit_alerts_cli(data_dir: Path) -> int:
-    """Nhắc sổ tiết kiệm đáo hạn over Telegram; skipped (the book is not read) while scheduled delivery is off. Counts only."""
-    from investment_agent.services.deposit_alerts import deposit_alerts_run
-    from investment_agent.services.deposit_book import read_book
-    return _telegram_step(data_dir, lambda send, repo, owner: deposit_alerts_run(data_dir, book=read_book(repo, owner)[0], send=send, today=_today()))
-
-
 def wealth_alerts_cli(data_dir: Path) -> int:
     """Việc tài chính hôm nay: the personal reminders of this run in one Telegram note; skipped (nothing personal is read) while
     scheduled delivery is off. Prints counts only, never the books."""
@@ -1397,38 +1287,6 @@ def wealth_alerts_cli(data_dir: Path) -> int:
         ]
         return wealth_alerts_run(runs, send=send, today=today)
     return _telegram_step(data_dir, body)
-
-
-def pyramid_alerts_cli(data_dir: Path) -> int:
-    """Nhắc Tháp tài sản over Telegram; skipped (nothing personal is read) while scheduled delivery is off. Counts only."""
-    from investment_agent.services.deposit_book import book_quotes
-    from investment_agent.services.equity_budget import budget_view
-    from investment_agent.services.pyramid_alerts import pyramid_alerts_run
-    return _telegram_step(data_dir, lambda send, repo, owner: pyramid_alerts_run(
-        data_dir, pyramid=budget_view(repo, owner, quotes=book_quotes(data_dir))[0].get("pyramid"), send=send, today=_today()))
-
-
-def loan_alerts_cli(data_dir: Path) -> int:
-    """Nhắc hết lãi ưu đãi, bảo hiểm and cho thuê over Telegram; skipped (the book is not read) while scheduled delivery is off."""
-    from investment_agent.services.insurance_alerts import insurance_alerts_run
-    from investment_agent.services.loan_alerts import loan_alerts_run, read_property_book
-    from investment_agent.services.rental_alerts import read_rental_book, rental_alerts_run
-
-    def body(send, repo, owner):
-        book, today = read_property_book(repo, owner), _today()
-        return {**loan_alerts_run(data_dir, book=book, send=send, today=today), "insurance": insurance_alerts_run(data_dir, book=book, send=send, today=today),
-                "rental": rental_alerts_run(data_dir, book=read_rental_book(repo, owner), send=send, today=today)}
-    return _telegram_step(data_dir, body)
-
-
-def insider_alerts_cli(data_dir: Path) -> int:
-    """Giao dịch nội bộ mới for held tickers over Telegram; skipped while scheduled delivery is off."""
-    from datetime import datetime, timezone
-
-    from investment_agent.services.holdings_view import held_from_repo
-    from investment_agent.services.insider_alerts import insider_alerts_run
-    return _telegram_step(data_dir, lambda send, repo, owner: insider_alerts_run(data_dir, held=held_from_repo(repo, owner), get=_http_text,
-                                                                                 send=send, now=datetime.now(timezone.utc)))
 
 
 def weekly_inputs(data_dir: Path, *, ledger_events: list, held: set[str], alerts: list[dict], insider, today) -> dict:

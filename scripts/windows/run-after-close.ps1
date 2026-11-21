@@ -68,9 +68,6 @@ $fn = & $python -W ignore -m investment_agent.jobs.step fund-nav-sync --data-dir
 # Chi bao luan diem: one Telegram note for thesis indicators newly at their bad level and scenario reviews due.
 $tl = & $python -W ignore -m investment_agent.jobs.step thesis-lights --data-dir $data 2>$null
 "$(Get-Date -Format o) thesis-lights exit=$LASTEXITCODE $tl" | Add-Content -LiteralPath $log -Encoding UTF8
-# Ke hoach giai ngan: one Telegram note for the planned tranches whose condition is now met (after the closes are stored).
-$bp = & $python -W ignore -m investment_agent.jobs.step buy-plan-check --data-dir $data 2>$null
-"$(Get-Date -Format o) buy-plan-check exit=$LASTEXITCODE $bp" | Add-Content -LiteralPath $log -Encoding UTF8
 # Lich vi mo: one Telegram note the day before the owner's events marked for a reminder (sent once per event).
 $me = & $python -W ignore -m investment_agent.jobs.step macro-events-remind --data-dir $data 2>$null
 "$(Get-Date -Format o) macro-events-remind exit=$LASTEXITCODE $me" | Add-Content -LiteralPath $log -Encoding UTF8
@@ -86,9 +83,6 @@ $bs = & $python -W ignore -m investment_agent.jobs.step beta-sync --data-dir $da
 # CAPM default ERP: Damodaran (NYU Stern) for Vietnam, read at most weekly.
 $es = & $python -W ignore -m investment_agent.jobs.step erp-sync --data-dir $data 2>$null
 "$(Get-Date -Format o) erp-sync exit=$LASTEXITCODE $es" | Add-Content -LiteralPath $log -Encoding UTF8
-# Giao dich noi bo moi: Telegram note for held tickers' new insider notices (only when scheduled delivery is on).
-$ia = & $python -W ignore -m investment_agent.jobs.step insider-alerts --data-dir $data 2>$null
-"$(Get-Date -Format o) insider-alerts exit=$LASTEXITCODE $ia" | Add-Content -LiteralPath $log -Encoding UTF8
 # Ban tin tuan: weekend runs only, once per week (only when scheduled delivery is on).
 $wb = & $python -W ignore -m investment_agent.jobs.step weekly-brief --data-dir $data --calendar $calendar 2>$null
 "$(Get-Date -Format o) weekly-brief exit=$LASTEXITCODE $wb" | Add-Content -LiteralPath $log -Encoding UTF8
@@ -110,9 +104,6 @@ $events = & $python -W ignore -m investment_agent.jobs.step events-sync --data-d
 # Nhat ky: remind what was written when a journalled ticker moved another 15% (threshold in Cai dat).
 $journal = & $python -W ignore -m investment_agent.jobs.step journal-review --data-dir $data 2>$null
 "$(Get-Date -Format o) journal-review exit=$LASTEXITCODE $journal" | Add-Content -LiteralPath $log -Encoding UTF8
-# Ke hoach sut giam: full price history once per ticker, then a reminder when a holding falls past the threshold below cost.
-$drawdown = & $python -W ignore -m investment_agent.jobs.step drawdown-check --data-dir $data 2>$null
-"$(Get-Date -Format o) drawdown-check exit=$LASTEXITCODE $drawdown" | Add-Content -LiteralPath $log -Encoding UTF8
 # Viec tai chinh hom nay: so tiet kiem dao han, het lai uu dai, bao hiem, cho thue, Thap tai san, gop von deu and ke hoach tich san
 # in one Telegram note (after prices, NAVs and gold are synced; only when scheduled delivery is on). Each keeps its own rule.
 $wa = & $python -W ignore -m investment_agent.jobs.step wealth-alerts --data-dir $data 2>$null
@@ -144,9 +135,10 @@ if ((Get-Date).Hour -ge 20) {
 # Bo loc tin hieu: tickers new to the owner's notifying screens (after Xu huong and the session snapshot above).
 $sc = & $python -W ignore -m investment_agent.jobs.step screen-check --data-dir $data --calendar $calendar 2>$null
 "$(Get-Date -Format o) screen-check exit=$LASTEXITCODE $sc" | Add-Content -LiteralPath $log -Encoding UTF8
-# Luan diem dau tu: every condition of open theses on stored data, after the statements refresh when it ran.
-$tc = & $python -W ignore -m investment_agent.jobs.step thesis-check --scope data --data-dir $data --calendar $calendar 2>$null
-"$(Get-Date -Format o) thesis-check-data exit=$LASTEXITCODE $tc" | Add-Content -LiteralPath $log -Encoding UTF8
+# Danh muc hom nay: ke hoach giai ngan, giao dich noi bo moi, ke hoach sut giam (full price history once per ticker) and luan diem
+# dau tu (every condition on stored data) in one Telegram note, after every source they read. 15 minutes: the history fill is paced.
+$pf = & $python -W ignore -m investment_agent.jobs.step --timeout 900 portfolio-alerts --data-dir $data --calendar $calendar 2>$null
+"$(Get-Date -Format o) portfolio-alerts exit=$LASTEXITCODE $pf" | Add-Content -LiteralPath $log -Encoding UTF8
 $summary = & $python -W ignore -m investment_agent.jobs.step scheduled-run --calendar $calendar --data-dir $data 2>$null
 $runExit = $LASTEXITCODE
 "$(Get-Date -Format o) exit=$runExit $summary" | Add-Content -LiteralPath $log -Encoding UTF8

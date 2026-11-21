@@ -134,6 +134,9 @@ def main() -> int:
     tower.add_argument("--data-dir", type=Path, required=True)
     wealth = commands.add_parser("wealth-alerts", help="Việc tài chính hôm nay: the personal reminders of this run in one Telegram note")
     wealth.add_argument("--data-dir", type=Path, required=True)
+    folio = commands.add_parser("portfolio-alerts", help="Danh mục hôm nay: buy plan, insider notices, drawdowns and theses in one Telegram note")
+    folio.add_argument("--data-dir", type=Path, required=True)
+    folio.add_argument("--calendar", type=Path, required=True)
     loans = commands.add_parser("loan-alerts", help="Khoản vay and bảo hiểm: Telegram once per loan 90 days before its promotion ends, and per premium 30 days before it is due")
     loans.add_argument("--data-dir", type=Path, required=True)
     contrib = commands.add_parser("contribution-remind", help="Góp vốn đều: Telegram once a month from the contribution day until it is met")
@@ -253,6 +256,8 @@ def main() -> int:
         return pyramid_alerts_cli(args.data_dir)
     if args.command == "wealth-alerts":
         return wealth_alerts_cli(args.data_dir)
+    if args.command == "portfolio-alerts":
+        return portfolio_alerts_cli(args.data_dir, args.calendar)
     if args.command == "loan-alerts":
         return loan_alerts_cli(args.data_dir)
     if args.command == "contribution-remind":
@@ -1007,37 +1012,42 @@ def contribution_cli(data_dir: Path) -> int:
 def drawdown_cli(data_dir: Path) -> int:
     """Fill full daily history for VN-Index and held tickers (once each, paced for Vnstock), then remind once per threshold crossing."""
     import os
-    import time
-    import uuid
 
     import httpx
 
     from investment_agent.api.auth import OwnerContext
     from investment_agent.notifications.telegram import TelegramSender
     from investment_agent.repositories.firestore import personal_repository_from_env
-    from investment_agent.services.drawdown import drawdown_run
     from investment_agent.services.records import notification_settings
     from investment_agent.settings import Settings
 
-    from investment_agent.market.providers.vnstock_adapter import VnstockProvider
     settings = Settings.from_env()
     repo = personal_repository_from_env()
     owner = OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
     chosen, _ = notification_settings(repo, owner)
-    provider = VnstockProvider()  # daily closes from VNDirect since Vnstock 6.0.0 (thousand đồng, adjusted, as before)
-
-    def fetch(symbol, start, end):
-        time.sleep(0.3)
-        return provider.fetch_closes(symbol, start, end, interval="1D", index=False)
 
     def send(text):
         if not (settings.telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):
             return False
         sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
         return _part_sender(sender, chosen.chat_id, data_dir)(text)
-    out = drawdown_run(repo, owner, data_dir, fetch=fetch, send=send, request_id=f"drawdown-{uuid.uuid4().hex[:16]}")
-    print(json.dumps(out))
+    print(json.dumps(_drawdown_run(data_dir, repo, owner, send=send)))
     return 0
+
+
+def _drawdown_run(data_dir: Path, repo, owner, *, send) -> dict:
+    """Kế hoạch sụt giảm: the price history is filled whatever send does; send returning False leaves the reminders due."""
+    import time
+    import uuid
+
+    from investment_agent.market.providers.vnstock_adapter import VnstockProvider
+    from investment_agent.services.drawdown import drawdown_run
+    provider = VnstockProvider()  # daily closes from VNDirect since Vnstock 6.0.0 (thousand đồng, adjusted, as before)
+
+    def fetch(symbol, start, end):
+        time.sleep(0.3)
+        return provider.fetch_closes(symbol, start, end, interval="1D", index=False)
+    return drawdown_run(repo, owner, data_dir, fetch=fetch, send=send, request_id=f"drawdown-{uuid.uuid4().hex[:16]}")
 
 
 def beta_sync(data_dir: Path, get=None) -> int:
@@ -1771,15 +1781,9 @@ def thesis_check_cli(data_dir: Path, calendar_path: Path, scope: str, now=None) 
     """Luận điểm đầu tư: "price" every few minutes in the session (loss against cost, one board read for those tickers), "data" after
     the close (every condition, on stored data). With scheduled Telegram delivery off it records states and closes theses without
     sending."""
-    import uuid
     from datetime import datetime, timezone
-    from decimal import Decimal
 
-    from investment_agent.domain.thesis import KINDS
-    from investment_agent.market.live_board import build_board, in_session
-    from investment_agent.services.holdings_view import held_from_repo
-    from investment_agent.services.theses import gather, position_shares, read_theses, thesis_check_run
-    from investment_agent.services.weekly_brief import VN
+    from investment_agent.market.live_board import in_session
 
     now = now or datetime.now(timezone.utc)
     if scope == "price" and not in_session(now):
@@ -1787,13 +1791,65 @@ def thesis_check_cli(data_dir: Path, calendar_path: Path, scope: str, now=None) 
         return 0
     telegram = _scheduled_telegram(data_dir)
     if telegram is None:  # still record states and close sold tickers' theses; nothing is sent, so notes stay due for later
-        import os
-
-        from investment_agent.api.auth import OwnerContext
-        from investment_agent.repositories.firestore import personal_repository_from_env
-        send, repo, owner = None, personal_repository_from_env(), OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
+        send, (repo, owner) = None, _scheduler_owner()
     else:
         send, repo, owner = telegram
+    print(json.dumps(_thesis_run(data_dir, calendar_path, scope, repo, owner, send=send, now=now), ensure_ascii=False))
+    return 0
+
+
+def portfolio_alerts_cli(data_dir: Path, calendar_path: Path, now=None) -> int:
+    """Danh mục hôm nay (owner, 21/11/2026): Kế hoạch giải ngân, giao dịch nội bộ mới, Kế hoạch sụt giảm and Luận điểm đầu tư (all
+    conditions, stored data) in one Telegram note. While scheduled delivery is off the price history is still filled and the theses'
+    states still recorded, nothing is sent, as before. Prints counts only."""
+    import uuid
+    from datetime import datetime, timezone
+
+    from investment_agent.services.buy_plan import check_plan
+    from investment_agent.services.holdings_view import held_from_repo
+    from investment_agent.services.insider_alerts import insider_alerts_run
+    from investment_agent.services.wealth_alerts import combined_run
+    from investment_agent.services.weekly_brief import VN
+
+    now = now or datetime.now(timezone.utc)
+    today = now.astimezone(VN).date()
+    telegram = _scheduled_telegram(data_dir)
+    if telegram is None:
+        repo, owner = _scheduler_owner()
+        out = {"drawdown": _drawdown_run(data_dir, repo, owner, send=lambda text: False),
+               "thesis": _thesis_run(data_dir, calendar_path, "data", repo, owner, send=None, now=now)}
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off", "runs": out}, ensure_ascii=False))
+        return 0
+    send, repo, owner = telegram
+    runs = [
+        ("buy_plan", lambda s: check_plan(repo, owner, data_dir, send=s, today=today, request_id=f"buy-plan-{uuid.uuid4().hex[:16]}")),
+        ("insider", lambda s: insider_alerts_run(data_dir, held=held_from_repo(repo, owner), get=_http_text, send=s, now=now)),
+        ("drawdown", lambda s: _drawdown_run(data_dir, repo, owner, send=s)),
+        ("thesis", lambda s: _thesis_run(data_dir, calendar_path, "data", repo, owner, send=s, now=now)),
+    ]
+    print(json.dumps(combined_run(runs, send=send, today=today, title="Danh mục hôm nay"), ensure_ascii=False))
+    return 0
+
+
+def _scheduler_owner():
+    """(repo, owner) for a scheduled step that records state even while scheduled delivery is off."""
+    import os
+
+    from investment_agent.api.auth import OwnerContext
+    from investment_agent.repositories.firestore import personal_repository_from_env
+    return personal_repository_from_env(), OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
+
+
+def _thesis_run(data_dir: Path, calendar_path: Path, scope: str, repo, owner, *, send, now) -> dict:
+    """Luận điểm đầu tư for one scope; send None records states without sending (notes stay due)."""
+    import uuid
+    from decimal import Decimal
+
+    from investment_agent.domain.thesis import KINDS
+    from investment_agent.market.live_board import build_board
+    from investment_agent.services.holdings_view import held_from_repo
+    from investment_agent.services.theses import gather, position_shares, read_theses, thesis_check_run
+    from investment_agent.services.weekly_brief import VN
     today = now.astimezone(VN).date()
     held = held_from_repo(repo, owner)
     open_ = [t for t in read_theses(repo, owner)[0] if t["closed_on"] is None]
@@ -1823,8 +1879,7 @@ def thesis_check_cli(data_dir: Path, calendar_path: Path, scope: str, now=None) 
             own = None
     out = thesis_check_run(repo, owner, data_dir, scope=scope, facts=facts, shares=position_shares(repo, owner), held=held, send=send, now=now,
                            today=today, request_id=f"thesis-check-{uuid.uuid4().hex[:16]}", lesson=(lambda t, c: own) if own else None)
-    print(json.dumps({**out, "errors": errors}, ensure_ascii=False))
-    return 0
+    return {**out, "errors": errors}
 
 
 def journal_cli(data_dir: Path) -> int:

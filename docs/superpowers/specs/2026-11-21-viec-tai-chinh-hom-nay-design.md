@@ -25,7 +25,21 @@ Mỗi lượt lịch có tới 5 bước gửi tin cá nhân riêng lẻ. Ngày 
 - Tắt gửi tin theo lịch thì không đọc dữ liệu cá nhân và không gửi gì.
 - Các lệnh cũ vẫn còn để chạy tay; lịch chỉ dùng bước gộp.
 
+## Danh mục hôm nay (duyệt cùng ngày)
+- Bước `portfolio-alerts` thay cho `buy-plan-check`, `insider-alerts`, `drawdown-check` và `thesis-check --scope data`.
+- Bước chạy sau mọi nguồn mà các phần này đọc (báo cáo, kế hoạch, sự kiện, giá vàng) và trước bản tin phiên. Giới hạn 15 phút, vì
+  phần sụt giảm lấy lịch sử giá có giãn cách.
+- Thứ tự trong tin:
+  1. Kế hoạch giải ngân.
+  2. Giao dịch nội bộ mới.
+  3. Kế hoạch sụt giảm.
+  4. Luận điểm đầu tư.
+- Tin mở đầu bằng "Danh mục hôm nay dd/mm/yyyy". Cách gộp, xếp hàng chờ khi gửi lỗi và một phần lỗi không chặn phần khác giống như
+  Việc tài chính hôm nay.
+- Tắt gửi tin theo lịch: vẫn lấy lịch sử giá cho Kế hoạch sụt giảm và vẫn ghi trạng thái luận điểm (đóng luận điểm của mã đã bán),
+  như trước; không gửi gì, nên các lời nhắc vẫn còn chờ.
+- Luận điểm theo giá trong phiên (mỗi 5 phút) vẫn gửi riêng, vì cần báo ngay.
+
 ## Không làm
-- Không gộp các tin về cổ phiếu (sụt giảm, luận điểm, giao dịch nội bộ, kế hoạch giải ngân), các tin vĩ mô (đã gộp ở Nhắc vĩ mô),
-  hay bản tin phiên.
+- Không gộp các tin vĩ mô (đã gộp ở Nhắc vĩ mô), bản tin phiên, hay các cảnh báo trong phiên.
 - Không gửi số liệu cá nhân cho AI.

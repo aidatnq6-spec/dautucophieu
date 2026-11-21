@@ -34,5 +34,13 @@ bằng có lợi nhất.
   - Có thể mua thêm: số nhỏ hơn của "Tới mức tối đa" và "Tiền có sẵn để mua".
 - **Phần bù lớp thiếu** ghi "Chuyển sang vàng để lên mức tối thiểu trước" kèm số dương, không dùng số âm.
 
+## Nhắc Tháp tài sản qua Telegram (duyệt 21/11/2026)
+- Bước `pyramid-alerts` chạy mỗi lượt lịch, sau khi đã lấy giá cổ phiếu, NAV quỹ và giá vàng.
+- Gửi một tin khi một lớp (tiền gửi gồm tiền mặt, trái phiếu, vàng, cổ phiếu, tiền số) đổi trạng thái giữa thiếu, đủ và vượt, kể cả
+  khi trở lại "đủ". Mỗi dòng ghi tỷ trọng trên phần sau dự phòng, khoảng mục tiêu, và số đồng thiếu hay vượt.
+- Lượt đầu chỉ ghi trạng thái. Trạng thái lưu ở `data/alerts/pyramid.json`, chỉ chứa chữ, không có số tiền. Trạng thái chỉ cập
+  nhật khi tin đã gửi được, nên gửi lỗi thì lượt sau gửi lại.
+- Tắt gửi tin theo lịch thì không đọc dữ liệu cá nhân và không gửi gì.
+
 ## Không làm
 Không đặt lệnh, không nêu mã nên mua hay bán. Không gửi số liệu cá nhân cho AI.

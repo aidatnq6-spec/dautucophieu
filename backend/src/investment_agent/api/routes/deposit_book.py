@@ -26,7 +26,7 @@ class BookRequest(DepositBook):
 def _view(request: Request, repo, owner) -> dict:
     reserve, from_profile, _ = protected_deductions(repo, owner)
     today = now(request).astimezone(VN).date()
-    return {**book_view(repo, owner, reserve=reserve, profile_reserve=from_profile, quotes=book_quotes(request.app.state.data_dir), today=today),
+    return {**book_view(repo, owner, reserve=reserve, profile_reserve=from_profile, quotes=book_quotes(request.app.state.data_dir, request.app.state.market), today=today),
             "gold_moves": gold_price_moves(request.app.state.data_dir, today=today)}
 
 

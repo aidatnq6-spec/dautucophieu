@@ -73,7 +73,7 @@ def test_the_pyramid_takes_deposits_and_cash_accounts_from_the_book(tmp_path):
     amounts = {l["id"]: l["amount"] for l in b["pyramid"]["layers"]}
     assert amounts["deposit"] == "300000000" and amounts["cash"] == "110000000"  # 200 + 100 tr in sổ; 95 ledger + 15 accounts
     assert amounts["gold"] == "0" and amounts["reserve"] == "0"  # the hand-entered gold and reserve no longer count once there is a book
-    assert b["deposit_source"] == "book" and b["total"] == "415000000"  # 110 + 300 + 5 stocks
+    assert b["deposit_source"] == "book" and b["total"] == "416000000"  # 110 + 300 + 6 stocks at market
 
 
 def test_the_book_alone_builds_the_pyramid_with_every_layer_from_its_lists(tmp_path):
@@ -83,7 +83,7 @@ def test_the_book_alone_builds_the_pyramid_with_every_layer_from_its_lists(tmp_p
     body = call(c, clock, "GET", "/internal/equity-budget").json()
     amounts = {l["id"]: l["amount"] for l in body["budget"]["pyramid"]["layers"]}
     assert body["budget"]["status"] == "ok" and body["budget"]["layer_sources"] == dict.fromkeys(("deposit", "bond", "gold", "crypto"), "book")
-    assert amounts == {"reserve": "0", "cash": "110000000", "deposit": "0", "bond": "0", "gold": "0", "stocks": "5000000", "crypto": "0"}
+    assert amounts == {"reserve": "0", "cash": "110000000", "deposit": "0", "bond": "0", "gold": "0", "stocks": "6000000", "crypto": "0"}
 
 
 def test_the_reserve_is_entered_in_the_book_and_blank_uses_the_profile(tmp_path):

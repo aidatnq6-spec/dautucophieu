@@ -77,7 +77,7 @@ def _view(request: Request, repo, owner) -> dict:
     deposits = MacroStore(Path(data_dir)).read("deposit_12m") if data_dir is not None else []
     default_rate = deposits[-1]["value"] if deposits else None
     record = read_version(repo, owner, *RECORD, None)
-    budget, _ = budget_view(repo, owner, quotes=book_quotes(request.app.state.data_dir))
+    budget, _ = budget_view(repo, owner, quotes=book_quotes(request.app.state.data_dir, request.app.state.market))
     capital = Decimal(budget["base"]) if budget.get("status") == "ok" else None
     plan = read_version(repo, owner, *CONTRIBUTION_PLAN, None)
     contribution = Decimal(plan.payload["amount"]) if plan else Decimal(0)
@@ -92,7 +92,7 @@ def _view(request: Request, repo, owner) -> dict:
         bond_rate = (record.payload.get("bond_rate") if record else None) or BOND_RATE
         bonds = None
         if (budget.get("layer_sources") or {}).get("bond") == "book":  # each row at its own rate; the owner's bond rate for the rest, counted
-            bonds = bond_income(read_book(repo, owner)[0], default_rate=Decimal(bond_rate), navs=book_quotes(request.app.state.data_dir)["funds"])
+            bonds = bond_income(read_book(repo, owner)[0], default_rate=Decimal(bond_rate), navs=book_quotes(request.app.state.data_dir, request.app.state.market)["funds"])
         income = income_by_layer(deposit=layers.get("deposit", Decimal(0)), deposit_rate=Decimal(default_rate), bond=layers.get("bond", Decimal(0)),
                                  bond_rate=Decimal(bond_rate), dividends_12m=dividends_last_year(data_dir, repo, owner, today),
                                  stocks=layers.get("stocks", Decimal(0)),

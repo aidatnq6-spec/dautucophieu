@@ -100,7 +100,7 @@ export function PassiveIncome({ refresh }: { refresh?: string } = {}) {
             : <li>Trái phiếu (lợi suất từng dòng): {formatVnd(view!.income.bond)}/tháng{view!.income.bond_default_rate_count > 0
               && <span className="caption"> ({view!.income.bond_default_rate_count} dòng chưa nhập lợi suất, tính theo {rate(view!.goal?.bond_rate ?? view!.default_bond_rate)}%/năm)</span>}</li>}
           {view!.income.stocks !== undefined
-            ? <li>Cổ phiếu ({rate(view!.goal!.stock_rate!)}%/năm, bạn nhập): {formatVnd(view!.income.stocks)}/tháng <span className="caption">(theo giá mua)</span></li>
+            ? <li>Cổ phiếu ({rate(view!.goal!.stock_rate!)}%/năm, bạn nhập): {formatVnd(view!.income.stocks)}/tháng <span className="caption">(theo thị giá)</span></li>
             : <li>Cổ tức tiền mặt 12 tháng: {formatVnd(view!.income.dividends)}/tháng <span className="caption">(theo lịch sự kiện, số cổ phiếu đang nắm)</span></li>}
           <li>Vàng, tiền mặt, tiền số: không tạo dòng tiền</li>
         </ul>}

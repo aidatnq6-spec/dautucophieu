@@ -25,13 +25,13 @@ def test_without_a_total_the_page_asks_for_one():
     assert call(c, clock, "GET", "/internal/equity-budget").json() == {"version": 0, "budget": {"status": "no_total"}}
 
 
-def test_budget_follows_the_risk_group_and_counts_holdings_at_cost():
+def test_budget_follows_the_risk_group_and_counts_holdings_at_market_price():
     c, clock = client()
     assert save(c, clock, "2000000000").status_code == 200
     body = call(c, clock, "GET", "/internal/equity-budget").json()
     b = body["budget"]
     assert body["version"] == 1 and b["group"] == "balanced" and b["ratio"] == "0.35"
-    assert b["budget"] == "700000000" and b["held_cost"] == "5000000" and b["room"] == "695000000"
+    assert b["budget"] == "700000000" and b["held_cost"] == "5000000" and b["held_value"] == "6000000" and b["room"] == "694000000"
 
 
 def test_emergency_reserve_is_taken_out_before_the_ratio():
@@ -81,12 +81,26 @@ def test_layers_add_up_to_the_total_with_stocks_and_cash_from_the_ledger_and_bui
                                                           "reserve": "100000000", "expected_version": 0, "request_id": "eb1"})
     assert ok.status_code == 200
     b = call(c, clock, "GET", "/internal/equity-budget").json()["budget"]
-    assert b["total"] == "600000000"  # 100 reserve + 300 deposits + 95 ledger cash + 100 gold + 5 stocks at cost
+    assert b["total"] == "601000000"  # 100 reserve + 300 deposits + 95 ledger cash + 100 gold + 6 stocks at market (100 FPT × 60,000)
     p = b["pyramid"]
     amounts = {l["id"]: l["amount"] for l in p["layers"]}
-    assert amounts == {"reserve": "100000000", "cash": "95000000", "deposit": "300000000", "bond": "0", "gold": "100000000", "stocks": "5000000",
+    assert amounts == {"reserve": "100000000", "cash": "95000000", "deposit": "300000000", "bond": "0", "gold": "100000000", "stocks": "6000000",
                        "crypto": "0"}
     assert b["layers"] == {"deposit": "300000000", "bond": "0", "gold": "100000000", "crypto": "0"}
+    assert b["stock_valuation"] == {"basis": "market", "cost": "5000000", "value": "6000000", "unpriced": [], "price_dates": ["2027-01-14"]}
+
+
+def test_a_holding_without_a_price_stays_at_cost_and_is_named():
+    from investment_agent.market.view import SyntheticMarket
+    clock = Clock()
+    c = make_client(clock, PersonalRepository("owner-1", MemoryDocumentStore()), market=SyntheticMarket())
+    setup_owner(c, clock)
+    buy_fpt(c, clock)
+    call(c, clock, "PUT", "/internal/equity-budget", {"layers": {"deposit": "300000000", "bond": "0", "gold": "100000000", "crypto": "0"},
+                                                     "reserve": "100000000", "expected_version": 0, "request_id": "eb1"})
+    b = call(c, clock, "GET", "/internal/equity-budget").json()["budget"]
+    assert b["held_value"] == "5000000" and b["stock_valuation"]["unpriced"] == ["FPT"] and b["stock_valuation"]["price_dates"] == []
+    assert {l["id"]: l["amount"] for l in b["pyramid"]["layers"]}["stocks"] == "5000000"
 
 
 def test_a_single_total_still_works_without_a_pyramid():

@@ -1,7 +1,7 @@
 """Vốn dành cho cổ phiếu: the owner's total financial assets (one number, `settings/equity_budget`), less the emergency reserve and
 needs due within 12 months from the confirmed profile, times the equity ratio of the risk group. Personal data; never sent to a model."""
 
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from investment_agent.domain.allocation import load_allocation_policy
 from investment_agent.domain.asset_pyramid import asset_pyramid, new_money
@@ -14,7 +14,7 @@ from investment_agent.services.deposit_book import RECORD as BOOK_RECORD, ledger
 from investment_agent.services.records import LedgerBook, StoredRisk, effective_risk, read_current, read_version
 
 RECORD = ("settings", "equity_budget")
-LAYERS = ("deposit", "bond", "gold", "crypto")  # by hand before there is a Sổ tài sản, then its lists; stocks (at cost) and ledger cash come from the ledger
+LAYERS = ("deposit", "bond", "gold", "crypto")  # by hand before there is a Sổ tài sản, then its lists; stocks (at market price) and ledger cash come from the ledger
 PROTECTED = {"emergency_reserve", "due_within_12_months"}
 BOOK_LISTS = {"deposit": "deposits", "bond": "bonds", "gold": "gold", "crypto": "crypto"}  # layer → list in Sổ tài sản (totals key = field)
 
@@ -47,7 +47,10 @@ def budget_view(repo, owner, *, quotes: dict) -> tuple[dict, int]:
     effective = effective_risk(repo, owner, StoredRisk.model_validate(risk.payload).assessment if risk else None)
     group = effective.group if effective else None
     state = replay(list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events))
-    held_cost = sum((p.total_cost for p in state.positions if p.quantity + p.pending_quantity > 0), Decimal(0))
+    held = [p for p in state.positions if p.quantity + p.pending_quantity > 0]
+    held_cost = sum((p.total_cost for p in held), Decimal(0))
+    valuation = stock_valuation(held, quotes.get("stocks"))
+    held_value = Decimal(valuation["value"])
     ratios = dict(load_allocation_policy().baseline_equity)
     layers = stored.payload.get("layers") if stored else None
     amounts, sources, cash_source = None, dict.fromkeys(LAYERS, "manual"), "ledger"
@@ -56,17 +59,35 @@ def budget_view(repo, owner, *, quotes: dict) -> tuple[dict, int]:
         sources = dict.fromkeys(LAYERS, "book")
         cash_source = "ledger" if book.count_ledger_cash else "book"  # False: the owner keeps cash to the book's accounts
         amounts = {"reserve": deductions, "cash": (state.cash if cash_source == "ledger" else Decimal(0)) + from_book["accounts"],
-                   **{layer: from_book[BOOK_LISTS[layer]] for layer in LAYERS}, "stocks": held_cost}
+                   **{layer: from_book[BOOK_LISTS[layer]] for layer in LAYERS}, "stocks": held_value}
     elif layers:  # by hand: the total is the sum of the layers, with the reserve as the bottom layer
-        amounts = {"reserve": deductions, "cash": state.cash, **{layer: Decimal(layers[layer]) for layer in LAYERS}, "stocks": held_cost}
+        amounts = {"reserve": deductions, "cash": state.cash, **{layer: Decimal(layers[layer]) for layer in LAYERS}, "stocks": held_value}
     total = sum(amounts.values(), Decimal(0)) if amounts else Decimal(stored.payload["total"])
-    budget = equity_budget(total=total, deductions=deductions, group=group, ratios=ratios, held_cost=held_cost)
+    budget = equity_budget(total=total, deductions=deductions, group=group, ratios=ratios, held_cost=held_cost, held_value=held_value)
     if budget["status"] == "ok":
         pyramid = asset_pyramid(amounts, deductions=deductions, stock_ratio=ratios[group]) if amounts else None
         budget = {**budget, "deductions_source": "manual" if manual is not None else "profile", "profile_deductions": format(from_profile, "f"),
                   "reserve": manual, "layers": layers, "pyramid": pyramid, "deposit_source": sources["deposit"],
-                  "layer_sources": sources, "cash_source": cash_source, "pyramid_source": "book" if book is not None else "manual"}
+                  "layer_sources": sources, "cash_source": cash_source, "pyramid_source": "book" if book is not None else "manual",
+                  "stock_valuation": valuation}
     return budget, stored.version if stored else 0
+
+
+def stock_valuation(held, price) -> dict:
+    """Held stocks at their latest stored close (owner, 21/11/2026); a ticker without a recent close stays at cost and is named, never
+    priced by guess. price: symbol → PricePoint or None."""
+    value, unpriced, dates = Decimal(0), [], set()
+    for p in held:
+        point = price(p.security_id) if price else None
+        if point is None:
+            value += p.total_cost
+            unpriced.append(p.security_id)
+        else:
+            value += (p.quantity + p.pending_quantity) * point.price
+            dates.add(point.session_date.isoformat())
+    cost = sum((p.total_cost for p in held), Decimal(0))
+    whole = lambda v: format(v.quantize(Decimal(1), ROUND_HALF_UP), "f")  # noqa: E731
+    return {"basis": "market", "cost": whole(cost), "value": whole(value), "unpriced": sorted(unpriced), "price_dates": sorted(dates)}
 
 
 def new_money_view(repo, owner, *, amount: Decimal, quotes: dict, today) -> dict:

@@ -44,7 +44,7 @@ def buy_check(request: Request, symbol: str, amount: str):
         name = ticker["sector"] if ticker else None
         sector = next((s for s in after["sectors"] if s["sector"] == name and len(s["symbols"]) > 1), None)
     try:
-        budget, _ = budget_view(repo, owner, quotes=book_quotes(request.app.state.data_dir))
+        budget, _ = budget_view(repo, owner, quotes=book_quotes(request.app.state.data_dir, request.app.state.market))
     except RepositoryUnavailable:
         return unavailable()
     warnings, stocks_over = [], False

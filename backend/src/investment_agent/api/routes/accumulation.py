@@ -33,7 +33,7 @@ class PostRequest(ContractModel):
 
 def _view(request: Request, repo, owner) -> dict:
     today = now(request).astimezone(VN).date()
-    return {**accumulation_view(repo, owner, quotes=book_quotes(request.app.state.data_dir), today=today),
+    return {**accumulation_view(repo, owner, quotes=book_quotes(request.app.state.data_dir, request.app.state.market), today=today),
             "gold_moves": gold_price_moves(request.app.state.data_dir, today=today)}
 
 

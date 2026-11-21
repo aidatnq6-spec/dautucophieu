@@ -43,7 +43,7 @@ def post_new_money(request: Request, body: NewMoneyRequest):
     if repo is None:
         return unavailable()
     try:
-        return new_money_view(repo, owner, amount=Decimal(body.amount), quotes=book_quotes(request.app.state.data_dir), today=now(request).astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date())
+        return new_money_view(repo, owner, amount=Decimal(body.amount), quotes=book_quotes(request.app.state.data_dir, request.app.state.market), today=now(request).astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date())
     except RepositoryUnavailable:
         return unavailable()
 
@@ -54,7 +54,7 @@ def get_budget(request: Request):
     if repo is None:
         return unavailable()
     try:
-        budget, version = budget_view(repo, owner, quotes=book_quotes(request.app.state.data_dir))
+        budget, version = budget_view(repo, owner, quotes=book_quotes(request.app.state.data_dir, request.app.state.market))
     except RepositoryUnavailable:
         return unavailable()
     return {"version": version, "budget": budget}
@@ -93,7 +93,7 @@ def put_budget(request: Request, body: BudgetRequest):
                "layers": {k: format(v, "f") for k, v in layers.items()} if layers else None}
     try:
         repo.write(owner, *RECORD, payload, expected_version=body.expected_version, request_id=body.request_id)
-        budget, version = budget_view(repo, owner, quotes=book_quotes(request.app.state.data_dir))
+        budget, version = budget_view(repo, owner, quotes=book_quotes(request.app.state.data_dir, request.app.state.market))
     except WRITE_ERRORS as exc:
         return write_error(exc)
     return {"version": version, "budget": budget}

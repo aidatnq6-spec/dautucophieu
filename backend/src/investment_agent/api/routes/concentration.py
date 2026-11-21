@@ -37,7 +37,7 @@ def concentration_view(request: Request, symbol: str | None = None, amount: str 
     try:
         view = compose_overview(repo, owner, request.app.state.market, request_now(request))
         settings, _ = portfolio_settings(repo, owner)
-        budget, _ = budget_view(repo, owner, quotes=book_quotes(request.app.state.data_dir))
+        budget, _ = budget_view(repo, owner, quotes=book_quotes(request.app.state.data_dir, request.app.state.market))
     except RepositoryUnavailable:
         return unavailable()
     capital = view["capital"]

@@ -35,7 +35,7 @@ def _view(request: Request, repo, owner) -> dict:
     cycle = rate_cycle(series, today=now(request).astimezone(VN).date())
     stored = read_version(repo, owner, *RECORD, None)
     targets = CycleTargets.model_validate(stored.payload) if stored else CycleTargets()
-    budget, _ = budget_view(repo, owner, quotes=book_quotes(data_dir))
+    budget, _ = budget_view(repo, owner, quotes=book_quotes(data_dir, request.app.state.market))
     pyramid = budget.get("pyramid")
     mix = getattr(targets, cycle["phase"]) if cycle["phase"] else None
     reason = "no_phase" if not cycle["phase"] else (budget["status"] if budget["status"] != "ok" else "no_layers") if pyramid is None else "no_target" if mix is None else None

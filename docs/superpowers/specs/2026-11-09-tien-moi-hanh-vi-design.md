@@ -8,7 +8,7 @@ Nhập số tiền, chia từ dưới lên trên các lớp Tháp đang hiện, 
 2. Từng lớp dưới mức tối thiểu, lớp thấp trước (tiền gửi tính cùng tiền mặt).
 3. Cổ phiếu tới mức trần; phần còn lại vào tiền gửi, như quy tắc mục tiêu của Tháp.
 
-Cổ phiếu theo giá vốn như Tháp. Không lưu, không nêu mã, không phải khuyến nghị.
+Cổ phiếu theo thị giá như Tháp (từ 21/11/2026). Không lưu, không nêu mã, không phải khuyến nghị.
 
 ## Soi hành vi giao dịch (Danh mục & Giao dịch)
 Chọn file TCBS; đọc rồi bỏ, không lưu và không đụng sổ, cho đến khi sổ được dựng lại. Theo từng năm: số lệnh, số mã, giá trị mua, bán, phí và thuế, tỷ lệ phí và thuế trên giá trị giao dịch, thời gian giữ bình quân và tỷ lệ cổ phiếu đã bán theo thời gian giữ (đến 30 ngày, 31 đến 180, trên 180).

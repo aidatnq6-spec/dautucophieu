@@ -62,7 +62,7 @@ export function CycleTargets({ refresh }: { refresh?: string } = {}) {
   return (
     <section className="surface" aria-label="Phân bổ mục tiêu theo chu kỳ">
       <h2>Phân bổ mục tiêu theo chu kỳ</h2>
-      <p className="caption wrap">Bạn tự đặt tỷ trọng mong muốn cho từng giai đoạn lãi suất, phần mềm so với các lớp đang có. Tỷ trọng tính trên phần sau quỹ dự phòng, tiền gửi gồm cả tiền mặt, cổ phiếu theo giá vốn như Tháp. Không ảnh hưởng mục tiêu của Tháp hay phần chia tiền mới. Phép so trên số bạn đặt, không phải dự báo hay khuyến nghị.</p>
+      <p className="caption wrap">Bạn tự đặt tỷ trọng mong muốn cho từng giai đoạn lãi suất, phần mềm so với các lớp đang có. Tỷ trọng tính trên phần sau quỹ dự phòng, tiền gửi gồm cả tiền mặt, cổ phiếu theo thị giá như Tháp. Không ảnh hưởng mục tiêu của Tháp hay phần chia tiền mới. Phép so trên số bạn đặt, không phải dự báo hay khuyến nghị.</p>
       {view && phaseName && <p><strong>Giai đoạn hiện tại: {phaseName.toLowerCase()}</strong>{view.basis === "us_reference" ? " (tạm theo lãi suất Mỹ, chưa đủ dữ liệu Việt Nam)" : ""}, theo Mốc chu kỳ lãi suất ở trang Vĩ mô.</p>}
       {view?.reason && <p className="notice pv-note" data-testid="ct-reason">{REASON[view.reason]}</p>}
       {view && view.rows.length > 0 && <div className="tablewrap"><table aria-label="Chênh lệch so với mục tiêu của giai đoạn">

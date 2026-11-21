@@ -20,7 +20,7 @@ REASONS = {"no_total": "Chưa có số tài sản tài chính: nhập Sổ tài 
 
 def _financial(repo, owner, market, data_dir, now: datetime) -> tuple[Decimal | None, str | None, list[str]]:
     """(financial assets, why they are not known, holdings left out for want of a price)."""
-    budget, _ = budget_view(repo, owner, quotes=book_quotes(data_dir))
+    budget, _ = budget_view(repo, owner, quotes=book_quotes(data_dir, market))
     pyramid = budget.get("pyramid")
     if pyramid is None:
         return None, REASONS["no_layers" if budget["status"] == "ok" else budget["status"]], []

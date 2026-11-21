@@ -83,6 +83,20 @@ def test_when_short_layers_take_the_whole_surplus_nothing_is_left_for_stocks():
     assert f["left_for_stocks"] == "0" and f["stock_room"] == "20000000" and f["buyable"] == "0"
 
 
+def test_a_layer_less_than_one_point_outside_its_range_is_not_flagged():
+    """Owner, 21/11/2026: with stocks at market price shares move every session, so a layer is short or over only once it is more than
+    1 point of the base outside its range; the gap is still measured to the edge of the range."""
+    p = asset_pyramid(layers(deposit=305, gold=95, stocks=600), deductions=Decimal(100) * M, stock_ratio=Decimal("0.60"))
+    l = by_id(p)
+    assert p["tolerance"] == "0.01"
+    assert l["deposit"]["status"] == "ok" and l["deposit"]["gap"] is None   # 30.5% against at most 30%
+    assert l["gold"]["status"] == "ok" and l["gold"]["gap"] is None         # 9.5% against at least 10%
+    p = asset_pyramid(layers(deposit=315, gold=85, stocks=600), deductions=Decimal(100) * M, stock_ratio=Decimal("0.60"))
+    l = by_id(p)
+    assert l["deposit"]["status"] == "over" and l["deposit"]["gap"] == "15000000"
+    assert l["gold"]["status"] == "short" and l["gold"]["gap"] == "15000000"
+
+
 # --- Tái cân bằng lớp Vàng trong Việc cần xem (chủ sở hữu chọn, 20/11/2026) ---
 D = Decimal
 

@@ -44,16 +44,25 @@ def _read(path: Path) -> list[str]:
     return json.loads(path.read_text(encoding="utf-8")).get("active", []) if path.is_file() else []
 
 
-def check_liquidity(data_dir: Path, *, send, today: date) -> dict:
+def liquidity_note(data_dir: Path, *, today: date):
+    """(the section of what newly started, or None; commit(sent)): what is still on stays marked; what cleared is dropped, so it can
+    be sent again; a note Telegram did not take is tried next run."""
     path = Path(data_dir) / STATE
     active = _active(Path(data_dir), today)
     before = set(_read(path))
     new = [k for k in active if k not in before]
-    sent = bool(new) and bool(send("⚠️ Thanh khoản và tỷ giá\n" + "\n".join(active[k] for k in new)))
-    # what is still on stays marked; what cleared is dropped, so it can be sent again; a note Telegram did not take is tried next run
-    keep = sorted((set(active) & before) | (set(new) if sent else set()))
-    if keep != sorted(before):
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"active": keep, "on": today.isoformat()}), encoding="utf-8")
-        os.replace(tmp, path)
-    return {"status": "ok", "new": len(new), "sent": sent}
+    text = "⚠️ Thanh khoản và tỷ giá\n" + "\n".join(active[k] for k in new) if new else None
+
+    def commit(sent: bool) -> dict:
+        keep = sorted((set(active) & before) | (set(new) if sent else set()))
+        if keep != sorted(before):
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps({"active": keep, "on": today.isoformat()}), encoding="utf-8")
+            os.replace(tmp, path)
+        return {"status": "ok", "new": len(new), "sent": sent}
+    return text, commit
+
+
+def check_liquidity(data_dir: Path, *, send, today: date) -> dict:
+    text, commit = liquidity_note(data_dir, today=today)
+    return commit(bool(send(text)) if text else False)

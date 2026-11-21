@@ -20,6 +20,9 @@ trên trang Vĩ mô, tính từ số đã lưu; một tin Telegram khi một đ�
 - Sau mỗi lượt cập nhật vĩ mô: so mức với lượt trước (`data/macro/_signals.json`); đèn đổi giữa xanh, vàng, đỏ thì gửi một tin gồm
   mọi đèn đã đổi. Lượt đầu chỉ ghi mức. Chuyển sang hoặc từ "chưa có số", "số cũ" không gửi.
 - Chỉ gửi khi đã bật gửi theo lịch, như các nhắc khác.
+- Gửi chung với Nhắc thanh khoản và tỷ giá (chủ sở hữu chọn 21/11/2026): một bước `macro-alerts` ngay sau lượt cập nhật vĩ mô soạn cả
+  hai phần và gửi một tin gồm phần nào đang có, kèm một dòng "không phải khuyến nghị". Mỗi phần giữ trạng thái riêng; tin không gửi được
+  thì cả hai phần giữ nguyên để lượt sau gửi lại. Lệnh `macro-signals` và `liquidity-alerts` vẫn chạy tay được, lịch không gọi nữa.
 
 ## Không làm
-- Không đổi Nhắc thanh khoản và tỷ giá (liên ngân hàng nhảy vọt, tỷ giá sát trần): hai việc đo khác nhau, đèn chỉ báo khi đổi mức.
+- Không đổi điều kiện của Nhắc thanh khoản và tỷ giá (liên ngân hàng nhảy vọt, tỷ giá sát trần): hai việc đo khác nhau; chỉ gửi chung.

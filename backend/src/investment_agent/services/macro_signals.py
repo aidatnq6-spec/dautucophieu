@@ -19,20 +19,29 @@ def load_series(data_dir: Path) -> dict[str, list[tuple[date, Decimal]]]:
     return {k: [(date.fromisoformat(o["date"]), Decimal(o["value"])) for o in store.read(k)] for k in SERIES}
 
 
-def signals_run(data_dir: Path, *, today: date, send) -> dict:
+FOOTER = "Chỉ mô tả dữ liệu, không phải khuyến nghị. Chi tiết ở trang Vĩ mô."
+
+
+def signals_note(data_dir: Path, *, today: date):
+    """(the lights' section or None, a summary, commit(sent)): commit keeps the levels unless a changed light's note did not go out."""
     current = macro_signals(load_series(data_dir), today=today)
     path = Path(data_dir) / "macro" / "_signals.json"
     previous = json.loads(path.read_text(encoding="utf-8"))["levels"] if path.is_file() else None
     lines = signal_changes(previous, current)
-    sent = False
-    if lines:
-        sent = bool(send("ĐÈN TÍN HIỆU RỦI RO VĨ MÔ\n" + "\n".join(f"- {line}" for line in lines)
-                         + "\nChỉ mô tả dữ liệu, không phải khuyến nghị. Chi tiết ở trang Vĩ mô."))
     levels = {s["id"]: s["level"] for s in current}
-    if lines and not sent:
-        return {"levels": levels, "changes": len(lines), "sent": False, "first_run": False}
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps({"levels": levels, "at": datetime.now(timezone.utc).isoformat()}), encoding="utf-8")
-    os.replace(tmp, path)
-    return {"levels": levels, "changes": len(lines), "sent": sent, "first_run": previous is None}
+    text = "ĐÈN TÍN HIỆU RỦI RO VĨ MÔ\n" + "\n".join(f"- {line}" for line in lines) if lines else None
+
+    def commit(sent: bool) -> dict:
+        if lines and not sent:
+            return {"levels": levels, "changes": len(lines), "sent": False, "first_run": False}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"levels": levels, "at": datetime.now(timezone.utc).isoformat()}), encoding="utf-8")
+        os.replace(tmp, path)
+        return {"levels": levels, "changes": len(lines), "sent": sent, "first_run": previous is None}
+    return text, commit
+
+
+def signals_run(data_dir: Path, *, today: date, send) -> dict:
+    text, commit = signals_note(data_dir, today=today)
+    return commit(bool(send(text + "\n" + FOOTER)) if text else False)

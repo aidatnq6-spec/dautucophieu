@@ -23,7 +23,7 @@ Mỗi lượt lịch có tới 5 bước gửi tin cá nhân riêng lẻ. Ngày 
   lời nhắc đã ghi "đã nhắc" sẽ được giao muộn hơn, nhưng không mất và không gửi trùng.
 - Một phần lỗi (ví dụ không đọc được sổ) không chặn các phần khác.
 - Tắt gửi tin theo lịch thì không đọc dữ liệu cá nhân và không gửi gì.
-- Các lệnh cũ vẫn còn để chạy tay; lịch chỉ dùng bước gộp.
+- Các lệnh một phần cũ (`deposit-alerts`, `pyramid-alerts`, `loan-alerts`, `contribution-remind`, `accumulation-remind`, `buy-plan-check`, `insider-alerts`, `drawdown-check`, cùng `macro-signals`, `liquidity-alerts` đã gộp ở Nhắc vĩ mô) đã bị xóa (chủ sở hữu duyệt 21/11/2026): chạy riêng một phần dễ gửi trùng nội dung với tin gộp.
 
 ## Danh mục hôm nay (duyệt cùng ngày)
 - Bước `portfolio-alerts` thay cho `buy-plan-check`, `insider-alerts`, `drawdown-check` và `thesis-check --scope data`.

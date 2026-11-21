@@ -286,6 +286,14 @@ if __name__ == "__main__":
     SeriesStore(os.path.join(data, "trend-sources")).upsert("US10Y-1d", us_points)
     SeriesStore(os.path.join(data, "trend-sources")).upsert("DXY-ecb-1d", [(datetime(2026, 8, 1) + timedelta(days=i), str(99 + (i % 3) / 10))
                                                                        for i in range(60)])
+    # Bản tin tuần on the web: two synthetic notes as they went out (made-up figures).
+    weekly = os.path.join(data, "weekly-brief")
+    os.makedirs(weekly, exist_ok=True)
+    for week, text in (("2026-11-13", "BẢN TIN TUẦN 09/11–13/11/2026" + chr(10) + chr(10) + "Danh mục: +0,50% · VN-Index: −0,20%"),
+                       ("2026-11-20", "BẢN TIN TUẦN 16/11–20/11/2026" + chr(10) + chr(10) + "Danh mục: +1,20% · VN-Index: +0,80%" + chr(10) + chr(10)
+                        + "VÀNG TRONG TUẦN (13/11 → 20/11)" + chr(10) + "- Vàng miếng SJC (Phú Quý mua vào): 12.870.000 đ/chỉ ngày 20/11")):
+        with open(os.path.join(weekly, f"{week}.json"), "w", encoding="utf-8") as f:
+            json.dump({"week": week, "sent_at": f"{week[:8]}{int(week[8:]) + 1:02d}T01:32:00+00:00", "text": text}, f, ensure_ascii=False)
     app = create_app(InternalAuthSettings.from_env(), personal_repository=repository, market=MARKET,
                      jobs=JobStore(os.path.join(data, "jobs.sqlite")), outbox=deliveries, deliveries=deliveries, data_dir=data)
     uvicorn.run(app, host="127.0.0.1", port=int(os.environ["E2E_PYTHON_PORT"]), workers=1, access_log=False)

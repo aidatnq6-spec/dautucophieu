@@ -298,3 +298,30 @@ def test_a_missing_gold_price_is_named_never_filled_in():
     empty = {**gold, "sjc": {"now": None, "before": None, "since": None, "latest": None}}
     assert "- Vàng miếng SJC (Phú Quý mua vào): chưa có số liệu" in compose(**INPUTS, held=set(), watched=set(), today=SAT, gold=empty)
     assert "VÀNG TRONG TUẦN" not in compose(**INPUTS, held=set(), watched=set(), today=SAT)
+
+
+# Bản tin tuần on the web (owner, 21/11/2026): the text that went out is kept, one file a week, and can be sent again on request.
+def test_the_text_that_went_out_is_kept_for_the_web_and_a_failed_send_keeps_nothing(tmp_path):
+    from investment_agent.services.weekly_brief import read_weekly, weekly_list
+    texts = []
+    compose_inputs = lambda: INPUTS | {"held": set(), "watched": set()}  # noqa: E731
+    saturday = datetime(2026, 10, 31, 1, 30, tzinfo=timezone.utc)
+    weekly_brief_run(tmp_path, inputs=compose_inputs, send=lambda t: False, now=saturday)
+    assert weekly_list(tmp_path) == []
+    weekly_brief_run(tmp_path, inputs=compose_inputs, send=lambda t: texts.append(t) or True, now=saturday)
+    assert weekly_list(tmp_path) == [{"week": "2026-10-30", "sent_at": saturday.isoformat()}]
+    assert read_weekly(tmp_path, "2026-10-30")["text"] == texts[0] and read_weekly(tmp_path, "2026-10-23") is None
+    assert read_weekly(tmp_path, "../alerts/weekly") is None  # a week is a date, never a path
+
+
+def test_the_week_can_be_sent_again_on_request_and_the_kept_text_is_the_new_one(tmp_path):
+    texts = []
+    compose_inputs = lambda: INPUTS | {"held": set(), "watched": set()}  # noqa: E731
+    saturday = datetime(2026, 10, 31, 1, 30, tzinfo=timezone.utc)
+    weekly_brief_run(tmp_path, inputs=compose_inputs, send=lambda t: texts.append(t) or True, now=saturday)
+    later = datetime(2026, 10, 31, 3, 0, tzinfo=timezone.utc)
+    assert weekly_brief_run(tmp_path, inputs=compose_inputs, send=lambda t: texts.append(t) or True, now=later)["status"] == "already_sent"
+    out = weekly_brief_run(tmp_path, inputs=compose_inputs, send=lambda t: texts.append(t) or True, now=later, resend=True)
+    assert out == {"status": "ok", "week": "2026-10-30", "sent": True, "resent": True} and len(texts) == 2
+    from investment_agent.services.weekly_brief import weekly_list
+    assert weekly_list(tmp_path) == [{"week": "2026-10-30", "sent_at": later.isoformat()}]

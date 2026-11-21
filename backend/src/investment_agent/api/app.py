@@ -22,6 +22,7 @@ from .routes.sectors import router as sectors_router
 from .routes.reaction import router as reaction_router
 from .routes.projects import router as projects_router
 from .routes.funds import router as funds_router
+from .routes.weekly_brief import router as weekly_brief_router
 from .routes.asset_views import router as asset_views_router
 from .routes.idea_board import router as idea_board_router
 from .routes.buy_plan import router as buy_plan_router
@@ -158,6 +159,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(reaction_router)
     app.include_router(projects_router)
     app.include_router(funds_router)
+    app.include_router(weekly_brief_router)
     app.include_router(asset_views_router)
     app.include_router(idea_board_router)
     app.include_router(buy_plan_router)

@@ -15,7 +15,7 @@ test("creating an after-close report shows progress and a readable brief", async
   await seedOwner(page);
   await openReports(page);
   await page.getByLabel("Ngày phiên").fill("2026-10-23");
-  await page.getByRole("button", { name: "Tạo bản tin" }).click();
+  await page.getByRole("button", { name: "Tạo bản tin", exact: true }).click();
   await expect(page.getByRole("status")).toContainText(/Đã phát hành|Thiếu dữ liệu/);
   await page.getByRole("link", { name: "Phiên 2026-10-23" }).first().click();
   await expect(page.getByRole("heading", { name: "Bản tin phiên 2026-10-23" })).toBeVisible();
@@ -31,7 +31,7 @@ test("re-running the same session does not create a second report", async ({ pag
   await expect(page.getByRole("link", { name: "Phiên 2026-10-23" }).first()).toBeVisible();
   const before = await page.getByRole("link", { name: "Phiên 2026-10-23" }).count();
   await page.getByLabel("Ngày phiên").fill("2026-10-23");
-  await page.getByRole("button", { name: "Tạo bản tin" }).click();
+  await page.getByRole("button", { name: "Tạo bản tin", exact: true }).click();
   await expect(page.getByRole("status")).toContainText(/Đã phát hành|Thiếu dữ liệu/);
   await expect(page.getByRole("link", { name: "Phiên 2026-10-23" })).toHaveCount(before);
 });
@@ -39,7 +39,7 @@ test("re-running the same session does not create a second report", async ({ pag
 test("a future session is refused", async ({ page }) => {
   await openReports(page);
   await page.getByLabel("Ngày phiên").fill("2099-01-02");
-  await page.getByRole("button", { name: "Tạo bản tin" }).click();
+  await page.getByRole("button", { name: "Tạo bản tin", exact: true }).click();
   await expect(page.getByRole("alert").filter({ hasText: "Phiên chưa diễn ra" })).toBeVisible();
 });
 

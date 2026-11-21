@@ -10,7 +10,7 @@ async function openBrief(page: import("@playwright/test").Page) {
   await page.goto("/reports");
   await expect(page.getByText("Đang tải…")).toHaveCount(0);
   await page.getByLabel("Ngày phiên").fill("2026-10-23");
-  await page.getByRole("button", { name: "Tạo bản tin" }).click();
+  await page.getByRole("button", { name: "Tạo bản tin", exact: true }).click();
   await expect(page.getByRole("status")).toContainText(/Đã phát hành|Thiếu dữ liệu/);
   await page.getByRole("link", { name: "Phiên 2026-10-23" }).first().click();
   await expect(page.getByRole("heading", { name: "Thị trường phiên 23/10" })).toBeVisible();

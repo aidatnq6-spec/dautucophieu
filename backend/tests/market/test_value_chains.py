@@ -100,22 +100,21 @@ def test_the_committed_chains_read_the_series_the_app_now_keeps():
     kinds = {(c.id, f.id): f.kind for c in load_value_chains().chains for f in c.factors}
     port = next(f for c in load_value_chains().chains if c.id == "port" for f in c.factors if f.kind == "series")
     assert port.indicator == "port_container_yoy"
-    seafood = next(c for c in load_value_chains().chains if c.id == "seafood")
-    assert [(f.id, f.indicator, f.weight) for f in seafood.factors if f.kind == "series"] == [("pangasius_export", "vn_pangasius_export_yoy", "major")]
     # tariffs and trade defence are events: noted on the diagram, kept off the good/bad bar
-    assert {k for k, v in kinds.items() if v == "event"} == {("industrial-park", "us_tariff"), ("port", "us_tariff"), ("seafood", "us_tariff"),
+    assert {k for k, v in kinds.items() if v == "event"} == {("industrial-park", "us_tariff"), ("port", "us_tariff"),
                                                              ("steel", "trade_defence")}
 
 
 # The 50 watched tickers on 30/10/2026, as listed in the spec (data\ is not in Git).
-WATCHED_2026_10_30 = ("MBB ACB BID CTG SHB STB TCB VCB EIB KDH VHM VIC KBC DXG NLG IJC MSN VNM VHC KDC SBT ANV PAN GVR DCM DPM PHR DPR "
+# VHC and ANV left with Thủy sản (owner, 21/11/2026)
+WATCHED_2026_10_30 = ("MBB ACB BID CTG SHB STB TCB VCB EIB KDH VHM VIC KBC DXG NLG IJC MSN VNM KDC SBT PAN GVR DCM DPM PHR DPR "
                       "GAS REE NT2 HDG GMD PVT VSC HAH SSI HCM VND BMP CTD VCG FPT CMG MWG DGW HPG BVH PNJ PVD").split()
 
 
 def test_the_committed_config_gives_every_watched_ticker_one_chain():
     chains = load_value_chains().chains
     owned = [s for c in chains for s in c.symbols]
-    assert len(WATCHED_2026_10_30) == 50 and sorted(owned) == sorted(WATCHED_2026_10_30)
+    assert len(WATCHED_2026_10_30) == 48 and sorted(owned) == sorted(WATCHED_2026_10_30)
 
 
 def test_hydrology_dairy_and_container_freight_are_read_from_their_series():

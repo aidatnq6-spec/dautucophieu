@@ -20,7 +20,7 @@ SHARE_BANDS = {"wti": Decimal("0.05"), "dxy": Decimal("0.02"), "usd_vnd_free": D
                "usd_vnd_vcb": Decimal("0.01"), "m2_vn": Decimal("0.01"), "vnindex_value": Decimal("0.15"),
                "us_software_invest": Decimal("0.01")}  # quarter on quarter
 COMMODITY_BAND = Decimal("0.05")
-GROWTH = ("vn_retail_yoy", "vn_public_invest_yoy", "vn_fdi_disbursed_yoy", "vn_pangasius_export_yoy")  # % against a year before; a move within 1 point is flat
+GROWTH = ("vn_retail_yoy", "vn_public_invest_yoy", "vn_fdi_disbursed_yoy")  # % against a year before; a move within 1 point is flat
 POINT_BANDS = {**{r: Decimal("0.25") for r in RATES}, "vn_cpi_yoy": Decimal("0.2"), "us_cpi_yoy": Decimal("0.2"), **{g: Decimal("1") for g in GROWTH}}
 PMI = ("vn_pmi", "us_pmi")
 AVERAGED = {"vnindex_value": 20}  # sessions averaged on each side of the month-long comparison

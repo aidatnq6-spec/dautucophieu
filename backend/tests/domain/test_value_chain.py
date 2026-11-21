@@ -38,7 +38,7 @@ def test_foreign_flows_read_the_sign_of_twenty_sessions():
     assert (r["direction"], r["change"], r["kind"]) == ("down", "-2000", "net")  # the five early buying days are outside the 20 sessions
 
 
-@pytest.mark.parametrize("indicator", ["vn_retail_yoy", "vn_public_invest_yoy", "vn_fdi_disbursed_yoy", "vn_pangasius_export_yoy"])
+@pytest.mark.parametrize("indicator", ["vn_retail_yoy", "vn_public_invest_yoy", "vn_fdi_disbursed_yoy"])
 def test_growth_rates_move_in_points_with_a_one_point_band(indicator):
     read = lambda a, b: read_indicator(indicator, [(date(2026, 9, 30), Decimal(a)), (date(2026, 10, 31), Decimal(b))],  # noqa: E731
                                        today=date(2026, 11, 10), max_age_days=75)

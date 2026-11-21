@@ -397,11 +397,11 @@ def test_commodity_series_are_kept_under_their_own_keys_for_three_years(tmp_path
         return "observation_date,X\n2026-08-01,150.5\n2026-09-01,153.84\n"
     store = MacroStore(tmp_path)
     result = fetch_commodities(store, get=get, today=date(2026, 10, 30), sleep=lambda s: None)
-    # the other world prices come from the World Bank's sheet (fetch_chain_series); FRED keeps only shrimp, which the sheet dropped
-    # and US software investment (quarterly), the stand-in for IT demand abroad (owner, 20/11/2026)
-    assert COMMODITIES == {"com_shrimp": "PSHRIUSDM", "us_software_invest": "B985RC1Q027SBEA"}
-    assert result == {"com_shrimp": "ok", "us_software_invest": "ok"}
-    assert store.read("com_shrimp")[-1]["value"] == "153.84"
+    # the other world prices come from the World Bank's sheet (fetch_chain_series); FRED keeps only US software investment (quarterly),
+    # the stand-in for IT demand abroad (owner, 20/11/2026); shrimp went with Thủy sản (owner, 21/11/2026)
+    assert COMMODITIES == {"us_software_invest": "B985RC1Q027SBEA"}
+    assert result == {"us_software_invest": "ok"}
+    assert store.read("us_software_invest")[-1]["value"] == "153.84"
     assert all("cosd=2023-10-30" in u for u in asked)
     assert not any(i["id"].startswith("com_") for i in load_indicators())
 

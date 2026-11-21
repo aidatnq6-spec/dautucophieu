@@ -33,6 +33,13 @@ def test_dong_tien_lists_the_watched_tickers_with_the_held_ones_first(tmp_path):
     assert out["date"] == "2027-01-14" and out["basis"] == "closes" and "new_high" in out["counts"]
 
 
+def test_dinh_gia_chuoi_gives_one_row_per_chain_with_its_pe_and_pb_sides(tmp_path):
+    c, clock = client(tmp_path)
+    out = call(c, clock, "GET", "/internal/market/value-chains/valuation").json()
+    assert out["chains"] and {"id", "name", "members", "priced", "pe", "pb", "since"} <= set(out["chains"][0])
+    assert {"now", "median_5y", "position", "n"} <= set(out["chains"][0]["pe"])
+
+
 def test_hieu_suat_theo_ky_gives_one_row_per_chain(tmp_path):
     c, clock = client(tmp_path)
     out = call(c, clock, "GET", "/internal/market/value-chains/returns").json()

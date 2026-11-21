@@ -54,3 +54,14 @@ Chủ sở hữu duyệt ngày 21/11/2026 (kaizen từ FireAnt Quant AI). Trang 
      (để không lẫn với 9 đèn của trang Vĩ mô).
   3. Vĩ mô hôm nay: bao nhiêu điều kiện đã biết đang đúng (ngưỡng tỷ giá 1%), kể tên, và số điều kiện chưa biết.
 - Kết thúc bằng "Chỉ mô tả quá khứ, không phải dự báo hay khuyến nghị."
+## 500 phiên, rủi ro trong kỳ, Sau một cú sốc thì sao? (chủ sở hữu, 21/11/2026)
+- Thêm kỳ 500 phiên (khoảng 2 năm). Nhóm có dưới 5 khoảng không chồng lấn thì không hiện số, ghi "không đủ dữ liệu cho kỳ này"
+  (cờ `enough`); câu tóm tắt cũng không đọc số của nhóm đó.
+- Mỗi nhóm thêm: Xấu thường gặp (P10) và Tốt thường gặp (P90) của VN-Index H phiên sau (phân vị bao gồm hai đầu, trên mọi mẫu);
+  Giảm sâu nhất trong kỳ: mức thấp nhất của VN-Index trong H phiên sau so với ngày vào (0 nếu không xuống dưới), trung vị và tệ nhất.
+- "Sau một cú sốc thì sao?", trên toàn bộ lịch sử VN-Index, mỗi loại kèm số lần, ngày gần nhất, cờ hôm nay và hàng "Mọi lúc":
+  - giảm từ 3% trong một phiên;
+  - giảm 5 phiên liền (phiên giảm thứ 5 của chuỗi);
+  - cắt xuống trung bình 200 phiên (phiên đầu tiên đóng cửa dưới đường, phiên trước ở trên hoặc bằng);
+  - giảm 20% từ đỉnh 52 tuần (đỉnh 250 phiên gần nhất; phiên đầu tiên vượt ngưỡng). Đỉnh mọi thời đại cho quá ít lần (5 lần từ 2000)
+    nên dùng đỉnh 52 tuần.

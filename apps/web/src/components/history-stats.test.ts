@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changePct, evidence, figureText } from "./history-stats";
+import { changePct, enough, evidence, figureText } from "./history-stats";
 
 describe("figureText", () => {
   it("names the month for a World Bank figure and the day for a daily one", () => {
@@ -24,5 +24,11 @@ describe("Thống kê lịch sử", () => {
     expect(evidence(s(66, 1, null))).toBe("chỉ 1 khoảng độc lập: rất ít");
     expect(evidence(s(900, 40, "2.4"))).toBe("40 khoảng độc lập, t = 2,4");
     expect(evidence(s(0, 0, null))).toBe("chưa có mẫu");
+  });
+
+  it("hides a group's figures below 5 independent windows", () => {
+    expect(enough({ ...s(66, 4, null), enough: false })).toBe(false);
+    expect(enough({ ...s(900, 40, "2.4"), enough: true })).toBe(true);
+    expect(enough(s(66, 4, null))).toBe(false);  // an older answer without the flag
   });
 });

@@ -31,7 +31,8 @@ def test_a_group_says_its_samples_the_independent_ones_and_a_t_on_those_alone():
     out = group_summary(list(index), returns, index, h=10)
     assert out["n"] == 40 and out["n_independent"] == 4 and out["win_rate"] == "0.5000"
     assert out["mean"] == "0.0400" and out["t"] is None  # the four independent days all gained 10%: no spread, no t
-    assert group_summary([], returns, index, h=10) == {"n": 0, "n_independent": 0, "mean": None, "median": None, "win_rate": None, "t": None}
+    assert group_summary([], returns, index, h=10) == {"n": 0, "n_independent": 0, "mean": None, "median": None, "win_rate": None, "t": None,
+                                                    "p10": None, "p90": None, "dip_median": None, "dip_worst": None, "enough": False}
 
 
 def test_a_lights_past_levels_are_worked_out_as_the_light_does_and_each_session_takes_the_level_known_that_day():
@@ -94,3 +95,12 @@ def test_pe_days_fall_in_five_groups_by_where_they_sat_in_the_five_years_before(
     assert out["today"]["bucket"] in range(5) and out["today"]["pe"] == "14.90"
     assert all(g["pe_low"] is not None for g in out["groups"])
     assert out["trend"] is not None and {"slope", "intercept", "r2"} <= set(out["trend"])
+
+
+def test_the_summary_does_not_read_figures_from_too_few_windows():
+    from investment_agent.domain.history_stats import history_summary
+    stats, conditions = summary_input(indep=3)
+    for g in stats["pe"]["groups"]:
+        g["enough"] = False
+    text = history_summary(stats, conditions)
+    assert ("Ở nhóm này chỉ có 3 khoảng 250 phiên không chồng lấn: không đủ dữ liệu cho kỳ này. ") in text and "trung bình +20,6%" not in text

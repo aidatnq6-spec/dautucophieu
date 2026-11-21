@@ -21,7 +21,7 @@ def get_history_states(request: Request, h: int, a: str, b: str, fx: str):
     from investment_agent.services.history_stats import FX_THRESHOLDS, history_states
     require_owner(request)
     if h not in HORIZONS or a not in CONDITIONS or b not in CONDITIONS or a == b or fx not in FX_THRESHOLDS:
-        return error(422, "invalid_states", "Chọn số phiên 20, 60, 120 hoặc 250, hai điều kiện khác nhau và ngưỡng tỷ giá 0,5, 1, 2 hoặc 3%.")
+        return error(422, "invalid_states", "Chọn số phiên 20, 60, 120, 250 hoặc 500, hai điều kiện khác nhau và ngưỡng tỷ giá 0,5, 1, 2 hoặc 3%.")
     data_dir = request.app.state.data_dir
     if data_dir is None:
         return unavailable()
@@ -33,7 +33,7 @@ def get_history_stats(request: Request, h: int):
     """h: sessions ahead, as a path segment (the web proxy forwards no query string)."""
     require_owner(request)
     if h not in HORIZONS:
-        return error(422, "invalid_horizon", "Số phiên phải là 20, 60, 120 hoặc 250.")
+        return error(422, "invalid_horizon", "Số phiên phải là 20, 60, 120, 250 hoặc 500.")
     data_dir = request.app.state.data_dir
     if data_dir is None:
         return unavailable()

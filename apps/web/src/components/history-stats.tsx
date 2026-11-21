@@ -2,14 +2,16 @@
 import { useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
 
-type Summary = { n: number; n_independent: number; mean: string | null; median: string | null; win_rate: string | null; t: string | null };
+type Summary = { n: number; n_independent: number; mean: string | null; median: string | null; win_rate: string | null; t: string | null;
+  p10?: string | null; p90?: string | null; dip_median?: string | null; dip_worst?: string | null; enough?: boolean };
 type PeGroup = Summary & { bucket: number; label: string; pe_low: string | null; pe_high: string | null };
 type Dot = { date: string; pe: string; change: string; bucket: number };
 type PeStats = { h: number; groups: PeGroup[]; all: Summary; scatter: Dot[]; trend: { slope: string; intercept: string; r2: string } | null;
   today: { date: string; pe: string; position: string; bucket: number } | null; from: string | null };
 type LightGroup = Summary & { level: "green" | "yellow" | "red" };
 type Light = { id: string; name: string; h: number; groups: LightGroup[]; all: Summary; today: "green" | "yellow" | "red" | null; from: string | null };
-export type HistoryStats = { h: number; horizons: number[]; pe: PeStats; lights: Light[]; summary?: string };
+type Shock = Summary & { id: string; label: string; events: number; recent: string[]; today: boolean };
+export type HistoryStats = { h: number; horizons: number[]; pe: PeStats; lights: Light[]; shocks?: { h: number; groups: Shock[]; all: Summary; from: string | null }; summary?: string };
 
 const LEVEL = { green: "Bình thường", yellow: "Cảnh báo", red: "Nguy hiểm" } as const;
 const num = (v: number, d: number) => v.toLocaleString("vi-VN", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -30,22 +32,36 @@ export function evidence(s: Summary): string {
   return `${s.n_independent} khoảng độc lập, t = ${num(Number(s.t), 1)}`;
 }
 
+/** Fewer than 5 independent windows: the figures are not shown, only that the period has too little data. */
+export function enough(s: Summary): boolean {
+  return s.enough ?? s.n_independent >= 5;
+}
+
 function Row({ label, s, mark }: { label: string; s: Summary; mark?: boolean }) {
+  const ok = enough(s);
+  const cell = (v: string | null | undefined) => (ok ? changePct(v ?? null) : "—");
   return (
     <tr className={mark ? "hs-today" : undefined}>
       <td data-label="Nhóm">{label}{mark && <span className="pill good"> hôm nay</span>}</td>
       <td className="num" data-label="Số mẫu">{s.n}</td>
       <td className="num" data-label="Không chồng lấn">{s.n_independent}</td>
-      <td className={`num ${s.mean && Number(s.mean) > 0 ? "positive" : s.mean && Number(s.mean) < 0 ? "negative" : ""}`} data-label="Trung bình">{changePct(s.mean)}</td>
-      <td className="num" data-label="Trung vị">{changePct(s.median)}</td>
-      <td className="num" data-label="Tỷ lệ tăng">{s.win_rate === null ? "—" : `${num(Number(s.win_rate) * 100, 0)}%`}</td>
-      <td data-label="Độ tin cậy" className="caption">{evidence(s)}</td>
+      {ok ? <>
+        <td className={`num ${s.mean && Number(s.mean) > 0 ? "positive" : s.mean && Number(s.mean) < 0 ? "negative" : ""}`} data-label="Trung bình">{changePct(s.mean)}</td>
+        <td className="num" data-label="Trung vị">{changePct(s.median)}</td>
+        <td className="num" data-label="Tỷ lệ tăng">{s.win_rate === null ? "—" : `${num(Number(s.win_rate) * 100, 0)}%`}</td>
+        <td className="num" data-label="Xấu thường gặp (P10)">{cell(s.p10)}</td>
+        <td className="num" data-label="Tốt thường gặp (P90)">{cell(s.p90)}</td>
+        <td className="num negative" data-label="Giảm sâu nhất trong kỳ: trung vị">{cell(s.dip_median)}</td>
+        <td className="num negative" data-label="Giảm sâu nhất trong kỳ: tệ nhất">{cell(s.dip_worst)}</td>
+        <td data-label="Độ tin cậy" className="caption">{evidence(s)}</td>
+      </> : <td colSpan={8} className="caption" data-label="Kết quả">{s.n === 0 ? "chưa có mẫu" : "không đủ dữ liệu cho kỳ này"}</td>}
     </tr>
   );
 }
 
 const HEAD = <thead><tr><th>Nhóm</th><th className="num">Số mẫu</th><th className="num">Không chồng lấn</th><th className="num">Trung bình</th>
-  <th className="num">Trung vị</th><th className="num">Tỷ lệ tăng</th><th>Độ tin cậy</th></tr></thead>;
+  <th className="num">Trung vị</th><th className="num">Tỷ lệ tăng</th><th className="num">Xấu thường gặp (P10)</th><th className="num">Tốt thường gặp (P90)</th>
+  <th className="num">Giảm sâu nhất trong kỳ: trung vị</th><th className="num">Giảm sâu nhất trong kỳ: tệ nhất</th><th>Độ tin cậy</th></tr></thead>;
 
 function Scatter({ pe }: { pe: PeStats }) {
   if (pe.scatter.length < 3) return null;
@@ -159,12 +175,14 @@ export function HistoryStatsView() {
         {data?.summary && <p className="hs-summary" data-testid="history-summary">{data.summary}
           <span className="caption"> (câu viết theo mẫu từ chính các số trên trang, không dùng AI)</span></p>}
         <div className="chips" role="radiogroup" aria-label="VN-Index sau bao nhiêu phiên">
-          {[20, 60, 120, 250].map((x) => <button key={x} type="button" role="radio" aria-checked={h === x} className={`chip${h === x ? " on" : ""}`}
+          {(data?.horizons ?? [20, 60, 120, 250, 500]).map((x) => <button key={x} type="button" role="radio" aria-checked={h === x} className={`chip${h === x ? " on" : ""}`}
             onClick={() => setH(x)}>{x} phiên</button>)}
         </div>
         <p className="caption">Mỗi phiên trong quá khứ được xếp theo trạng thái đã biết ngay hôm đó, rồi xem VN-Index {h} phiên sau. Các khoảng {h} phiên của
           những ngày liền nhau gối lên nhau, nên ngoài số mẫu còn ghi số <strong>khoảng không chồng lấn</strong> (cách nhau ít nhất {h} phiên); thống kê t chỉ
-          tính trên các khoảng đó. Kết quả quá khứ không bảo đảm tương lai; không phải khuyến nghị.</p>
+          tính trên các khoảng đó. Nhóm có dưới 5 khoảng không chồng lấn thì không hiện số. P10 là kết quả xấu thường gặp (1 trong 10 lần tệ hơn), P90 là
+          kết quả tốt thường gặp; &ldquo;giảm sâu nhất trong kỳ&rdquo; là mức VN-Index thấp nhất so với ngày vào trong {h} phiên sau đó. Kết quả quá khứ không bảo
+          đảm tương lai; không phải khuyến nghị.</p>
       </section>
       {error && <p className="errors" role="alert">{error}</p>}
       {!data && !error && <p className="muted fx-loading" role="status">Đang tính…</p>}
@@ -184,6 +202,16 @@ export function HistoryStatsView() {
               <Row label="Mọi lúc" s={data.pe.all} /></tbody>
           </table>
         </section>
+        {data.shocks && <section className="surface" aria-label="Sau một cú sốc thì sao">
+          <h2>Sau một cú sốc thì sao?</h2>
+          <p className="caption">Các ngày VN-Index gặp một cú sốc, và VN-Index {h} phiên sau đó. Cú giảm 20% tính từ đỉnh 52 tuần (250 phiên), chỉ ngày đầu tiên
+            vượt ngưỡng; cắt xuống trung bình 200 phiên chỉ ngày đầu tiên đóng cửa dưới đường đó. VN-Index có từ {data.shocks.from ? dmy(data.shocks.from) : "—"}.</p>
+          <table className="fv-table" aria-label="VN-Index sau cú sốc">{HEAD}
+            <tbody>{data.shocks.groups.map((sh) => <Row key={sh.id} label={`${sh.label} (${sh.events} lần${sh.recent.length ? `, gần nhất ${dmy(sh.recent[sh.recent.length - 1])}` : ""})`}
+              s={sh} mark={sh.today} />)}
+              <Row label="Mọi lúc" s={data.shocks.all} /></tbody>
+          </table>
+        </section>}
         <StatesView h={h} />
         <section className="surface" aria-label="Kiểm tra ngưỡng đèn bằng lịch sử">
           <h2>Kiểm tra ngưỡng Đèn tín hiệu rủi ro vĩ mô</h2>

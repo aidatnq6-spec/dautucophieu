@@ -14,7 +14,7 @@ from bisect import bisect_right
 from datetime import date, timedelta
 from decimal import Decimal
 
-from .history_stats import YEARS_5, forward_returns, group_summary
+from .history_stats import YEARS_5, forward_dips, forward_returns, group_summary
 
 MONTHLY_LAG = timedelta(days=10)
 QUARTER = timedelta(days=91)
@@ -96,10 +96,10 @@ def states_table(a: list[tuple[date, bool]], b: list[tuple[date, bool]], closes:
                  kinds: tuple[str, str] = ("daily", "daily")) -> dict:
     sessions = [d for d, _ in closes]
     index = {d: i for i, d in enumerate(sessions)}
-    returns = forward_returns(closes, h)
+    returns, dips = forward_returns(closes, h), forward_dips(closes, h)
     sa, sb = _on_sessions(a, sessions, kinds[0]), _on_sessions(b, sessions, kinds[1])
     both = [d for d in sessions if d in sa and d in sb]
-    rows = [{"a": x, "b": y, **group_summary([d for d in both if sa[d] is x and sb[d] is y], returns, index, h=h)}
+    rows = [{"a": x, "b": y, **group_summary([d for d in both if sa[d] is x and sb[d] is y], returns, index, h=h, dips=dips)}
             for x, y in ((True, True), (True, False), (False, True), (False, False))]
     runs, start = [], None
     for d in both:  # the stretches where both held, for the chart
@@ -112,5 +112,5 @@ def states_table(a: list[tuple[date, bool]], b: list[tuple[date, bool]], closes:
     if start:
         runs.append([start.isoformat(), end.isoformat()])
     last = both[-1] if both and sessions and both[-1] == sessions[-1] else None  # "today" only when both are known on the latest session
-    return {"h": h, "rows": rows, "all": group_summary(both, returns, index, h=h), "today": {"a": sa[last], "b": sb[last]} if last else None,
+    return {"h": h, "rows": rows, "all": group_summary(both, returns, index, h=h, dips=dips), "today": {"a": sa[last], "b": sb[last]} if last else None,
             "from": both[0].isoformat() if both else None, "runs": runs}

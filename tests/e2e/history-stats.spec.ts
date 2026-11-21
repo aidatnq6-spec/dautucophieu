@@ -11,6 +11,10 @@ test("Thống kê lịch sử shows the P/E groups and the lights' check, and th
   await expect(page.getByTestId("light-history-oil")).toContainText("Giá dầu WTI");
   await expect(page.getByTestId("history-summary")).toContainText("không phải dự báo hay khuyến nghị");
   await expect(page.getByTestId("history-summary")).toContainText("không dùng AI");
+  await expect(page.getByRole("table", { name: "VN-Index sau cú sốc" })).toContainText("VN-Index giảm từ 3% trong một phiên");
+  await expect(page.getByRole("table", { name: "VN-Index sau đó theo nhóm P/E" })).toContainText("Giảm sâu nhất trong kỳ: tệ nhất");
+  await page.getByRole("radio", { name: "500 phiên" }).click();
+  await expect(page.getByRole("table", { name: "VN-Index sau đó theo nhóm P/E" })).toContainText(/không đủ dữ liệu cho kỳ này|chưa có mẫu/);  // the fixture's history is short for 500 sessions
   await page.getByRole("radio", { name: "60 phiên" }).click();
   await expect(page.getByRole("radio", { name: "60 phiên" })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("region", { name: "Số phiên nhìn tới" })).toContainText("VN-Index 60 phiên sau");

@@ -8,11 +8,11 @@ from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from investment_agent.domain.history_stats import light_groups, pe_groups
+from investment_agent.domain.history_stats import light_groups, pe_groups, shock_groups
 from investment_agent.market.leading import MacroStore
 from investment_agent.market.series import SeriesStore
 
-HORIZONS = (20, 60, 120, 250)
+HORIZONS = (20, 60, 120, 250, 500)  # 500: two years, for the long series (a group under five independent windows hides its figures)
 LIGHTS = ("oil", "usd", "us10y", "pe")
 _CACHE: dict = {}
 TTL_SECONDS = 3600
@@ -93,7 +93,8 @@ def history_stats(data_dir: Path, *, h: int, today: date) -> dict:
     series = {"factor_oil": _macro(data_dir, "factor_oil"), "factor_usd": _macro(data_dir, "factor_usd"), "us10y": _us10y(data_dir),
               "vnindex_pe": pe}
     out = {"h": h, "horizons": list(HORIZONS), "closes_from": closes[0][0].isoformat() if closes else None,
-           "pe": pe_groups(pe, closes, h=h), "lights": [light_groups(k, series, closes, h=h) for k in LIGHTS]}
+           "pe": pe_groups(pe, closes, h=h), "lights": [light_groups(k, series, closes, h=h) for k in LIGHTS],
+           "shocks": shock_groups(closes, h=h)}
     from investment_agent.domain.history_stats import history_summary
     out["summary"] = history_summary(out, conditions_now(data_dir, fx="1", today=today)[1])  # by a fixed pattern, no model
     _CACHE.clear() if len(_CACHE) > 16 else None

@@ -30,6 +30,26 @@ def forward_returns(closes: Points, h: int) -> dict[date, Decimal]:
     return {closes[i][0]: closes[i + h][1] / closes[i][1] - 1 for i in range(len(closes) - h) if closes[i][1]}
 
 
+def forward_dips(closes: Points, h: int) -> dict[date, Decimal]:
+    """The deepest fall within the h sessions after each day: the lowest close of those sessions against the day's close (0 when none
+    is lower). Sliding minimum over the window, so a 500-session look stays quick."""
+    from collections import deque
+    values, n, out = [v for _, v in closes], len(closes), {}
+    window: deque[int] = deque()  # indices of the window i+1 … i+h, their closes increasing
+    for i in range(n - 1, -1, -1):
+        j = i + 1  # the window for day i is j … j+h-1; add j, drop what falls out on the right
+        if j < n:
+            while window and values[window[-1]] >= values[j]:
+                window.pop()
+            window.append(j)
+        while window and window[0] > i + h:
+            window.popleft()
+        if i + h < n and values[i]:
+            low = values[window[0]] if window else values[i]
+            out[closes[i][0]] = min(Decimal(0), low / values[i] - 1)
+    return out
+
+
 def independent(days: list[date], index: dict[date, int], *, h: int) -> list[date]:
     out, last = [], None
     for d in sorted(days, key=lambda x: index[x]):
@@ -39,18 +59,76 @@ def independent(days: list[date], index: dict[date, int], *, h: int) -> list[dat
     return out
 
 
-def group_summary(days: list[date], returns: dict[date, Decimal], index: dict[date, int], *, h: int) -> dict:
+ENOUGH = 5  # fewer independent windows than this: the figures are hidden ("không đủ dữ liệu cho kỳ này")
+
+
+def group_summary(days: list[date], returns: dict[date, Decimal], index: dict[date, int], *, h: int,
+                  dips: dict[date, Decimal] | None = None) -> dict:
+    """Also the ordinary bad and good outcomes (10th and 90th percentiles, inclusive) and, with dips, the deepest fall within the h
+    sessions: its median and its worst. enough: at least ENOUGH independent windows."""
     days = [d for d in days if d in returns and d in index]
     if not days:
-        return {"n": 0, "n_independent": 0, "mean": None, "median": None, "win_rate": None, "t": None}
+        return {"n": 0, "n_independent": 0, "mean": None, "median": None, "win_rate": None, "t": None, "p10": None, "p90": None,
+                "dip_median": None, "dip_worst": None, "enough": False}
+    from statistics import quantiles
     values = [returns[d] for d in days]
     free = [returns[d] for d in independent(days, index, h=h)]
     t = None
     if len(free) >= 3:
         sd = stdev(free)
         t = _q(mean(free) / (sd / Decimal(len(free)).sqrt()), "0.01") if sd > 0 else None
+    cuts = quantiles(values, n=10, method="inclusive") if len(values) >= 2 else [values[0]] * 9
+    falls = [dips[d] for d in days if dips and d in dips]
     return {"n": len(values), "n_independent": len(free), "mean": _q(mean(values)), "median": _q(median(values)),
-            "win_rate": _q(Decimal(sum(1 for v in values if v > 0)) / len(values)), "t": t}
+            "win_rate": _q(Decimal(sum(1 for v in values if v > 0)) / len(values)), "t": t, "p10": _q(cuts[0]), "p90": _q(cuts[-1]),
+            "dip_median": _q(median(falls)) if falls else None, "dip_worst": _q(min(falls)) if falls else None, "enough": len(free) >= ENOUGH}
+
+
+SHOCKS = {"drop3": "VN-Index giảm từ 3% trong một phiên", "down5": "VN-Index giảm 5 phiên liền",
+          "below200": "VN-Index cắt xuống đường trung bình 200 phiên", "dd20": "VN-Index giảm 20% từ đỉnh 52 tuần"}
+PEAK_SESSIONS = 250  # the 52-week high the 20% fall is measured from (an all-time peak counted 2008, 2011, 2020 as one, 21/11/2026)
+
+
+def shock_days(closes: Points) -> dict[str, list[date]]:
+    """The days each shock happened. A run of falls counts once, on its fifth day; the 200-session average needs 200 closes; the fall
+    from the 52-week high counts on the day it first reaches 20% (from under 20% the session before)."""
+    out = {k: [] for k in SHOCKS}
+    run, total, before = 0, Decimal(0), None
+    values = [v for _, v in closes]
+    for i, (d, v) in enumerate(closes):
+        if i:
+            prev = values[i - 1]
+            if prev and v / prev - 1 <= Decimal("-0.03"):
+                out["drop3"].append(d)
+            run = run + 1 if v < prev else 0
+            if run == 5:
+                out["down5"].append(d)
+        total += v
+        if i >= 200:
+            total -= values[i - 200]
+        if i >= 200:
+            ma, ma_prev = total / 200, (total - v + values[i - 200]) / 200
+            if v < ma and values[i - 1] >= ma_prev:
+                out["below200"].append(d)
+        high = max(values[max(0, i - PEAK_SESSIONS + 1):i + 1])
+        fall = v / high - 1 if high else Decimal(0)
+        if fall <= Decimal("-0.20") and before is not None and before > Decimal("-0.20"):
+            out["dd20"].append(d)
+        before = fall
+    return out
+
+
+def shock_groups(closes: Points, *, h: int) -> dict:
+    """Sau một cú sốc thì sao: VN-Index h sessions after each kind of shock, with the risk figures, the latest times it happened and
+    whether it happened on the latest session; "all" is every session, to compare against."""
+    index = {d: i for i, (d, _) in enumerate(closes)}
+    returns, dips = forward_returns(closes, h), forward_dips(closes, h)
+    days = shock_days(closes)
+    last = closes[-1][0] if closes else None
+    groups = [{"id": k, "label": label, "events": len(days[k]), "recent": [d.isoformat() for d in days[k][-3:]], "today": bool(days[k]) and days[k][-1] == last,
+               **group_summary(days[k], returns, index, h=h, dips=dips)} for k, label in SHOCKS.items()]
+    return {"h": h, "groups": groups, "all": group_summary([d for d, _ in closes], returns, index, h=h, dips=dips),
+            "from": closes[0][0].isoformat() if closes else None}
 
 
 def _percentiles(pe: Points) -> dict[date, Decimal]:
@@ -104,16 +182,16 @@ def light_groups(key: str, series: dict[str, Points], closes: Points, *, h: int)
     measured = light_measures(key, series)
     days = [d for d, _ in measured]
     index = {d: i for i, (d, _) in enumerate(closes)}
-    returns = forward_returns(closes, h)
+    returns, dips = forward_returns(closes, h), forward_dips(closes, h)
     level_on: dict[date, str] = {}
     for d, _ in closes:
         i = bisect_right(days, d) - 1
         if i >= 0 and d - days[i] <= KNOWN_FOR:
             level_on[d] = ms._level(key, measured[i][1])
-    groups = [{"level": lv, **group_summary([d for d, x in level_on.items() if x == lv], returns, index, h=h)} for lv in ("green", "yellow", "red")]
+    groups = [{"level": lv, **group_summary([d for d, x in level_on.items() if x == lv], returns, index, h=h, dips=dips)} for lv in ("green", "yellow", "red")]
     spec = ms.SIGNALS[key]
     return {"id": key, "name": spec.name, "h": h, "yellow": str(spec.yellow), "red": str(spec.red), "bad_side": spec.bad, "groups": groups,
-            "all": group_summary(list(level_on), returns, index, h=h), "today": ms._level(key, measured[-1][1]) if measured else None,
+            "all": group_summary(list(level_on), returns, index, h=h, dips=dips), "today": ms._level(key, measured[-1][1]) if measured else None,
             "from": min(level_on).isoformat() if level_on else None}
 
 
@@ -149,7 +227,9 @@ def history_summary(stats: dict, conditions: list[dict] | None) -> str:
     if today:
         g = pe["groups"][today["bucket"]]
         parts.append(f"Hôm nay P/E VN-Index {today['pe'].replace('.', ',')}, thuộc nhóm {g['label'].lower()} so với 5 năm trước. ")
-        if g["n"]:
+        if g["n"] and g.get("enough", True) is False:  # too few windows: no figure is read out
+            parts.append(f"Ở nhóm này chỉ có {g['n_independent']} khoảng {h} phiên không chồng lấn: không đủ dữ liệu cho kỳ này. ")
+        elif g["n"]:
             parts.append(f"Trong quá khứ, ở nhóm này VN-Index {h} phiên sau trung bình {_pct(g['mean'])} (mọi lúc {_pct(pe['all']['mean'])}), "
                          f"tăng ở {round(Decimal(g['win_rate']) * 100)}% số lần; {_evidence(g)}. ")
     else:
@@ -161,8 +241,13 @@ def history_summary(stats: dict, conditions: list[dict] | None) -> str:
         parts.append(f"Cả {len(stats['lights'])} đèn có lịch sử dài ({names}) đang ở mức bình thường. ")
     for lg in off:
         g = next(x for x in lg["groups"] if x["level"] == lg["today"])
-        past = (f"trong quá khứ ở mức này VN-Index {h} phiên sau trung bình {_pct(g['mean'])} (mọi lúc {_pct(lg['all']['mean'])}, "
-                f"{g['n_independent']} khoảng không chồng lấn)") if g["n"] else "chưa có lần nào ở mức này trong dữ liệu đã lưu"
+        if not g["n"]:
+            past = "chưa có lần nào ở mức này trong dữ liệu đã lưu"
+        elif g.get("enough", True) is False:
+            past = f"ở mức này chỉ có {g['n_independent']} khoảng {h} phiên không chồng lấn: không đủ dữ liệu cho kỳ này"
+        else:
+            past = (f"trong quá khứ ở mức này VN-Index {h} phiên sau trung bình {_pct(g['mean'])} (mọi lúc {_pct(lg['all']['mean'])}, "
+                    f"{g['n_independent']} khoảng không chồng lấn)")
         parts.append(f"Đèn {lg['name']} đang ở mức {LEVEL_WORD[lg['today']]}; {past}. ")
     if conditions:
         known = [c for c in conditions if c.get("state") is not None]
@@ -176,7 +261,7 @@ def history_summary(stats: dict, conditions: list[dict] | None) -> str:
 
 def pe_groups(pe: Points, closes: Points, *, h: int) -> dict:
     index = {d: i for i, (d, _) in enumerate(closes)}
-    returns = forward_returns(closes, h)
+    returns, dips = forward_returns(closes, h), forward_dips(closes, h)
     places = _percentiles(pe)
     by_day = dict(pe)
     groups = []
@@ -184,13 +269,13 @@ def pe_groups(pe: Points, closes: Points, *, h: int) -> dict:
         days = [d for d, p in places.items() if _bucket(p) == b]
         values = [by_day[d] for d in days]
         groups.append({"bucket": b, "label": label, "pe_low": _q(min(values), "0.01") if values else None,
-                       "pe_high": _q(max(values), "0.01") if values else None, **group_summary(days, returns, index, h=h)})
+                       "pe_high": _q(max(values), "0.01") if values else None, **group_summary(days, returns, index, h=h, dips=dips)})
     sample = [d for d in places if d in returns]
     scatter = [{"date": d.isoformat(), "pe": _q(by_day[d], "0.01"), "change": _q(returns[d]), "bucket": _bucket(places[d])}
                for d in sample[::5]]  # one day in five: enough to see the cloud, light enough to draw
     last = pe[-1][0] if pe else None
     today = {"date": last.isoformat(), "pe": _q(by_day[last], "0.01"), "position": _q(places[last], "0.01"), "bucket": _bucket(places[last])} \
         if last in places else None
-    return {"h": h, "groups": groups, "all": group_summary(sample, returns, index, h=h), "scatter": scatter,
+    return {"h": h, "groups": groups, "all": group_summary(sample, returns, index, h=h, dips=dips), "scatter": scatter,
             "trend": _trend([by_day[d] for d in sample], [returns[d] for d in sample]), "today": today,
             "from": min(places).isoformat() if places else None}

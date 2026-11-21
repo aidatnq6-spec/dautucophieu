@@ -68,6 +68,14 @@ def test_funding_for_more_stocks_fills_short_layers_first_then_goes_to_stocks():
     assert f["from_cash"] == "50000000" and f["to_raise"] == "50000000"  # cash already in the brokerage account is used first
 
 
+def test_funding_names_the_room_to_the_stock_minimum_beside_the_room_to_its_maximum():
+    """Owner, 21/11/2026: the room for stocks reads as one block, to the minimum and to the maximum of the target."""
+    p = asset_pyramid(layers(cash=50, deposit=350, gold=50, stocks=400, bond=150), deductions=Decimal(100) * M, stock_ratio=Decimal("0.60"))
+    assert p["funding"]["stock_to_min"] == "150000000" and p["funding"]["stock_room"] == "200000000"  # 55% and 60% of 1 tỷ less 400
+    p = asset_pyramid(layers(deposit=300, gold=100, stocks=580), deductions=Decimal(100) * M, stock_ratio=Decimal("0.60"))
+    assert p["funding"]["stock_to_min"] == "0"  # already above the minimum
+
+
 def test_funding_is_capped_by_the_stock_room():
     # bond 200 vs at most 100 gives 100; deposit 50 is short of its 100 minimum and takes 50; stocks are already over their target
     p = asset_pyramid(layers(deposit=50, bond=200, gold=100, stocks=650), deductions=Decimal(100) * M, stock_ratio=Decimal("0.60"))

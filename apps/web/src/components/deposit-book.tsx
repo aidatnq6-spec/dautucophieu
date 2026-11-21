@@ -373,7 +373,7 @@ export function DepositBook({ onSaved, refresh }: { onSaved?: () => void; refres
         mới; Xóa hỏi lại rồi xóa. Mỗi lần lưu hay xóa, Tháp tài sản tính lại. Ô lãi hay lợi suất để trống là chưa nhập, không phải 0. Sổ chưa đến
         hạn không bao giờ được tính là tiền rút ngay.</p>
 
-      <h3>Quỹ dự phòng</h3>
+      <h3 id="quy-du-phong">Quỹ dự phòng</h3>
       {reserveDraft === null ? <div className="db-reserve">
         <span>Quỹ dự phòng và khoản chi 12 tháng: <strong data-testid="book-reserve">{view ? formatVnd(reserve ?? view.profile_reserve) : ""}</strong>
           {view && reserve === null && <span className="caption"> (theo hồ sơ)</span>}</span>

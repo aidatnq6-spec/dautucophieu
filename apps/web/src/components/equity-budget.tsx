@@ -9,7 +9,7 @@ import type { IntangiblesView } from "./intangibles";
 type Layer = { id: string; amount: string; share: string | null; target_min: string | null; target_max: string | null;
   status: "fixed" | "short" | "ok" | "over"; gap: string | null };
 type Funding = { sources: { id: string; surplus: string }[]; pool: string; fills: { id: string; amount: string }[]; left_for_stocks: string;
-  stock_room: string; buyable: string; from_cash: string; to_raise: string };
+  stock_room: string; buyable: string; from_cash: string; to_raise: string; stock_to_min?: string };
 type Pyramid = { total: string; base: string; layers: Layer[]; warnings: { short: string; over: string[] }[]; funding?: Funding; tolerance?: string };
 export type StockValuation = { basis: "market"; cost: string; value: string; unpriced: string[]; price_dates: string[] };
 type Layers = { deposit: string; bond: string; gold: string; crypto: string };
@@ -53,7 +53,8 @@ function PyramidView({ p, intangibles, fromBook, cashFromBook, valuation }: { p:
     <>
       <ol className="pyr" aria-label="Các lớp tài sản, từ dưới lên">
         {p.layers.map((l, i) => {
-          const [word, tone] = STATUS[l.status];
+          // a reserve of 0 is not "fixed" but missing: the targets are then on every asset (owner, 21/11/2026)
+          const [word, tone] = l.id === "reserve" && l.amount === "0" ? ["chưa có", "warn"] : STATUS[l.status];
           return (
             <li key={l.id} data-testid={`layer-${l.id}`} className={`pyr-layer pyr-${l.status}`} style={{ ["--step" as string]: i }}>
               <div className="pyr-name"><strong>{NAME[l.id]}</strong>{l.id === "cash" && cashFromBook
@@ -90,7 +91,8 @@ const SOURCE: Record<string, string> = { deposit: "Tiền gửi + tiền mặt",
 
 /** Where more money for stocks could come from: what sits above each layer's ceiling, after filling layers below their minimum first
  * (the owner's rule). A calculation on the owner's figures, not advice; never from a short layer or the reserve. */
-function FundingView({ f }: { f: Funding }) {
+function FundingView({ f, stocks }: { f: Funding; stocks?: Layer }) {
+  const span = stocks?.target_min && stocks.target_max ? ` (mục tiêu ${whole(stocks.target_min)}–${pct(stocks.target_max)})` : "";
   return (
     <section className="eb-funding" aria-label="Nguồn tiền để mua thêm cổ phiếu">
       <h3>Nguồn tiền để mua thêm cổ phiếu</h3>
@@ -100,11 +102,17 @@ function FundingView({ f }: { f: Funding }) {
         {f.sources.map((s) => <div key={s.id} data-testid={`funding-source-${s.id}`}><dt>{SOURCE[s.id]} <span className="caption">(phần vượt mức trần)</span></dt>
           <dd>{s.surplus === "0" ? <span className="muted">0 đ · không lấy</span> : formatVnd(s.surplus)}</dd></div>)}
         <div><dt>Tổng phần dư</dt><dd>{formatVnd(f.pool)}</dd></div>
-        {f.fills.map((x) => <div key={x.id} data-testid={`funding-fill-${x.id}`}><dt>Bù {NAME[x.id].toLowerCase()} lên mức tối thiểu trước</dt>
-          <dd>−{formatVnd(x.amount)}</dd></div>)}
-        <div><dt>Còn lại cho cổ phiếu</dt><dd>{formatVnd(f.left_for_stocks)}</dd></div>
-        <div><dt>Còn trống trong vốn dành cho cổ phiếu</dt><dd data-testid="funding-room">{formatVnd(f.stock_room)}</dd></div>
-        <div className="eb-main"><dt>Có thể mua thêm <span className="caption">(số nhỏ hơn của hai dòng trên)</span></dt>
+        {f.fills.map((x) => <div key={x.id} data-testid={`funding-fill-${x.id}`}><dt>Chuyển sang {NAME[x.id].toLowerCase()} để lên mức tối thiểu trước</dt>
+          <dd>{formatVnd(x.amount)}</dd></div>)}
+      </dl>
+      <h4>Chỗ cho cổ phiếu{span}</h4>
+      <dl className="eb-result" role="group" aria-label="Chỗ cho cổ phiếu">
+        {f.stock_to_min !== undefined && <div><dt>Tới mức tối thiểu <span className="caption">(cổ phiếu đang dưới mức này bao nhiêu)</span></dt>
+          <dd data-testid="funding-to-min">{formatVnd(f.stock_to_min)}</dd></div>}
+        <div><dt>Tới mức tối đa <span className="caption">(bằng phần còn trống trong vốn dành cho cổ phiếu)</span></dt>
+          <dd data-testid="funding-room">{formatVnd(f.stock_room)}</dd></div>
+        <div><dt>Tiền có sẵn để mua <span className="caption">(phần dư còn lại sau khi bù các lớp thiếu)</span></dt><dd>{formatVnd(f.left_for_stocks)}</dd></div>
+        <div className="eb-main"><dt>Có thể mua thêm <span className="caption">(số nhỏ hơn của tới mức tối đa và tiền có sẵn)</span></dt>
           <dd data-testid="funding-buyable">{formatVnd(f.buyable)}</dd></div>
         {f.buyable !== "0" && <div><dt>Trong đó</dt><dd>tiền mặt sẵn trong tài khoản {formatVnd(f.from_cash)} · cần rút hoặc bán thêm {formatVnd(f.to_raise)}</dd></div>}
       </dl>
@@ -171,6 +179,9 @@ export function EquityBudget({ refresh }: { refresh?: string } = {}) {
       {message && <p className="errors" role="alert">{message}</p>}
       {b?.status === "ok" && !b.pyramid && <p className="notice">Đang dùng tổng tài sản nhập một con số ({formatVnd(b.total)}). Nhập số tiền từng lớp ở trên để xem tháp tài sản.</p>}
       {b?.status === "no_risk" && <p className="notice">Chưa có kết quả khảo sát rủi ro nên chưa biết tỷ trọng cổ phiếu.</p>}
+      {b?.status === "ok" && b.pyramid && b.deductions === "0" && <p className="notice" data-testid="reserve-missing">Quỹ dự phòng và khoản chi 12 tháng
+        đang là 0 đ, nên mục tiêu các lớp đang tính trên toàn bộ tài sản. Nếu bạn có quỹ dự phòng hay khoản sắp chi, nhập ở{" "}
+        {bookOnly ? <a href="#quy-du-phong">Sổ tài sản → Quỹ dự phòng</a> : "ô Quỹ dự phòng ở trên"} để Tháp tính lại.</p>}
       {b?.status === "ok" && b.pyramid && <PyramidView p={b.pyramid} intangibles={intangibles} fromBook={fromBook} cashFromBook={b.cash_source === "book"} valuation={b.stock_valuation} />}
       {b?.status === "ok" && <dl className="eb-result">
         <div><dt>Tổng tài sản tài chính</dt><dd data-testid="equity-total">{formatVnd(b.total)}</dd></div>
@@ -180,9 +191,9 @@ export function EquityBudget({ refresh }: { refresh?: string } = {}) {
         <div className="eb-main"><dt>Vốn dành cho cổ phiếu</dt><dd data-testid="equity-budget">{formatVnd(b.budget)}</dd></div>
         <div><dt data-testid="equity-held">Đang nắm (theo thị giá): {formatVnd(b.held_value ?? b.held_cost)}{b.held_weight ? ` (${pct(b.held_weight)})` : ""}
           <span className="caption"> · giá vốn {formatVnd(b.held_cost)}</span></dt>
-          <dd>{b.over ? <span className="negative">Đã vượt {formatVnd(b.over)}</span> : <>còn trống {formatVnd(b.room)}</>}</dd></div>
+          <dd>{b.over ? <span className="negative">Đã vượt {formatVnd(b.over)}</span> : <>còn trống {formatVnd(b.room)} <span className="caption">(tới mức tối đa)</span></>}</dd></div>
       </dl>}
-      {b?.status === "ok" && b.pyramid?.funding && <FundingView f={b.pyramid.funding} />}
+      {b?.status === "ok" && b.pyramid?.funding && <FundingView f={b.pyramid.funding} stocks={b.pyramid.layers.find((l) => l.id === "stocks")} />}
     </section>
   );
 }

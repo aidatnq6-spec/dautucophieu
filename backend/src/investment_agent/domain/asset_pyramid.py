@@ -58,15 +58,17 @@ def asset_pyramid(amounts: dict[str, Decimal], *, deductions: Decimal, stock_rat
             if over:
                 warnings.append({"short": layer["id"], "over": over})
     return {"total": format(total, "f"), "base": format(base, "f"), "layers": out, "warnings": warnings, "tolerance": str(TOLERANCE),
-            "funding": _funding(out, cash=amounts.get("cash", Decimal(0)), stock_room=max(ranges["stocks"][1] * base - amounts.get("stocks", Decimal(0)), Decimal(0)))}
+            "funding": _funding(out, cash=amounts.get("cash", Decimal(0)), stock_room=max(ranges["stocks"][1] * base - amounts.get("stocks", Decimal(0)), Decimal(0)),
+                                stock_to_min=max(ranges["stocks"][0] * base - amounts.get("stocks", Decimal(0)), Decimal(0)))}
 
 
 SOURCES = ("deposit", "bond", "gold", "crypto")  # layers whose surplus above the ceiling can be moved; deposits count with cash
 
 
-def _funding(layers: list[dict], *, cash: Decimal, stock_room: Decimal) -> dict:
+def _funding(layers: list[dict], *, cash: Decimal, stock_room: Decimal, stock_to_min: Decimal = Decimal(0)) -> dict:
     """Owner's rule (27/10/2026): money above a layer's ceiling first fills layers below their minimum, bottom up; only the rest is
-    for more stocks, capped by the room left in the stock target. Cash already in the brokerage account is used first."""
+    for more stocks, capped by the room left in the stock target. Cash already in the brokerage account is used first. stock_to_min:
+    how far the stocks are below the target's minimum, shown beside the room to its maximum (21/11/2026)."""
     by_id = {l["id"]: l for l in layers}
     surplus = {i: Decimal(by_id[i]["gap"]) if by_id[i]["status"] == "over" else Decimal(0) for i in SOURCES}
     pool = left = sum(surplus.values(), Decimal(0))
@@ -81,6 +83,7 @@ def _funding(layers: list[dict], *, cash: Decimal, stock_room: Decimal) -> dict:
     from_cash = min(cash, buyable)
     return {"sources": [{"id": i, "surplus": format(surplus[i], "f")} for i in SOURCES], "pool": format(pool, "f"), "fills": fills,
             "left_for_stocks": format(left, "f"), "stock_room": format(room, "f"), "buyable": format(buyable, "f"),
+            "stock_to_min": format(stock_to_min.quantize(Decimal(1), ROUND_HALF_UP), "f"),
             "from_cash": format(from_cash, "f"), "to_raise": format(buyable - from_cash, "f")}
 
 

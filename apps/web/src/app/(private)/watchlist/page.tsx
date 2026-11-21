@@ -1,3 +1,4 @@
+import { FlowBoard } from "../../../components/flow-board";
 import { ScreenerView } from "../../../components/screener-view";
 import { WatchQuadrant } from "../../../components/watch-quadrant";
 import { WatchlistView } from "../../../components/watchlist-view";
@@ -7,6 +8,7 @@ export default function WatchlistPage() {
     <>
       <div className="pagehead"><h1>Các mã đang theo dõi</h1><p className="muted">Giá đóng cửa gần nhất và mức thay đổi, cập nhật theo lịch chạy.</p></div>
       <ScreenerView />
+      <FlowBoard />
       <WatchlistView />
       <WatchQuadrant />
     </>

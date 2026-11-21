@@ -17,7 +17,7 @@ test("the watchlist shows prices and changes without recommendations", async ({ 
   await expect(fpt).toContainText("+3,64%");
   await expect(fpt).toContainText("+14,00%");
   await expect(table.getByRole("row", { name: /VCB/ })).toContainText("Chưa có giá");
-  await expect(page.getByText(/không phải khuyến nghị/)).toBeVisible();
+  await expect(page.getByText(/không phải khuyến nghị mua bán/)).toBeVisible();  // the price list's own notice (Dòng tiền has its own)
 });
 
 test("filters by index group", async ({ page }) => {

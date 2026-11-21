@@ -40,6 +40,19 @@ def value_chains(request: Request):
     return _view(request)
 
 
+@router.get("/value-chains/returns")
+def value_chain_returns(request: Request):
+    """Hiệu suất theo kỳ: each chain's members over a week to a year and since January, on stored closes (domain.chain_returns)."""
+    from investment_agent.services.flow_board import chain_board
+    require_owner(request)
+    data_dir = request.app.state.data_dir
+    if data_dir is None:
+        return unavailable()
+    config = load_value_chains(getattr(request.app.state, "value_chains_path", VALUE_CHAINS_PATH))
+    chains = [{"id": c.id, "name": c.name, "symbols": list(c.symbols)} for c in config.chains]
+    return {"chains": chain_board(data_dir, chains, today=now(request).astimezone(VN).date())}
+
+
 @router.put("/value-chains/{chain_id}/approval")
 def set_approval(request: Request, chain_id: str, body: ApprovalRequest):
     """Duyệt or bỏ duyệt one chain; the approval holds for the content the page showed (its fingerprint) and nothing else."""

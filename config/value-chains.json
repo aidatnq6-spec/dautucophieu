@@ -2490,11 +2490,11 @@
      "id": "crack_spread",
      "label": "Biên lọc dầu (crack spread)",
      "stage": "middle",
-     "indicator": null,
+     "indicator": "crack_321_us",
      "when_up": "good",
      "weight": "major",
      "share": null,
-     "why": "Chênh lệch giữa giá xăng, dầu diesel bán ra và giá dầu thô đầu vào quyết định lợi nhuận BSR; chưa có nguồn số liệu công khai",
+     "why": "Chênh lệch giữa giá xăng, dầu diesel bán ra và giá dầu thô đầu vào quyết định lợi nhuận BSR; không có số Singapore công khai nên đo bằng crack 3-2-1 của Mỹ làm đại diện",
      "refs": [
       {
        "source": "acbs-oilgas",
@@ -2656,13 +2656,13 @@
     },
     {
      "id": "us_demand",
-     "label": "Nhu cầu và tồn kho may mặc ở Mỹ",
+     "label": "Tồn kho so với doanh số ở cửa hàng quần áo Mỹ",
      "stage": "output",
-     "indicator": null,
-     "when_up": "good",
+     "indicator": "us_apparel_inv_ratio",
+     "when_up": "bad",
      "weight": "major",
      "share": null,
-     "why": "Nhu cầu Mỹ chưa phục hồi rõ, tồn kho cửa hàng quần áo cao khiến khách hàng thận trọng bổ sung hàng; chưa có nguồn số liệu trong ứng dụng",
+     "why": "Nhu cầu Mỹ chưa phục hồi rõ; tồn kho cửa hàng quần áo cao khiến khách hàng thận trọng bổ sung hàng, làm chậm đơn đặt may",
      "refs": [
       {
        "source": "shinhan-msh-0826",

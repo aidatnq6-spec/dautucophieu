@@ -398,11 +398,12 @@ def test_commodity_series_are_kept_under_their_own_keys_for_three_years(tmp_path
     store = MacroStore(tmp_path)
     result = fetch_commodities(store, get=get, today=date(2026, 10, 30), sleep=lambda s: None)
     # the other world prices come from the World Bank's sheet (fetch_chain_series); FRED keeps only US software investment (quarterly),
-    # the stand-in for IT demand abroad (owner, 20/11/2026); shrimp went with Thủy sản (owner, 21/11/2026)
-    assert COMMODITIES == {"us_software_invest": "B985RC1Q027SBEA"}
-    assert result == {"us_software_invest": "ok"}
+    # the stand-in for IT demand abroad (owner, 20/11/2026); shrimp went with Thủy sản, and US clothing stores' inventories to sales came
+    # for Dệt may (owner, 21/11/2026), with the US crack spread worked out from three daily prices
+    assert COMMODITIES == {"us_software_invest": "B985RC1Q027SBEA", "us_apparel_inv_ratio": "MRTSIR448USS"}
+    assert result == {"us_software_invest": "ok", "us_apparel_inv_ratio": "ok", "crack_321_us": "ok"}
     assert store.read("us_software_invest")[-1]["value"] == "153.84"
-    assert all("cosd=2023-10-30" in u for u in asked)
+    assert all("cosd=2023-10-30" in u for u in asked if not any(s in u for s in ("DGASNYH", "DDFUELNYH", "DCOILBRENTEU")))
     assert not any(i["id"].startswith("com_") for i in load_indicators())
 
 
@@ -590,6 +591,22 @@ def test_the_ministry_release_gives_the_fuel_price_ceilings_on_their_day():
     from investment_agent.market.leading import MacroError
     with pytest.raises(MacroError):
         parse_moit_fuel("<p>Bộ Công Thương họp về xăng dầu</p>")
+
+
+def test_a_release_with_the_misspelt_link_is_found_and_an_unreadable_page_does_not_hide_the_others(tmp_path):
+    """The 19/11/2026 release was posted under "dieu-hang-gia-xang-dau" and the ministry's letter of the same day (an attachment page,
+    no ceilings in its text) under "dieu-hanh-gia-ban-xang-dau": neither was found, so the ceiling stayed at 22/10."""
+    from investment_agent.market.leading import MOIT, MacroStore, fetch_auto, load_indicators, moit_release_links
+    release = MOIT + "/tin-tuc/thong-tin-ve-viec-dieu-hang-gia-xang-dau-ngay-19-11-2026.html"
+    letter = MOIT + "/van-ban-phap-luat/van-ban-dieu-hanh/van-ban-so-9846-bct-tttn-ve-viec-thong-bao-dieu-hanh-gia-ban-xang-dau.html"
+    listing = f'<a href="{letter}">a</a><a href="/tin-tuc/thong-tin-ve-viec-dieu-hang-gia-xang-dau-ngay-19-11-2026.html">b</a>'
+    assert moit_release_links(listing) == [letter, release]
+    pages = {letter: "<p>Văn bản số 9846/BCT-TTTN</p>",
+             release: MOIT_RELEASE.replace("22 tháng 10", "19 tháng 11").replace("25.213", "19.100")}
+    get = lambda url: pages.get(url, listing)  # noqa: E731
+    ron95 = [i for i in load_indicators() if i["id"] == "vn_ron95_price"]
+    assert fetch_auto(ron95, MacroStore(tmp_path), get=get, today=date(2026, 11, 21), sleep=lambda s: None) == {"vn_ron95_price": "ok"}
+    assert [(o["date"], o["value"]) for o in MacroStore(tmp_path).read("vn_ron95_price")] == [("2026-11-19", "19100")]
 
 
 def test_the_sjc_gap_is_kept_as_a_daily_indicator(tmp_path):

@@ -184,7 +184,8 @@ def _grouped(raw: str) -> str:
 def moit_release_links(page: str) -> list[str]:
     """Links to Bộ Công Thương's fuel price releases ("…điều hành giá xăng dầu…"), newest first as the page lists them."""
     out = []
-    for href in re.findall(r'href="([^"]*dieu-hanh-gia-xang-dau[^"]*\.html)"', page):
+    # the ministry's slugs vary: "dieu-hang" (a typo, 19/11/2026) and "dieu-hanh-gia-ban" (its letter of the period)
+    for href in re.findall(r'href="([^"]*dieu-han[hg]-gia(?:-ban)?-xang-dau[^"]*\.html)"', page):
         url = href if href.startswith("http") else MOIT + href
         if url not in out:
             out.append(url)
@@ -726,7 +727,14 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
             links = []
             for listing in MOIT_PAGES:
                 links += [u for u in moit_release_links(page(listing)) if u not in links]
-            found = [parse_moit_fuel(page(u)) for u in links[:MOIT_PER_RUN]]
+            found = []
+            for u in links[:MOIT_PER_RUN + 1]:  # one more: the letter of a period sits beside its release
+                try:
+                    found.append(parse_moit_fuel(page(u)))
+                except MacroError:  # an attachment page with no ceilings in its text: the release of that period is read instead
+                    continue
+            if links and not found:
+                raise MacroError("moit_fuel_unreadable")
             points = sorted({f["date"]: f[src["field"]] for f in found if f.get(src["field"]) and f["date"].isoformat() not in known}.items())
             return points or None  # no new period published: nothing new, not a failure
         elif src["kind"] == "sjc_gap":
@@ -858,7 +866,13 @@ def fetch_factors(store: MacroStore, *, get: Callable[[str], str], today: date |
 # owner removed Thủy sản (21/11/2026).
 # US private investment in software (BEA, quarterly, billions a year) is the owner's chosen stand-in for IT demand abroad (20/11/2026):
 # FPT's largest market is Japan, which has no such public series, so it is labelled a stand-in on the page.
-COMMODITIES = {"us_software_invest": "B985RC1Q027SBEA"}
+# US clothing stores' inventories to sales (Census, monthly) stands for US apparel demand in Dệt may (owner, 21/11/2026), the ratio
+# Shinhan's MSH report reads (24/08/2026, p. 1 and 3).
+COMMODITIES = {"us_software_invest": "B985RC1Q027SBEA", "us_apparel_inv_ratio": "MRTSIR448USS"}
+# The US 3-2-1 crack spread stands for the refining margin in Xăng dầu (owner, 21/11/2026): no Singapore crack is public. EIA's daily
+# spot prices on FRED, each day with all three: (2 x New York Harbor gasoline + 1 x New York Harbor ULSD) x 42 / 3 - Brent, USD a barrel.
+CRACK_SERIES = {"gasoline": "DGASNYH", "diesel": "DDFUELNYH", "brent": "DCOILBRENTEU"}
+CRACK_KEY, CRACK_DAYS = "crack_321_us", 400
 COMMODITY_YEARS = 3
 
 
@@ -877,6 +891,19 @@ def fetch_commodities(store: MacroStore, *, get: Callable[[str], str], today: da
             results[key] = "ok"
         except Exception as exc:
             results[key] = f"error:{type(exc).__name__}"
+    try:
+        since = (today - timedelta(days=CRACK_DAYS)).isoformat()
+        legs = {k: dict((d, Decimal(v)) for d, v in parse_fred_csv(_get_with_retry(get, FRED_CSV.format(series=s) + f"&cosd={since}", sleep)))
+                for k, s in CRACK_SERIES.items()}
+        days = sorted(set(legs["gasoline"]) & set(legs["diesel"]) & set(legs["brent"]))
+        points = [(d, _plain(((2 * legs["gasoline"][d] + legs["diesel"][d]) * 42 / 3 - legs["brent"][d]).quantize(Decimal("0.01"), ROUND_HALF_UP)))
+                  for d in days]
+        if not points:
+            raise MacroError("no_observations")
+        store.upsert(CRACK_KEY, points, entry="auto")
+        results[CRACK_KEY] = "ok"
+    except Exception as exc:
+        results[CRACK_KEY] = f"error:{type(exc).__name__}"
     return results
 
 
@@ -911,7 +938,7 @@ SSE_INDEX = "https://en.sse.net.cn/currentIndex"
 SSE_SERIES = {"com_container_scfi": ("scfi", "SCFI_T"), "com_tanker_ctfi": ("ctfi", "CTFI_T")}
 SHFE_DAILY = "https://www.shfe.com.cn/data/tradedata/future/dailydata/kx{day}.dat"
 SHFE_WEEK, SHFE_MONTH_BACK, SHFE_RECENT = 7, (30, 37), 10
-CHAIN_SERIES = (*WB_COMMODITIES, "port_container_yoy", "com_dairy", "vn_hydro_inflow_yoy", *SSE_SERIES, "com_steel_hrc")
+CHAIN_SERIES = (*WB_COMMODITIES, "port_container_yoy", CRACK_KEY, "com_dairy", "vn_hydro_inflow_yoy", *SSE_SERIES, "com_steel_hrc")
 _XL = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 _XL_REL = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 _EN_MONTHS = {m: i for i, m in enumerate(("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",

@@ -13,5 +13,10 @@ Chủ sở hữu duyệt ngày 21/11/2026 (kaizen từ FireAnt, đề xuất 6).
 - Quy tắc lỗi của `macro-sync`: một chỉ số Mỹ đọc lỗi nhưng còn số trong 7 ngày là "trễ" (bước vẫn đạt); không có số trong 7 ngày là
   "quá hạn" (bước báo lỗi).
 
+## Trong bản tin sau phiên (duyệt cùng ngày)
+- Ảnh chụp phiên lưu mục `us` (số `macro-sync` đã lưu trong cùng lượt, không đọc mạng thêm).
+- Tin Telegram và bản tin trên web có một dòng ngay sau dòng châu Á, ví dụ "Mỹ (FRED): S&P 500 −2,02% (phiên 19/11) · …". Mỗi chỉ số
+  ghi ngày phiên của nó; chỉ số quá 7 ngày bị bỏ khỏi dòng.
+
 ## Không làm
-Không thêm chỉ số châu Âu (chưa có nguồn công khai tương đương), không đưa vào bản tin Telegram.
+Không thêm chỉ số châu Âu (chưa có nguồn công khai tương đương).

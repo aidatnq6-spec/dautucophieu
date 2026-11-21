@@ -145,6 +145,9 @@ def render_market_brief(report: dict, market: dict) -> str:
     from investment_agent.market.asia_indices import asia_line
     if asia := asia_line(market.get("asia")):
         lines.append(asia)
+    from investment_agent.market.us_indices import us_line
+    if us := us_line(market.get("us")):
+        lines.append(us)
     if signal := signal_lines(market.get("signals")):
         lines += ["", "TÍN HIỆU PHIÊN", *[f"- {s}" for s in signal], ""]
     board, hose = market.get("board") or {}, market.get("hose") or {}

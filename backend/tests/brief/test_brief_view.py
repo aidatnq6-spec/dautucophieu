@@ -65,3 +65,8 @@ def test_the_heat_map_lists_traded_stocks_by_sector_with_their_matched_value():
     assert rows[0] == {"symbol": "FPT", "sector": "Công nghệ Thông tin", "pct": "-0.0175", "value_mn": "572175.08", "held": True}
     older = market_view(SNAP, watched=[], held=set())["heatmap"]  # snapshots stored before 21/11/2026 have no matched value per stock
     assert older["status"] == "missing" and "giá trị giao dịch" in older["reason"]
+
+def test_the_us_line_of_the_snapshot_is_shown_after_the_asian_one():
+    us = {"rows": [{"id": "us_dow", "name": "Dow Jones", "date": "2026-10-23", "day_pct": "-0.0193", "stale": False}], "source": "FRED"}
+    assert market_view({**SNAP, "us": us}, watched=[], held=set())["us_line"] == "Mỹ (FRED): Dow Jones −1,93% (phiên 23/10)"
+    assert market_view(SNAP, watched=[], held=set())["us_line"] is None  # snapshots stored before 21/11/2026

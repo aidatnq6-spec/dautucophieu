@@ -100,7 +100,7 @@ def _signals(sections: dict, shares, store: BriefStore, sessions_before: list[da
 
 def build_snapshot(*, session_date: date, previous_session: date | None, now: datetime, listing, board, series, hose_get, rss_get,
                    store: BriefStore, earlier: list[date] = (), index_bars=lambda: {}, shares=lambda symbols: {},
-                   vn30_weights=lambda: {}, asia=lambda: None) -> dict:
+                   vn30_weights=lambda: {}, asia=lambda: None, us=lambda: None) -> dict:
     """earlier: the sessions before session_date on the trading calendar, ascending; index_bars(): VN-Index daily bars by session;
     shares(symbols): shares outstanding by symbol, for Tín hiệu phiên (mã kéo chỉ số)."""
     sections: dict[str, dict] = {}
@@ -130,6 +130,11 @@ def build_snapshot(*, session_date: date, previous_session: date | None, now: da
         sections["asia"] = asia() or _missing("Chưa đọc chỉ số châu Á")
     except Exception:
         sections["asia"] = _missing("Không đọc được chỉ số châu Á")
+    try:  # Chứng khoán Mỹ (market.us_indices): FRED's closes as macro-sync stored them, each with its session date (21/11/2026)
+        got = us()
+        sections["us"] = {"status": "ok", **got} if got and got.get("rows") else _missing("Chưa có chỉ số Mỹ từ FRED")
+    except Exception:
+        sections["us"] = _missing("Không đọc được chỉ số Mỹ")
     try:
         sections["hose_liquidity"] = hose_liquidity(sections["hose"], earlier=list(earlier), hose_get=hose_get)
     except Exception:

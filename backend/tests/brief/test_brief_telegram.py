@@ -127,3 +127,13 @@ def test_the_asian_markets_line_follows_the_index_lines():
     assert "Châu Á (VNDirect, đọc 15:32 16/11): KOSPI −0,98%" in text
     assert text.index("VN-Index") < text.index("Châu Á") < text.index("Giá trị khớp lệnh")
     assert "Châu Á" not in render_report(REPORT, market=MARKET)
+
+
+def test_the_us_markets_line_follows_the_asian_one():
+    asia = {"status": "ok", "read_at": "2026-11-16T15:32:00+07:00", "rows": [
+        {"code": "KOSPI", "name": "KOSPI", "price": "5290.53", "change_pct": "-0.0098", "unchanged_since": None, "fred_date": None}]}
+    us = {"rows": [{"id": "us_dow", "name": "Dow Jones", "date": "2026-11-13", "day_pct": "-0.0193", "stale": False}], "source": "FRED"}
+    text = render_report(REPORT, market={**MARKET, "asia": asia, "us": us})
+    assert "Mỹ (FRED): Dow Jones −1,93% (phiên 13/11)" in text
+    assert text.index("Châu Á") < text.index("Mỹ (FRED)") < text.index("Giá trị khớp lệnh")
+    assert "Mỹ (FRED)" not in render_report(REPORT, market=MARKET)

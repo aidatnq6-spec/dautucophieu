@@ -44,3 +44,13 @@ Chủ sở hữu duyệt ngày 21/11/2026 (kaizen từ FireAnt Quant AI). Trang 
 - Chủ sở hữu chọn A và B; bảng 4 ô (A có/không × B có/không) và "Mọi lúc"; ô của hôm nay tô đậm, chỉ khi phiên mới nhất biết đủ cả
   hai. Bảng "Vĩ mô hôm nay" ghi từng điều kiện, số liệu tháng hay ngày nào, có từ khi nào. Biểu đồ VN-Index theo tuần, tô các giai
   đoạn cả A và B cùng đúng.
+
+## Câu tóm tắt ở đầu trang (duyệt 21/11/2026)
+- Một đoạn ngắn viết **theo mẫu cố định từ chính các số trên trang, không dùng AI**, tính lại theo số phiên đang chọn:
+  1. P/E VN-Index hôm nay thuộc nhóm nào; trong quá khứ nhóm đó đi kèm VN-Index H phiên sau trung bình bao nhiêu (so với mọi lúc),
+     tăng ở bao nhiêu % số lần, và độ tin cậy nói thẳng: dưới 5 khoảng không chồng lấn là "quá ít"; |t| dưới 2 là "chênh lệch chưa rõ";
+     còn lại ghi số khoảng và t.
+  2. Đèn nào trong 4 đèn có lịch sử dài đang không ở mức bình thường, và lịch sử của mức đó; nếu cả 4 bình thường thì nêu tên 4 đèn
+     (để không lẫn với 9 đèn của trang Vĩ mô).
+  3. Vĩ mô hôm nay: bao nhiêu điều kiện đã biết đang đúng (ngưỡng tỷ giá 1%), kể tên, và số điều kiện chưa biết.
+- Kết thúc bằng "Chỉ mô tả quá khứ, không phải dự báo hay khuyến nghị."

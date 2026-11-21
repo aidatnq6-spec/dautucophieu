@@ -117,6 +117,63 @@ def light_groups(key: str, series: dict[str, Points], closes: Points, *, h: int)
             "from": min(level_on).isoformat() if level_on else None}
 
 
+LEVEL_WORD = {"yellow": "cảnh báo", "red": "nguy hiểm"}
+
+
+def _pct(v) -> str:
+    x = Decimal(str(v)) * 100
+    return ("+" if x > 0 else "−" if x < 0 else "") + f"{abs(x):.1f}".replace(".", ",") + "%"
+
+
+def _lower(label: str) -> str:
+    """The first letter lower-cased when the word is an ordinary one ("Giá dầu" → "giá dầu"), not an acronym ("P/E", "USD")."""
+    return label[0].lower() + label[1:] if len(label) > 1 and label[1].islower() else label
+
+
+def _evidence(g: dict) -> str:
+    """Too few windows and an unclear difference are two reasons, said apart."""
+    t, n = g.get("t"), g["n_independent"]
+    if n < 5:
+        return f"nhưng chỉ có {n} khoảng không chồng lấn, quá ít để coi là chắc"
+    tt = None if t is None else format(Decimal(t).normalize(), "f").replace(".", ",")
+    if t is None or abs(Decimal(t)) < 2:
+        return f"dựa trên {n} khoảng không chồng lấn nhưng chênh lệch chưa rõ{f' (t = {tt})' if tt else ''}, chưa đủ để coi là chắc"
+    return f"{n} khoảng không chồng lấn, t = {tt}"
+
+
+def history_summary(stats: dict, conditions: list[dict] | None) -> str:
+    """Câu tóm tắt ở đầu Thống kê lịch sử, by a fixed pattern from the page's own figures (no model): today's P/E group and its past
+    with the evidence it rests on, the lights off normal, and how many macro conditions hold today."""
+    h, pe, parts = stats["h"], stats["pe"], []
+    today = pe.get("today")
+    if today:
+        g = pe["groups"][today["bucket"]]
+        parts.append(f"Hôm nay P/E VN-Index {today['pe'].replace('.', ',')}, thuộc nhóm {g['label'].lower()} so với 5 năm trước. ")
+        if g["n"]:
+            parts.append(f"Trong quá khứ, ở nhóm này VN-Index {h} phiên sau trung bình {_pct(g['mean'])} (mọi lúc {_pct(pe['all']['mean'])}), "
+                         f"tăng ở {round(Decimal(g['win_rate']) * 100)}% số lần; {_evidence(g)}. ")
+    else:
+        parts.append("Chưa có P/E VN-Index hôm nay. ")
+    off = [lg for lg in stats["lights"] if lg.get("today") in LEVEL_WORD]
+    if not off:
+        # only the lights with a long history are here, not all of Vĩ mô's: they are named so the two pages do not seem to disagree
+        names = ", ".join(lg["name"] for lg in stats["lights"])
+        parts.append(f"Cả {len(stats['lights'])} đèn có lịch sử dài ({names}) đang ở mức bình thường. ")
+    for lg in off:
+        g = next(x for x in lg["groups"] if x["level"] == lg["today"])
+        past = (f"trong quá khứ ở mức này VN-Index {h} phiên sau trung bình {_pct(g['mean'])} (mọi lúc {_pct(lg['all']['mean'])}, "
+                f"{g['n_independent']} khoảng không chồng lấn)") if g["n"] else "chưa có lần nào ở mức này trong dữ liệu đã lưu"
+        parts.append(f"Đèn {lg['name']} đang ở mức {LEVEL_WORD[lg['today']]}; {past}. ")
+    if conditions:
+        known = [c for c in conditions if c.get("state") is not None]
+        true = [_lower(c["label"]) for c in known if c["state"]]
+        unknown = len(conditions) - len(known)
+        parts.append(f"Vĩ mô hôm nay: {len(true)}/{len(known)} điều kiện đã biết đang đúng ({'; '.join(true) if true else 'không điều kiện nào'})"
+                     + (f"; {unknown} điều kiện chưa biết" if unknown else "") + ". ")
+    parts.append("Chỉ mô tả quá khứ, không phải dự báo hay khuyến nghị.")
+    return "".join(parts)
+
+
 def pe_groups(pe: Points, closes: Points, *, h: int) -> dict:
     index = {d: i for i, (d, _) in enumerate(closes)}
     returns = forward_returns(closes, h)

@@ -1,7 +1,8 @@
 """Bản tin tuần: one Telegram note on the weekend about the Monday–Friday just past — the portfolio's time-weighted return against
 VN-Index, foreign net trading on HOSE summed over the session snapshots, each held ticker's weekly change, insider notices of held
 tickers, known corporate events of the next seven days, the owner's own catalysts due that week (or already due), and price alerts that fired; then the receivable signs that came on or
-went off since last week's note, the monthly macro figures with a new period, and the public sources failing now. Built from data the
+went off since last week's note, the week's world and SJC gold prices with SJC's gap to the world price, the monthly macro figures
+with a new period, and the public sources failing now. Built from data the
 app already keeps; a missing piece is named, never estimated. Sent once per week (data/alerts/weekly.json, which also keeps the marks
 the next week compares with), retried until it goes out.
 """
@@ -195,6 +196,62 @@ def _fuel(rows: list[dict]) -> list[str]:
     return out
 
 
+GOLD_MAX_GAP_DAYS = 3  # a price stands for a Friday only when read on it or up to 3 days before
+GOLD_WORLD = ("Vàng thế giới XAU/USD (gold-api.com)", "USD/oz", 2)
+GOLD_SJC = ("Vàng miếng SJC (Phú Quý mua vào)", "đ/chỉ", 0)
+
+
+def _price_on(points: list[tuple[date, str]], day: date) -> dict | None:
+    found = [(d, v) for d, v in points if d <= day]
+    if not found or (day - found[-1][0]).days > GOLD_MAX_GAP_DAYS:
+        return None
+    return {"date": found[-1][0].isoformat(), "value": found[-1][1]}
+
+
+def gold_week(data_dir, *, today: date) -> dict:
+    """Vàng trong tuần (owner's choice, 21/11/2026): the world price (XAU/USD) and Phú Quý's SJC buying price on the week's Friday and
+    the Friday before, and the stored SJC gap of that earlier Friday; no figure older than 3 days stands for a Friday."""
+    from pathlib import Path
+
+    from investment_agent.market.gold_price import gold_history
+    from investment_agent.market.leading import SJC_KIND, MacroStore
+    store, end = MacroStore(Path(data_dir)), week_of(today)[1]
+    before = end - timedelta(days=7)
+    stored = lambda key: [(date.fromisoformat(o["date"]), o["value"]) for o in store.read(key)]  # noqa: E731
+    sjc = sorted((date.fromisoformat(d), v) for d, v in (gold_history(Path(data_dir)).get(SJC_KIND) or {}).items())
+
+    def row(points):
+        return {"now": _price_on(points, end), "before": _price_on(points, before),
+                "since": points[0][0].isoformat() if points else None, "latest": points[-1][0].isoformat() if points else None}
+    return {"end": end.isoformat(), "before": before.isoformat(), "world": row(stored("xau_usd")), "sjc": row(sjc),
+            "gap_before": _price_on(stored("sjc_gap_pct"), before)}
+
+
+def _gold_line(spec: tuple[str, str, int], r: dict) -> str:
+    label, unit, digits = spec
+    if r["now"] is None:
+        return f"- {label}: " + (f"chưa có số trong tuần (số gần nhất {_dm(r['latest'])})" if r["latest"] else "chưa có số liệu")
+    now = Decimal(r["now"]["value"])
+    line = f"- {label}: {_num(now, digits)} {unit} ngày {_dm(r['now']['date'])}"
+    if r["before"] is None:
+        return line + "; chưa có số thứ Sáu trước" + (f" (lưu từ {_dm(r['since'])})" if r["since"] else "")
+    old = Decimal(r["before"]["value"])
+    return line + f" ({_pct(now / old - 1)} so với {_num(old, digits)} ngày {_dm(r['before']['date'])})"
+
+
+def _gold(gold: dict | None, premium: dict | None) -> list[str]:
+    from investment_agent.domain.us_chain import premium_text
+    head = f"VÀNG TRONG TUẦN ({_dm(gold['before'])} → {_dm(gold['end'])})" if gold else "VÀNG TRONG TUẦN"
+    lines = [head, *([_gold_line(GOLD_WORLD, gold["world"]), _gold_line(GOLD_SJC, gold["sjc"])] if gold else [])]
+    if premium:
+        gap = premium_text(premium)
+        if gold and gold["gap_before"]:
+            value = Decimal(gold["gap_before"]["value"])
+            gap += f"; thứ Sáu trước ({_dm(gold['gap_before']['date'])}): {'+' if value > 0 else ''}{_num(value, 1)}%"
+        lines.append(f"- {gap}")
+    return lines
+
+
 def _count(text: str, n: int) -> str:
     """'Hạn công bố … Q4/2026 (20 ngày …)' → 'Hạn công bố … Q4/2026 của n mã (20 ngày …)'."""
     head, sep, tail = text.partition(" (")
@@ -223,7 +280,7 @@ def compose(*, series, index, briefs, closes, insider, events, alerts, held: set
             shares: dict[str, int] | None = None, todo: list[str] | None = None, signs: dict | None = None, macro: dict | None = None,
             sources: list[dict] | None = None, manual: list[dict] | None = None, catalysts: list[dict] | None = None,
             us_events: list[dict] | None = None, us_chain: dict | None = None, week_signals: dict | None = None,
-            fuel: list[dict] | None = None) -> str:
+            fuel: list[dict] | None = None, gold: dict | None = None) -> str:
     start, end = week_of(today)
     sessions = sessions if sessions is not None else [start + timedelta(days=i) for i in range(5)]
     lines = [f"BẢN TIN TUẦN {_dm(start)}–{_dm(end)}/{end.year}", "",
@@ -254,11 +311,13 @@ def compose(*, series, index, briefs, closes, insider, events, alerts, held: set
         lines.append("Không có sự kiện đã biết.")
     if fuel:
         lines += ["", "GIÁ XĂNG DẦU (kỳ điều hành mới)", *_fuel(fuel)]
+    premium = None
     if us_chain is not None:
-        from investment_agent.domain.us_chain import chain_summary, premium_text
-        gold = next((n for n in us_chain["nodes"] if n["id"] == "gold"), {})
-        lines += ["", "CHUỖI LIÊN THỊ TRƯỜNG TRONG TUẦN", f"- {chain_summary(us_chain)}",
-                  *([f"- {premium_text(gold['premium'])}"] if gold.get("premium") else [])]
+        from investment_agent.domain.us_chain import chain_summary
+        premium = next((n for n in us_chain["nodes"] if n["id"] == "gold"), {}).get("premium")
+        lines += ["", "CHUỖI LIÊN THỊ TRƯỜNG TRONG TUẦN", f"- {chain_summary(us_chain)}"]
+    if gold is not None or premium:  # the SJC gap sits with the week's gold prices (moved from the chain, 21/11/2026)
+        lines += ["", *_gold(gold, premium)]
     if us_events is not None:
         lines += ["", f"LỊCH VĨ MÔ MỸ ({_dm(today)}–{_dm(today + timedelta(days=NEXT_DAYS))}, giờ Việt Nam)",
                   *([f"- {_dm(e['on'])} {e['at']}: {e['text']}" for e in us_events] or ["Không có lịch công bố nào của Fed hay CPI Mỹ."])]

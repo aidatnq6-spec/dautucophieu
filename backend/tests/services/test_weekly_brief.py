@@ -186,15 +186,16 @@ def test_the_us_macro_events_of_the_coming_week_are_listed():
     assert "LỊCH VĨ MÔ MỸ" not in compose(**INPUTS, held=set(), watched=set(), today=SAT)
 
 
-def test_the_week_chain_and_the_sjc_gap_are_one_short_section():
+def test_the_week_chain_is_one_sentence_and_the_sjc_gap_goes_to_the_gold_section():
     chain = {"mode": "tightening", "driver": "us_cpi", "nodes": [
         {"id": "us_cpi", "direction": "up"},
         {"id": "gold", "direction": "flat", "premium": {"world_per_chi": "12128663", "sjc_sell": "13750000", "gap": "1621337", "gap_pct": "0.1337"}}],
         "with": ["us_rates", "dxy", "usd_vnd"], "against": [], "flat": ["gold"], "missing": []}
     text = compose(**INPUTS, held=set(), watched=set(), today=SAT, us_chain=chain)
     assert ("CHUỖI LIÊN THỊ TRƯỜNG TRONG TUẦN\n"
-            "- CPI Mỹ tăng nên chuỗi đang theo chiều thắt chặt. Khớp chuỗi: lãi suất Mỹ, DXY, tỷ giá USD/VND. Đi ngang: vàng.\n"
-            "- Vàng miếng SJC bán ra 13.750.000 đ/chỉ, cao hơn giá thế giới quy đổi 12.128.663 đ/chỉ là 1.621.337 đ (+13,4%)") in text
+            "- CPI Mỹ tăng nên chuỗi đang theo chiều thắt chặt. Khớp chuỗi: lãi suất Mỹ, DXY, tỷ giá USD/VND. Đi ngang: vàng.\n\n") in text
+    assert ("VÀNG TRONG TUẦN\n- Vàng miếng SJC bán ra 13.750.000 đ/chỉ, cao hơn giá thế giới quy đổi 12.128.663 đ/chỉ là 1.621.337 đ "
+            "(+13,4%)") in text  # without the week's prices, the section still carries the gap
     calm = {"mode": None, "driver": None, "nodes": [], "with": [], "against": [], "flat": [], "missing": []}
     assert "- Tuần này CPI Mỹ và lãi suất Mỹ đều đi ngang: chuỗi chưa có chiều rõ." in compose(**INPUTS, held=set(), watched=set(), today=SAT,
                                                                                           us_chain=calm)
@@ -227,3 +228,73 @@ def test_a_new_fuel_price_period_is_listed_with_its_change_from_the_one_before(t
     d = (SAT - timedelta(days=3)).strftime("%d/%m")
     assert f"GIÁ XĂNG DẦU (kỳ điều hành mới)\n- Giá trần xăng E10 RON95-III: 19.840 đ/lít từ {d} (−5.373 đ, −21,31% so với kỳ 22/10)" in text
     assert "GIÁ XĂNG DẦU" not in compose(**INPUTS, held=set(), watched=set(), today=SAT, fuel=[])
+
+
+# --- Vàng trong tuần (owner's choice, 21/11/2026): world and SJC prices on the Friday against the Friday before; made-up figures ---
+
+FRI, PREV_FRI = date(2026, 10, 30), date(2026, 10, 23)
+
+
+def _gold_data(tmp_path, *, world, sjc, gap):
+    import json
+
+    from investment_agent.market.leading import MacroStore
+    store = MacroStore(tmp_path)
+    store.upsert("xau_usd", [(d, v) for d, v in world], entry="auto")
+    store.upsert("sjc_gap_pct", [(d, v) for d, v in gap], entry="auto")
+    (tmp_path / "gold-price-history.json").write_text(json.dumps({"Vàng miếng SJC": {d.isoformat(): v for d, v in sjc}}), encoding="utf-8")
+
+
+def test_gold_week_takes_each_price_on_the_friday_and_the_friday_before(tmp_path):
+    from investment_agent.services.weekly_brief import gold_week
+    _gold_data(tmp_path, world=[(date(2026, 10, 21), "2400"), (date(2026, 10, 22), "2500"), (FRI - timedelta(days=1), "2550.5")],
+               sjc=[(PREV_FRI, "14000000"), (FRI, "13860000"), (SAT, "13900000")], gap=[(PREV_FRI, "12.5")])
+    g = gold_week(tmp_path, today=SAT)
+    assert (g["end"], g["before"]) == ("2026-10-30", "2026-10-23")
+    assert g["world"]["now"] == {"date": "2026-10-29", "value": "2550.5"}  # the last on or before Friday, within 3 days
+    assert g["world"]["before"] == {"date": "2026-10-22", "value": "2500"}
+    assert g["sjc"]["now"] == {"date": "2026-10-30", "value": "13860000"}  # Saturday's price belongs to next week
+    assert g["gap_before"] == {"date": "2026-10-23", "value": "12.5"}
+
+
+def test_gold_week_takes_no_figure_older_than_three_days(tmp_path):
+    from investment_agent.services.weekly_brief import gold_week
+    _gold_data(tmp_path, world=[(date(2026, 10, 26), "2500")], sjc=[(date(2026, 10, 19), "14000000"), (FRI, "13860000")], gap=[])
+    g = gold_week(tmp_path, today=SAT)
+    assert g["world"] == {"now": None, "before": None, "since": "2026-10-26", "latest": "2026-10-26"}
+    assert g["sjc"]["before"] is None and g["sjc"]["since"] == "2026-10-19"
+    assert g["gap_before"] is None
+
+
+def test_the_gold_section_carries_both_prices_and_the_sjc_gap_moved_from_the_chain():
+    premium = {"world_per_chi": "12128663", "sjc_sell": "13750000", "gap": "1621337", "gap_pct": "0.1337"}
+    chain = {"mode": "tightening", "driver": "us_cpi", "nodes": [{"id": "us_cpi", "direction": "up"},
+                                                                {"id": "gold", "direction": "flat", "premium": premium}],
+             "with": ["us_rates", "dxy", "usd_vnd"], "against": [], "flat": ["gold"], "missing": []}
+    gold = {"end": "2026-10-30", "before": "2026-10-23",
+            "world": {"now": {"date": "2026-10-30", "value": "2550.5"}, "before": {"date": "2026-10-23", "value": "2500"},
+                      "since": "2026-10-01", "latest": "2026-10-30"},
+            "sjc": {"now": {"date": "2026-10-30", "value": "13860000"}, "before": {"date": "2026-10-23", "value": "14000000"},
+                    "since": "2026-10-01", "latest": "2026-10-30"},
+            "gap_before": {"date": "2026-10-23", "value": "12.5"}}
+    text = compose(**INPUTS, held=set(), watched=set(), today=SAT, us_chain=chain, gold=gold)
+    assert ("VÀNG TRONG TUẦN (23/10 → 30/10)\n"
+            "- Vàng thế giới XAU/USD (gold-api.com): 2.550,50 USD/oz ngày 30/10 (+2,02% so với 2.500,00 ngày 23/10)\n"
+            "- Vàng miếng SJC (Phú Quý mua vào): 13.860.000 đ/chỉ ngày 30/10 (−1,00% so với 14.000.000 ngày 23/10)\n"
+            "- Vàng miếng SJC bán ra 13.750.000 đ/chỉ, cao hơn giá thế giới quy đổi 12.128.663 đ/chỉ là 1.621.337 đ (+13,4%); "
+            "thứ Sáu trước (23/10): +12,5%") in text
+    assert ("CHUỖI LIÊN THỊ TRƯỜNG TRONG TUẦN\n- CPI Mỹ tăng nên chuỗi đang theo chiều thắt chặt. Khớp chuỗi: lãi suất Mỹ, DXY, "
+            "tỷ giá USD/VND. Đi ngang: vàng.\n\n") in text  # the gap line is no longer in the chain
+    assert text.index("CHUỖI LIÊN THỊ TRƯỜNG") < text.index("VÀNG TRONG TUẦN")
+
+
+def test_a_missing_gold_price_is_named_never_filled_in():
+    gold = {"end": "2026-10-30", "before": "2026-10-23",
+            "world": {"now": {"date": "2026-10-30", "value": "2550.5"}, "before": None, "since": "2026-10-26", "latest": "2026-10-30"},
+            "sjc": {"now": None, "before": None, "since": "2026-10-01", "latest": "2026-10-20"}, "gap_before": None}
+    text = compose(**INPUTS, held=set(), watched=set(), today=SAT, gold=gold)
+    assert "- Vàng thế giới XAU/USD (gold-api.com): 2.550,50 USD/oz ngày 30/10; chưa có số thứ Sáu trước (lưu từ 26/10)" in text
+    assert "- Vàng miếng SJC (Phú Quý mua vào): chưa có số trong tuần (số gần nhất 20/10)" in text
+    empty = {**gold, "sjc": {"now": None, "before": None, "since": None, "latest": None}}
+    assert "- Vàng miếng SJC (Phú Quý mua vào): chưa có số liệu" in compose(**INPUTS, held=set(), watched=set(), today=SAT, gold=empty)
+    assert "VÀNG TRONG TUẦN" not in compose(**INPUTS, held=set(), watched=set(), today=SAT)

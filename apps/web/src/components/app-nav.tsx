@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BookOpenText, Building2, ClipboardList, Briefcase, CalendarDays, ChartLine, Eye, Grid3x3, Globe, House, Newspaper, NotebookPen, PiggyBank, Scale, Settings, UserRound, Workflow } from "lucide-react";
+import { Activity, BookOpenText, Building2, ClipboardList, Briefcase, CalendarDays, ChartLine, Eye, FlaskConical, Grid3x3, Globe, House, Newspaper, NotebookPen, PiggyBank, Scale, Settings, UserRound, Workflow } from "lucide-react";
 
 // Six short groups, each with its own accent colour (nav-tone-*), so the eye finds where a group starts.
 const GROUPS = [
@@ -12,7 +12,8 @@ const GROUPS = [
   { title: "Vĩ mô & thị trường", tone: "market", links: [
     { href: "/macro", label: "Vĩ mô", icon: Globe },
     { href: "/market", label: "Thị trường trong phiên", icon: ChartLine },
-    { href: "/trend", label: "Xu hướng", icon: Activity }] },
+    { href: "/trend", label: "Xu hướng", icon: Activity },
+    { href: "/history", label: "Thống kê lịch sử", icon: FlaskConical }] },
   { title: "Phân tích ngành", tone: "sectors", links: [
     { href: "/value-chains", label: "Chuỗi giá trị", icon: Workflow },
     { href: "/sectors", label: "Ngành theo quý", icon: Grid3x3 }] },

@@ -720,6 +720,19 @@ class MacroStore:
         os.replace(tmp, self.root / "_status.json")
 
 
+MAX_PARALLEL_SOURCES = 6
+# Source kinds that read the same host share a group, so that host is asked one request at a time.
+SOURCE_GROUPS = {"sbv_interbank": "sbv", "sbv_central": "sbv", "sbv_m2": "sbv", "nso_report": "nso", "nso_cpi": "nso",
+                 "gold_api": "gold_vcb", "sjc_gap": "gold_vcb", "vcb": "gold_vcb"}
+LAST = {"real_rate"}  # reads series fetched earlier in the same run
+
+
+def source_group(indicator: dict) -> str | None:
+    """The group an indicator is read in (its source's host); None for one read after every group has finished."""
+    kind = indicator["source"]["kind"]
+    return None if kind in LAST else SOURCE_GROUPS.get(kind, kind)
+
+
 def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str], str], today: date | None = None,
                sleep: Callable[[float], None] = time.sleep) -> dict[str, str]:
     """Fetch every automatic indicator; one failing source never stops the others. Topi pages carry no
@@ -840,7 +853,8 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
         return points
 
     results, gaps = {}, {}
-    for ind in indicators:
+
+    def run(ind):
         src, first_error = ind["source"], None
         known = {o["date"] for o in store.read(ind["id"])}
         while src:
@@ -866,6 +880,21 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
                 src = src.get("fallback")
         if ind["id"] not in results and first_error is not None:
             results[ind["id"]] = f"error:{error_name(first_error)}"
+
+    # Sources on different hosts side by side; one host's indicators one after another (21/11/2026: about 58 s a run, read in
+    # sequence). The real rate reads two series of this run, so it goes last.
+    groups: dict[str, list] = {}
+    for ind in indicators:
+        if (g := source_group(ind)) is not None:
+            groups.setdefault(g, []).append(ind)
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=MAX_PARALLEL_SOURCES) as pool:
+        for done in pool.map(lambda members: [run(i) for i in members], list(groups.values())):
+            pass
+    for ind in indicators:
+        if source_group(ind) is None:
+            run(ind)
+    results = {i["id"]: results[i["id"]] for i in indicators if i["id"] in results}  # in the configured order
     store.record_statuses(results)
     if gaps:
         store.record_gaps(gaps)

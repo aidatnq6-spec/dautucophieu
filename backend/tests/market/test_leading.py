@@ -703,3 +703,29 @@ def test_the_gap_is_kept_with_the_indicator_and_shown_on_its_row(tmp_path):
     assert row["date"] == "2026-09-01" and row["gap"] == {"month": "2026-10", "base": "2025-10"}
     fetch_auto(only, store, get=lambda url: CPI_GAP.replace("2025-10-01,\n", "2025-10-01,325.0\n"), today=date(2026, 11, 21), sleep=lambda s: None)
     assert next(r for r in macro_rows(only, store, today=date(2026, 11, 21)) if r["id"] == "us_cpi_yoy")["gap"] is None
+
+def test_sources_on_different_hosts_are_read_at_the_same_time_and_the_real_rate_last(tmp_path):
+    """macro-sync read 34 indicators one after another (about 58 s a run, 21/11/2026). Sources on different hosts now go side by side;
+    the indicators of one host still go one after another, and the real rate, which reads two series of this run, goes last."""
+    import threading
+    from investment_agent.market.leading import source_group
+    wanted = [i for i in load_indicators() if i["id"] in ("us10y", "vn10y")]
+    assert source_group(wanted[0]) != source_group(wanted[1])
+    both = threading.Barrier(2, timeout=5)  # only passes when the two hosts are asked at the same time
+
+    def get(url):
+        both.wait()
+        if "fred" in url or "treasury" in url:
+            return "observation_date,DGS10\n2026-10-29,4.10\n2026-10-30,4.12\n"
+        return "Recent readings 10/29/2026 | 3.10% 10/30/2026 | 3.12% Source: Hanoi Stock Exchange"
+    out = fetch_auto(wanted, MacroStore(tmp_path), get=get, today=date(2026, 10, 30), sleep=lambda s: None)
+    assert out["vn10y"] == "ok"
+
+
+def test_one_hosts_indicators_share_a_group():
+    from investment_agent.market.leading import source_group
+    by_id = {i["id"]: i for i in load_indicators()}
+    sbv = {source_group(i) for i in by_id.values() if i["source"]["kind"].startswith("sbv_")}
+    nso = {source_group(i) for i in by_id.values() if i["source"]["kind"].startswith("nso_")}
+    assert len(sbv) == 1 and len(nso) == 1
+    assert source_group(next(i for i in by_id.values() if i["source"]["kind"] == "real_rate")) is None  # run last, alone

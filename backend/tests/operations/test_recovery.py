@@ -198,3 +198,34 @@ def test_cli_auto_backup_skips_without_touching_firestore(tmp_path, monkeypatch,
     root = _existing(tmp_path / "backups", f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-daily")
     assert cli.run_backup(tmp_path / "data", root, "auto") == 0
     assert json.loads(capsys.readouterr().out) == {"status": "skipped", "reason": "not_due"}
+
+
+def test_a_folder_held_open_for_a_moment_is_renamed_on_a_later_try(data, tmp_path, monkeypatch):
+    """21/11/2026 08:37: Windows refused to rename the finished backup folder (WinError 5) while another program held a file in it,
+    so the day had no backup. The rename is tried again a few times before giving up."""
+    from investment_agent.operations import backup
+    real, calls, waits = os.replace, [], []
+
+    def flaky(src, dst):
+        calls.append(src)
+        if len(calls) < 3 and ".partial-" in str(src):
+            raise PermissionError(5, "Access is denied")
+        return real(src, dst)
+    monkeypatch.setattr(backup.os, "replace", flaky)
+    monkeypatch.setattr(backup.time, "sleep", waits.append)
+    d, _ = data
+    manifest = create_backup(d, tmp_path / "backups", personal_export=None, now=NOW, kind="daily")
+    assert manifest.path.is_dir() and len(calls) == 3 and waits == [1, 2]
+
+
+def test_a_folder_still_held_after_every_try_fails_and_leaves_nothing_behind(data, tmp_path, monkeypatch):
+    from investment_agent.operations import backup
+
+    def held(src, dst):
+        raise PermissionError(5, "Access is denied")
+    monkeypatch.setattr(backup.os, "replace", held)
+    monkeypatch.setattr(backup.time, "sleep", lambda s: None)
+    d, _ = data
+    with pytest.raises(PermissionError):
+        create_backup(d, tmp_path / "backups", personal_export=None, now=NOW, kind="daily")
+    assert not any((tmp_path / "backups").iterdir())

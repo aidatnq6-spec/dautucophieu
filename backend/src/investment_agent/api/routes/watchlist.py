@@ -38,6 +38,22 @@ def watchlist(request: Request):
             "vn100_review": vn100_review(wl), "rows": rows}
 
 
+@router.get("/watchlist/flow")
+def watchlist_flow(request: Request):
+    """Dòng tiền & kỹ thuật: the watched tickers on stored public data; held ones first and marked (services.flow_board)."""
+    from investment_agent.services.flow_board import flow_board, stored_bars
+    require_owner(request)
+    data_dir = request.app.state.data_dir
+    if data_dir is None:
+        return unavailable()
+    try:
+        held = held_tickers(request)
+    except RepositoryUnavailable:
+        return unavailable()
+    store = getattr(request.app.state.market, "store", None)  # the app's price store, already warm from the other pages
+    return flow_board(data_dir, load_watchlist(data_dir).symbols, held=held, bars_for=stored_bars(data_dir, store) if store is not None else None)
+
+
 @router.get("/market/overview")
 def market_overview(request: Request):
     require_owner(request)

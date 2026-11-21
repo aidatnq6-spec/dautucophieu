@@ -76,3 +76,10 @@ def test_the_world_cotton_price_can_be_chosen_for_any_kind_of_company():
     for kind in (None, "bank"):
         cotton = next(c for c in catalog(kind) if c["id"] == "macro:com_cotton")
         assert (cotton["label"], cotton["tier"]) == ("Giá bông", "Dẫn dắt")
+
+
+def test_the_us_crack_spread_and_apparel_inventories_can_be_chosen():
+    """The stand-ins kept for Xăng dầu and Dệt may (owner, 21/11/2026) can drive a light too, named as US stand-ins."""
+    ids = {c["id"]: c for c in catalog(None)}
+    assert ids["macro:crack_321_us"]["label"] == "Biên lọc dầu (crack 3-2-1 Mỹ)"
+    assert ids["macro:us_apparel_inv_ratio"]["label"] == "Tồn kho/doanh số cửa hàng quần áo Mỹ"

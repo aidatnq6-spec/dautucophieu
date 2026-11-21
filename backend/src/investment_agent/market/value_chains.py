@@ -24,7 +24,7 @@ _SHARE = r"^0\.\d{1,4}(-0\.\d{1,4})?$"
 COMMODITY_LABELS = {"com_coal": "Giá than thế giới (Úc)", "com_iron_ore": "Giá quặng sắt thế giới", "com_rubber": "Giá cao su thế giới",
                     "com_sugar": "Giá đường thế giới", "com_lng": "Giá khí LNG (Nhật Bản)",
                     "com_aluminium": "Giá nhôm thế giới", "com_copper": "Giá đồng thế giới", "com_wheat": "Giá lúa mì thế giới",
-                    "com_soybean": "Giá đậu tương thế giới", "com_urea": "Giá urê thế giới (Trung Đông, World Bank)",
+                    "com_soybean": "Giá đậu tương thế giới", "com_cotton": "Giá bông thế giới (Cotlook A, World Bank)", "com_urea": "Giá urê thế giới (Trung Đông, World Bank)",
                     "port_container_yoy": "Sản lượng container qua cảng Việt Nam so cùng kỳ (VPA)",
                     "com_dairy": "Chỉ số giá sữa thế giới (FAO)", "com_container_scfi": "Cước container xuất khẩu từ Thượng Hải (SCFI, Sở Giao dịch Vận tải biển Thượng Hải)",
                     "com_tanker_ctfi": "Cước tàu dầu thô chở về Trung Quốc (CTFI, Sở Giao dịch Vận tải biển Thượng Hải)",

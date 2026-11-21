@@ -91,8 +91,8 @@ def pink_sheet(rows):
 
 # Brent, urea, then the world prices Chuỗi giá trị reads (columns D onward, as the sheet names them)
 WB_NAMES = ["Iron ore, cfr spot", "Coal, Australian", "Rubber, RSS3", "Sugar, world", "Liquefied natural gas, Japan", "Aluminum", "Copper",
-            "Wheat, US HRW", "Soybeans"]
-_WB_COLS = "DEFGHIJKL"
+            "Wheat, US HRW", "Soybeans", "Cotton, A Index"]
+_WB_COLS = "DEFGHIJKLM"
 PINK = pink_sheet([{"A": "World Bank Commodity Price Data (The Pink Sheet)"}, {"B": "Crude oil, Brent", "C": "Urea ", **dict(zip(_WB_COLS, WB_NAMES))},
                    {"B": "($/bbl)", "C": "($/mt)"},
                    {"A": "2026M08", "B": 70.1, "C": "…", **{c: 99 for c in _WB_COLS}}, {"A": "2026M09", "B": 71, "C": 407.5, **{c: 100 for c in _WB_COLS}},

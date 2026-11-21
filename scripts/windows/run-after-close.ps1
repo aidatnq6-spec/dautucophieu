@@ -112,6 +112,9 @@ $drawdown = & $python -W ignore -m investment_agent.jobs.step drawdown-check --d
 # Nhac so tiet kiem dao han: one Telegram note per deposit from the day before it matures (only when scheduled delivery is on).
 $da = & $python -W ignore -m investment_agent.jobs.step deposit-alerts --data-dir $data 2>$null
 "$(Get-Date -Format o) deposit-alerts exit=$LASTEXITCODE $da" | Add-Content -LiteralPath $log -Encoding UTF8
+# Nhac Thap tai san: one Telegram note when a layer turns short, back in range or over (after prices, NAVs and gold are synced).
+$pa = & $python -W ignore -m investment_agent.jobs.step pyramid-alerts --data-dir $data 2>$null
+"$(Get-Date -Format o) pyramid-alerts exit=$LASTEXITCODE $pa" | Add-Content -LiteralPath $log -Encoding UTF8
 # Nhac het lai uu dai: one Telegram note per loan 90 days before its promotion ends (only when scheduled delivery is on).
 $la = & $python -W ignore -m investment_agent.jobs.step loan-alerts --data-dir $data 2>$null
 "$(Get-Date -Format o) loan-alerts exit=$LASTEXITCODE $la" | Add-Content -LiteralPath $log -Encoding UTF8

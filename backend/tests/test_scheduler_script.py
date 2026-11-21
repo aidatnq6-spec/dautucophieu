@@ -61,6 +61,14 @@ def test_deposit_reminder_runs_on_every_wake_up():
     assert step < next(i for i, l in enumerate(ls) if "investment_agent.jobs.step scheduled-run" in l)
 
 
+def test_the_tower_is_checked_after_prices_and_fund_navs_are_synced():
+    ls = lines()
+    step = next(i for i, l in enumerate(ls) if "investment_agent.jobs.step pyramid-alerts" in l)
+    assert step > next(i for i, l in enumerate(ls) if "market-sync --symbols" in l)
+    assert step > next(i for i, l in enumerate(ls) if "investment_agent.jobs.step fund-nav-sync" in l)
+    assert step > next(i for i, l in enumerate(ls) if "investment_agent.jobs.step gold-price-sync" in l)
+
+
 def test_fund_navs_are_synced_on_every_wake_up():
     assert any("investment_agent.jobs.step fund-nav-sync" in l for l in lines())
 

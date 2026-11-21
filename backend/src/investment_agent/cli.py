@@ -130,6 +130,8 @@ def main() -> int:
     sectors.add_argument("--output", type=Path, required=True)
     deposits = commands.add_parser("deposit-alerts", help="Sổ tiết kiệm: Telegram once per sổ from the day before it matures")
     deposits.add_argument("--data-dir", type=Path, required=True)
+    tower = commands.add_parser("pyramid-alerts", help="Tháp tài sản: Telegram once when a layer turns short, back in range or over")
+    tower.add_argument("--data-dir", type=Path, required=True)
     loans = commands.add_parser("loan-alerts", help="Khoản vay and bảo hiểm: Telegram once per loan 90 days before its promotion ends, and per premium 30 days before it is due")
     loans.add_argument("--data-dir", type=Path, required=True)
     contrib = commands.add_parser("contribution-remind", help="Góp vốn đều: Telegram once a month from the contribution day until it is met")
@@ -245,6 +247,8 @@ def main() -> int:
         return scheduled_run(args.calendar, args.data_dir)
     if args.command == "deposit-alerts":
         return deposit_alerts_cli(args.data_dir)
+    if args.command == "pyramid-alerts":
+        return pyramid_alerts_cli(args.data_dir)
     if args.command == "loan-alerts":
         return loan_alerts_cli(args.data_dir)
     if args.command == "contribution-remind":
@@ -1451,6 +1455,26 @@ def deposit_alerts_cli(data_dir: Path) -> int:
     book, _ = read_book(repo, owner)
     out = deposit_alerts_run(data_dir, book=book, send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
     print(json.dumps(out))  # counts only, never the book
+    return 0
+
+
+def pyramid_alerts_cli(data_dir: Path) -> int:
+    """Nhắc Tháp tài sản over Telegram; skipped (nothing personal is read) while scheduled delivery is off."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from investment_agent.services.deposit_book import book_quotes
+    from investment_agent.services.equity_budget import budget_view
+    from investment_agent.services.pyramid_alerts import pyramid_alerts_run
+
+    telegram = _scheduled_telegram(data_dir)
+    if telegram is None:
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
+        return 0
+    send, repo, owner = telegram
+    budget, _ = budget_view(repo, owner, quotes=book_quotes(data_dir))
+    out = pyramid_alerts_run(data_dir, pyramid=budget.get("pyramid"), send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
+    print(json.dumps(out))  # counts only, never the layers
     return 0
 
 

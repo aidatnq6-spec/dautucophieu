@@ -17,4 +17,6 @@ lịch sau phiên không xong trong 2 ngày; chưa diễn tập, diễn tập h�
   - Bước chỉ thoát lỗi khi có nguồn **quá hạn**: chỉ số hỏng mà không còn số nào trong hạn của nó, OMO hỏng mà không có phiên nào trong 7 ngày, hoặc một nguồn khác hỏng. Nguồn hỏng nhưng số vẫn còn trong hạn là `late`: vẫn in ra, bước thoát 0.
   - Nhắc lỗi nguồn vẫn đếm số lượt lỗi liên tiếp của từng nguồn như cũ.
 - Khi nguồn có số tháng mới nhất nhưng để trống số cùng kỳ năm trước (FRED để trống CPI Mỹ tháng 10/2025 vì Mỹ không công bố), tháng đó không tính được mức tăng so cùng kỳ và **không được lấp**. Phần mềm ghi tháng thiếu vào `data/macro/_gaps.json`; trang Vĩ mô và sự cố quá hạn của chỉ số nêu rõ lý do.
+- `macro-sync` đọc các chỉ số theo nhóm máy chủ nguồn: các nhóm chạy song song (tối đa 6), chỉ số cùng một máy chủ vẫn đọc lần lượt;
+  lãi suất thực đọc sau cùng vì dùng hai chuỗi vừa tải. Khoảng 58 giây còn khoảng 20 giây một lượt (21/11/2026).
 - Hạn của Cung tiền M2 Việt Nam: 100 ngày (trước là 80), vì NHNN công bố chậm 2–3 tháng (chủ sở hữu duyệt 21/11/2026).

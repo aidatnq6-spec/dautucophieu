@@ -68,6 +68,19 @@ def test_each_automatic_indicator_past_its_age_is_named_as_its_own_problem(tmp_p
     assert problems["macro:us_cpi_yoy"]["detail"] == "số mới nhất ngày 01/08/2026, quá hạn 75 ngày"
 
 
+def test_an_indicator_old_because_the_source_left_the_year_ago_month_blank_says_so(tmp_path):
+    from datetime import date
+    from investment_agent.market.leading import MacroStore
+    data = healthy(tmp_path)
+    drilled(data)
+    store = MacroStore(data)
+    store.upsert("us_cpi_yoy", [(date(2026, 8, 1), "2.9")], entry="auto")
+    store.record_gaps({"us_cpi_yoy": {"month": "2026-10", "base": "2025-10"}})
+    detail = next(p for p in report(data)["problems"] if p["id"] == "macro:us_cpi_yoy")["detail"]
+    assert detail == ("số mới nhất ngày 01/08/2026, quá hạn 75 ngày; tháng 10/2026 chưa tính được so cùng kỳ vì nguồn để trống số "
+                      "tháng 10/2025 (không tự lấp)")
+
+
 def test_a_step_failing_twice_running_is_a_problem_once_is_not(tmp_path):
     data = healthy(tmp_path)
     drilled(data)

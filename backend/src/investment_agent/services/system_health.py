@@ -148,6 +148,11 @@ def calendar_problems(config_dir: Path, *, now: datetime) -> list[dict]:
     return out
 
 
+def gap_text(gap: dict) -> str:
+    month, base = (f"{g[5:7]}/{g[:4]}" for g in (gap["month"], gap["base"]))
+    return f"tháng {month} chưa tính được so cùng kỳ vì nguồn để trống số tháng {base} (không tự lấp)"
+
+
 def macro_problems(data_dir: Path, *, today) -> list[dict]:
     """Each automatic Vĩ mô indicator whose latest figure is past its own age (owner, 21/11/2026): the folder can be fresh while one
     series is months old. One problem per series, so each is announced once and its recovery too. A series with no figure yet (just
@@ -159,7 +164,10 @@ def macro_problems(data_dir: Path, *, today) -> list[dict]:
     for r in macro_rows(indicators, MacroStore(Path(data_dir)), today=today):
         if r["auto"] and r["stale"]:
             day, limit = date.fromisoformat(r["date"]), limits[r["id"]]
-            out.append({"id": f"macro:{r['id']}", "label": r["label"], "detail": f"số mới nhất ngày {day:%d/%m/%Y}, quá hạn {limit} ngày"})
+            detail = f"số mới nhất ngày {day:%d/%m/%Y}, quá hạn {limit} ngày"
+            if gap := r.get("gap"):  # the source left the year-ago month blank: said, never filled in
+                detail += f"; {gap_text(gap)}"
+            out.append({"id": f"macro:{r['id']}", "label": r["label"], "detail": detail})
     return out
 
 

@@ -191,7 +191,7 @@
    "label": "Cung tiền M2 Việt Nam (tỷ đồng)",
    "unit": "tỷ đồng",
    "rule": "down",
-   "max_age_days": 80,
+   "max_age_days": 100,
    "period": "month",
    "source": {
     "kind": "sbv_m2",

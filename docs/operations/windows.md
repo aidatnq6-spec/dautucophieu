@@ -71,6 +71,8 @@ scripts\windows\register-tasks.ps1 -Unregister
 Đăng ký yêu cầu `.env.local`, lịch giao dịch năm hiện tại và múi giờ máy UTC+07. Tác vụ dùng đường dẫn tuyệt đối, không truyền token qua tham số, chạy ẩn, `StartWhenAvailable` để chạy bù, và không sửa tác vụ khác. Máy tắt hoặc ngủ thì không bảo đảm đúng giờ.
 
 Nhật ký: `logs\scheduler.log` chỉ ghi thời điểm, mã thoát và tóm tắt JSON (không có bí mật hay số liệu cá nhân).
+- Ba bước chạy mỗi 5 phút (cảnh báo giá, luận điểm theo giá, tình trạng hệ thống) dùng `--quiet`. Kết quả không có gì mới (ngoài phiên, không kích hoạt, không gửi, tình trạng không đổi) thì không ghi. Lỗi, tin đã gửi và lượt đầu mỗi giờ luôn được ghi.
+- Đầu mỗi lượt sau phiên, `log-rotate` chuyển nhật ký sang `scheduler-YYYY-MM.log` khi dòng đầu thuộc tháng trước. Tệp mới mang theo 200 dòng cuối để Tình trạng hệ thống vẫn thấy lượt "finish" gần nhất. Giữ 6 tháng.
 
 ### Tự cập nhật ứng dụng
 

@@ -11,6 +11,10 @@ $python = Get-RepoPython
 # The setup above stops on error; the steps below must not. Under 'Stop', Windows PowerShell 5.1 turns any stderr line of a step
 # into a terminating error even with 2>$null, so one warning stopped every later step unlogged (06:08 logon run, 2026-11-21).
 $ErrorActionPreference = 'Continue'
+# Nhat ky theo thang: once its first line is from an earlier month the log moves to scheduler-YYYY-MM.log (six months kept); the new one
+# carries the last 200 lines, so Tinh trang he thong still finds the last finished run.
+$rotated = & $python -W ignore -m investment_agent.jobs.log_rotate $log 2>$null
+"$(Get-Date -Format o) log-rotate exit=$LASTEXITCODE $rotated" | Add-Content -LiteralPath $log -Encoding UTF8
 $data = Join-Path $script:RepoRoot 'data'
 New-Item -ItemType Directory -Force -Path $data | Out-Null
 $calendar = Join-Path $data 'trading-calendar.json'

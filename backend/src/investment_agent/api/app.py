@@ -13,6 +13,7 @@ from investment_agent.repositories.personal import ReadPlan, prefetch, read_scop
 from .auth import InternalAuthSettings, InternalAuthenticator, Unauthorized, require_owner
 from .routes.buy_check import router as buy_check_router
 from .routes.usage import router as usage_router
+from .routes.history_stats import router as history_stats_router
 from .routes.concentration import router as concentration_router
 from .routes.contributions import router as contributions_router
 from .routes.corporate import router as corporate_router
@@ -204,6 +205,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(concentration_router)
     app.include_router(insights_router)
     app.include_router(usage_router)
+    app.include_router(history_stats_router)
 
     @app.get("/internal/identity")
     def identity(request: Request):

@@ -24,7 +24,7 @@ _SHARE = r"^0\.\d{1,4}(-0\.\d{1,4})?$"
 COMMODITY_LABELS = {"com_coal": "Giá than thế giới (Úc)", "com_iron_ore": "Giá quặng sắt thế giới", "com_rubber": "Giá cao su thế giới",
                     "com_sugar": "Giá đường thế giới", "com_lng": "Giá khí LNG (Nhật Bản)",
                     "com_aluminium": "Giá nhôm thế giới", "com_copper": "Giá đồng thế giới", "com_wheat": "Giá lúa mì thế giới",
-                    "com_soybean": "Giá đậu tương thế giới", "com_cotton": "Giá bông thế giới (Cotlook A, World Bank)", "com_urea": "Giá urê thế giới (Trung Đông, World Bank)",
+                    "com_soybean": "Giá đậu tương thế giới", "com_cotton": "Giá bông thế giới (Cotlook A, World Bank)", "crack_321_us": "Biên lọc dầu đại diện: crack 3-2-1 Mỹ (EIA qua FRED, USD/thùng)", "us_apparel_inv_ratio": "Tồn kho/doanh số cửa hàng quần áo Mỹ (Census qua FRED)", "com_urea": "Giá urê thế giới (Trung Đông, World Bank)",
                     "port_container_yoy": "Sản lượng container qua cảng Việt Nam so cùng kỳ (VPA)",
                     "com_dairy": "Chỉ số giá sữa thế giới (FAO)", "com_container_scfi": "Cước container xuất khẩu từ Thượng Hải (SCFI, Sở Giao dịch Vận tải biển Thượng Hải)",
                     "com_tanker_ctfi": "Cước tàu dầu thô chở về Trung Quốc (CTFI, Sở Giao dịch Vận tải biển Thượng Hải)",
@@ -33,7 +33,7 @@ COMMODITY_LABELS = {"com_coal": "Giá than thế giới (Úc)", "com_iron_ore": 
                     "vn_hydro_inflow_yoy": "Lượng nước về các hồ thủy điện lớn so cùng kỳ năm trước (EVN)"}
 COMMODITY_MAX_AGE_DAYS = 75  # monthly averages, published with about a month's lag
 CHAIN_MAX_AGE_DAYS = {"vn_hydro_inflow_yoy": 7, "com_container_scfi": 14, "com_tanker_ctfi": 7, "com_steel_hrc": 10,
-                      "us_software_invest": 220}  # daily and weekly series; a quarter (dated to its first day) is the latest until ~7 months on
+                      "us_software_invest": 220, "crack_321_us": 14, "us_apparel_inv_ratio": 110}  # daily and weekly series; a quarter (dated to its first day) is the latest until ~7 months on
 
 
 class Source(ContractModel):

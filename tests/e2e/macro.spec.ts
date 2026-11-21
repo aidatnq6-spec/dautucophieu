@@ -82,6 +82,16 @@ test("oil and dollar sensitivity lists held tickers first and says what the doll
   await expect(box.getByRole("row", { name: /FPT/ })).toContainText("đang nắm");
 });
 
+test("five risk lights with their thresholds; missing data is said, not shown as green", async ({ page }) => {
+  await openMacro(page);
+  const box = page.getByRole("region", { name: "Đèn tín hiệu rủi ro vĩ mô" });
+  const lights = box.getByRole("list", { name: "Các đèn tín hiệu" }).getByRole("listitem");
+  await expect(lights).toHaveText([/Giá dầu WTI/, /Đồng USD/, /Tỷ giá tự do/, /Khối ngoại/, /Lãi suất liên ngân hàng/]);
+  await expect(box.getByTestId("signal-oil")).toContainText("vàng ≥ +10% · đỏ ≥ +20%");
+  await expect(box.getByTestId("signal-interbank")).toContainText("vàng ≥ 5%/năm · đỏ ≥ 7%/năm");
+  await expect(box).toContainText("không phải khuyến nghị");
+});
+
 test("no horizontal page scroll on the macro page at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 900 });
   await openMacro(page);

@@ -211,3 +211,17 @@ def test_the_gold_moves_say_what_is_missing(tmp_path):
     clock = Clock()
     moves = call(client(tmp_path, clock), clock, "GET", "/internal/macro/sjc-gap").json()["moves"]
     assert moves["world"]["missing"] == moves["sjc"]["missing"] == moves["pass_through"]["missing"] == "no_data"
+
+
+def test_macro_signals_show_each_light(tmp_path):
+    """Đèn tín hiệu rủi ro vĩ mô (spec 21/11/2026), read on the clock's day (2027-01-15)."""
+    clock = Clock()
+    store = MacroStore(tmp_path)
+    store.upsert("factor_oil", [(date(2026, 12, 1), "100"), (date(2027, 1, 14), "121")], entry="auto")
+    store.upsert("vn_interbank_on", [(date(2027, 1, 14), "5.5")], entry="auto")
+    store.upsert("foreign_net", [(date(2026, 12, 30), "-5")], entry="auto")  # 16 days old
+    body = call(client(tmp_path, clock), clock, "GET", "/internal/macro/signals").json()
+    lights = {s["id"]: s for s in body["signals"]}
+    assert [s["id"] for s in body["signals"]] == ["oil", "usd", "fx_gap", "foreign", "interbank"]
+    assert (lights["oil"]["level"], lights["interbank"]["level"], lights["usd"]["level"], lights["foreign"]["level"]) == \
+        ("red", "yellow", "missing", "stale")

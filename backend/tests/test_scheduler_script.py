@@ -169,3 +169,11 @@ def test_the_slow_market_sync_gets_fifteen_minutes_and_price_alerts_stop_before_
     assert all("jobs.step --timeout 900 market-sync" in l for l in ls if "market-sync" in l and "& $python" in l)
     alerts = [l for l in _script_lines("run-alerts.ps1") if "& $python" in l]
     assert alerts and all("jobs.step --timeout 240 " in l for l in alerts)
+
+
+def test_macro_signals_run_right_after_the_macro_sync():
+    """Đèn tín hiệu rủi ro vĩ mô (spec 21/11/2026): the lights are read on the figures the macro sync just stored."""
+    ls = lines()
+    sync = next(i for i, l in enumerate(ls) if "jobs.step macro-sync" in l)
+    step = next(i for i, l in enumerate(ls) if "jobs.step macro-signals" in l)
+    assert sync < step < next(i for i, l in enumerate(ls) if "jobs.step scheduled-run" in l)

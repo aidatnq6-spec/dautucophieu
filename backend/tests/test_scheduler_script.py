@@ -169,7 +169,8 @@ def _script_lines(name):
 
 def test_every_scheduled_step_runs_under_a_time_limit():
     for name in ("run-after-close.ps1", "run-alerts.ps1"):
-        calls = [l for l in _script_lines(name) if "& $python" in l]
+        # the log's monthly move is a local file move with no source to wait on, so it is the one call outside the time limit
+        calls = [l for l in _script_lines(name) if "& $python" in l and "investment_agent.jobs.log_rotate" not in l]
         assert calls and all("-m investment_agent.jobs.step " in l for l in calls), name
         assert not any("investment_agent.cli" in l for l in _script_lines(name)), name
 
@@ -187,3 +188,21 @@ def test_macro_signals_run_right_after_the_macro_sync():
     sync = next(i for i, l in enumerate(ls) if "jobs.step macro-sync" in l)
     step = next(i for i, l in enumerate(ls) if "jobs.step macro-alerts" in l)
     assert sync < step < next(i for i, l in enumerate(ls) if "jobs.step scheduled-run" in l)
+
+
+# --- 21/11/2026: nhật ký gọn hơn ---
+def test_the_log_is_moved_to_its_month_once_a_run_has_started_and_before_any_step():
+    ls = lines()
+    rot = next(i for i, l in enumerate(ls) if "investment_agent.jobs.log_rotate" in l)
+    assert next(i for i, l in enumerate(ls) if "start pid=" in l) < rot < next(i for i, l in enumerate(ls) if "investment_agent.jobs.step" in l)
+
+
+ALERTS = SCRIPT.with_name("run-alerts.ps1")
+
+
+def test_the_five_minute_steps_are_quiet_and_log_only_what_they_print():
+    text = ALERTS.read_text(encoding="utf-8-sig")
+    for step in ("price-alerts", "thesis-check", "health-check"):
+        call = next(l for l in text.splitlines() if f"investment_agent.jobs.step --timeout 240 --quiet {step}" in l)
+        assert call.strip().startswith("$")
+    assert text.count("if ($") >= 3 and "Add-Content" in text

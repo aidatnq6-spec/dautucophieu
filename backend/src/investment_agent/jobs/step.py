@@ -13,6 +13,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import datetime
 
 DEFAULT_TIMEOUT = 600
 TIMEOUT_EXIT = 124
@@ -47,11 +48,39 @@ def run_step(command: list[str], *, timeout: float) -> tuple[str, int]:
     return text, process.returncode
 
 
+COUNTS = ("triggered", "events", "new", "recovered")
+
+
+def quiet(text: str, code: int, *, now: datetime) -> bool:
+    """A five-minute step with nothing new to log (owner, 21/11/2026): exit 0, no stderr, nothing sent, triggered or newly wrong, no
+    errors. The first wake-up of each hour is always kept, so the log still shows the task is alive."""
+    if code != 0 or now.minute < 5 or " stderr: " in text:
+        return False
+    try:
+        out = json.loads(text)
+    except ValueError:
+        return False
+    if not isinstance(out, dict) or out.get("status") not in ("ok", "skipped") or out.get("sent") is True or out.get("errors"):
+        return False
+    if out.get("status") == "skipped":
+        return out.get("reason") == "outside_session"
+    return all(not out.get(k) for k in COUNTS)
+
+
+def _now() -> datetime:
+    return datetime.now()
+
+
 def main(argv: list[str]) -> int:
     timeout: float = DEFAULT_TIMEOUT
     if argv[:1] == ["--timeout"]:
         timeout, argv = int(argv[1]), argv[2:]
+    hush = argv[:1] == ["--quiet"]  # a five-minute step: print nothing when there is nothing new, so nothing is logged
+    if hush:
+        argv = argv[1:]
     out, code = run_step([sys.executable, "-W", "ignore", "-m", "investment_agent.cli", *argv], timeout=timeout)
+    if hush and quiet(out, code, now=_now()):
+        return code
     sys.stdout.write(out.encode("ascii", errors="backslashreplace").decode("ascii") + "\n")
     return code
 

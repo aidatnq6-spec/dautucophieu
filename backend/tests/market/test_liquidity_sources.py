@@ -113,6 +113,58 @@ def test_the_omo_page_gives_each_session_by_kind_and_tenor(tmp_path):
         parse_omo("<p>Kết quả đấu thầu</p>")
 
 
+def test_a_server_error_is_asked_again_after_the_pause_and_a_late_series_inside_its_age_is_not_a_failed_run(tmp_path, capsys):
+    """Owner, 21/11/2026: sbv.gov.vn answered 5xx on most runs, so macro-sync exited 1 and Tình trạng hệ thống said it was failing
+    while every series was still inside its age. A server error is asked again after the pause, like a timeout; a source still failing
+    then fails the run only once its series is past its own age (Nhắc lỗi nguồn still counts runs in a row)."""
+    from datetime import timedelta
+
+    import httpx
+
+    from investment_agent.cli import macro_sync
+    from investment_agent.market.leading import VN, MacroStore
+    from datetime import datetime
+    today = datetime.now(VN).date()
+    MacroStore(tmp_path).upsert("vn_interbank_1w", [(today - timedelta(days=2), "4.5")], entry="auto")  # 2 days against 5
+    slow_calls = []
+
+    def fail(url, code):
+        raise httpx.HTTPStatusError(str(code), request=httpx.Request("GET", url), response=httpx.Response(code))
+
+    def fast(url):
+        return fail(url, 503 if "sbv.gov.vn" in url else 404)
+
+    def slow(url):
+        slow_calls.append(url)
+        return fail(url, 503 if "sbv.gov.vn" in url else 404)
+    code = macro_sync(tmp_path, get=fast, slow_get=slow, sleep=lambda s: None)
+    out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert out["results"]["vn_interbank_1w"] == "error:ServerError" and out["results"]["us_cpi_yoy"] == "error:HTTPStatusError"
+    assert any("sbv.gov.vn" in u for u in slow_calls) and not any("fred.stlouisfed.org" in u for u in slow_calls)
+    assert "vn_interbank_1w" in out["late"] and "vn_interbank_1w" not in out["stale"]
+    assert "us_cpi_yoy" in out["stale"]  # never stored: no figure inside its age
+    assert code == 1
+
+
+def test_a_run_whose_failures_are_all_inside_their_age_exits_0(tmp_path, capsys):
+    from datetime import datetime, timedelta
+
+    import httpx
+
+    from investment_agent.cli import macro_sync
+    from investment_agent.market import leading
+    from investment_agent.market.leading import VN, MacroStore
+    today = datetime.now(VN).date()
+    MacroStore(tmp_path).upsert("vn_interbank_1w", [(today - timedelta(days=2), "4.5")], entry="auto")
+    only = [i for i in leading.load_indicators() if i["id"] == "vn_interbank_1w"]
+
+    def down(url):
+        raise httpx.HTTPStatusError("503", request=httpx.Request("GET", url), response=httpx.Response(503))
+    code = macro_sync(tmp_path, get=down, slow_get=down, sleep=lambda s: None, indicators=only, extras=False)
+    out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert out["late"] == ["vn_interbank_1w"] and out["stale"] == [] and out["status"] == "partial" and code == 0
+
+
 def test_macro_sync_asks_an_unreachable_nso_again_after_the_pause(tmp_path, capsys):
     """nso.gov.vn's name servers fail for seconds to a minute at a time (11/2026): getaddrinfo raises ConnectError for every retry
     of the first pass, so the six NSO indicators were missing on about half the runs. Like a timed-out source, an unreachable one is

@@ -102,6 +102,15 @@ def _transient(exc: Exception) -> bool:
     return isinstance(exc, httpx.TransportError)
 
 
+def error_name(exc: Exception) -> str:
+    """The error as a run reports it: a server's 429 or 5xx is "ServerError" (asked again after the pause, 21/11/2026), any other
+    answer keeps its type name (a 404 stays "HTTPStatusError", final)."""
+    import httpx
+    if isinstance(exc, httpx.HTTPStatusError) and _transient(exc):
+        return "ServerError"
+    return type(exc).__name__
+
+
 def _get_with_retry(get: Callable[[str], str], url: str, sleep: Callable[[float], None]) -> str:
     for delay in (*RETRY_DELAYS, None):
         try:
@@ -832,7 +841,7 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
                     first_error = exc  # reported, so a slow source gets its second, slower try in macro_sync
                 src = src.get("fallback")
         if ind["id"] not in results and first_error is not None:
-            results[ind["id"]] = f"error:{type(first_error).__name__}"
+            results[ind["id"]] = f"error:{error_name(first_error)}"
     store.record_statuses(results)
     return results
 

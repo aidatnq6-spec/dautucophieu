@@ -4,12 +4,14 @@ import { ApiError, api } from "../lib/api";
 
 type Level = "green" | "yellow" | "red" | "missing" | "stale";
 export type Signal = {
-  id: "oil" | "usd" | "fx_gap" | "foreign" | "interbank"; name: string; level: Level; value: string | null; latest_date: string | null;
+  id: "oil" | "usd" | "fx_gap" | "fx_ceiling" | "us10y" | "foreign" | "interbank" | "pe" | "pmi"; name: string; level: Level; value: string | null; latest_date: string | null;
   yellow: string; red: string; down_yellow: string | null; down_red: string | null; since: string | null; max_age_days: number;
   spark: { date: string; value: string }[]; next: { level: "yellow" | "red"; by: string } | null;
   level_since: string | null; level_since_open: boolean; link: string;
   move: { direction: "up" | "down" | "flat"; bad: boolean | null; by: string } | null;
+  bad_side?: "up" | "down"; strict?: boolean; pe?: string | null;
 };
+const SHARE = new Set(["oil", "usd", "fx_gap", "fx_ceiling", "pe"]);
 
 const dm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const num = (v: number, digits: number) => v.toLocaleString("vi-VN", { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -24,7 +26,11 @@ export function signalValue(s: Signal): string {
   const v = Number(s.value);
   if (s.id === "oil" || s.id === "usd") return `${signed(v * 100, 1)}% trong 30 ngày`;
   if (s.id === "fx_gap") return `tự do ${v >= 0 ? "cao" : "thấp"} hơn ${num(Math.abs(v) * 100, 2)}%`;
+  if (s.id === "fx_ceiling") return `còn ${num(v * 100, 2)}% tới trần biên độ`;
+  if (s.id === "us10y") return `${signed(v, 2)} điểm % trong 30 ngày`;
   if (s.id === "foreign") return `bán ròng ${s.value} phiên liên tiếp`;
+  if (s.id === "pe") return `P/E ${num(Number(s.pe ?? 0), 2)} · cao hơn hoặc bằng ${num(v * 100, 1)}% số phiên 5 năm`;
+  if (s.id === "pmi") return `PMI ${num(v, 1)}`;
   return `${num(v, 2)}%/năm`;
 }
 
@@ -37,6 +43,10 @@ export function signalThresholds(s: Signal): string {
       ? `${up} · giảm: cảnh báo ≤ ${signed(Number(s.down_yellow) * 100, 0)}% · nguy hiểm ≤ ${signed(Number(s.down_red) * 100, 0)}%` : up;
   }
   if (s.id === "fx_gap") return `cảnh báo ≥ ${num(y * 100, 0)}% · nguy hiểm ≥ ${num(r * 100, 0)}%`;
+  if (s.id === "fx_ceiling") return `cảnh báo ≤ ${num(y * 100, 0)}% · nguy hiểm ≤ ${num(r * 100, 0)}% tới trần`;
+  if (s.id === "us10y") return `cảnh báo ≥ +${num(y, 1)} · nguy hiểm ≥ +${num(r, 1)} điểm %`;
+  if (s.id === "pe") return `cảnh báo ≥ ${num(y * 100, 0)}% · nguy hiểm ≥ ${num(r * 100, 0)}% số phiên 5 năm`;
+  if (s.id === "pmi") return `cảnh báo < ${num(y, 0)} · nguy hiểm < ${num(r, 0)}`;
   if (s.id === "foreign") return `cảnh báo ≥ ${y} phiên · nguy hiểm ≥ ${r} phiên`;
   return `cảnh báo ≥ ${num(y, 0)}%/năm · nguy hiểm ≥ ${num(r, 0)}%/năm`;
 }
@@ -46,7 +56,8 @@ export function signalNext(s: Signal): string | null {
   if (!s.next) return s.level === "red" ? "đang ở mức nguy hiểm" : null;
   const by = Number(s.next.by), to = WORD[s.next.level];
   if (s.id === "foreign") return `thêm ${num(by, 0)} phiên bán ròng là mức ${to}`;
-  if (s.id === "interbank") return `còn ${num(by, 2)} điểm % nữa là mức ${to}`;
+  if (s.id === "interbank" || s.id === "us10y") return `còn ${num(by, 2)} điểm % nữa là mức ${to}`;
+  if (s.id === "pmi") return `còn ${num(by, 1)} điểm nữa là mức ${to}`;
   return `còn ${num(by * 100, 2)} điểm % nữa là mức ${to}`;
 }
 
@@ -71,10 +82,11 @@ export function signalMove(s: Signal): { text: string; tone: "bad" | "good" | "f
   if (!m || s.level === "missing") return null;
   if (s.id === "foreign") return m.bad ? { text: "▲ đang bán ròng · chiều xấu", tone: "bad" } : { text: "▼ phiên cuối mua ròng · chiều tốt", tone: "good" };
   const by = Number(m.by);
-  const size = s.id === "interbank" ? `${num(by, 2)} điểm %` : s.id === "fx_gap" ? `${num(by * 100, 2)} điểm %` : `${num(by * 100, 1)}%`;
-  const span = s.id === "oil" || s.id === "usd" ? "" : " so với 30 ngày trước";
+  const size = s.id === "pmi" ? `${num(by, 1)} điểm` : SHARE.has(s.id) ? `${num(by * 100, 2)} điểm %` : `${num(by, 2)} điểm %`;
+  const own = s.id === "oil" || s.id === "usd" || s.id === "us10y";  // the value line already gives the 30-day change
+  const span = own ? "" : s.id === "pmi" ? " so với tháng trước" : " so với 30 ngày trước";
   if (m.direction === "flat") return { text: `→ đi ngang${span}`, tone: "flat" };
-  const amount = s.id === "oil" || s.id === "usd" ? "" : ` ${size}`;  // the value line already gives the 30-day change
+  const amount = own ? "" : ` ${size}`;
   return { text: `${m.direction === "up" ? "▲ tăng" : "▼ giảm"}${amount}${span} · ${m.bad ? "chiều xấu" : "chiều tốt"}`, tone: m.bad ? "bad" : "good" };
 }
 
@@ -117,7 +129,7 @@ export function MacroSignals() {
             <li key={s.id} data-testid={`signal-${s.id}`}>
               <span className={`ms-dot ms-${s.level}`} aria-hidden="true" />
               <div className="ms-body">
-                <a href={`#chi-so-${s.link}`} className="ms-name"><strong>{s.name}</strong></a> <span className={`ms-level ms-${s.level}-ink`}>{LEVEL[s.level]}</span>
+                <a href={s.link} className="ms-name"><strong>{s.name}</strong></a> <span className={`ms-level ms-${s.level}-ink`}>{LEVEL[s.level]}</span>
                 {since && <span className="caption"> · {since}</span>}
                 <div>
                   {s.level === "missing" ? <span className="muted">chưa có số{s.latest_date ? ` đủ 30 ngày (mới nhất ${dm(s.latest_date)})` : ""}</span>

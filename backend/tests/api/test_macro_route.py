@@ -222,6 +222,6 @@ def test_macro_signals_show_each_light(tmp_path):
     store.upsert("foreign_net", [(date(2026, 12, 30), "-5")], entry="auto")  # 16 days old
     body = call(client(tmp_path, clock), clock, "GET", "/internal/macro/signals").json()
     lights = {s["id"]: s for s in body["signals"]}
-    assert [s["id"] for s in body["signals"]] == ["oil", "usd", "fx_gap", "foreign", "interbank"]
+    assert [s["id"] for s in body["signals"]] == ["oil", "usd", "fx_gap", "fx_ceiling", "us10y", "foreign", "interbank", "pe", "pmi"]
     assert (lights["oil"]["level"], lights["interbank"]["level"], lights["usd"]["level"], lights["foreign"]["level"]) == \
         ("red", "yellow", "missing", "stale")

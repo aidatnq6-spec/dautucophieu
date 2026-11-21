@@ -35,9 +35,9 @@ def test_a_light_change_and_a_liquidity_alert_of_the_same_run_go_in_one_message(
 
 
 def test_one_part_alone_is_sent_alone(tmp_path):
-    seed(tmp_path, ["4.0", "4.0", "4.0", "4.0", "4.0", "4.0"])
+    seed(tmp_path, ["3.0", "3.0", "3.0", "3.0", "3.0", "3.0"])
     run(tmp_path, [])
-    seed(tmp_path, ["4.0", "4.0", "4.0", "4.0", "4.0", "4.0"], vcb="26200")  # near the ceiling; no light moved
+    seed(tmp_path, ["3.0", "3.0", "3.0", "3.0", "3.0", "3.0", "3.1", "4.2"])  # +1,2 points in 5 sessions, still under the light's 5%
     sent = []
     assert run(tmp_path, sent)["parts"] == ["liquidity"] and len(sent) == 1 and "ĐÈN TÍN HIỆU" not in sent[0]
 

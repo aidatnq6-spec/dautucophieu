@@ -86,7 +86,9 @@ test("five risk lights with their thresholds; missing data is said, not shown as
   await openMacro(page);
   const box = page.getByRole("region", { name: "Đèn tín hiệu rủi ro vĩ mô" });
   const lights = box.getByRole("list", { name: "Các đèn tín hiệu" }).getByRole("listitem");
-  await expect(lights).toHaveText([/Giá dầu WTI/, /Đồng USD/, /Tỷ giá tự do/, /Khối ngoại/, /Lãi suất liên ngân hàng/]);
+  await expect(lights).toHaveText([/Giá dầu WTI/, /Đồng USD/, /Tỷ giá tự do/, /Tỷ giá Vietcombank so với trần/, /Lợi suất trái phiếu Mỹ/,
+    /Khối ngoại/, /Lãi suất liên ngân hàng/, /P\/E VN-Index/, /PMI sản xuất Việt Nam/]);
+  await expect(box.getByTestId("signal-pmi")).toContainText("cảnh báo < 50 · nguy hiểm < 48");
   await expect(box.getByTestId("signal-oil")).toContainText("cảnh báo ≥ +10% · nguy hiểm ≥ +20%");
   await expect(box.getByTestId("signal-interbank")).toContainText("cảnh báo ≥ 5%/năm · nguy hiểm ≥ 7%/năm");
   await expect(box).toContainText("không phải khuyến nghị");

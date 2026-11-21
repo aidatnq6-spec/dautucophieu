@@ -11,12 +11,16 @@ from pathlib import Path
 from investment_agent.domain.macro_signals import macro_signals, signal_changes
 from investment_agent.market.leading import MacroStore
 
-SERIES = ("factor_oil", "factor_usd", "usd_vnd_free", "usd_vnd_vcb", "foreign_net", "vn_interbank_on")
+SERIES = ("factor_oil", "factor_usd", "usd_vnd_free", "usd_vnd_vcb", "usd_vnd_central", "us10y", "foreign_net", "vn_interbank_on", "vn_pmi")
+PE_SERIES = "VNINDEX-pe-1d"  # VNDirect's daily P/E of VN-Index, kept by index-valuation-sync
 
 
 def load_series(data_dir: Path) -> dict[str, list[tuple[date, Decimal]]]:
     store = MacroStore(Path(data_dir))
-    return {k: [(date.fromisoformat(o["date"]), Decimal(o["value"])) for o in store.read(k)] for k in SERIES}
+    from investment_agent.market.series import SeriesStore
+    out = {k: [(date.fromisoformat(o["date"]), Decimal(o["value"])) for o in store.read(k)] for k in SERIES}
+    out["vnindex_pe"] = [(date.fromisoformat(t[:10]), Decimal(v)) for t, v in SeriesStore(Path(data_dir) / "index-valuation").points(PE_SERIES)]
+    return out
 
 
 FOOTER = "Chỉ mô tả dữ liệu, không phải khuyến nghị. Chi tiết ở trang Vĩ mô."

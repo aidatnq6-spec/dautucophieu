@@ -65,3 +65,13 @@ Chủ sở hữu duyệt ngày 21/11/2026 (kaizen từ FireAnt Quant AI). Trang 
   - cắt xuống trung bình 200 phiên (phiên đầu tiên đóng cửa dưới đường, phiên trước ở trên hoặc bằng);
   - giảm 20% từ đỉnh 52 tuần (đỉnh 250 phiên gần nhất; phiên đầu tiên vượt ngưỡng). Đỉnh mọi thời đại cho quá ít lần (5 lần từ 2000)
     nên dùng đỉnh 52 tuần.
+
+## Cú sốc chồng cú sốc và Cú sốc hôm nay (chủ sở hữu, 21/11/2026)
+- Cú sốc chồng cú sốc: giảm từ 3% trong một phiên và giảm 5 phiên liền, mỗi loại tách theo VN-Index ngày đó đang dưới / trên (hoặc bằng)
+  trung bình 200 phiên, và đã giảm 20% từ đỉnh 52 tuần; cùng các cột như mọi bảng, kèm hàng "Mọi lúc".
+- Cú sốc hôm nay: khi phiên mới nhất có cú sốc, câu tóm tắt đầu trang thêm một câu; ảnh chụp phiên (`data/brief/`) lưu mục `shocks`
+  (kỳ 60 phiên) và bản tin trên web cùng Telegram 15:30 thêm một dòng sau dòng Mỹ. Câu viết theo mẫu, không dùng AI:
+  tên cú sốc, rồi lịch sử của nó (số lần từ năm có dữ liệu, số khoảng không chồng lấn, trung bình so với mọi lúc, xấu thường gặp P10,
+  giảm sâu nhất trong kỳ trung vị). Khi một nhóm tách hẹp hơn cũng đúng hôm nay và có đủ khoảng độc lập thì đọc nhóm đó
+  (ưu tiên "đã giảm 20% từ đỉnh"); nhóm không đủ dữ liệu thì ghi "không đủ dữ liệu cho kỳ này", không đọc số.
+  Không có cú sốc thì không có dòng. Kết thúc bằng "Chỉ mô tả quá khứ, không phải dự báo."

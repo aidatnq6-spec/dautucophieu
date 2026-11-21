@@ -34,7 +34,7 @@ def market_view(snapshot: dict | None, *, watched: list[str], held: set[str], ne
         news = {"status": "ok", "items": pick_news(news["items"], watched=watched, held=held, sector_names=sector_names, limit=news_limit)}
     view = {k: snapshot.get(k) for k in ("session_date", "updated_at", "indices", "hose", "proprietary")}
     view["board"] = {k: v for k, v in board.items() if k != "symbols"}
-    for name in ("index_session", "hose_liquidity", "signals", "asia", "us"):  # snapshots stored before 06/11/2026 (signals: 16/11, us: 21/11) lack them
+    for name in ("index_session", "hose_liquidity", "signals", "asia", "us", "shocks"):  # snapshots stored before 06/11/2026 (signals: 16/11, us and shocks: 21/11) lack them
         view[name] = snapshot.get(name) or {"status": "missing", "reason": "Ảnh chụp phiên này chưa có mục này"}
     view["recovery"] = recovery_checks(snapshot.get("index_session"), board)  # Bảng kiểm "Thị trường phục hồi"
     from investment_agent.notifications.render import signal_lines
@@ -43,6 +43,8 @@ def market_view(snapshot: dict | None, *, watched: list[str], held: set[str], ne
     view["asia_line"] = asia_line(snapshot.get("asia"))  # Tín hiệu phiên, the same lines as the Telegram brief
     from investment_agent.market.us_indices import us_line
     view["us_line"] = us_line(snapshot.get("us"))  # Chứng khoán Mỹ (FRED), stored with the snapshot from 21/11/2026
+    from investment_agent.domain.history_stats import shock_line
+    view["shock_line"] = shock_line(snapshot.get("shocks"))  # Cú sốc hôm nay, stored with the snapshot from 21/11/2026
     view["impact"] = _impact((snapshot.get("signals") or {}).get("pull") or {}, held)
     view["heatmap"] = _heatmap(symbols, held) if priced else {"status": "missing", "reason": board.get("reason") or "Chưa có bảng giá cả sàn"}
     return {**view, "tickers": first + others, "news": news}

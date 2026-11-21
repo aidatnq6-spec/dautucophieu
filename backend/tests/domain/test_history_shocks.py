@@ -49,3 +49,40 @@ def test_the_four_shocks_on_vn_index():
     assert shocks["down5"] == [date(2010, 1, 1) + timedelta(days=214)]                                         # the fifth fall in a row (210 … 214)
     assert shocks["below200"] == [date(2010, 1, 1) + timedelta(days=210)]                                      # first close under the average
     assert shocks["dd20"] == [date(2010, 1, 1) + timedelta(days=226)]                                          # 79 is 21% under 100
+
+
+# Cú sốc chồng cú sốc and Cú sốc hôm nay (owner, 21/11/2026): a 3% fall or five falls in a row, split by whether VN-Index was then
+# under its 200-session average or 20% under its 52-week high; and one line, on the page, in the brief and on Telegram, when VN-Index
+# had a shock on the latest session, read from its past.
+
+from investment_agent.domain.history_stats import combo_days, shock_line, shocks_today  # noqa: E402
+
+
+def test_a_shock_is_split_by_where_vn_index_stood_that_day():
+    values = ["100"] * 210 + ["96"] + ["95", "94", "93", "92", "91"] + ["91"] * 10 + ["79"]
+    combos = combo_days(closes_of(values))
+    day = lambda i: date(2010, 1, 1) + timedelta(days=i)  # noqa: E731
+    assert combos["drop3_under200"] == [day(210), day(226)] and combos["drop3_over200"] == []
+    assert combos["down5_under200"] == [day(214)]
+    assert combos["drop3_dd20"] == [day(226)] and combos["down5_dd20"] == []
+
+
+def test_the_shock_of_the_latest_session_is_read_from_its_past():
+    values = []
+    for k in range(61):  # a rising market with a 4% fall every fourth session, the last one on the latest session
+        base = D(100) * D("1.01") ** k
+        values += [base, base, base, base * D("0.96")]
+    closes = closes_of(values)
+    out = shocks_today(closes, session=closes[-1][0], h=20)
+    assert out["status"] == "ok" and [s["id"] for s in out["today"]] == ["drop3"]
+    line = shock_line(out)
+    assert line.startswith("Cú sốc hôm nay: VN-Index giảm từ 3% trong một phiên. ")
+    assert "20 phiên sau trung bình" in line and "(mọi lúc " in line and "khoảng không chồng lấn" in line
+    assert line.endswith("Chỉ mô tả quá khứ, không phải dự báo.")
+
+
+def test_no_line_without_a_shock_or_without_the_session():
+    closes = closes_of(["100"] * 300)
+    assert shocks_today(closes, session=closes[-1][0], h=60)["today"] == [] and shock_line(shocks_today(closes, session=closes[-1][0], h=60)) is None
+    assert shocks_today(closes, session=closes[-1][0] + timedelta(days=1), h=60)["status"] == "missing"  # the session's close is not stored yet
+    assert shock_line(None) is None

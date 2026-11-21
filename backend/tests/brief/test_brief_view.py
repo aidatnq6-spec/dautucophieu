@@ -70,3 +70,12 @@ def test_the_us_line_of_the_snapshot_is_shown_after_the_asian_one():
     us = {"rows": [{"id": "us_dow", "name": "Dow Jones", "date": "2026-10-23", "day_pct": "-0.0193", "stale": False}], "source": "FRED"}
     assert market_view({**SNAP, "us": us}, watched=[], held=set())["us_line"] == "Mỹ (FRED): Dow Jones −1,93% (phiên 23/10)"
     assert market_view(SNAP, watched=[], held=set())["us_line"] is None  # snapshots stored before 21/11/2026
+
+def test_the_shock_line_of_the_snapshot_is_shown_with_the_markets():
+    g = {"id": "down5", "label": "VN-Index giảm 5 phiên liền", "events": 98, "n": 98, "n_independent": 49, "enough": True,
+         "mean": "0.0053", "p10": "-0.2117", "dip_median": "-0.0819", "within": None}
+    shocks = {"status": "ok", "h": 60, "today": [g], "all": {"mean": "0.0429"}, "from": "2000-07-28"}
+    view = market_view({**SNAP, "shocks": shocks}, watched=[], held=set())
+    assert view["shock_line"].startswith("Cú sốc hôm nay: VN-Index giảm 5 phiên liền.")
+    assert view["shocks"] == shocks  # Telegram renders from this view
+    assert market_view(SNAP, watched=[], held=set())["shock_line"] is None  # snapshots stored before 21/11/2026

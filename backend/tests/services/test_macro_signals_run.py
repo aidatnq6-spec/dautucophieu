@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 
 from investment_agent.market.leading import MacroStore
 from investment_agent.services.macro_signals import load_series, signals_run
@@ -16,7 +17,8 @@ def test_the_first_run_only_records_the_levels_then_a_change_is_sent_once(tmp_pa
     sent = []
     first = signals_run(tmp_path, today=date(2026, 10, 28), send=lambda text: sent.append(text) or True)
     assert first["first_run"] is True and first["changes"] == 0 and sent == []
-    assert first["levels"] == {"oil": "green", "usd": "missing", "fx_gap": "yellow", "foreign": "missing", "interbank": "missing"}
+    assert first["levels"] == {"oil": "green", "usd": "missing", "fx_gap": "yellow", "fx_ceiling": "missing", "us10y": "missing",
+                               "foreign": "missing", "interbank": "missing", "pe": "missing", "pmi": "missing"}
     assert signals_run(tmp_path, today=date(2026, 10, 28), send=lambda text: sent.append(text) or True)["changes"] == 0 and sent == []
     seed(tmp_path, oil_now="125")  # +25% in 30 days
     out = signals_run(tmp_path, today=date(2026, 10, 28), send=lambda text: sent.append(text) or True)
@@ -25,11 +27,16 @@ def test_the_first_run_only_records_the_levels_then_a_change_is_sent_once(tmp_pa
     assert signals_run(tmp_path, today=date(2026, 10, 28), send=lambda text: sent.append(text) or True)["changes"] == 0 and len(sent) == 1
 
 
-def test_load_series_reads_the_six_stored_series(tmp_path):
+def test_load_series_reads_every_stored_series_the_lights_need(tmp_path):
+    from datetime import datetime
+
+    from investment_agent.market.series import SeriesStore
     seed(tmp_path)
+    SeriesStore(tmp_path / "index-valuation").upsert("VNINDEX-pe-1d", [(datetime(2026, 10, 27), "10.65")])
     series = load_series(tmp_path)
-    assert set(series) == {"factor_oil", "factor_usd", "usd_vnd_free", "usd_vnd_vcb", "foreign_net", "vn_interbank_on"}
-    assert str(series["factor_oil"][-1][1]) == "107.89"
+    assert set(series) == {"factor_oil", "factor_usd", "usd_vnd_free", "usd_vnd_vcb", "usd_vnd_central", "us10y", "foreign_net",
+                           "vn_interbank_on", "vn_pmi", "vnindex_pe"}
+    assert str(series["factor_oil"][-1][1]) == "107.89" and series["vnindex_pe"] == [(date(2026, 10, 27), Decimal("10.65"))]
 
 
 def test_a_change_that_could_not_be_sent_is_tried_again(tmp_path):

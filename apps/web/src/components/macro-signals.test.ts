@@ -3,7 +3,7 @@ import { type Signal, signalMove, signalNext, signalSince, signalSummary, signal
 
 const light = (id: Signal["id"], value: string | null, yellow: string, red: string, more: Partial<Signal> = {}): Signal =>
   ({ id, name: id, level: "green", value, latest_date: "2026-11-20", yellow, red, down_yellow: null, down_red: null, since: null, max_age_days: 7,
-     spark: [], next: null, level_since: null, level_since_open: false, link: "wti", move: null, ...more });
+     spark: [], next: null, level_since: null, level_since_open: false, link: "#chi-so-wti", move: null, ...more });
 
 describe("Đèn tín hiệu rủi ro vĩ mô", () => {
   it("says each light's value in its own words", () => {
@@ -44,5 +44,19 @@ describe("Đèn tín hiệu rủi ro vĩ mô", () => {
       .toEqual({ text: "→ đi ngang so với 30 ngày trước", tone: "flat" });
     expect(signalMove(light("foreign", "4", "5", "10", { move: { direction: "up", bad: true, by: "4" } })))
       .toEqual({ text: "▲ đang bán ròng · chiều xấu", tone: "bad" });
+  });
+  it("reads the four lights added on 21/11/2026 in their own units", () => {
+    expect(signalValue(light("fx_ceiling", "0.037", "0.02", "0.01"))).toBe("còn 3,70% tới trần biên độ");
+    expect(signalThresholds(light("fx_ceiling", null, "0.02", "0.01"))).toBe("cảnh báo ≤ 2% · nguy hiểm ≤ 1% tới trần");
+    expect(signalValue(light("us10y", "-0.21", "0.3", "0.5"))).toBe("−0,21 điểm % trong 30 ngày");
+    expect(signalThresholds(light("us10y", null, "0.3", "0.5"))).toBe("cảnh báo ≥ +0,3 · nguy hiểm ≥ +0,5 điểm %");
+    expect(signalValue(light("pe", "0.025", "0.80", "0.90", { pe: "10.65" }))).toBe("P/E 10,65 · cao hơn hoặc bằng 2,5% số phiên 5 năm");
+    expect(signalValue(light("pmi", "52.3", "50", "48"))).toBe("PMI 52,3");
+    expect(signalThresholds(light("pmi", null, "50", "48"))).toBe("cảnh báo < 50 · nguy hiểm < 48");
+    expect(signalNext(light("pmi", "52.3", "50", "48", { next: { level: "yellow", by: "2.3" } }))).toBe("còn 2,3 điểm nữa là mức cảnh báo");
+    expect(signalMove(light("fx_ceiling", "0.037", "0.02", "0.01", { move: { direction: "down", bad: true, by: "0.0019" } })))
+      .toEqual({ text: "▼ giảm 0,19 điểm % so với 30 ngày trước · chiều xấu", tone: "bad" });
+    expect(signalMove(light("pmi", "52.3", "50", "48", { move: { direction: "up", bad: false, by: "0.4" } })))
+      .toEqual({ text: "▲ tăng 0,4 điểm so với tháng trước · chiều tốt", tone: "good" });
   });
 });

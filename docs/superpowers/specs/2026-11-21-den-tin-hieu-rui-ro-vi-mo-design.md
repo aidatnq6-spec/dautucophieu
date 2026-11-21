@@ -35,6 +35,17 @@ trên trang Vĩ mô, tính từ số đã lưu; một tin Telegram khi một đ�
   hoặc số đầu tiên đã lưu (ngang khi dưới 0,05 điểm % với tỷ giá, 0,1 điểm % với lãi suất); khối ngoại: đang bán ròng là chiều xấu,
   phiên cuối mua ròng là chiều tốt. Với cả năm đèn, chiều tăng là chiều xấu.
 
+## Bốn đèn thêm (chủ sở hữu duyệt 21/11/2026)
+| Đèn | Đo | Cảnh báo | Nguy hiểm | Chiều xấu | Số quá cũ sau |
+|---|---|---|---|---|---|
+| Tỷ giá Vietcombank so với trần | trần (tỷ giá trung tâm × 1,05) chia giá bán Vietcombank, trừ 1; tỷ giá trung tâm gần nhất trong 7 ngày trước | ≤ 2% | ≤ 1% | giảm | 7 ngày |
+| Lợi suất trái phiếu Mỹ 10 năm | đổi trong 30 ngày, điểm % (`us10y`) | ≥ +0,3 | ≥ +0,5 | tăng | 10 ngày |
+| P/E VN-Index so với lịch sử | phần các phiên trong 5 năm (tới phiên đó) có P/E thấp hơn hoặc bằng (VNDirect) | ≥ 80% | ≥ 90% | tăng | 7 ngày |
+| PMI sản xuất Việt Nam | mức tháng mới nhất (`vn_pmi`) | < 50 | < 48 | giảm | 45 ngày |
+
+- Đi ngang khi đổi dưới: 0,1 điểm % (trần), 0,05 điểm % (lợi suất), 2 điểm phần trăm vị (P/E), 0,3 điểm (PMI).
+- Tên đèn dẫn tới: tỷ giá Vietcombank, lợi suất Mỹ 10 năm, PMI trên bảng Vĩ mô; P/E tới trang Định giá.
+
 ## Telegram
 - Sau mỗi lượt cập nhật vĩ mô: so mức với lượt trước (`data/macro/_signals.json`); đèn đổi giữa xanh, vàng, đỏ thì gửi một tin gồm
   mọi đèn đã đổi. Lượt đầu chỉ ghi mức. Chuyển sang hoặc từ "chưa có số", "số cũ" không gửi.

@@ -26,7 +26,7 @@ def by_id(signals):
 
 def test_each_light_against_its_yellow_and_red_thresholds():
     s = by_id(macro_signals(base(), today=TODAY))
-    assert [x["id"] for x in macro_signals(base(), today=TODAY)] == ["oil", "usd", "fx_gap", "foreign", "interbank"]
+    assert [x["id"] for x in macro_signals(base(), today=TODAY)][:3] == ["oil", "usd", "fx_gap"]
     assert (s["oil"]["level"], s["oil"]["value"], s["oil"]["yellow"], s["oil"]["red"]) == ("green", "0.0636", "0.10", "0.20")
     assert (s["usd"]["level"], s["usd"]["value"]) == ("green", "0.01")
     assert (s["fx_gap"]["level"], s["fx_gap"]["value"], s["fx_gap"]["latest_date"]) == ("yellow", "0.0184", "2026-10-27")
@@ -41,7 +41,8 @@ def test_red_at_or_past_the_red_threshold():
     data["foreign_net"] = days(date(2026, 10, 27), ["-1"] * 10)
     data["vn_interbank_on"] = [(date(2026, 10, 25), Decimal("7"))]
     s = by_id(macro_signals(data, today=TODAY))
-    assert {k: v["level"] for k, v in s.items()} == {"oil": "red", "usd": "yellow", "fx_gap": "yellow", "foreign": "red", "interbank": "red"}
+    assert {k: s[k]["level"] for k in ("oil", "usd", "fx_gap", "foreign", "interbank")} == \
+        {"oil": "red", "usd": "yellow", "fx_gap": "yellow", "foreign": "red", "interbank": "red"}
 
 
 def test_missing_data_and_a_short_history_say_so():
@@ -133,3 +134,55 @@ def test_each_light_says_since_when_it_has_been_at_its_level():
     data["vn_interbank_on"] = days(date(2026, 10, 27), ["3.1"] * 40)
     s = by_id(macro_signals(data, today=TODAY))
     assert (s["interbank"]["level_since"], s["interbank"]["level_since_open"]) == ("2026-09-27", True)  # green all 30 days shown
+
+
+# --- Four more lights (owner, 21/11/2026) ---
+
+def test_the_bank_rate_close_to_its_ceiling_is_a_risk_on_the_falling_side():
+    data = base()
+    data["usd_vnd_central"] = [(date(2026, 10, 20), Decimal("25000"))]  # ceiling 26.250
+    data["usd_vnd_vcb"] = [(date(2026, 9, 25), Decimal("25500")), (date(2026, 10, 27), Decimal("25800"))]
+    s = by_id(macro_signals(data, today=TODAY))["fx_ceiling"]
+    assert (s["level"], s["value"]) == ("yellow", "0.0174")  # 26.250 / 25.800 - 1 = 1,74% left
+    assert s["next"] == {"level": "red", "by": "0.0074"}
+    assert s["move"]["direction"] == "flat" or s["move"]["bad"] is not None
+    data["usd_vnd_vcb"] = [(date(2026, 10, 27), Decimal("26000"))]
+    assert by_id(macro_signals(data, today=TODAY))["fx_ceiling"]["level"] == "red"  # 0,96% left
+    data["usd_vnd_central"] = [(date(2026, 10, 10), Decimal("25000"))]  # 17 days before: no ceiling read for that day
+    assert by_id(macro_signals(data, today=TODAY))["fx_ceiling"]["level"] == "missing"
+
+
+def test_the_us_10_year_yield_rising_fast_is_a_risk():
+    data = base()
+    data["us10y"] = [(date(2026, 9, 20), Decimal("4.40")), (date(2026, 10, 20), Decimal("4.75"))]
+    s = by_id(macro_signals(data, today=TODAY))["us10y"]
+    assert (s["level"], s["value"], s["next"]) == ("yellow", "0.35", {"level": "red", "by": "0.15"})
+    assert s["move"] == {"direction": "up", "bad": True, "by": "0.35"}
+
+
+def test_the_vn_index_pe_is_read_against_its_own_five_years():
+    data = base()
+    data["vnindex_pe"] = [(date(2021, 10, 1) + timedelta(days=i), Decimal(10 + i % 10)) for i in range(1850)]  # 10..19 over and over
+    data["vnindex_pe"] += [(date(2026, 10, 25), Decimal("18.5"))]
+    s = by_id(macro_signals(data, today=TODAY))["pe"]
+    assert s["level"] == "yellow" and Decimal(s["value"]) >= Decimal("0.8") and Decimal(s["value"]) < Decimal("0.9")
+    assert s["pe"] == "18.5"
+    data["vnindex_pe"] += [(date(2026, 10, 26), Decimal("25"))]
+    assert by_id(macro_signals(data, today=TODAY))["pe"]["level"] == "red"
+
+
+def test_vn_pmi_below_50_warns_and_below_48_is_danger():
+    data = base()
+    data["vn_pmi"] = [(date(2026, 9, 30), Decimal("50.6")), (date(2026, 10, 31), Decimal("49.4"))]
+    s = by_id(macro_signals(data, today=date(2026, 11, 21)))["pmi"]
+    assert (s["level"], s["next"]) == ("yellow", {"level": "red", "by": "1.4"})
+    assert s["move"] == {"direction": "down", "bad": True, "by": "1.2"}
+    data["vn_pmi"] = [(date(2026, 10, 31), Decimal("50"))]
+    assert by_id(macro_signals(data, today=date(2026, 11, 21)))["pmi"]["level"] == "green"  # 50 is not below 50
+    data["vn_pmi"] = [(date(2026, 10, 31), Decimal("47.9"))]
+    assert by_id(macro_signals(data, today=date(2026, 11, 21)))["pmi"]["level"] == "red"
+
+
+def test_nine_lights_in_order():
+    assert [s["id"] for s in macro_signals(base(), today=TODAY)] == \
+        ["oil", "usd", "fx_gap", "fx_ceiling", "us10y", "foreign", "interbank", "pe", "pmi"]

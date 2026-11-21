@@ -948,89 +948,23 @@ def scheduled_run(calendar_path: Path, data_dir: Path) -> int:
 
 def accumulation_cli(data_dir: Path) -> int:
     """Remind once per plan and month, from the plan's day, while the month's purchases are below the plan."""
-    import os
-    import uuid
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-
-    import httpx
-
-    from investment_agent.api.auth import OwnerContext
-    from investment_agent.notifications.telegram import TelegramSender
-    from investment_agent.repositories.firestore import personal_repository_from_env
     from investment_agent.services.accumulation import remind_run
-    from investment_agent.services.records import notification_settings
-    from investment_agent.settings import Settings
-
-    settings = Settings.from_env()
-    repo = personal_repository_from_env()
-    owner = OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
-    chosen, _ = notification_settings(repo, owner)
-
-    def send(text):
-        if not (settings.telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):
-            return False
-        sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
-        return _part_sender(sender, chosen.chat_id, data_dir)(text)
-    out = remind_run(repo, owner, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date(), send=send, request_id=f"accumulation-{uuid.uuid4().hex[:16]}")
-    print(json.dumps(out))
+    send, repo, owner = _owner_send(data_dir)
+    print(json.dumps(remind_run(repo, owner, today=_today(), send=send, request_id=_rid("accumulation"))))
     return 0
 
 
 def contribution_cli(data_dir: Path) -> int:
     """Remind once a month, from the plan's day, while this month's deposits are below the planned contribution."""
-    import os
-    import uuid
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-
-    import httpx
-
-    from investment_agent.api.auth import OwnerContext
-    from investment_agent.notifications.telegram import TelegramSender
-    from investment_agent.repositories.firestore import personal_repository_from_env
     from investment_agent.services.contributions import remind_run
-    from investment_agent.services.records import notification_settings
-    from investment_agent.settings import Settings
-
-    settings = Settings.from_env()
-    repo = personal_repository_from_env()
-    owner = OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
-    chosen, _ = notification_settings(repo, owner)
-
-    def send(text):
-        if not (settings.telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):
-            return False
-        sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
-        return _part_sender(sender, chosen.chat_id, data_dir)(text)
-    out = remind_run(repo, owner, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date(), send=send,
-                     request_id=f"contribution-{uuid.uuid4().hex[:16]}")
-    print(json.dumps(out))
+    send, repo, owner = _owner_send(data_dir)
+    print(json.dumps(remind_run(repo, owner, today=_today(), send=send, request_id=_rid("contribution"))))
     return 0
 
 
 def drawdown_cli(data_dir: Path) -> int:
     """Fill full daily history for VN-Index and held tickers (once each, paced for Vnstock), then remind once per threshold crossing."""
-    import os
-
-    import httpx
-
-    from investment_agent.api.auth import OwnerContext
-    from investment_agent.notifications.telegram import TelegramSender
-    from investment_agent.repositories.firestore import personal_repository_from_env
-    from investment_agent.services.records import notification_settings
-    from investment_agent.settings import Settings
-
-    settings = Settings.from_env()
-    repo = personal_repository_from_env()
-    owner = OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
-    chosen, _ = notification_settings(repo, owner)
-
-    def send(text):
-        if not (settings.telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):
-            return False
-        sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
-        return _part_sender(sender, chosen.chat_id, data_dir)(text)
+    send, repo, owner = _owner_send(data_dir)
     print(json.dumps(_drawdown_run(data_dir, repo, owner, send=send)))
     return 0
 
@@ -1144,42 +1078,63 @@ def index_closes_cli(data_dir: Path, *, get=None, today=None, sleep=None) -> int
     return 0 if all(r["status"] == "ok" for r in results) else 1
 
 
-def thesis_lights_cli(data_dir: Path) -> int:
-    """Chỉ báo luận điểm after the close; skipped (nothing is read) while scheduled delivery is off."""
-    import uuid
+def _today():
+    """Today in Vietnam."""
     from datetime import datetime
     from zoneinfo import ZoneInfo
+    return datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date()
 
-    from investment_agent.services.thesis_model import check_lights
 
+def _rid(name: str) -> str:
+    """A request id for one write of a scheduled step."""
+    import uuid
+    return f"{name}-{uuid.uuid4().hex[:16]}"
+
+
+def _telegram_step(data_dir: Path, body) -> int:
+    """A step that only sends: skipped (nothing personal is read) while scheduled delivery is off, else body(send, repo, owner)'s
+    result is printed (counts only). Always exit 0: a failed note is the step's own business to retry."""
     telegram = _scheduled_telegram(data_dir)
     if telegram is None:
         print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
         return 0
-    send, repo, owner = telegram
-    out = check_lights(repo, owner, data_dir, send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date(),
-                       request_id=f"thesis-lights-{uuid.uuid4().hex[:16]}")
-    print(json.dumps(out))  # counts only
+    print(json.dumps(body(*telegram)))
     return 0
+
+
+def _owner_send(data_dir: Path):
+    """(send, repo, owner) for a step that reads and records even while scheduled delivery is off: send then returns False, so what
+    it would have said stays due. Delivery is checked when a note is sent, as each such step did on its own before."""
+    import httpx
+
+    from investment_agent.notifications.telegram import TelegramSender
+    from investment_agent.services.records import notification_settings
+    from investment_agent.settings import Settings
+
+    settings = Settings.from_env()
+    repo, owner = _scheduler_owner()
+    chosen, _ = notification_settings(repo, owner)
+
+    def send(text):
+        if not (settings.telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):
+            return False
+        sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
+        return _part_sender(sender, chosen.chat_id, data_dir)(text)
+    return send, repo, owner
+
+
+def thesis_lights_cli(data_dir: Path) -> int:
+    """Chỉ báo luận điểm after the close; skipped (nothing is read) while scheduled delivery is off."""
+    from investment_agent.services.thesis_model import check_lights
+    return _telegram_step(data_dir, lambda send, repo, owner: check_lights(repo, owner, data_dir, send=send, today=_today(),
+                                                                           request_id=_rid("thesis-lights")))
 
 
 def buy_plan_cli(data_dir: Path) -> int:
-    """Kế hoạch giải ngân after the close; skipped (the plan is not read) while scheduled delivery is off."""
-    import uuid
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-
+    """Kế hoạch giải ngân after the close; skipped (the plan is not read) while scheduled delivery is off. Counts only, never the plan."""
     from investment_agent.services.buy_plan import check_plan
-
-    telegram = _scheduled_telegram(data_dir)
-    if telegram is None:
-        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
-        return 0
-    send, repo, owner = telegram
-    out = check_plan(repo, owner, data_dir, send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date(),
-                     request_id=f"buy-plan-{uuid.uuid4().hex[:16]}")
-    print(json.dumps(out))  # counts only, never the plan
-    return 0
+    return _telegram_step(data_dir, lambda send, repo, owner: check_plan(repo, owner, data_dir, send=send, today=_today(),
+                                                                         request_id=_rid("buy-plan")))
 
 
 def receivable_alerts_cli(data_dir: Path) -> int:
@@ -1187,15 +1142,8 @@ def receivable_alerts_cli(data_dir: Path) -> int:
     from investment_agent.services.drawdown import held_costs
     from investment_agent.services.receivable_signs import SIGNS, receivable_signs
     from investment_agent.services.sign_alerts import check_signs
-
-    telegram = _scheduled_telegram(data_dir)
-    if telegram is None:
-        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
-        return 0
-    send, repo, owner = telegram
-    out = check_signs(data_dir, rows=receivable_signs(data_dir), held=set(held_costs(repo, owner)), titles=dict(SIGNS), send=send)
-    print(json.dumps(out))
-    return 0
+    return _telegram_step(data_dir, lambda send, repo, owner: check_signs(data_dir, rows=receivable_signs(data_dir), held=set(held_costs(repo, owner)),
+                                                                          titles=dict(SIGNS), send=send))
 
 
 def source_alerts_cli(data_dir: Path) -> int:
@@ -1222,14 +1170,7 @@ def signal_runs_alerts_cli(data_dir: Path) -> int:
 def sjc_gap_alerts_cli(data_dir: Path) -> int:
     """Nhắc chênh lệch vàng SJC: skipped while scheduled delivery is off or no threshold is set."""
     from investment_agent.services.sjc_gap import check_sjc_gap, read_threshold
-    telegram = _scheduled_telegram(data_dir)
-    if telegram is None:
-        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
-        return 0
-    send, repo, owner = telegram
-    threshold, _ = read_threshold(repo, owner)
-    print(json.dumps(check_sjc_gap(Path(data_dir), threshold=threshold, send=send)))
-    return 0
+    return _telegram_step(data_dir, lambda send, repo, owner: check_sjc_gap(Path(data_dir), threshold=read_threshold(repo, owner)[0], send=send))
 
 
 def us_calendar_cli(data_dir: Path) -> int:
@@ -1268,66 +1209,26 @@ def calendar_watch_cli(data_dir: Path) -> int:
 
 def macro_alerts_cli(data_dir: Path) -> int:
     """Nhắc vĩ mô: Đèn tín hiệu rủi ro vĩ mô and Nhắc thanh khoản và tỷ giá in one note; skipped while scheduled delivery is off."""
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-
     from investment_agent.services.macro_alerts import macro_alerts_run
-
-    telegram = _scheduled_telegram(data_dir)
-    if telegram is None:
-        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
-        return 0
-    print(json.dumps(macro_alerts_run(data_dir, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date(), send=telegram[0])))
-    return 0
+    return _telegram_step(data_dir, lambda send, repo, owner: macro_alerts_run(data_dir, today=_today(), send=send))
 
 
 def macro_signals_cli(data_dir: Path) -> int:
     """Đèn tín hiệu rủi ro vĩ mô: one Telegram note when a light changes level; skipped while scheduled delivery is off. Public figures."""
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-
     from investment_agent.services.macro_signals import signals_run
-
-    telegram = _scheduled_telegram(data_dir)
-    if telegram is None:
-        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
-        return 0
-    print(json.dumps(signals_run(data_dir, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date(), send=telegram[0])))
-    return 0
+    return _telegram_step(data_dir, lambda send, repo, owner: signals_run(data_dir, today=_today(), send=send))
 
 
 def liquidity_alerts_cli(data_dir: Path) -> int:
     """Nhắc thanh khoản và tỷ giá; skipped while scheduled delivery is off. Public figures only."""
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-
     from investment_agent.services.liquidity_alerts import check_liquidity
-
-    telegram = _scheduled_telegram(data_dir)
-    if telegram is None:
-        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
-        return 0
-    out = check_liquidity(data_dir, send=telegram[0], today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
-    print(json.dumps(out))
-    return 0
+    return _telegram_step(data_dir, lambda send, repo, owner: check_liquidity(data_dir, send=send, today=_today()))
 
 
 def macro_events_cli(data_dir: Path) -> int:
     """Lịch vĩ mô: the reminder the day before; skipped (the list is not read) while scheduled delivery is off."""
-    import uuid
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-
     from investment_agent.services.macro_events import remind
-
-    telegram = _scheduled_telegram(data_dir)
-    if telegram is None:
-        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
-        return 0
-    send, repo, owner = telegram
-    out = remind(repo, owner, send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date(), request_id=f"macro-events-{uuid.uuid4().hex[:16]}")
-    print(json.dumps(out))  # counts only
-    return 0
+    return _telegram_step(data_dir, lambda send, repo, owner: remind(repo, owner, send=send, today=_today(), request_id=_rid("macro-events")))
 
 
 def fund_holdings_sync_cli(data_dir: Path, *, post=None, get=None) -> int:
@@ -1372,28 +1273,8 @@ def gold_price_sync_cli(data_dir: Path, *, get=None) -> int:
 
 def quarter_alerts_cli(data_dir: Path) -> int:
     """Báo cáo quý mới over Telegram; skipped entirely while scheduled delivery is off, so turning it on starts from a baseline."""
-    import os
-
-    import httpx
-
-    from investment_agent.api.auth import OwnerContext
-    from investment_agent.notifications.telegram import TelegramSender
-    from investment_agent.repositories.firestore import personal_repository_from_env
     from investment_agent.services.quarter_alerts import quarter_alerts_run
-    from investment_agent.services.records import notification_settings
-    from investment_agent.settings import Settings
-
-    settings = Settings.from_env()
-    repo = personal_repository_from_env()
-    owner = OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
-    chosen, _ = notification_settings(repo, owner)
-    if not (settings.telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):
-        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
-        return 0
-    sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
-    out = quarter_alerts_run(data_dir, send=_part_sender(sender, chosen.chat_id, data_dir), repo=repo, owner=owner)
-    print(json.dumps(out))
-    return 0
+    return _telegram_step(data_dir, lambda send, repo, owner: quarter_alerts_run(data_dir, send=send, repo=repo, owner=owner))
 
 
 def _part_sender(sender, chat_id: str, data_dir: Path):
@@ -1403,17 +1284,9 @@ def _part_sender(sender, chat_id: str, data_dir: Path):
 
 
 def lights_check_cli(data_dir: Path) -> int:
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-
+    """Bảng đèn chỉ báo sớm: Telegram when a colour changes; skipped while scheduled delivery is off."""
     from investment_agent.services.early_lights import lights_check
-    telegram = _scheduled_telegram(data_dir)
-    if telegram is None:
-        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
-        return 0
-    send, repo, owner = telegram
-    print(json.dumps(lights_check(repo, owner, data_dir, send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())))
-    return 0
+    return _telegram_step(data_dir, lambda send, repo, owner: lights_check(repo, owner, data_dir, send=send, today=_today()))
 
 
 def health_check_cli(data_dir: Path, telegram=None) -> int:
@@ -1491,31 +1364,15 @@ def _http_text(url: str) -> str:
 
 
 def deposit_alerts_cli(data_dir: Path) -> int:
-    """Nhắc sổ tiết kiệm đáo hạn over Telegram; skipped (the book is not read) while scheduled delivery is off."""
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-
+    """Nhắc sổ tiết kiệm đáo hạn over Telegram; skipped (the book is not read) while scheduled delivery is off. Counts only."""
     from investment_agent.services.deposit_alerts import deposit_alerts_run
     from investment_agent.services.deposit_book import read_book
-
-    telegram = _scheduled_telegram(data_dir)
-    if telegram is None:
-        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
-        return 0
-    send, repo, owner = telegram
-    book, _ = read_book(repo, owner)
-    out = deposit_alerts_run(data_dir, book=book, send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
-    print(json.dumps(out))  # counts only, never the book
-    return 0
+    return _telegram_step(data_dir, lambda send, repo, owner: deposit_alerts_run(data_dir, book=read_book(repo, owner)[0], send=send, today=_today()))
 
 
 def wealth_alerts_cli(data_dir: Path) -> int:
     """Việc tài chính hôm nay: the personal reminders of this run in one Telegram note; skipped (nothing personal is read) while
-    scheduled delivery is off. Prints counts only."""
-    import uuid
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-
+    scheduled delivery is off. Prints counts only, never the books."""
     from investment_agent.services import accumulation, contributions
     from investment_agent.services.deposit_alerts import deposit_alerts_run
     from investment_agent.services.deposit_book import book_quotes, read_book
@@ -1526,66 +1383,42 @@ def wealth_alerts_cli(data_dir: Path) -> int:
     from investment_agent.services.rental_alerts import read_rental_book, rental_alerts_run
     from investment_agent.services.wealth_alerts import wealth_alerts_run
 
-    telegram = _scheduled_telegram(data_dir)
-    if telegram is None:
-        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
-        return 0
-    send, repo, owner = telegram
-    today = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date()
-    rid = lambda name: f"{name}-{uuid.uuid4().hex[:16]}"  # noqa: E731
-    runs = [
-        ("deposits", lambda s: deposit_alerts_run(data_dir, book=read_book(repo, owner)[0], send=s, today=today)),
-        ("loans", lambda s: loan_alerts_run(data_dir, book=read_property_book(repo, owner), send=s, today=today)),
-        ("insurance", lambda s: insurance_alerts_run(data_dir, book=read_property_book(repo, owner), send=s, today=today)),
-        ("rental", lambda s: rental_alerts_run(data_dir, book=read_rental_book(repo, owner), send=s, today=today)),
-        ("tower", lambda s: pyramid_alerts_run(data_dir, pyramid=budget_view(repo, owner, quotes=book_quotes(data_dir))[0].get("pyramid"),
-                                               send=s, today=today)),
-        ("contribution", lambda s: contributions.remind_run(repo, owner, today=today, send=s, request_id=rid("contribution"))),
-        ("accumulation", lambda s: accumulation.remind_run(repo, owner, today=today, send=s, request_id=rid("accumulation"))),
-    ]
-    print(json.dumps(wealth_alerts_run(runs, send=send, today=today)))  # counts only, never the books
-    return 0
+    def body(send, repo, owner):
+        today = _today()
+        runs = [
+            ("deposits", lambda s: deposit_alerts_run(data_dir, book=read_book(repo, owner)[0], send=s, today=today)),
+            ("loans", lambda s: loan_alerts_run(data_dir, book=read_property_book(repo, owner), send=s, today=today)),
+            ("insurance", lambda s: insurance_alerts_run(data_dir, book=read_property_book(repo, owner), send=s, today=today)),
+            ("rental", lambda s: rental_alerts_run(data_dir, book=read_rental_book(repo, owner), send=s, today=today)),
+            ("tower", lambda s: pyramid_alerts_run(data_dir, pyramid=budget_view(repo, owner, quotes=book_quotes(data_dir))[0].get("pyramid"),
+                                                   send=s, today=today)),
+            ("contribution", lambda s: contributions.remind_run(repo, owner, today=today, send=s, request_id=_rid("contribution"))),
+            ("accumulation", lambda s: accumulation.remind_run(repo, owner, today=today, send=s, request_id=_rid("accumulation"))),
+        ]
+        return wealth_alerts_run(runs, send=send, today=today)
+    return _telegram_step(data_dir, body)
 
 
 def pyramid_alerts_cli(data_dir: Path) -> int:
-    """Nhắc Tháp tài sản over Telegram; skipped (nothing personal is read) while scheduled delivery is off."""
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-
+    """Nhắc Tháp tài sản over Telegram; skipped (nothing personal is read) while scheduled delivery is off. Counts only."""
     from investment_agent.services.deposit_book import book_quotes
     from investment_agent.services.equity_budget import budget_view
     from investment_agent.services.pyramid_alerts import pyramid_alerts_run
-
-    telegram = _scheduled_telegram(data_dir)
-    if telegram is None:
-        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
-        return 0
-    send, repo, owner = telegram
-    budget, _ = budget_view(repo, owner, quotes=book_quotes(data_dir))
-    out = pyramid_alerts_run(data_dir, pyramid=budget.get("pyramid"), send=send, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
-    print(json.dumps(out))  # counts only, never the layers
-    return 0
+    return _telegram_step(data_dir, lambda send, repo, owner: pyramid_alerts_run(
+        data_dir, pyramid=budget_view(repo, owner, quotes=book_quotes(data_dir))[0].get("pyramid"), send=send, today=_today()))
 
 
 def loan_alerts_cli(data_dir: Path) -> int:
-    """Nhắc hết lãi ưu đãi over Telegram; skipped (the book is not read) while scheduled delivery is off."""
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-
+    """Nhắc hết lãi ưu đãi, bảo hiểm and cho thuê over Telegram; skipped (the book is not read) while scheduled delivery is off."""
     from investment_agent.services.insurance_alerts import insurance_alerts_run
-    from investment_agent.services.rental_alerts import read_rental_book, rental_alerts_run
     from investment_agent.services.loan_alerts import loan_alerts_run, read_property_book
+    from investment_agent.services.rental_alerts import read_rental_book, rental_alerts_run
 
-    telegram = _scheduled_telegram(data_dir)
-    if telegram is None:
-        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
-        return 0
-    send, repo, owner = telegram
-    book, today = read_property_book(repo, owner), datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date()
-    out = {**loan_alerts_run(data_dir, book=book, send=send, today=today), "insurance": insurance_alerts_run(data_dir, book=book, send=send, today=today),
-           "rental": rental_alerts_run(data_dir, book=read_rental_book(repo, owner), send=send, today=today)}
-    print(json.dumps(out))  # counts only, never the book
-    return 0
+    def body(send, repo, owner):
+        book, today = read_property_book(repo, owner), _today()
+        return {**loan_alerts_run(data_dir, book=book, send=send, today=today), "insurance": insurance_alerts_run(data_dir, book=book, send=send, today=today),
+                "rental": rental_alerts_run(data_dir, book=read_rental_book(repo, owner), send=send, today=today)}
+    return _telegram_step(data_dir, body)
 
 
 def insider_alerts_cli(data_dir: Path) -> int:
@@ -1594,15 +1427,8 @@ def insider_alerts_cli(data_dir: Path) -> int:
 
     from investment_agent.services.holdings_view import held_from_repo
     from investment_agent.services.insider_alerts import insider_alerts_run
-
-    telegram = _scheduled_telegram(data_dir)
-    if telegram is None:
-        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
-        return 0
-    send, repo, owner = telegram
-    out = insider_alerts_run(data_dir, held=held_from_repo(repo, owner), get=_http_text, send=send, now=datetime.now(timezone.utc))
-    print(json.dumps(out))
-    return 0
+    return _telegram_step(data_dir, lambda send, repo, owner: insider_alerts_run(data_dir, held=held_from_repo(repo, owner), get=_http_text,
+                                                                                 send=send, now=datetime.now(timezone.utc)))
 
 
 def weekly_inputs(data_dir: Path, *, ledger_events: list, held: set[str], alerts: list[dict], insider, today) -> dict:
@@ -1884,38 +1710,20 @@ def _thesis_run(data_dir: Path, calendar_path: Path, scope: str, repo, owner, *,
 
 def journal_cli(data_dir: Path) -> int:
     """Remind the owner of what they wrote when a journalled ticker moved another threshold step (default 15%) from the recorded price."""
-    import os
-    import uuid
     from decimal import Decimal
 
-    import httpx
-
-    from investment_agent.api.auth import OwnerContext
     from investment_agent.market.series import SeriesStore
-    from investment_agent.notifications.telegram import TelegramSender
-    from investment_agent.repositories.firestore import personal_repository_from_env
     from investment_agent.services.journal import read_journal, review_run
-    from investment_agent.services.records import notification_settings, portfolio_settings
-    from investment_agent.settings import Settings
+    from investment_agent.services.records import portfolio_settings
 
-    settings = Settings.from_env()
-    repo = personal_repository_from_env()
-    owner = OwnerContext(os.environ["FIREBASE_OWNER_UID"], "owner", "scheduler")
-    chosen, _ = notification_settings(repo, owner)
-    if not (settings.telegram_bot_token and chosen.enabled and chosen.scheduled_enabled and chosen.chat_id):
-        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
-        return 0
-    series = SeriesStore(Path(data_dir) / "trend-sources")
-    prices = {}
-    for symbol in {e.symbol for e in read_journal(repo, owner)[0]}:
-        if closes := series.read(f"{symbol}-1d"):  # last close, thousand đồng
-            prices[symbol] = Decimal(str(closes[-1][1])) * 1000
-    sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client())
-    out = review_run(repo, owner, prices=prices, threshold=portfolio_settings(repo, owner)[0].journal_review_threshold,
-                     send=_part_sender(sender, chosen.chat_id, data_dir),
-                     request_id=f"journal-review-{uuid.uuid4().hex[:16]}")
-    print(json.dumps(out))
-    return 0
+    def body(send, repo, owner):
+        series, prices = SeriesStore(Path(data_dir) / "trend-sources"), {}
+        for symbol in {e.symbol for e in read_journal(repo, owner)[0]}:
+            if closes := series.read(f"{symbol}-1d"):  # last close, thousand đồng
+                prices[symbol] = Decimal(str(closes[-1][1])) * 1000
+        return review_run(repo, owner, prices=prices, threshold=portfolio_settings(repo, owner)[0].journal_review_threshold, send=send,
+                          request_id=_rid("journal-review"))
+    return _telegram_step(data_dir, body)
 
 
 def events_cli(data_dir: Path) -> int:

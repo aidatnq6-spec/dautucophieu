@@ -176,3 +176,11 @@ def test_next_years_hose_calendar_missing_from_december_is_a_problem_and_this_ye
     assert "calendar:2027" not in ids(december)
     (config / "trading-calendar-hose-2026.json").unlink()
     assert ids(december)["calendar:2026"]["detail"].startswith("chưa có lịch giao dịch HOSE năm 2026")
+
+
+def test_statements_are_old_only_past_their_seven_day_refresh_and_two_days_more():
+    """statements-sync refreshes a ticker once it is 7 days old, so 4 days said a healthy source was stale (owner, 21/11/2026)."""
+    from investment_agent.market.statements import MAX_AGE_DAYS
+    statements = next(s for s in SOURCES if s["id"] == "statements")
+    assert statements["max_days"] == MAX_AGE_DAYS + 2 == 9
+    assert {s["id"]: s["max_days"] for s in SOURCES}["financial-ratios"] == 4  # the others keep the spec's limits

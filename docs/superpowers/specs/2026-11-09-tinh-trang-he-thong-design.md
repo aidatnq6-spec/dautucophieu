@@ -2,7 +2,7 @@
 
 Duyệt 09/11/2026 (chủ sở hữu). Phần tự động chỉ đáng tin khi biết lúc nó ngừng chạy; trước đây kết quả chỉ nằm trong `logs/scheduler.log`.
 
-Sự cố gồm: một bước lỗi từ 2 lần liên tiếp; dữ liệu quá hạn dù các bước báo thành công (giá VN-Index 6 ngày theo phiên cuối; vĩ mô, sự kiện 3; báo cáo, chỉ số ngành 4; xu hướng 6; thuyết minh Vietcap 10 ngày, theo tệp mới nhất);
+Sự cố gồm: một bước lỗi từ 2 lần liên tiếp; dữ liệu quá hạn dù các bước báo thành công (giá VN-Index 6 ngày theo phiên cuối; vĩ mô, sự kiện 3; báo cáo cơ bản, chỉ số ngành 4; Báo cáo VNDirect 9 (làm mới mỗi mã sau 7 ngày, thêm 2; chủ sở hữu duyệt 21/11/2026); xu hướng 6; thuyết minh Vietcap 10 ngày, theo tệp mới nhất);
 lịch sau phiên không xong trong 2 ngày; chưa diễn tập, diễn tập hỏng, hoặc lần gần nhất quá 14 ngày.
 
 - `health-check` chạy cuối lịch sau phiên và trong tác vụ cảnh báo, để lịch sau phiên ngừng vẫn phát hiện được. Chỉ khi có thay đổi mới đọc Firestore và gửi Telegram: mỗi sự cố báo một lần, hồi phục báo một lần; gửi không được thì lần sau báo lại.

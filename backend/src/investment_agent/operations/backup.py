@@ -21,6 +21,7 @@ import secrets
 import shutil
 import sqlite3
 import tempfile
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -107,6 +108,22 @@ def export_personal(repo, owner, *, now: datetime) -> dict:
             "documents": repo.export(owner)}
 
 
+# Windows refuses to rename a folder while another program (an antivirus scan, an editor's file watcher) holds a file in it: the
+# finished backup is renamed into place again after 1, 2 and 4 seconds before the run gives up (21/11/2026, WinError 5 at 08:37).
+RENAME_WAITS = (1, 2, 4)
+
+
+def _rename(work: Path, final: Path) -> None:
+    for wait in (*RENAME_WAITS, None):
+        try:
+            os.replace(work, final)
+            return
+        except PermissionError:
+            if wait is None:
+                raise
+            time.sleep(wait)
+
+
 def create_backup(data_dir: Path, backup_root: Path, *, personal_export: dict | None, now: datetime, kind: str, encryption_key: bytes | None = None) -> BackupManifest:
     if kind not in {"daily", "weekly", "manual"}:
         raise BackupError("unknown backup kind")
@@ -147,7 +164,7 @@ def create_backup(data_dir: Path, backup_root: Path, *, personal_export: dict | 
                  for p in sorted(work.rglob("*")) if p.is_file()]
         manifest = {"schema": "backup-1", "kind": kind, "created_at": now.isoformat(), "files": files, "personal_export": personal_export is not None, **({"encryption": SCHEME} if encryption_key is not None else {})}
         (work / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
-        os.replace(work, final)
+        _rename(work, final)
     except BaseException:
         shutil.rmtree(work, ignore_errors=True)
         raise

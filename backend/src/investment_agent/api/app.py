@@ -1,4 +1,5 @@
 import time
+from datetime import datetime, timezone
 from typing import Callable
 
 from fastapi import FastAPI, Request
@@ -11,6 +12,7 @@ from investment_agent.repositories.personal import ReadPlan, prefetch, read_scop
 
 from .auth import InternalAuthSettings, InternalAuthenticator, Unauthorized, require_owner
 from .routes.buy_check import router as buy_check_router
+from .routes.usage import router as usage_router
 from .routes.concentration import router as concentration_router
 from .routes.contributions import router as contributions_router
 from .routes.corporate import router as corporate_router
@@ -99,6 +101,24 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
 
     @app.middleware("http")
     async def authenticated_boundary(request: Request, call_next):
+        started = time.perf_counter()
+        response = await _authenticated(request, call_next)
+        _note_if_slow(request, response.status_code, time.perf_counter() - started)
+        return response
+
+    def _note_if_slow(request: Request, status: int, seconds: float) -> None:
+        """Sử dụng phần mềm: a request over the threshold is kept, its path masked (services.usage); never the usage page itself."""
+        from investment_agent.services import usage
+        data_dir = getattr(app.state, "data_dir", None)
+        if data_dir is None or seconds < usage.SLOW_SECONDS or request.url.path == "/health" or request.url.path.startswith("/internal/usage"):
+            return
+        try:
+            usage.record_slow(data_dir, method=request.method, path=request.url.path, seconds=seconds, status=status,
+                              at=datetime.now(timezone.utc))
+        except OSError:
+            pass  # a note that cannot be written must not fail the request
+
+    async def _authenticated(request: Request, call_next):
         try:
             if request.url.path != "/health" or request.method != "GET":
                 body = await request.body()
@@ -183,6 +203,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(performance_router)
     app.include_router(concentration_router)
     app.include_router(insights_router)
+    app.include_router(usage_router)
 
     @app.get("/internal/identity")
     def identity(request: Request):

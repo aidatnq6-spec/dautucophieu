@@ -31,6 +31,11 @@ const GROUPS = [
     { href: "/settings", label: "Cài đặt", icon: Settings }] },
 ];
 
+/** The menu's name of a page path ("/macro" is "Vĩ mô"); pages outside the menu keep their path. */
+export function pageLabel(page: string): string {
+  return GROUPS.flatMap((g) => g.links).find((l) => l.href === page)?.label ?? page;
+}
+
 export function AppNav() {
   const path = usePathname();
   return (

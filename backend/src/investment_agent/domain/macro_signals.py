@@ -15,13 +15,17 @@ SIGNALS = {
     "foreign": ("Khối ngoại", Decimal(5), Decimal(10)),                               # consecutive net-selling sessions
     "interbank": ("Lãi suất liên ngân hàng qua đêm", Decimal(5), Decimal(7)),         # %/năm
 }
-# the falling side, where a fall is a risk too: oil down hard tells of a weakening world economy (owner, 21/11/2026)
-DOWN = {"oil": (Decimal("-0.15"), Decimal("-0.25"))}
+# a falling side where a fall is a risk too; none since the owner's review (21/11/2026): Vietnam buys its oil abroad, so oil falling is
+# mostly good, and the dollar falling is good for the dong
+DOWN: dict[str, tuple[Decimal, Decimal]] = {}
+# a move smaller than this reads "flat": share for oil and the dollar, points of share for the gap, points for the overnight rate
+FLAT = {"oil": Decimal("0.01"), "usd": Decimal("0.002"), "fx_gap": Decimal("0.0005"), "interbank": Decimal("0.1")}
 # days after which a light's latest figure no longer stands for today (oil daily, the broad dollar weekly-ish on FRED, the rest daily)
 MAX_AGE_DAYS = {"oil": 10, "usd": 14, "fx_gap": 7, "foreign": 7, "interbank": 7}
 # the row of Vĩ mô's table nearest to what each light measures
 LINK = {"oil": "wti", "usd": "dxy", "fx_gap": "usd_vnd_free", "foreign": "foreign_net", "interbank": "vn_interbank_on"}
-LEVEL_WORD = {"green": "xanh", "yellow": "vàng", "red": "đỏ"}
+# the level's name in the Telegram line, as on the page: the colour is the level against the thresholds, not the way things moved
+LEVEL_WORD = {"green": "bình thường", "yellow": "cảnh báo", "red": "nguy hiểm"}
 RANK = {"green": 0, "yellow": 1, "red": 2}
 
 Points = list[tuple[date, Decimal]]
@@ -85,6 +89,24 @@ def _measured(key: str, series: dict[str, Points]) -> Points:
     return list(series.get("vn_interbank_on") or [])
 
 
+def _move(key: str, measured: Points) -> dict | None:
+    """Which way the light's measure went and whether that way is the bad one (up, for all five lights)."""
+    if not measured:
+        return None
+    latest, value = measured[-1]
+    if key in ("oil", "usd"):
+        change = value
+    elif key == "foreign":
+        direction = "up" if value > 0 else "down"
+        return {"direction": direction, "bad": direction == "up", "by": _plain(value)}
+    else:
+        base = [v for d, v in measured if d <= latest - WINDOW] or [measured[0][1]]
+        change = value - base[-1]
+    direction = "flat" if abs(change) < FLAT[key] else "up" if change > 0 else "down"
+    return {"direction": direction, "bad": None if direction == "flat" else direction == "up",
+            "by": _show(key, abs(change)) if key != "interbank" else _plain(abs(change))}
+
+
 def _since(key: str, first_of: Points, latest: date) -> date | None:
     """The first stored day when fewer than 30 days of what the light reads are kept, else None."""
     first = first_of[0][0] if first_of else None
@@ -97,7 +119,7 @@ def _light(key: str, measured: Points, raw: Points, today: date) -> dict:
     out = {"id": key, "name": name, "level": "missing", "value": None, "max_age_days": MAX_AGE_DAYS[key], "yellow": str(yellow),
            "red": str(red), "down_yellow": str(down[0]) if down else None, "down_red": str(down[1]) if down else None,
            "latest_date": raw[-1][0].isoformat() if raw else None, "since": None, "spark": [], "next": None,
-           "level_since": None, "level_since_open": False, "link": LINK[key]}
+           "level_since": None, "level_since_open": False, "link": LINK[key], "move": None}
     if not measured:
         return out
     latest, value = measured[-1]
@@ -109,7 +131,7 @@ def _light(key: str, measured: Points, raw: Points, today: date) -> dict:
         start -= 1
     return {**out, "level": level, "value": _show(key, value), "latest_date": latest.isoformat(), "since": (s.isoformat() if (s := _since(key, raw, latest)) else None),
             "spark": [{"date": d.isoformat(), "value": _show(key, v)} for d, v in recent],
-            "next": None if level == "stale" else _next(key, value),
+            "next": None if level == "stale" else _next(key, value), "move": _move(key, measured),
             # the whole window at one level, with older days stored: it began on that day or earlier
             "level_since": recent[start][0].isoformat(), "level_since_open": start == 0 and measured[0][0] < recent[0][0]}
 

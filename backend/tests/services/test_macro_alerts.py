@@ -28,7 +28,7 @@ def test_a_light_change_and_a_liquidity_alert_of_the_same_run_go_in_one_message(
     seed(tmp_path, ["4.0", "4.0", "4.0", "4.0", "4.0", "4.0", "4.1", "7.2"])  # +3,2 points in 5 sessions, and red at 7%
     out = run(tmp_path, sent)
     assert out["sent"] is True and out["parts"] == ["signals", "liquidity"] and len(sent) == 1
-    assert "ĐÈN TÍN HIỆU RỦI RO VĨ MÔ" in sent[0] and "Lãi suất liên ngân hàng qua đêm: xanh → đỏ" in sent[0]
+    assert "ĐÈN TÍN HIỆU RỦI RO VĨ MÔ" in sent[0] and "Lãi suất liên ngân hàng qua đêm: bình thường → nguy hiểm" in sent[0]
     assert "Thanh khoản và tỷ giá" in sent[0] and "qua đêm tăng 3,2 điểm %" in sent[0]
     assert sent[0].count("không phải khuyến nghị") == 1
     assert run(tmp_path, sent)["sent"] is False and len(sent) == 1  # both parts remember they were sent

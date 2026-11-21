@@ -26,6 +26,15 @@ trên trang Vĩ mô, tính từ số đã lưu; một tin Telegram khi một đ�
    USD không thêm chiều giảm.
 6. Tên đèn dẫn tới dòng chỉ số gần nhất trên bảng Vĩ mô (dầu → WTI, USD → DXY, tỷ giá → tỷ giá tự do, khối ngoại, lãi suất qua đêm).
 
+## Nhãn mức và chiều biến động (chủ sở hữu chọn 21/11/2026, sau khi xem trang)
+- Bỏ chiều giảm của dầu (thay mục 5 ở trên): Việt Nam nhập khẩu ròng xăng dầu, dầu giảm phần lớn là tốt; dầu chỉ báo khi tăng.
+- Màu chấm vẫn là mức rủi ro so với ngưỡng, nhưng gọi là Bình thường (xanh), Cảnh báo (vàng), Nguy hiểm (đỏ), trên trang và trong tin
+  Telegram, để màu không bị đọc là chiều tăng giảm.
+- Mỗi đèn thêm chiều biến động với màu riêng: ▲ hay ▼ kèm "chiều xấu" (đỏ) hoặc "chiều tốt" (xanh), "đi ngang" khi đổi rất ít. Dầu, USD:
+  dấu của mức đổi 30 ngày (ngang khi dưới 1% với dầu, 0,2% với USD); tỷ giá tự do, lãi suất qua đêm: so với số cách ít nhất 30 ngày
+  hoặc số đầu tiên đã lưu (ngang khi dưới 0,05 điểm % với tỷ giá, 0,1 điểm % với lãi suất); khối ngoại: đang bán ròng là chiều xấu,
+  phiên cuối mua ròng là chiều tốt. Với cả năm đèn, chiều tăng là chiều xấu.
+
 ## Telegram
 - Sau mỗi lượt cập nhật vĩ mô: so mức với lượt trước (`data/macro/_signals.json`); đèn đổi giữa xanh, vàng, đỏ thì gửi một tin gồm
   mọi đèn đã đổi. Lượt đầu chỉ ghi mức. Chuyển sang hoặc từ "chưa có số", "số cũ" không gửi.

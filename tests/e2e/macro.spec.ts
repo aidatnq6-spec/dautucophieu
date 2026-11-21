@@ -87,11 +87,11 @@ test("five risk lights with their thresholds; missing data is said, not shown as
   const box = page.getByRole("region", { name: "Đèn tín hiệu rủi ro vĩ mô" });
   const lights = box.getByRole("list", { name: "Các đèn tín hiệu" }).getByRole("listitem");
   await expect(lights).toHaveText([/Giá dầu WTI/, /Đồng USD/, /Tỷ giá tự do/, /Khối ngoại/, /Lãi suất liên ngân hàng/]);
-  await expect(box.getByTestId("signal-oil")).toContainText("vàng ≥ +10% · đỏ ≥ +20%");
-  await expect(box.getByTestId("signal-interbank")).toContainText("vàng ≥ 5%/năm · đỏ ≥ 7%/năm");
+  await expect(box.getByTestId("signal-oil")).toContainText("cảnh báo ≥ +10% · nguy hiểm ≥ +20%");
+  await expect(box.getByTestId("signal-interbank")).toContainText("cảnh báo ≥ 5%/năm · nguy hiểm ≥ 7%/năm");
   await expect(box).toContainText("không phải khuyến nghị");
-  await expect(box.getByLabel("Tóm tắt các đèn")).toContainText(/\d đỏ · \d vàng · \d xanh/);
-  await expect(box.getByTestId("signal-oil")).toContainText("giảm: vàng ≤ −15% · đỏ ≤ −25%");
+  await expect(box.getByLabel("Tóm tắt các đèn")).toContainText(/\d nguy hiểm · \d cảnh báo · \d bình thường/);
+  await expect(box.getByTestId("signal-oil")).not.toContainText("giảm:");  // oil falling is not a risk (owner, 21/11/2026)
   await expect(box.getByRole("link", { name: "Giá dầu WTI" })).toHaveAttribute("href", "#chi-so-wti");
   await expect(page.locator("#chi-so-wti")).toHaveCount(1);  // the light leads to its row of the table
 });

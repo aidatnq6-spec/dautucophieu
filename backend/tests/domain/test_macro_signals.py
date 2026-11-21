@@ -70,7 +70,7 @@ def test_changes_are_reported_only_when_a_light_moves_and_never_on_the_first_run
     assert signal_changes(None, current) == []
     assert signal_changes({"oil": "green", "usd": "green", "fx_gap": "yellow", "foreign": "green", "interbank": "green"}, current) == []
     moved = signal_changes({"oil": "red", "usd": "green", "fx_gap": "green", "foreign": "green", "interbank": "missing"}, current)
-    assert moved == ["Giá dầu WTI: đỏ → xanh (+6,4% trong 30 ngày)", "Tỷ giá tự do so với Vietcombank: xanh → vàng (tự do cao hơn 1,84%)"]
+    assert moved == ["Giá dầu WTI: nguy hiểm → bình thường (+6,4% trong 30 ngày)", "Tỷ giá tự do so với Vietcombank: bình thường → cảnh báo (tự do cao hơn 1,84%)"]
 
 
 def test_a_figure_past_its_age_is_said_to_be_old_and_not_coloured():
@@ -84,19 +84,31 @@ def test_a_figure_past_its_age_is_said_to_be_old_and_not_coloured():
     assert signal_changes({"interbank": "red"}, macro_signals(data, today=TODAY)) == []  # to or from old says nothing
 
 
-def test_oil_falling_hard_is_a_risk_too_and_the_dollar_falling_is_not():
-    """Kaizen 5 (owner, 21/11/2026): oil down 15% in 30 days is yellow, 25% red; the dollar keeps only its rise."""
+def test_oil_and_the_dollar_falling_stay_normal():
+    """Owner, 21/11/2026: Vietnam buys its oil abroad, so oil falling is mostly good; only a rise is a risk, as for the dollar."""
     data = base()
-    data["factor_oil"] = [(date(2026, 9, 20), Decimal("100")), (date(2026, 10, 20), Decimal("82.7"))]  # -17,3%
-    data["factor_usd"] = [(date(2026, 9, 23), Decimal("100")), (date(2026, 10, 23), Decimal("90"))]    # -10%
+    data["factor_oil"] = [(date(2026, 9, 20), Decimal("100")), (date(2026, 10, 20), Decimal("75"))]  # -25%
+    data["factor_usd"] = [(date(2026, 9, 23), Decimal("100")), (date(2026, 10, 23), Decimal("90"))]  # -10%
     s = by_id(macro_signals(data, today=TODAY))
-    assert (s["oil"]["level"], s["oil"]["down_yellow"], s["oil"]["down_red"]) == ("yellow", "-0.15", "-0.25")
-    assert s["usd"]["level"] == "green" and s["usd"]["down_yellow"] is None
-    data["factor_oil"] = [(date(2026, 9, 20), Decimal("100")), (date(2026, 10, 20), Decimal("75"))]
-    assert by_id(macro_signals(data, today=TODAY))["oil"]["level"] == "red"
-    moved = signal_changes({"oil": "green"}, macro_signals(data, today=TODAY))
-    assert moved == ["Giá dầu WTI: xanh → đỏ (−25,0% trong 30 ngày)"]
+    assert (s["oil"]["level"], s["oil"]["down_yellow"], s["usd"]["level"]) == ("green", None, "green")
+    assert s["oil"]["next"] == {"level": "yellow", "by": "0.35"}  # -25% is 35 points from +10%
 
+
+def test_each_light_says_which_way_it_moved_and_whether_that_way_is_bad():
+    """Owner, 21/11/2026: beside the level, the move and its side; for all five lights up is the bad side."""
+    data = base()
+    data["factor_oil"] = [(date(2026, 9, 20), Decimal("100")), (date(2026, 10, 20), Decimal("82.7"))]   # -17,3%
+    data["usd_vnd_free"] = [(date(2026, 9, 25), Decimal("26300")), (date(2026, 10, 27), Decimal("26500"))]
+    data["usd_vnd_vcb"] = [(date(2026, 9, 25), Decimal("26000")), (date(2026, 10, 27), Decimal("26020"))]
+    data["vn_interbank_on"] = [(date(2026, 9, 25), Decimal("3.12")), (date(2026, 10, 25), Decimal("3.10"))]
+    s = by_id(macro_signals(data, today=TODAY))
+    assert s["oil"]["move"] == {"direction": "down", "bad": False, "by": "0.173"}
+    assert s["usd"]["move"] == {"direction": "up", "bad": True, "by": "0.01"}                 # +1%, over its 0,2% band
+    assert s["fx_gap"]["move"] == {"direction": "up", "bad": True, "by": "0.0069"}            # 1,15% then 1,84%
+    assert s["interbank"]["move"] == {"direction": "flat", "bad": None, "by": "0.02"}         # 0,02 points: flat
+    assert s["foreign"]["move"] == {"direction": "up", "bad": True, "by": "3"}                # 3 sessions of selling
+    data["foreign_net"] = days(date(2026, 10, 27), ["-300", "200"])
+    assert by_id(macro_signals(data, today=TODAY))["foreign"]["move"] == {"direction": "down", "bad": False, "by": "0"}
 
 def test_each_light_says_how_far_the_next_level_is():
     """Kaizen 2 (owner, 21/11/2026): in the light's own unit, towards the side its value is on."""
@@ -106,8 +118,8 @@ def test_each_light_says_how_far_the_next_level_is():
     assert s["interbank"]["next"] == {"level": "yellow", "by": "1.9"}   # 3,1% to 5%
     assert s["oil"]["next"] == {"level": "yellow", "by": "0.0364"}      # +6,36% to +10%
     data = base()
-    data["factor_oil"] = [(date(2026, 9, 20), Decimal("100")), (date(2026, 10, 20), Decimal("90"))]  # -10%: towards the falling side
-    assert by_id(macro_signals(data, today=TODAY))["oil"]["next"] == {"level": "yellow", "by": "0.05"}
+    data["factor_oil"] = [(date(2026, 9, 20), Decimal("100")), (date(2026, 10, 20), Decimal("90"))]  # -10%: 20 points from +10%
+    assert by_id(macro_signals(data, today=TODAY))["oil"]["next"] == {"level": "yellow", "by": "0.2"}
     data["vn_interbank_on"] = [(date(2026, 10, 25), Decimal("7.5"))]
     assert by_id(macro_signals(data, today=TODAY))["interbank"]["next"] is None  # already red
 

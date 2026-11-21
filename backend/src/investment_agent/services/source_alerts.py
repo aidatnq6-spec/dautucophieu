@@ -12,7 +12,7 @@ STATE = "sources.json"
 THRESHOLD = 3
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
 ERRORS = {"ConnectError": "lỗi kết nối", "ConnectTimeout": "hết thời gian kết nối", "ReadTimeout": "hết thời gian chờ",
-          "HTTPStatusError": "trang trả lỗi", "MacroError": "không đọc được nội dung"}
+          "HTTPStatusError": "trang trả lỗi", "ServerError": "máy chủ trả lỗi tạm thời", "MacroError": "không đọc được nội dung"}
 
 
 def _read(path: Path, empty: dict) -> dict:

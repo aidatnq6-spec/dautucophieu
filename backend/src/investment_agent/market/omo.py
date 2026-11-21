@@ -61,4 +61,5 @@ def omo_sync(store: OmoStore, *, get) -> str:
         store.upsert(parse_omo(get(SBV_OMO)))
         return "ok"
     except Exception as exc:
-        return f"error:{type(exc).__name__}"
+        from investment_agent.market.leading import error_name
+        return f"error:{error_name(exc)}"

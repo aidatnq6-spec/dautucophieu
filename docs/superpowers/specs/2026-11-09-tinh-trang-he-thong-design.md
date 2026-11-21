@@ -9,3 +9,10 @@ lịch sau phiên không xong trong 2 ngày; chưa diễn tập, diễn tập h�
 - `backup-drill` mỗi tuần khôi phục bản sao lưu mới nhất vào thư mục tạm, kiểm checksum, đọc được bản xuất cá nhân, rồi xóa; chỉ giữ số tệp và loại lỗi. Không ghi vào Firestore hay `data/`.
 - Chỉ đọc tên bước và mã thoát từ nhật ký, không đọc nội dung bước in ra. Trang Cài đặt có khối Tình trạng hệ thống.
 - Giới hạn: máy tắt thì không có gì chạy và không báo được. Kỳ nghỉ dài có thể báo giá quá hạn một lần.
+
+## Từng chỉ số vĩ mô và lỗi tạm thời (duyệt 21/11/2026)
+- Mỗi chỉ số vĩ mô tự động có số mới nhất đã quá hạn của chính nó là một sự cố riêng (mã `macro:<chỉ số>`), có tên, ngày số mới nhất và hạn. Thư mục Vĩ mô có thể mới trong khi một chuỗi đã cũ hàng tháng. Chỉ số chưa có số nào (vừa thêm) và chỉ số nhập tay (đã có nhắc riêng) không tính.
+- `macro-sync`:
+  - Lỗi máy chủ (429, 5xx) được ghi là `ServerError` và hỏi lại sau 30 giây như lỗi quá thời gian; kể cả trang OMO. Lỗi 404 hay lỗi khác vẫn là kết quả cuối.
+  - Bước chỉ thoát lỗi khi có nguồn **quá hạn**: chỉ số hỏng mà không còn số nào trong hạn của nó, OMO hỏng mà không có phiên nào trong 7 ngày, hoặc một nguồn khác hỏng. Nguồn hỏng nhưng số vẫn còn trong hạn là `late`: vẫn in ra, bước thoát 0.
+  - Nhắc lỗi nguồn vẫn đếm số lượt lỗi liên tiếp của từng nguồn như cũ.

@@ -564,17 +564,21 @@ def trend_run(data_dir: Path, calendar_path: Path, now=None, provider=None, get=
 
 MACRO_TIMEOUTS = ("error:ReadTimeout", "error:ConnectTimeout", "error:WriteTimeout", "error:PoolTimeout")
 # also asked again after the pause: a host that could not be reached at all (nso.gov.vn's name servers fail for up to a minute)
-MACRO_ASK_AGAIN = (*MACRO_TIMEOUTS, "error:ConnectError")
+MACRO_ASK_AGAIN = (*MACRO_TIMEOUTS, "error:ConnectError", "error:ServerError")  # and a server's 429 or 5xx (sbv.gov.vn, 11/2026)
+OMO_MAX_AGE_DAYS = 7  # the OMO page shows one session; a missed run is late, not stale, while a session this recent is stored
 MACRO_SLOW_PAUSE = 30  # seconds before asking a slow source again
 MACRO_SLOW_TIMEOUT = 90
 
 
-def macro_sync(data_dir: Path, get=None, slow_get=None, sleep=None, get_bytes=None) -> int:
-    """Exit 0 when every automatic indicator updated, 1 when some failed (each is reported). Indicators whose source timed out are
-    asked once more after a pause, with a longer wait (stockbiz is often slow), and so are those whose host could not be reached."""
+def macro_sync(data_dir: Path, get=None, slow_get=None, sleep=None, get_bytes=None, indicators=None, extras: bool = True) -> int:
+    """Every source's result is reported. Indicators whose source timed out are asked once more after a pause, with a longer wait
+    (stockbiz is often slow), and so are those whose host could not be reached or answered a server error.
+
+    Exit 1 only when something is stale (owner, 21/11/2026): a failed indicator with no figure inside its own age, a failed OMO read
+    with no session in 7 days, or any other failed source. A failure whose series still stands for today is "late": reported, exit 0.
+    indicators / extras=False: one indicator alone, without the other sources (tests)."""
     import time
-    from investment_agent.market.leading import (MacroStore, fetch_auto, fetch_chain_extras, fetch_chain_markets, fetch_chain_series,
-                                                 fetch_commodities, fetch_factors, load_indicators)
+    from investment_agent.market.leading import MacroStore, fetch_auto, load_indicators
 
     def fetcher(timeout):
         import httpx
@@ -595,8 +599,53 @@ def macro_sync(data_dir: Path, get=None, slow_get=None, sleep=None, get_bytes=No
     if get_bytes is None and get is None:  # injected text fetchers (tests) get no live workbook download
         get_bytes = bytes_fetcher(60)
     get, slow_get, sleep = get or fetcher(30), slow_get or fetcher(MACRO_SLOW_TIMEOUT), sleep or time.sleep
-    indicators = load_indicators()
+    indicators = load_indicators() if indicators is None else indicators
     results = fetch_auto(indicators, MacroStore(data_dir), get=get, sleep=sleep)
+    if extras:
+        _macro_extras(data_dir, results, get=get, get_bytes=get_bytes, sleep=sleep)
+    slow = [i for i in indicators if results.get(i["id"]) in MACRO_ASK_AGAIN]
+    if slow or results.get("omo") in MACRO_ASK_AGAIN:
+        sleep(MACRO_SLOW_PAUSE)
+    if slow:
+        results.update(fetch_auto(slow, MacroStore(data_dir), get=slow_get, sleep=sleep))
+    if results.get("omo") in MACRO_ASK_AGAIN:
+        from investment_agent.market.omo import OmoStore, omo_sync
+        results["omo"] = omo_sync(OmoStore(data_dir), get=slow_get)
+    failed = {k: v for k, v in results.items() if v != "ok"}
+    late, stale = _macro_late(data_dir, failed, indicators)
+    # every source of this run, for Nhắc lỗi nguồn (source-alerts counts runs in a row)
+    from datetime import datetime, timezone
+    last = Path(data_dir) / "macro" / "_last_run.json"
+    last.parent.mkdir(parents=True, exist_ok=True)
+    last.write_text(json.dumps({"at": datetime.now(timezone.utc).isoformat(), "results": results}), encoding="utf-8")
+    print(json.dumps({"status": "ok" if not failed else "partial", "late": late, "stale": stale, "results": results}))
+    return 1 if stale else 0
+
+
+def _macro_late(data_dir: Path, failed: dict, indicators: list[dict]) -> tuple[list[str], list[str]]:
+    """(late, stale) among the failed sources: late while the stored series still stands for today."""
+    from datetime import date, datetime
+    from investment_agent.market.leading import VN, MacroStore
+    from investment_agent.market.omo import OmoStore
+    today, limits, store = datetime.now(VN).date(), {i["id"]: i["max_age_days"] for i in indicators}, MacroStore(data_dir)
+    late, stale = [], []
+    for key in sorted(failed):
+        if key in limits:
+            points = store.read(key)
+            fresh = bool(points) and (today - date.fromisoformat(points[-1]["date"])).days <= limits[key]
+        elif key == "omo":
+            sessions = OmoStore(data_dir).sessions()
+            fresh = bool(sessions) and (today - date.fromisoformat(sessions[-1]["date"])).days <= OMO_MAX_AGE_DAYS
+        else:
+            fresh = False
+        (late if fresh else stale).append(key)
+    return late, stale
+
+
+def _macro_extras(data_dir: Path, results: dict, *, get, get_bytes, sleep) -> None:
+    """The sources beyond the indicators: factors, world prices, Chuỗi giá trị series, the yearly central rate and OMO."""
+    from investment_agent.market.leading import (MacroStore, fetch_chain_extras, fetch_chain_markets, fetch_chain_series, fetch_commodities,
+                                                 fetch_factors)
     results.update(fetch_factors(MacroStore(data_dir), get=get, sleep=sleep))  # long oil and US dollar history for the sensitivity reading
     results.update(fetch_commodities(MacroStore(data_dir), get=get, sleep=sleep))  # monthly world prices for Chuỗi giá trị
     results.update(fetch_chain_series(MacroStore(data_dir), get=get, get_bytes=get_bytes, sleep=sleep))  # urea, container throughput
@@ -615,18 +664,6 @@ def macro_sync(data_dir: Path, get=None, slow_get=None, sleep=None, get_bytes=No
     from investment_agent.market.omo import OmoStore, omo_sync
     # Nghiệp vụ thị trường mở: the page shows only the latest session, so each run keeps it (Thanh khoản hệ thống)
     results["omo"] = omo_sync(OmoStore(data_dir), get=lambda url: _get_with_retry(get, url, sleep))
-    slow = [i for i in indicators if results.get(i["id"]) in MACRO_ASK_AGAIN]
-    if slow:
-        sleep(MACRO_SLOW_PAUSE)
-        results.update(fetch_auto(slow, MacroStore(data_dir), get=slow_get, sleep=sleep))
-    failed = {k: v for k, v in results.items() if v != "ok"}
-    # every source of this run, for Nhắc lỗi nguồn (source-alerts counts runs in a row)
-    from datetime import datetime, timezone
-    last = Path(data_dir) / "macro" / "_last_run.json"
-    last.parent.mkdir(parents=True, exist_ok=True)
-    last.write_text(json.dumps({"at": datetime.now(timezone.utc).isoformat(), "results": results}), encoding="utf-8")
-    print(json.dumps({"status": "ok" if not failed else "partial", "results": results}))
-    return 0 if not failed else 1
 
 
 def financial_ratios_sync(data_dir: Path, get=None, today=None) -> int:

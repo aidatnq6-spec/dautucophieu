@@ -53,6 +53,21 @@ def test_nothing_wrong_when_steps_pass_sources_are_fresh_and_the_restore_drill_i
     assert out["problems"] == [] and out["ok"] is True and out["sources"][0]["stale"] is False
 
 
+def test_each_automatic_indicator_past_its_age_is_named_as_its_own_problem(tmp_path):
+    """Owner, 21/11/2026: the Vĩ mô folder can be fresh while one series is months old; each such series is said once, by name."""
+    from datetime import date
+    from investment_agent.market.leading import MacroStore
+    data = healthy(tmp_path)
+    drilled(data)
+    store = MacroStore(data)
+    store.upsert("us_cpi_yoy", [(date(2026, 8, 1), "2.9")], entry="auto")      # 100 days against 75
+    store.upsert("vn_interbank_1w", [(date(2026, 11, 6), "4.5")], entry="auto")  # 3 days against 5: fine
+    problems = {p["id"]: p for p in report(data)["problems"]}
+    assert set(problems) == {"macro:us_cpi_yoy"}
+    assert problems["macro:us_cpi_yoy"]["label"] == "Lạm phát CPI của Mỹ (so cùng kỳ)"
+    assert problems["macro:us_cpi_yoy"]["detail"] == "số mới nhất ngày 01/08/2026, quá hạn 75 ngày"
+
+
 def test_a_step_failing_twice_running_is_a_problem_once_is_not(tmp_path):
     data = healthy(tmp_path)
     drilled(data)

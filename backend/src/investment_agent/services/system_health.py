@@ -148,6 +148,21 @@ def calendar_problems(config_dir: Path, *, now: datetime) -> list[dict]:
     return out
 
 
+def macro_problems(data_dir: Path, *, today) -> list[dict]:
+    """Each automatic Vĩ mô indicator whose latest figure is past its own age (owner, 21/11/2026): the folder can be fresh while one
+    series is months old. One problem per series, so each is announced once and its recovery too. A series with no figure yet (just
+    added) and those entered by hand (reminded on their own) are left out."""
+    from datetime import date
+    from investment_agent.market.leading import MacroStore, load_indicators, macro_rows
+    out, indicators = [], load_indicators()
+    limits = {i["id"]: i["max_age_days"] for i in indicators}
+    for r in macro_rows(indicators, MacroStore(Path(data_dir)), today=today):
+        if r["auto"] and r["stale"]:
+            day, limit = date.fromisoformat(r["date"]), limits[r["id"]]
+            out.append({"id": f"macro:{r['id']}", "label": r["label"], "detail": f"số mới nhất ngày {day:%d/%m/%Y}, quá hạn {limit} ngày"})
+    return out
+
+
 def health_report(data_dir: Path, *, now: datetime, calendar=None, config_dir: Path | None = None) -> dict:
     from investment_agent.domain.pinned import CONFIG_DIR
     data_dir = Path(data_dir)
@@ -165,6 +180,7 @@ def health_report(data_dir: Path, *, now: datetime, calendar=None, config_dir: P
         if stale:
             problems.append({"id": f"source:{s['id']}", "label": s["label"],
                              "detail": "chưa có dữ liệu" if last is None else f"cập nhật lần cuối {_dmy(last)}, quá {s['max_days']} ngày"})
+    problems.extend(macro_problems(data_dir, today=now.astimezone(timezone(timedelta(hours=7))).date()))
     lines = _read_tail(root / "logs" / "scheduler.log")
     steps = parse_log(lines or [])
     finishes = [l.lstrip("﻿").split(" ", 1)[0] for l in (lines or []) if " finish exit=" in l]

@@ -247,6 +247,16 @@ def signals(request: Request):
     return {"signals": macro_signals(load_series(Path(request.app.state.data_dir)), today=now(request).astimezone(VN).date())}
 
 
+@router.get("/us")
+def us(request: Request):
+    """Chứng khoán Mỹ: S&P 500, Nasdaq Composite and Dow Jones from FRED, each with its session date (market.us_indices)."""
+    from investment_agent.market.us_indices import us_indices
+    require_owner(request)
+    if request.app.state.data_dir is None:
+        return unavailable()
+    return us_indices(MacroStore(Path(request.app.state.data_dir)), today=now(request).astimezone(VN).date())
+
+
 @router.get("/asia")
 def asia(request: Request):
     """Chứng khoán châu Á: the last read of Nikkei, KOSPI, Shanghai and Hang Seng (market.asia_indices), with the brief's line."""

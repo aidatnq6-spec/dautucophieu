@@ -187,6 +187,8 @@ if __name__ == "__main__":
                                                                          for d, v in ((31, "4000"), (1, "3500"))])
     # CAPM hint and the people block: a stored bond yield and beta, and cached shareholders so the page never calls VNDirect.
     MacroStore(data).upsert("vn10y", [(date.today() - timedelta(days=1), "4.49")], entry="auto")
+    # Chứng khoán Mỹ: two FRED sessions of the S&P 500
+    MacroStore(data).upsert("us_sp500", [(date.today() - timedelta(days=2), "6100"), (date.today() - timedelta(days=1), "6200")], entry="auto")
     from investment_agent.market.beta import BetaStore
     from investment_agent.market.company_people import SCHEMA as PEOPLE_SCHEMA, PeopleStore
     BetaStore(data).save({"values": {"FPT": {"beta": "0.73", "date": (date.today() - timedelta(days=1)).isoformat()}}})

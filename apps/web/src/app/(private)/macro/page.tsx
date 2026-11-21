@@ -3,6 +3,7 @@ import { MacroSignals } from "../../../components/macro-signals";
 import { UsChain } from "../../../components/us-chain";
 import { SjcGap } from "../../../components/sjc-gap";
 import { AsiaMarkets } from "../../../components/asia-markets";
+import { UsMarkets } from "../../../components/us-markets";
 import { MacroView } from "../../../components/macro-view";
 import { MacroCalendar, RateSpread } from "../../../components/macro-extras";
 import { MacroLiquidity } from "../../../components/macro-liquidity";
@@ -19,6 +20,7 @@ export default function MacroPage() {
       <MacroChain />
       <UsChain />
       <SjcGap />
+      <UsMarkets />
       <AsiaMarkets />
       <Sensitivity />
       <RateCycle />

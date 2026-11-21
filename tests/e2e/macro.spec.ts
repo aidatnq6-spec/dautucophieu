@@ -226,5 +226,8 @@ test("the SJC gap section takes a threshold and turns the alert off again", asyn
 test("the Asian markets section and the fuel link of the chain are on the macro page", async ({ page }) => {
   await page.goto("/macro");
   await expect(page.getByRole("region", { name: "Chứng khoán châu Á" })).toContainText(/VNDirect/);
+  const us = page.getByRole("region", { name: "Chứng khoán Mỹ" }).getByRole("list", { name: "Các chỉ số Mỹ" });
+  await expect(us).toContainText("S&P 500");
+  await expect(us).toContainText("+1,64%");
   await expect(page.getByRole("region", { name: "Chuỗi tác động vĩ mô" }).getByTestId("chain-fuel")).toContainText("Giá xăng trong nước");
 });

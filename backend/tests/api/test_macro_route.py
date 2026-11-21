@@ -225,3 +225,11 @@ def test_macro_signals_show_each_light(tmp_path):
     assert [s["id"] for s in body["signals"]] == ["oil", "usd", "fx_gap", "fx_ceiling", "us10y", "foreign", "interbank", "pe", "pmi"]
     assert (lights["oil"]["level"], lights["interbank"]["level"], lights["usd"]["level"], lights["foreign"]["level"]) == \
         ("red", "yellow", "missing", "stale")
+
+
+def test_the_us_indices_are_served_with_their_session_dates(tmp_path):
+    clock = Clock()  # 15/01/2027
+    MacroStore(tmp_path).upsert("us_sp500", [(date(2027, 1, 13), "6100"), (date(2027, 1, 14), "6200")], entry="auto")
+    out = call(client(tmp_path, clock), clock, "GET", "/internal/macro/us").json()
+    assert out["source"] == "FRED" and [r["name"] for r in out["rows"]] == ["S&P 500"]
+    assert out["rows"][0]["date"] == "2027-01-14" and out["rows"][0]["day_pct"] == "0.0164" and out["rows"][0]["stale"] is False

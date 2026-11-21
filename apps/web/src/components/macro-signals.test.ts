@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { type Signal, signalNext, signalSince, signalSummary, signalThresholds, signalValue } from "./macro-signals";
+import { type Signal, signalMove, signalNext, signalSince, signalSummary, signalThresholds, signalValue } from "./macro-signals";
 
 const light = (id: Signal["id"], value: string | null, yellow: string, red: string, more: Partial<Signal> = {}): Signal =>
   ({ id, name: id, level: "green", value, latest_date: "2026-11-20", yellow, red, down_yellow: null, down_red: null, since: null, max_age_days: 7,
-     spark: [], next: null, level_since: null, level_since_open: false, link: "wti", ...more });
+     spark: [], next: null, level_since: null, level_since_open: false, link: "wti", move: null, ...more });
 
 describe("Đèn tín hiệu rủi ro vĩ mô", () => {
   it("says each light's value in its own words", () => {
@@ -14,25 +14,35 @@ describe("Đèn tín hiệu rủi ro vĩ mô", () => {
     expect(signalValue(light("usd", null, "0.02", "0.04"))).toBe("");
   });
   it("gives the yellow and red thresholds the owner approved", () => {
-    expect(signalThresholds(light("oil", null, "0.10", "0.20"))).toBe("vàng ≥ +10% · đỏ ≥ +20%");
-    expect(signalThresholds(light("usd", null, "0.02", "0.04"))).toBe("vàng ≥ +2% · đỏ ≥ +4%");
-    expect(signalThresholds(light("foreign", null, "5", "10"))).toBe("vàng ≥ 5 phiên · đỏ ≥ 10 phiên");
-    expect(signalThresholds(light("interbank", null, "5", "7"))).toBe("vàng ≥ 5%/năm · đỏ ≥ 7%/năm");
+    expect(signalThresholds(light("oil", null, "0.10", "0.20"))).toBe("cảnh báo ≥ +10% · nguy hiểm ≥ +20%");
+    expect(signalThresholds(light("usd", null, "0.02", "0.04"))).toBe("cảnh báo ≥ +2% · nguy hiểm ≥ +4%");
+    expect(signalThresholds(light("foreign", null, "5", "10"))).toBe("cảnh báo ≥ 5 phiên · nguy hiểm ≥ 10 phiên");
+    expect(signalThresholds(light("interbank", null, "5", "7"))).toBe("cảnh báo ≥ 5%/năm · nguy hiểm ≥ 7%/năm");
   });
   it("adds oil's falling side to its thresholds", () => {
     expect(signalThresholds(light("oil", null, "0.10", "0.20", { down_yellow: "-0.15", down_red: "-0.25" })))
-      .toBe("vàng ≥ +10% · đỏ ≥ +20% · giảm: vàng ≤ −15% · đỏ ≤ −25%");
+      .toBe("cảnh báo ≥ +10% · nguy hiểm ≥ +20% · giảm: cảnh báo ≤ −15% · nguy hiểm ≤ −25%");
   });
   it("says how far the next level is, in the light's own unit", () => {
-    expect(signalNext(light("fx_gap", "0.0119", "0.01", "0.02", { level: "yellow", next: { level: "red", by: "0.0081" } }))).toBe("còn 0,81 điểm % nữa là đỏ");
-    expect(signalNext(light("foreign", "4", "5", "10", { next: { level: "yellow", by: "1" } }))).toBe("thêm 1 phiên bán ròng là vàng");
-    expect(signalNext(light("interbank", "4.68", "5", "7", { next: { level: "yellow", by: "0.32" } }))).toBe("còn 0,32 điểm % nữa là vàng");
-    expect(signalNext(light("oil", "0.3", "0.10", "0.20", { level: "red" }))).toBe("đang ở mức đỏ");
+    expect(signalNext(light("fx_gap", "0.0119", "0.01", "0.02", { level: "yellow", next: { level: "red", by: "0.0081" } }))).toBe("còn 0,81 điểm % nữa là mức nguy hiểm");
+    expect(signalNext(light("foreign", "4", "5", "10", { next: { level: "yellow", by: "1" } }))).toBe("thêm 1 phiên bán ròng là mức cảnh báo");
+    expect(signalNext(light("interbank", "4.68", "5", "7", { next: { level: "yellow", by: "0.32" } }))).toBe("còn 0,32 điểm % nữa là mức cảnh báo");
+    expect(signalNext(light("oil", "0.3", "0.10", "0.20", { level: "red" }))).toBe("đang ở mức nguy hiểm");
   });
   it("says since when a light holds its level, and sums the lights up", () => {
-    expect(signalSince(light("oil", "-0.17", "0.10", "0.20", { level: "yellow", level_since: "2026-11-16" }))).toBe("Vàng từ 16/11");
-    expect(signalSince(light("usd", "0", "0.02", "0.04", { level_since: "2026-10-22", level_since_open: true }))).toBe("Xanh ít nhất từ 22/10");
+    expect(signalSince(light("oil", "-0.17", "0.10", "0.20", { level: "yellow", level_since: "2026-11-16" }))).toBe("Cảnh báo từ 16/11");
+    expect(signalSince(light("usd", "0", "0.02", "0.04", { level_since: "2026-10-22", level_since_open: true }))).toBe("Bình thường ít nhất từ 22/10");
     const rows = [light("oil", "1", "1", "2", { level: "yellow" }), light("usd", "0", "1", "2"), light("fx_gap", null, "1", "2", { level: "missing" })];
-    expect(signalSummary(rows)).toBe("0 đỏ · 1 vàng · 1 xanh · 1 chưa có số");
+    expect(signalSummary(rows)).toBe("0 nguy hiểm · 1 cảnh báo · 1 bình thường · 1 chưa có số");
+  });
+  it("says which way each light moved, with its own colour", () => {
+    expect(signalMove(light("oil", "-0.173", "0.10", "0.20", { move: { direction: "down", bad: false, by: "0.173" } })))
+      .toEqual({ text: "▼ giảm · chiều tốt", tone: "good" });
+    expect(signalMove(light("fx_gap", "0.0119", "0.01", "0.02", { move: { direction: "up", bad: true, by: "0.0069" } })))
+      .toEqual({ text: "▲ tăng 0,69 điểm % so với 30 ngày trước · chiều xấu", tone: "bad" });
+    expect(signalMove(light("interbank", "4.68", "5", "7", { move: { direction: "flat", bad: null, by: "0.02" } })))
+      .toEqual({ text: "→ đi ngang so với 30 ngày trước", tone: "flat" });
+    expect(signalMove(light("foreign", "4", "5", "10", { move: { direction: "up", bad: true, by: "4" } })))
+      .toEqual({ text: "▲ đang bán ròng · chiều xấu", tone: "bad" });
   });
 });

@@ -8,13 +8,15 @@ export type Signal = {
   yellow: string; red: string; down_yellow: string | null; down_red: string | null; since: string | null; max_age_days: number;
   spark: { date: string; value: string }[]; next: { level: "yellow" | "red"; by: string } | null;
   level_since: string | null; level_since_open: boolean; link: string;
+  move: { direction: "up" | "down" | "flat"; bad: boolean | null; by: string } | null;
 };
 
 const dm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const num = (v: number, digits: number) => v.toLocaleString("vi-VN", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 const signed = (v: number, digits: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${num(Math.abs(v), digits)}`;
-const LEVEL: Record<Level, string> = { green: "Xanh", yellow: "Vàng", red: "Đỏ", missing: "Chưa có số", stale: "Số cũ" };
-const WORD = { yellow: "vàng", red: "đỏ" } as const;
+// The dot is the level against the thresholds, named so it is not read as the way things moved (owner, 21/11/2026).
+const LEVEL: Record<Level, string> = { green: "Bình thường", yellow: "Cảnh báo", red: "Nguy hiểm", missing: "Chưa có số", stale: "Số cũ" };
+const WORD = { yellow: "cảnh báo", red: "nguy hiểm" } as const;
 
 /** What the light measures, in words: a 30-day change, the free rate's gap, a run of sessions or a rate. */
 export function signalValue(s: Signal): string {
@@ -30,21 +32,22 @@ export function signalValue(s: Signal): string {
 export function signalThresholds(s: Signal): string {
   const y = Number(s.yellow), r = Number(s.red);
   if (s.id === "oil" || s.id === "usd") {
-    const up = `vàng ≥ +${num(y * 100, 0)}% · đỏ ≥ +${num(r * 100, 0)}%`;
-    return s.down_yellow && s.down_red ? `${up} · giảm: vàng ≤ ${signed(Number(s.down_yellow) * 100, 0)}% · đỏ ≤ ${signed(Number(s.down_red) * 100, 0)}%` : up;
+    const up = `cảnh báo ≥ +${num(y * 100, 0)}% · nguy hiểm ≥ +${num(r * 100, 0)}%`;
+    return s.down_yellow && s.down_red
+      ? `${up} · giảm: cảnh báo ≤ ${signed(Number(s.down_yellow) * 100, 0)}% · nguy hiểm ≤ ${signed(Number(s.down_red) * 100, 0)}%` : up;
   }
-  if (s.id === "fx_gap") return `vàng ≥ ${num(y * 100, 0)}% · đỏ ≥ ${num(r * 100, 0)}%`;
-  if (s.id === "foreign") return `vàng ≥ ${y} phiên · đỏ ≥ ${r} phiên`;
-  return `vàng ≥ ${num(y, 0)}%/năm · đỏ ≥ ${num(r, 0)}%/năm`;
+  if (s.id === "fx_gap") return `cảnh báo ≥ ${num(y * 100, 0)}% · nguy hiểm ≥ ${num(r * 100, 0)}%`;
+  if (s.id === "foreign") return `cảnh báo ≥ ${y} phiên · nguy hiểm ≥ ${r} phiên`;
+  return `cảnh báo ≥ ${num(y, 0)}%/năm · nguy hiểm ≥ ${num(r, 0)}%/năm`;
 }
 
 /** How far the next level is, in the light's own unit. */
 export function signalNext(s: Signal): string | null {
-  if (!s.next) return s.level === "red" ? "đang ở mức đỏ" : null;
+  if (!s.next) return s.level === "red" ? "đang ở mức nguy hiểm" : null;
   const by = Number(s.next.by), to = WORD[s.next.level];
-  if (s.id === "foreign") return `thêm ${num(by, 0)} phiên bán ròng là ${to}`;
-  if (s.id === "interbank") return `còn ${num(by, 2)} điểm % nữa là ${to}`;
-  return `còn ${num(by * 100, 2)} điểm % nữa là ${to}`;
+  if (s.id === "foreign") return `thêm ${num(by, 0)} phiên bán ròng là mức ${to}`;
+  if (s.id === "interbank") return `còn ${num(by, 2)} điểm % nữa là mức ${to}`;
+  return `còn ${num(by * 100, 2)} điểm % nữa là mức ${to}`;
 }
 
 /** Since when the light has held its level, worked out from the stored days. */
@@ -56,10 +59,23 @@ export function signalSince(s: Signal): string | null {
 /** Counts of each level for the line at the top of the box. */
 export function signalSummary(rows: Signal[]): string {
   const count = (l: Level) => rows.filter((s) => s.level === l).length;
-  const parts = [`${count("red")} đỏ`, `${count("yellow")} vàng`, `${count("green")} xanh`];
+  const parts = [`${count("red")} nguy hiểm`, `${count("yellow")} cảnh báo`, `${count("green")} bình thường`];
   if (count("stale")) parts.push(`${count("stale")} số cũ`);
   if (count("missing")) parts.push(`${count("missing")} chưa có số`);
   return parts.join(" · ");
+}
+
+/** Which way the measure went, with its own colour: up is the bad side for all five lights. */
+export function signalMove(s: Signal): { text: string; tone: "bad" | "good" | "flat" } | null {
+  const m = s.move;
+  if (!m || s.level === "missing") return null;
+  if (s.id === "foreign") return m.bad ? { text: "▲ đang bán ròng · chiều xấu", tone: "bad" } : { text: "▼ phiên cuối mua ròng · chiều tốt", tone: "good" };
+  const by = Number(m.by);
+  const size = s.id === "interbank" ? `${num(by, 2)} điểm %` : s.id === "fx_gap" ? `${num(by * 100, 2)} điểm %` : `${num(by * 100, 1)}%`;
+  const span = s.id === "oil" || s.id === "usd" ? "" : " so với 30 ngày trước";
+  if (m.direction === "flat") return { text: `→ đi ngang${span}`, tone: "flat" };
+  const amount = s.id === "oil" || s.id === "usd" ? "" : ` ${size}`;  // the value line already gives the 30-day change
+  return { text: `${m.direction === "up" ? "▲ tăng" : "▼ giảm"}${amount}${span} · ${m.bad ? "chiều xấu" : "chiều tốt"}`, tone: m.bad ? "bad" : "good" };
 }
 
 /** The light's own measure over 30 days, with its yellow and red lines (both sides for oil). */
@@ -96,7 +112,7 @@ export function MacroSignals() {
       {rows && <>
         <p className="ms-summary" aria-label="Tóm tắt các đèn"><strong>{signalSummary(rows)}</strong></p>
         <ul className="ms-list" aria-label="Các đèn tín hiệu">{rows.map((s) => {
-          const next = signalNext(s), since = signalSince(s);
+          const next = signalNext(s), since = signalSince(s), move = signalMove(s);
           return (
             <li key={s.id} data-testid={`signal-${s.id}`}>
               <span className={`ms-dot ms-${s.level}`} aria-hidden="true" />
@@ -108,6 +124,7 @@ export function MacroSignals() {
                     : <>{signalValue(s)}{s.latest_date && <span className="caption"> · số ngày {dm(s.latest_date)}</span>}
                       {s.level === "stale" && <span className="caption"> (quá {s.max_age_days} ngày, không tô màu)</span>}</>}
                 </div>
+                {move && <div className={`ms-move ms-move-${move.tone}`}>{move.text}</div>}
                 {next && <div className="ms-next">{next}</div>}
                 <div className="caption">{signalThresholds(s)}{s.since && ` · số liệu từ ${dm(s.since)}, chưa đủ 30 ngày`}</div>
               </div>

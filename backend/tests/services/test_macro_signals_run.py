@@ -21,7 +21,7 @@ def test_the_first_run_only_records_the_levels_then_a_change_is_sent_once(tmp_pa
     seed(tmp_path, oil_now="125")  # +25% in 30 days
     out = signals_run(tmp_path, today=date(2026, 10, 28), send=lambda text: sent.append(text) or True)
     assert out == {**out, "changes": 1, "sent": True, "first_run": False}
-    assert len(sent) == 1 and "Giá dầu WTI: xanh → đỏ (+25,0% trong 30 ngày)" in sent[0] and "không phải khuyến nghị" in sent[0]
+    assert len(sent) == 1 and "Giá dầu WTI: bình thường → nguy hiểm (+25,0% trong 30 ngày)" in sent[0] and "không phải khuyến nghị" in sent[0]
     assert signals_run(tmp_path, today=date(2026, 10, 28), send=lambda text: sent.append(text) or True)["changes"] == 0 and len(sent) == 1
 
 

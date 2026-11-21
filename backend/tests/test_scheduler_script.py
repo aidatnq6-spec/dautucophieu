@@ -80,8 +80,10 @@ def test_source_alerts_follow_the_macro_update():
 
 
 def test_liquidity_alerts_follow_the_macro_update():
+    """Nhắc thanh khoản và tỷ giá now goes out with the lights in one step, macro-alerts (owner, 21/11/2026)."""
     ls = lines()
-    assert next(i for i, l in enumerate(ls) if "jobs.step macro-sync" in l) < next(i for i, l in enumerate(ls) if "jobs.step liquidity-alerts" in l)
+    assert next(i for i, l in enumerate(ls) if "jobs.step macro-sync" in l) < next(i for i, l in enumerate(ls) if "jobs.step macro-alerts" in l)
+    assert not any("jobs.step liquidity-alerts" in l or "jobs.step macro-signals" in l for l in ls)  # never two messages for one run
 
 
 def test_macro_event_reminders_run_on_every_wake_up():
@@ -175,5 +177,5 @@ def test_macro_signals_run_right_after_the_macro_sync():
     """Đèn tín hiệu rủi ro vĩ mô (spec 21/11/2026): the lights are read on the figures the macro sync just stored."""
     ls = lines()
     sync = next(i for i, l in enumerate(ls) if "jobs.step macro-sync" in l)
-    step = next(i for i, l in enumerate(ls) if "jobs.step macro-signals" in l)
+    step = next(i for i, l in enumerate(ls) if "jobs.step macro-alerts" in l)
     assert sync < step < next(i for i, l in enumerate(ls) if "jobs.step scheduled-run" in l)

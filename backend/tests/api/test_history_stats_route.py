@@ -29,6 +29,7 @@ def test_the_page_reads_one_horizon_at_a_time(tmp_path):
     out = call(c, clock, "GET", "/internal/history-stats/60").json()
     assert out["h"] == 60 and out["horizons"] == [20, 60, 120, 250]
     assert len(out["pe"]["groups"]) == 5 and [lg["id"] for lg in out["lights"]] == ["oil", "usd", "us10y", "pe"]
+    assert out["summary"].startswith("Hôm nay P/E VN-Index") and out["summary"].endswith("không phải dự báo hay khuyến nghị.")
 
 
 def test_only_the_offered_horizons_are_accepted(tmp_path):

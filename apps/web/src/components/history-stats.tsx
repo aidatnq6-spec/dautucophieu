@@ -9,7 +9,7 @@ type PeStats = { h: number; groups: PeGroup[]; all: Summary; scatter: Dot[]; tre
   today: { date: string; pe: string; position: string; bucket: number } | null; from: string | null };
 type LightGroup = Summary & { level: "green" | "yellow" | "red" };
 type Light = { id: string; name: string; h: number; groups: LightGroup[]; all: Summary; today: "green" | "yellow" | "red" | null; from: string | null };
-export type HistoryStats = { h: number; horizons: number[]; pe: PeStats; lights: Light[] };
+export type HistoryStats = { h: number; horizons: number[]; pe: PeStats; lights: Light[]; summary?: string };
 
 const LEVEL = { green: "Bình thường", yellow: "Cảnh báo", red: "Nguy hiểm" } as const;
 const num = (v: number, d: number) => v.toLocaleString("vi-VN", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -156,6 +156,8 @@ export function HistoryStatsView() {
   return (
     <>
       <section className="surface" aria-label="Số phiên nhìn tới">
+        {data?.summary && <p className="hs-summary" data-testid="history-summary">{data.summary}
+          <span className="caption"> (câu viết theo mẫu từ chính các số trên trang, không dùng AI)</span></p>}
         <div className="chips" role="radiogroup" aria-label="VN-Index sau bao nhiêu phiên">
           {[20, 60, 120, 250].map((x) => <button key={x} type="button" role="radio" aria-checked={h === x} className={`chip${h === x ? " on" : ""}`}
             onClick={() => setH(x)}>{x} phiên</button>)}

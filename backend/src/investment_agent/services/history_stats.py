@@ -44,19 +44,11 @@ def all_series(data_dir: Path) -> dict[str, list[tuple[date, Decimal]]]:
     return out
 
 
-def history_states(data_dir: Path, *, a: str, b: str, h: int, fx: str, today: date) -> dict:
-    """The 2×2 of two conditions, every condition's state today (known since when) and VN-Index's weekly line for the chart."""
-    from investment_agent.domain.history_states import CONDITIONS, condition_days, states_table
-    key = ("states", str(data_dir), a, b, h, fx, today)
-    hit = _CACHE.get(key)
-    if hit and time.monotonic() - hit[0] < TTL_SECONDS:
-        return hit[1]
+def conditions_now(data_dir: Path, *, fx: str, today: date) -> tuple[dict, list[dict]]:
+    """(each condition's known states, each condition today: its state if its figure still stands, the figure's own date, since when)."""
+    from investment_agent.domain.history_states import CONDITIONS, MONTHLY_LAG, STALE, condition_days
     series, threshold = all_series(Path(data_dir)), Decimal(fx) / 100
-    closes = _series(SeriesStore(Path(data_dir) / "trend-sources"), "VNINDEX-1d")
-    label = lambda k: CONDITIONS[k]["label"].replace("{fx}", f"{fx}%")  # noqa: E731
     known = {k: condition_days(k, series, fx=threshold) for k in CONDITIONS}
-    table = states_table(known[a], known[b], closes, h=h, kinds=(CONDITIONS[a]["kind"], CONDITIONS[b]["kind"]))
-    from investment_agent.domain.history_states import MONTHLY_LAG, STALE
     conditions = []
     for k, spec in CONDITIONS.items():
         last = known[k][-1] if known[k] else None
@@ -64,9 +56,23 @@ def history_states(data_dir: Path, *, a: str, b: str, h: int, fx: str, today: da
         # the figure's own date: a month's end (known on the 10th after, USD/VND on the 1st), a day's (known the next day)
         figure = None if last is None else last[0] - (timedelta(days=0) if k == "pe_high" else MONTHLY_LAG if spec["kind"] == "monthly" and k != "fx_up"
                                                        else timedelta(days=1))
-        conditions.append({"id": k, "label": label(k), "kind": spec["kind"], "state": last[1] if fresh else None,
+        conditions.append({"id": k, "label": spec["label"].replace("{fx}", f"{fx}%"), "kind": spec["kind"], "state": last[1] if fresh else None,
                            "known_on": last[0].isoformat() if last else None, "figure_date": figure.isoformat() if figure else None,
                            "from": known[k][0][0].isoformat() if known[k] else None})
+    return known, conditions
+
+
+def history_states(data_dir: Path, *, a: str, b: str, h: int, fx: str, today: date) -> dict:
+    """The 2×2 of two conditions, every condition's state today (known since when) and VN-Index's weekly line for the chart."""
+    from investment_agent.domain.history_states import CONDITIONS, condition_days, states_table
+    key = ("states", str(data_dir), a, b, h, fx, today)
+    hit = _CACHE.get(key)
+    if hit and time.monotonic() - hit[0] < TTL_SECONDS:
+        return hit[1]
+    closes = _series(SeriesStore(Path(data_dir) / "trend-sources"), "VNINDEX-1d")
+    known, conditions = conditions_now(Path(data_dir), fx=fx, today=today)
+    label = lambda k: CONDITIONS[k]["label"].replace("{fx}", f"{fx}%")  # noqa: E731
+    table = states_table(known[a], known[b], closes, h=h, kinds=(CONDITIONS[a]["kind"], CONDITIONS[b]["kind"]))
     weekly = {}
     for d, v in closes:
         weekly[d.isocalendar()[:2]] = (d, v)
@@ -88,6 +94,8 @@ def history_stats(data_dir: Path, *, h: int, today: date) -> dict:
               "vnindex_pe": pe}
     out = {"h": h, "horizons": list(HORIZONS), "closes_from": closes[0][0].isoformat() if closes else None,
            "pe": pe_groups(pe, closes, h=h), "lights": [light_groups(k, series, closes, h=h) for k in LIGHTS]}
+    from investment_agent.domain.history_stats import history_summary
+    out["summary"] = history_summary(out, conditions_now(data_dir, fx="1", today=today)[1])  # by a fixed pattern, no model
     _CACHE.clear() if len(_CACHE) > 16 else None
     _CACHE[key] = (time.monotonic(), out)
     return out

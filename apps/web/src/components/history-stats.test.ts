@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { changePct, evidence } from "./history-stats";
+import { changePct, evidence, figureText } from "./history-stats";
+
+describe("figureText", () => {
+  it("names the month for a World Bank figure and the day for a daily one", () => {
+    const c = (kind: "monthly" | "daily", figure_date: string | null) => ({ id: "x", label: "x", kind, state: true, known_on: null, figure_date, from: null });
+    expect(figureText(c("monthly", "2026-07-31"))).toBe("số tháng 07/2026");
+    expect(figureText(c("daily", "2026-11-19"))).toBe("số ngày 19/11/2026");
+    expect(figureText(c("daily", null))).toBe("chưa có số");
+  });
+});
 
 const s = (n: number, ind: number, t: string | null) => ({ n, n_independent: ind, mean: "0.1", median: "0.1", win_rate: "0.6", t });
 

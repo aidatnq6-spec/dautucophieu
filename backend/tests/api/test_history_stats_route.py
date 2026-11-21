@@ -34,3 +34,19 @@ def test_the_page_reads_one_horizon_at_a_time(tmp_path):
 def test_only_the_offered_horizons_are_accepted(tmp_path):
     c, clock = client(tmp_path)
     assert call(c, clock, "GET", "/internal/history-stats/61").status_code == 422
+
+
+def test_the_two_by_two_reads_two_conditions_and_the_usd_vnd_threshold(tmp_path):
+    c, clock = client(tmp_path)
+    out = call(c, clock, "GET", "/internal/history-stats/states/60/oil_up/pe_high/1").json()
+    assert out["h"] == 60 and out["a"]["id"] == "oil_up" and out["b"]["id"] == "pe_high" and len(out["rows"]) == 4
+    assert {c["id"] for c in out["conditions"]} >= {"cpi_up", "fx_up", "oil_up"} and "line" in out
+    fx = next(c for c in out["conditions"] if c["id"] == "fx_up")
+    assert fx["label"] == "Tỷ giá USD/VND tăng hơn 1% trong 3 tháng" and fx["state"] is None  # no World Bank figures in this test
+
+
+def test_the_two_by_two_refuses_an_unknown_condition_or_threshold(tmp_path):
+    c, clock = client(tmp_path)
+    assert call(c, clock, "GET", "/internal/history-stats/states/60/oil_up/nope/1").status_code == 422
+    assert call(c, clock, "GET", "/internal/history-stats/states/60/oil_up/pe_high/7").status_code == 422
+    assert call(c, clock, "GET", "/internal/history-stats/states/60/oil_up/oil_up/1").status_code == 422

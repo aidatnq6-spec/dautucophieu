@@ -585,4 +585,4 @@ main h2{scroll-margin-top:16px}
 .hs-axis{stroke:var(--line);stroke-width:1}.hs-tick{font-size:11px;fill:var(--muted)}
 .hs-up{fill:color-mix(in srgb,var(--good) 60%,transparent)}.hs-down{fill:color-mix(in srgb,var(--bad) 60%,transparent)}
 .hs-trend{stroke:var(--brand);stroke-width:2}.hs-now{stroke:var(--ink);stroke-width:1.5;stroke-dasharray:4 3}
-tr.hs-today td{font-weight:600;background:color-mix(in srgb,var(--brand) 8%,transparent)}
+tr.hs-today td{font-weight:600;background:color-mix(in srgb,var(--brand) 8%,transparent)}.hs-run{fill:color-mix(in srgb,var(--bad) 22%,transparent)}.hs-line{fill:none;stroke:var(--ink);stroke-width:1.4}

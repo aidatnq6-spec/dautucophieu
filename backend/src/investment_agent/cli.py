@@ -607,7 +607,8 @@ def _macro_late(data_dir: Path, failed: dict, indicators: list[dict]) -> tuple[l
     from investment_agent.market.omo import OmoStore
     from investment_agent.market.us_indices import INDICES as US_INDICES, MAX_AGE_DAYS as US_MAX_AGE
     today, store = datetime.now(VN).date(), MacroStore(data_dir)
-    limits = {**{k: US_MAX_AGE for k, _, _ in US_INDICES}, **{i["id"]: i["max_age_days"] for i in indicators}}
+    from investment_agent.market.history_series import MAX_AGE_DAYS as HISTORY_MAX_AGE
+    limits = {**{k: US_MAX_AGE for k, _, _ in US_INDICES}, **HISTORY_MAX_AGE, **{i["id"]: i["max_age_days"] for i in indicators}}
     late, stale = [], []
     for key in sorted(failed):
         if key in limits:
@@ -629,6 +630,11 @@ def _macro_extras(data_dir: Path, results: dict, *, get, get_bytes, sleep) -> No
     results.update(fetch_factors(MacroStore(data_dir), get=get, sleep=sleep))  # long oil and US dollar history for the sensitivity reading
     from investment_agent.market.us_indices import fetch_us_indices
     results.update(fetch_us_indices(MacroStore(data_dir), get=get, sleep=sleep))  # Chứng khoán Mỹ (FRED), beside the Asian indices
+    from investment_agent.market.history_series import fetch_history_series
+    from investment_agent.market.leading import VN as _VN
+    from datetime import datetime as _datetime
+    # Lịch sử vĩ mô dài for Thống kê lịch sử (World Bank, FRED), once a week
+    results.update(fetch_history_series(MacroStore(data_dir), Path(data_dir), get=get, sleep=sleep, today=_datetime.now(_VN).date()))
     results.update(fetch_commodities(MacroStore(data_dir), get=get, sleep=sleep))  # monthly world prices for Chuỗi giá trị
     results.update(fetch_chain_series(MacroStore(data_dir), get=get, get_bytes=get_bytes, sleep=sleep))  # urea, container throughput
     if get_bytes is not None:  # dairy, hydropower inflow, freight, steel: live runs only, like the World Bank sheet

@@ -135,6 +135,14 @@ def build_snapshot(*, session_date: date, previous_session: date | None, now: da
         sections["us"] = {"status": "ok", **got} if got and got.get("rows") else _missing("Chưa có chỉ số Mỹ từ FRED")
     except Exception:
         sections["us"] = _missing("Không đọc được chỉ số Mỹ")
+    try:  # Cú sốc hôm nay (domain.history_stats): VN-Index's shocks of the session, read from its stored closes since 2000 (21/11/2026)
+        from decimal import Decimal
+
+        from investment_agent.domain.history_stats import shocks_today
+        closes = sorted((t.date(), Decimal(str(v))) for t, v in series("VNINDEX"))
+        sections["shocks"] = shocks_today(closes, session=session_date)
+    except Exception:
+        sections["shocks"] = _missing("Không tính được cú sốc của VN-Index")
     try:
         sections["hose_liquidity"] = hose_liquidity(sections["hose"], earlier=list(earlier), hose_get=hose_get)
     except Exception:

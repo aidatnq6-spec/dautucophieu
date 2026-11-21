@@ -148,6 +148,9 @@ def render_market_brief(report: dict, market: dict) -> str:
     from investment_agent.market.us_indices import us_line
     if us := us_line(market.get("us")):
         lines.append(us)
+    from investment_agent.domain.history_stats import shock_line
+    if shock := shock_line(market.get("shocks")):  # Cú sốc hôm nay: only when VN-Index had one on the session
+        lines.append(shock)
     if signal := signal_lines(market.get("signals")):
         lines += ["", "TÍN HIỆU PHIÊN", *[f"- {s}" for s in signal], ""]
     board, hose = market.get("board") or {}, market.get("hose") or {}

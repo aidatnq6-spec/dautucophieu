@@ -76,7 +76,7 @@ def group_summary(days: list[date], returns: dict[date, Decimal], index: dict[da
     t = None
     if len(free) >= 3:
         sd = stdev(free)
-        t = _q(mean(free) / (sd / Decimal(len(free)).sqrt()), "0.01") if sd > 0 else None
+        t = _q(mean(free) / (sd / Decimal(len(free)).sqrt()), "0.01") if sd > Decimal("1e-9") else None  # a spread of rounding only: no t
     cuts = quantiles(values, n=10, method="inclusive") if len(values) >= 2 else [values[0]] * 9
     falls = [dips[d] for d in days if dips and d in dips]
     return {"n": len(values), "n_independent": len(free), "mean": _q(mean(values)), "median": _q(median(values)),
@@ -118,17 +118,95 @@ def shock_days(closes: Points) -> dict[str, list[date]]:
     return out
 
 
+# Cú sốc chồng cú sốc (21/11/2026): a sharp fall split by where VN-Index stood that day, to see whether the risks add up
+COMBOS = {
+    "drop3_under200": ("drop3", "under200", "Giảm từ 3% trong một phiên khi đang dưới trung bình 200 phiên"),
+    "drop3_over200": ("drop3", "over200", "Giảm từ 3% trong một phiên khi đang trên trung bình 200 phiên"),
+    "drop3_dd20": ("drop3", "dd20", "Giảm từ 3% trong một phiên khi đã giảm 20% từ đỉnh 52 tuần"),
+    "down5_under200": ("down5", "under200", "Giảm 5 phiên liền khi đang dưới trung bình 200 phiên"),
+    "down5_over200": ("down5", "over200", "Giảm 5 phiên liền khi đang trên trung bình 200 phiên"),
+    "down5_dd20": ("down5", "dd20", "Giảm 5 phiên liền khi đã giảm 20% từ đỉnh 52 tuần"),
+}
+
+
+def _standing(closes: Points) -> dict[str, set[date]]:
+    """The sessions VN-Index closed under / at or over its 200-session average (once 200 sessions exist), and 20% or more under its
+    52-week high."""
+    values, out, total = [v for _, v in closes], {"under200": set(), "over200": set(), "dd20": set()}, Decimal(0)
+    for i, (d, v) in enumerate(closes):
+        total += v
+        if i >= 200:
+            total -= values[i - 200]
+        if i >= 199:
+            out["under200" if v < total / 200 else "over200"].add(d)
+        high = max(values[max(0, i - PEAK_SESSIONS + 1):i + 1])
+        if high and v / high - 1 <= Decimal("-0.20"):
+            out["dd20"].add(d)
+    return out
+
+
+def combo_days(closes: Points) -> dict[str, list[date]]:
+    shocks, standing = shock_days(closes), _standing(closes)
+    return {k: [d for d in shocks[s] if d in standing[w]] for k, (s, w, _) in COMBOS.items()}
+
+
+def _shock_rows(days: dict[str, list[date]], labels: dict[str, str], closes: Points, returns, dips, index, *, h: int) -> list[dict]:
+    last = closes[-1][0] if closes else None
+    return [{"id": k, "label": labels[k], "events": len(days[k]), "recent": [d.isoformat() for d in days[k][-3:]],
+             "today": bool(days[k]) and days[k][-1] == last, **group_summary(days[k], returns, index, h=h, dips=dips)} for k in labels]
+
+
 def shock_groups(closes: Points, *, h: int) -> dict:
     """Sau một cú sốc thì sao: VN-Index h sessions after each kind of shock, with the risk figures, the latest times it happened and
-    whether it happened on the latest session; "all" is every session, to compare against."""
+    whether it happened on the latest session; "combos" splits the sharp falls by where VN-Index stood; "all" is every session."""
     index = {d: i for i, (d, _) in enumerate(closes)}
     returns, dips = forward_returns(closes, h), forward_dips(closes, h)
-    days = shock_days(closes)
-    last = closes[-1][0] if closes else None
-    groups = [{"id": k, "label": label, "events": len(days[k]), "recent": [d.isoformat() for d in days[k][-3:]], "today": bool(days[k]) and days[k][-1] == last,
-               **group_summary(days[k], returns, index, h=h, dips=dips)} for k, label in SHOCKS.items()]
-    return {"h": h, "groups": groups, "all": group_summary([d for d, _ in closes], returns, index, h=h, dips=dips),
+    groups = _shock_rows(shock_days(closes), SHOCKS, closes, returns, dips, index, h=h)
+    combos = _shock_rows(combo_days(closes), {k: c[2] for k, c in COMBOS.items()}, closes, returns, dips, index, h=h)
+    return {"h": h, "groups": groups, "combos": combos, "all": group_summary([d for d, _ in closes], returns, index, h=h, dips=dips),
             "from": closes[0][0].isoformat() if closes else None}
+
+
+TODAY_H = 60  # the brief and Telegram read a shock's past 60 sessions on
+
+
+def shocks_today(closes: Points, *, session: date, h: int = TODAY_H) -> dict:
+    """Cú sốc hôm nay for the brief: the shocks of the session, each with its past (the narrower split when one applies and has enough
+    independent windows)."""
+    closes = [(d, v) for d, v in closes if d <= session]
+    if not closes or closes[-1][0] != session:
+        return {"status": "missing", "reason": "Chưa có giá VN-Index phiên này"}
+    out = shock_groups(closes, h=h)
+    return {"status": "ok", "h": h, "today": _today_shocks(out), "all": out["all"], "from": out["from"]}
+
+
+def _today_shocks(out: dict) -> list[dict]:
+    today = []
+    for g in (g for g in out["groups"] if g["today"]):
+        narrow = [c for c in out.get("combos", []) if c["today"] and c["enough"] and c["id"].startswith(g["id"] + "_")]  # a split too thin says less
+        narrow.sort(key=lambda c: not c["id"].endswith("dd20"))  # 20% under the high says more than the 200-session side
+        today.append({**g, "within": narrow[0] if narrow else None})
+    return today
+
+
+def _shock_past(g: dict, everyday: dict, h: int, since: str | None) -> str:
+    head = f"{g['events']} lần từ {since[:4]}" if since else f"{g['events']} lần"
+    if g.get("enough", True) is False:
+        return f"{head}, chỉ {g['n_independent']} khoảng {h} phiên không chồng lấn: không đủ dữ liệu cho kỳ này"
+    return (f"{head} ({g['n_independent']} khoảng không chồng lấn), {h} phiên sau trung bình {_pct(g['mean'])} (mọi lúc {_pct(everyday['mean'])}), "
+            f"xấu thường gặp {_pct(g['p10'])}, giảm sâu nhất trong kỳ trung vị {_pct(g['dip_median'])}")
+
+
+def shock_line(section: dict | None) -> str | None:
+    """One line when VN-Index had a shock on the session, by a fixed pattern (no model); None otherwise."""
+    if not section or section.get("status") != "ok" or not section["today"]:
+        return None
+    return _shock_sentence(section["today"], section["all"], section["h"], section.get("from")) + " Chỉ mô tả quá khứ, không phải dự báo."
+
+
+def _shock_sentence(today: list[dict], everyday: dict, h: int, since: str | None) -> str:
+    parts = [f"{_lower(g['within']['label']) if g.get('within') else g['label']}: {_shock_past(g.get('within') or g, everyday, h, since)}" for g in today]
+    return f"Cú sốc hôm nay: {'; '.join(g['label'] for g in today)}. Trong quá khứ, " + "; ".join(parts) + "."
 
 
 def _percentiles(pe: Points) -> dict[date, Decimal]:
@@ -255,6 +333,8 @@ def history_summary(stats: dict, conditions: list[dict] | None) -> str:
         unknown = len(conditions) - len(known)
         parts.append(f"Vĩ mô hôm nay: {len(true)}/{len(known)} điều kiện đã biết đang đúng ({'; '.join(true) if true else 'không điều kiện nào'})"
                      + (f"; {unknown} điều kiện chưa biết" if unknown else "") + ". ")
+    if (shocks := stats.get("shocks")) and (today := _today_shocks(shocks)):
+        parts.append(_shock_sentence(today, shocks["all"], h, shocks.get("from")) + " ")
     parts.append("Chỉ mô tả quá khứ, không phải dự báo hay khuyến nghị.")
     return "".join(parts)
 

@@ -137,3 +137,14 @@ def test_the_us_markets_line_follows_the_asian_one():
     assert "Mỹ (FRED): Dow Jones −1,93% (phiên 13/11)" in text
     assert text.index("Châu Á") < text.index("Mỹ (FRED)") < text.index("Giá trị khớp lệnh")
     assert "Mỹ (FRED)" not in render_report(REPORT, market=MARKET)
+
+
+def test_a_shock_of_the_session_gets_its_line_after_the_markets_abroad():
+    us = {"rows": [{"id": "us_dow", "name": "Dow Jones", "date": "2026-11-13", "day_pct": "-0.0193", "stale": False}], "source": "FRED"}
+    g = {"id": "drop3", "label": "VN-Index giảm từ 3% trong một phiên", "events": 199, "n": 199, "n_independent": 48, "enough": True,
+         "mean": "-0.0305", "p10": "-0.3444", "dip_median": "-0.1058", "within": None}
+    shocks = {"status": "ok", "h": 60, "today": [g], "all": {"mean": "0.0429"}, "from": "2000-07-28"}
+    text = render_report(REPORT, market={**MARKET, "us": us, "shocks": shocks})
+    assert "Cú sốc hôm nay: VN-Index giảm từ 3% trong một phiên. Trong quá khứ" in text
+    assert text.index("Mỹ (FRED)") < text.index("Cú sốc hôm nay") < text.index("Giá trị khớp lệnh")
+    assert "Cú sốc" not in render_report(REPORT, market=MARKET)

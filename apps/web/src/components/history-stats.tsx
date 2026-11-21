@@ -11,7 +11,7 @@ type PeStats = { h: number; groups: PeGroup[]; all: Summary; scatter: Dot[]; tre
 type LightGroup = Summary & { level: "green" | "yellow" | "red" };
 type Light = { id: string; name: string; h: number; groups: LightGroup[]; all: Summary; today: "green" | "yellow" | "red" | null; from: string | null };
 type Shock = Summary & { id: string; label: string; events: number; recent: string[]; today: boolean };
-export type HistoryStats = { h: number; horizons: number[]; pe: PeStats; lights: Light[]; shocks?: { h: number; groups: Shock[]; all: Summary; from: string | null }; summary?: string };
+export type HistoryStats = { h: number; horizons: number[]; pe: PeStats; lights: Light[]; shocks?: { h: number; groups: Shock[]; combos?: Shock[]; all: Summary; from: string | null }; summary?: string };
 
 const LEVEL = { green: "Bình thường", yellow: "Cảnh báo", red: "Nguy hiểm" } as const;
 const num = (v: number, d: number) => v.toLocaleString("vi-VN", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -211,6 +211,16 @@ export function HistoryStatsView() {
               s={sh} mark={sh.today} />)}
               <Row label="Mọi lúc" s={data.shocks.all} /></tbody>
           </table>
+          {data.shocks.combos && <>
+            <h3>Cú sốc chồng cú sốc</h3>
+            <p className="caption">Cùng cú giảm, tách theo VN-Index lúc đó đang ở đâu: dưới hay trên trung bình 200 phiên, hoặc đã giảm 20% từ đỉnh 52 tuần. Nếu
+              nhóm &ldquo;dưới&rdquo; kém hẳn nhóm &ldquo;trên&rdquo; với đủ khoảng độc lập thì rủi ro có cộng dồn.</p>
+            <table className="fv-table" aria-label="VN-Index sau cú sốc chồng cú sốc">{HEAD}
+              <tbody>{data.shocks.combos.map((sh) => <Row key={sh.id} label={`${sh.label} (${sh.events} lần${sh.recent.length ? `, gần nhất ${dmy(sh.recent[sh.recent.length - 1])}` : ""})`}
+                s={sh} mark={sh.today} />)}
+                <Row label="Mọi lúc" s={data.shocks.all} /></tbody>
+            </table>
+          </>}
         </section>}
         <StatesView h={h} />
         <section className="surface" aria-label="Kiểm tra ngưỡng đèn bằng lịch sử">

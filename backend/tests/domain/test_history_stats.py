@@ -104,3 +104,17 @@ def test_the_summary_does_not_read_figures_from_too_few_windows():
         g["enough"] = False
     text = history_summary(stats, conditions)
     assert ("Ở nhóm này chỉ có 3 khoảng 250 phiên không chồng lấn: không đủ dữ liệu cho kỳ này. ") in text and "trung bình +20,6%" not in text
+
+def test_the_summary_says_a_shock_of_the_latest_session_with_its_past():
+    from investment_agent.domain.history_stats import history_summary
+    stats, conditions = summary_input()
+    g = lambda k, label, today, enough=True: {"id": k, "label": label, "events": 199, "today": today, "n": 199, "n_independent": 18,  # noqa: E731
+                                              "enough": enough, "mean": "0.1003", "p10": "-0.5688", "dip_median": "-0.1733"}
+    stats["shocks"] = {"groups": [g("drop3", "VN-Index giảm từ 3% trong một phiên", True), g("down5", "VN-Index giảm 5 phiên liền", False)],
+                       "combos": [], "all": {"mean": "0.1536"}, "from": "2000-07-28"}
+    text = history_summary(stats, conditions)
+    assert ("Cú sốc hôm nay: VN-Index giảm từ 3% trong một phiên. Trong quá khứ, VN-Index giảm từ 3% trong một phiên: 199 lần từ 2000 "
+            "(18 khoảng không chồng lấn), 250 phiên sau trung bình +10,0% (mọi lúc +15,4%), xấu thường gặp −56,9%, "
+            "giảm sâu nhất trong kỳ trung vị −17,3%. Chỉ mô tả quá khứ") in text
+    stats["shocks"]["groups"][0]["today"] = False
+    assert "Cú sốc" not in history_summary(stats, conditions)

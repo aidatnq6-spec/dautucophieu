@@ -127,3 +127,12 @@ def test_the_us_markets_are_stored_with_the_snapshot_and_a_failure_only_blanks_t
         raise OSError("down")
     snap = build_snapshot(**{**deps(tmp_path / "b"), "us": broken})
     assert snap["us"]["status"] == "missing" and snap["board"]["status"] == "ok"
+
+def test_a_shock_of_the_session_is_stored_with_the_snapshot(tmp_path):
+    from datetime import timedelta
+    start = datetime(2025, 1, 1)
+    closes = [(start + timedelta(days=i), 1000.0) for i in range(299)] + [(datetime(2026, 10, 26), 960.0)]  # −4% on the session
+    snap = build_snapshot(**deps(tmp_path, series=lambda index_id: closes))
+    assert snap["shocks"]["status"] == "ok" and [g["id"] for g in snap["shocks"]["today"]] == ["drop3", "below200"]
+    plain = build_snapshot(**deps(tmp_path / "b"))
+    assert plain["shocks"]["status"] == "ok" and plain["shocks"]["today"] == []

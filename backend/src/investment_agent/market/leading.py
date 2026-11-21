@@ -144,6 +144,16 @@ def parse_fred_csv(text: str, *, transform: str | None = None) -> list[tuple[dat
     return [(d, _plain(v)) for d, v in points]
 
 
+def fred_yoy_gap(text: str) -> dict | None:
+    """The newest month the source has a figure for but whose year-ago figure is blank, so its change on a year cannot be worked out
+    (the US did not publish October 2025's CPI). None when the newest month has its change. Never filled in (owner, 21/11/2026)."""
+    raw, yoy = parse_fred_csv(text), parse_fred_csv(text, transform="yoy")
+    if not raw or (yoy and yoy[-1][0] >= raw[-1][0]):
+        return None
+    month = raw[-1][0]
+    return {"month": f"{month.year}-{month.month:02d}", "base": f"{month.year - 1}-{month.month:02d}"}
+
+
 def parse_vcb_xml(text: str, *, currency: str, field: str) -> tuple[date, str]:
     try:
         root = ET.fromstring(text)
@@ -689,6 +699,18 @@ class MacroStore:
         path = self.root / "_status.json"
         return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
 
+    def gaps(self) -> dict[str, dict]:
+        """Per indicator, the newest month the source could not give a change for (fred_yoy_gap)."""
+        path = self.root / "_gaps.json"
+        return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+
+    def record_gaps(self, gaps: dict[str, dict | None]) -> None:
+        merged = {k: v for k, v in {**self.gaps(), **gaps}.items() if v is not None}
+        self.root.mkdir(parents=True, exist_ok=True)
+        tmp = self.root / "_gaps.tmp"
+        tmp.write_text(json.dumps(merged, ensure_ascii=False, indent=1), encoding="utf-8")
+        os.replace(tmp, self.root / "_gaps.json")
+
     def record_statuses(self, results: dict[str, str]) -> None:
         now = datetime.now(timezone.utc).isoformat()
         merged = {**self.statuses(), **{k: {"status": v, "at": now} for k, v in results.items()}}
@@ -817,7 +839,7 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
             raise MacroError("no_observations")
         return points
 
-    results = {}
+    results, gaps = {}, {}
     for ind in indicators:
         src, first_error = ind["source"], None
         known = {o["date"] for o in store.read(ind["id"])}
@@ -835,6 +857,8 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
                     have = {o["date"] for o in store.read(ind["id"])}
                     store.upsert(ind["id"], [p for p in older if p[0].isoformat() not in have], entry="auto")
                 results[ind["id"]] = "ok"
+                if src["kind"] == "fred" and src.get("transform") == "yoy":  # a month the source cannot give a change for is named
+                    gaps[ind["id"]] = fred_yoy_gap(page(FRED_CSV.format(series=src["series"])))
                 break
             except Exception as exc:  # network, parse or source change: the fallback is tried; a timeout anywhere is the error
                 if first_error is None or ("Timeout" in type(exc).__name__ and "Timeout" not in type(first_error).__name__):
@@ -843,6 +867,8 @@ def fetch_auto(indicators: list[dict], store: MacroStore, *, get: Callable[[str]
         if ind["id"] not in results and first_error is not None:
             results[ind["id"]] = f"error:{error_name(first_error)}"
     store.record_statuses(results)
+    if gaps:
+        store.record_gaps(gaps)
     return results
 
 
@@ -1197,7 +1223,7 @@ def macro_reminders(indicators: list[dict], store: MacroStore, *, today: date) -
 
 
 def macro_rows(indicators: list[dict], store: MacroStore, *, today: date) -> list[dict]:
-    rows, statuses = [], store.statuses()
+    rows, statuses, gaps = [], store.statuses(), store.gaps()
     for ind in indicators:
         obs = store.read(ind["id"])
         status = statuses.get(ind["id"], {}).get("status")
@@ -1207,7 +1233,7 @@ def macro_rows(indicators: list[dict], store: MacroStore, *, today: date) -> lis
                      "value": last["value"] if last else None, "date": last["date"] if last else None,
                      "previous": obs[-2]["value"] if len(obs) >= 2 else None, "trend": trend, "assessment": assessment,
                      "stale": last is not None and (today - date.fromisoformat(last["date"])).days > ind["max_age_days"],
-                     "source_url": (last or {}).get("source_url") or ind["url"], "note": ind.get("note"),
+                     "source_url": (last or {}).get("source_url") or ind["url"], "note": ind.get("note"), "gap": gaps.get(ind["id"]),
                      # a hand-entered indicator has no source to fail; a status left from an older automatic source is not shown
                      "source_error": status if status not in (None, "ok") and ind["source"]["kind"] != "manual" else None,
                      "manual_allowed": ind["source"]["kind"] == "manual" or bool(ind["source"].get("manual_fallback"))})

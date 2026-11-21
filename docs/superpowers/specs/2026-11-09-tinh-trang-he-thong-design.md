@@ -16,3 +16,5 @@ lịch sau phiên không xong trong 2 ngày; chưa diễn tập, diễn tập h�
   - Lỗi máy chủ (429, 5xx) được ghi là `ServerError` và hỏi lại sau 30 giây như lỗi quá thời gian; kể cả trang OMO. Lỗi 404 hay lỗi khác vẫn là kết quả cuối.
   - Bước chỉ thoát lỗi khi có nguồn **quá hạn**: chỉ số hỏng mà không còn số nào trong hạn của nó, OMO hỏng mà không có phiên nào trong 7 ngày, hoặc một nguồn khác hỏng. Nguồn hỏng nhưng số vẫn còn trong hạn là `late`: vẫn in ra, bước thoát 0.
   - Nhắc lỗi nguồn vẫn đếm số lượt lỗi liên tiếp của từng nguồn như cũ.
+- Khi nguồn có số tháng mới nhất nhưng để trống số cùng kỳ năm trước (FRED để trống CPI Mỹ tháng 10/2025 vì Mỹ không công bố), tháng đó không tính được mức tăng so cùng kỳ và **không được lấp**. Phần mềm ghi tháng thiếu vào `data/macro/_gaps.json`; trang Vĩ mô và sự cố quá hạn của chỉ số nêu rõ lý do.
+- Hạn của Cung tiền M2 Việt Nam: 100 ngày (trước là 80), vì NHNN công bố chậm 2–3 tháng (chủ sở hữu duyệt 21/11/2026).

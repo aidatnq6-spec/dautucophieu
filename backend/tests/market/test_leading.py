@@ -192,8 +192,8 @@ def test_reminders_name_manual_indicators_that_are_missing_or_overdue(tmp_path):
 
 def test_monthly_and_weekly_update_rhythm_is_configured():
     ages = {i["id"]: i["max_age_days"] for i in load_indicators()}
-    # M2 comes out up to 45 days after its month, so 35 days would mark every reading old
-    assert (ages["us_pmi"], ages["vn_pmi"], ages["m2_vn"], ages["vn10y"], ages["vn_interbank_on"]) == (35, 35, 80, 7, 7)
+    # M2 comes out two to three months after its month (owner raised 80 to 100 days, 21/11/2026)
+    assert (ages["us_pmi"], ages["vn_pmi"], ages["m2_vn"], ages["vn10y"], ages["vn_interbank_on"]) == (35, 35, 100, 7, 7)
 
 
 def news(title, published="2026-10-01T09:30:00+07:00"):
@@ -676,3 +676,30 @@ def test_the_real_deposit_rate_is_not_computed_from_a_missing_or_old_input(tmp_p
     assert out["vn_real_deposit"].startswith("error:") and store.read("vn_real_deposit") == []
     _, out, store = _real_deposit(tmp_path / "b", (date(2026, 11, 19), "5.2"), (date(2026, 9, 30), "3.25"))  # CPI past its 40 days
     assert out["vn_real_deposit"].startswith("error:") and store.read("vn_real_deposit") == []
+
+
+# --- 21/11/2026: hạn M2 và lý do CPI Mỹ thiếu số cùng kỳ ---
+def test_m2_is_given_100_days_for_the_state_banks_two_to_three_month_lag():
+    m2 = next(i for i in load_indicators() if i["id"] == "m2_vn")
+    assert m2["max_age_days"] == 100
+
+
+CPI_GAP = "observation_date,CPIAUCNS\n2025-09-01,324.800\n2025-10-01,\n2025-11-01,324.122\n2026-09-01,336.940\n2026-10-01,337.511\n"
+
+
+def test_a_month_whose_year_ago_figure_is_blank_at_the_source_is_named_never_filled():
+    from investment_agent.market.leading import fred_yoy_gap
+    assert parse_fred_csv(CPI_GAP, transform="yoy")[-1][0] == date(2026, 9, 1)  # October 2026 cannot be computed
+    assert fred_yoy_gap(CPI_GAP) == {"month": "2026-10", "base": "2025-10"}
+    assert fred_yoy_gap(CPI_GAP.replace("2025-10-01,\n", "2025-10-01,325.0\n")) is None
+
+
+def test_the_gap_is_kept_with_the_indicator_and_shown_on_its_row(tmp_path):
+    store = MacroStore(tmp_path)
+    only = [i for i in load_indicators() if i["id"] == "us_cpi_yoy"]
+    results = fetch_auto(only, store, get=lambda url: CPI_GAP, today=date(2026, 11, 21), sleep=lambda s: None)
+    assert results["us_cpi_yoy"] == "ok"
+    row = next(r for r in macro_rows(only, store, today=date(2026, 11, 21)) if r["id"] == "us_cpi_yoy")
+    assert row["date"] == "2026-09-01" and row["gap"] == {"month": "2026-10", "base": "2025-10"}
+    fetch_auto(only, store, get=lambda url: CPI_GAP.replace("2025-10-01,\n", "2025-10-01,325.0\n"), today=date(2026, 11, 21), sleep=lambda s: None)
+    assert next(r for r in macro_rows(only, store, today=date(2026, 11, 21)) if r["id"] == "us_cpi_yoy")["gap"] is None

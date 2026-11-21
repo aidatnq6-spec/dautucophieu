@@ -5,7 +5,14 @@ import { formatDecimal, hanoiDate } from "../lib/format";
 
 type Row = { id: string; label: string; unit: string; auto: boolean; value: string | null; date: string | null; previous: string | null;
   trend: string | null; assessment: string | null; stale: boolean; source_url: string; note: string | null;
-  source_error: string | null; manual_allowed: boolean; period: "month" | "session" | null };
+  source_error: string | null; manual_allowed: boolean; period: "month" | "session" | null; gap?: { month: string; base: string } | null };
+
+/** Why the newest month has no change on a year: the source left the year-ago month blank (owner, 21/11/2026); never filled in. */
+export function gapNote(gap: { month: string; base: string } | null | undefined): string | null {
+  if (!gap) return null;
+  const my = (ym: string) => `${ym.slice(5, 7)}/${ym.slice(0, 4)}`;
+  return `Tháng ${my(gap.month)} chưa tính được so cùng kỳ vì nguồn để trống số tháng ${my(gap.base)}; phần mềm không tự lấp.`;
+}
 
 /** The month before today's, as yyyy-mm: a monthly figure is usually entered once its month is over. */
 export function lastMonth(today: string): string {
@@ -88,7 +95,8 @@ export function MacroView() {
                 <td data-label="Đánh giá">{r.assessment ? <span className={`pill ${TONE[r.assessment] ?? ""}`}>{r.assessment}</span> : "—"}</td>
                 <td className="mt-when" data-label="Cập nhật"><span className="mt-day">{when ? when.day : "—"}</span>
                   <div className="caption">{when && <>{when.ago} · </>}{r.auto ? "Tự động" : "Nhập tay"}{r.stale && <> · <span className="negative">số liệu cũ</span></>}</div>
-                  {r.source_error && <div className="caption negative">Lỗi nguồn lần gần nhất{r.manual_allowed ? "; có thể nhập tay" : ""}</div>}</td>
+                  {r.source_error && <div className="caption negative">Lỗi nguồn lần gần nhất{r.manual_allowed ? "; có thể nhập tay" : ""}</div>}
+                  {gapNote(r.gap) && <div className="caption" data-testid={`gap-${r.id}`}>{gapNote(r.gap)}</div>}</td>
                 <td className="mt-actions"><a href={r.source_url} target="_blank" rel="noreferrer noopener">Nguồn</a>
                   {r.manual_allowed && editing !== r.id && <button className="btn" onClick={() => setEditing(r.id)}>Nhập</button>}</td>
               </tr>

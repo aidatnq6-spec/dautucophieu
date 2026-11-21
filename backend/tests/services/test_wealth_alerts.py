@@ -48,6 +48,14 @@ def test_a_note_that_could_not_go_out_waits_and_goes_first_next_time(tmp_path):
     assert log2 == [*split_message(note), *split_message("Tin khác")]
 
 
+def test_the_same_gathering_serves_danh_muc_hom_nay_under_its_own_title(tmp_path):
+    from investment_agent.services.wealth_alerts import combined_run
+    send, log = sender(tmp_path)
+    out = combined_run([part("drawdown", "Kế hoạch sụt giảm\n• X"), part("thesis", "Luận điểm\n• Y")], send=send, today=TODAY,
+                       title="Danh mục hôm nay")
+    assert out["parts"] == 2 and log == split_message("Danh mục hôm nay 21/11/2026\n\nKế hoạch sụt giảm\n• X\n\nLuận điểm\n• Y")
+
+
 def test_one_part_failing_never_stops_the_others(tmp_path):
     send, log = sender(tmp_path)
 

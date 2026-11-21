@@ -13,6 +13,11 @@ Run = Callable[[Callable[[str], bool]], dict]
 
 def wealth_alerts_run(runs: list[tuple[str, Run]], *, send, today: date) -> dict:
     """runs: (name, run) where run(send) calls one part with that send; send: a PartSender (it has queue())."""
+    return combined_run(runs, send=send, today=today, title="Việc tài chính hôm nay")
+
+
+def combined_run(runs: list[tuple[str, Run]], *, send, today: date, title: str) -> dict:
+    """One note of the parts that had something to say, headed "<title> dd/mm/yyyy": Việc tài chính hôm nay and Danh mục hôm nay."""
     texts, out = [], {}
 
     def collect(text: str) -> bool:
@@ -25,7 +30,7 @@ def wealth_alerts_run(runs: list[tuple[str, Run]], *, send, today: date) -> dict
             out[name] = {"error": type(exc).__name__}
     if not texts:
         return {"parts": 0, "sent": False, "queued": False, "runs": out}
-    note = "\n\n".join([f"Việc tài chính hôm nay {today:%d/%m/%Y}", *texts])
+    note = "\n\n".join([f"{title} {today:%d/%m/%Y}", *texts])
     sent = bool(send(note))
     if not sent:
         send.queue(note)

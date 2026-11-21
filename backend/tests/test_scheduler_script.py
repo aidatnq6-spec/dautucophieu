@@ -45,7 +45,7 @@ def test_journal_reviews_run_on_every_wake_up():
 
 def test_drawdown_check_runs_on_every_wake_up():
     ls = lines()
-    step = next(i for i, l in enumerate(ls) if "investment_agent.jobs.step drawdown-check" in l)
+    step = next(i for i, l in enumerate(ls) if "investment_agent.jobs.step --timeout 900 portfolio-alerts" in l)
     assert step < next(i for i, l in enumerate(ls) if "investment_agent.jobs.step scheduled-run" in l)
 
 
@@ -99,7 +99,7 @@ def test_macro_event_reminders_run_on_every_wake_up():
 
 
 def test_the_buy_plan_is_checked_on_every_wake_up():
-    assert any("investment_agent.jobs.step buy-plan-check" in l for l in lines())
+    assert any("investment_agent.jobs.step --timeout 900 portfolio-alerts" in l for l in lines())
 
 
 def test_fund_holdings_are_synced_after_the_navs():
@@ -211,4 +211,12 @@ def test_the_personal_reminders_go_out_as_one_step():
     ls = lines()
     assert sum("investment_agent.jobs.step wealth-alerts" in l for l in ls) == 1
     for old in ("deposit-alerts", "pyramid-alerts", "loan-alerts", "contribution-remind", "accumulation-remind"):
+        assert not any(f"investment_agent.jobs.step {old}" in l for l in ls), old
+
+def test_the_stock_reminders_go_out_as_one_step_after_the_data_they_read():
+    ls = lines()
+    step = next(i for i, l in enumerate(ls) if "investment_agent.jobs.step --timeout 900 portfolio-alerts --data-dir $data --calendar $calendar" in l)
+    for before in ("statements-sync", "fundamentals-sync", "plans-sync", "events-sync", "gold-price-sync"):
+        assert next(i for i, l in enumerate(ls) if f"investment_agent.jobs.step {before}" in l) < step, before
+    for old in ("buy-plan-check", "insider-alerts", "drawdown-check", "thesis-check"):
         assert not any(f"investment_agent.jobs.step {old}" in l for l in ls), old

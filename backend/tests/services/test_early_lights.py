@@ -68,3 +68,11 @@ def test_a_failed_send_is_tried_again_next_run(tmp_path):
     MacroStore(tmp_path).upsert("wti", [(date(2026, 11, 7), "50")], entry="auto")
     assert lights_check(repo, OWNER, tmp_path, send=lambda t: False, today=TODAY)["sent"] is False
     assert lights_check(repo, OWNER, tmp_path, send=lambda t: True, today=TODAY)["changes"] == 1
+
+
+def test_the_world_cotton_price_can_be_chosen_for_any_kind_of_company():
+    """Giá bông (World Bank, kept for Dệt may since 21/11/2026) joins the commodities a light can follow (owner, 21/11/2026); a macro
+    light reads its series by id, like the other prices."""
+    for kind in (None, "bank"):
+        cotton = next(c for c in catalog(kind) if c["id"] == "macro:com_cotton")
+        assert (cotton["label"], cotton["tier"]) == ("Giá bông", "Dẫn dắt")

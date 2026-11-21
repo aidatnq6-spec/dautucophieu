@@ -122,3 +122,13 @@ def test_the_last_five_sessions_each_with_their_signals(tmp_path):
                        "ratio20": "0.69", "asia": "against", "asia_counted": 3, "top": {"symbol": "VIC", "points": "7.96"}}
     assert rows[2]["known"] is False and rows[2]["breadth"] is None  # before 16/11 the snapshots had no signals
     assert recent_signals(tmp_path, day(2026, 11, 12))[0]["date"] == "2026-11-12"  # an older session: its own five
+
+
+def test_the_ten_stocks_that_moved_the_index_most_each_way_are_kept():
+    """Tác động lên VN-Index (21/11/2026): ten each way for the chart; the Telegram line still names three."""
+    from decimal import Decimal
+    from investment_agent.brief.signals import index_pull
+    symbols = {f"U{i:02d}": {"ref": 10000, "change": 100 + i} for i in range(12)} | {f"D{i:02d}": {"ref": 10000, "change": -(100 + i)} for i in range(12)}
+    shares = {s: Decimal(1_000_000) for s in symbols}
+    pull = index_pull(symbols, shares, change=Decimal("-0.24"), close=Decimal("1200"))
+    assert len(pull["up"]) == 10 and len(pull["down"]) == 10 and pull["up"][0]["symbol"] == "U11"

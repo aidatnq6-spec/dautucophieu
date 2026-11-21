@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { RecentSignals, type SignalRow } from "./recent-signals";
+import { HeatMapView, ImpactView, type HeatMap, type Impact } from "./session-maps";
 
 type Missing = { status: "missing"; reason: string };
 type IndexRow = { id: string; status: "ok"; close: string; change: string; pct: string } | ({ id: string } & Missing);
@@ -20,7 +21,7 @@ type IndexSession = { status: "ok"; range: { high: string; low: string; close: s
 type HoseLiquidity = { status: "ok"; today_bn: string; previous_bn: string; change_pct: string; avg20_bn: string; ratio20: string } | Missing;
 export type MarketSection = { session_date: string; updated_at: string; indices: { status: string; rows: IndexRow[] } | Missing; board: Board;
   hose: Hose; proprietary: Missing; tickers: Ticker[]; news: News; index_session?: IndexSession; hose_liquidity?: HoseLiquidity;
-  recovery?: Recovery; signal_lines?: string[]; asia_line?: string | null; recent_signals?: SignalRow[] };
+  recovery?: Recovery; signal_lines?: string[]; asia_line?: string | null; recent_signals?: SignalRow[]; impact?: Impact; heatmap?: HeatMap };
 type Check = { id: string; met: boolean | null; label: string; figure: string };
 type Recovery = { status: "ok"; met: number; known: number; total: number; checks: Check[] } | Missing;
 
@@ -100,6 +101,8 @@ export function BriefMarket({ market, session }: { market: MarketSection | null;
         <p className="caption">Điểm kéo chỉ số tính theo số cổ phiếu lưu hành (VNDirect) và giá cuối phiên; chỉ hiện khi tổng khớp mức thay đổi
           của VN-Index. Thanh khoản so với trung bình 20 phiên.</p>
       </section>}
+      <ImpactView impact={market.impact} />
+      <HeatMapView heatmap={market.heatmap} />
       {market.recent_signals && <RecentSignals rows={market.recent_signals} />}
       {market.recovery?.status === "ok" && <section aria-label="Bảng kiểm thị trường phục hồi" data-testid="recovery">
         <h3>Bảng kiểm &ldquo;Thị trường phục hồi&rdquo;: {recoveryHead(market.recovery)}</h3>

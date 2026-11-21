@@ -9,7 +9,7 @@
 
 from decimal import ROUND_HALF_UP, Decimal
 
-TOP, WITHOUT = 5, 3
+TOP, WITHOUT = 10, 3  # ten each way for Tác động lên VN-Index (21/11/2026); the Telegram line still names three
 GAP = Decimal("1.5")
 LOW = Decimal("0.8")
 _Q2 = Decimal("0.01")

@@ -79,6 +79,7 @@ def main() -> int:
     wb = commands.add_parser("weekly-brief", help="Bản tin tuần over Telegram on the weekend, once per week")
     wb.add_argument("--data-dir", type=Path, required=True)
     wb.add_argument("--calendar", type=Path, required=True)
+    wb.add_argument("--resend", action="store_true", help="send this week's note again (owner's request), on the weekend only")
     ia = commands.add_parser("insider-alerts", help="Telegram note for new insider or major-shareholder notices of held tickers")
     ia.add_argument("--data-dir", type=Path, required=True)
     pa = commands.add_parser("price-alerts", help="during the session, Telegram note for the owner's price levels crossed")
@@ -221,7 +222,7 @@ def main() -> int:
     if args.command == "quarter-alerts":
         return quarter_alerts_cli(args.data_dir)
     if args.command == "weekly-brief":
-        return weekly_brief_cli(args.data_dir, args.calendar)
+        return weekly_brief_cli(args.data_dir, args.calendar, resend=args.resend)
     if args.command == "insider-alerts":
         return insider_alerts_cli(args.data_dir)
     if args.command == "price-alerts":
@@ -1518,7 +1519,7 @@ def weekly_inputs(data_dir: Path, *, ledger_events: list, held: set[str], alerts
             "events": EventStore(Path(data_dir)).events(sorted(watched)), "alerts": alerts, "held": held, "watched": watched}
 
 
-def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
+def weekly_brief_cli(data_dir: Path, calendar_path: Path, resend: bool = False) -> int:
     """Bản tin tuần on Saturday (or the first weekend run after), once per week; skipped while scheduled delivery is off."""
     from datetime import datetime, timezone
 
@@ -1594,7 +1595,7 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path) -> int:
                 "gold": gold_week(Path(data_dir), today=today),
                 "week_signals": week_signals([BriefStore(Path(data_dir)).read(d) or {} for d in
                                               (sessions if sessions is not None else [start + timedelta(days=i) for i in range(5)])])}
-    print(json.dumps(weekly_brief_run(data_dir, inputs=inputs, send=send, now=now)))
+    print(json.dumps(weekly_brief_run(data_dir, inputs=inputs, send=send, now=now, resend=resend)))
     return 0
 
 

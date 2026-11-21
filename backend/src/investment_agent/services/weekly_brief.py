@@ -9,6 +9,7 @@ the next week compares with), retried until it goes out.
 
 import json
 import os
+import re
 from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
@@ -353,7 +354,34 @@ def _state(data_dir: Path) -> Path:
     return Path(data_dir) / "alerts" / "weekly.json"
 
 
-def weekly_brief_run(data_dir: Path, *, inputs: Callable[[], dict], send: Callable[[str], bool], now: datetime) -> dict:
+# Bản tin tuần on the web (owner, 21/11/2026): the text Telegram took, one file a week (data/weekly-brief/<Friday>.json), read back by the
+# app; a week is named only by its date, so a request can never reach another file.
+WEEKLY_DIR = "weekly-brief"
+_WEEK = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _keep_text(data_dir: Path, week: str, sent_at: str, text: str) -> None:
+    folder = Path(data_dir) / WEEKLY_DIR
+    folder.mkdir(parents=True, exist_ok=True)
+    tmp = folder / f"{week}.tmp"
+    tmp.write_text(json.dumps({"week": week, "sent_at": sent_at, "text": text}, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, folder / f"{week}.json")
+
+
+def read_weekly(data_dir: Path, week: str) -> dict | None:
+    path = Path(data_dir) / WEEKLY_DIR / f"{week}.json"
+    return json.loads(path.read_text(encoding="utf-8")) if _WEEK.match(week) and path.is_file() else None
+
+
+def weekly_list(data_dir: Path) -> list[dict]:
+    """The kept weeks, newest first, without their text."""
+    folder = Path(data_dir) / WEEKLY_DIR
+    found = [read_weekly(data_dir, p.stem) for p in folder.glob("*.json")] if folder.is_dir() else []
+    return sorted(({"week": f["week"], "sent_at": f["sent_at"]} for f in found if f), key=lambda f: f["week"], reverse=True)
+
+
+def weekly_brief_run(data_dir: Path, *, inputs: Callable[[], dict], send: Callable[[str], bool], now: datetime,
+                     resend: bool = False) -> dict:
     today = now.astimezone(VN).date()
     if today.weekday() < 5:
         return {"status": "skipped", "reason": "weekday"}
@@ -361,7 +389,7 @@ def weekly_brief_run(data_dir: Path, *, inputs: Callable[[], dict], send: Callab
     path = _state(data_dir)
     state = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
     sent_for = state.get("week")
-    if sent_for == friday.isoformat():
+    if sent_for == friday.isoformat() and not resend:  # resend: the owner asked for this week's note again
         return {"status": "already_sent", "week": sent_for}
     got = inputs()
     # last week's marks, so the note says what changed since
@@ -369,8 +397,10 @@ def weekly_brief_run(data_dir: Path, *, inputs: Callable[[], dict], send: Callab
         got["signs"] = {**got["signs"], "before": state.get("signs")}
     if got.get("macro") is not None:
         got["macro"] = {**got["macro"], "before": state.get("macro")}
-    if not send(compose(**got, today=today)):
+    text = compose(**got, today=today)
+    if not send(text):
         return {"status": "ok", "week": friday.isoformat(), "sent": False}
+    _keep_text(data_dir, friday.isoformat(), now.isoformat(), text)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     keep = {"week": friday.isoformat(), "sent_at": now.isoformat(),
@@ -378,4 +408,4 @@ def weekly_brief_run(data_dir: Path, *, inputs: Callable[[], dict], send: Callab
             "macro": {k: v["date"] for k, v in got["macro"]["now"].items()} if got.get("macro") is not None else state.get("macro")}
     tmp.write_text(json.dumps(keep, ensure_ascii=False), encoding="utf-8")
     os.replace(tmp, path)
-    return {"status": "ok", "week": friday.isoformat(), "sent": True}
+    return {"status": "ok", "week": friday.isoformat(), "sent": True, **({"resent": True} if resend and sent_for == friday.isoformat() else {})}

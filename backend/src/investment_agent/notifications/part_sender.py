@@ -40,6 +40,11 @@ class PartSender:
                 return i
         return len(parts)
 
+    def queue(self, text: str) -> None:
+        """Keep a whole note to go out first next time, after the parts already waiting: for a note whose reminders already marked
+        themselves sent (Việc tài chính hôm nay), so it is delivered later rather than lost."""
+        self._keep(self._pending() + split_message(text))
+
     def __call__(self, text: str) -> bool:
         waiting = self._pending()
         if waiting:

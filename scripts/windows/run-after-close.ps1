@@ -113,21 +113,10 @@ $journal = & $python -W ignore -m investment_agent.jobs.step journal-review --da
 # Ke hoach sut giam: full price history once per ticker, then a reminder when a holding falls past the threshold below cost.
 $drawdown = & $python -W ignore -m investment_agent.jobs.step drawdown-check --data-dir $data 2>$null
 "$(Get-Date -Format o) drawdown-check exit=$LASTEXITCODE $drawdown" | Add-Content -LiteralPath $log -Encoding UTF8
-# Nhac so tiet kiem dao han: one Telegram note per deposit from the day before it matures (only when scheduled delivery is on).
-$da = & $python -W ignore -m investment_agent.jobs.step deposit-alerts --data-dir $data 2>$null
-"$(Get-Date -Format o) deposit-alerts exit=$LASTEXITCODE $da" | Add-Content -LiteralPath $log -Encoding UTF8
-# Nhac Thap tai san: one Telegram note when a layer turns short, back in range or over (after prices, NAVs and gold are synced).
-$pa = & $python -W ignore -m investment_agent.jobs.step pyramid-alerts --data-dir $data 2>$null
-"$(Get-Date -Format o) pyramid-alerts exit=$LASTEXITCODE $pa" | Add-Content -LiteralPath $log -Encoding UTF8
-# Nhac het lai uu dai: one Telegram note per loan 90 days before its promotion ends (only when scheduled delivery is on).
-$la = & $python -W ignore -m investment_agent.jobs.step loan-alerts --data-dir $data 2>$null
-"$(Get-Date -Format o) loan-alerts exit=$LASTEXITCODE $la" | Add-Content -LiteralPath $log -Encoding UTF8
-# Gop von deu: once a month from the contribution day, while this month's deposits are below the plan.
-$contrib = & $python -W ignore -m investment_agent.jobs.step contribution-remind --data-dir $data 2>$null
-"$(Get-Date -Format o) contribution-remind exit=$LASTEXITCODE $contrib" | Add-Content -LiteralPath $log -Encoding UTF8
-# Ke hoach tich san: once per plan and month from its day, while the month's purchases are below the plan.
-$accum = & $python -W ignore -m investment_agent.jobs.step accumulation-remind --data-dir $data 2>$null
-"$(Get-Date -Format o) accumulation-remind exit=$LASTEXITCODE $accum" | Add-Content -LiteralPath $log -Encoding UTF8
+# Viec tai chinh hom nay: so tiet kiem dao han, het lai uu dai, bao hiem, cho thue, Thap tai san, gop von deu and ke hoach tich san
+# in one Telegram note (after prices, NAVs and gold are synced; only when scheduled delivery is on). Each keeps its own rule.
+$wa = & $python -W ignore -m investment_agent.jobs.step wealth-alerts --data-dir $data 2>$null
+"$(Get-Date -Format o) wealth-alerts exit=$LASTEXITCODE $wa" | Add-Content -LiteralPath $log -Encoding UTF8
 # Statements for the Định giá page: from the 20:00 slot, refresh the 8 stalest tickers (about 3 minutes, paced for Vnstock's limit).
 if ((Get-Date).Hour -ge 20) {
     $fund = & $python -W ignore -m investment_agent.jobs.step fundamentals-sync --data-dir $data --limit 8 2>$null

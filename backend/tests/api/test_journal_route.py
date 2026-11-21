@@ -39,6 +39,18 @@ def test_an_entry_captures_reason_emotion_and_the_context_of_the_moment(tmp_path
     assert body["held"] == ["FPT"]  # tickers the owner can write a "why I still hold" entry for
 
 
+def test_each_ticker_is_priced_once_however_many_entries_it_has(tmp_path, monkeypatch):
+    """621 entries were priced one by one (0.29 s of 0.42 s); the price is the same for every entry of a ticker."""
+    c, clock = client(tmp_path)
+    for i in range(3):
+        call(c, clock, "POST", "/internal/journal", {"symbol": "FPT", "kind": "hold", "reason": f"lý do {i}", "request_id": f"j-{i}"})
+    asked = []
+    real = MARKET.price
+    monkeypatch.setattr(MARKET, "price", lambda symbol: asked.append(symbol) or real(symbol), raising=False)
+    entries = call(c, clock, "GET", "/internal/journal").json()["entries"]
+    assert len(entries) == 3 and all(e["current_price"] == "60000" for e in entries) and asked == ["FPT"]
+
+
 def test_notes_are_appended_and_the_original_stays(tmp_path):
     c, clock = client(tmp_path)
     call(c, clock, "POST", "/internal/journal", {"symbol": "FPT", "kind": "hold", "reason": "Giữ vì cổ tức đều", "emotion": "calm",

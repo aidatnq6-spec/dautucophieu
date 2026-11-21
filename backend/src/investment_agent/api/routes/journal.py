@@ -77,10 +77,12 @@ def get_journal(request: Request):
         held = sorted(held_from_repo(repo, owner))
     except RepositoryUnavailable:
         return unavailable()
-    market, rows = request.app.state.market, []
+    market, rows, prices = request.app.state.market, [], {}
     for e in reversed(entries):
-        point = market.price(e.symbol)
-        current = point.price if point is not None else None
+        if e.symbol not in prices:  # one price per ticker: hundreds of entries share a few dozen tickers
+            point = market.price(e.symbol)
+            prices[e.symbol] = point.price if point is not None else None
+        current = prices[e.symbol]
         rows.append({**e.model_dump(mode="json"), "current_price": str(current) if current is not None else None,
                      "change": change(e.context.get("price"), current)})
     return {"version": version, "threshold": str(settings.journal_review_threshold), "held": held, "entries": rows}

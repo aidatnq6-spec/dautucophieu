@@ -213,3 +213,8 @@ Cũng trong ngày 15/11/2026, chủ sở hữu chốt lại: **Phân tích ngàn
 - Cấu trúc chính xác của tệp cấu hình và của API.
 - Cách duyệt cụ thể, trong hai hướng ở mục "Duyệt".
 - Bố cục chi tiết, miễn là theo kiểu C và các yêu cầu ở mục "Giao diện".
+
+## Bỏ ngành Thủy sản (21/11/2026)
+Chủ sở hữu bỏ ngành Thủy sản và hai mã VHC, ANV khỏi phần mềm: không còn chuỗi Thủy sản; ứng dụng ngừng đọc xuất khẩu cá tra (VASEP) và
+giá tôm thế giới (FRED), giá tôm cũng không còn là lựa chọn của Bảng đèn chỉ báo sớm. Danh sách theo dõi còn 48 mã. Sổ riêng (giao dịch,
+luận điểm, nhật ký, cảnh báo) giữ nguyên.

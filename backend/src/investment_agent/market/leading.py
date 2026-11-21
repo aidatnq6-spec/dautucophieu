@@ -854,10 +854,11 @@ def fetch_factors(store: MacroStore, *, get: Callable[[str], str], today: date |
 
 # Monthly world prices for Chuỗi giá trị's input and output costs, kept under data/macro/ but outside macro-indicators.json, so they never
 # show on Vĩ mô. FRED's copy of the IMF prices ran two to three months behind (20/11/2026: September last), so the others moved to the
-# World Bank's sheet (WB_COMMODITIES, fetch_chain_series); only shrimp, which the sheet dropped in 2023, is still read here.
+# World Bank's sheet (WB_COMMODITIES, fetch_chain_series). World shrimp, which the sheet dropped in 2023, was read here until the
+# owner removed Thủy sản (21/11/2026).
 # US private investment in software (BEA, quarterly, billions a year) is the owner's chosen stand-in for IT demand abroad (20/11/2026):
 # FPT's largest market is Japan, which has no such public series, so it is labelled a stand-in on the page.
-COMMODITIES = {"com_shrimp": "PSHRIUSDM", "us_software_invest": "B985RC1Q027SBEA"}
+COMMODITIES = {"us_software_invest": "B985RC1Q027SBEA"}
 COMMODITY_YEARS = 3
 
 
@@ -886,19 +887,6 @@ def fetch_commodities(store: MacroStore, *, get: Callable[[str], str], today: da
 #   all but /wp-admin/), which began in 10/2026, so the series fills in month by month.
 WB_COMMODITY_PAGE = "https://www.worldbank.org/en/research/commodity-markets"
 VPA_POSTS = "https://www.vpa.org.vn/wp-json/wp/v2/posts?search=container%20throughput&per_page=24&_fields=date,title"
-# - Vietnam's cá tra (pangasius) exports in the month against a year before, from VASEP's public monthly summaries ("Xuất khẩu cá tra
-#   8 tháng …": "Riêng tháng 8, xuất khẩu đạt 205 triệu USD, tăng 6%"); VASEP's statistics pages need a member login, so they are not
-#   used. robots.txt (checked 15/11/2026) allows these pages but disallows any path containing certain words: such links are skipped.
-#   Only months not stored yet are opened, three per run.
-VASEP_PANGASIUS = "https://vasep.com.vn/san-pham-xuat-khau/ca-tra/xuat-nhap-khau"
-VASEP_BASE = "https://vasep.com.vn"
-VASEP_PER_RUN = 3
-# older listing pages are read only while fewer than six months are stored (to fill the history once); some months have no summary
-# at all (12/2025, 6/2026), so waiting for twelve would read them on every run
-VASEP_PAGES, VASEP_FULL_HISTORY = 4, 6
-_VASEP_ROBOTS = ("print-", "xodpqbox", "【", "news-", ".tag", ".shtml", "betgg8", "xsn", "zop", "android", "vietlott", "ban-ca", "games", "gods",
-                 "Gov", "ios", "iphone", "jun", "king", "kwin", "muv", "poc", "poker", "qsj", "rna", "mac", "soft", "store", "tig", "vn/2024",
-                 "Wap", "xiazai", "Xoilac", "Zop", "bóng", "bắn")
 # Columns of the sheet's "Monthly Prices", the same goods as the IMF series they replace (rubber: RSS3, as IMF's PRUBBUSDM; sugar: the
 # world price, as PSUGAISAUSDM; wheat: US hard red winter, as PWHEAMTUSDM). Units are the World Bank's.
 WB_COMMODITIES = {"com_urea": "Urea", "com_coal": "Coal, Australian", "com_iron_ore": "Iron ore, cfr spot", "com_rubber": "Rubber, RSS3",
@@ -922,7 +910,7 @@ SSE_INDEX = "https://en.sse.net.cn/currentIndex"
 SSE_SERIES = {"com_container_scfi": ("scfi", "SCFI_T"), "com_tanker_ctfi": ("ctfi", "CTFI_T")}
 SHFE_DAILY = "https://www.shfe.com.cn/data/tradedata/future/dailydata/kx{day}.dat"
 SHFE_WEEK, SHFE_MONTH_BACK, SHFE_RECENT = 7, (30, 37), 10
-CHAIN_SERIES = (*WB_COMMODITIES, "port_container_yoy", "vn_pangasius_export_yoy", "com_dairy", "vn_hydro_inflow_yoy", *SSE_SERIES, "com_steel_hrc")
+CHAIN_SERIES = (*WB_COMMODITIES, "port_container_yoy", "com_dairy", "vn_hydro_inflow_yoy", *SSE_SERIES, "com_steel_hrc")
 _XL = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 _XL_REL = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 _EN_MONTHS = {m: i for i, m in enumerate(("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
@@ -983,73 +971,11 @@ def parse_vpa_container(text: str) -> list[tuple[date, str]]:
     return sorted(found.items())
 
 
-_VASEP_LINK = re.compile(r'<a[^>]+href="(?:https://vasep\.com\.vn)?(/san-pham-xuat-khau/ca-tra/[^"]+?\.html)"[^>]*title="([^"]+)"')
-# Titles name the month in several ways ("8 tháng", "5 tháng đầu năm", "tháng 4/2026" shown as "tháng 42026", "tháng đầu năm 2026",
-# "sau 8 tháng"); a piece on one market ("sang Brazil") or one company is not the industry's month.
-_VASEP_NOT_INDUSTRY = re.compile(r"(?i) sang |vĩnh hoàn|doanh thu|doanh nghiệp")
-_VASEP_MONTH_YEAR = re.compile(r"tháng (\d{1,2}?)/?(20\d{2})\b")
-_VASEP_COUNT = re.compile(r"(?i)(\d{1,2}) tháng")
-# The whole month's sentence, in the wordings VASEP uses: "Riêng (trong) tháng 8, xuất khẩu (cá tra) đạt …", "Tháng 5/2026, (kim ngạch)
-# xuất khẩu cá tra (của) Việt Nam … đạt …", "(Kim ngạch) xuất khẩu|XK cá tra (Việt Nam) (trong) tháng 9/2025 … đạt|với …"; then
-# "… triệu USD, (tiếp tục|nhẹ) tăng|giảm x%". A sentence on one market names it ("sang Mỹ", "thị trường này") and does not match.
-_VASEP_MONTH = re.compile(
-    r"(?i)(?:riêng (?:trong )?tháng (\d{1,2})(?:/(\d{4}))?, xuất khẩu(?: cá tra)?"
-    r"|(?:xuất khẩu|XK) cá tra (?:của )?(?:Việt Nam )?(?:trong )?tháng (\d{1,2})/(\d{4})"
-    r"|tháng (\d{1,2})/(\d{4}),? (?:kim ngạch )?xuất khẩu cá tra (?:của )?(?:Việt Nam)?)"
-    r"[^.;]{0,90}?(?:đạt|với) (?:gần |hơn )?[\d.,]+ triệu USD,[^.;]{0,30}?(tăng|giảm)[^.;\d]{0,10}([\d.,]+)%")
-
-
-def parse_vasep_links(page: str) -> list[tuple[int, int | None, str]]:
-    """(month, year or None, path) of each "Xuất khẩu cá tra N tháng …" summary on VASEP's cá tra trade page, newest first; paths that
-    robots.txt disallows are left out."""
-    out, seen = [], set()
-    for path, raw in _VASEP_LINK.findall(page):
-        title = unicodedata.normalize("NFC", html_lib.unescape(raw)).strip()
-        if path in seen or "cá tra" not in title.lower() or _VASEP_NOT_INDUSTRY.search(title) or any(w in path for w in _VASEP_ROBOTS):
-            continue
-        dated, count, year = _VASEP_MONTH_YEAR.search(title), _VASEP_COUNT.search(title), re.search(r"năm (20\d{2})", title)
-        if dated:
-            month, year = int(dated.group(1)), int(dated.group(2))
-        elif count:
-            month, year = int(count.group(1)), int(year.group(1)) if year else None
-        elif re.search(r"(?i)tháng đầu năm", title):
-            month, year = 1, int(year.group(1)) if year else None
-        else:
-            continue
-        if 1 <= month <= 12:
-            seen.add(path)
-            out.append((month, year, path))
-    if not out:
-        raise MacroError("vasep_unreadable")
-    return out
-
-
-def parse_vasep_article(page: str, *, month: int, year: int | None) -> tuple[date, str] | None:
-    """The month's exports against a year before (%), from the sentence on the month alone (not a market, not the year to date). Without
-    a year in the title, the year is the one published in (the year before for a December figure read in January)."""
-    body = unicodedata.normalize("NFC", _text(re.sub(r"(?is)<script.*?</script>|<style.*?</style>", " ", page)))
-    for m in _VASEP_MONTH.finditer(body):
-        said, said_year = next(((g[0], g[1]) for g in ((m.group(1), m.group(2)), (m.group(3), m.group(4)), (m.group(5), m.group(6))) if g[0]))
-        if int(said) != month:
-            continue
-        value = _vn_number(m.group(8)) * (-1 if m.group(7).lower() == "giảm" else 1)
-        if abs(value) > 200:
-            return None
-        if said_year:
-            year = int(said_year)
-        if year is None:
-            pub = re.search(r'"datePublished"\s*:\s*"(\d{4})-(\d{2})', page)
-            if not pub:
-                return None
-            year = int(pub.group(1)) - (1 if month > int(pub.group(2)) else 0)
-        return date(year, month, calendar.monthrange(year, month)[1]), _plain(value)
-    return None
-
 
 def fetch_chain_series(store: MacroStore, *, get: Callable[[str], str], get_bytes: Callable[[str], bytes] | None, today: date | None = None,
                        sleep: Callable[[float], None] = time.sleep) -> dict[str, str]:
     """The World Bank's world prices (only with a bytes fetcher, and only while one lacks last month or still holds points from another
-    source; each series is then replaced whole), container throughput and cá tra exports; each reported apart."""
+    source; each series is then replaced whole) and container throughput; each reported apart."""
     today = today or datetime.now(VN).date()
     results = {}
     if get_bytes is not None:
@@ -1077,26 +1003,6 @@ def fetch_chain_series(store: MacroStore, *, get: Callable[[str], str], get_byte
         results["port_container_yoy"] = "ok"
     except Exception as exc:
         results["port_container_yoy"] = f"error:{type(exc).__name__}"
-    try:
-        known = {o["date"] for o in store.read("vn_pangasius_export_yoy")}
-        # a month's summary comes out after the month: a title without a year is this year's, or last year's for a month not over yet;
-        # used only to skip what is stored (the stored date comes from the article's own publication date)
-        year_of = lambda m, y: y or (today.year if m < today.month else today.year - 1)  # noqa: E731
-        links = parse_vasep_links(_get_with_retry(get, VASEP_PANGASIUS, sleep))
-        for n in range(2, VASEP_PAGES + 1) if len(known) < VASEP_FULL_HISTORY else ():
-            try:
-                links += [x for x in parse_vasep_links(_get_with_retry(get, f"{VASEP_PANGASIUS}?trang={n}", sleep)) if x not in links]
-            except MacroError:
-                break
-        due = [(m, y, p) for m, y, p in links
-               if date(year_of(m, y), m, calendar.monthrange(year_of(m, y), m)[1]).isoformat() not in known][:VASEP_PER_RUN]
-        found = [parse_vasep_article(_get_with_retry(get, VASEP_BASE + p, sleep), month=m, year=y) for m, y, p in due]
-        points = sorted({d: v for d, v in (f for f in found if f) if d.isoformat() not in known}.items())
-        if points:
-            store.upsert("vn_pangasius_export_yoy", points, entry="auto")
-        results["vn_pangasius_export_yoy"] = "ok"
-    except Exception as exc:
-        results["vn_pangasius_export_yoy"] = f"error:{type(exc).__name__}"
     return results
 
 

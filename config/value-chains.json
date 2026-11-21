@@ -186,18 +186,6 @@
    "publisher": "ACBS",
    "date": "2026-03-18",
    "url": "https://acbs.com.vn/acbsmedia/2026/03/VHM-by-ACBS_18.3.2026-EN.pdf"
-  },
-  "vasep-vhc-0826": {
-   "title": "Doanh thu Vĩnh Hoàn phục hồi trong tháng 8/2026",
-   "publisher": "VASEP",
-   "date": "2026-10-08",
-   "url": "https://vasep.com.vn/san-pham-xuat-khau/ca-tra/doanh-nghiep/doanh-thu-vinh-hoan-phuc-hoi-trong-thang-8-2026-38432.html"
-  },
-  "vasep-catra-8m": {
-   "title": "Xuất khẩu cá tra 8 tháng: Duy trì đà tăng, Trung Quốc và Brazil tạo lực đẩy",
-   "publisher": "VASEP",
-   "date": "2026-09-22",
-   "url": "https://vasep.com.vn/san-pham-xuat-khau/ca-tra/xuat-nhap-khau/xuat-khau-ca-tra-8-thang-duy-tri-da-tang-trung-quoc-va-brazil-tao-luc-day-38249.html"
   }
  },
  "chains": [
@@ -1904,104 +1892,6 @@
       {
        "source": "acbs-vnm",
        "page": 3
-      }
-     ]
-    }
-   ]
-  },
-  {
-   "id": "seafood",
-   "name": "Thủy sản",
-   "icb": "Thực phẩm và đồ uống",
-   "status": "draft",
-   "symbols": [
-    "VHC",
-    "ANV"
-   ],
-   "stages": {
-    "input": [
-     {
-      "name": "Nguyên liệu cá",
-      "note": "Lợi thế nguyên liệu khác nhau giữa các doanh nghiệp (ví dụ trong nguồn là FMC, doanh nghiệp tôm)",
-      "share": null,
-      "basis": null,
-      "refs": [
-       {
-        "source": "acbs-strategy-0926",
-        "page": 36
-       }
-      ]
-     }
-    ],
-    "middle": [
-     {
-      "name": "Chế biến (mức độ tích hợp cao)",
-      "note": null,
-      "share": null,
-      "basis": null,
-      "refs": [
-       {
-        "source": "acbs-strategy-0926",
-        "page": 36
-       }
-      ]
-     }
-    ],
-    "output": [
-     {
-      "name": "Xuất khẩu, nhạy cảm với thị trường Hoa Kỳ",
-      "note": null,
-      "share": null,
-      "basis": null,
-      "refs": [
-       {
-        "source": "acbs-strategy-0926",
-        "page": 20
-       },
-       {
-        "source": "acbs-s301",
-        "page": 5
-       }
-      ]
-     }
-    ]
-   },
-   "factors": [
-    {
-     "id": "pangasius_export",
-     "label": "Xuất khẩu cá tra",
-     "stage": "output",
-     "kind": "series",
-     "indicator": "vn_pangasius_export_yoy",
-     "when_up": "good",
-     "weight": "major",
-     "share": null,
-     "why": "Cá tra là mặt hàng chủ lực của Vĩnh Hoàn (doanh thu cá tra tháng 8/2026 đạt 535 tỷ đồng) và VHC, ANV bán chủ yếu ra nước ngoài; mức chính do người soạn gán vì nguồn không nêu tỷ trọng. Đọc theo kim ngạch xuất khẩu cá tra trong tháng so với cùng kỳ do VASEP công bố (toàn ngành, không riêng hai mã)",
-     "refs": [
-      {
-       "source": "vasep-vhc-0826",
-       "page": null
-      },
-      {
-       "source": "vasep-catra-8m",
-       "page": null
-      }
-     ]
-    },
-    {
-     "id": "us_tariff",
-     "label": "Thuế quan và phòng vệ thương mại Mỹ",
-     "stage": "output",
-     "kind": "event",
-     "indicator": null,
-     "when_up": "bad",
-     "weight": "minor",
-     "share": null,
-     "why": "Nguồn xếp rủi ro trực tiếp từ thuế Mục 301 với thủy sản ở mức thấp–trung bình; rủi ro chính nằm ở biện pháp phòng vệ thương mại theo từng mặt hàng",
-     "refs": [
-      {
-       "source": "acbs-strategy-0926",
-       "page": 20
       }
      ]
     }

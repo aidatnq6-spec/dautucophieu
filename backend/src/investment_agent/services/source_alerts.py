@@ -98,7 +98,7 @@ def macro_labels() -> dict[str, tuple[str, str]]:
     from investment_agent.market.value_chains import COMMODITY_LABELS
     out = {i["id"]: (SOURCES.get(i["source"]["kind"], i["source"]["kind"]), i["label"]) for i in load_indicators()}
     for k, name in COMMODITY_LABELS.items():
-        out[k] = ({"com_urea": "World Bank", "port_container_yoy": "Hiệp hội Cảng biển (VPA)", "vn_pangasius_export_yoy": "VASEP"}.get(k, "FRED"), name)
+        out[k] = ({"com_urea": "World Bank", "port_container_yoy": "Hiệp hội Cảng biển (VPA)"}.get(k, "FRED"), name)
     out["omo"] = ("NHNN (sbv.gov.vn)", "Nghiệp vụ thị trường mở")
     out["central_baseline"] = ("Thị trường Tài chính Tiền tệ", "Tỷ giá trung tâm đầu năm")
     out["factor_oil"], out["factor_usd"] = ("FRED", "Chuỗi dầu dài hạn"), ("FRED", "Chuỗi USD dài hạn")

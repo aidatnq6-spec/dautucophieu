@@ -23,7 +23,14 @@ from investment_agent.valuation.peer_compare import COLUMNS
 from investment_agent.valuation.statement_table import statement_table
 
 MAX_RULES = 12
-STALE_DAYS = 120  # a monthly series can lag a couple of months; older than this says nothing about today
+STALE_DAYS = 120  # a monthly world price can lag a couple of months; older than this says nothing about today
+# Each other series is old by its own limit (owner, 21/11/2026): a macro indicator by Vĩ mô's, a Chuỗi giá trị series by its own there.
+
+
+def _max_age(series: str) -> int:
+    from investment_agent.market.value_chains import CHAIN_MAX_AGE_DAYS
+    own = {i["id"]: i["max_age_days"] for i in load_indicators()}
+    return own.get(series) or CHAIN_MAX_AGE_DAYS.get(series) or STALE_DAYS
 STATE_FILE = ("alerts", "lights.json")
 STATES = {"bad": "Xấu", "watch": "Theo dõi", "good": "Tốt"}
 _COMMODITIES = {"com_coal": "Giá than", "com_iron_ore": "Giá quặng sắt", "com_rubber": "Giá cao su", "com_sugar": "Giá đường", "com_lng": "Giá LNG",
@@ -108,7 +115,6 @@ def symbol_lights(repo, owner, data_dir: Path, symbol: str, *, today: date) -> d
     rules = saved.payload.get("rules", []) if saved else []
     options = {c["id"]: c for c in catalog(kind)}
     stock = _stock_values(repo, owner, data_dir, symbol, kind) if any(r["id"].startswith("stock:") for r in rules) else {}
-    limit = (today - timedelta(days=STALE_DAYS)).isoformat()
     rows = []
     for r in rules:
         info = options.get(r["id"])
@@ -116,11 +122,12 @@ def symbol_lights(repo, owner, data_dir: Path, symbol: str, *, today: date) -> d
             continue
         value, day, note = None, None, None
         if r["id"].startswith("macro:"):
-            points = MacroStore(data_dir).read(r["id"].split(":", 1)[1])
+            series = r["id"].split(":", 1)[1]
+            points = MacroStore(data_dir).read(series)
             if points:
                 value, day = Decimal(points[-1]["value"]), points[-1]["date"]
-                if day < limit:
-                    note = f"Số cũ ({day}), không tô màu"
+                if day < (today - timedelta(days=_max_age(series))).isoformat():
+                    note = f"Số cũ ({day}, quá {_max_age(series)} ngày), không tô màu"
         elif r["id"] in stock:
             value, day = stock[r["id"]]
         bad, good = Decimal(r["bad"]), Decimal(r["good"])

@@ -41,6 +41,7 @@ test("the brief shows the stocks that moved VN-Index and the session's heat map,
   await expect(impact.getByRole("list", { name: "Mã kéo lên" })).toContainText("đang nắm");
   await expect(impact.getByRole("list", { name: "Mã kéo xuống" })).toContainText("VHM");
   await expect(impact).toContainText("VN-Index thực tế +12,30 điểm");
+  await expect(page.getByTestId("us-line")).toHaveText("Mỹ (FRED): Dow Jones −1,93% (phiên 22/10)");
   const map = page.getByRole("region", { name: "Bản đồ nhiệt phiên" });
   await expect(map.getByRole("img", { name: "Bản đồ nhiệt các mã HOSE theo ngành" })).toBeVisible();
   await expect(map.locator("rect.hm-held")).toHaveCount(1);

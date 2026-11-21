@@ -30,6 +30,19 @@ def fetch_us_indices(store: MacroStore, *, get: Callable[[str], str], sleep) -> 
     return results
 
 
+def us_line(out: dict | None) -> str | None:
+    """One line for the after-close brief, beside the Asian one: each index's session change with its own session date; a figure
+    older than seven days is left out."""
+    rows = [r for r in (out or {}).get("rows") or [] if not r.get("stale") and r.get("day_pct") is not None]
+    if not rows:
+        return None
+
+    def pct(ratio: str) -> str:
+        v = Decimal(ratio) * 100
+        return ("+" if v > 0 else "−" if v < 0 else "") + f"{abs(v):.2f}".replace(".", ",") + "%"
+    return "Mỹ (FRED): " + " · ".join(f"{r['name']} {pct(r['day_pct'])} (phiên {r['date'][8:10]}/{r['date'][5:7]})" for r in rows)
+
+
 def _pct(now: Decimal, before: Decimal | None) -> str | None:
     return str((now / before - 1).quantize(Decimal("0.0001"), ROUND_HALF_UP)) if before else None
 

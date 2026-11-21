@@ -117,3 +117,13 @@ def test_the_signals_are_built_with_the_shares_and_the_earlier_sessions(tmp_path
     assert signals["breadth_gap"] is None
     plain = build_snapshot(**deps(tmp_path, now=datetime(2026, 10, 26, 16, 0, tzinfo=VN)))
     assert plain["signals"]["pull"]["status"] == "mismatch"  # a later run without shares keeps nothing worse than it had
+
+
+def test_the_us_markets_are_stored_with_the_snapshot_and_a_failure_only_blanks_them(tmp_path):
+    us = {"rows": [{"id": "us_dow", "name": "Dow Jones", "date": "2026-10-23", "day_pct": "-0.0193", "stale": False}], "source": "FRED"}
+    assert build_snapshot(**{**deps(tmp_path), "us": lambda: us})["us"] == {"status": "ok", **us}
+
+    def broken():
+        raise OSError("down")
+    snap = build_snapshot(**{**deps(tmp_path / "b"), "us": broken})
+    assert snap["us"]["status"] == "missing" and snap["board"]["status"] == "ok"

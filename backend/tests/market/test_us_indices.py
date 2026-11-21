@@ -58,3 +58,11 @@ def test_the_extras_of_macro_sync_include_the_us_indices():
     import inspect
     from investment_agent import cli
     assert "fetch_us_indices" in inspect.getsource(cli._macro_extras)
+
+def test_one_line_for_the_brief_names_each_session_and_leaves_old_figures_out():
+    from investment_agent.market.us_indices import us_line
+    out = {"rows": [{"id": "us_sp500", "name": "S&P 500", "date": "2026-11-19", "day_pct": "-0.0202", "stale": False},
+                    {"id": "us_nasdaq", "name": "Nasdaq Composite", "date": "2026-11-19", "day_pct": "-0.0225", "stale": False},
+                    {"id": "us_dow", "name": "Dow Jones", "date": "2026-11-01", "day_pct": "0.01", "stale": True}], "source": "FRED"}
+    assert us_line(out) == "Mỹ (FRED): S&P 500 −2,02% (phiên 19/11) · Nasdaq Composite −2,25% (phiên 19/11)"
+    assert us_line({"rows": [], "source": "FRED"}) is None and us_line(None) is None

@@ -157,6 +157,8 @@ if __name__ == "__main__":
                              "symbols": {"FPT": {"price": 57000, "ref": 55000, "change": 2000, "pct": "0.0364", "sector": "Công nghệ Thông tin",
                                                  "value_mn": "572175.08"},
                                          "VCB": {"price": 61000, "ref": 61000, "change": 0, "pct": "0.0000", "sector": "Ngân hàng", "value_mn": "300000"}}},
+                   "us": {"status": "ok", "source": "FRED", "rows": [{"id": "us_dow", "name": "Dow Jones", "date": "2026-10-22", "day_pct": "-0.0193",
+                                                                      "stale": False}]},
                    "signals": {"status": "ok", "pull": {"status": "ok", "computed": "12.30", "actual": "12.30",
                                                         "up": [{"symbol": "FPT", "points": "1.50"}], "down": [{"symbol": "VHM", "points": "-0.40"}],
                                                         "without_top": None}},

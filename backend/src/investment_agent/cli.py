@@ -308,6 +308,15 @@ def _asia(data_dir: Path, now, get) -> dict:
     return read_asia(data_dir, get=get, now=now.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")))
 
 
+def _us(data_dir: Path, now) -> dict:
+    """Chứng khoán Mỹ for the snapshot: the closes macro-sync stored from FRED (nothing is fetched here)."""
+    from zoneinfo import ZoneInfo
+
+    from investment_agent.market.leading import MacroStore
+    from investment_agent.market.us_indices import us_indices
+    return us_indices(MacroStore(data_dir), today=now.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date())
+
+
 def _vn30_weights(data_dir: Path, session) -> dict:
     """VN30's weight inputs from HOSE's notice (index-groups.json), when the notice is in effect on the session."""
     kept = _read_json(data_dir / "index-groups.json").get("vn30_weights") or {}
@@ -1695,7 +1704,7 @@ def brief_snapshot_cli(data_dir: Path, calendar_path: Path, *, listing=None, boa
                           board=board, series=lambda index_id: series.read(f"{index_id}-1d"), hose_get=http_get, rss_get=http_get,
                           store=BriefStore(data_dir), earlier=earlier, index_bars=index_bars,
                           shares=lambda symbols: _vd_shares(symbols, http_get), vn30_weights=lambda: _vn30_weights(Path(data_dir), session),
-                          asia=lambda: _asia(Path(data_dir), now, http_get))
+                          asia=lambda: _asia(Path(data_dir), now, http_get), us=lambda: _us(Path(data_dir), now))
     print(json.dumps({"status": "ok", "session": session.isoformat(),
                       "sections": {k: v["status"] for k, v in snap.items() if isinstance(v, dict) and "status" in v}}, ensure_ascii=False))
     return 0

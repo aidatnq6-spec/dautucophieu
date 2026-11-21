@@ -60,6 +60,8 @@ def main() -> int:
     uc.add_argument("--data-dir", type=Path, required=True)
     cw = commands.add_parser("calendar-watch", help="from 1 December, one Telegram note when HOSE posts next year's holiday calendar")
     cw.add_argument("--data-dir", type=Path, required=True)
+    ms = commands.add_parser("macro-signals", help="Đèn tín hiệu rủi ro vĩ mô: one Telegram note when a light changes level")
+    ms.add_argument("--data-dir", type=Path, required=True)
     la = commands.add_parser("liquidity-alerts", help="one Telegram note when the overnight interbank rate jumps or the bank USD rate nears the ceiling")
     la.add_argument("--data-dir", type=Path, required=True)
     me = commands.add_parser("macro-events-remind", help="one Telegram note the day before the owner's macro events marked for a reminder")
@@ -194,6 +196,8 @@ def main() -> int:
         return us_calendar_cli(args.data_dir)
     if args.command == "calendar-watch":
         return calendar_watch_cli(args.data_dir)
+    if args.command == "macro-signals":
+        return macro_signals_cli(args.data_dir)
     if args.command == "liquidity-alerts":
         return liquidity_alerts_cli(args.data_dir)
     if args.command == "macro-events-remind":
@@ -1199,6 +1203,21 @@ def calendar_watch_cli(data_dir: Path) -> int:
     out = watch_calendar(Path(data_dir), CONFIG_DIR, send=telegram[0] if telegram else (lambda text: False),
                          today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
     print(json.dumps(out))
+    return 0
+
+
+def macro_signals_cli(data_dir: Path) -> int:
+    """Đèn tín hiệu rủi ro vĩ mô: one Telegram note when a light changes level; skipped while scheduled delivery is off. Public figures."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from investment_agent.services.macro_signals import signals_run
+
+    telegram = _scheduled_telegram(data_dir)
+    if telegram is None:
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
+        return 0
+    print(json.dumps(signals_run(data_dir, today=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date(), send=telegram[0])))
     return 0
 
 

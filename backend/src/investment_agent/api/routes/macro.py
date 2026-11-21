@@ -236,6 +236,17 @@ def put_sjc_gap(request: Request, body: SjcGapRequest):
         return write_error(exc)
 
 
+@router.get("/signals")
+def signals(request: Request):
+    """Đèn tín hiệu rủi ro vĩ mô (spec 2026-11-21): five lights with their thresholds and the last 30 days of what each measures."""
+    from investment_agent.domain.macro_signals import macro_signals
+    from investment_agent.services.macro_signals import load_series
+    require_owner(request)
+    if request.app.state.data_dir is None:
+        return unavailable()
+    return {"signals": macro_signals(load_series(Path(request.app.state.data_dir)), today=now(request).astimezone(VN).date())}
+
+
 @router.get("/asia")
 def asia(request: Request):
     """Chứng khoán châu Á: the last read of Nikkei, KOSPI, Shanghai and Hang Seng (market.asia_indices), with the brief's line."""

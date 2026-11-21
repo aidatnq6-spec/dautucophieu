@@ -53,7 +53,7 @@ def glance(request: Request):
     try:
         view = compose_overview(repo, owner, market, now(request))
         events = list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)
-        budget, _ = budget_view(repo, owner, quotes=book_quotes(request.app.state.data_dir))
+        budget, _ = budget_view(repo, owner, quotes=book_quotes(request.app.state.data_dir, request.app.state.market))
         entries, _ = read_journal(repo, owner)
         threshold = portfolio_settings(repo, owner)[0].journal_review_threshold
         latest = latest_report(repo, owner)

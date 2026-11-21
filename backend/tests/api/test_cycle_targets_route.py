@@ -19,14 +19,14 @@ def save(c, clock, version=0, rid="ct1", **targets):
 def test_the_current_phases_targets_are_compared_with_the_tower(tmp_path):
     c, clock = client(tmp_path)
     falling(tmp_path)
-    save_layers(c, clock)  # reserve 120, cash 95, deposits 300, gold 100, stocks 5 at cost: base 500 tr
+    save_layers(c, clock)  # reserve 120, cash 95, deposits 300, gold 100, stocks 6 at market (5 at cost): base 501 tr
     r = save(c, clock, down=MIX)
     assert r.status_code == 200
     body = r.json()
     assert body["phase"] == "down" and body["basis"] == "vietnam" and body["reason"] is None and body["version"] == 1
     rows = {x["id"]: x for x in body["rows"]}
-    assert rows["deposit"]["held"] == "395000000" and rows["deposit"]["gap"] == "-195000000"  # 40% of 500 tr less deposits and cash
-    assert rows["stocks"]["gap"] == "170000000"
+    assert rows["deposit"]["held"] == "395000000" and rows["deposit"]["gap"] == "-194600000"  # 40% of 501 tr less deposits and cash
+    assert rows["stocks"]["gap"] == "169350000"
     assert body["targets"]["down"]["stocks"] == "35" and body["targets"]["up"] is None
 
 

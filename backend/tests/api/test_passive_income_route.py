@@ -36,7 +36,7 @@ def test_the_goal_uses_the_pyramid_capital_the_monthly_plan_and_the_default_rate
     call(c, clock, "PUT", "/internal/contributions", {"amount": "8000000", "day": 10, "start": "2027-02", "expected_version": 0, "request_id": "cp1"})
     assert call(c, clock, "PUT", "/internal/passive-income", {"target": "5000000", "rate": None, "expected_version": 0, "request_id": "pi1"}).status_code == 200
     body = call(c, clock, "GET", "/internal/passive-income").json()
-    assert body["capital"] == "1000000000" and body["contribution"] == "8000000"   # 900 tr deposits + 95 tr cash + 5 tr stocks
+    assert body["capital"] == "1001000000" and body["contribution"] == "8000000"   # 900 tr deposits + 95 tr cash + 6 tr stocks at market
     assert body["result"]["required"] == "1000000000" and body["result"]["months"] == 0  # 5 tr × 12 / 6%
 
 
@@ -68,7 +68,7 @@ def test_the_stock_rate_is_stored_and_used(tmp_path):
     call(c, clock, "PUT", "/internal/passive-income", {"target": "10000000", "rate": None, "bond_rate": None, "stock_rate": "12", "expected_version": 0,
                                                        "request_id": "pi1"})
     body = call(c, clock, "GET", "/internal/passive-income").json()
-    assert body["goal"]["stock_rate"] == "12" and body["income"]["stocks"] == "50000" and body["income"]["dividends"] == "0"  # 5 tr at cost × 12% / 12
+    assert body["goal"]["stock_rate"] == "12" and body["income"]["stocks"] == "60000" and body["income"]["dividends"] == "0"  # 6 tr at market × 12% / 12
     bad = call(c, clock, "PUT", "/internal/passive-income", {"target": "10000000", "rate": None, "stock_rate": "90", "expected_version": 1, "request_id": "pi2"})
     assert bad.status_code == 422
 

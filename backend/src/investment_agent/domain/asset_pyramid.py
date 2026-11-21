@@ -7,6 +7,9 @@ from decimal import ROUND_HALF_UP, Decimal
 
 ORDER = ("reserve", "cash", "deposit", "bond", "gold", "stocks", "crypto")  # bottom to top; cash shares the deposit target
 GOLD, BOND_MAX, CRYPTO_MAX, STOCK_BAND = (Decimal("0.10"), Decimal("0.15")), Decimal("0.10"), Decimal("0.05"), Decimal("0.05")
+# Owner, 21/11/2026: stocks at market price move the shares every session, so a layer is short or over only once it is more than this
+# share of the base outside its range; the gap is still measured to the edge of the range.
+TOLERANCE = Decimal("0.01")
 
 
 def _r(value: Decimal) -> str:
@@ -40,9 +43,9 @@ def asset_pyramid(amounts: dict[str, Decimal], *, deductions: Decimal, stock_rat
         held = amount + (amounts.get("cash", Decimal(0)) if layer == "deposit" else 0)  # deposits are judged together with cash
         share = held / base if base > 0 else None
         status, gap = "ok", None
-        if share is not None and share < low:
+        if share is not None and share < low - TOLERANCE:
             status, gap = "short", (low * base - held)
-        elif share is not None and share > high:
+        elif share is not None and share > high + TOLERANCE:
             status, gap = "over", (held - high * base)
         out.append({"id": layer, "amount": format(amount, "f"), "share": str(share.quantize(Decimal("0.0001"), ROUND_HALF_UP)) if share is not None else None,
                     "target_min": _r(low), "target_max": _r(high), "status": status,
@@ -54,7 +57,7 @@ def asset_pyramid(amounts: dict[str, Decimal], *, deductions: Decimal, stock_rat
             over = [above["id"] for above in out[i + 1:] if above["status"] == "over"]
             if over:
                 warnings.append({"short": layer["id"], "over": over})
-    return {"total": format(total, "f"), "base": format(base, "f"), "layers": out, "warnings": warnings,
+    return {"total": format(total, "f"), "base": format(base, "f"), "layers": out, "warnings": warnings, "tolerance": str(TOLERANCE),
             "funding": _funding(out, cash=amounts.get("cash", Decimal(0)), stock_room=max(ranges["stocks"][1] * base - amounts.get("stocks", Decimal(0)), Decimal(0)))}
 
 

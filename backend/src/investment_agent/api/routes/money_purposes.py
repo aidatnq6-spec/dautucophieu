@@ -27,7 +27,7 @@ class PurposesRequest(MoneyPurposes):
 def _view(request: Request, repo, owner) -> dict:
     stored = read_version(repo, owner, *RECORD, None)
     data = MoneyPurposes.model_validate(stored.payload) if stored else MoneyPurposes()
-    rows = book_rows(read_book(repo, owner)[0] or DepositBook(), book_quotes(request.app.state.data_dir), today=now(request).astimezone(VN).date())
+    rows = book_rows(read_book(repo, owner)[0] or DepositBook(), book_quotes(request.app.state.data_dir, request.app.state.market), today=now(request).astimezone(VN).date())
     return {"version": stored.version if stored else 0, "data": data.model_dump(mode="json"), "rows": rows, "view": purpose_view(rows, data)}
 
 

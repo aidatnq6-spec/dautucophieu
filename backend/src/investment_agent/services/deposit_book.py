@@ -45,9 +45,21 @@ def ledger_cash(repo, owner) -> Decimal:
     return replay(list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)).cash
 
 
-def book_quotes(data_dir: Path | None) -> dict:
-    """Public prices the book's rows are valued at: {"funds": fund NAVs (Fmarket), "gold": Phú Quý prices}; empty before the first sync."""
-    return {"funds": fund_navs(data_dir), "gold": gold_prices(data_dir)}
+def book_quotes(data_dir: Path | None, market=None) -> dict:
+    """Public prices the book's rows are valued at: {"funds": fund NAVs (Fmarket), "gold": Phú Quý prices}; empty before the first sync.
+    "stocks": a held ticker's latest stored close (symbol → PricePoint or None), from the app's market when given, else the price store
+    under data_dir, for Tháp tài sản at market price (owner, 21/11/2026)."""
+    return {"funds": fund_navs(data_dir), "gold": gold_prices(data_dir), "stocks": market.price if market is not None else _stored_prices(data_dir)}
+
+
+def _stored_prices(data_dir: Path | None):
+    if data_dir is None or not (Path(data_dir) / "prices").exists():
+        return lambda symbol: None
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from investment_agent.market.prices import PriceStore
+    from investment_agent.market.view import StoreMarket
+    return StoreMarket(PriceStore(Path(data_dir)), None, today=lambda: datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date()).price
 
 
 def gold_price_moves(data_dir: Path | None, *, today: date) -> dict:

@@ -83,3 +83,20 @@ def test_the_us_crack_spread_and_apparel_inventories_can_be_chosen():
     ids = {c["id"]: c for c in catalog(None)}
     assert ids["macro:crack_321_us"]["label"] == "Biên lọc dầu (crack 3-2-1 Mỹ)"
     assert ids["macro:us_apparel_inv_ratio"]["label"] == "Tồn kho/doanh số cửa hàng quần áo Mỹ"
+
+
+def test_each_series_is_old_by_its_own_limit_not_one_for_all(tmp_path):
+    """Owner, 21/11/2026: a daily series is old within days, not after 120. A macro indicator keeps the limit of Vĩ mô, a Chuỗi giá trị
+    series its own there; monthly world prices keep 120 days."""
+    from datetime import timedelta
+    repo = setup(tmp_path)
+    store = MacroStore(tmp_path)
+    store.upsert("crack_321_us", [(TODAY - timedelta(days=20), "29.55")], entry="auto")   # past 14 days
+    store.upsert("dxy", [(TODAY - timedelta(days=8), "99")], entry="auto")                # past Vĩ mô's 7 days
+    store.upsert("com_cotton", [(TODAY - timedelta(days=100), "2")], entry="auto")        # within 120
+    save(repo, [{"id": "macro:crack_321_us", "bad": "10", "good": "30"}, {"id": "macro:dxy", "bad": "110", "good": "95"},
+                {"id": "macro:com_cotton", "bad": "2.5", "good": "1.5"}])
+    rows = {r["id"]: r for r in symbol_lights(repo, OWNER, tmp_path, "VCB", today=TODAY)["rows"]}
+    assert rows["macro:crack_321_us"]["state"] == "none" and "quá 14 ngày" in rows["macro:crack_321_us"]["note"]
+    assert rows["macro:dxy"]["state"] == "none" and "quá 7 ngày" in rows["macro:dxy"]["note"]
+    assert rows["macro:com_cotton"]["state"] != "none" and rows["macro:com_cotton"]["note"] is None

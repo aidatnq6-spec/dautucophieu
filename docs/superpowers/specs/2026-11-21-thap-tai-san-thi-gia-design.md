@@ -22,5 +22,17 @@ bằng có lợi nhất.
   - Phần "Nguồn tiền để mua thêm cổ phiếu" chỉ lấy phần dư của lớp đang "vượt".
   - Tiền mới vẫn chia để đưa từng lớp lên đúng mức tối thiểu, không trừ dải chịu đựng.
 
+## Quỹ dự phòng bằng 0 và chỗ cho cổ phiếu (đề xuất 3 + 4, duyệt 21/11/2026)
+- **Quỹ dự phòng bằng 0:**
+  - Lớp Dự phòng ghi "chưa có" (màu cảnh báo) thay cho "cố định".
+  - Dưới tiêu đề có lời nhắc: quỹ dự phòng và khoản chi 12 tháng đang là 0 đ, nên mục tiêu các lớp đang tính trên toàn bộ tài sản.
+  - Lời nhắc dẫn tới Sổ tài sản → Quỹ dự phòng; nếu chưa có Sổ tài sản thì chỉ tới ô Quỹ dự phòng ở trên.
+- **Chỗ cho cổ phiếu** là một khối riêng trong "Nguồn tiền để mua thêm cổ phiếu", ghi khoảng mục tiêu, gồm:
+  - Tới mức tối thiểu: cổ phiếu đang dưới mức tối thiểu bao nhiêu, 0 nếu đã đạt.
+  - Tới mức tối đa: bằng phần còn trống trong vốn dành cho cổ phiếu.
+  - Tiền có sẵn để mua: phần dư còn lại sau khi bù các lớp thiếu.
+  - Có thể mua thêm: số nhỏ hơn của "Tới mức tối đa" và "Tiền có sẵn để mua".
+- **Phần bù lớp thiếu** ghi "Chuyển sang vàng để lên mức tối thiểu trước" kèm số dương, không dùng số âm.
+
 ## Không làm
 Không đặt lệnh, không nêu mã nên mua hay bán. Không gửi số liệu cá nhân cho AI.

@@ -71,6 +71,14 @@ test("money for more stocks comes from layers above their ceiling, after filling
     const gap = (await box.getByTestId("layer-gold").locator(".pill").innerText()).replace(/^thiếu /, "");
     return (await funding.getByTestId("funding-fill-gold").innerText()).includes(gap);
   }, { timeout: 10_000 }).toBe(true);
+  await expect(funding.getByTestId("funding-fill-gold")).toContainText("Chuyển sang vàng để lên mức tối thiểu");
+  await expect(funding.getByTestId("funding-fill-gold")).not.toContainText("−");
+  // the room for stocks reads as one block: to the minimum and to the maximum of the target, then the money at hand
+  const room = funding.getByRole("group", { name: "Chỗ cho cổ phiếu" });
+  await expect(room.getByTestId("funding-to-min")).toContainText("đ");
+  await expect(room).toContainText("Tới mức tối thiểu");
+  await expect(room).toContainText("Tới mức tối đa");
+  await expect(room).toContainText("Tiền có sẵn để mua");
   // the surplus is large, so what can be bought is the room left in the stock target
   await expect(funding.getByTestId("funding-buyable")).toHaveText(await funding.getByTestId("funding-room").innerText());
   await expect(funding).toContainText("không phải khuyến nghị");
@@ -87,6 +95,18 @@ test("the reserve can be entered by hand, and cleared to use the profile again",
   await enterLayers(box, { deposit: "100000000000" });
   await expect(box).toContainText("(theo hồ sơ)");
   await expect(box).not.toContainText("(nhập tay)");
+});
+
+test("a reserve of 0 is said plainly: the targets are on every asset", async ({ page }) => {
+  await seedOwner(page);
+  await page.goto("/profile?tab=tai-san");
+  const box = page.getByRole("region", { name: "Tháp tài sản" });
+  await enterLayers(box, { deposit: "100000000000", reserve: "0" });
+  await expect(box.getByTestId("reserve-missing")).toContainText("mục tiêu các lớp đang tính trên toàn bộ tài sản");
+  await expect(box.getByTestId("layer-reserve")).toContainText("chưa có");
+  await enterLayers(box, { deposit: "100000000000", reserve: "500000000" });
+  await expect(box.getByTestId("reserve-missing")).toBeHidden();
+  await expect(box.getByTestId("layer-reserve")).toContainText("cố định");
 });
 
 test("no horizontal scroll on the profile page at 375px", async ({ page }) => {

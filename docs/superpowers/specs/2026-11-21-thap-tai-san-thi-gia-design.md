@@ -14,7 +14,7 @@ bằng có lợi nhất.
 - **Dùng chung số này:** Tháp tài sản, Vốn dành cho cổ phiếu (dòng "Đang nắm" và "còn trống/đã vượt", cả ô ở Tổng quan), Tháp
   theo chu kỳ, Tiền mới tháng này đi đâu, Kiểm tra trước khi mua, Dòng tiền thụ động (phần cổ phiếu) và dòng Vàng ở Việc cần xem.
 - **Hiển thị:** lớp Cổ phiếu ghi ngày giá và giá vốn bên cạnh. Dòng "Đang nắm (theo thị giá)" cũng ghi giá vốn.
-- **Mức tập trung giữ giá mua** như trước. Nền chia của nó (vốn dành cho cổ phiếu) nay tính trên tổng tài sản theo thị giá.
+- **Mức tập trung cũng theo thị giá** (chủ sở hữu chọn thêm cùng ngày). Mã không có giá gần đây tính theo giá vốn và được nêu tên. Cột "Giá vốn" đổi thành "Giá trị"; dòng "Còn trống" nay khớp với Tháp tài sản.
 - **Dải chịu đựng 1 điểm %.**
   - Một lớp chỉ "thiếu" khi tỷ trọng thấp hơn mức tối thiểu quá 1 điểm %, và chỉ "vượt" khi cao hơn mức tối đa quá 1 điểm %
     (tính trên phần sau quỹ dự phòng).

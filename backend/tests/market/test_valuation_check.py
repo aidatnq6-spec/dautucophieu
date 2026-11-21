@@ -27,6 +27,36 @@ def test_only_watched_tickers_are_read_and_one_failure_does_not_stop_the_others(
     assert store.read("AAA")["market_cap"] == "1000000000000" and store.read("BBB") is None
 
 
+def rows_of(*codes, total=None, profit=False):
+    data = [{"code": c, "ratioCode": "NET_PROFIT_TR", "reportDate": "2026-09-30", "value": 1e11} for c in codes] if profit else \
+        [{"code": c, "ratioCode": "MARKETCAP", "reportDate": "2026-11-06", "value": 1e12} for c in codes]
+    return json.dumps({"data": data, "totalElements": total if total is not None else len(data)})
+
+
+def test_the_watched_tickers_are_read_in_one_call_per_batch_not_two_each(tmp_path):
+    """55 tickers took about 110 calls and 48 s; one call per batch of 50 for each kind gives the same figures (checked live 21/11/2026)."""
+    store, calls = ValuationCheckStore(tmp_path), []
+
+    def get(url):
+        calls.append(url)
+        return rows_of("AAA", "BBB", profit="NET_PROFIT_TR" in url)
+    assert fetch_checks(store, ["AAA", "BBB"], get=get, today=TODAY, sleep=lambda s: None) == {"AAA": "ok", "BBB": "ok"}
+    assert len(calls) == 2 and "code:AAA,BBB" in calls[0]
+    assert store.read("BBB")["market_cap"] == "1000000000000" and store.read("BBB")["profit_quarter"] == "2026-Q3"
+
+
+def test_a_batch_cut_short_is_read_ticker_by_ticker_again(tmp_path):
+    store, calls = ValuationCheckStore(tmp_path), []
+
+    def get(url):
+        calls.append(url)
+        if "code:AAA,BBB" in url:
+            return rows_of("AAA", total=999, profit="NET_PROFIT_TR" in url)  # VNDirect says there are more rows than it gave
+        return page(("MARKETCAP", "2026-11-06", 1e12))
+    assert fetch_checks(store, ["AAA", "BBB"], get=get, today=TODAY, sleep=lambda s: None) == {"AAA": "ok", "BBB": "ok"}
+    assert any(u.split("code:")[1].startswith("BBB~") for u in calls)
+
+
 def test_a_figure_more_than_a_tenth_away_is_flagged_and_a_missing_side_is_only_shown():
     ours = {"market_cap": "1050000000000", "pe": "15.00", "pb": None, "close_date": "2026-11-06"}
     out = compare(ours, {"date": "2026-11-06", "market_cap": "1000000000000", "pe": "12.5", "pb": "1.5"})

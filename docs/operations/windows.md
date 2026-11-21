@@ -26,7 +26,7 @@ Tùy chọn: cài Tesseract kèm dữ liệu tiếng Việt để đọc báo c�
 
 ### Các bước tự động khác
 
-Mỗi bước ghi một dòng `<thời điểm> <tên bước> exit=<mã>` vào `logs\scheduler.log`. Một bước lỗi không chặn các bước sau. Các bước mới nhất:
+Mỗi bước ghi một dòng `<thời điểm> <tên bước> exit=<mã>` vào `logs\scheduler.log`. Một bước lỗi không chặn các bước sau, kể cả khi bước đó in ra stderr. Mỗi bước chạy qua `investment_agent.jobs.step`: tối đa 10 phút (`market-sync` 15 phút, cảnh báo giá 4 phút); quá giờ thì bước bị dừng cùng các tiến trình con, ghi `exit=124 {"status": "timeout", ...}`, và các bước sau vẫn chạy. Dòng stderr cuối cùng của bước (tên và nội dung lỗi) được ghi thêm ở cuối dòng dạng `stderr: "…"`. Các bước mới nhất:
 
 | Lệnh | Khi nào | Làm gì | Dữ liệu |
 |---|---|---|---|

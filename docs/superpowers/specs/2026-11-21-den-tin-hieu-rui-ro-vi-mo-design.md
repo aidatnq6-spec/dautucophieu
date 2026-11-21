@@ -16,6 +16,16 @@ trên trang Vĩ mô, tính từ số đã lưu; một tin Telegram khi một đ�
 - Số mới nhất cũ hơn hạn ở cột cuối thì đèn ghi "số cũ" kèm ngày, không tô màu (không đoán số).
 - Đèn có thêm đường 30 ngày của chính thứ nó đo; dưới 30 ngày số liệu thì ghi tính từ ngày nào.
 
+## Cải tiến chủ sở hữu duyệt 21/11/2026
+1. Đường nhỏ của mỗi đèn vẽ đúng thứ đèn đo theo từng ngày trong 30 ngày (mức đổi 30 ngày của dầu, USD; khoảng chênh tỷ giá; số phiên
+   bán ròng liên tiếp; lãi suất qua đêm), kèm đường ngưỡng vàng và đỏ.
+2. Mỗi đèn ghi khoảng cách tới mức kế tiếp (ví dụ "còn 0,81 điểm % nữa là đỏ", "thêm 1 phiên bán ròng là vàng").
+3. Dòng tóm tắt đầu khối: số đèn xanh, vàng, đỏ (và chưa có số, số cũ nếu có).
+4. Mỗi đèn ghi ở mức hiện tại từ ngày nào, tính lại từ số đã lưu theo từng ngày; cả 30 ngày cùng mức thì ghi "ít nhất từ" ngày đầu.
+5. Dầu WTI thêm chiều giảm: vàng khi giảm từ 15%, đỏ khi giảm từ 25% trong 30 ngày (giảm mạnh thường báo kinh tế thế giới yếu đi).
+   USD không thêm chiều giảm.
+6. Tên đèn dẫn tới dòng chỉ số gần nhất trên bảng Vĩ mô (dầu → WTI, USD → DXY, tỷ giá → tỷ giá tự do, khối ngoại, lãi suất qua đêm).
+
 ## Telegram
 - Sau mỗi lượt cập nhật vĩ mô: so mức với lượt trước (`data/macro/_signals.json`); đèn đổi giữa xanh, vàng, đỏ thì gửi một tin gồm
   mọi đèn đã đổi. Lượt đầu chỉ ghi mức. Chuyển sang hoặc từ "chưa có số", "số cũ" không gửi.

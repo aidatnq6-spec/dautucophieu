@@ -891,7 +891,8 @@ VPA_POSTS = "https://www.vpa.org.vn/wp-json/wp/v2/posts?search=container%20throu
 # world price, as PSUGAISAUSDM; wheat: US hard red winter, as PWHEAMTUSDM). Units are the World Bank's.
 WB_COMMODITIES = {"com_urea": "Urea", "com_coal": "Coal, Australian", "com_iron_ore": "Iron ore, cfr spot", "com_rubber": "Rubber, RSS3",
                   "com_sugar": "Sugar, world", "com_lng": "Liquefied natural gas, Japan", "com_aluminium": "Aluminum", "com_copper": "Copper",
-                  "com_wheat": "Wheat, US HRW", "com_soybean": "Soybeans"}
+                  "com_wheat": "Wheat, US HRW", "com_soybean": "Soybeans",
+                  "com_cotton": "Cotton, A Index"}  # Dệt may (owner, 21/11/2026)
 # More Chuỗi giá trị series (checked 20/11/2026, robots.txt read first), fetched by fetch_chain_extras:
 # - the FAO Dairy Price Index (2014-2016 = 100), monthly, in FAO's public food price index file (fao.org allows /media/docs/); read only
 #   while last month is missing;

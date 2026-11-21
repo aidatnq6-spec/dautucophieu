@@ -102,19 +102,21 @@ def test_the_committed_chains_read_the_series_the_app_now_keeps():
     assert port.indicator == "port_container_yoy"
     # tariffs and trade defence are events: noted on the diagram, kept off the good/bad bar
     assert {k for k, v in kinds.items() if v == "event"} == {("industrial-park", "us_tariff"), ("port", "us_tariff"),
-                                                             ("steel", "trade_defence")}
+                                                             ("steel", "trade_defence"), ("coated-steel", "hrc_trade_defence"),
+                                                             ("coated-steel", "export_trade_cases"), ("fuel", "pricing_decree"),
+                                                             ("garment", "us_tariff")}
 
 
 # The 50 watched tickers on 30/10/2026, as listed in the spec (data\ is not in Git).
-# VHC and ANV left with Thủy sản (owner, 21/11/2026)
-WATCHED_2026_10_30 = ("MBB ACB BID CTG SHB STB TCB VCB EIB KDH VHM VIC KBC DXG NLG IJC MSN VNM KDC SBT PAN GVR DCM DPM PHR DPR "
+# VHC and ANV left with Thủy sản; BMI, BSR, HSG, MSH, NKG, PLX, TLG got their chains (owner, 21/11/2026)
+WATCHED_2026_11_21 = ("BMI BSR HSG MSH NKG PLX TLG MBB ACB BID CTG SHB STB TCB VCB EIB KDH VHM VIC KBC DXG NLG IJC MSN VNM KDC SBT PAN GVR DCM DPM PHR DPR "
                       "GAS REE NT2 HDG GMD PVT VSC HAH SSI HCM VND BMP CTD VCG FPT CMG MWG DGW HPG BVH PNJ PVD").split()
 
 
 def test_the_committed_config_gives_every_watched_ticker_one_chain():
     chains = load_value_chains().chains
     owned = [s for c in chains for s in c.symbols]
-    assert len(WATCHED_2026_10_30) == 48 and sorted(owned) == sorted(WATCHED_2026_10_30)
+    assert len(WATCHED_2026_11_21) == 55 and sorted(owned) == sorted(WATCHED_2026_11_21)
 
 
 def test_hydrology_dairy_and_container_freight_are_read_from_their_series():

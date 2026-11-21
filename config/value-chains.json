@@ -186,6 +186,30 @@
    "publisher": "ACBS",
    "date": "2026-03-18",
    "url": "https://acbs.com.vn/acbsmedia/2026/03/VHM-by-ACBS_18.3.2026-EN.pdf"
+  },
+  "acbs-hsg-1125": {
+   "title": "Cập nhật nhanh HSG – N/A",
+   "publisher": "ACBS",
+   "date": "2025-11-07",
+   "url": "https://acbs.com.vn/acbsmedia/2025/11/HSG_Cap-nhat-nhanh-07.11.2025.pdf"
+  },
+  "vnd-hsg-nkg-0725": {
+   "title": "CTCP Tập đoàn Hoa Sen (HSG) – Thiếu động lực tăng trưởng mới (kèm NKG)",
+   "publisher": "VNDIRECT",
+   "date": "2025-07-04",
+   "url": "https://www.vndirect.com.vn/cmsupload/beta/HSG_NKG_BCCapnhat_20250704.pdf"
+  },
+  "shinhan-msh-0826": {
+   "title": "CTCP May Sông Hồng – Linh hoạt ứng phó trước áp lực từ thị trường Mỹ",
+   "publisher": "Shinhan Securities Vietnam",
+   "date": "2026-08-24",
+   "url": "https://shinhansec.com.vn/uploads/report/MSH_Q2_2026_VN.pdf"
+  },
+  "vnd-msh-0426": {
+   "title": "May Sông Hồng (MSH) – Duy trì tăng trưởng trên nền cao (Báo cáo ĐHCĐ)",
+   "publisher": "VNDIRECT",
+   "date": "2026-04-29",
+   "url": "https://www.vndirect.com.vn/cmsupload/beta/MSH_BCDHCD_20260429.pdf"
   }
  },
  "chains": [
@@ -419,7 +443,8 @@
    "icb": "Bảo hiểm",
    "status": "draft",
    "symbols": [
-    "BVH"
+    "BVH",
+    "BMI"
    ],
    "stages": {
     "input": [
@@ -1988,7 +2013,8 @@
    "symbols": [
     "MSN",
     "KDC",
-    "PAN"
+    "PAN",
+    "TLG"
    ],
    "stages": {
     "input": [
@@ -2274,6 +2300,389 @@
      "refs": [
       {
        "source": "acbs-fpt",
+       "page": 1
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "coated-steel",
+   "name": "Tôn mạ",
+   "icb": "Tài nguyên Cơ bản",
+   "status": "draft",
+   "symbols": [
+    "HSG",
+    "NKG"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Thép cuộn cán nóng (HRC)",
+      "note": "HSG lấy 40% HRC từ nhập khẩu, 60% từ nhà cung cấp trong nước (HPG, Formosa)",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "vnd-hsg-nkg-0725",
+        "page": 6
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Cán nguội, mạ kẽm và mạ màu thành tôn",
+      "note": "HSG dẫn đầu phân khúc tôn mạ kẽm với 28% thị phần",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "vnd-hsg-nkg-0725",
+        "page": 1
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Tôn mạ bán trong nước và xuất khẩu",
+      "note": "Xuất khẩu dự kiến khoảng 40% sản lượng HSG, so với gần 50% năm 2024",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "vnd-hsg-nkg-0725",
+        "page": 14
+       },
+       {
+        "source": "acbs-hsg-1125",
+        "page": 2
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "hrc_price",
+     "label": "Giá thép cuộn cán nóng (HRC) đầu vào",
+     "stage": "input",
+     "indicator": "com_steel_hrc",
+     "when_up": "bad",
+     "weight": "major",
+     "share": null,
+     "why": "Biên lợi nhuận gộp của HSG thu hẹp do giá HRC đầu vào tăng (Q3/2025)",
+     "refs": [
+      {
+       "source": "acbs-hsg-1125",
+       "page": 2
+      }
+     ]
+    },
+    {
+     "id": "hrc_trade_defence",
+     "label": "Thuế chống bán phá giá HRC nhập từ Trung Quốc",
+     "stage": "input",
+     "kind": "event",
+     "indicator": null,
+     "when_up": "bad",
+     "weight": "minor",
+     "share": null,
+     "why": "Giá HRC đầu vào tăng sau khi áp thuế chống bán phá giá AD20 với HRC nhập khẩu từ Trung Quốc",
+     "refs": [
+      {
+       "source": "acbs-hsg-1125",
+       "page": 2
+      }
+     ]
+    },
+    {
+     "id": "export_trade_cases",
+     "label": "Điều tra chống bán phá giá ở thị trường xuất khẩu",
+     "stage": "output",
+     "kind": "event",
+     "indicator": null,
+     "when_up": "bad",
+     "weight": "minor",
+     "share": null,
+     "why": "Các cuộc điều tra chống bán phá giá liên tục tại thị trường xuất khẩu là rủi ro giảm giá",
+     "refs": [
+      {
+       "source": "vnd-hsg-nkg-0725",
+       "page": 19
+      },
+      {
+       "source": "vnd-hsg-nkg-0725",
+       "page": 14
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "fuel",
+   "name": "Xăng dầu",
+   "icb": "Dầu khí",
+   "status": "draft",
+   "symbols": [
+    "BSR",
+    "PLX"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Dầu thô",
+      "note": "Lọc dầu Dung Quất dùng 30–35% dầu thô nhập khẩu",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-oilgas",
+        "page": 10
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "Lọc dầu Dung Quất (BSR)",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-oilgas",
+        "page": 19
+       }
+      ]
+     },
+     {
+      "name": "Phân phối, bán lẻ xăng dầu (PLX)",
+      "note": "70% nguồn hàng từ Dung Quất và Nghi Sơn, 30% nhập khẩu",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-oilgas",
+        "page": 10
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Xăng, dầu diesel tiêu thụ trong nước",
+      "note": "Nhu cầu xăng dầu trong nước dự báo tăng trên 8%/năm",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "acbs-oilgas",
+        "page": 2
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "crack_spread",
+     "label": "Biên lọc dầu (crack spread)",
+     "stage": "middle",
+     "indicator": null,
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "Chênh lệch giữa giá xăng, dầu diesel bán ra và giá dầu thô đầu vào quyết định lợi nhuận BSR; chưa có nguồn số liệu công khai",
+     "refs": [
+      {
+       "source": "acbs-oilgas",
+       "page": 19
+      },
+      {
+       "source": "acbs-oilgas",
+       "page": 10
+      }
+     ]
+    },
+    {
+     "id": "crude",
+     "label": "Giá dầu Brent",
+     "stage": "input",
+     "indicator": "brent",
+     "when_up": "good",
+     "weight": "minor",
+     "share": null,
+     "why": "Giá thành phẩm tăng giúp BSR cải thiện biên, và đầu mối bán lẻ lãi nhờ tồn kho giá rẻ; giá dầu sụt đột ngột buộc trích lập dự phòng tồn kho (PLX lỗ Q1.2026 vì dự phòng 6.512 tỷ đồng)",
+     "refs": [
+      {
+       "source": "acbs-oilgas",
+       "page": 10
+      },
+      {
+       "source": "acbs-oilgas",
+       "page": 3
+      },
+      {
+       "source": "acbs-oilgas",
+       "page": 2
+      }
+     ]
+    },
+    {
+     "id": "retail_price",
+     "label": "Giá trần xăng trong nước",
+     "stage": "output",
+     "indicator": "vn_ron95_price",
+     "when_up": "good",
+     "weight": "minor",
+     "share": null,
+     "why": "Giá bán tăng theo kỳ điều hành tạo chênh lệch với hàng tồn kho giá rẻ mua trước đó; giá cao kéo dài có thể làm giảm nhu cầu",
+     "refs": [
+      {
+       "source": "acbs-oilgas",
+       "page": 3
+      },
+      {
+       "source": "acbs-oilgas",
+       "page": 2
+      }
+     ]
+    },
+    {
+     "id": "pricing_decree",
+     "label": "Nghị định kinh doanh xăng dầu (đầu mối tự công bố giá)",
+     "stage": "output",
+     "kind": "event",
+     "indicator": null,
+     "when_up": "good",
+     "weight": "minor",
+     "share": null,
+     "why": "Cho đầu mối tự tính và công bố giá theo thị trường, giúp biên lợi nhuận của PLX ổn định hơn",
+     "refs": [
+      {
+       "source": "acbs-oilgas",
+       "page": 7
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "garment",
+   "name": "Dệt may",
+   "icb": "Hàng cá nhân & Gia dụng",
+   "status": "draft",
+   "symbols": [
+    "MSH"
+   ],
+   "stages": {
+    "input": [
+     {
+      "name": "Bông, vải và nguyên phụ liệu",
+      "note": "Biến động giá nguyên vật liệu đầu vào là một rủi ro",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "shinhan-msh-0826",
+        "page": 3
+       },
+       {
+        "source": "shinhan-msh-0826",
+        "page": 1
+       }
+      ]
+     }
+    ],
+    "middle": [
+     {
+      "name": "May theo đơn FOB và gia công CMT",
+      "note": "1H2026: doanh thu FOB đi ngang, CMT tăng 52%",
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "shinhan-msh-0826",
+        "page": 1
+       },
+       {
+        "source": "vnd-msh-0426",
+        "page": 1
+       }
+      ]
+     }
+    ],
+    "output": [
+     {
+      "name": "Hàng may mặc xuất khẩu, Mỹ là thị trường chủ lực",
+      "note": null,
+      "share": null,
+      "basis": null,
+      "refs": [
+       {
+        "source": "vnd-msh-0426",
+        "page": 1
+       },
+       {
+        "source": "shinhan-msh-0826",
+        "page": 1
+       }
+      ]
+     }
+    ]
+   },
+   "factors": [
+    {
+     "id": "cotton",
+     "label": "Giá bông thế giới",
+     "stage": "input",
+     "indicator": "com_cotton",
+     "when_up": "bad",
+     "weight": "minor",
+     "share": null,
+     "why": "Rủi ro biến động giá nguyên vật liệu đầu vào; giá cotton tăng mạnh do nguồn cung sụt giảm",
+     "refs": [
+      {
+       "source": "shinhan-msh-0826",
+       "page": 1
+      },
+      {
+       "source": "shinhan-msh-0826",
+       "page": 3
+      }
+     ]
+    },
+    {
+     "id": "us_demand",
+     "label": "Nhu cầu và tồn kho may mặc ở Mỹ",
+     "stage": "output",
+     "indicator": null,
+     "when_up": "good",
+     "weight": "major",
+     "share": null,
+     "why": "Nhu cầu Mỹ chưa phục hồi rõ, tồn kho cửa hàng quần áo cao khiến khách hàng thận trọng bổ sung hàng; chưa có nguồn số liệu trong ứng dụng",
+     "refs": [
+      {
+       "source": "shinhan-msh-0826",
+       "page": 1
+      }
+     ]
+    },
+    {
+     "id": "us_tariff",
+     "label": "Thuế Section 301 của Mỹ",
+     "stage": "output",
+     "kind": "event",
+     "indicator": null,
+     "when_up": "bad",
+     "weight": "major",
+     "share": null,
+     "why": "Từ 24/7/2026 Mỹ áp thuế 12,5% lên hàng nhập khẩu từ Việt Nam, tạo áp lực lên giá bán và đơn hàng",
+     "refs": [
+      {
+       "source": "shinhan-msh-0826",
        "page": 1
       }
      ]

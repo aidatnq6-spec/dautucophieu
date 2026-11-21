@@ -79,3 +79,34 @@ def test_each_event_is_reminded_once_the_day_before_or_on_the_day(tmp_path):
     later = remind_us_calendar(tmp_path, send=lambda t: sent.append(t) or True, today=date(2026, 12, 10))  # not sent the day before: on the day
     assert later == {"sent": 2} and sent[-2].startswith("Lịch vĩ mô Mỹ: hôm nay 10/12 lúc 02:00")
     assert json.loads((tmp_path / "alerts" / "us-calendar.json").read_text(encoding="utf-8"))["told"]
+
+
+def test_a_later_fed_month_page_not_yet_posted_is_not_an_error_but_this_month_and_bls_still_are(tmp_path):
+    from investment_agent.market.us_calendar import NotPublished
+    jan = "https://www.federalreserve.gov/newsevents/2027-january.htm"
+    def posted_later(url):
+        if url == jan:
+            raise NotPublished(url)
+        return pages(url)
+    out = refresh_us_calendar(tmp_path, get=posted_later, today=date(2026, 11, 16))
+    assert out == {"status": "ok", "events": 6, "errors": [], "not_published": [jan]}
+    saved = json.loads((tmp_path / "macro" / "us-calendar.json").read_text(encoding="utf-8"))
+    assert saved["errors"] == [] and saved["not_published"] == [jan]
+    def none_posted(url):
+        raise NotPublished(url)
+    again = refresh_us_calendar(tmp_path, get=none_posted, today=date(2026, 11, 17))
+    assert again["errors"] == ["https://www.federalreserve.gov/newsevents/2026-november.htm", BLS_CPI]
+    assert again["not_published"] == ["https://www.federalreserve.gov/newsevents/2026-december.htm", jan]
+
+
+def test_the_default_reader_turns_a_404_into_not_published(monkeypatch):
+    import httpx
+    import pytest
+    from investment_agent.market import us_calendar
+    request = httpx.Request("GET", "https://www.federalreserve.gov/newsevents/2027-january.htm")
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: httpx.Response(404, request=request))
+    with pytest.raises(us_calendar.NotPublished):
+        us_calendar.default_get(str(request.url))
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: httpx.Response(503, request=request))
+    with pytest.raises(httpx.HTTPStatusError):
+        us_calendar.default_get(str(request.url))

@@ -48,13 +48,17 @@ def test_a_lights_past_levels_are_worked_out_as_the_light_does_and_each_session_
 
 
 def summary_input(lights_today=("green", "green", "green", "green"), indep=6, t="1.58"):
+    """t: the test against the rest (t_rest); 2.57 is what 6 windows need, so 1.58 is unclear and 2.40 with 40 windows is clear."""
+    need = "2.57" if indep == 6 else "2.02"
     group = lambda b, mean, ind=indep, tt=t: {"bucket": b, "label": ["Rẻ nhất", "Rẻ", "Giữa", "Đắt", "Đắt nhất"][b], "n": 500, "n_independent": ind,  # noqa: E731
-                                               "mean": mean, "median": mean, "win_rate": "0.7857", "t": tt}
+                                               "mean": mean, "median": mean, "win_rate": "0.7857", "t": "9.99", "t_rest": tt, "t_need": need,
+                                               "differs": abs(Decimal(tt)) >= Decimal(need), "halves": "same"}
     pe = {"h": 250, "groups": [group(0, "0.2058")] + [group(b, "0.05") for b in range(1, 5)], "all": {"mean": "0.1190", "n": 1725},
           "today": {"date": "2026-11-20", "pe": "10.65", "position": "0.02", "bucket": 0}}
     names = {"oil": "Giá dầu WTI", "usd": "Đồng USD (chỉ số rộng của Fed)", "us10y": "Lợi suất trái phiếu Mỹ 10 năm", "pe": "P/E VN-Index so với 5 năm"}
     lights = [{"id": k, "name": names[k], "today": lv, "all": {"mean": "0.0250"},
-               "groups": [{"level": x, "n": 80, "n_independent": 11, "mean": "-0.0574", "t": "-1.20"} for x in ("green", "yellow", "red")]}
+               "groups": [{"level": x, "n": 80, "n_independent": 11, "mean": "-0.0574", "t": "-1.20", "t_rest": "-1.20", "t_need": "2.20",
+                           "differs": False, "halves": "flip"} for x in ("green", "yellow", "red")]}
               for k, lv in zip(names, lights_today)]
     conditions = [{"label": "Giá dầu tăng trong 3 tháng", "state": True}, {"label": "Lạm phát (CPI) tăng so với 3 tháng trước", "state": False},
                   {"label": "Tỷ giá USD/VND tăng hơn 1% trong 3 tháng", "state": None}]
@@ -67,7 +71,7 @@ def test_the_summary_says_todays_pe_group_its_past_and_how_little_it_rests_on():
     text = history_summary(stats, conditions)
     assert text.startswith("Hôm nay P/E VN-Index 10,65, thuộc nhóm rẻ nhất so với 5 năm trước. ")
     assert ("Trong quá khứ, ở nhóm này VN-Index 250 phiên sau trung bình +20,6% (mọi lúc +11,9%), tăng ở 79% số lần; "
-            "dựa trên 6 khoảng không chồng lấn nhưng chênh lệch chưa rõ (t = 1,58), chưa đủ để coi là chắc. ") in text
+            "dựa trên 6 khoảng không chồng lấn nhưng chưa rõ khác các lúc còn lại (t = 1,58, cần 2,57), chưa đủ để coi là chắc. ") in text
     weak = history_summary(summary_input(indep=3)[0], conditions)
     assert "nhưng chỉ có 3 khoảng không chồng lấn, quá ít để coi là chắc. " in weak
     assert ("Cả 4 đèn có lịch sử dài (Giá dầu WTI, Đồng USD (chỉ số rộng của Fed), Lợi suất trái phiếu Mỹ 10 năm, P/E VN-Index so với 5 năm) "
@@ -81,8 +85,8 @@ def test_the_summary_names_a_light_off_normal_with_its_past():
     stats, conditions = summary_input(lights_today=("green", "red", "green", "green"), indep=40, t="2.40")
     text = history_summary(stats, conditions)
     assert ("Đèn Đồng USD (chỉ số rộng của Fed) đang ở mức nguy hiểm; trong quá khứ ở mức này VN-Index 250 phiên sau trung bình −5,7% "
-            "(mọi lúc +2,5%, 11 khoảng không chồng lấn). ") in text
-    assert "40 khoảng không chồng lấn, t = 2,4. " in text
+            "(mọi lúc +2,5%), dựa trên 11 khoảng không chồng lấn nhưng chưa rõ khác các lúc còn lại (t = −1,2, cần 2,20), chưa đủ để coi là chắc. ") in text
+    assert "40 khoảng không chồng lấn, khác các lúc còn lại (t = 2,4, cần 2,02), ổn định ở hai nửa lịch sử. " in text
 
 
 def test_pe_days_fall_in_five_groups_by_where_they_sat_in_the_five_years_before():
@@ -118,3 +122,83 @@ def test_the_summary_says_a_shock_of_the_latest_session_with_its_past():
             "giảm sâu nhất trong kỳ trung vị −17,3%. Chỉ mô tả quá khứ") in text
     stats["shocks"]["groups"][0]["today"] = False
     assert "Cú sốc" not in history_summary(stats, conditions)
+
+
+def _blocks(extra):
+    """400 sessions, h = 10: a group on the first ten sessions of every twenty, the rest on the other ten. Both move 3% ± 2% by block,
+    so a t against 0 is large for either; extra(i) is added to the group's change only."""
+    index = {date(2018, 1, 1) + timedelta(days=i): i for i in range(400)}
+    group = [d for d, i in index.items() if i % 20 < 10]
+    rest = [d for d, i in index.items() if i % 20 >= 10]
+    base = lambda i: D("0.03") + D("0.02") * (1 if (i // 20) % 2 else -1)  # noqa: E731
+    returns = {d: base(i) + (extra(i) if i % 20 < 10 else 0) for d, i in index.items()}
+    return group, rest, returns, index
+
+
+def test_a_group_is_tested_against_the_rest_not_against_zero_owner_22_11_2026():
+    """Kaizen 22/11/2026: VN-Index rises over time, so almost every group's mean is above 0; the question the page asks is whether
+    the group differs from the other sessions. Welch's t on the independent windows of both, against the t its degrees of freedom need."""
+    group, rest, returns, index = _blocks(lambda i: 0)
+    out = group_summary(group, returns, index, h=10, rest=rest)
+    assert abs(D(out["t"])) > 5  # against 0: looks strong
+    assert out["t_rest"] == "0.00" and out["t_need"] == "2.02" and out["differs"] is False
+    _, _, ahead, _ = _blocks(lambda i: D("0.05"))
+    better = group_summary(group, ahead, index, h=10, rest=rest)
+    assert better["differs"] is True and D(better["t_rest"]) > D(better["t_need"]) and better["halves"] == "same"
+    assert "t_rest" not in group_summary(group, returns, index, h=10)  # no rest given (the every-session row): nothing to compare
+
+
+def test_a_group_ahead_in_one_half_of_history_and_behind_in_the_other_is_said_to_flip():
+    group, rest, returns, index = _blocks(lambda i: D("0.05") if i < 200 else D("-0.05"))
+    assert group_summary(group, returns, index, h=10, rest=rest)["halves"] == "flip"
+
+
+def test_too_few_windows_on_either_side_is_not_compared():
+    group, rest, returns, index = _blocks(lambda i: D("0.05"))
+    out = group_summary(group, returns, index, h=10, rest=rest[:30])  # the rest: 3 independent windows
+    assert out["differs"] is None and out["t_rest"] is None and out["halves"] is None
+
+
+def test_the_t_needed_follows_the_degrees_of_freedom():
+    from investment_agent.domain.history_stats import t_needed
+    assert [t_needed(df) for df in (4, 6, 10, 30, 1000)] == ["2.78", "2.45", "2.23", "2.04", "1.96"]
+
+
+def test_the_summary_reads_the_test_against_the_rest_and_says_how_many_groups_were_tested():
+    from investment_agent.domain.history_stats import evidence_text, history_summary
+    g = {"n": 500, "n_independent": 6, "t_rest": "1.58", "t_need": "2.57", "differs": False, "halves": "same"}
+    assert evidence_text(g) == "dựa trên 6 khoảng không chồng lấn nhưng chưa rõ khác các lúc còn lại (t = 1,58, cần 2,57), chưa đủ để coi là chắc"
+    assert evidence_text({**g, "t_rest": "3.1", "differs": True}) == "6 khoảng không chồng lấn, khác các lúc còn lại (t = 3,1, cần 2,57), ổn định ở hai nửa lịch sử"
+    assert evidence_text({**g, "t_rest": "3.1", "differs": True, "halves": "flip"}).endswith("nhưng đổi chiều giữa hai nửa lịch sử")
+    assert evidence_text({**g, "t_need": "2.00"}).startswith("dựa trên 6 khoảng không chồng lấn nhưng chưa rõ khác các lúc còn lại (t = 1,58, cần 2,00)")
+    assert evidence_text({**g, "differs": None, "t_rest": None}) == "dựa trên 6 khoảng không chồng lấn, chưa so được với các lúc còn lại"
+    assert evidence_text({**g, "n_independent": 3}) == "nhưng chỉ có 3 khoảng không chồng lấn, quá ít để coi là chắc"
+    stats, conditions = summary_input()
+    stats["tested"] = 118
+    text = history_summary(stats, conditions)
+    assert ("Trang so 118 nhóm với các lúc còn lại; dù không có quan hệ thật, khoảng 6 nhóm vẫn vượt ngưỡng do ngẫu nhiên. "
+            "Chỉ mô tả quá khứ, không phải dự báo hay khuyến nghị.") in text
+
+
+def test_every_table_sets_each_group_against_the_other_sessions_of_the_same_table():
+    from investment_agent.domain.history_states import states_table
+    from investment_agent.domain.history_stats import light_groups, shock_groups
+    days = [date(2018, 1, 1) + timedelta(days=i) for i in range(900)]
+    closes = [(d, D(1000 + (i % 37) * 7 - (i % 11) * 5 + i)) for i, d in enumerate(days)]
+    pe = [(d, D(10 + (i % 50) / 10)) for i, d in enumerate(days)]
+    oil = [(d, D(50) if i % 200 < 150 else D(65)) for i, d in enumerate(days)]
+    tables = [pe_groups(pe, closes, h=20)["groups"], light_groups("oil", {"factor_oil": oil}, closes, h=20)["groups"],
+              shock_groups(closes, h=20)["groups"], shock_groups(closes, h=20)["combos"],
+              states_table([(d, i % 90 < 45) for i, d in enumerate(days)], [(d, i % 60 < 20) for i, d in enumerate(days)], closes, h=20)["rows"]]
+    for groups in tables:
+        assert all({"t_rest", "t_need", "differs", "halves"} <= set(g) for g in groups)
+    assert any(g["differs"] is not None for g in tables[0])
+    assert "t_rest" not in pe_groups(pe, closes, h=20)["all"]  # the every-session row is what the groups are read against
+
+
+def test_tested_counts_the_groups_set_against_the_rest():
+    from investment_agent.domain.history_stats import tested_groups
+    g = lambda d: {"differs": d}  # noqa: E731
+    stats = {"pe": {"groups": [g(True), g(None), g(False)]}, "lights": [{"groups": [g(False), g(None)]}],
+             "shocks": {"groups": [g(True)], "combos": [g(None), g(False)]}}
+    assert tested_groups(stats) == 5

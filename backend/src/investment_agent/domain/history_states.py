@@ -99,8 +99,11 @@ def states_table(a: list[tuple[date, bool]], b: list[tuple[date, bool]], closes:
     returns, dips = forward_returns(closes, h), forward_dips(closes, h)
     sa, sb = _on_sessions(a, sessions, kinds[0]), _on_sessions(b, sessions, kinds[1])
     both = [d for d in sessions if d in sa and d in sb]
-    rows = [{"a": x, "b": y, **group_summary([d for d in both if sa[d] is x and sb[d] is y], returns, index, h=h, dips=dips)}
-            for x, y in ((True, True), (True, False), (False, True), (False, False))]
+    rows = []
+    for x, y in ((True, True), (True, False), (False, True), (False, False)):
+        cell = [d for d in both if sa[d] is x and sb[d] is y]
+        mine = set(cell)
+        rows.append({"a": x, "b": y, **group_summary(cell, returns, index, h=h, dips=dips, rest=[d for d in both if d not in mine])})
     runs, start = [], None
     for d in both:  # the stretches where both held, for the chart
         if sa[d] and sb[d]:

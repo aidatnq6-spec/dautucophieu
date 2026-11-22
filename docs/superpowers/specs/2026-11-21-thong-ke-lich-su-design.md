@@ -75,3 +75,15 @@ Chủ sở hữu duyệt ngày 21/11/2026 (kaizen từ FireAnt Quant AI). Trang 
   giảm sâu nhất trong kỳ trung vị). Khi một nhóm tách hẹp hơn cũng đúng hôm nay và có đủ khoảng độc lập thì đọc nhóm đó
   (ưu tiên "đã giảm 20% từ đỉnh"); nhóm không đủ dữ liệu thì ghi "không đủ dữ liệu cho kỳ này", không đọc số.
   Không có cú sốc thì không có dòng. Kết thúc bằng "Chỉ mô tả quá khứ, không phải dự báo."
+
+## Độ tin cậy so với các lúc còn lại (kaizen, chủ sở hữu duyệt 22/11/2026)
+- Kiểm trên dữ liệu thật 22/11/2026: 16 nhóm có |t| ≥ 2 so với 0, nhưng không nhóm nào khác "Mọi lúc" (Welch). VN-Index tăng dần theo
+  thời gian nên trung bình gần như nhóm nào cũng trên 0; câu hỏi đúng là nhóm có khác các phiên còn lại không.
+- Mỗi nhóm (P/E, đèn, cú sốc, cú sốc chồng cú sốc, bảng 2×2) được so với **các phiên còn lại của cùng bảng**: thống kê t Welch trên khoảng
+  không chồng lấn của cả hai bên; ngưỡng là t hai phía 5% theo bậc tự do (ví dụ 6 khoảng cần 2,57; nhiều khoảng gần 1,96), không cố
+  định 2. Một bên dưới 5 khoảng thì "chưa so được". Hàng "Mọi lúc" là mốc so sánh.
+- **Hai nửa lịch sử**: khoảng của nhóm chia đôi theo thời gian; mỗi nửa so với các lúc còn lại của cùng giai đoạn. Cùng chiều ở hai nửa:
+  "ổn định ở hai nửa lịch sử"; ngược chiều: "nhưng đổi chiều giữa hai nửa lịch sử". Chỉ nói khi nhóm khác rõ.
+- **Nhiều phép kiểm**: trang ghi số nhóm đã so ở kỳ đang chọn và khoảng 5% số đó vẫn vượt ngưỡng do ngẫu nhiên; câu tóm tắt cũng ghi.
+- Câu tóm tắt đọc phép kiểm này cho nhóm P/E hôm nay và cho đèn đang không bình thường. Dòng Cú sốc hôm nay trong bản tin giữ như cũ.
+- Kết quả đầu tiên (22/11/2026): kỳ 20 phiên 2/27 nhóm khác rõ, 60 phiên 1/25, 120 phiên 1/23, 250 và 500 phiên 0, gần với số do ngẫu nhiên.

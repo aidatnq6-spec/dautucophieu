@@ -95,7 +95,8 @@ def history_stats(data_dir: Path, *, h: int, today: date) -> dict:
     out = {"h": h, "horizons": list(HORIZONS), "closes_from": closes[0][0].isoformat() if closes else None,
            "pe": pe_groups(pe, closes, h=h), "lights": [light_groups(k, series, closes, h=h) for k in LIGHTS],
            "shocks": shock_groups(closes, h=h)}
-    from investment_agent.domain.history_stats import history_summary
+    from investment_agent.domain.history_stats import history_summary, tested_groups
+    out["tested"] = tested_groups(out)  # how many groups were set against the rest: about 5% pass by chance
     out["summary"] = history_summary(out, conditions_now(data_dir, fx="1", today=today)[1])  # by a fixed pattern, no model
     _CACHE.clear() if len(_CACHE) > 16 else None
     _CACHE[key] = (time.monotonic(), out)

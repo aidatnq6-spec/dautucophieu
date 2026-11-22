@@ -1,14 +1,15 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BookOpenText, Building2, ClipboardList, Briefcase, CalendarDays, ChartLine, Eye, FlaskConical, Grid3x3, Globe, House, Newspaper, NotebookPen, PiggyBank, Scale, Settings, UserRound, Workflow } from "lucide-react";
+import { Activity, BookOpenText, Building2, CalendarCheck, ClipboardList, Briefcase, CalendarDays, ChartLine, Eye, FlaskConical, Grid3x3, Globe, House, Newspaper, NotebookPen, PiggyBank, Scale, Settings, UserRound, Workflow } from "lucide-react";
 
 // Six short groups, each with its own accent colour (nav-tone-*), so the eye finds where a group starts.
 const GROUPS = [
   { title: null, tone: null, links: [{ href: "/", label: "Tổng quan", icon: House }] },
   { title: "Tài sản", tone: "assets", links: [
     { href: "/portfolio", label: "Danh mục & Giao dịch", icon: Briefcase },
-    { href: "/profile", label: "Hồ sơ & rủi ro", icon: UserRound }] },
+    { href: "/profile", label: "Hồ sơ & rủi ro", icon: UserRound },
+    { href: "/year", label: "Năm tài chính", icon: CalendarCheck }] },
   { title: "Vĩ mô & thị trường", tone: "market", links: [
     { href: "/macro", label: "Vĩ mô", icon: Globe },
     { href: "/market", label: "Thị trường trong phiên", icon: ChartLine },

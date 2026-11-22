@@ -58,7 +58,7 @@ test("the menu is grouped, and every link fits a laptop screen", async ({ page }
   for (const [group, link] of [["Tài sản", "Hồ sơ & rủi ro"], ["Vĩ mô & thị trường", "Xu hướng"], ["Phân tích ngành", "Ngành theo quý"], ["Cổ phiếu", "Định giá"], ["Tin tức", "Nhận định"], ["Công cụ", "Cài đặt"]]) {
     await expect(nav.getByRole("group", { name: group }).getByRole("link", { name: link })).toBeVisible();
   }
-  await expect(nav.getByRole("link")).toHaveCount(19);  // Thống kê lịch sử added (21/11/2026)
+  await expect(nav.getByRole("link")).toHaveCount(20);  // Thống kê lịch sử (21/11/2026), Năm tài chính (22/11/2026)
   await expect(nav.getByRole("link", { name: "Cài đặt" })).toBeInViewport({ ratio: 1 });
   await page.setViewportSize({ width: 375, height: 800 });
   await expect(nav.getByText("Cổ phiếu", { exact: true })).toBeHidden();

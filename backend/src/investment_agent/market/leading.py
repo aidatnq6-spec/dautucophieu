@@ -686,9 +686,15 @@ class MacroStore:
     def upsert(self, indicator: str, points: list[tuple[date, str]], *, entry: str, source_url: str | None = None, replace: bool = False) -> None:
         """Adds or overwrites the points by date; with replace, the stored points are dropped first (a series moved to a source in other units)."""
         now = datetime.now(timezone.utc).isoformat()
-        by_date = {} if replace else {o["date"]: o for o in self.read(indicator)}
+        before = {o["date"]: o for o in self.read(indicator)}
+        by_date = {} if replace else dict(before)
         for day, value in points:
-            by_date[day.isoformat()] = {"date": day.isoformat(), "value": value, "entry": entry, "source_url": source_url, "recorded_at": now}
+            key = day.isoformat()
+            # first_seen: when this date first came in, kept through later runs and revisions, so a source's real delay can be read
+            # (owner, 22/11/2026); a figure stored before then has none: unknown, never filled in
+            seen = before[key].get("first_seen") if key in before else now
+            by_date[key] = {"date": key, "value": value, "entry": entry, "source_url": source_url, "recorded_at": now,
+                            **({"first_seen": seen} if seen else {})}
         self.root.mkdir(parents=True, exist_ok=True)
         path, tmp = self._path(indicator), self._path(indicator).with_suffix(".tmp")
         tmp.write_text(json.dumps({"indicator": indicator, "observations": [by_date[k] for k in sorted(by_date)]}, ensure_ascii=False, indent=1),
@@ -1251,17 +1257,29 @@ def macro_reminders(indicators: list[dict], store: MacroStore, *, today: date) -
     return out
 
 
-def macro_rows(indicators: list[dict], store: MacroStore, *, today: date) -> list[dict]:
+def _sessions_after(last: date, today: date, is_session) -> int:
+    """HOSE sessions after the figure's day up to today."""
+    return sum(1 for i in range(1, (today - last).days + 1) if is_session(last + timedelta(days=i)))
+
+
+def macro_rows(indicators: list[dict], store: MacroStore, *, today: date, is_session=None) -> list[dict]:
+    """A session indicator (max_age_sessions, owner 22/11/2026) is old by the HOSE sessions it has missed, so a long holiday is not an
+    alert; the others by calendar days (max_age_days)."""
+    if is_session is None:
+        from investment_agent.market.sessions import is_session
     rows, statuses, gaps = [], store.statuses(), store.gaps()
     for ind in indicators:
         obs = store.read(ind["id"])
         status = statuses.get(ind["id"], {}).get("status")
         last = obs[-1] if obs else None
         trend, assessment = evaluate(ind["rule"], [o["value"] for o in obs[-2:]])
+        sessions = ind.get("max_age_sessions")
+        age_sessions = _sessions_after(date.fromisoformat(last["date"]), today, is_session) if last and sessions else None
+        stale = last is not None and (age_sessions > sessions if sessions else (today - date.fromisoformat(last["date"])).days > ind["max_age_days"])
         rows.append({"id": ind["id"], "label": ind["label"], "unit": ind["unit"], "auto": ind["source"]["kind"] != "manual", "period": ind.get("period"),
                      "value": last["value"] if last else None, "date": last["date"] if last else None,
                      "previous": obs[-2]["value"] if len(obs) >= 2 else None, "trend": trend, "assessment": assessment,
-                     "stale": last is not None and (today - date.fromisoformat(last["date"])).days > ind["max_age_days"],
+                     "stale": stale, "age_sessions": age_sessions,
                      "source_url": (last or {}).get("source_url") or ind["url"], "note": ind.get("note"), "gap": gaps.get(ind["id"]),
                      # a hand-entered indicator has no source to fail; a status left from an older automatic source is not shown
                      "source_error": status if status not in (None, "ok") and ind["source"]["kind"] != "manual" else None,

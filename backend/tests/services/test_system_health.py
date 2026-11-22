@@ -268,3 +268,13 @@ def test_a_problem_turned_known_is_not_announced_as_recovered_and_a_new_known_on
     known = [{"id": "gap:2026-10", "ids": ["macro:us_cpi_yoy", "macro:us_core_cpi_yoy"], "label": "CPI", "detail": "y"}]
     assert alert_changes([], tmp_path, save=True, known=known) == ([], [])
     assert alert_changes([], tmp_path, save=False) == ([], ["macro:us_cpi_yoy"])  # the gap over and the figure back: said once
+
+
+def test_a_session_indicator_problem_names_the_hose_sessions_missed(tmp_path):
+    from datetime import date
+    from investment_agent.market.leading import MacroStore
+    data = healthy(tmp_path)
+    drilled(data)
+    MacroStore(data).upsert("vnindex_value", [(date(2026, 11, 4), "20000")], entry="auto")  # Wednesday; 9/11 is Monday: 5, 6, 9 missed
+    detail = next(p for p in report(data)["problems"] if p["id"] == "macro:vnindex_value")["detail"]
+    assert detail == "số mới nhất ngày 04/11/2026, đã 3 phiên HOSE chưa có số mới (hạn 2 phiên)"

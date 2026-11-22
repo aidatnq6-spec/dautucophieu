@@ -729,3 +729,33 @@ def test_one_hosts_indicators_share_a_group():
     nso = {source_group(i) for i in by_id.values() if i["source"]["kind"].startswith("nso_")}
     assert len(sbv) == 1 and len(nso) == 1
     assert source_group(next(i for i in by_id.values() if i["source"]["kind"] == "real_rate")) is None  # run last, alone
+
+def test_a_session_indicator_is_old_by_hose_sessions_missed_not_by_calendar_days(tmp_path):
+    """Owner, 22/11/2026: a 4-day limit called the market figures old over every long holiday (Tết, 30/4–1/5, 2/9), then recovered:
+    two Telegram notes saying nothing. A session indicator's age is the HOSE sessions after its figure up to today."""
+    store = MacroStore(tmp_path)
+    store.upsert("vnindex_value", [(date(2026, 4, 28), "20000")], entry="auto")  # Tuesday; HOSE shut 29/4 (in lieu), 30/4, 1/5
+    holidays = {date(2026, 4, 29), date(2026, 4, 30), date(2026, 5, 1)}
+    session = lambda d: d.weekday() < 5 and d not in holidays  # noqa: E731
+    row = lambda today: next(r for r in macro_rows(load_indicators(), store, today=today, is_session=session) if r["id"] == "vnindex_value")  # noqa: E731
+    assert row(date(2026, 5, 4))["stale"] is False   # six days, one session (Monday 4/5)
+    assert row(date(2026, 5, 5))["stale"] is False   # two sessions missed: within the limit
+    assert row(date(2026, 5, 6))["stale"] is True and row(date(2026, 5, 6))["age_sessions"] == 3
+    assert {i["id"]: i.get("max_age_sessions") for i in load_indicators() if i.get("period") == "session"} == {
+        "foreign_net": 2, "vnindex_value": 2, "vn10y": 5, "vn_interbank_on": 5, "vn_interbank_1w": 3, "vn_interbank_1m": 3}
+
+
+def test_each_figure_keeps_the_time_it_was_first_seen(tmp_path):
+    """Owner, 22/11/2026: recorded_at is rewritten on every run, so how late a source publishes was lost. first_seen stays from the
+    first run that stored that date; a figure stored before has none (unknown, never filled in)."""
+    import json
+    store = MacroStore(tmp_path)
+    path = tmp_path / "macro" / "m2_vn.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"indicator": "m2_vn", "observations": [
+        {"date": "2026-07-31", "value": "1", "entry": "auto", "source_url": None, "recorded_at": "2026-11-01T00:00:00+00:00"}]}), encoding="utf-8")
+    store.upsert("m2_vn", [(date(2026, 7, 31), "1"), (date(2026, 8, 31), "2")], entry="auto")
+    first = {o["date"]: o.get("first_seen") for o in store.read("m2_vn")}
+    assert first["2026-07-31"] is None and first["2026-08-31"] is not None
+    store.upsert("m2_vn", [(date(2026, 8, 31), "2.1")], entry="auto")  # revised later: still first seen on the first run
+    assert {o["date"]: o.get("first_seen") for o in store.read("m2_vn")}["2026-08-31"] == first["2026-08-31"]

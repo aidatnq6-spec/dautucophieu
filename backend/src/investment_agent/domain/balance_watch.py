@@ -390,6 +390,7 @@ def inventory_view(quarters: dict, n: int = 12) -> dict:
 
 
 INVENTORY_GAP = Decimal("0.20")  # inventory growing this much faster than cost of sales (owner, 22/11/2026)
+INVENTORY_MATERIAL = Decimal("0.10")  # flagged only from this share of total assets (owner, 22/11/2026: ports at 1–2% were noise)
 
 
 def _inventory_days(quarters: dict, period: str) -> Decimal | None:
@@ -407,16 +408,23 @@ def inventory_pace(quarters: dict, peers: dict | None, *, property: bool = False
     whose inventory is projects, not goods."""
     out = _days_view(quarters, peers, _inventory_days)
     latest = out["quarter"]
-    inv_growth = cogs_growth = flag = None
+    inv_growth = cogs_growth = flag = share = None
     if latest:
+        (inv_now,), (assets,) = _get(quarters[latest], "inventory"), _get(quarters[latest], "total_assets")
+        share = inv_now / assets if inv_now is not None and assets is not None and assets > 0 else None
         ago = _back(latest, 4)
         (inv,), (inv_ago,) = _get(quarters[latest], "inventory"), _get(quarters.get(ago, {}), "inventory")
         cogs, cogs_ago = _cogs4(quarters, latest), _cogs4(quarters, ago)
         if inv is not None and inv_ago is not None and inv_ago > 0 and cogs is not None and cogs_ago is not None:
             inv_growth, cogs_growth = inv / inv_ago - 1, cogs / cogs_ago - 1
             rising = out["change"] is not None and Decimal(out["change"]) > 0
-            flag = False if property else (inv_growth - cogs_growth >= INVENTORY_GAP and rising)
-    return {**out, "inventory_growth": _r(inv_growth), "cogs_growth": _r(cogs_growth), "flag": flag}
+            if property:
+                flag = False
+            elif share is None:
+                flag = None  # materiality not read: never flagged on a guess
+            else:
+                flag = share >= INVENTORY_MATERIAL and inv_growth - cogs_growth >= INVENTORY_GAP and rising
+    return {**out, "inventory_growth": _r(inv_growth), "cogs_growth": _r(cogs_growth), "share": _r(share), "flag": flag}
 
 
 INVENTORY_FLOW_SHARE = Decimal("0.20")  # Dự phòng giảm giá tồn kho đi vào lợi nhuận (owner, 22/11/2026)

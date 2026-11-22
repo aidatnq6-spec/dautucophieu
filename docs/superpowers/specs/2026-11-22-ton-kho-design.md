@@ -36,3 +36,5 @@ nguồn công khai: ngoài phạm vi.
 - Phần 2: `inventory_pace`; dòng số ngày tồn kho trong mục Tồn kho; cột "Tồn kho tăng nhanh hơn giá vốn" trên Bảng dấu hiệu. Chạy thử 22/11:
   12/41 mã bật cờ, trong đó có mã tồn kho rất nhỏ (cảng, vận tải 10–20 ngày): cần chủ sở hữu quyết ngưỡng trọng yếu.
 - Phần 3: `inventory_provision_flow`; dòng trong mục Tồn kho, nhãn "Hoàn nhập dự phòng tồn kho lớn" hoặc "Trích thêm dự phòng tồn kho lớn".
+- Ngưỡng trọng yếu (chủ sở hữu duyệt 22/11/2026): cờ "Tồn kho tăng nhanh hơn giá vốn" chỉ bật khi tồn kho thuần từ **10% tổng tài sản**;
+  dưới ngưỡng vẫn hiện số và ghi "không ghi cờ"; thiếu tổng tài sản thì không đọc được (không bật cờ). Chạy thử: 12 còn 8 mã.

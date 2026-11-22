@@ -27,7 +27,7 @@ type Balance = { symbol: string; sector: string | null; debt: { rows: DebtRow[];
   inventory_pace?: InventoryPace; inventory_provision_flow?: InventoryFlow };
 type InvFlowRow = { quarter: string; balance: string | null; change: string | null; pbt: string | null; share: string | null; kind: "release" | "charge" | null };
 export type InventoryFlow = { rows: InvFlowRow[]; quarter: string | null; kind: "release" | "charge" | null };
-export type InventoryPace = Dso & { inventory_growth: string | null; cogs_growth: string | null; flag: boolean | null };
+export type InventoryPace = Dso & { inventory_growth: string | null; cogs_growth: string | null; share?: string | null; flag: boolean | null };
 type InvRow = { quarter: string; gross: string | null; provision: string | null; net: string | null; coverage: string | null; share: string | null };
 export type Inventory = { rows: InvRow[] };
 type FlowRow = { quarter: string; balance: string | null; change: string | null; pbt: string | null; share: string | null; release: boolean };
@@ -178,7 +178,8 @@ export function inventoryPaceText(p: InventoryPace): string {
   const sector = p.sector_median !== null ? `; trung vị ngành ${p.sector_median} ngày (${p.sector_count} mã)` : "";
   const growth = p.inventory_growth !== null && p.cogs_growth !== null
     ? ` Tồn kho tăng ${rate(p.inventory_growth)} so cùng kỳ, giá vốn bốn quý tăng ${rate(p.cogs_growth)}.` : "";
-  const why = p.flag ? " Hàng nhập về nhanh hơn hàng bán ra: xem thuyết minh tồn kho (loại hàng nào tăng) và dự phòng giảm giá." : "";
+  const small = !p.flag && p.share != null && Number(p.share) < 0.1 ? ` Tồn kho chỉ ${rate(p.share)} tổng tài sản: không ghi cờ.` : "";
+  const why = p.flag ? " Hàng nhập về nhanh hơn hàng bán ra: xem thuyết minh tồn kho (loại hàng nào tăng) và dự phòng giảm giá." : small;
   return `${q(p.quarter)}: tồn kho đủ ${p.days} ngày giá vốn${ago}${sector}.${growth}${why}`;
 }
 
@@ -354,7 +355,7 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
         </table></div>
         <p className="caption">Giá gốc và dự phòng giảm giá hàng tồn kho theo bảng cân đối (VNDirect); giá trị thuần = giá gốc − dự phòng. Bao phủ = dự phòng ÷
           giá gốc. Số ngày tồn kho = tồn kho thuần cuối quý ÷ giá vốn bốn quý × 365; được ghi là tăng nhanh hơn giá vốn khi tồn kho tăng so cùng kỳ
-          nhanh hơn giá vốn bốn quý từ 20 điểm % và số ngày tăng (không ghi với Bất động sản, nơi tồn kho là dự án). Cơ cấu (nguyên vật liệu, dở dang, thành phẩm, hàng hóa) chỉ có trong thuyết minh, không có ở đây. Ô thiếu số để trống. Không phải khuyến nghị.</p>
+          nhanh hơn giá vốn bốn quý từ 20 điểm %, số ngày tăng và tồn kho từ 10% tổng tài sản (không ghi với Bất động sản, nơi tồn kho là dự án). Cơ cấu (nguyên vật liệu, dở dang, thành phẩm, hàng hóa) chỉ có trong thuyết minh, không có ở đây. Ô thiếu số để trống. Không phải khuyến nghị.</p>
       </section>}
       {data.property && <section className="surface" aria-label="Tiền khách trả trước">
         <h2>Tiền khách trả trước</h2>

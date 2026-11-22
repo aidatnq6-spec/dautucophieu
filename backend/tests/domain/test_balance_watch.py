@@ -295,7 +295,7 @@ def test_inventory_days_and_a_stock_growing_faster_than_cost_of_sales():
     and the sector; flagged when inventory grows 20 points faster than four quarters' cost of sales and the days rise. Property: no flag."""
     from investment_agent.domain.balance_watch import inventory_pace
     B = 10**9
-    q = lambda inv, cogs: {"inventory": str(inv * B), "cogs": str(cogs * B)}  # noqa: E731
+    q = lambda inv, cogs: {"inventory": str(inv * B), "cogs": str(cogs * B), "total_assets": str(1000 * B)}  # noqa: E731
     qs = {f"2024-Q{n}": q(200, 100) for n in range(1, 5)} | {f"2025-Q{n}": q(300, 110) for n in range(1, 5)}
     out = inventory_pace(qs, {"PEER": {f"2025-Q{n}": q(100, 100) for n in range(1, 5)}})
     assert (out["days"], out["year_ago"], out["sector_median"]) == ("249", "183", "91")  # 300×365/440; 200×365/400; 100×365/400
@@ -319,3 +319,16 @@ def test_the_change_of_the_inventory_provision_against_the_quarters_profit_both_
     assert (rows["2026-Q1"]["change"], rows["2026-Q1"]["share"], rows["2026-Q1"]["kind"]) == (str(-200 * B), "0.2000", "release")
     assert out["kind"] == "release" and out["quarter"] == "2026-Q1"
     assert inventory_provision_flow({"2025-Q4": q(600, 10), "2026-Q1": q(100, -50)})["kind"] is None  # a loss: no share, no flag
+
+
+def test_inventory_under_10_percent_of_total_assets_is_not_flagged_owner_22_11_2026():
+    """12 of 41 tickers were flagged, ports with 1–2% of assets among them: the flag needs inventory from 10% of total assets."""
+    from investment_agent.domain.balance_watch import inventory_pace
+    B = 10**9
+    q = lambda inv, cogs, assets: {"inventory": str(inv * B), "cogs": str(cogs * B), "total_assets": str(assets * B)}  # noqa: E731
+    fast = lambda assets: {f"2024-Q{n}": q(200, 100, assets) for n in range(1, 5)} | {f"2025-Q{n}": q(300, 110, assets) for n in range(1, 5)}  # noqa: E731
+    assert inventory_pace(fast(3000), None)["flag"] is True                     # 10%: material
+    small = inventory_pace(fast(3001), None)
+    assert small["flag"] is False and small["days"] == "249" and small["share"] == "0.1000"  # just under 10%: the figure, no flag
+    no_assets = {k: {**v, "total_assets": None} for k, v in fast(3000).items()}
+    assert inventory_pace(no_assets, None)["flag"] is None  # materiality not read: not flagged, said not read

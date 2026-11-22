@@ -54,7 +54,7 @@ def test_inventory_growing_faster_than_cost_of_sales_is_a_sign_with_its_figures(
     from investment_agent.market.statements import StatementStore
     d = data(tmp_path)
     B = 10**9
-    q = lambda inv, cogs: {"inventory": str(inv * B), "cogs": str(cogs * B)}  # noqa: E731
+    q = lambda inv, cogs: {"inventory": str(inv * B), "cogs": str(cogs * B), "total_assets": str(1000 * B)}  # noqa: E731
     StatementStore(d / "statements").save({"symbol": "AAA", "years": {}, "quarters": {f"2024-Q{n}": q(200, 100) for n in range(1, 5)}
                                            | {f"2025-Q{n}": q(300, 110) for n in range(1, 5)}})
     aaa = next(r for r in receivable_signs(d) if r["symbol"] == "AAA")

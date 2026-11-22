@@ -16,7 +16,7 @@ test("a monthly income goal shows the capital needed and the estimate, in today'
   await box.getByRole("button", { name: "Tính mục tiêu" }).click();
   await expect(box.getByTestId("pi-required")).toHaveText("2.000.000.000 đ");  // 10 tr × 12 / 6%
   await expect(box.getByTestId("pi-when")).toHaveText(/Đã đạt|khoảng \d+ năm|khoảng \d+ tháng|Chưa đạt trong 50 năm/);
-  await expect(box).toContainText("chưa tính lạm phát");
+  await expect(box).toContainText("trừ lạm phát khỏi tỷ suất");  // the real-return line (22/11/2026)
 });
 
 test("no horizontal scroll on the profile page at 375px with the goal", async ({ page }) => {

@@ -1218,7 +1218,7 @@ def health_check_cli(data_dir: Path, telegram=None) -> int:
     except (OSError, ValueError, KeyError):
         calendar = None
     report = health_report(data_dir, now=now, calendar=calendar)
-    new, recovered = alert_changes(report["problems"], data_dir, save=False)
+    new, recovered = alert_changes(report["problems"], data_dir, save=False, known=report["known"])
     if not new and not recovered:
         print(json.dumps({"status": "ok", "problems": len(report["problems"]), "sent": False}))
         return 0
@@ -1228,7 +1228,7 @@ def health_check_cli(data_dir: Path, telegram=None) -> int:
         return 0
     sent = bool(chosen[0](render_changes(new, recovered)))
     if sent:
-        alert_changes(report["problems"], data_dir, save=True)
+        alert_changes(report["problems"], data_dir, save=True, known=report["known"])
     print(json.dumps({"status": "ok", "problems": len(report["problems"]), "new": len(new), "recovered": len(recovered), "sent": sent}))
     return 0
 

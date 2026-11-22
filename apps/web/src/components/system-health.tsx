@@ -5,7 +5,8 @@ import { ApiError, api } from "../lib/api";
 type Problem = { id: string; label: string; detail: string };
 type Source = { id: string; label: string; last: string | null; max_days: number; stale: boolean };
 type Step = { step: string; last_at: string; exit: number; failing: number };
-type Health = { ok: boolean; problems: Problem[]; sources: Source[]; steps: Step[]; last_finish: string | null; drill: { at: string; ok: boolean; backup: string; files: number; error: string | null } | null };
+type Known = Problem & { ids: string[] };
+type Health = { ok: boolean; problems: Problem[]; known?: Known[]; sources: Source[]; steps: Step[]; last_finish: string | null; drill: { at: string; ok: boolean; backup: string; files: number; error: string | null } | null };
 
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" }) : "—");
 
@@ -22,6 +23,7 @@ export function SystemHealth() {
       {!h && !message && <p className="muted" role="status">Đang kiểm tra…</p>}
       {h && <>
         {h.ok ? <p className="notice" role="status">Mọi thứ đang chạy bình thường.</p> : <ul className="errors" aria-label="Sự cố">{h.problems.map((p) => <li key={p.id}><strong>{p.label}</strong>: {p.detail}</li>)}</ul>}
+        {h.known && h.known.length > 0 && <ul className="caption" aria-label="Đã biết">{h.known.map((k) => <li key={k.id}><strong>Đã biết</strong> · {k.label}: {k.detail}</li>)}</ul>}
         <p className="caption">Lượt sau phiên xong gần nhất: {when(h.last_finish)} · Diễn tập khôi phục: {h.drill ? `${when(h.drill.at)}, ${h.drill.ok ? `đạt (${h.drill.files} tệp)` : "không đạt"}` : "chưa có"}</p>
         <div className="tablewrap"><table aria-label="Độ mới của dữ liệu">
           <thead><tr><th>Nguồn</th><th>Cập nhật lần cuối</th><th className="num">Cho phép</th><th>Trạng thái</th></tr></thead>

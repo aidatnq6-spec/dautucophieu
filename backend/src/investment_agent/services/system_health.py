@@ -153,22 +153,63 @@ def gap_text(gap: dict) -> str:
     return f"tháng {month} chưa tính được so cùng kỳ vì nguồn để trống số tháng {base} (không tự lấp)"
 
 
-def macro_problems(data_dir: Path, *, today) -> list[dict]:
+CPI_IDS = ("us_cpi_yoy", "us_core_cpi_yoy")  # their next month has a BLS date in Lịch vĩ mô Mỹ
+
+
+def _explained(r: dict, gap: dict | None) -> bool:
+    """The age comes only from the blank year-ago month: the newest figure is the month just before the one the source left blank."""
+    if not gap:
+        return False
+    y, m = int(gap["month"][:4]), int(gap["month"][5:7])
+    before = (y, m - 1) if m > 1 else (y - 1, 12)
+    return (int(r["date"][:4]), int(r["date"][5:7])) == before
+
+
+def _bls_date(data_dir: Path, year: int, month: int) -> str | None:
+    """BLS's own date for the CPI of that month, from the stored Lịch vĩ mô Mỹ; None when the calendar does not list it."""
+    import calendar as _cal
+    path = Path(data_dir) / "macro" / "us-calendar.json"
+    events = json.loads(path.read_text(encoding="utf-8")).get("events", []) if path.is_file() else []
+    want = f"{_cal.month_name[month]} {year}"
+    on = next((e["et"][:10] for e in events if e.get("kind") == "cpi" and e.get("detail") == want), None)
+    return f"{on[8:10]}/{on[5:7]}/{on[:4]}" if on else None
+
+
+def macro_problems(data_dir: Path, *, today) -> tuple[list[dict], list[dict]]:
     """Each automatic Vĩ mô indicator whose latest figure is past its own age (owner, 21/11/2026): the folder can be fresh while one
     series is months old. One problem per series, so each is announced once and its recovery too. A series with no figure yet (just
-    added) and those entered by hand (reminded on their own) are left out."""
+    added) and those entered by hand (reminded on their own) are left out.
+
+    Kaizen (owner, 22/11/2026): when the age comes only from the year-ago month the source left blank, there is nothing to do; it is
+    known, not a problem (not in Cần để ý, not sent), one line for the series sharing that month, until the next month is itself past
+    the age (the blank month's date plus max_age_days); then it is a problem again."""
     from datetime import date
     from investment_agent.market.leading import MacroStore, load_indicators, macro_rows
-    out, indicators = [], load_indicators()
+    out, held, indicators = [], {}, load_indicators()
     limits = {i["id"]: i["max_age_days"] for i in indicators}
     for r in macro_rows(indicators, MacroStore(Path(data_dir)), today=today):
-        if r["auto"] and r["stale"]:
-            day, limit = date.fromisoformat(r["date"]), limits[r["id"]]
-            detail = f"số mới nhất ngày {day:%d/%m/%Y}, quá hạn {limit} ngày"
-            if gap := r.get("gap"):  # the source left the year-ago month blank: said, never filled in
-                detail += f"; {gap_text(gap)}"
-            out.append({"id": f"macro:{r['id']}", "label": r["label"], "detail": detail})
-    return out
+        if not (r["auto"] and r["stale"]):
+            continue
+        day, limit, gap = date.fromisoformat(r["date"]), limits[r["id"]], r.get("gap")
+        if _explained(r, gap):
+            until = date(int(gap["month"][:4]), int(gap["month"][5:7]), 1) + timedelta(days=limit)
+            if today <= until:
+                held.setdefault(gap["month"], []).append((r, gap, until))
+                continue
+        detail = f"số mới nhất ngày {day:%d/%m/%Y}, quá hạn {limit} ngày"
+        if gap:  # the source left the year-ago month blank: said, never filled in
+            detail += f"; {gap_text(gap)}"
+        out.append({"id": f"macro:{r['id']}", "label": r["label"], "detail": detail})
+    known = []
+    for month, rows in held.items():
+        gap, until = rows[0][1], max(u for _, _, u in rows)
+        y, m = int(month[:4]), int(month[5:7])
+        ny, nm = (y, m + 1) if m < 12 else (y + 1, 1)
+        bls = _bls_date(data_dir, ny, nm) if all(r["id"] in CPI_IDS for r, _, _ in rows) else None
+        known.append({"id": f"gap:{month}", "ids": [f"macro:{r['id']}" for r, _, _ in rows], "label": "; ".join(r["label"] for r, _, _ in rows),
+                      "detail": f"{gap_text(gap)}. Không cần làm gì: tự hết khi có số tháng {nm:02d}/{ny}{f' (BLS hẹn công bố {bls})' if bls else ''}; "
+                                f"đến {until:%d/%m/%Y} vẫn chưa có thì báo lại thành sự cố."})
+    return out, known
 
 
 def health_report(data_dir: Path, *, now: datetime, calendar=None, config_dir: Path | None = None) -> dict:
@@ -188,7 +229,8 @@ def health_report(data_dir: Path, *, now: datetime, calendar=None, config_dir: P
         if stale:
             problems.append({"id": f"source:{s['id']}", "label": s["label"],
                              "detail": "chưa có dữ liệu" if last is None else f"cập nhật lần cuối {_dmy(last)}, quá {s['max_days']} ngày"})
-    problems.extend(macro_problems(data_dir, today=now.astimezone(timezone(timedelta(hours=7))).date()))
+    macro, known = macro_problems(data_dir, today=now.astimezone(timezone(timedelta(hours=7))).date())
+    problems.extend(macro)
     lines = _read_tail(root / "logs" / "scheduler.log")
     steps = parse_log(lines or [])
     finishes = [l.lstrip("﻿").split(" ", 1)[0] for l in (lines or []) if " finish exit=" in l]
@@ -214,7 +256,8 @@ def health_report(data_dir: Path, *, now: datetime, calendar=None, config_dir: P
         problems.append({"id": "drill", "label": "Diễn tập khôi phục", "detail": f"bản sao lưu {drill['backup']} không khôi phục được ({drill['error']})"})
     elif now - _when(drill["at"]) > timedelta(days=DRILL_MAX_DAYS):
         problems.append({"id": "drill", "label": "Diễn tập khôi phục", "detail": f"lần gần nhất {_dmy(_when(drill['at']))}"})
-    return {"checked_at": now.isoformat(), "ok": not problems, "problems": problems, "sources": sources, "steps": steps, "last_finish": finishes[-1] if finishes else None, "drill": drill}
+    return {"checked_at": now.isoformat(), "ok": not problems, "problems": problems, "sources": sources, "steps": steps, "last_finish": finishes[-1] if finishes else None, "drill": drill,
+            "known": known}
 
 
 def _read_drill(data_dir: Path) -> dict | None:
@@ -229,14 +272,17 @@ def _write(path: Path, value) -> None:
     os.replace(tmp, path)
 
 
-def alert_changes(problems: list[dict], data_dir: Path, *, save: bool) -> tuple[list[dict], list[str]]:
-    """Problems not yet announced, and those announced that are over; with save, remembers the current set (after a delivered message)."""
+def alert_changes(problems: list[dict], data_dir: Path, *, save: bool, known: list[dict] | None = None) -> tuple[list[dict], list[str]]:
+    """Problems not yet announced, and those announced that are over; with save, remembers the current set (after a delivered message).
+    known: an announced problem now known (a blank year-ago month) is not over yet, so it is neither said to recover nor forgotten; one
+    that was never announced is not sent."""
     path = Path(data_dir).joinpath(*STATE_FILE)
-    known = set(json.loads(path.read_text(encoding="utf-8"))) if path.is_file() else set()
-    current = {p["id"] for p in problems}
+    announced = set(json.loads(path.read_text(encoding="utf-8"))) if path.is_file() else set()
+    held = {i for k in known or [] for i in k["ids"]} & announced
+    current = {p["id"] for p in problems} | held
     if save:
         _write(path, sorted(current))
-    return [p for p in problems if p["id"] not in known], sorted(known - current)
+    return [p for p in problems if p["id"] not in announced], sorted(announced - current)
 
 
 def render_changes(new: list[dict], recovered: list[str]) -> str:

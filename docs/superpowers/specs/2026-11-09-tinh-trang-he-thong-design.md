@@ -32,3 +32,12 @@ lịch sau phiên không xong trong 2 ngày; chưa diễn tập, diễn tập h�
 - Kiểm 22/11/2026: BLS không công bố mức tăng 12 tháng của CPI và CPI lõi tháng 10/2026 ("BLS cannot publish 12-month percent changes
   for October 2026 for indexes where October 2025 data are unavailable"); CPI tháng 11/2026 hẹn công bố 10/12/2026. Không có nguồn
   chính thức thay thế, nên tháng 10/2026 để trống.
+
+## Hạn theo phiên và ngày thấy đầu (chủ sở hữu duyệt 22/11/2026)
+- Sáu chỉ số theo phiên tính hạn bằng **số phiên HOSE đã qua** sau ngày của số mới nhất (lịch giao dịch HOSE; năm chưa có lịch thì mọi ngày
+  thường): giá trị khớp lệnh và khối ngoại 2 phiên; liên ngân hàng 1 tuần, 1 tháng 3 phiên; qua đêm và TPCP 10 năm 5 phiên. Một tuần bình
+  thường chặt như hạn theo ngày cũ (4, 5, 7 ngày); kỳ nghỉ dài (Tết, 30/4–1/5, 2/9) không còn báo quá hạn rồi báo hồi phục. Sự cố ghi
+  "đã N phiên HOSE chưa có số mới (hạn M phiên)". Chỉ số khác giữ hạn theo ngày.
+- Mỗi số vĩ mô lưu `first_seen`: lần đầu phần mềm thấy ngày đó, giữ qua các lượt sau và khi nguồn sửa số. Số lưu trước 22/11/2026 không
+  có (không biết, không tự lấp). Để sau vài tháng đặt hạn M2 và các chỉ số tháng theo độ trễ công bố thật.
+- Chưa đổi: đèn Khối ngoại, Liên ngân hàng, P/E trên trang Vĩ mô vẫn hiện "Số cũ" sau 7 ngày lịch (chỉ hiển thị, không gửi Telegram).

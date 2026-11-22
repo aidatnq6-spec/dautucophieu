@@ -187,6 +187,7 @@ def macro_problems(data_dir: Path, *, today) -> tuple[list[dict], list[dict]]:
     from investment_agent.market.leading import MacroStore, load_indicators, macro_rows
     out, held, indicators = [], {}, load_indicators()
     limits = {i["id"]: i["max_age_days"] for i in indicators}
+    sessions = {i["id"]: i.get("max_age_sessions") for i in indicators}
     for r in macro_rows(indicators, MacroStore(Path(data_dir)), today=today):
         if not (r["auto"] and r["stale"]):
             continue
@@ -196,7 +197,10 @@ def macro_problems(data_dir: Path, *, today) -> tuple[list[dict], list[dict]]:
             if today <= until:
                 held.setdefault(gap["month"], []).append((r, gap, until))
                 continue
-        detail = f"số mới nhất ngày {day:%d/%m/%Y}, quá hạn {limit} ngày"
+        if r.get("age_sessions") is not None:  # a session indicator: old by HOSE sessions missed (owner, 22/11/2026)
+            detail = f"số mới nhất ngày {day:%d/%m/%Y}, đã {r['age_sessions']} phiên HOSE chưa có số mới (hạn {sessions[r['id']]} phiên)"
+        else:
+            detail = f"số mới nhất ngày {day:%d/%m/%Y}, quá hạn {limit} ngày"
         if gap:  # the source left the year-ago month blank: said, never filled in
             detail += f"; {gap_text(gap)}"
         out.append({"id": f"macro:{r['id']}", "label": r["label"], "detail": detail})

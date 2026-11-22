@@ -41,6 +41,8 @@ class GoalRequest(ContractModel):
     stock_rate: str | None = Field(default=None, max_length=8)  # yearly yield the owner expects from stocks; None = last year's cash dividends
     independent: str | None = Field(default=None, max_length=24)  # monthly spending for the two higher levels of Ba mức tự do tài chính
     freedom: str | None = Field(default=None, max_length=24)
+    inflation: str | None = Field(default=None, max_length=8)  # percent per year; None = Vietnam's latest CPI on the year (owner, 22/11/2026)
+    margin: str | None = Field(default=None, max_length=8)  # safety margin on the real target, percent; None = 0
     expected_version: int = Field(strict=True, ge=0)
     request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
 
@@ -107,10 +109,31 @@ def _view(request: Request, repo, owner) -> dict:
         rate = record.payload.get("rate") or default_rate
         if rate is not None:
             result = {**passive_income(target=Decimal(record.payload["target"]), rate=Decimal(rate), capital=capital, contribution=contribution,
-                                       today=today, income_now=Decimal(income["total"]) if income else None), "rate": rate}
+                                       today=today, income_now=Decimal(income["total"]) if income else None), "rate": rate,
+                      **_real(data_dir, record.payload, rate=Decimal(rate), capital=capital, contribution=contribution, today=today)}
     goal = {**record.payload, "bond_rate": record.payload.get("bond_rate") or BOND_RATE} if record else None
     return {"version": record.version if record else 0, "goal": goal, "default_rate": default_rate, "default_bond_rate": BOND_RATE,
             "income": income, "levels": _levels(repo, owner, income, record.payload if record else {}, today) if income else None, "result": result, "capital": format(capital, "f") if capital is not None else None, "contribution": format(contribution, "f")}
+
+
+def _real(data_dir, goal: dict, *, rate: Decimal, capital, contribution: Decimal, today) -> dict:
+    """Mốc theo lợi suất thực and the 4% rule beside it (owner, 22/11/2026): the owner's inflation, else Vietnam's latest CPI on the year."""
+    from investment_agent.domain.passive_income import real_target, rule_of_four
+    store = MacroStore(Path(data_dir)) if data_dir is not None else None
+    latest = lambda key: (store.read(key) or [None])[-1] if store else None  # noqa: E731
+    inflation, source = goal.get("inflation"), None
+    if inflation is None:
+        cpi = latest("vn_cpi_yoy")
+        inflation, source = (cpi["value"], {"source": "vn_cpi_yoy", "date": cpi["date"]}) if cpi else (None, None)
+    margin = goal.get("margin") or "0"
+    target = Decimal(goal["target"])
+    real = None
+    if inflation is not None:
+        real = {**real_target(target=target, rate=rate, inflation=Decimal(inflation), margin=Decimal(margin), capital=capital,
+                              contribution=contribution, today=today), "inflation": inflation, "inflation_from": source, "margin": margin}
+    fx = latest("usd_vnd_vcb")
+    return {"real": real, "four": {**rule_of_four(target=target, usd_vnd=Decimal(fx["value"]) if fx else None)},
+            "four_fx_date": fx["date"] if fx else None}
 
 
 @router.get("/passive-income")
@@ -151,11 +174,21 @@ def put_passive_income(request: Request, body: GoalRequest):
         return error(422, "invalid_rate", "Lãi suất trái phiếu từ 0% đến 30%/năm.")
     if stock_rate is not None and not (stock_rate.is_finite() and Decimal(0) <= stock_rate <= Decimal(50)):
         return error(422, "invalid_rate", "Lợi suất cổ phiếu từ 0% đến 50%/năm.")
+    try:
+        inflation = Decimal(body.inflation) if body.inflation is not None else None
+        margin = Decimal(body.margin) if body.margin is not None else None
+    except InvalidOperation:
+        return error(422, "invalid_goal", "Lạm phát và biên an toàn phải là số.")
+    if inflation is not None and not (inflation.is_finite() and Decimal(-5) <= inflation <= Decimal(30)):
+        return error(422, "invalid_rate", "Lạm phát giả định từ −5% đến 30%/năm.")
+    if margin is not None and not (margin.is_finite() and Decimal(0) <= margin <= Decimal(200)):
+        return error(422, "invalid_rate", "Biên an toàn từ 0% đến 200%.")
     payload = {"target": format(target, "f"), "rate": format(rate, "f") if rate is not None else None,
                "bond_rate": format(bond_rate, "f") if bond_rate is not None else None,
                "stock_rate": format(stock_rate, "f") if stock_rate is not None else None,
                "independent": format(Decimal(body.independent), "f") if body.independent is not None else None,
-               "freedom": format(Decimal(body.freedom), "f") if body.freedom is not None else None}
+               "freedom": format(Decimal(body.freedom), "f") if body.freedom is not None else None,
+               "inflation": format(inflation, "f") if inflation is not None else None, "margin": format(margin, "f") if margin is not None else None}
     try:
         repo.write(owner, *RECORD, payload, expected_version=body.expected_version, request_id=body.request_id)
         return _view(request, repo, owner)

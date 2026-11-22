@@ -79,3 +79,51 @@ def get_year_review(request: Request, year: int):
                                     quotes=book_quotes(Path(data_dir)) if data_dir is not None else {})
     except RepositoryUnavailable:
         return unavailable()
+
+
+class GoalsRequest(ContractModel):
+    contribution: str | None = Field(default=None, max_length=24)
+    savings_rate: str | None = Field(default=None, max_length=12)
+    total_assets: str | None = Field(default=None, max_length=24)
+    expected_version: int = Field(strict=True, ge=0)
+    request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
+
+
+def _goal_args(request: Request) -> dict:
+    from investment_agent.services.deposit_book import book_quotes
+    data_dir = request.app.state.data_dir
+    return {"data_dir": Path(data_dir) if data_dir is not None else None, "quotes": book_quotes(Path(data_dir)) if data_dir is not None else {}}
+
+
+@router.get("/year-goals/{year}")
+def get_year_goals(request: Request, year: int):
+    """Mục tiêu năm: this year's or next year's goals and where they stand."""
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None:
+        return unavailable()
+    today = now(request).astimezone(VN).date()
+    if year not in (today.year, today.year + 1):
+        return error(422, "invalid_year", f"Mục tiêu đặt cho năm {today.year} hoặc {today.year + 1}.")
+    try:
+        return year_end.goals_view(repo, owner, year=year, today=today, **_goal_args(request))
+    except RepositoryUnavailable:
+        return unavailable()
+
+
+@router.put("/year-goals/{year}")
+def put_year_goals(request: Request, year: int, body: GoalsRequest):
+    from investment_agent.domain.year_goals import GoalError
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None:
+        return unavailable()
+    today = now(request).astimezone(VN).date()
+    if year not in (today.year, today.year + 1):
+        return error(422, "invalid_year", f"Mục tiêu đặt cho năm {today.year} hoặc {today.year + 1}.")
+    try:
+        raw = {"contribution": body.contribution, "savings_rate": body.savings_rate, "total_assets": body.total_assets}
+        return year_end.save_goals(repo, owner, year=year, raw=raw, expected_version=body.expected_version, request_id=body.request_id,
+                                   today=today, **_goal_args(request))
+    except GoalError as exc:
+        return error(422, "invalid_goals", str(exc))
+    except WRITE_ERRORS as exc:
+        return write_error(exc)

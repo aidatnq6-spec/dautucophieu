@@ -1,4 +1,5 @@
 import { YearEnd } from "../../../components/year-end";
+import { YearGoals } from "../../../components/year-goals";
 import { YearReview } from "../../../components/year-review";
 
 export default function YearPage() {
@@ -8,6 +9,7 @@ export default function YearPage() {
         này và kho cá nhân, không gửi cho AI.</p></div>
       <YearEnd />
       <YearReview />
+      <YearGoals />
     </>
   );
 }

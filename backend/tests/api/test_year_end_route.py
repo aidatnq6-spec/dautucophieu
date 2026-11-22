@@ -38,3 +38,15 @@ def test_the_year_review_reads_the_ledger_of_that_year_and_names_what_is_missing
     assert body["contributions"] is None  # no Góp vốn đều plan
     assert body["cashflow"]["months"] == 0 and body["cashflow"]["missing"] == []  # January is not closed yet
     assert call(c, clock, "GET", "/internal/year-review/2010").status_code == 422
+
+
+def test_goals_are_set_for_this_year_or_the_next_and_the_year_end_list_sees_them():
+    c, clock = client()  # 15/01/2027
+    assert call(c, clock, "GET", "/internal/year-goals/2027").json()["goals"] is None
+    bad = call(c, clock, "PUT", "/internal/year-goals/2027", {"savings_rate": "1.5", "expected_version": 0, "request_id": "g0"})
+    assert bad.status_code == 422
+    saved = call(c, clock, "PUT", "/internal/year-goals/2027", {"contribution": "120000000", "savings_rate": "0.3", "expected_version": 0, "request_id": "g1"})
+    assert saved.status_code == 200 and saved.json()["goals"] == {"contribution": "120000000", "savings_rate": "0.3"}
+    goals = next(i for i in call(c, clock, "GET", "/internal/year-end").json()["items"] if i["id"] == "goals")
+    assert goals["done"] is True  # the 2026 list: next year's goals are set
+    assert call(c, clock, "GET", "/internal/year-goals/2029").status_code == 422

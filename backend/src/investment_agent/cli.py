@@ -1321,6 +1321,7 @@ def wealth_alerts_cli(data_dir: Path) -> int:
             ("accumulation", lambda s: accumulation.remind_run(repo, owner, today=today, send=s, request_id=_rid("accumulation"))),
             ("snapshot", lambda s: year_end.snapshot_run(repo, owner, pyramid=pyramid(), today=today, request_id=_rid("snapshot"))),
             ("year_end", year_end_part),
+            ("goals", lambda s: year_end.goals_remind_run(repo, owner, today=today, send=s, request_id=_rid("goals"), data_dir=data_dir, quotes=quotes)),
         ]
         return wealth_alerts_run(runs, send=send, today=today)
     return _telegram_step(data_dir, body)

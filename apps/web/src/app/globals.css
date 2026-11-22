@@ -586,3 +586,4 @@ main h2{scroll-margin-top:16px}
 .hs-up{fill:color-mix(in srgb,var(--good) 60%,transparent)}.hs-down{fill:color-mix(in srgb,var(--bad) 60%,transparent)}
 .hs-trend{stroke:var(--brand);stroke-width:2}.hs-now{stroke:var(--ink);stroke-width:1.5;stroke-dasharray:4 3}
 tr.hs-today td{font-weight:600;background:color-mix(in srgb,var(--brand) 8%,transparent)}.hs-run{fill:color-mix(in srgb,var(--bad) 22%,transparent)}.hs-line{fill:none;stroke:var(--ink);stroke-width:1.4}.hs-summary{font-size:15px;line-height:1.55;margin:0 0 10px}.ye-list{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px}.ye-list li{line-height:1.6}
+.yr-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}.yr-part h3{margin:0 0 6px}.yr-dl{display:grid;grid-template-columns:auto auto;gap:4px 12px;margin:0}.yr-dl dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}.yr-layers{margin:6px 0 0;padding-left:18px}

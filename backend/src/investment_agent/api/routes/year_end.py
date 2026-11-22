@@ -61,3 +61,21 @@ def post_year_end_tick(request: Request, body: TickRequest):
         return error(422, "year_end_closed", str(exc))
     except WRITE_ERRORS as exc:
         return write_error(exc)
+
+
+@router.get("/year-review/{year}")
+def get_year_review(request: Request, year: int):
+    """Tổng kết năm of one year, from 2020 to the current year."""
+    owner, repo = require_owner(request), request.app.state.personal_repository
+    if repo is None:
+        return unavailable()
+    today = now(request).astimezone(VN).date()
+    if not 2020 <= year <= today.year:
+        return error(422, "invalid_year", f"Chọn một năm từ 2020 đến {today.year}.")
+    from investment_agent.services.deposit_book import book_quotes
+    data_dir = request.app.state.data_dir
+    try:
+        return year_end.year_review(repo, owner, data_dir=Path(data_dir) if data_dir is not None else None, year=year, today=today,
+                                    quotes=book_quotes(Path(data_dir)) if data_dir is not None else {})
+    except RepositoryUnavailable:
+        return unavailable()

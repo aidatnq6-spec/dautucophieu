@@ -85,5 +85,8 @@ Chủ sở hữu duyệt ngày 21/11/2026 (kaizen từ FireAnt Quant AI). Trang 
 - **Hai nửa lịch sử**: khoảng của nhóm chia đôi theo thời gian; mỗi nửa so với các lúc còn lại của cùng giai đoạn. Cùng chiều ở hai nửa:
   "ổn định ở hai nửa lịch sử"; ngược chiều: "nhưng đổi chiều giữa hai nửa lịch sử". Chỉ nói khi nhóm khác rõ.
 - **Nhiều phép kiểm**: trang ghi số nhóm đã so ở kỳ đang chọn và khoảng 5% số đó vẫn vượt ngưỡng do ngẫu nhiên; câu tóm tắt cũng ghi.
-- Câu tóm tắt đọc phép kiểm này cho nhóm P/E hôm nay và cho đèn đang không bình thường. Dòng Cú sốc hôm nay trong bản tin giữ như cũ.
+- Câu tóm tắt đọc phép kiểm này cho nhóm P/E hôm nay và cho đèn đang không bình thường.
+- Dòng Cú sốc hôm nay (trang, bản tin web, Telegram 15:30) thêm kết luận của phép kiểm sau "giảm sâu nhất trong kỳ trung vị", ví dụ
+  "; chưa rõ khác các lúc còn lại (t = 0,84, cần 2,20)" (chủ sở hữu duyệt 22/11/2026). Ảnh chụp phiên lưu trước 22/11/2026 không có phép
+  kiểm nên dòng của chúng giữ như cũ.
 - Kết quả đầu tiên (22/11/2026): kỳ 20 phiên 2/27 nhóm khác rõ, 60 phiên 1/25, 120 phiên 1/23, 250 và 500 phiên 0, gần với số do ngẫu nhiên.

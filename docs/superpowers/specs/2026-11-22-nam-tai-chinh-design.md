@@ -54,3 +54,9 @@ thiếu kèm lý do, không ước lượng.
   năm trước đến mục tiêu; không có ảnh chụp thì không tính, ghi lý do. Tỷ lệ tiết kiệm: tỷ lệ các tháng Thu chi đã xong so với mục tiêu.
 - "Chậm" khi kém tiến độ đều hơn 10 điểm (tỷ lệ tiết kiệm: dưới mục tiêu). Một dòng trong Việc tài chính hôm nay mỗi tháng, từ ngày 1,
   chỉ khi có mục chậm; ghi đã nhắc khi gửi được (`settings/year_goals_reminded_<năm>`).
+
+## Sửa sau rà soát (22/11/2026)
+- Rà luận điểm: lần "Giữ tiếp, có lý do" cũng tính là đã rà (chủ sở hữu duyệt).
+- Mục tiêu tổng tài sản không cao hơn tổng đầu năm: không tính tiến độ, ghi lý do (trước đây ra phần trăm âm và báo chậm).
+- Lợi suất năm lấy từ mức chưa làm tròn của Hiệu suất (cuối năm ÷ cuối năm trước − 1), không nhân dồn 12 tháng đã làm tròn.
+- Ngày diễn tập khôi phục ghi theo giờ Việt Nam.

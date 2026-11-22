@@ -41,3 +41,6 @@ lịch sau phiên không xong trong 2 ngày; chưa diễn tập, diễn tập h�
 - Mỗi số vĩ mô lưu `first_seen`: lần đầu phần mềm thấy ngày đó, giữ qua các lượt sau và khi nguồn sửa số. Số lưu trước 22/11/2026 không
   có (không biết, không tự lấp). Để sau vài tháng đặt hạn M2 và các chỉ số tháng theo độ trễ công bố thật.
 - Chưa đổi: đèn Khối ngoại, Liên ngân hàng, P/E trên trang Vĩ mô vẫn hiện "Số cũ" sau 7 ngày lịch (chỉ hiển thị, không gửi Telegram).
+- Sửa sau rà soát (22/11/2026): trạng thái đã báo lưu riêng phần "Đã biết" (`{"announced", "held"}`; danh sách cũ vẫn đọc được). Sự cố đã báo,
+  chuyển sang Đã biết rồi quá hạn báo lại thì **được gửi lại**; có số mới thật thì báo hồi phục một lần. Tệp lịch Mỹ hỏng không làm hỏng báo cáo.
+  Lịch HOSE đọc một lần mỗi tệp (đọc lại khi tệp đổi).

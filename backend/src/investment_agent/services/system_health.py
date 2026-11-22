@@ -169,7 +169,10 @@ def _bls_date(data_dir: Path, year: int, month: int) -> str | None:
     """BLS's own date for the CPI of that month, from the stored Lịch vĩ mô Mỹ; None when the calendar does not list it."""
     import calendar as _cal
     path = Path(data_dir) / "macro" / "us-calendar.json"
-    events = json.loads(path.read_text(encoding="utf-8")).get("events", []) if path.is_file() else []
+    try:
+        events = json.loads(path.read_text(encoding="utf-8")).get("events", []) if path.is_file() else []
+    except (OSError, ValueError, AttributeError):  # damaged or another shape: no BLS date, the report still comes
+        return None
     want = f"{_cal.month_name[month]} {year}"
     on = next((e["et"][:10] for e in events if e.get("kind") == "cpi" and e.get("detail") == want), None)
     return f"{on[8:10]}/{on[5:7]}/{on[:4]}" if on else None
@@ -281,12 +284,15 @@ def alert_changes(problems: list[dict], data_dir: Path, *, save: bool, known: li
     known: an announced problem now known (a blank year-ago month) is not over yet, so it is neither said to recover nor forgotten; one
     that was never announced is not sent."""
     path = Path(data_dir).joinpath(*STATE_FILE)
-    announced = set(json.loads(path.read_text(encoding="utf-8"))) if path.is_file() else set()
-    held = {i for k in known or [] for i in k["ids"]} & announced
-    current = {p["id"] for p in problems} | held
+    saved = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else []
+    # a plain list is the announced set (before 22/11/2026); "held": announced problems now known, kept apart so one past its date is
+    # announced again (owner review 22/11/2026) while one whose figure came back is said recovered once
+    announced, was_held = (set(saved), set()) if isinstance(saved, list) else (set(saved["announced"]), set(saved["held"]))
+    held = {i for k in known or [] for i in k["ids"]} & (announced | was_held)
+    current = {p["id"] for p in problems}
     if save:
-        _write(path, sorted(current))
-    return [p for p in problems if p["id"] not in announced], sorted(announced - current)
+        _write(path, {"announced": sorted(current), "held": sorted(held)})
+    return [p for p in problems if p["id"] not in announced], sorted((announced | was_held) - current - held)
 
 
 def render_changes(new: list[dict], recovered: list[str]) -> str:

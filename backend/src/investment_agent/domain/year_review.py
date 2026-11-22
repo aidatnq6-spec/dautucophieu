@@ -28,10 +28,16 @@ def year_portfolio(perf: dict, *, year: int) -> dict:
     within = [p for p in series if p["date"][:4] == str(year)]
     if not months or not within:
         return {"return": None, "vnindex": None, "start": None, "end": None, "note": f"Hiệu suất chưa có phiên nào của năm {year}"}
-    chain = lambda key: _s(_compound([Decimal(m[key]) for m in months]) - 1, Q4)  # noqa: E731
+    prior = [m for m in perf.get("monthly", []) if m["month"] < f"{year}-01"]
+
+    def chain(key: str, level: str) -> str:
+        if all(level in m for m in months) and (not prior or level in prior[-1]):  # the unrounded levels: one division, no twelve roundings
+            base = Decimal(prior[-1][level]) if prior else Decimal(100)
+            return _s(Decimal(months[-1][level]) / base - 1, Q4)
+        return _s(_compound([Decimal(m[key]) for m in months]) - 1, Q4)
     start = before[-1] if before else within[0]
     note = None if before else f"sổ giao dịch bắt đầu {_dmy(within[0]['date'])}: tính từ ngày đó"
-    return {"return": chain("portfolio"), "vnindex": chain("vnindex"), "start": {"date": start["date"], "value": start["value"]},
+    return {"return": chain("portfolio", "level"), "vnindex": chain("vnindex", "index_level"), "start": {"date": start["date"], "value": start["value"]},
             "end": {"date": within[-1]["date"], "value": within[-1]["value"]}, "note": note}
 
 

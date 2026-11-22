@@ -73,3 +73,12 @@ def test_the_month_end_snapshot_is_the_last_day_written_in_each_month_and_keeps_
     assert snaps["2026-11"] == {"taken_on": "2026-11-30", "total": "1100", "layers": {"deposit": "500", "stocks": "600"}}
     assert snaps["2026-12"]["taken_on"] == "2026-12-01"
     assert snapshot_run(r, OWNER, pyramid=None, today=date(2026, 12, 2), request_id="s5") == {"month": "2026-12", "written": False, "reason": "no_pyramid"}
+
+
+def test_the_drill_date_is_said_in_vietnam_time(tmp_path):
+    import json
+    (tmp_path / "data" / "alerts").mkdir(parents=True)
+    (tmp_path / "data" / "alerts" / "restore-drill.json").write_text(json.dumps({"at": "2026-11-30T23:00:00+00:00", "ok": True}), encoding="utf-8")
+    facts = gather_facts(repo(), OWNER, data_dir=tmp_path / "data", config_dir=tmp_path, today=date(2026, 12, 2),
+                         now=datetime(2026, 12, 2, 1, tzinfo=timezone.utc), quotes={})
+    assert facts["drill"] == (True, "lần gần nhất 01/12/2026")  # 06:00 on 1 December in Vietnam

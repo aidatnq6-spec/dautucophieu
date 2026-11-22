@@ -7,7 +7,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from .ledger import replay
 
-_Q2, _Q4 = Decimal("0.01"), Decimal("0.0001")
+_Q2, _Q4, _Q8 = Decimal("0.01"), Decimal("0.0001"), Decimal("0.00000001")
 
 
 def _external(events: list, start_excl: date | None, end_incl: date, closes: dict, day: date) -> Decimal:
@@ -54,7 +54,9 @@ def performance(events: list, *, closes: dict[str, dict[date, float]], index: di
         if is_month_end:
             monthly.append({"month": point["date"][:7],
                             "portfolio": str((point["_level"] / last["portfolio"] - 1).quantize(_Q4, ROUND_HALF_UP)),
-                            "vnindex": str((point["_index"] / last["vnindex"] - 1).quantize(_Q4, ROUND_HALF_UP))})
+                            "vnindex": str((point["_index"] / last["vnindex"] - 1).quantize(_Q4, ROUND_HALF_UP)),
+                            # the month-end levels unrounded enough that a year read from them does not carry twelve roundings
+                            "level": str(point["_level"].quantize(_Q8, ROUND_HALF_UP)), "index_level": str(point["_index"].quantize(_Q8, ROUND_HALF_UP))})
             last = {"portfolio": point["_level"], "vnindex": point["_index"]}
     total = None
     if series:

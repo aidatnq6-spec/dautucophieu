@@ -73,9 +73,10 @@ def goals_progress(goals: dict, *, year: int, today: date, put_in: str | None, s
     if "total_assets" in goals:
         goal = Decimal(goals["total_assets"])
         share = None
-        if total_now is not None and total_start is not None and goal != Decimal(total_start):
+        below = total_start is not None and goal <= Decimal(total_start)  # no way to go from the start: no reading (owner review 22/11/2026)
+        if total_now is not None and total_start is not None and not below:
             share = (Decimal(total_now) - Decimal(total_start)) / (goal - Decimal(total_start))  # the way from the start to the goal
-        rows.append({"id": "total_assets", "goal": goals["total_assets"], "now": total_now, "start": total_start,
+        rows.append({"id": "total_assets", "goal": goals["total_assets"], "now": total_now, "start": total_start, "below_start": below,
                      "share": _q(share) if share is not None else None, "pace": _q(p) if share is not None else None,
                      "behind": share is not None and p - share > BEHIND})
     return {"year": year, "pace": _q(p), "rows": rows}

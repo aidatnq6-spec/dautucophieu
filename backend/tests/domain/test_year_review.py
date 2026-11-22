@@ -61,3 +61,14 @@ def test_the_tower_says_when_the_start_of_the_year_was_never_stored():
     assert out["end_month"] == "2026-11" and [l["id"] for l in out["now"]] == ["gold"]
     later = year_tower({**snaps, "2026-12": {"taken_on": "2026-12-31", "total": "2", "layers": {}}}, pyramid, year=2027)
     assert later["start"]["total"] == "2" and later["note"] is None
+
+
+def test_the_years_return_uses_the_unrounded_levels_when_hieu_suat_gives_them():
+    perf = {"monthly": [{"month": "2025-12", "portfolio": "0.1", "vnindex": "0", "level": "110.00000000", "index_level": "100.00000000"},
+                        {"month": "2026-01", "portfolio": "0.0001", "vnindex": "0.0001", "level": "110.01234500", "index_level": "100.01234500"},
+                        {"month": "2026-02", "portfolio": "0.0001", "vnindex": "0.0001", "level": "110.02469000", "index_level": "100.02469000"}],
+            "series": [{"date": "2025-12-31", "value": "1"}, {"date": "2026-02-27", "value": "1"}]}
+    out = year_portfolio(perf, year=2026)
+    assert out["return"] == "0.0002" and out["vnindex"] == "0.0002"  # 110.02469 / 110 − 1 = 0.000224…, not 1.0001² − 1
+    started = year_portfolio({**perf, "monthly": perf["monthly"][1:], "series": perf["series"][1:]}, year=2026)
+    assert started["return"] == "0.1002"  # no month before: from the ledger's own start at 100

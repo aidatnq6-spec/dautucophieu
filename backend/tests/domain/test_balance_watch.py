@@ -276,3 +276,15 @@ def test_each_quarter_gives_receivables_before_provision_and_how_much_of_it_is_p
     assert row["total"] == str(487 * B) and row["gross"] == str(553 * B) and row["coverage"] == "0.1193"
     blank = receivables_view({"2021-Q4": {**q, "bad_debt_lt": None}})["rows"][-1]
     assert blank["gross"] is None and blank["coverage"] is None  # a provision line missing: blank, never taken as 0
+
+
+def test_inventory_rows_give_cost_provision_net_coverage_and_share_of_assets():
+    """Khối Tồn kho (owner, 22/11/2026): MWG 31/12/2021, 29.850 at cost, 683 provided for, 29.167 net, 62.971 total assets."""
+    from investment_agent.domain.balance_watch import inventory_view
+    B = 10**9
+    q = {"inventory_gross": str(29850 * B), "inventory_provision": str(-683 * B), "inventory": str(29167 * B), "total_assets": str(62971 * B)}
+    row = inventory_view({"2021-Q4": q})["rows"][-1]
+    assert row == {"quarter": "2021-Q4", "gross": str(29850 * B), "provision": str(683 * B), "net": str(29167 * B), "coverage": "0.0229",
+                   "share": "0.4632"}
+    old = inventory_view({"2021-Q4": {"inventory": str(29167 * B), "total_assets": str(62971 * B)}})["rows"][-1]
+    assert old["gross"] is None and old["coverage"] is None and old["share"] == "0.4632"  # cost not fetched yet: blank, not worked back

@@ -377,6 +377,18 @@ def provision_flow(quarters: dict, n: int = 12) -> dict:
     return {"rows": rows, "flag": bool(latest and latest["release"]), "quarter": latest["quarter"] if latest else None}
 
 
+def inventory_view(quarters: dict, n: int = 12) -> dict:
+    """Khối Tồn kho (owner, 22/11/2026): each of the last n quarters at cost, the provision for a fall in value (as a positive amount), net,
+    the share provided for and net inventory against total assets. A line not fetched leaves its cell blank; cost is never worked back."""
+    rows = []
+    for period in sorted(quarters)[-n:]:
+        gross, provision, net, assets = _get(quarters[period], "inventory_gross", "inventory_provision", "inventory", "total_assets")
+        rows.append({"quarter": period, "gross": _s(gross), "provision": _s(-provision if provision is not None else None), "net": _s(net),
+                     "coverage": _r(-provision / gross) if provision is not None and gross is not None and gross > 0 else None,
+                     "share": _r(net / assets) if net is not None and assets is not None and assets > 0 else None})
+    return {"rows": rows}
+
+
 def _advances(q: dict) -> Decimal | None:
     st, lt = _get(q, "advances_st", "advances_lt")
     return st + lt if st is not None and lt is not None else None

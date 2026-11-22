@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advancesText, borrowingText, coverageText, lendingText, provisionFlowText, carryText, dsoText, otherSectorText, prepayDaysText, provisionText, raiseText, revisionText, sectorText, type Carry } from "./balance-watch";
+import { advancesText, borrowingText, coverageText, inventoryText, lendingText, provisionFlowText, carryText, dsoText, otherSectorText, prepayDaysText, provisionText, raiseText, revisionText, sectorText, type Carry } from "./balance-watch";
 
 describe("otherSectorText", () => {
   it("sets the ticker's other receivables and loans against the sector, and says when it stands out", () => {
@@ -129,5 +129,16 @@ describe("coverageText", () => {
     const rows = [r("2023-Q1", "0.05"), r("2024-Q4", "0.085"), r("2025-Q4", "0.1193")];
     expect(coverageText(rows)).toMatch(/^Q4\/2025: dự phòng bằng 11,9% phải thu trước dự phòng .*; cùng kỳ năm trước 8,5%; Q1\/2023 5,0%\.$/);
     expect(coverageText([r("2025-Q4", null)])).toMatch(/^Chưa tính được/);
+  });
+});
+
+describe("inventoryText", () => {
+  const row = (quarter: string, net: string | null, share: string | null, gross: string | null = null, provision: string | null = null, coverage: string | null = null) =>
+    ({ quarter, gross, provision, net, coverage, share });
+  it("says the latest net, its share of assets and the provision, against a year before", () => {
+    const text = inventoryText({ rows: [row("2020-Q4", "19422000000000", "0.4222"), row("2021-Q4", "29167000000000", "0.4632", "29850000000000", "683000000000", "0.0229")] });
+    expect(text).toMatch(/^Q4\/2021: tồn kho thuần .* bằng 46,3% tổng tài sản; dự phòng giảm giá .* bằng 2,3% giá gốc .*Cùng kỳ năm trước: .*\(42,2% tổng tài sản\)\.$/);
+    expect(inventoryText({ rows: [row("2021-Q4", "1", null)] })).toMatch(/chưa có giá gốc và dự phòng/);
+    expect(inventoryText({ rows: [] })).toBe("Báo cáo đã lưu chưa có dòng hàng tồn kho.");
   });
 });

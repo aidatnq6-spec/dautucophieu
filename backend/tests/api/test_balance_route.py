@@ -78,3 +78,10 @@ def test_the_balance_carries_the_provision_flow(tmp_path):
     c, clock = client(tmp_path)
     flow = call(c, clock, "GET", "/internal/stock/FPT/balance").json()["provision_flow"]
     assert flow["quarter"] == "2026-Q1" and flow["rows"][-1]["change"] is None and flow["flag"] is False  # no provision lines: blank
+
+
+def test_the_balance_carries_the_inventory_block(tmp_path):
+    c, clock = client(tmp_path)
+    inv = call(c, clock, "GET", "/internal/stock/KDH/balance").json()["inventory"]
+    assert inv["rows"][-1]["quarter"] == "2026-Q1" and inv["rows"][-1]["net"] == str(5200 * B) and inv["rows"][-1]["share"] == "2.6000"
+    assert inv["rows"][-1]["gross"] is None  # cost not stored in this fixture: blank

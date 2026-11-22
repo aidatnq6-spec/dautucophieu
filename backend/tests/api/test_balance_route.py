@@ -52,3 +52,17 @@ def test_banks_and_unwatched_tickers_are_not_read_this_way(tmp_path):
     c, clock = client(tmp_path)
     assert call(c, clock, "GET", "/internal/stock/VCB/balance").json()["code"] == "not_applicable"
     assert call(c, clock, "GET", "/internal/stock/HPG/balance").status_code == 404
+
+
+def test_the_revisions_of_a_ticker_come_newest_first_with_the_lines_name(tmp_path):
+    from datetime import date
+
+    from investment_agent.market.statement_revisions import record_revisions
+    c, clock = client(tmp_path)
+    assert call(c, clock, "GET", "/internal/stock/FPT/balance").json()["revisions"] == []
+    record_revisions(tmp_path, "FPT", [{"period": "2025", "line": "npat_parent", "old": "100000000000", "new": "80000000000"}], kind="years",
+                     seen_on=date(2026, 11, 22))
+    record_revisions(tmp_path, "FPT", [{"period": "2025", "line": "equity", "old": "900000000000", "new": "870000000000"}], kind="years",
+                     seen_on=date(2026, 12, 1))
+    rows = call(c, clock, "GET", "/internal/stock/FPT/balance").json()["revisions"]
+    assert [(r["line"], r["label"]) for r in rows] == [("equity", "Vốn chủ sở hữu"), ("npat_parent", "LNST công ty mẹ")]

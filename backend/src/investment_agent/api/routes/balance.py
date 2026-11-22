@@ -49,4 +49,12 @@ def balance(symbol: str, request: Request):
             "property": property_cash(quarters) if sector == PROPERTY else None,
             "liquidity": liquidity_rows(quarters), "carry": carry(quarters),
             "receivables": receivables_view(quarters, {s: qs for s, qs in peers.items() if s != symbol}),
-            "raise_prepay": raise_prepay(quarters, (FundamentalsStore(data_dir / "fundamentals").read(symbol) or {}).get("share_issues"))}
+            "raise_prepay": raise_prepay(quarters, (FundamentalsStore(data_dir / "fundamentals").read(symbol) or {}).get("share_issues")),
+            "revisions": _revisions(data_dir, symbol)}
+
+
+def _revisions(data_dir: Path, symbol: str) -> list[dict]:
+    """Số đã công bố bị sửa (22/11/2026), newest first, each with its line's name."""
+    from investment_agent.market.statement_revisions import LINES, read_revisions
+    rows = read_revisions(data_dir, symbol)
+    return [{**r, "label": LINES[r["line"]]} for r in sorted(rows, key=lambda r: (r["seen_on"], r["period"]), reverse=True)]

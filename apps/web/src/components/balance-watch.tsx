@@ -21,7 +21,9 @@ export type RaiseEvent = { issue_date: string; quarter: string; capital_added: s
 export type Provision = { quarter: string | null; amount: string | null; share: string | null; year_ago: string | null; kind: "jump" | "none" | null };
 type Balance = { symbol: string; sector: string | null; debt: { rows: DebtRow[]; flag: Flag }; sector_debt: SectorDebt | null;
   property: { rows: CashRow[]; signal: Signal } | null; liquidity: LiquidityRow[]; carry: Carry;
-  receivables: { rows: ArRow[]; dso: Dso; provision: Provision; prepay_days: Dso; other_vs_sector: OtherVsSector }; raise_prepay: { flag: boolean; events: RaiseEvent[] } };
+  receivables: { rows: ArRow[]; dso: Dso; provision: Provision; prepay_days: Dso; other_vs_sector: OtherVsSector }; raise_prepay: { flag: boolean; events: RaiseEvent[] };
+  revisions?: Revision[] };
+export type Revision = { kind: "years" | "quarters"; period: string; line: string; label: string; old: string; new: string; seen_on: string };
 
 const SHOWN = 8;  // quarters in each table
 const q = (p: string) => `Q${p.slice(-1)}/${p.slice(0, 4)}`;
@@ -115,6 +117,13 @@ export function raiseText(e: RaiseEvent): string {
 }
 
 /** The bad-debt provision of the latest quarter, in words. */
+/** One figure the source changed for a closed period (Số đã công bố bị sửa, 22/11/2026): old → new and the day seen; no cause inferred. */
+export function revisionText(r: Revision): string {
+  const when = r.kind === "years" ? `Năm ${r.period}` : `Quý ${r.period.slice(-1)}/${r.period.slice(0, 4)}`;
+  const seen = `${r.seen_on.slice(8, 10)}/${r.seen_on.slice(5, 7)}/${r.seen_on.slice(0, 4)}`;
+  return `${when}, ${r.label}: ${ty(r.old)} → ${ty(r.new)} (thấy ${seen})`;
+}
+
 export function provisionText(p: Provision): string {
   if (!p.quarter || p.amount === null) return "Báo cáo đã lưu chưa có dòng dự phòng phải thu khó đòi.";
   if (p.kind === "none") return `${q(p.quarter)}: không trích dự phòng phải thu ngắn hạn khó đòi.`;
@@ -230,6 +239,15 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
           nửa số vốn điều lệ vừa thêm, trong quý ghi nhận vốn và quý kế tiếp. Phải thu từ bên liên quan và tên từng khách hàng chỉ có trong thuyết minh, không có ở đây.
           Từ năm 2026, Thông tư 99 bỏ chỉ tiêu phải thu về cho vay và gộp khoản cho vay vào phải thu khác: cột Cho vay về 0, cột Phải thu khác tăng
           tương ứng; khi so qua năm hãy cộng hai cột. Báo cáo công khai (VNDirect); ô thiếu số để trống. Không phải khuyến nghị.</p>
+      </section>
+      <section className="surface" aria-label="Số đã công bố bị sửa">
+        <h2>Số đã công bố bị sửa</h2>
+        {data.revisions && data.revisions.length > 0
+          ? <ul className="ye-list">{data.revisions.map((r) => <li key={`${r.kind}${r.period}${r.line}${r.new}`}>{revisionText(r)}</li>)}</ul>
+          : <p className="muted">Chưa thấy lần sửa nào.</p>}
+        <p className="caption">Từ 22/11/2026, mỗi lần đồng bộ hằng tuần đọc lại hai năm báo cáo gần nhất; số của một kỳ đã đóng (LNST công ty mẹ, LNTT, vốn chủ,
+          dự phòng phải thu) đổi quá cả 1% và 1 tỷ thì được ghi lại. Có thể do điều chỉnh hồi tố hoặc nguồn sửa lỗi nhập; xem thuyết minh và báo cáo kiểm
+          toán. Lần sửa trước ngày đó hoặc cũ hơn hai năm không dựng lại được.</p>
       </section>
       {data.property && <section className="surface" aria-label="Tiền khách trả trước">
         <h2>Tiền khách trả trước</h2>

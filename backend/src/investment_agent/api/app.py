@@ -16,6 +16,7 @@ from .routes.usage import router as usage_router
 from .routes.history_stats import router as history_stats_router
 from .routes.concentration import router as concentration_router
 from .routes.contributions import router as contributions_router
+from .routes.year_end import router as year_end_router
 from .routes.corporate import router as corporate_router
 from .routes.accumulation import router as accumulation_router
 from .routes.cashflow import router as cashflow_router
@@ -193,6 +194,7 @@ def create_app(settings: InternalAuthSettings | None = None, *, clock: Callable[
     app.include_router(buy_check_router)
     app.include_router(wealth_check_router)
     app.include_router(contributions_router)
+    app.include_router(year_end_router)
     app.include_router(passive_income_router)
     app.include_router(intangibles_router)
     app.include_router(bank_figures_router)

@@ -1293,16 +1293,34 @@ def wealth_alerts_cli(data_dir: Path) -> int:
     from investment_agent.services.wealth_alerts import wealth_alerts_run
 
     def body(send, repo, owner):
+        from datetime import datetime, timezone
+
+        from investment_agent.domain.pinned import CONFIG_DIR
+        from investment_agent.services import year_end
         today = _today()
+        quotes, cache = book_quotes(data_dir), {}
+
+        def pyramid():  # Tháp tài sản once for the run: the tower note, the month-end snapshot and Việc cuối năm all read it
+            if "p" not in cache:
+                cache["p"] = budget_view(repo, owner, quotes=quotes)[0].get("pyramid")
+            return cache["p"]
+
+        def year_end_part(s):
+            if year_end.checklist_year(today) is None:
+                return {"due": None, "sent": False}
+            facts = year_end.gather_facts(repo, owner, data_dir=data_dir, config_dir=CONFIG_DIR, today=today, now=datetime.now(timezone.utc),
+                                          quotes=quotes)
+            return year_end.remind_run(repo, owner, today=today, send=s, request_id=_rid("year-end"), facts=facts)
         runs = [
             ("deposits", lambda s: deposit_alerts_run(data_dir, book=read_book(repo, owner)[0], send=s, today=today)),
             ("loans", lambda s: loan_alerts_run(data_dir, book=read_property_book(repo, owner), send=s, today=today)),
             ("insurance", lambda s: insurance_alerts_run(data_dir, book=read_property_book(repo, owner), send=s, today=today)),
             ("rental", lambda s: rental_alerts_run(data_dir, book=read_rental_book(repo, owner), send=s, today=today)),
-            ("tower", lambda s: pyramid_alerts_run(data_dir, pyramid=budget_view(repo, owner, quotes=book_quotes(data_dir))[0].get("pyramid"),
-                                                   send=s, today=today)),
+            ("tower", lambda s: pyramid_alerts_run(data_dir, pyramid=pyramid(), send=s, today=today)),
             ("contribution", lambda s: contributions.remind_run(repo, owner, today=today, send=s, request_id=_rid("contribution"))),
             ("accumulation", lambda s: accumulation.remind_run(repo, owner, today=today, send=s, request_id=_rid("accumulation"))),
+            ("snapshot", lambda s: year_end.snapshot_run(repo, owner, pyramid=pyramid(), today=today, request_id=_rid("snapshot"))),
+            ("year_end", year_end_part),
         ]
         return wealth_alerts_run(runs, send=send, today=today)
     return _telegram_step(data_dir, body)

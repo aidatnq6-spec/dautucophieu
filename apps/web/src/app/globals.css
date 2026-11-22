@@ -26,7 +26,7 @@ a{color:var(--link)}
 .nav-group[class*=nav-tone-] .nav-head::before{content:"";width:4px;height:14px;border-radius:2px;background:var(--nav-tone)}
 .nav-tone-assets{--nav-tone:var(--good)}.nav-tone-market{--nav-tone:var(--brand)}.nav-tone-stocks{--nav-tone:var(--orange)}
 .nav-tone-news{--nav-tone:var(--rsi)}.nav-tone-sectors{--nav-tone:var(--brand-2)}.nav-tone-tools{--nav-tone:var(--muted)}
-@media(min-width:651px){.side{padding-top:20px}.side .nav a{padding-top:3px;padding-bottom:3px}.side .brand{margin-bottom:10px}.side .nav-group[class*=nav-tone-]{margin-top:4px}.side .nav-group[class*=nav-tone-] .nav-head{margin-top:4px}}  /* nineteen links and six headings fit a 900px-high screen */
+@media(min-width:651px){.side{padding-top:20px}.side .nav a{padding-top:2px;padding-bottom:2px}.side .brand{margin-bottom:10px}.side .nav-group[class*=nav-tone-]{margin-top:4px}.side .nav-group[class*=nav-tone-] .nav-head{margin-top:4px}}  /* twenty links and six headings fit a 900px-high screen */
 @media(max-width:650px){.nav-group[class*=nav-tone-] .nav-head{display:none}}  /* the phone's one-row menu has no headings */
 .nav a{text-decoration:none;color:var(--ink);padding:8px 12px;border-radius:7px;display:flex;gap:12px;align-items:center;white-space:nowrap}
 .nav a[aria-current=page]{background:var(--nav-on-bg);color:var(--nav-on-ink);font-weight:600}
@@ -585,4 +585,4 @@ main h2{scroll-margin-top:16px}
 .hs-axis{stroke:var(--line);stroke-width:1}.hs-tick{font-size:11px;fill:var(--muted)}
 .hs-up{fill:color-mix(in srgb,var(--good) 60%,transparent)}.hs-down{fill:color-mix(in srgb,var(--bad) 60%,transparent)}
 .hs-trend{stroke:var(--brand);stroke-width:2}.hs-now{stroke:var(--ink);stroke-width:1.5;stroke-dasharray:4 3}
-tr.hs-today td{font-weight:600;background:color-mix(in srgb,var(--brand) 8%,transparent)}.hs-run{fill:color-mix(in srgb,var(--bad) 22%,transparent)}.hs-line{fill:none;stroke:var(--ink);stroke-width:1.4}.hs-summary{font-size:15px;line-height:1.55;margin:0 0 10px}
+tr.hs-today td{font-weight:600;background:color-mix(in srgb,var(--brand) 8%,transparent)}.hs-run{fill:color-mix(in srgb,var(--bad) 22%,transparent)}.hs-line{fill:none;stroke:var(--ink);stroke-width:1.4}.hs-summary{font-size:15px;line-height:1.55;margin:0 0 10px}.ye-list{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px}.ye-list li{line-height:1.6}

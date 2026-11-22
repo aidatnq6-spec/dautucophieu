@@ -26,7 +26,7 @@ a{color:var(--link)}
 .nav-group[class*=nav-tone-] .nav-head::before{content:"";width:4px;height:14px;border-radius:2px;background:var(--nav-tone)}
 .nav-tone-assets{--nav-tone:var(--good)}.nav-tone-market{--nav-tone:var(--brand)}.nav-tone-stocks{--nav-tone:var(--orange)}
 .nav-tone-news{--nav-tone:var(--rsi)}.nav-tone-sectors{--nav-tone:var(--brand-2)}.nav-tone-tools{--nav-tone:var(--muted)}
-@media(min-width:651px){.side{padding-top:20px}.side .nav a{padding-top:3px;padding-bottom:3px}.side .brand{margin-bottom:10px}.side .nav-group[class*=nav-tone-]{margin-top:4px}.side .nav-group[class*=nav-tone-] .nav-head{margin-top:4px}}  /* nineteen links and six headings fit a 900px-high screen */
+@media(min-width:651px){.side{padding-top:20px}.side .nav a{padding-top:2px;padding-bottom:2px}.side .brand{margin-bottom:10px}.side .nav-group[class*=nav-tone-]{margin-top:4px}.side .nav-group[class*=nav-tone-] .nav-head{margin-top:4px}}  /* twenty links and six headings fit a 900px-high screen */
 @media(max-width:650px){.nav-group[class*=nav-tone-] .nav-head{display:none}}  /* the phone's one-row menu has no headings */
 .nav a{text-decoration:none;color:var(--ink);padding:8px 12px;border-radius:7px;display:flex;gap:12px;align-items:center;white-space:nowrap}
 .nav a[aria-current=page]{background:var(--nav-on-bg);color:var(--nav-on-ink);font-weight:600}

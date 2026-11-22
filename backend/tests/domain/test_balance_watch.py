@@ -304,3 +304,18 @@ def test_inventory_days_and_a_stock_growing_faster_than_cost_of_sales():
     calm = {**qs, **{f"2025-Q{n}": q(220, 110) for n in range(1, 5)}}
     assert inventory_pace(calm, None)["flag"] is False  # +10% against +10%
     assert inventory_pace({"2025-Q4": q(300, 110)}, None)["flag"] is None  # no year before: not read
+
+
+def test_the_change_of_the_inventory_provision_against_the_quarters_profit_both_ways():
+    """Dự phòng giảm giá tồn kho đi vào lợi nhuận (owner, 22/11/2026): from 20% of a positive profit a fall is "release", a rise "charge"."""
+    from investment_agent.domain.balance_watch import inventory_provision_flow
+    B = 10**9
+    q = lambda p, pbt: {"inventory_provision": str(-p * B), "pbt": str(pbt * B)}  # noqa: E731
+    out = inventory_provision_flow({"2025-Q2": q(504, 1000), "2025-Q3": q(682, 800), "2025-Q4": q(600, 1000), "2026-Q1": q(400, 1000)})
+    rows = {r["quarter"]: r for r in out["rows"]}
+    assert rows["2025-Q2"]["change"] is None
+    assert (rows["2025-Q3"]["change"], rows["2025-Q3"]["share"], rows["2025-Q3"]["kind"]) == (str(178 * B), "0.2225", "charge")
+    assert (rows["2025-Q4"]["change"], rows["2025-Q4"]["kind"]) == (str(-82 * B), None)  # 8.2%: under 20%
+    assert (rows["2026-Q1"]["change"], rows["2026-Q1"]["share"], rows["2026-Q1"]["kind"]) == (str(-200 * B), "0.2000", "release")
+    assert out["kind"] == "release" and out["quarter"] == "2026-Q1"
+    assert inventory_provision_flow({"2025-Q4": q(600, 10), "2026-Q1": q(100, -50)})["kind"] is None  # a loss: no share, no flag

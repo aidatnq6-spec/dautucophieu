@@ -29,3 +29,10 @@ nguồn công khai: ngoài phạm vi.
 
 ## Thứ tự
 1 → 2 → 3, mỗi phần một nhánh, TDD, verify rồi merge.
+
+## Đã làm (22/11/2026)
+- Phần 1: dòng `inventory_gross`, `inventory_provision` (bộ dòng phiên bản 6); `inventory_view`; mục Tồn kho trên hồ sơ mã. Đồng bộ lại toàn
+  bộ 41 mã ngay sau khi merge: cả 41 mã có giá gốc và dự phòng.
+- Phần 2: `inventory_pace`; dòng số ngày tồn kho trong mục Tồn kho; cột "Tồn kho tăng nhanh hơn giá vốn" trên Bảng dấu hiệu. Chạy thử 22/11:
+  12/41 mã bật cờ, trong đó có mã tồn kho rất nhỏ (cảng, vận tải 10–20 ngày): cần chủ sở hữu quyết ngưỡng trọng yếu.
+- Phần 3: `inventory_provision_flow`; dòng trong mục Tồn kho, nhãn "Hoàn nhập dự phòng tồn kho lớn" hoặc "Trích thêm dự phòng tồn kho lớn".

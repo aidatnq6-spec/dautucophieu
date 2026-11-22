@@ -278,3 +278,25 @@ def test_a_session_indicator_problem_names_the_hose_sessions_missed(tmp_path):
     MacroStore(data).upsert("vnindex_value", [(date(2026, 11, 4), "20000")], entry="auto")  # Wednesday; 9/11 is Monday: 5, 6, 9 missed
     detail = next(p for p in report(data)["problems"] if p["id"] == "macro:vnindex_value")["detail"]
     assert detail == "số mới nhất ngày 04/11/2026, đã 3 phiên HOSE chưa có số mới (hạn 2 phiên)"
+
+
+def test_a_known_problem_past_its_date_is_announced_again_owner_review_22_11_2026(tmp_path):
+    """The Đã biết line promises "đến … vẫn chưa có thì báo lại thành sự cố": a problem announced, then known, then past its date is
+    sent again; the gap over with the figure back is said recovered once."""
+    problem = [{"id": "macro:us_cpi_yoy", "label": "CPI", "detail": "x"}]
+    known = [{"id": "gap:2026-10", "ids": ["macro:us_cpi_yoy"], "label": "CPI", "detail": "y"}]
+    alert_changes(problem, tmp_path, save=True)                      # 20/11: announced
+    assert alert_changes([], tmp_path, save=True, known=known) == ([], [])  # 22/11: known, not recovered
+    new, back = alert_changes(problem, tmp_path, save=False)         # 16/12: past its date
+    assert [p["id"] for p in new] == ["macro:us_cpi_yoy"] and back == []
+    assert alert_changes([], tmp_path, save=False) == ([], ["macro:us_cpi_yoy"])  # figure back instead: recovered once
+
+
+def test_a_damaged_us_calendar_never_breaks_the_report(tmp_path):
+    from datetime import date
+    data = healthy(tmp_path)
+    drilled(data)
+    _cpi_gap(data, last=date(2026, 9, 1))
+    (data / "macro" / "us-calendar.json").write_text("{not json", encoding="utf-8")
+    out = health_report(data, now=datetime(2026, 11, 22, 1, 0, tzinfo=timezone.utc))
+    assert out["known"][0]["detail"].endswith("tự hết khi có số tháng 11/2026; đến 15/12/2026 vẫn chưa có thì báo lại thành sự cố.")

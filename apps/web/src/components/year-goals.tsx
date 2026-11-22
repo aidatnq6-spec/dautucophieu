@@ -4,7 +4,7 @@ import { ApiError, api, requestId } from "../lib/api";
 import { formatVnd, groupDigitsInput, hanoiDate, parseMoneyInput } from "../lib/format";
 
 type Goals = { contribution?: string; savings_rate?: string; total_assets?: string };
-type Row = { id: "contribution" | "savings_rate" | "total_assets"; goal: string; now: string | null; start?: string | null; share: string | null;
+type Row = { id: "contribution" | "savings_rate" | "total_assets"; goal: string; now: string | null; start?: string | null; below_start?: boolean; share: string | null;
   pace: string | null; behind: boolean };
 type View = { year: number; version: number; goals: Goals | null; progress: { pace: string; rows: Row[] } | null };
 
@@ -20,9 +20,15 @@ export function rateInput(raw: string): string | null | "" {
   return x > 0 && x < 100 ? String(Number((x / 100).toFixed(4))) : null;
 }
 
+/** A saved share ("0.07") as the percentage typed in ("7"), rounded to the 2 decimals rateInput keeps: no float noise. */
+export function rateShow(v: string): string {
+  return String(Number((Number(v) * 100).toFixed(2))).replace(".", ",");
+}
+
 /** Where one goal stands, in words: never a forecast. */
 export function rowText(r: Row): string {
   if (r.id === "savings_rate") return r.now === null ? "chưa có tháng Thu chi nào đã xong" : `hiện ${pct(r.now)}, mục tiêu ${pct(r.goal)}`;
+  if (r.below_start) return "mục tiêu không cao hơn tổng đầu năm: không tính tiến độ";
   if (r.share === null) {
     return r.id === "total_assets" && !r.start ? "chưa có ảnh chụp cuối năm trước để tính quãng đường" : "chưa có số để so";
   }
@@ -41,13 +47,16 @@ export function YearGoals() {
   const [total, setTotal] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => {
+    let current = true;  // a reply for a year no longer chosen is dropped (owner review 22/11/2026)
     api<View>(`year-goals/${year}`).then((v) => {
+      if (!current) return;
       setView(v);
       setContribution(v.goals?.contribution ? formatVnd(v.goals.contribution, { unit: false }) : "");
-      setRate(v.goals?.savings_rate ? String(Number(v.goals.savings_rate) * 100).replace(".", ",") : "");
+      setRate(v.goals?.savings_rate ? rateShow(v.goals.savings_rate) : "");
       setTotal(v.goals?.total_assets ? formatVnd(v.goals.total_assets, { unit: false }) : "");
       setMessage(null);
-    }, (e) => setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải."));
+    }, (e) => { if (current) setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải."); });
+    return () => { current = false; };
   }, [year]);
   async function save() {
     if (!view) return;

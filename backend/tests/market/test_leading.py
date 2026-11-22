@@ -759,3 +759,15 @@ def test_each_figure_keeps_the_time_it_was_first_seen(tmp_path):
     assert first["2026-07-31"] is None and first["2026-08-31"] is not None
     store.upsert("m2_vn", [(date(2026, 8, 31), "2.1")], entry="auto")  # revised later: still first seen on the first run
     assert {o["date"]: o.get("first_seen") for o in store.read("m2_vn")}["2026-08-31"] == first["2026-08-31"]
+
+
+def test_the_hose_calendar_is_read_once_per_file_not_once_per_day(monkeypatch):
+    from investment_agent.market import sessions
+    import investment_agent.cli as cli
+    calls = []
+    real = cli.load_calendar
+    monkeypatch.setattr(cli, "load_calendar", lambda path: calls.append(path) or real(path))
+    sessions._CACHE.clear()
+    for d in range(1, 29):
+        sessions.is_session(date(2026, 2, d))
+    assert len(calls) == 1

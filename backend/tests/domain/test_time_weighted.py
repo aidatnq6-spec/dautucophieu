@@ -32,8 +32,10 @@ def test_time_weighted_return_ignores_deposits_and_compares_with_vnindex():
 
 def test_monthly_returns_chain_within_each_month():
     out = performance(events(), closes=CLOSES, index=INDEX, today=D4)
-    assert out["monthly"] == [{"month": "2026-10", "portfolio": "0.0500", "vnindex": "0.0200"},
-                              {"month": "2026-11", "portfolio": "0.0476", "vnindex": "0.0098"}]
+    assert [{k: m[k] for k in ("month", "portfolio", "vnindex")} for m in out["monthly"]] == [
+        {"month": "2026-10", "portfolio": "0.0500", "vnindex": "0.0200"}, {"month": "2026-11", "portfolio": "0.0476", "vnindex": "0.0098"}]
+    # the month-end levels, unrounded enough for Tổng kết năm (owner review 22/11/2026)
+    assert out["monthly"][0]["level"] == "105.00000000" and out["monthly"][0]["index_level"] == "102.00000000"
 
 
 def test_a_day_without_a_price_is_skipped_not_guessed():

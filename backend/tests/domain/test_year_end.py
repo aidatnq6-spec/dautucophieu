@@ -60,3 +60,11 @@ def test_the_reminder_lists_what_is_left():
                                      "Xem và đánh dấu ở trang Năm tài chính.")
     done = year_end_view(2026, facts={k: (True, "") for k in ("theses", "tower", "calendar", "drill", "goals")}, ticks={"dividends", "cashflow"})
     assert render_reminder(done) is None
+
+
+def test_holding_on_with_a_reason_counts_as_a_review():
+    base = {"symbol": "AAA", "created_on": "2026-06-01", "closed_on": None}
+    in_history = {**base, "history": [{"id": "c1", "ended_on": "2026-11-15", "ended_by": "hold"}], "conditions": []}
+    on_condition = {**base, "history": [], "conditions": [{"id": "c2", "hold": {"since": "2026-11-15"}}]}
+    for thesis in (in_history, on_condition):
+        assert theses_fact([thesis], held={"AAA"}, today=date(2026, 12, 1))[0] is True

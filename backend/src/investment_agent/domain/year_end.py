@@ -32,7 +32,14 @@ def checklist_year(today: date) -> int | None:
 
 
 def _touched(thesis: dict) -> date:
-    days = [thesis["created_on"], *(h["on"] for h in thesis.get("history", []) if h.get("type") == "edit" and h.get("on"))]
+    """The last time the owner looked at it: written, edited, or held on with a reason (owner, 22/11/2026)."""
+    days = [thesis["created_on"]]
+    for h in thesis.get("history", []):
+        if h.get("type") == "edit" and h.get("on"):
+            days.append(h["on"])
+        if h.get("ended_by") == "hold" and h.get("ended_on"):
+            days.append(h["ended_on"])
+    days += [c["hold"]["since"] for c in thesis.get("conditions", []) if (c.get("hold") or {}).get("since")]
     return date.fromisoformat(max(days))
 
 

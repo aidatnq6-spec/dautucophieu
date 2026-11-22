@@ -57,10 +57,12 @@ def gather_facts(repo, owner, *, data_dir: Path | None, config_dir: Path, today:
         last = _read_drill(Path(data_dir))
         if last is None:
             return False, "chưa diễn tập lần nào"
+        from zoneinfo import ZoneInfo
         at = _when(last["at"])
+        local = at.astimezone(ZoneInfo("Asia/Ho_Chi_Minh"))
         if not last["ok"]:
-            return False, f"lần gần nhất {at:%d/%m/%Y} không đạt"
-        return (now - at <= timedelta(days=DRILL_DAYS)), f"lần gần nhất {at:%d/%m/%Y}"
+            return False, f"lần gần nhất {local:%d/%m/%Y} không đạt"
+        return (now - at <= timedelta(days=DRILL_DAYS)), f"lần gần nhất {local:%d/%m/%Y}"
 
     def goals():
         have = read_version(repo, owner, "settings", f"year_goals_{nxt}", None) is not None

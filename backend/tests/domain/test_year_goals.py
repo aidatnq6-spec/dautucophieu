@@ -31,3 +31,10 @@ def test_each_goal_reads_where_it_stands_and_more_than_ten_points_under_the_pace
     assert by["total_assets"]["share"] == "0.2000" and by["total_assets"]["behind"] is True  # 100 tr of the 500 tr from the start to the goal
     missing = goals_progress(goals, year=2027, today=date(2027, 7, 2), put_in=None, savings_rate=None, total_now="1600000000", total_start=None)
     assert all(r["behind"] is False for r in missing["rows"]) and {r["id"]: r["share"] for r in missing["rows"]}["total_assets"] is None
+
+
+def test_a_total_assets_goal_under_the_start_gives_no_reading_never_a_negative_share():
+    out = goals_progress({"total_assets": "1000000000"}, year=2027, today=date(2027, 7, 2), put_in=None, savings_rate=None,
+                         total_now="1250000000", total_start="1200000000")
+    row = out["rows"][0]
+    assert row["share"] is None and row["behind"] is False and row["below_start"] is True

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advancesText, borrowingText, lendingText, provisionFlowText, carryText, dsoText, otherSectorText, prepayDaysText, provisionText, raiseText, revisionText, sectorText, type Carry } from "./balance-watch";
+import { advancesText, borrowingText, coverageText, lendingText, provisionFlowText, carryText, dsoText, otherSectorText, prepayDaysText, provisionText, raiseText, revisionText, sectorText, type Carry } from "./balance-watch";
 
 describe("otherSectorText", () => {
   it("sets the ticker's other receivables and loans against the sector, and says when it stands out", () => {
@@ -119,5 +119,15 @@ describe("provisionFlowText", () => {
     expect(fall).toMatch(/giảm .* bằng 20,0% LNTT.*hoàn nhập.*xóa nợ/);
     expect(provisionFlowText({ rows: [row("-4000000000", "-5000000000", null)], flag: false, quarter: "2026-Q1" })).toMatch(/không dương/);
     expect(provisionFlowText({ rows: [row(null, null, null)], flag: false, quarter: "2026-Q1" })).toMatch(/^Chưa tính được/);
+  });
+});
+
+describe("coverageText", () => {
+  const r = (quarter: string, coverage: string | null) => ({ quarter, customers: null, prepay: null, loans: null, other: null, provision: null, total: "487000000000",
+    gross: "553000000000", coverage, total_share: null, other_share: null, dso: null, prepay_days: null });
+  it("sets the latest coverage against a year before and the first of the twelve quarters", () => {
+    const rows = [r("2023-Q1", "0.05"), r("2024-Q4", "0.085"), r("2025-Q4", "0.1193")];
+    expect(coverageText(rows)).toMatch(/^Q4\/2025: dự phòng bằng 11,9% phải thu trước dự phòng .*; cùng kỳ năm trước 8,5%; Q1\/2023 5,0%\.$/);
+    expect(coverageText([r("2025-Q4", null)])).toMatch(/^Chưa tính được/);
   });
 });

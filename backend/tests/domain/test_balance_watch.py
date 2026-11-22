@@ -149,8 +149,8 @@ def test_receivable_rows_add_short_and_long_term_parts_and_their_share_of_total_
     qs = quarters_from(2025, [ar_quarter() for _ in range(8)])
     row = receivables_view(qs)["rows"][-1]
     assert row == {"quarter": "2026-Q4", "customers": str(100 * B), "prepay": str(20 * B), "loans": str(0), "other": str(80 * B),
-                   "provision": str(-10 * B), "total": str(190 * B), "total_share": "0.1900", "other_share": "0.0800", "dso": "100",
-                   "prepay_days": None}
+                   "provision": str(-10 * B), "total": str(190 * B), "gross": str(200 * B), "coverage": "0.0500", "total_share": "0.1900",
+                   "other_share": "0.0800", "dso": "100", "prepay_days": None}
 
 
 # R2 Số ngày thu tiền: short-term customer receivables at the quarter's end against the last four quarters' revenue, × 365.
@@ -264,3 +264,15 @@ def test_the_change_of_the_provision_balance_is_set_against_the_quarters_profit_
     assert out["flag"] is True and out["quarter"] == "2026-Q1"
     loss = provision_flow({"2025-Q4": q(66, 0, 10), "2026-Q1": q(26, 0, -5)})
     assert loss["rows"][-1]["share"] is None and loss["flag"] is False  # no share of a loss
+
+
+def test_each_quarter_gives_receivables_before_provision_and_how_much_of_it_is_provided_for():
+    """Giá trị thuần và mức bao phủ (owner, 22/11/2026): the total is already net of the provision (the HAG note: 553 − 66 = 487 tỷ);
+    before it = net + provision, coverage = provision ÷ before."""
+    from investment_agent.domain.balance_watch import receivables_view
+    B = 10**9
+    q = {"receivables": str(487 * B), "receivables_lt": "0", "bad_debt_st": str(-66 * B), "bad_debt_lt": "0", "total_assets": str(5000 * B)}
+    row = receivables_view({"2021-Q4": q})["rows"][-1]
+    assert row["total"] == str(487 * B) and row["gross"] == str(553 * B) and row["coverage"] == "0.1193"
+    blank = receivables_view({"2021-Q4": {**q, "bad_debt_lt": None}})["rows"][-1]
+    assert blank["gross"] is None and blank["coverage"] is None  # a provision line missing: blank, never taken as 0

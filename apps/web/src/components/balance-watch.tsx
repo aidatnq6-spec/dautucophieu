@@ -13,7 +13,8 @@ type LiquidityRow = { quarter: string; cash: string | null; st_investments: stri
 export type Carry = { quarter: string | null; kind: "carry" | "no_debt" | "unusual_income" | "low_interest" | null; missing: string[]; fin_income: string | null; interest: string | null;
   net: string | null; avg_cash_like: string | null; avg_debt: string | null; yield: string | null; cost: string | null; spread: string | null };
 type ArRow = { quarter: string; customers: string | null; prepay: string | null; loans: string | null; other: string | null; provision: string | null;
-  total: string | null; total_share: string | null; other_share: string | null; dso: string | null; prepay_days: string | null };
+  total: string | null; gross?: string | null; coverage?: string | null; total_share: string | null; other_share: string | null; dso: string | null;
+  prepay_days: string | null };
 export type Dso = { quarter: string | null; days: string | null; year_ago: string | null; change: string | null; sector_median: string | null; sector_count: number };
 export type OtherVsSector = { quarter: string | null; share: string | null; sector_median: string | null; sector_count: number; high: boolean | null };
 export type RaiseEvent = { issue_date: string; quarter: string; capital_added: string; prepay_before: string | null; prepay_after: string | null;
@@ -139,6 +140,19 @@ export function provisionFlowText(f: ProvisionFlow): string {
   return up ? main : `${main} Số dư giảm có thể do hoàn nhập (làm tăng lợi nhuận) hoặc do xóa nợ (không ảnh hưởng lợi nhuận); nguồn công khai không tách được, cần xem thuyết minh.`;
 }
 
+/** Mức bao phủ dự phòng over the 12 quarters (22/11/2026): the latest against a year before and the first of the 12. */
+export function coverageText(rows: ArRow[]): string {
+  const known = rows.filter((r) => r.coverage != null);
+  const last = known[known.length - 1];
+  if (!last) return "Chưa tính được mức bao phủ dự phòng (thiếu dòng dự phòng hoặc phải thu).";
+  const back = (n: number) => { const [y, k] = last.quarter.split("-Q").map(Number); const i = y * 4 + k - 1 - n; return `${Math.floor(i / 4)}-Q${(i % 4) + 1}`; };
+  const ago = known.find((r) => r.quarter === back(4));
+  const first = known[0] !== last ? known[0] : undefined;
+  const parts = [ago ? `cùng kỳ năm trước ${rate(ago.coverage!)}` : null, first && first !== ago ? `${q(first.quarter)} ${rate(first.coverage!)}` : null].filter(Boolean);
+  return `${q(last.quarter)}: dự phòng bằng ${rate(last.coverage!)} phải thu trước dự phòng (${ty(last.gross ?? null)}), giá trị thuần ${ty(last.total)}`
+    + (parts.length ? `; ${parts.join("; ")}.` : ".");
+}
+
 /** One figure the source changed for a closed period (Số đã công bố bị sửa, 22/11/2026): old → new and the day seen; no cause inferred. */
 export function revisionText(r: Revision): string {
   const when = r.kind === "years" ? `Năm ${r.period}` : `Quý ${r.period.slice(-1)}/${r.period.slice(0, 4)}`;
@@ -237,9 +251,10 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
         {data.provision_flow && <p data-testid="provision-flow">{data.provision_flow.flag && <><span className="pill warn">Giảm dự phòng lớn so với lợi nhuận</span> </>}{provisionFlowText(data.provision_flow)}</p>}
         <p data-testid="provision">{data.receivables.provision.kind === "jump" && <><span className="pill warn">Dự phòng tăng mạnh</span> </>}
           {provisionText(data.receivables.provision)}</p>
+        <p data-testid="coverage">{coverageText(data.receivables.rows)}</p>
         <div className="tablewrap"><table className="fv-table" aria-label={`Phải thu ${symbol}`}>
           <thead><tr><th>Quý</th><th className="num">Khách hàng</th><th className="num">Trả trước người bán</th><th className="num">Cho vay</th>
-            <th className="num">Phải thu khác</th><th className="num">Dự phòng</th><th className="num">Tổng phải thu</th><th className="num">Trên tổng tài sản</th>
+            <th className="num">Phải thu khác</th><th className="num">Dự phòng</th><th className="num">Trước dự phòng</th><th className="num">Bao phủ</th><th className="num">Giá trị thuần</th><th className="num">Trên tổng tài sản</th>
             <th className="num">Số ngày thu tiền</th><th className="num">Số ngày ứng trước</th></tr></thead>
           <tbody>{data.receivables.rows.slice(-SHOWN).reverse().map((r) => (
             <tr key={r.quarter}>
@@ -249,7 +264,9 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
               <td className="num" data-label="Cho vay">{ty(r.loans)}</td>
               <td className="num" data-label="Phải thu khác">{ty(r.other)}{r.other_share !== null && <span className="caption"> ({rate(r.other_share)} TS)</span>}</td>
               <td className="num" data-label="Dự phòng">{ty(r.provision)}</td>
-              <td className="num" data-label="Tổng phải thu">{ty(r.total)}</td>
+              <td className="num" data-label="Trước dự phòng">{ty(r.gross ?? null)}</td>
+              <td className="num" data-label="Bao phủ">{r.coverage == null ? "—" : rate(r.coverage)}</td>
+              <td className="num" data-label="Giá trị thuần">{ty(r.total)}</td>
               <td className="num" data-label="Trên tổng tài sản">{r.total_share === null ? "—" : rate(r.total_share)}</td>
               <td className="num" data-label="Số ngày thu tiền">{r.dso === null ? "—" : `${r.dso} ngày`}</td>
               <td className="num" data-label="Số ngày ứng trước">{r.prepay_days === null ? "—" : `${r.prepay_days} ngày`}</td>

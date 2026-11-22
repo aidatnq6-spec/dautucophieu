@@ -3,7 +3,9 @@ import { useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
 
 type Summary = { n: number; n_independent: number; mean: string | null; median: string | null; win_rate: string | null; t: string | null;
-  p10?: string | null; p90?: string | null; dip_median?: string | null; dip_worst?: string | null; enough?: boolean };
+  p10?: string | null; p90?: string | null; dip_median?: string | null; dip_worst?: string | null; enough?: boolean;
+  // against the other sessions of the same table (22/11/2026); absent on the every-session row
+  t_rest?: string | null; t_need?: string | null; differs?: boolean | null; halves?: "same" | "flip" | null };
 type PeGroup = Summary & { bucket: number; label: string; pe_low: string | null; pe_high: string | null };
 type Dot = { date: string; pe: string; change: string; bucket: number };
 type PeStats = { h: number; groups: PeGroup[]; all: Summary; scatter: Dot[]; trend: { slope: string; intercept: string; r2: string } | null;
@@ -11,7 +13,7 @@ type PeStats = { h: number; groups: PeGroup[]; all: Summary; scatter: Dot[]; tre
 type LightGroup = Summary & { level: "green" | "yellow" | "red" };
 type Light = { id: string; name: string; h: number; groups: LightGroup[]; all: Summary; today: "green" | "yellow" | "red" | null; from: string | null };
 type Shock = Summary & { id: string; label: string; events: number; recent: string[]; today: boolean };
-export type HistoryStats = { h: number; horizons: number[]; pe: PeStats; lights: Light[]; shocks?: { h: number; groups: Shock[]; combos?: Shock[]; all: Summary; from: string | null }; summary?: string };
+export type HistoryStats = { h: number; horizons: number[]; pe: PeStats; lights: Light[]; shocks?: { h: number; groups: Shock[]; combos?: Shock[]; all: Summary; from: string | null }; summary?: string; tested?: number };
 
 const LEVEL = { green: "Bình thường", yellow: "Cảnh báo", red: "Nguy hiểm" } as const;
 const num = (v: number, d: number) => v.toLocaleString("vi-VN", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -24,12 +26,20 @@ export function changePct(v: string | null): string {
   return `${x > 0 ? "+" : x < 0 ? "−" : ""}${num(Math.abs(x), 1)}%`;
 }
 
-/** How much a group's figures can be leaned on: few independent windows, or a t under 2, is said plainly. */
+const tNum = (v: string) => { const x = Number(v); return `${x < 0 ? "−" : ""}${Math.abs(x).toLocaleString("vi-VN", { maximumFractionDigits: 2 })}`; };
+
+/** How much a group's figures can be leaned on (owner, 22/11/2026): few independent windows, and whether the group differs from the
+ * other sessions of the table (Welch's t against what its degrees of freedom need), not from 0: VN-Index rises over time. */
 export function evidence(s: Summary): string {
   if (s.n === 0) return "chưa có mẫu";
-  if (s.n_independent < 5) return `chỉ ${s.n_independent} khoảng độc lập: rất ít`;
-  if (s.t === null || Math.abs(Number(s.t)) < 2) return `${s.n_independent} khoảng độc lập, chưa rõ khác 0`;
-  return `${s.n_independent} khoảng độc lập, t = ${num(Number(s.t), 1)}`;
+  const n = s.n_independent;
+  if (n < 5) return `chỉ ${n} khoảng độc lập: rất ít`;
+  if (s.differs === undefined) return `${n} khoảng độc lập; mốc so sánh`;
+  if (s.differs === null || !s.t_rest || !s.t_need) return `${n} khoảng độc lập, chưa so được với các lúc còn lại`;
+  const test = `(t = ${tNum(s.t_rest)}, cần ${num(Number(s.t_need), 2)})`;
+  if (!s.differs) return `${n} khoảng độc lập, chưa rõ khác các lúc còn lại ${test}`;
+  const halves = s.halves === "same" ? ", ổn định ở hai nửa lịch sử" : s.halves === "flip" ? ", nhưng đổi chiều giữa hai nửa lịch sử" : "";
+  return `${n} khoảng độc lập, khác các lúc còn lại ${test}${halves}`;
 }
 
 /** Fewer than 5 independent windows: the figures are not shown, only that the period has too little data. */
@@ -179,8 +189,10 @@ export function HistoryStatsView() {
             onClick={() => setH(x)}>{x} phiên</button>)}
         </div>
         <p className="caption">Mỗi phiên trong quá khứ được xếp theo trạng thái đã biết ngay hôm đó, rồi xem VN-Index {h} phiên sau. Các khoảng {h} phiên của
-          những ngày liền nhau gối lên nhau, nên ngoài số mẫu còn ghi số <strong>khoảng không chồng lấn</strong> (cách nhau ít nhất {h} phiên); thống kê t chỉ
-          tính trên các khoảng đó. Nhóm có dưới 5 khoảng không chồng lấn thì không hiện số. P10 là kết quả xấu thường gặp (1 trong 10 lần tệ hơn), P90 là
+          những ngày liền nhau gối lên nhau, nên ngoài số mẫu còn ghi số <strong>khoảng không chồng lấn</strong> (cách nhau ít nhất {h} phiên). Độ tin cậy so mỗi nhóm
+          với các lúc còn lại của cùng bảng (thống kê t Welch, chỉ trên các khoảng đó), không so với 0, vì VN-Index tăng dần theo thời gian; ngưỡng t
+          theo số khoảng (ít khoảng thì cần t cao hơn). &ldquo;Ổn định ở hai nửa lịch sử&rdquo; là nhóm lệch cùng chiều ở cả nửa đầu và nửa sau.
+          {data?.tested ? ` Trang so ${data.tested} nhóm; dù không có quan hệ thật, khoảng ${Math.round(data.tested * 0.05)} nhóm vẫn vượt ngưỡng do ngẫu nhiên.` : ""} Nhóm có dưới 5 khoảng không chồng lấn thì không hiện số. P10 là kết quả xấu thường gặp (1 trong 10 lần tệ hơn), P90 là
           kết quả tốt thường gặp; &ldquo;giảm sâu nhất trong kỳ&rdquo; là mức VN-Index thấp nhất so với ngày vào trong {h} phiên sau đó. Kết quả quá khứ không bảo
           đảm tương lai; không phải khuyến nghị.</p>
       </section>

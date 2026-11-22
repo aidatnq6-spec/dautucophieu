@@ -19,10 +19,16 @@ describe("Thống kê lịch sử", () => {
     expect(changePct(null)).toBe("—");
   });
 
-  it("says plainly how much a group's figures rest on", () => {
-    expect(evidence(s(588, 6, "1.58"))).toBe("6 khoảng độc lập, chưa rõ khác 0");
+  it("says plainly how much a group's figures rest on, tested against the other sessions, not against 0", () => {
+    const vs = (t_rest: string | null, t_need: string | null, differs: boolean | null, halves: "same" | "flip" | null = null) =>
+      ({ ...s(588, 6, "9.9"), t_rest, t_need, differs, halves });
+    expect(evidence(vs("1.58", "2.57", false))).toBe("6 khoảng độc lập, chưa rõ khác các lúc còn lại (t = 1,58, cần 2,57)");
+    expect(evidence(vs("-3.1", "2.57", true, "same"))).toBe("6 khoảng độc lập, khác các lúc còn lại (t = −3,1, cần 2,57), ổn định ở hai nửa lịch sử");
+    expect(evidence(vs("3.1", "2.57", true, "flip"))).toBe("6 khoảng độc lập, khác các lúc còn lại (t = 3,1, cần 2,57), nhưng đổi chiều giữa hai nửa lịch sử");
+    expect(evidence(vs("1.5", "2.00", false))).toBe("6 khoảng độc lập, chưa rõ khác các lúc còn lại (t = 1,5, cần 2,00)");
+    expect(evidence(vs(null, null, null))).toBe("6 khoảng độc lập, chưa so được với các lúc còn lại");
+    expect(evidence(s(900, 40, "2.4"))).toBe("40 khoảng độc lập; mốc so sánh");  // the every-session row has no rest
     expect(evidence(s(66, 1, null))).toBe("chỉ 1 khoảng độc lập: rất ít");
-    expect(evidence(s(900, 40, "2.4"))).toBe("40 khoảng độc lập, t = 2,4");
     expect(evidence(s(0, 0, null))).toBe("chưa có mẫu");
   });
 

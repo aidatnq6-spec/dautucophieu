@@ -4,6 +4,9 @@
 - group_summary: samples, the samples that do not overlap (days at least H sessions apart, chosen from the earliest), mean, median,
   share of rises, and a t-statistic on the non-overlapping samples only: overlapping windows share most of their days and are not
   independent, so a t on all of them overstates the evidence.
+- Against the rest (owner, 22/11/2026): VN-Index rises over time, so a t against 0 is large for almost any group. With rest (the
+  other sessions of the same table), Welch's t compares the group's independent windows with the rest's, against the t its degrees
+  of freedom need (two-sided 5%), and the two halves of the group's history are each set against the rest of the same years.
 - pe_groups: each day's P/E placed among the P/E of the five years before it (known on the day; at least 250 sessions), in five
   groups from cheapest to dearest, with a scatter of P/E against the later change and its least-squares line.
 
@@ -60,19 +63,58 @@ def independent(days: list[date], index: dict[date, int], *, h: int) -> list[dat
 
 
 ENOUGH = 5  # fewer independent windows than this: the figures are hidden ("không đủ dữ liệu cho kỳ này")
+Z975 = 1.959963984540054
+
+
+def t_needed(df: float) -> str:
+    """Student's t a two-sided 5% test needs at df degrees of freedom (Cornish–Fisher to the fourth term, within 0.005 from df = 4)."""
+    z, v = Z975, float(df)
+    t = z + (z ** 3 + z) / (4 * v) + (5 * z ** 5 + 16 * z ** 3 + 3 * z) / (96 * v ** 2)         + (3 * z ** 7 + 19 * z ** 5 + 17 * z ** 3 - 15 * z) / (384 * v ** 3)         + (79 * z ** 9 + 776 * z ** 7 + 1482 * z ** 5 - 1920 * z ** 3 - 945 * z) / (92160 * v ** 4)
+    return _q(Decimal(str(t)), "0.01")
+
+
+def _welch(a: list[Decimal], b: list[Decimal]) -> tuple[Decimal, float] | None:
+    va, vb = stdev(a) ** 2 / len(a), stdev(b) ** 2 / len(b)
+    if va + vb <= Decimal("1e-18"):
+        return None
+    df = float((va + vb) ** 2 / (va ** 2 / (len(a) - 1) + vb ** 2 / (len(b) - 1))) if va and vb else float(min(len(a), len(b)) - 1)
+    return (mean(a) - mean(b)) / (va + vb).sqrt(), df
+
+
+def _against_rest(free_days: list[date], rest_days: list[date], returns: dict[date, Decimal], index: dict[date, int], *, h: int) -> dict:
+    none = {"t_rest": None, "t_need": None, "differs": None, "halves": None}
+    other = independent(rest_days, index, h=h)
+    if len(free_days) < ENOUGH or len(other) < ENOUGH:
+        return none
+    a, b = [returns[d] for d in free_days], [returns[d] for d in other]
+    w = _welch(a, b)
+    if w is None:
+        return none
+    t, need = _q(w[0], "0.01"), t_needed(w[1])
+    split = index[free_days[len(free_days) // 2]]  # the group's later half starts here; the rest is cut at the same session
+    sides = []
+    for mine, theirs in ((a[:len(a) // 2], [returns[d] for d in other if index[d] < split]),
+                         (a[len(a) // 2:], [returns[d] for d in other if index[d] >= split])):
+        sides.append(mean(mine) - mean(theirs) if mine and theirs else None)
+    halves = None if None in sides or 0 in sides else "same" if (sides[0] > 0) == (sides[1] > 0) else "flip"
+    return {"t_rest": t, "t_need": need, "differs": abs(Decimal(t)) >= Decimal(need), "halves": halves}
 
 
 def group_summary(days: list[date], returns: dict[date, Decimal], index: dict[date, int], *, h: int,
-                  dips: dict[date, Decimal] | None = None) -> dict:
+                  dips: dict[date, Decimal] | None = None, rest: list[date] | None = None) -> dict:
     """Also the ordinary bad and good outcomes (10th and 90th percentiles, inclusive) and, with dips, the deepest fall within the h
-    sessions: its median and its worst. enough: at least ENOUGH independent windows."""
+    sessions: its median and its worst. enough: at least ENOUGH independent windows. With rest, the test against the rest
+    (t_rest, t_need, differs, halves); None when either side has fewer than ENOUGH independent windows."""
+    vs = None if rest is None else [d for d in rest if d in returns and d in index]
     days = [d for d in days if d in returns and d in index]
     if not days:
-        return {"n": 0, "n_independent": 0, "mean": None, "median": None, "win_rate": None, "t": None, "p10": None, "p90": None,
-                "dip_median": None, "dip_worst": None, "enough": False}
+        empty = {"n": 0, "n_independent": 0, "mean": None, "median": None, "win_rate": None, "t": None, "p10": None, "p90": None,
+                 "dip_median": None, "dip_worst": None, "enough": False}
+        return empty if vs is None else {**empty, "t_rest": None, "t_need": None, "differs": None, "halves": None}
     from statistics import quantiles
     values = [returns[d] for d in days]
-    free = [returns[d] for d in independent(days, index, h=h)]
+    free_days = independent(days, index, h=h)
+    free = [returns[d] for d in free_days]
     t = None
     if len(free) >= 3:
         sd = stdev(free)
@@ -81,7 +123,8 @@ def group_summary(days: list[date], returns: dict[date, Decimal], index: dict[da
     falls = [dips[d] for d in days if dips and d in dips]
     return {"n": len(values), "n_independent": len(free), "mean": _q(mean(values)), "median": _q(median(values)),
             "win_rate": _q(Decimal(sum(1 for v in values if v > 0)) / len(values)), "t": t, "p10": _q(cuts[0]), "p90": _q(cuts[-1]),
-            "dip_median": _q(median(falls)) if falls else None, "dip_worst": _q(min(falls)) if falls else None, "enough": len(free) >= ENOUGH}
+            "dip_median": _q(median(falls)) if falls else None, "dip_worst": _q(min(falls)) if falls else None, "enough": len(free) >= ENOUGH,
+            **({} if vs is None else _against_rest(free_days, vs, returns, index, h=h))}
 
 
 SHOCKS = {"drop3": "VN-Index giảm từ 3% trong một phiên", "down5": "VN-Index giảm 5 phiên liền",
@@ -150,10 +193,17 @@ def combo_days(closes: Points) -> dict[str, list[date]]:
     return {k: [d for d in shocks[s] if d in standing[w]] for k, (s, w, _) in COMBOS.items()}
 
 
+def _rest(universe: list[date], days: list[date]) -> list[date]:
+    mine = set(days)
+    return [d for d in universe if d not in mine]
+
+
 def _shock_rows(days: dict[str, list[date]], labels: dict[str, str], closes: Points, returns, dips, index, *, h: int) -> list[dict]:
     last = closes[-1][0] if closes else None
+    every = [d for d, _ in closes]
     return [{"id": k, "label": labels[k], "events": len(days[k]), "recent": [d.isoformat() for d in days[k][-3:]],
-             "today": bool(days[k]) and days[k][-1] == last, **group_summary(days[k], returns, index, h=h, dips=dips)} for k in labels]
+             "today": bool(days[k]) and days[k][-1] == last,
+             **group_summary(days[k], returns, index, h=h, dips=dips, rest=_rest(every, days[k]))} for k in labels]
 
 
 def shock_groups(closes: Points, *, h: int) -> dict:
@@ -266,7 +316,10 @@ def light_groups(key: str, series: dict[str, Points], closes: Points, *, h: int)
         i = bisect_right(days, d) - 1
         if i >= 0 and d - days[i] <= KNOWN_FOR:
             level_on[d] = ms._level(key, measured[i][1])
-    groups = [{"level": lv, **group_summary([d for d, x in level_on.items() if x == lv], returns, index, h=h, dips=dips)} for lv in ("green", "yellow", "red")]
+    groups = []
+    for lv in ("green", "yellow", "red"):
+        days = [d for d, x in level_on.items() if x == lv]
+        groups.append({"level": lv, **group_summary(days, returns, index, h=h, dips=dips, rest=_rest(list(level_on), days))})
     spec = ms.SIGNALS[key]
     return {"id": key, "name": spec.name, "h": h, "yellow": str(spec.yellow), "red": str(spec.red), "bad_side": spec.bad, "groups": groups,
             "all": group_summary(list(level_on), returns, index, h=h, dips=dips), "today": ms._level(key, measured[-1][1]) if measured else None,
@@ -286,15 +339,34 @@ def _lower(label: str) -> str:
     return label[0].lower() + label[1:] if len(label) > 1 and label[1].islower() else label
 
 
-def _evidence(g: dict) -> str:
-    """Too few windows and an unclear difference are two reasons, said apart."""
-    t, n = g.get("t"), g["n_independent"]
-    if n < 5:
+def _num(v: str) -> str:
+    """Vietnamese decimal comma and a true minus sign, as the percentages are written."""
+    return format(Decimal(v).normalize(), "f").replace(".", ",").replace("-", "−")
+
+
+def evidence_text(g: dict) -> str:
+    """Too few windows, no rest to set against, and an unclear difference from the rest are said apart (owner, 22/11/2026: the test is
+    against the other sessions, not against 0); a clear one says whether it held in both halves of history."""
+    n = g["n_independent"]
+    if n < ENOUGH:
         return f"nhưng chỉ có {n} khoảng không chồng lấn, quá ít để coi là chắc"
-    tt = None if t is None else format(Decimal(t).normalize(), "f").replace(".", ",")
-    if t is None or abs(Decimal(t)) < 2:
-        return f"dựa trên {n} khoảng không chồng lấn nhưng chênh lệch chưa rõ{f' (t = {tt})' if tt else ''}, chưa đủ để coi là chắc"
-    return f"{n} khoảng không chồng lấn, t = {tt}"
+    if g.get("differs") is None:
+        return f"dựa trên {n} khoảng không chồng lấn, chưa so được với các lúc còn lại"
+    test = f"(t = {_num(g['t_rest'])}, cần {g['t_need'].replace('.', ',')})"  # the need keeps its two decimals: "cần 2,00", not "cần 2"
+    if not g["differs"]:
+        return f"dựa trên {n} khoảng không chồng lấn nhưng chưa rõ khác các lúc còn lại {test}, chưa đủ để coi là chắc"
+    halves = {"same": ", ổn định ở hai nửa lịch sử", "flip": ", nhưng đổi chiều giữa hai nửa lịch sử"}.get(g.get("halves"), "")
+    return f"{n} khoảng không chồng lấn, khác các lúc còn lại {test}{halves}"
+
+
+CHANCE = Decimal("0.05")  # the share of groups that pass a 5% test with no real link
+
+
+def tested_groups(stats: dict) -> int:
+    """The groups of the page set against the rest (P/E, the lights, the shocks and their splits)."""
+    shocks = stats.get("shocks") or {}
+    groups = [*stats["pe"]["groups"], *(g for lg in stats["lights"] for g in lg["groups"]), *shocks.get("groups", []), *shocks.get("combos", [])]
+    return sum(1 for g in groups if g.get("differs") is not None)
 
 
 def history_summary(stats: dict, conditions: list[dict] | None) -> str:
@@ -309,7 +381,7 @@ def history_summary(stats: dict, conditions: list[dict] | None) -> str:
             parts.append(f"Ở nhóm này chỉ có {g['n_independent']} khoảng {h} phiên không chồng lấn: không đủ dữ liệu cho kỳ này. ")
         elif g["n"]:
             parts.append(f"Trong quá khứ, ở nhóm này VN-Index {h} phiên sau trung bình {_pct(g['mean'])} (mọi lúc {_pct(pe['all']['mean'])}), "
-                         f"tăng ở {round(Decimal(g['win_rate']) * 100)}% số lần; {_evidence(g)}. ")
+                         f"tăng ở {round(Decimal(g['win_rate']) * 100)}% số lần; {evidence_text(g)}. ")
     else:
         parts.append("Chưa có P/E VN-Index hôm nay. ")
     off = [lg for lg in stats["lights"] if lg.get("today") in LEVEL_WORD]
@@ -324,8 +396,8 @@ def history_summary(stats: dict, conditions: list[dict] | None) -> str:
         elif g.get("enough", True) is False:
             past = f"ở mức này chỉ có {g['n_independent']} khoảng {h} phiên không chồng lấn: không đủ dữ liệu cho kỳ này"
         else:
-            past = (f"trong quá khứ ở mức này VN-Index {h} phiên sau trung bình {_pct(g['mean'])} (mọi lúc {_pct(lg['all']['mean'])}, "
-                    f"{g['n_independent']} khoảng không chồng lấn)")
+            past = (f"trong quá khứ ở mức này VN-Index {h} phiên sau trung bình {_pct(g['mean'])} (mọi lúc {_pct(lg['all']['mean'])}), "
+                    f"{evidence_text(g)}")
         parts.append(f"Đèn {lg['name']} đang ở mức {LEVEL_WORD[lg['today']]}; {past}. ")
     if conditions:
         known = [c for c in conditions if c.get("state") is not None]
@@ -335,6 +407,9 @@ def history_summary(stats: dict, conditions: list[dict] | None) -> str:
                      + (f"; {unknown} điều kiện chưa biết" if unknown else "") + ". ")
     if (shocks := stats.get("shocks")) and (today := _today_shocks(shocks)):
         parts.append(_shock_sentence(today, shocks["all"], h, shocks.get("from")) + " ")
+    if tested := stats.get("tested"):
+        parts.append(f"Trang so {tested} nhóm với các lúc còn lại; dù không có quan hệ thật, khoảng "
+                     f"{(tested * CHANCE).quantize(Decimal(1), ROUND_HALF_UP)} nhóm vẫn vượt ngưỡng do ngẫu nhiên. ")
     parts.append("Chỉ mô tả quá khứ, không phải dự báo hay khuyến nghị.")
     return "".join(parts)
 
@@ -345,12 +420,13 @@ def pe_groups(pe: Points, closes: Points, *, h: int) -> dict:
     places = _percentiles(pe)
     by_day = dict(pe)
     groups = []
+    sample = [d for d in places if d in returns]
     for b, label in enumerate(GROUP_LABELS):
         days = [d for d, p in places.items() if _bucket(p) == b]
         values = [by_day[d] for d in days]
         groups.append({"bucket": b, "label": label, "pe_low": _q(min(values), "0.01") if values else None,
-                       "pe_high": _q(max(values), "0.01") if values else None, **group_summary(days, returns, index, h=h, dips=dips)})
-    sample = [d for d in places if d in returns]
+                       "pe_high": _q(max(values), "0.01") if values else None,
+                       **group_summary(days, returns, index, h=h, dips=dips, rest=_rest(sample, days))})
     scatter = [{"date": d.isoformat(), "pe": _q(by_day[d], "0.01"), "change": _q(returns[d]), "bucket": _bucket(places[d])}
                for d in sample[::5]]  # one day in five: enough to see the cloud, light enough to draw
     last = pe[-1][0] if pe else None

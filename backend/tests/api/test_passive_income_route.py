@@ -1,3 +1,4 @@
+from decimal import Decimal
 from datetime import date
 
 from fastapi.testclient import TestClient
@@ -111,4 +112,27 @@ def test_the_real_target_uses_the_owners_inflation_or_vietnams_latest_cpi_and_a_
     real = call(c, clock, "GET", "/internal/passive-income").json()["result"]["real"]
     assert real["inflation_from"] is None and real["required"] == "5280000000"  # 240 tr ÷ 5% × 1.1
     bad = call(c, clock, "PUT", "/internal/passive-income", {"target": "20000000", "margin": "-5", "expected_version": 2, "request_id": "pi3"})
+    assert bad.status_code == 422
+
+
+def test_the_return_needed_by_the_target_year_is_set_beside_deposits_vn_index_and_the_owners_own(tmp_path):
+    """Lợi suất cần có để đạt đúng hạn (owner, 22/11/2026)."""
+    from datetime import datetime
+
+    from investment_agent.market.series import SeriesStore
+    SeriesStore(tmp_path / "trend-sources").upsert("VNINDEX-1d", [(datetime(2000, 7, 28), "100"), (datetime(2027, 1, 14), "1688.79")])
+    MacroStore(tmp_path).upsert("vn_cpi_yoy", [(date(2026, 12, 31), "3")], entry="auto")
+    c, clock = client(tmp_path)  # 15/01/2027; deposit 6%
+    call(c, clock, "PUT", "/internal/equity-budget", {"layers": {"deposit": "900000000", "bond": "0", "gold": "0", "crypto": "0"}, "reserve": "0",
+                                                     "expected_version": 0, "request_id": "eb1"})
+    call(c, clock, "PUT", "/internal/contributions", {"amount": "8000000", "day": 10, "start": "2027-02", "expected_version": 0, "request_id": "cp1"})
+    assert call(c, clock, "PUT", "/internal/passive-income", {"target": "20000000", "rate": "8", "by_year": 2035, "expected_version": 0,
+                                                              "request_id": "pi1"}).status_code == 200
+    need = call(c, clock, "GET", "/internal/passive-income").json()["result"]["needed"]
+    assert need["by_year"] == 2035 and need["goal_from"] == "real" and need["status"] == "ok" and Decimal(need["rate"]) > 0
+    assert need["deposit"] == "6" and need["vnindex"] == {"rate": "11.27", "from": "2000-07-28", "to": "2027-01-14"}
+    assert need["own"] == {"rate": None, "reason": "short"}  # the ledger began this month
+    if Decimal(need["rate"]) > Decimal("11.27"):
+        assert need["at_vnindex"]["reached_on"] is not None or need["at_vnindex"]["contribution"] is not None
+    bad = call(c, clock, "PUT", "/internal/passive-income", {"target": "20000000", "by_year": 2020, "expected_version": 1, "request_id": "pi2"})
     assert bad.status_code == 422

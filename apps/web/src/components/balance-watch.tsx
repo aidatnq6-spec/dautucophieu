@@ -23,7 +23,9 @@ export type Provision = { quarter: string | null; amount: string | null; share: 
 type Balance = { symbol: string; sector: string | null; debt: { rows: DebtRow[]; flag: Flag }; sector_debt: SectorDebt | null;
   property: { rows: CashRow[]; signal: Signal } | null; liquidity: LiquidityRow[]; carry: Carry;
   receivables: { rows: ArRow[]; dso: Dso; provision: Provision; prepay_days: Dso; other_vs_sector: OtherVsSector }; raise_prepay: { flag: boolean; events: RaiseEvent[] };
-  revisions?: Revision[]; lending?: Lending; provision_flow?: ProvisionFlow };
+  revisions?: Revision[]; lending?: Lending; provision_flow?: ProvisionFlow; inventory?: Inventory };
+type InvRow = { quarter: string; gross: string | null; provision: string | null; net: string | null; coverage: string | null; share: string | null };
+export type Inventory = { rows: InvRow[] };
 type FlowRow = { quarter: string; balance: string | null; change: string | null; pbt: string | null; share: string | null; release: boolean };
 export type ProvisionFlow = { rows: FlowRow[]; flag: boolean; quarter: string | null };
 export type Lending = { quarter: string | null; share: string | null; year_ago: string | null; flag: "high" | "rising" | null };
@@ -151,6 +153,18 @@ export function coverageText(rows: ArRow[]): string {
   const parts = [ago ? `cùng kỳ năm trước ${rate(ago.coverage!)}` : null, first && first !== ago ? `${q(first.quarter)} ${rate(first.coverage!)}` : null].filter(Boolean);
   return `${q(last.quarter)}: dự phòng bằng ${rate(last.coverage!)} phải thu trước dự phòng (${ty(last.gross ?? null)}), giá trị thuần ${ty(last.total)}`
     + (parts.length ? `; ${parts.join("; ")}.` : ".");
+}
+
+/** Khối Tồn kho (22/11/2026): the latest quarter net, its share of total assets and the share provided for, against a year before. */
+export function inventoryText(inv: Inventory): string {
+  const last = inv.rows[inv.rows.length - 1];
+  if (!last || last.net === null) return "Báo cáo đã lưu chưa có dòng hàng tồn kho.";
+  const [y, k] = last.quarter.split("-Q").map(Number);
+  const ago = inv.rows.find((r) => r.quarter === `${y - 1}-Q${k}`);
+  const share = last.share !== null ? `, bằng ${rate(last.share)} tổng tài sản` : "";
+  const cover = last.coverage !== null ? `; dự phòng giảm giá ${ty(last.provision)}, bằng ${rate(last.coverage)} giá gốc ${ty(last.gross)}` : "; chưa có giá gốc và dự phòng của quý này";
+  const before = ago && ago.net !== null ? ` Cùng kỳ năm trước: ${ty(ago.net)}${ago.share !== null ? ` (${rate(ago.share)} tổng tài sản)` : ""}.` : "";
+  return `${q(last.quarter)}: tồn kho thuần ${ty(last.net)}${share}${cover}.${before}`;
 }
 
 /** One figure the source changed for a closed period (Số đã công bố bị sửa, 22/11/2026): old → new and the day seen; no cause inferred. */
@@ -290,6 +304,25 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
           dự phòng phải thu) đổi quá cả 1% và 1 tỷ thì được ghi lại. Có thể do điều chỉnh hồi tố hoặc nguồn sửa lỗi nhập; xem thuyết minh và báo cáo kiểm
           toán. Lần sửa trước ngày đó hoặc cũ hơn hai năm không dựng lại được.</p>
       </section>
+      {data.inventory && <section className="surface" aria-label="Tồn kho">
+        <h2>Tồn kho</h2>
+        <p data-testid="inventory">{inventoryText(data.inventory)}</p>
+        <div className="tablewrap"><table className="fv-table" aria-label={`Tồn kho ${symbol}`}>
+          <thead><tr><th>Quý</th><th className="num">Giá gốc</th><th className="num">Dự phòng giảm giá</th><th className="num">Bao phủ</th>
+            <th className="num">Giá trị thuần</th><th className="num">Trên tổng tài sản</th></tr></thead>
+          <tbody>{data.inventory.rows.slice(-SHOWN).reverse().map((r) => (
+            <tr key={r.quarter}>
+              <td data-label="Quý">{q(r.quarter)}</td>
+              <td className="num" data-label="Giá gốc">{ty(r.gross)}</td>
+              <td className="num" data-label="Dự phòng giảm giá">{ty(r.provision)}</td>
+              <td className="num" data-label="Bao phủ">{r.coverage === null ? "—" : rate(r.coverage)}</td>
+              <td className="num" data-label="Giá trị thuần">{ty(r.net)}</td>
+              <td className="num" data-label="Trên tổng tài sản">{r.share === null ? "—" : rate(r.share)}</td>
+            </tr>))}</tbody>
+        </table></div>
+        <p className="caption">Giá gốc và dự phòng giảm giá hàng tồn kho theo bảng cân đối (VNDirect); giá trị thuần = giá gốc − dự phòng. Bao phủ = dự phòng ÷
+          giá gốc. Cơ cấu (nguyên vật liệu, dở dang, thành phẩm, hàng hóa) chỉ có trong thuyết minh, không có ở đây. Ô thiếu số để trống. Không phải khuyến nghị.</p>
+      </section>}
       {data.property && <section className="surface" aria-label="Tiền khách trả trước">
         <h2>Tiền khách trả trước</h2>
         <p data-testid="advances-signal">{advancesText(data.property.signal)}</p>

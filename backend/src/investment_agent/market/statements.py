@@ -34,7 +34,8 @@ PRICE_URL = "https://api-finfo.vndirect.com.vn/v4/stock_prices?sort=date&q=code:
 FIRST_START, REFRESH_DAYS, MAX_AGE_DAYS, PACE_SECONDS = "2010-01-01", 730, 7, 1.0
 # Raised when LINES gains lines: a non-financial ticker kept with an older version is due and takes its whole history once, so the new
 # lines reach back as far as the old ones. 2: customer advances and inventory.
-LINES_VERSION = 5  # 3: current assets, receivables, current and long-term liabilities, EPS; 4: the parts of receivables; 5: interest received
+LINES_VERSION = 6  # 3: current assets, receivables, current and long-term liabilities, EPS; 4: the parts of receivables; 5: interest received;
+# 6: inventory at cost and its provision (Khối Tồn kho, 22/11/2026)
 FIN_LINES_VERSION = 2  # banks, securities firms and insurers: 2: basic EPS (23001 in each of their layouts)
 # (model, item code) → line. Model 1 balance sheet, 2 income statement, 3 cash flow (indirect); the general layout (TT200).
 LINES = {
@@ -47,6 +48,7 @@ LINES = {
     # Customer advances (Người mua trả tiền trước, short term 13130 and long term 13311) and inventory (11400, after its provision): names
     # from VNDirect's own model list (v4/financial_models, checked 11/11/2026), for Tiền khách trả trước of property developers.
     (1, 13130): "advances_st", (1, 13311): "advances_lt", (1, 11400): "inventory",
+    (1, 11410): "inventory_gross", (1, 11490): "inventory_provision",  # Khối Tồn kho: at cost and the provision for a fall in value
     # For the fundamentals record (Chất lượng báo cáo, EPS) since Vnstock 6.0.0: current assets, short-term receivables, current and
     # long-term liabilities, basic EPS (đồng). Names from v4/financial_models, checked 13/11/2026.
     (1, 11000): "current_assets", (1, 11300): "receivables", (1, 13100): "current_liabilities", (1, 13300): "long_liabilities",

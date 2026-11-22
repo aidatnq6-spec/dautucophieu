@@ -1527,6 +1527,7 @@ def portfolio_alerts_cli(data_dir: Path, calendar_path: Path, now=None) -> int:
     import uuid
     from datetime import datetime, timezone
 
+    from investment_agent.market.statement_revisions import revisions_note_run
     from investment_agent.services.buy_plan import check_plan
     from investment_agent.services.holdings_view import held_from_repo
     from investment_agent.services.insider_alerts import insider_alerts_run
@@ -1548,6 +1549,7 @@ def portfolio_alerts_cli(data_dir: Path, calendar_path: Path, now=None) -> int:
         ("insider", lambda s: insider_alerts_run(data_dir, held=held_from_repo(repo, owner), get=_http_text, send=s, now=now)),
         ("drawdown", lambda s: _drawdown_run(data_dir, repo, owner, send=s)),
         ("thesis", lambda s: _thesis_run(data_dir, calendar_path, "data", repo, owner, send=s, now=now)),
+        ("revisions", lambda s: revisions_note_run(data_dir, held=held_from_repo(repo, owner), send=s, today=today)),
     ]
     print(json.dumps(combined_run(runs, send=send, today=today, title="Danh mục hôm nay"), ensure_ascii=False))
     return 0

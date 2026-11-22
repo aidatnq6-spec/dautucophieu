@@ -237,3 +237,22 @@ def test_a_bank_follows_its_own_layout_version(tmp_path):
     store.save(base)  # kept before EPS was taken
     assert sync_statements(store, {"VCB": "Ngân hàng"}, get=Get(), now=NOW, limit=None, sleep=lambda s: None, kinds=("bank",)) == {"VCB": "ok"}
     assert store.read("VCB")["lines_version"] == FIN_LINES_VERSION
+
+
+def test_a_closed_years_figure_changed_by_the_source_is_logged_not_just_overwritten(tmp_path):
+    """Số đã công bố bị sửa (owner, 22/11/2026): the sync logs the change in data/statement-revisions before it overwrites."""
+    from investment_agent.market.statement_revisions import read_revisions
+
+    def get(url):
+        if "stock_prices" in url:
+            return json.dumps({"data": []})
+        kind = "ANNUAL" if "ANNUAL" in url else "QUARTER"
+        return text(row(23000, 8e10, "2024-12-31", kind=kind, code="HAG"), row(23000, 1.5e11, "2025-12-31", kind=kind, code="HAG"))
+    store = StatementStore(tmp_path / "statements")
+    store.save({"symbol": "HAG", "fetched_at": "2026-10-01T00:00:00+00:00", "lines_version": LINES_VERSION, "year_end_close": {"2025": {}},
+                "quarter_end_close": {}, "years": {"2024": {"npat_parent": "100000000000"}, "2025": {"npat_parent": "150000000000"}},
+                "quarters": {"2024-Q4": {"npat_parent": "100000000000"}, "2025-Q4": {"npat_parent": "150000000000"}}})
+    out = sync_statements(store, {"HAG": "Thực phẩm và đồ uống"}, get=get, now=NOW, limit=None, sleep=lambda s: None)
+    assert out == {"HAG": "ok"} and store.read("HAG")["years"]["2024"]["npat_parent"] == "80000000000"
+    assert {(r["kind"], r["period"], r["old"], r["new"], r["seen_on"]) for r in read_revisions(tmp_path, "HAG")} == {
+        ("years", "2024", "100000000000", "80000000000", "2026-11-07"), ("quarters", "2024-Q4", "100000000000", "80000000000", "2026-11-07")}

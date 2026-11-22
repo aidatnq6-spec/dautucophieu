@@ -225,6 +225,10 @@ def sync_statements(store: StatementStore, sectors: dict[str, str | None], *, ge
             for key, parse in (("year_end_close", parse_year_end_closes), ("quarter_end_close", parse_quarter_end_closes)):
                 record[key] = dict(sorted({**(old or {}).get(key, {}), **parse(prices, symbol=symbol)}.items()))
             for kind, key in (("QUARTER", "quarters"), ("ANNUAL", "years")):
+                if old is not None and not _old_lines(old, sectors[symbol]):  # Số đã công bố bị sửa: logged before it is overwritten
+                    from investment_agent.market.statement_revisions import find_revisions, record_revisions
+                    record_revisions(store.root.parent, symbol, find_revisions(old.get(key, {}), parsed[kind]["periods"]), kind=key,
+                                     seen_on=now.date())
                 record[key], record[f"{key}_created"], record[f"{key}_conflicts"] = _merge(old, key, parsed[kind])
             store.save(record)
             results[symbol] = "ok"

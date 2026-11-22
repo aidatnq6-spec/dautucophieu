@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advancesText, borrowingText, carryText, dsoText, otherSectorText, prepayDaysText, provisionText, raiseText, sectorText, type Carry } from "./balance-watch";
+import { advancesText, borrowingText, carryText, dsoText, otherSectorText, prepayDaysText, provisionText, raiseText, revisionText, sectorText, type Carry } from "./balance-watch";
 
 describe("otherSectorText", () => {
   it("sets the ticker's other receivables and loans against the sector, and says when it stands out", () => {
@@ -92,5 +92,13 @@ describe("sectorText", () => {
     expect(sectorText("Bất động sản", { members: 7, growth_2y: "0.3500", compared: 6, top: "VHM",
       quarters: [{ quarter: "2026-Q3", count: 7, debt: "1200000000000000", net_debt: "900000000000000", net_count: 7 }] }))
       .toBe("Ngành Bất động sản (7 mã theo dõi, 7 mã có số Q3/2026): tổng nợ vay 1.200.000 tỷ, nợ vay ròng 900.000 tỷ. So với hai năm trước: tăng 35% trên 6 mã có đủ số, tăng nhiều nhất là VHM.");
+  });
+});
+
+describe("revisionText", () => {
+  it("says the period, the line, the old and new figure and the day seen", () => {
+    expect(revisionText({ kind: "years", period: "2024", line: "npat_parent", label: "LNST công ty mẹ", old: "100000000000", new: "80000000000", seen_on: "2026-11-22" }))
+      .toMatch(/^Năm 2024, LNST công ty mẹ: 100.* → 80.* \(thấy 22\/11\/2026\)$/);
+    expect(revisionText({ kind: "quarters", period: "2025-Q2", line: "pbt", label: "LNTT", old: "1", new: "2", seen_on: "2026-12-01" })).toMatch(/^Quý 2\/2025, LNTT:/);
   });
 });

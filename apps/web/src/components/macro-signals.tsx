@@ -5,7 +5,7 @@ import { ApiError, api } from "../lib/api";
 type Level = "green" | "yellow" | "red" | "missing" | "stale";
 export type Signal = {
   id: "oil" | "usd" | "fx_gap" | "fx_ceiling" | "us10y" | "foreign" | "interbank" | "pe" | "pmi"; name: string; level: Level; value: string | null; latest_date: string | null;
-  yellow: string; red: string; down_yellow: string | null; down_red: string | null; since: string | null; max_age_days: number;
+  yellow: string; red: string; down_yellow: string | null; down_red: string | null; since: string | null; max_age_days: number; max_age_sessions?: number | null;
   spark: { date: string; value: string }[]; next: { level: "yellow" | "red"; by: string } | null;
   level_since: string | null; level_since_open: boolean; link: string;
   move: { direction: "up" | "down" | "flat"; bad: boolean | null; by: string } | null;
@@ -19,6 +19,11 @@ const signed = (v: number, digits: number) => `${v > 0 ? "+" : v < 0 ? "−" : "
 // The dot is the level against the thresholds, named so it is not read as the way things moved (owner, 21/11/2026).
 const LEVEL: Record<Level, string> = { green: "Bình thường", yellow: "Cảnh báo", red: "Nguy hiểm", missing: "Chưa có số", stale: "Số cũ" };
 const WORD = { yellow: "cảnh báo", red: "nguy hiểm" } as const;
+
+/** How old a greyed light is said to be: HOSE sessions for the market lights (22/11/2026), days for the others. */
+export function signalAge(s: Signal): string {
+  return s.max_age_sessions ? `quá ${s.max_age_sessions} phiên HOSE chưa có số mới` : `quá ${s.max_age_days} ngày`;
+}
 
 /** What the light measures, in words: a 30-day change, the free rate's gap, a run of sessions or a rate. */
 export function signalValue(s: Signal): string {
@@ -134,7 +139,7 @@ export function MacroSignals() {
                 <div>
                   {s.level === "missing" ? <span className="muted">chưa có số{s.latest_date ? ` đủ 30 ngày (mới nhất ${dm(s.latest_date)})` : ""}</span>
                     : <>{signalValue(s)}{s.latest_date && <span className="caption"> · số ngày {dm(s.latest_date)}</span>}
-                      {s.level === "stale" && <span className="caption"> (quá {s.max_age_days} ngày, không tô màu)</span>}</>}
+                      {s.level === "stale" && <span className="caption"> ({signalAge(s)}, không tô màu)</span>}</>}
                 </div>
                 {move && <div className={`ms-move ms-move-${move.tone}`}>{move.text}</div>}
                 {next && <div className="ms-next">{next}</div>}

@@ -86,3 +86,16 @@ def test_no_line_without_a_shock_or_without_the_session():
     assert shocks_today(closes, session=closes[-1][0], h=60)["today"] == [] and shock_line(shocks_today(closes, session=closes[-1][0], h=60)) is None
     assert shocks_today(closes, session=closes[-1][0] + timedelta(days=1), h=60)["status"] == "missing"  # the session's close is not stored yet
     assert shock_line(None) is None
+
+
+def test_the_shock_line_says_whether_the_shock_differs_from_the_other_sessions_owner_22_11_2026():
+    from investment_agent.domain.history_stats import _shock_past
+    g = {"events": 40, "n_independent": 12, "mean": "0.05", "p10": "-0.08", "dip_median": "-0.04", "enough": True,
+         "t_rest": "0.84", "t_need": "2.20", "differs": False, "halves": None}
+    every = {"mean": "0.048"}
+    past = _shock_past(g, every, 60, "2000-07-28")
+    assert past.endswith("giảm sâu nhất trong kỳ trung vị −4,0%; chưa rõ khác các lúc còn lại (t = 0,84, cần 2,20)")
+    clear = _shock_past({**g, "t_rest": "-3.1", "differs": True, "halves": "same"}, every, 60, "2000-07-28")
+    assert clear.endswith("; khác các lúc còn lại (t = −3,1, cần 2,20), ổn định ở hai nửa lịch sử")
+    old = {k: v for k, v in g.items() if k not in ("t_rest", "t_need", "differs", "halves")}  # a snapshot stored before 22/11/2026
+    assert _shock_past(old, every, 60, "2000-07-28").endswith("giảm sâu nhất trong kỳ trung vị −4,0%")

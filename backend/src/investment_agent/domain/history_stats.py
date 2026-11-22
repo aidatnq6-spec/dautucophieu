@@ -243,8 +243,9 @@ def _shock_past(g: dict, everyday: dict, h: int, since: str | None) -> str:
     head = f"{g['events']} lần từ {since[:4]}" if since else f"{g['events']} lần"
     if g.get("enough", True) is False:
         return f"{head}, chỉ {g['n_independent']} khoảng {h} phiên không chồng lấn: không đủ dữ liệu cho kỳ này"
+    tested = f"; {verdict(g)}" if "differs" in g else ""  # a snapshot stored before 22/11/2026 has no test against the rest: said as it was
     return (f"{head} ({g['n_independent']} khoảng không chồng lấn), {h} phiên sau trung bình {_pct(g['mean'])} (mọi lúc {_pct(everyday['mean'])}), "
-            f"xấu thường gặp {_pct(g['p10'])}, giảm sâu nhất trong kỳ trung vị {_pct(g['dip_median'])}")
+            f"xấu thường gặp {_pct(g['p10'])}, giảm sâu nhất trong kỳ trung vị {_pct(g['dip_median'])}{tested}")
 
 
 def shock_line(section: dict | None) -> str | None:
@@ -351,12 +352,21 @@ def evidence_text(g: dict) -> str:
     if n < ENOUGH:
         return f"nhưng chỉ có {n} khoảng không chồng lấn, quá ít để coi là chắc"
     if g.get("differs") is None:
-        return f"dựa trên {n} khoảng không chồng lấn, chưa so được với các lúc còn lại"
+        return f"dựa trên {n} khoảng không chồng lấn, {verdict(g)}"
+    if not g["differs"]:
+        return f"dựa trên {n} khoảng không chồng lấn nhưng {verdict(g)}, chưa đủ để coi là chắc"
+    return f"{n} khoảng không chồng lấn, {verdict(g)}"
+
+
+def verdict(g: dict) -> str:
+    """The test against the rest alone, for a line that has said its windows already."""
+    if g.get("differs") is None:
+        return "chưa so được với các lúc còn lại"
     test = f"(t = {_num(g['t_rest'])}, cần {g['t_need'].replace('.', ',')})"  # the need keeps its two decimals: "cần 2,00", not "cần 2"
     if not g["differs"]:
-        return f"dựa trên {n} khoảng không chồng lấn nhưng chưa rõ khác các lúc còn lại {test}, chưa đủ để coi là chắc"
+        return f"chưa rõ khác các lúc còn lại {test}"
     halves = {"same": ", ổn định ở hai nửa lịch sử", "flip": ", nhưng đổi chiều giữa hai nửa lịch sử"}.get(g.get("halves"), "")
-    return f"{n} khoảng không chồng lấn, khác các lúc còn lại {test}{halves}"
+    return f"khác các lúc còn lại {test}{halves}"
 
 
 CHANCE = Decimal("0.05")  # the share of groups that pass a 5% test with no real link

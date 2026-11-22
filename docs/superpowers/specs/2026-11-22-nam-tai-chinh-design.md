@@ -47,3 +47,10 @@ thiếu kèm lý do, không ước lượng.
 - Nộp, rút theo ngày trong năm; cổ tức tiền, thuế khấu trừ, lãi/lỗ đã chốt là sổ dựng lại đến 31/12 trừ sổ đến 31/12 năm trước.
 - Góp vốn đều: các tháng của năm đã qua ngày góp; Thu chi: các tháng đã xong, kể tên tháng chưa nhập.
 - Tháp tài sản: cơ cấu hiện tại so với mục tiêu; tổng đầu năm (ảnh chụp 12 năm trước) và cuối năm khi có. Năm 2026 ghi rõ không có số đầu năm.
+
+## Đã làm, đợt 3 (22/11/2026): Mục tiêu năm
+- Đặt cho năm nay hoặc năm sau (từ tháng 11 mở sẵn năm sau). Tiền góp, tổng tài sản là số đồng nguyên dương; tỷ lệ tiết kiệm trên 0 và dưới 100%.
+- Tiến độ đều = số ngày đã qua của năm / số ngày của năm. Tiền góp: nộp trừ rút trong năm. Tổng tài sản: quãng đường từ ảnh chụp tháng 12
+  năm trước đến mục tiêu; không có ảnh chụp thì không tính, ghi lý do. Tỷ lệ tiết kiệm: tỷ lệ các tháng Thu chi đã xong so với mục tiêu.
+- "Chậm" khi kém tiến độ đều hơn 10 điểm (tỷ lệ tiết kiệm: dưới mục tiêu). Một dòng trong Việc tài chính hôm nay mỗi tháng, từ ngày 1,
+  chỉ khi có mục chậm; ghi đã nhắc khi gửi được (`settings/year_goals_reminded_<năm>`).

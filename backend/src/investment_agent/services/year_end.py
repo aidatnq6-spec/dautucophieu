@@ -179,3 +179,87 @@ def year_review(repo, owner, *, data_dir: Path | None, year: int, today: date, q
         except Exception as exc:  # one part unreadable: named, the others still show
             out[key] = {"error": f"không đọc được ({type(exc).__name__})"}
     return out
+
+
+def _goals_record(year: int) -> tuple[str, str]:
+    return ("settings", f"year_goals_{year}")
+
+
+def _goals_figures(repo, owner, *, year: int, today: date, data_dir: Path | None, quotes: dict) -> dict:
+    """The figures each goal is read against; one the app cannot read is None (its goal shows no reading)."""
+    from investment_agent.domain import year_review as yr
+    from investment_agent.services.records import LedgerBook
+
+    def guard(read):
+        try:
+            return read()
+        except Exception:
+            return None
+    started = today >= date(year, 1, 1)
+
+    def put_in():
+        evs = list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)
+        return yr.year_flows(evs, year=year)["net"]
+
+    def rate():
+        from investment_agent.services.cashflow import RECORD
+        rec = read_version(repo, owner, *RECORD, None)
+        return yr.year_cashflow(rec.payload if rec else None, year=year, today=today)["rate"]
+
+    def total_now():
+        from investment_agent.services.equity_budget import budget_view
+        pyramid = budget_view(repo, owner, quotes=quotes)[0].get("pyramid")
+        return pyramid["total"] if pyramid else None
+
+    def total_start():
+        snap = read_snapshots(repo, owner).get(f"{year - 1}-12")
+        return snap["total"] if snap else None
+    return {"put_in": guard(put_in) if started else None, "savings_rate": guard(rate) if started else None,
+            "total_now": guard(total_now), "total_start": guard(total_start)}
+
+
+def goals_view(repo, owner, *, year: int, today: date, data_dir: Path | None, quotes: dict) -> dict:
+    from investment_agent.domain.year_goals import goals_progress
+    rec = read_version(repo, owner, *_goals_record(year), None)
+    if rec is None:
+        return {"year": year, "version": 0, "goals": None, "progress": None}
+    figures = _goals_figures(repo, owner, year=year, today=today, data_dir=data_dir, quotes=quotes)
+    return {"year": year, "version": rec.version, "goals": rec.payload, "progress": goals_progress(rec.payload, year=year, today=today, **figures)}
+
+
+def save_goals(repo, owner, *, year: int, raw: dict, expected_version: int, request_id: str, today: date, data_dir: Path | None, quotes: dict) -> dict:
+    from investment_agent.domain.year_goals import validate_goals
+    repo.write(owner, *_goals_record(year), validate_goals(raw), expected_version=expected_version, request_id=request_id)
+    return goals_view(repo, owner, year=year, today=today, data_dir=data_dir, quotes=quotes)
+
+
+GOAL_WORD = {"contribution": "tiền góp cả năm", "total_assets": "tổng tài sản cuối năm (quãng đường từ đầu năm)"}
+
+
+def _pct(v: str) -> str:
+    from decimal import ROUND_HALF_UP, Decimal
+    return f"{(Decimal(v) * 100).quantize(Decimal(1), ROUND_HALF_UP)}%"
+
+
+def goals_remind_run(repo, owner, *, today: date, send, request_id: str, data_dir: Path | None, quotes: dict) -> dict:
+    """One line a month, on or after the first, while a goal of this year is more than 10 points under the even pace (or the savings
+    rate is under its goal); marked only once sent."""
+    year, month = today.year, f"{today:%Y-%m}"
+    state_key = ("settings", f"year_goals_reminded_{year}")
+    rec = read_version(repo, owner, *state_key, None)
+    if rec and rec.payload.get("month") == month:
+        return {"due": None, "sent": False}
+    view = goals_view(repo, owner, year=year, today=today, data_dir=data_dir, quotes=quotes)
+    behind = [r for r in (view["progress"] or {}).get("rows", []) if r["behind"]]
+    if not behind:
+        return {"due": None, "sent": False}
+    parts = []
+    for r in behind:
+        if r["id"] == "savings_rate":
+            parts.append(f"tỷ lệ tiết kiệm {_pct(r['now'])}, mục tiêu {_pct(r['goal'])}")
+        else:
+            parts.append(f"{GOAL_WORD[r['id']]} đạt {_pct(r['share'])} mục tiêu, tiến độ đều theo thời gian là {_pct(r['pace'])}")
+    if not send(f"Mục tiêu {year}: " + "; ".join(parts) + ". So sánh, không phải dự báo."):
+        return {"due": month, "sent": False}
+    repo.write(owner, *state_key, {"month": month}, expected_version=rec.version if rec else 0, request_id=request_id)
+    return {"due": month, "sent": True}

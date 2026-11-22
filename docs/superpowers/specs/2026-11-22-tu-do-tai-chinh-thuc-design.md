@@ -31,3 +31,9 @@ phải khuyến nghị.
 
 ## Thứ tự
 1 → 2, mỗi phần một nhánh, TDD, verify rồi merge.
+
+## Đã làm (22/11/2026)
+- Phần 1: `real_target`, `rule_of_four` (domain/passive_income.py); ô Lạm phát giả định, Biên an toàn; dòng "Vốn cần có theo lợi suất thực" và
+  "So với con số rập khuôn".
+- Phần 2: `domain/required_return.py`; ô Năm muốn đạt (từ năm nay đến 60 năm sau); dòng "Lợi suất cần có" với ba mốc đối chiếu và hai phương án.
+  Lợi suất danh mục của bạn là Hiệu suất (gộp theo thời gian, đã trừ nộp rút) quy ra năm, chỉ khi sổ từ một năm.

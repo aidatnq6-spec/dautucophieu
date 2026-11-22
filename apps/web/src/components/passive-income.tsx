@@ -8,10 +8,35 @@ import { GrowthPath } from "./growth-path";
 export type Real = { required: string | null; real_rate: string; months: number | null; reached_on: string | null; reason: string | null; inflation: string;
   inflation_from: { source: string; date: string } | null; margin: string };
 type Four = { four_percent: string; million_usd: string | null };
+export type Needed = { by_year: number; goal: string; goal_from: "real" | "nominal"; status: "ok" | "reached" | "not_feasible" | "no_time"; rate: string | null;
+  deposit: string | null; vnindex: { rate: string | null; from: string; to: string } | null; own: { rate: string | null; reason: string | null; since?: string };
+  at_vnindex: { reached_on: string | null; contribution: string | null } | null };
 type Result = { required: string; income_now: string | null; progress: string | null; months: number | null; reached_on: string | null; rate: string;
-  real?: Real | null; four?: Four; four_fx_date?: string | null };
+  real?: Real | null; four?: Four; four_fx_date?: string | null; needed?: Needed | null };
 
 const dmy = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+
+const pct = (v: string) => `${v.replace(".", ",")}%`;
+
+/** Lợi suất cần có để đạt đúng hạn (22/11/2026): the rate needed, set beside rates that really happened, and what to change when it is high. */
+export function neededText(n: Needed): string[] {
+  const goal = `${formatVnd(n.goal)} (${n.goal_from === "real" ? "mốc theo lợi suất thực" : "mốc danh nghĩa"}) vào cuối năm ${n.by_year}`;
+  if (n.status === "reached") return [`Vốn hiện có đã đủ ${goal}.`];
+  if (n.status === "no_time") return [`Năm ${n.by_year} đã hết; chọn năm sau.`];
+  if (n.status === "not_feasible") return [`Để có ${goal} cần trên 50%/năm: không khả thi với số vốn và mức góp hiện tại.`];
+  const lines = [`Để có ${goal} cần lợi suất khoảng ${pct(n.rate!)}/năm.`];
+  const marks = [n.deposit ? `tiết kiệm 12 tháng ${pct(n.deposit)}` : null,
+    n.vnindex?.rate ? `VN-Index bình quân ${pct(n.vnindex.rate)}/năm từ ${n.vnindex.from.slice(0, 4)} (chỉ giá, chưa gồm cổ tức)` : null,
+    n.own.rate ? `danh mục của bạn ${pct(n.own.rate)}/năm (Hiệu suất)` : n.own.reason === "short" ? "danh mục của bạn: sổ chưa đủ một năm" : null].filter(Boolean);
+  if (marks.length) lines.push(`Đối chiếu: ${marks.join("; ")}.`);
+  if (n.vnindex?.rate && Number(n.rate) > Number(n.vnindex.rate)) {
+    const a = n.at_vnindex;
+    const alt = [a?.reached_on ? `với lợi suất bằng VN-Index bình quân sẽ đạt khoảng ${a.reached_on.slice(5, 7)}/${a.reached_on.slice(0, 4)}` : null,
+      a?.contribution ? `hoặc góp ${formatVnd(a.contribution)}/tháng để vẫn đạt đúng năm ${n.by_year}` : null].filter(Boolean);
+    lines.push(`Cao hơn mức VN-Index đã đạt bình quân từ năm ${n.vnindex.from.slice(0, 4)}; cân nhắc lùi hạn hoặc tăng mức góp${alt.length ? `: ${alt.join(", ")}` : ""}.`);
+  }
+  return lines;
+}
 
 /** Mốc tự do tài chính theo lợi suất thực (22/11/2026): the target in today's money, where the inflation figure came from, and when. */
 export function realText(r: Real, rateText: string): string {
@@ -28,7 +53,7 @@ type Income = { deposit: string; bond: string; dividends: string; stocks?: strin
 type Level = { id: "safe" | "independent" | "freedom"; spending: string | null; without_rent: string | null; with_rent: string | null; actual?: string | null };
 type Levels = { rent: string; rent_missing: string[]; rows: Level[]; actual?: string | null; actual_months?: string[] };
 type View = { version: number; levels?: Levels | null; goal: { target: string; rate: string | null; bond_rate: string; stock_rate?: string | null; independent?: string | null; freedom?: string | null; inflation?: string | null;
-    margin?: string | null } | null; default_rate: string | null; default_bond_rate: string;
+    margin?: string | null; by_year?: number | null } | null; default_rate: string | null; default_bond_rate: string;
   income: Income | null; result: Result | null; capital: string | null; contribution: string };
 
 const rate = (v: string) => Number(v).toLocaleString("vi-VN", { maximumFractionDigits: 2 });
@@ -55,6 +80,7 @@ export function PassiveIncome({ refresh }: { refresh?: string } = {}) {
   const [freedom, setFreedom] = useState("");
   const [inflation, setInflation] = useState("");
   const [margin, setMargin] = useState("");
+  const [byYear, setByYear] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const typed = useRef(false);  // a reload refreshes the figures; what is being typed stays
   useEffect(() => {
@@ -70,6 +96,7 @@ export function PassiveIncome({ refresh }: { refresh?: string } = {}) {
       if (v.goal?.freedom) setFreedom(formatVnd(v.goal.freedom, { unit: false }));
       if (v.goal?.inflation) setInflation(v.goal.inflation.replace(".", ","));
       if (v.goal?.margin) setMargin(v.goal.margin.replace(".", ","));
+      if (v.goal?.by_year) setByYear(String(v.goal.by_year));
     }, (e) => { if (live) setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải."); });
     return () => { live = false; };
   }, [refresh]);
@@ -83,9 +110,11 @@ export function PassiveIncome({ refresh }: { refresh?: string } = {}) {
     const ind = independent.trim() ? parseMoneyInput(independent) : null, free = freedom.trim() ? parseMoneyInput(freedom) : null;
     const inf = inflation.trim() ? parseMoneyInput(inflation) : null, mar = margin.trim() ? parseMoneyInput(margin) : null;
     if ((inflation.trim() && inf === null) || (margin.trim() && mar === null)) { setMessage("Lạm phát và biên an toàn: nhập số (%), hoặc để trống."); return; }
+    const year = byYear.trim() ? Number(byYear.trim()) : null;
+    if (byYear.trim() && !Number.isInteger(year)) { setMessage("Năm muốn đạt: nhập năm, ví dụ 2035, hoặc để trống."); return; }
     if ((independent.trim() && (ind === null || ind.includes("."))) || (freedom.trim() && (free === null || free.includes(".")))) { setMessage("Mức độc lập và mức tự do: nhập số đồng, hoặc để trống."); return; }
     try {
-      setView(await api<View>("passive-income", { method: "PUT", body: { target: t, rate: r, bond_rate: b, stock_rate: s, independent: ind, freedom: free, inflation: inf, margin: mar, expected_version: view.version, request_id: requestId() } }));
+      setView(await api<View>("passive-income", { method: "PUT", body: { target: t, rate: r, bond_rate: b, stock_rate: s, independent: ind, freedom: free, inflation: inf, margin: mar, by_year: year, expected_version: view.version, request_id: requestId() } }));
       setMessage(null);
       typed.current = false;
     } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); }
@@ -108,6 +137,8 @@ export function PassiveIncome({ refresh }: { refresh?: string } = {}) {
         <label className="field">Mức tự do: chi tiêu mỗi tháng (đ)<input inputMode="numeric" value={freedom} disabled={!view} onChange={(e) => setFreedom(groupDigitsInput(e.target.value))} /></label>
         <label className="field">Lạm phát giả định (%/năm)<input inputMode="decimal" value={inflation} disabled={!view} onChange={(e) => setInflation(e.target.value)}
           placeholder="để trống = CPI Việt Nam mới nhất" /></label>
+        <label className="field">Năm muốn đạt<input inputMode="numeric" maxLength={4} value={byYear} disabled={!view} onChange={(e) => setByYear(e.target.value.replace(/\D/g, ""))}
+          placeholder="ví dụ 2035" /></label>
         <label className="field">Biên an toàn (%)<input inputMode="decimal" value={margin} disabled={!view} onChange={(e) => setMargin(e.target.value)} placeholder="để trống = 0" /></label>
         <button type="submit" className="btn primary" disabled={!view}><Target size={16} aria-hidden="true" />Tính mục tiêu</button>
       </form>
@@ -117,6 +148,7 @@ export function PassiveIncome({ refresh }: { refresh?: string } = {}) {
         <div><dt>Vốn cần có (tỷ suất {rate(r.rate)}%/năm)</dt><dd data-testid="pi-required">{formatVnd(r.required)}</dd></div>
         {r.real !== undefined && <div><dt>Vốn cần có theo lợi suất thực</dt><dd data-testid="pi-real">{r.real ? (r.real.required ? formatVnd(r.real.required) : "không có mốc")
           : "chưa có CPI; nhập lạm phát giả định"}{r.real && <span className="caption"> · {realText(r.real, rate(r.rate))}</span>}</dd></div>}
+        {r.needed && <div><dt>Lợi suất cần có</dt><dd data-testid="pi-needed">{neededText(r.needed).map((line) => <p key={line}>{line}</p>)}</dd></div>}
         {r.four && <div><dt>So với con số rập khuôn</dt><dd className="caption">Quy tắc 4%: {formatVnd(r.four.four_percent)}{r.four.million_usd
           ? ` · 1 triệu USD ≈ ${formatVnd(r.four.million_usd)} (tỷ giá bán Vietcombank ngày ${dmy(r.four_fx_date!)})` : ""}</dd></div>}
         <div><dt>Hiện có (tháp tài sản, trừ quỹ dự phòng)</dt><dd>{view!.capital ? formatVnd(view!.capital) : "chưa nhập tháp tài sản"}</dd></div>

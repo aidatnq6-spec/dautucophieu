@@ -1,7 +1,7 @@
 """Mục tiêu dòng tiền thụ động on Hồ sơ & rủi ro: the goal (`settings/passive_income`), the capital from Tháp tài sản, the monthly
 contribution from Góp vốn đều, and an assumed yearly rate (the 12-month deposit rate unless the owner sets one)."""
 
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -12,7 +12,7 @@ from pydantic import Field
 from investment_agent.domain.deposit_book import bond_income, deposit_income
 from investment_agent.domain.models import ContractModel
 from investment_agent.domain.ledger import replay
-from investment_agent.domain.passive_income import freedom_levels, income_by_layer, passive_income
+from investment_agent.domain.passive_income import _month_after, freedom_levels, income_by_layer, passive_income
 from investment_agent.domain.property_book import PropertyBook, rent_now
 from investment_agent.market.corporate_events import EventStore
 from investment_agent.market.leading import MacroStore
@@ -43,6 +43,7 @@ class GoalRequest(ContractModel):
     freedom: str | None = Field(default=None, max_length=24)
     inflation: str | None = Field(default=None, max_length=8)  # percent per year; None = Vietnam's latest CPI on the year (owner, 22/11/2026)
     margin: str | None = Field(default=None, max_length=8)  # safety margin on the real target, percent; None = 0
+    by_year: int | None = Field(default=None, strict=True)  # the year the owner wants to reach the target by (Lợi suất cần có)
     expected_version: int = Field(strict=True, ge=0)
     request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
 
@@ -111,6 +112,8 @@ def _view(request: Request, repo, owner) -> dict:
             result = {**passive_income(target=Decimal(record.payload["target"]), rate=Decimal(rate), capital=capital, contribution=contribution,
                                        today=today, income_now=Decimal(income["total"]) if income else None), "rate": rate,
                       **_real(data_dir, record.payload, rate=Decimal(rate), capital=capital, contribution=contribution, today=today)}
+            result["needed"] = _needed(data_dir, repo, owner, record.payload, result, deposit=default_rate, capital=capital,
+                                       contribution=contribution, today=today)
     goal = {**record.payload, "bond_rate": record.payload.get("bond_rate") or BOND_RATE} if record else None
     return {"version": record.version if record else 0, "goal": goal, "default_rate": default_rate, "default_bond_rate": BOND_RATE,
             "income": income, "levels": _levels(repo, owner, income, record.payload if record else {}, today) if income else None, "result": result, "capital": format(capital, "f") if capital is not None else None, "contribution": format(contribution, "f")}
@@ -134,6 +137,56 @@ def _real(data_dir, goal: dict, *, rate: Decimal, capital, contribution: Decimal
     fx = latest("usd_vnd_vcb")
     return {"real": real, "four": {**rule_of_four(target=target, usd_vnd=Decimal(fx["value"]) if fx else None)},
             "four_fx_date": fx["date"] if fx else None}
+
+
+def _own_yearly(data_dir, repo, owner, today) -> dict:
+    """The owner's own return per year from Hiệu suất (time-weighted, deposits and withdrawals taken out), once the ledger is a year old."""
+    from investment_agent.domain.required_return import yearly_growth
+    from investment_agent.domain.time_weighted import performance
+    from investment_agent.market.series import SeriesStore
+    events = list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)
+    if not events or (today - min(e.effective_at for e in events)).days < 365 or data_dir is None:
+        return {"rate": None, "reason": "short" if events else "no_ledger"}
+    store = SeriesStore(Path(data_dir) / "trend-sources")
+    symbols = {e.security_id for e in events if getattr(e, "security_id", None)}
+    closes = {sym: {t.date(): v * 1000 for t, v in store.read(f"{sym}-1d")} for sym in symbols}
+    total = performance(events, closes=closes, index={t.date(): v for t, v in store.read("VNINDEX-1d")}, today=today)["total"]
+    if not total:
+        return {"rate": None, "reason": "no_prices"}
+    since = date.fromisoformat(total["since"])
+    return {"rate": yearly_growth((since, Decimal(100)), (today, Decimal(100) * (1 + Decimal(total["portfolio"])))), "reason": None, "since": total["since"]}
+
+
+def _needed(data_dir, repo, owner, goal: dict, result: dict, *, deposit, capital, contribution: Decimal, today) -> dict | None:
+    """Lợi suất cần có để đạt đúng hạn (owner, 22/11/2026): the rate that reaches the real target (else the plain one) by the end of the
+    year chosen, beside the 12-month deposit rate, VN-Index's growth per year over its stored history and the owner's own."""
+    from investment_agent.domain.required_return import contribution_for, months_at, months_until, required_return, yearly_growth
+    from investment_agent.market.series import SeriesStore
+    by_year = goal.get("by_year")
+    if not by_year:
+        return None
+    real = result.get("real") or {}
+    target, source = (Decimal(real["required"]), "real") if real.get("required") else (Decimal(result["required"]), "nominal")
+    months = months_until(date(by_year, 1, 1), today)
+    out = {"by_year": by_year, "goal": format(target, "f"), "goal_from": source, "capital": format(capital, "f") if capital is not None else None,
+           **required_return(capital=capital or Decimal(0), contribution=contribution, goal=target, months=months), "deposit": deposit}
+    points = SeriesStore(Path(data_dir) / "trend-sources").read("VNINDEX-1d") if data_dir is not None else []
+    vn = None
+    if len(points) >= 2:
+        first, last = points[0], points[-1]
+        vn = {"rate": yearly_growth((first[0].date(), Decimal(str(first[1]))), (last[0].date(), Decimal(str(last[1])))),
+              "from": first[0].date().isoformat(), "to": last[0].date().isoformat()}
+    out["vnindex"] = vn
+    out["own"] = _own_yearly(data_dir, repo, owner, today)
+    at = None
+    if vn and vn["rate"] is not None:
+        rate = Decimal(vn["rate"])
+        m = months_at(capital=capital or Decimal(0), contribution=contribution, goal=target, yearly_pct=rate)
+        extra = contribution_for(capital=capital or Decimal(0), goal=target, yearly_pct=rate, months=months)
+        at = {"reached_on": _month_after(today, m) if m is not None else None,
+              "contribution": format(extra, "f") if extra is not None else None}
+    out["at_vnindex"] = at
+    return out
 
 
 @router.get("/passive-income")
@@ -183,12 +236,16 @@ def put_passive_income(request: Request, body: GoalRequest):
         return error(422, "invalid_rate", "Lạm phát giả định từ −5% đến 30%/năm.")
     if margin is not None and not (margin.is_finite() and Decimal(0) <= margin <= Decimal(200)):
         return error(422, "invalid_rate", "Biên an toàn từ 0% đến 200%.")
+    this_year = now(request).astimezone(VN).date().year
+    if body.by_year is not None and not this_year <= body.by_year <= this_year + 60:
+        return error(422, "invalid_year", f"Năm muốn đạt từ {this_year} đến {this_year + 60}.")
     payload = {"target": format(target, "f"), "rate": format(rate, "f") if rate is not None else None,
                "bond_rate": format(bond_rate, "f") if bond_rate is not None else None,
                "stock_rate": format(stock_rate, "f") if stock_rate is not None else None,
                "independent": format(Decimal(body.independent), "f") if body.independent is not None else None,
                "freedom": format(Decimal(body.freedom), "f") if body.freedom is not None else None,
-               "inflation": format(inflation, "f") if inflation is not None else None, "margin": format(margin, "f") if margin is not None else None}
+               "inflation": format(inflation, "f") if inflation is not None else None, "margin": format(margin, "f") if margin is not None else None,
+               "by_year": body.by_year}
     try:
         repo.write(owner, *RECORD, payload, expected_version=body.expected_version, request_id=body.request_id)
         return _view(request, repo, owner)

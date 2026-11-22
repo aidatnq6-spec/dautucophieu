@@ -36,3 +36,15 @@ def test_each_watched_non_financial_ticker_gets_its_receivable_signs_most_first(
     assert aaa["count"] == 3 and bbb["count"] == 0
     assert aaa["signs"]["other_high"] is None  # no quarters stored: not read
     assert [k for k, _ in SIGNS][:3] == ["other_receivables", "other_high", "prepay_suppliers"]
+
+
+def test_lending_against_equity_is_a_sign_with_its_figure(tmp_path):
+    from investment_agent.market.statements import StatementStore
+    d = data(tmp_path)
+    B = 10**9
+    StatementStore(d / "statements").save({"symbol": "AAA", "years": {}, "quarters": {
+        "2025-Q1": {"other_receivables": str(100 * B), "other_receivables_lt": "0", "st_loans_receivable": "0", "lt_loans_receivable": "0", "equity": str(1000 * B)},
+        "2026-Q1": {"other_receivables": str(350 * B), "other_receivables_lt": "0", "equity": str(1000 * B)}}})
+    aaa = next(r for r in receivable_signs(d) if r["symbol"] == "AAA")
+    assert ("lending", "Cho vay lớn so với vốn chủ") in SIGNS and aaa["signs"]["lending"] is True
+    assert aaa["details"]["lending"] == "Cho vay và phải thu khác bằng 35% vốn chủ (quý 1/2026); xem Sổ phải thu bên liên quan trên hồ sơ mã."

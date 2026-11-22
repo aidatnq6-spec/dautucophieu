@@ -228,3 +228,22 @@ def test_other_receivables_and_loans_against_the_sector_median():
     assert (usual["share"], usual["high"]) == ("0.0700", False)
     alone = receivables_view(one(70))["other_vs_sector"]
     assert (alone["sector_median"], alone["sector_count"], alone["high"]) == (None, 0, None)
+
+
+def test_loans_and_other_receivables_against_equity_flag_from_30_percent_or_up_10_points():
+    """Cho vay và phải thu khác so với vốn chủ (owner, 22/11/2026): the HAG lesson, money lent out against what the owners put in."""
+    from investment_agent.domain.balance_watch import lending_view
+    B = 10**9
+    q = lambda loans, other, equity, lt=0: {"st_loans_receivable": str(loans * B), "lt_loans_receivable": str(lt * B),  # noqa: E731
+                                            "other_receivables": str(other * B), "other_receivables_lt": "0", "equity": str(equity * B)}
+    quarters = {"2025-Q1": q(50, 50, 1000), "2025-Q2": q(50, 60, 1000), "2025-Q3": q(60, 60, 1000), "2025-Q4": q(70, 60, 1000)}
+    quarters["2026-Q1"] = {"other_receivables": str(210 * B), "other_receivables_lt": "0", "equity": str(1000 * B)}  # Thông tư 99: no loans line
+    out = lending_view(quarters)
+    assert out["rows"][-1] == {"quarter": "2026-Q1", "lent": str(210 * B), "equity": str(1000 * B), "share": "0.2100", "equity_not_positive": False}
+    assert out["share"] == "0.2100" and out["year_ago"] == "0.1000" and out["flag"] == "rising"  # +11 points on a year
+    high = lending_view({**quarters, "2026-Q1": {**quarters["2026-Q1"], "other_receivables": str(300 * B)}})
+    assert high["flag"] == "high"
+    old_gap = lending_view({"2025-Q1": {"other_receivables": "1", "other_receivables_lt": "0", "equity": "10"}})
+    assert old_gap["rows"][0]["lent"] is None and old_gap["flag"] is None  # before 2026 a missing loans line is not taken as nothing
+    negative = lending_view({"2026-Q1": {"other_receivables": "1", "other_receivables_lt": "0", "equity": "-5"}})
+    assert negative["rows"][0]["share"] is None and negative["rows"][0]["equity_not_positive"] is True

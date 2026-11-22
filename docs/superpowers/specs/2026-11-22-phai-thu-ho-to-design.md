@@ -32,3 +32,9 @@ gọi AI, không đoán số. Áp dụng cho mã phi tài chính đang theo dõi
 
 ## Thứ tự làm
 1 → 2 → 3, mỗi phần một nhánh, TDD, verify rồi merge.
+
+## Đã làm
+- Phần 1 (22/11/2026): `market/statement_revisions.py`; nhật ký `data/statement-revisions/<MÃ>.json`; nhắc mã đang giữ trong Danh mục hôm nay
+  (đã báo lưu ở `data/alerts/statement-revisions.json`).
+- Phần 2 (22/11/2026): `lending_view` trong khối Phải thu (dòng có nhãn khi bật cờ) và cột "Cho vay lớn so với vốn chủ" trên Bảng dấu hiệu
+  phải thu, kèm câu nhắc xem Sổ phải thu bên liên quan. Trước 2026, thiếu dòng cho vay thì để trống; từ 2026 (Thông tư 99) coi là không có.

@@ -22,7 +22,8 @@ export type Provision = { quarter: string | null; amount: string | null; share: 
 type Balance = { symbol: string; sector: string | null; debt: { rows: DebtRow[]; flag: Flag }; sector_debt: SectorDebt | null;
   property: { rows: CashRow[]; signal: Signal } | null; liquidity: LiquidityRow[]; carry: Carry;
   receivables: { rows: ArRow[]; dso: Dso; provision: Provision; prepay_days: Dso; other_vs_sector: OtherVsSector }; raise_prepay: { flag: boolean; events: RaiseEvent[] };
-  revisions?: Revision[] };
+  revisions?: Revision[]; lending?: Lending };
+export type Lending = { quarter: string | null; share: string | null; year_ago: string | null; flag: "high" | "rising" | null };
 export type Revision = { kind: "years" | "quarters"; period: string; line: string; label: string; old: string; new: string; seen_on: string };
 
 const SHOWN = 8;  // quarters in each table
@@ -117,6 +118,15 @@ export function raiseText(e: RaiseEvent): string {
 }
 
 /** The bad-debt provision of the latest quarter, in words. */
+/** Cho vay và phải thu khác so với vốn chủ (22/11/2026): the latest quarter against a year before, and why it is flagged. */
+export function lendingText(l: Lending): string {
+  if (!l.quarter || l.share === null) return "Chưa tính được cho vay và phải thu khác so với vốn chủ (thiếu dòng phải thu hoặc vốn chủ không dương).";
+  const ago = l.year_ago !== null ? `; cùng kỳ năm trước ${rate(l.year_ago)}` : "";
+  const why = l.flag === "high" ? " Từ 30% vốn chủ: xem ai đang vay, có phải bên liên quan không (Sổ phải thu bên liên quan)."
+    : l.flag === "rising" ? " Tăng từ 10 điểm trong một năm: xem khoản cho vay mới là của ai." : "";
+  return `${q(l.quarter)}: cho vay và phải thu khác bằng ${rate(l.share)} vốn chủ${ago}.${why}`;
+}
+
 /** One figure the source changed for a closed period (Số đã công bố bị sửa, 22/11/2026): old → new and the day seen; no cause inferred. */
 export function revisionText(r: Revision): string {
   const when = r.kind === "years" ? `Năm ${r.period}` : `Quý ${r.period.slice(-1)}/${r.period.slice(0, 4)}`;
@@ -211,6 +221,7 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
         <p data-testid="prepay-days">{prepayDaysText(data.receivables.prepay_days)}</p>
         {data.raise_prepay.events.map((e) => <p key={e.issue_date} data-testid="raise-prepay" className={e.flag ? "notice" : undefined}>
           {e.flag && <><span className="pill warn">Trả trước tăng sau huy động vốn</span> </>}{raiseText(e)}</p>)}
+        {data.lending && <p data-testid="lending">{data.lending.flag && <><span className="pill warn">Cho vay lớn so với vốn chủ</span> </>}{lendingText(data.lending)}</p>}
         <p data-testid="provision">{data.receivables.provision.kind === "jump" && <><span className="pill warn">Dự phòng tăng mạnh</span> </>}
           {provisionText(data.receivables.provision)}</p>
         <div className="tablewrap"><table className="fv-table" aria-label={`Phải thu ${symbol}`}>

@@ -148,6 +148,7 @@ describe("inventoryPaceText", () => {
   it("says the days against a year before and the sector, the growth, and why it is flagged", () => {
     expect(inventoryPaceText(p)).toMatch(/^Q4\/2025: tồn kho đủ 249 ngày giá vốn; cùng kỳ năm trước 183 ngày; trung vị ngành 91 ngày \(3 mã\)\. Tồn kho tăng 50,0% .* 10,0%\. Hàng nhập về/);
     expect(inventoryPaceText({ ...p, flag: false })).not.toMatch(/Hàng nhập về/);
+    expect(inventoryPaceText({ ...p, flag: false, share: "0.02" })).toMatch(/Tồn kho chỉ 2,0% tổng tài sản: không ghi cờ\.$/);
     expect(inventoryPaceText({ ...p, days: null })).toMatch(/^Chưa tính được/);
   });
 });

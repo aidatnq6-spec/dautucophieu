@@ -131,3 +131,51 @@ def snapshot_run(repo, owner, *, pyramid: dict | None, today: date, request_id: 
                      "layers": {layer["id"]: layer["amount"] for layer in pyramid["layers"]}}
     repo.write(owner, *SNAPSHOTS, {"months": months}, expected_version=rec.version if rec else 0, request_id=request_id)
     return {"month": month, "written": True}
+
+
+def year_review(repo, owner, *, data_dir: Path | None, year: int, today: date, quotes: dict) -> dict:
+    """Tổng kết năm: each part read on its own; a part that cannot be read says so and the others still show."""
+    from investment_agent.domain import year_review as yr
+    from investment_agent.services.records import LedgerBook
+
+    def events():
+        return list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)
+
+    def portfolio():
+        from investment_agent.domain.time_weighted import performance
+        from investment_agent.market.series import SeriesStore
+        evs = events()
+        if data_dir is None:
+            return {"return": None, "note": "không có thư mục giá trên máy này"}
+        store = SeriesStore(Path(data_dir) / "trend-sources")
+        symbols = {e.security_id for e in evs if getattr(e, "security_id", None)}
+        closes = {s: {t.date(): v * 1000 for t, v in store.read(f"{s}-1d")} for s in symbols}  # thousand đồng, as Hiệu suất reads them
+        index = {t.date(): v for t, v in store.read("VNINDEX-1d")}
+        return yr.year_portfolio(performance(evs, closes=closes, index=index, today=min(today, date(year, 12, 31))), year=year)
+
+    def contributions():
+        from investment_agent.domain.contributions import contribution_status
+        from investment_agent.services.contributions import PLAN, cash_flows
+        plan = read_version(repo, owner, *PLAN, None)
+        if plan is None:
+            return None
+        status = contribution_status(cash_flows(repo, owner), plan.payload, today=today)
+        return yr.year_contributions(status, amount=plan.payload["amount"], year=year)
+
+    def cashflow():
+        from investment_agent.services.cashflow import RECORD
+        rec = read_version(repo, owner, *RECORD, None)
+        return yr.year_cashflow(rec.payload if rec else None, year=year, today=today)
+
+    def tower():
+        from investment_agent.services.equity_budget import budget_view
+        return yr.year_tower(read_snapshots(repo, owner), budget_view(repo, owner, quotes=quotes)[0].get("pyramid"), year=year)
+
+    out = {"year": year, "as_of": min(today, date(year, 12, 31)).isoformat(), "running": today <= date(year, 12, 31)}
+    for key, part in (("portfolio", portfolio), ("flows", lambda: yr.year_flows(events(), year=year)), ("contributions", contributions),
+                      ("cashflow", cashflow), ("tower", tower)):
+        try:
+            out[key] = part()
+        except Exception as exc:  # one part unreadable: named, the others still show
+            out[key] = {"error": f"không đọc được ({type(exc).__name__})"}
+    return out

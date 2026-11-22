@@ -39,3 +39,11 @@ thiếu kèm lý do, không ước lượng.
 - Nhắc là một phần của Việc tài chính hôm nay, một lần vào hoặc sau 01/12, 20/12, 05/01; chỉ ghi đã nhắc khi gửi được.
 - Ảnh chụp `settings/wealth_snapshots`: mỗi ngày ghi đè tháng đang chạy (tổng và số tiền từng tầng của Tháp tài sản), nên mỗi tháng giữ ngày
   cuối cùng được ghi. Chạy trong lượt Việc tài chính hôm nay, nên chỉ chạy khi đang bật gửi tự động.
+
+## Đã làm, đợt 2 (22/11/2026): Tổng kết năm
+- Chọn năm nay hoặc năm trước. Năm đang chạy ghi "tính đến ngày …". Mỗi phần đọc riêng; phần không đọc được ghi lý do, các phần khác vẫn hiện.
+- Lợi suất: nhân dồn các tháng của Hiệu suất trong năm (đã trừ nộp, rút), VN-Index cùng cách. Giá trị: phiên cuối năm trước (hoặc phiên đầu
+  của sổ nếu sổ bắt đầu trong năm, có ghi chú) và phiên cuối trong năm.
+- Nộp, rút theo ngày trong năm; cổ tức tiền, thuế khấu trừ, lãi/lỗ đã chốt là sổ dựng lại đến 31/12 trừ sổ đến 31/12 năm trước.
+- Góp vốn đều: các tháng của năm đã qua ngày góp; Thu chi: các tháng đã xong, kể tên tháng chưa nhập.
+- Tháp tài sản: cơ cấu hiện tại so với mục tiêu; tổng đầu năm (ảnh chụp 12 năm trước) và cuối năm khi có. Năm 2026 ghi rõ không có số đầu năm.

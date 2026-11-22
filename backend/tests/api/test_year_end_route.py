@@ -26,3 +26,15 @@ def test_the_list_shows_the_checks_and_the_owner_ticks_a_manual_item():
     assert refused.status_code == 422
     stale = call(c, clock, "POST", "/internal/year-end/tick", {"item": "cashflow", "done": True, "expected_version": 0, "request_id": "y3"})
     assert stale.status_code == 409
+
+
+def test_the_year_review_reads_the_ledger_of_that_year_and_names_what_is_missing():
+    from test_overview_route import buy_fpt
+    c, clock = client()
+    buy_fpt(c, clock)  # 100 tr deposited on 04/01/2027
+    body = call(c, clock, "GET", "/internal/year-review/2027").json()
+    assert body["year"] == 2027 and body["running"] is True and body["as_of"] == "2027-01-15"
+    assert body["flows"]["deposits"] == "100000000" and body["flows"]["withdrawals"] == "0"
+    assert body["contributions"] is None  # no Góp vốn đều plan
+    assert body["cashflow"]["months"] == 0 and body["cashflow"]["missing"] == []  # January is not closed yet
+    assert call(c, clock, "GET", "/internal/year-review/2010").status_code == 422

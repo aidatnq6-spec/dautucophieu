@@ -72,3 +72,9 @@ def test_the_balance_carries_lending_against_equity(tmp_path):
     c, clock = client(tmp_path)
     lending = call(c, clock, "GET", "/internal/stock/FPT/balance").json()["lending"]
     assert lending["quarter"] == "2026-Q1" and lending["share"] is None and lending["flag"] is None  # no receivable lines stored: blank, not 0
+
+
+def test_the_balance_carries_the_provision_flow(tmp_path):
+    c, clock = client(tmp_path)
+    flow = call(c, clock, "GET", "/internal/stock/FPT/balance").json()["provision_flow"]
+    assert flow["quarter"] == "2026-Q1" and flow["rows"][-1]["change"] is None and flow["flag"] is False  # no provision lines: blank

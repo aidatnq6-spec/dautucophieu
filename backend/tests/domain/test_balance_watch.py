@@ -247,3 +247,20 @@ def test_loans_and_other_receivables_against_equity_flag_from_30_percent_or_up_1
     assert old_gap["rows"][0]["lent"] is None and old_gap["flag"] is None  # before 2026 a missing loans line is not taken as nothing
     negative = lending_view({"2026-Q1": {"other_receivables": "1", "other_receivables_lt": "0", "equity": "-5"}})
     assert negative["rows"][0]["share"] is None and negative["rows"][0]["equity_not_positive"] is True
+
+
+def test_the_change_of_the_provision_balance_is_set_against_the_quarters_profit_before_tax():
+    """Dự phòng đi vào lợi nhuận (owner, 22/11/2026): the balance is accumulated, so only its change reaches the quarter; a fall from 20%
+    of a positive profit is flagged, said to be a release or a write-off, which public figures cannot tell apart."""
+    from investment_agent.domain.balance_watch import provision_flow
+    B = 10**9
+    q = lambda st, lt, pbt: {"bad_debt_st": str(-st * B), "bad_debt_lt": str(-lt * B), "pbt": str(pbt * B)}  # noqa: E731
+    out = provision_flow({"2025-Q3": q(47, 0, 100), "2025-Q4": q(66, 0, 160), "2026-Q1": q(26, 0, 200)})
+    rows = {r["quarter"]: r for r in out["rows"]}
+    assert rows["2025-Q3"]["change"] is None  # no quarter before it
+    assert (rows["2025-Q4"]["balance"], rows["2025-Q4"]["change"], rows["2025-Q4"]["share"], rows["2025-Q4"]["release"]) == (
+        str(66 * B), str(19 * B), "0.1188", False)  # 66 − 47 = 19 tỷ, 11.9% of 160
+    assert rows["2026-Q1"]["change"] == str(-40 * B) and rows["2026-Q1"]["share"] == "0.2000" and rows["2026-Q1"]["release"] is True
+    assert out["flag"] is True and out["quarter"] == "2026-Q1"
+    loss = provision_flow({"2025-Q4": q(66, 0, 10), "2026-Q1": q(26, 0, -5)})
+    assert loss["rows"][-1]["share"] is None and loss["flag"] is False  # no share of a loss

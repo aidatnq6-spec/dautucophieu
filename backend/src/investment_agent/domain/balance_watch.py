@@ -354,6 +354,25 @@ def lending_view(quarters: dict, n: int = 12) -> dict:
     return {"rows": rows, "quarter": None, "share": None, "year_ago": None, "flag": None}
 
 
+RELEASE_SHARE = Decimal("0.20")  # Dự phòng đi vào lợi nhuận (owner, 22/11/2026)
+
+
+def provision_flow(quarters: dict, n: int = 12) -> dict:
+    """Dự phòng đi vào lợi nhuận: each quarter the change of the receivables provision balance (short and long term, as a positive
+    amount) against that quarter's profit before tax. A fall from 20% of a positive profit is flagged; a fall can be a release (raising
+    profit) or a write-off (not touching it), which public figures cannot tell apart."""
+    rows = []
+    for period in sorted(quarters)[-n:]:
+        now_p, before_p = _both(quarters[period], "bad_debt_st", "bad_debt_lt"), _both(quarters.get(_back(period, 1), {}), "bad_debt_st", "bad_debt_lt")
+        (pbt,) = _get(quarters[period], "pbt")
+        change = (-now_p) - (-before_p) if now_p is not None and before_p is not None else None
+        share = abs(change) / pbt if change is not None and pbt is not None and pbt > 0 else None
+        rows.append({"quarter": period, "balance": _s(-now_p if now_p is not None else None), "change": _s(change), "pbt": _s(pbt), "share": _r(share),
+                     "release": change is not None and change < 0 and share is not None and share >= RELEASE_SHARE})
+    latest = rows[-1] if rows else None
+    return {"rows": rows, "flag": bool(latest and latest["release"]), "quarter": latest["quarter"] if latest else None}
+
+
 def _advances(q: dict) -> Decimal | None:
     st, lt = _get(q, "advances_st", "advances_lt")
     return st + lt if st is not None and lt is not None else None

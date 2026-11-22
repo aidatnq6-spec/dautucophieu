@@ -38,3 +38,5 @@ gọi AI, không đoán số. Áp dụng cho mã phi tài chính đang theo dõi
   (đã báo lưu ở `data/alerts/statement-revisions.json`).
 - Phần 2 (22/11/2026): `lending_view` trong khối Phải thu (dòng có nhãn khi bật cờ) và cột "Cho vay lớn so với vốn chủ" trên Bảng dấu hiệu
   phải thu, kèm câu nhắc xem Sổ phải thu bên liên quan. Trước 2026, thiếu dòng cho vay thì để trống; từ 2026 (Thông tư 99) coi là không có.
+- Phần 3 (22/11/2026): `provision_flow` trong khối Phải thu: dòng quý mới nhất (tăng/giảm, tỷ lệ so với LNTT; LNTT không dương thì không
+  tính tỷ lệ), nhãn "Giảm dự phòng lớn so với lợi nhuận" khi giảm từ 20% LNTT, luôn kèm câu không tách được hoàn nhập với xóa nợ.

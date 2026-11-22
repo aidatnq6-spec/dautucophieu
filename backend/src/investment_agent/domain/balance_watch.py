@@ -313,6 +313,47 @@ def receivables_view(quarters: dict, peers: dict | None = None, n: int = 12) -> 
             "provision": {"quarter": latest, "amount": _s(amount), "share": _r(part), "year_ago": _s(before), "kind": kind}}
 
 
+LENDING_HIGH, LENDING_RISE = Decimal("0.30"), Decimal("0.10")  # Cho vay và phải thu khác so với vốn chủ (owner, 22/11/2026)
+
+
+def _lent(q: dict, period: str) -> Decimal | None:
+    """Loans receivable plus other receivables, short and long term. From 2026 Thông tư 99 folds loans into other receivables and drops
+    the loans line: a missing loans line counts as nothing from then on, and leaves the cell blank before (never guessed)."""
+    other = _both(q, "other_receivables", "other_receivables_lt")
+    if other is None:
+        return None
+    st, lt = _get(q, "st_loans_receivable", "lt_loans_receivable")
+    if st is None and lt is None:
+        return other if int(period[:4]) >= 2026 else None
+    return other + (st or Decimal(0)) + (lt or Decimal(0))
+
+
+def lending_view(quarters: dict, n: int = 12) -> dict:
+    """Cho vay và phải thu khác so với vốn chủ: each of the last n quarters, and a flag on the latest from 30%, or up 10 points on a year."""
+    rows = []
+    for period in sorted(quarters)[-n:]:
+        lent, (equity,) = _lent(quarters[period], period), _get(quarters[period], "equity")
+        share = lent / equity if lent is not None and equity is not None and equity > 0 else None
+        rows.append({"quarter": period, "lent": _s(lent), "equity": _s(equity), "share": _r(share),
+                     "equity_not_positive": equity is not None and equity <= 0})
+    latest = max(quarters) if quarters else None
+    flag = None
+    if latest:
+        now_row = next((r for r in rows if r["quarter"] == latest), None)
+        ago_q = quarters.get(_back(latest, 4))
+        ago = None
+        if ago_q is not None:
+            lent, (equity,) = _lent(ago_q, _back(latest, 4)), _get(ago_q, "equity")
+            ago = lent / equity if lent is not None and equity is not None and equity > 0 else None
+        share = Decimal(now_row["share"]) if now_row and now_row["share"] is not None else None
+        if share is not None and share >= LENDING_HIGH:
+            flag = "high"
+        elif share is not None and ago is not None and share - ago >= LENDING_RISE:
+            flag = "rising"
+        return {"rows": rows, "quarter": latest, "share": _r(share), "year_ago": _r(ago), "flag": flag}
+    return {"rows": rows, "quarter": None, "share": None, "year_ago": None, "flag": None}
+
+
 def _advances(q: dict) -> Decimal | None:
     st, lt = _get(q, "advances_st", "advances_lt")
     return st + lt if st is not None and lt is not None else None

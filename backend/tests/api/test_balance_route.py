@@ -66,3 +66,9 @@ def test_the_revisions_of_a_ticker_come_newest_first_with_the_lines_name(tmp_pat
                      seen_on=date(2026, 12, 1))
     rows = call(c, clock, "GET", "/internal/stock/FPT/balance").json()["revisions"]
     assert [(r["line"], r["label"]) for r in rows] == [("equity", "Vốn chủ sở hữu"), ("npat_parent", "LNST công ty mẹ")]
+
+
+def test_the_balance_carries_lending_against_equity(tmp_path):
+    c, clock = client(tmp_path)
+    lending = call(c, clock, "GET", "/internal/stock/FPT/balance").json()["lending"]
+    assert lending["quarter"] == "2026-Q1" and lending["share"] is None and lending["flag"] is None  # no receivable lines stored: blank, not 0

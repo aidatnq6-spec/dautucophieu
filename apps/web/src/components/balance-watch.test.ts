@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advancesText, borrowingText, carryText, dsoText, otherSectorText, prepayDaysText, provisionText, raiseText, revisionText, sectorText, type Carry } from "./balance-watch";
+import { advancesText, borrowingText, lendingText, carryText, dsoText, otherSectorText, prepayDaysText, provisionText, raiseText, revisionText, sectorText, type Carry } from "./balance-watch";
 
 describe("otherSectorText", () => {
   it("sets the ticker's other receivables and loans against the sector, and says when it stands out", () => {
@@ -100,5 +100,13 @@ describe("revisionText", () => {
     expect(revisionText({ kind: "years", period: "2024", line: "npat_parent", label: "LNST công ty mẹ", old: "100000000000", new: "80000000000", seen_on: "2026-11-22" }))
       .toMatch(/^Năm 2024, LNST công ty mẹ: 100.* → 80.* \(thấy 22\/11\/2026\)$/);
     expect(revisionText({ kind: "quarters", period: "2025-Q2", line: "pbt", label: "LNTT", old: "1", new: "2", seen_on: "2026-12-01" })).toMatch(/^Quý 2\/2025, LNTT:/);
+  });
+});
+
+describe("lendingText", () => {
+  it("sets lending against equity, says why it is flagged, and never fills a blank", () => {
+    expect(lendingText({ quarter: "2026-Q1", share: "0.35", year_ago: "0.1", flag: "high" })).toMatch(/35.*vốn chủ; cùng kỳ năm trước 10.*Từ 30% vốn chủ/);
+    expect(lendingText({ quarter: "2026-Q1", share: "0.21", year_ago: "0.1", flag: "rising" })).toMatch(/Tăng từ 10 điểm/);
+    expect(lendingText({ quarter: "2026-Q1", share: null, year_ago: null, flag: null })).toMatch(/^Chưa tính được/);
   });
 });

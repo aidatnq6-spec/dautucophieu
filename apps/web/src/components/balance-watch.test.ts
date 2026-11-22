@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advancesText, borrowingText, coverageText, inventoryPaceText, inventoryText, lendingText, provisionFlowText, carryText, dsoText, otherSectorText, prepayDaysText, provisionText, raiseText, revisionText, sectorText, type Carry } from "./balance-watch";
+import { advancesText, borrowingText, coverageText, inventoryFlowText, inventoryPaceText, inventoryText, lendingText, provisionFlowText, carryText, dsoText, otherSectorText, prepayDaysText, provisionText, raiseText, revisionText, sectorText, type Carry } from "./balance-watch";
 
 describe("otherSectorText", () => {
   it("sets the ticker's other receivables and loans against the sector, and says when it stands out", () => {
@@ -149,5 +149,15 @@ describe("inventoryPaceText", () => {
     expect(inventoryPaceText(p)).toMatch(/^Q4\/2025: tồn kho đủ 249 ngày giá vốn; cùng kỳ năm trước 183 ngày; trung vị ngành 91 ngày \(3 mã\)\. Tồn kho tăng 50,0% .* 10,0%\. Hàng nhập về/);
     expect(inventoryPaceText({ ...p, flag: false })).not.toMatch(/Hàng nhập về/);
     expect(inventoryPaceText({ ...p, days: null })).toMatch(/^Chưa tính được/);
+  });
+});
+
+describe("inventoryFlowText", () => {
+  const f = (change: string | null, pbt: string | null, share: string | null, kind: "release" | "charge" | null) =>
+    ({ rows: [{ quarter: "2026-Q1", balance: "1", change, pbt, share, kind }], quarter: "2026-Q1", kind });
+  it("says the quarter's change against profit, both ways, and that a fall cannot be told apart", () => {
+    expect(inventoryFlowText(f("178000000000", "800000000000", "0.2225", "charge"))).toMatch(/tăng .* 22,3% LNTT của quý\. Trích thêm lớn/);
+    expect(inventoryFlowText(f("-200000000000", "1000000000000", "0.2", "release"))).toMatch(/giảm .* 20,0% LNTT.*hoàn nhập.*đã bán, đã hủy/);
+    expect(inventoryFlowText(f(null, null, null, null))).toMatch(/^Chưa tính được/);
   });
 });

@@ -419,6 +419,28 @@ def inventory_pace(quarters: dict, peers: dict | None, *, property: bool = False
     return {**out, "inventory_growth": _r(inv_growth), "cogs_growth": _r(cogs_growth), "flag": flag}
 
 
+INVENTORY_FLOW_SHARE = Decimal("0.20")  # Dự phòng giảm giá tồn kho đi vào lợi nhuận (owner, 22/11/2026)
+
+
+def inventory_provision_flow(quarters: dict, n: int = 12) -> dict:
+    """Each quarter the change of the inventory provision balance (a positive amount) against that quarter's profit before tax. From 20%
+    of a positive profit: "release" when it fell (a release raises profit, though goods sold or scrapped also use it up; public figures
+    cannot tell them apart) and "charge" when it rose (goods losing value)."""
+    rows = []
+    for period in sorted(quarters)[-n:]:
+        (now_p,), (before_p,), (pbt,) = (_get(quarters[period], "inventory_provision"), _get(quarters.get(_back(period, 1), {}), "inventory_provision"),
+                                         _get(quarters[period], "pbt"))
+        change = before_p - now_p if now_p is not None and before_p is not None else None  # provisions are negative: a rise is more negative
+        share = abs(change) / pbt if change is not None and pbt is not None and pbt > 0 else None
+        kind = None
+        if share is not None and share >= INVENTORY_FLOW_SHARE and change != 0:
+            kind = "release" if change < 0 else "charge"
+        rows.append({"quarter": period, "balance": _s(-now_p if now_p is not None else None), "change": _s(change), "pbt": _s(pbt),
+                     "share": _r(share), "kind": kind})
+    latest = rows[-1] if rows else None
+    return {"rows": rows, "quarter": latest["quarter"] if latest else None, "kind": latest["kind"] if latest else None}
+
+
 def _advances(q: dict) -> Decimal | None:
     st, lt = _get(q, "advances_st", "advances_lt")
     return st + lt if st is not None and lt is not None else None

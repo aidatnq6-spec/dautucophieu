@@ -24,7 +24,9 @@ type Balance = { symbol: string; sector: string | null; debt: { rows: DebtRow[];
   property: { rows: CashRow[]; signal: Signal } | null; liquidity: LiquidityRow[]; carry: Carry;
   receivables: { rows: ArRow[]; dso: Dso; provision: Provision; prepay_days: Dso; other_vs_sector: OtherVsSector }; raise_prepay: { flag: boolean; events: RaiseEvent[] };
   revisions?: Revision[]; lending?: Lending; provision_flow?: ProvisionFlow; inventory?: Inventory;
-  inventory_pace?: InventoryPace };
+  inventory_pace?: InventoryPace; inventory_provision_flow?: InventoryFlow };
+type InvFlowRow = { quarter: string; balance: string | null; change: string | null; pbt: string | null; share: string | null; kind: "release" | "charge" | null };
+export type InventoryFlow = { rows: InvFlowRow[]; quarter: string | null; kind: "release" | "charge" | null };
 export type InventoryPace = Dso & { inventory_growth: string | null; cogs_growth: string | null; flag: boolean | null };
 type InvRow = { quarter: string; gross: string | null; provision: string | null; net: string | null; coverage: string | null; share: string | null };
 export type Inventory = { rows: InvRow[] };
@@ -155,6 +157,17 @@ export function coverageText(rows: ArRow[]): string {
   const parts = [ago ? `cùng kỳ năm trước ${rate(ago.coverage!)}` : null, first && first !== ago ? `${q(first.quarter)} ${rate(first.coverage!)}` : null].filter(Boolean);
   return `${q(last.quarter)}: dự phòng bằng ${rate(last.coverage!)} phải thu trước dự phòng (${ty(last.gross ?? null)}), giá trị thuần ${ty(last.total)}`
     + (parts.length ? `; ${parts.join("; ")}.` : ".");
+}
+
+/** Dự phòng giảm giá tồn kho đi vào lợi nhuận (22/11/2026): the latest quarter's change against its profit before tax. */
+export function inventoryFlowText(f: InventoryFlow): string {
+  const r = f.rows[f.rows.length - 1];
+  if (!r || r.change === null) return "Chưa tính được thay đổi dự phòng giảm giá tồn kho trong quý (thiếu số dư của quý này hoặc quý trước).";
+  const up = Number(r.change) >= 0;
+  const share = r.share !== null ? `, bằng ${rate(r.share)} LNTT của quý` : r.pbt !== null ? " (LNTT của quý không dương: không tính tỷ lệ)" : "";
+  const main = `${q(r.quarter)}: dự phòng giảm giá tồn kho ${up ? "tăng" : "giảm"} ${ty(String(Math.abs(Number(r.change))))}${share}.`;
+  if (up) return r.kind === "charge" ? `${main} Trích thêm lớn: hàng đang mất giá, xem thuyết minh loại hàng nào.` : main;
+  return `${main} Số dư giảm có thể do hoàn nhập (làm tăng lợi nhuận) hoặc do hàng đã bán, đã hủy; nguồn công khai không tách được, cần xem thuyết minh.`;
 }
 
 /** Tồn kho tăng nhanh hơn sức bán (22/11/2026): the days inventory lasts, against a year before and the sector, and the growth of
@@ -321,6 +334,9 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
       {data.inventory && <section className="surface" aria-label="Tồn kho">
         <h2>Tồn kho</h2>
         <p data-testid="inventory">{inventoryText(data.inventory)}</p>
+        {data.inventory_provision_flow && <p data-testid="inventory-flow">{data.inventory_provision_flow.kind && <><span className="pill warn">
+          {data.inventory_provision_flow.kind === "release" ? "Hoàn nhập dự phòng tồn kho lớn" : "Trích thêm dự phòng tồn kho lớn"}</span> </>}
+          {inventoryFlowText(data.inventory_provision_flow)}</p>}
         {data.inventory_pace && <p data-testid="inventory-pace">{data.inventory_pace.flag && <><span className="pill warn">Tồn kho tăng nhanh hơn giá vốn</span> </>}
           {inventoryPaceText(data.inventory_pace)}</p>}
         <div className="tablewrap"><table className="fv-table" aria-label={`Tồn kho ${symbol}`}>

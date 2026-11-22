@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advancesText, borrowingText, coverageText, inventoryText, lendingText, provisionFlowText, carryText, dsoText, otherSectorText, prepayDaysText, provisionText, raiseText, revisionText, sectorText, type Carry } from "./balance-watch";
+import { advancesText, borrowingText, coverageText, inventoryPaceText, inventoryText, lendingText, provisionFlowText, carryText, dsoText, otherSectorText, prepayDaysText, provisionText, raiseText, revisionText, sectorText, type Carry } from "./balance-watch";
 
 describe("otherSectorText", () => {
   it("sets the ticker's other receivables and loans against the sector, and says when it stands out", () => {
@@ -140,5 +140,14 @@ describe("inventoryText", () => {
     expect(text).toMatch(/^Q4\/2021: tồn kho thuần .* bằng 46,3% tổng tài sản; dự phòng giảm giá .* bằng 2,3% giá gốc .*Cùng kỳ năm trước: .*\(42,2% tổng tài sản\)\.$/);
     expect(inventoryText({ rows: [row("2021-Q4", "1", null)] })).toMatch(/chưa có giá gốc và dự phòng/);
     expect(inventoryText({ rows: [] })).toBe("Báo cáo đã lưu chưa có dòng hàng tồn kho.");
+  });
+});
+
+describe("inventoryPaceText", () => {
+  const p = { quarter: "2025-Q4", days: "249", year_ago: "183", change: "66", sector_median: "91", sector_count: 3, inventory_growth: "0.5", cogs_growth: "0.1", flag: true };
+  it("says the days against a year before and the sector, the growth, and why it is flagged", () => {
+    expect(inventoryPaceText(p)).toMatch(/^Q4\/2025: tồn kho đủ 249 ngày giá vốn; cùng kỳ năm trước 183 ngày; trung vị ngành 91 ngày \(3 mã\)\. Tồn kho tăng 50,0% .* 10,0%\. Hàng nhập về/);
+    expect(inventoryPaceText({ ...p, flag: false })).not.toMatch(/Hàng nhập về/);
+    expect(inventoryPaceText({ ...p, days: null })).toMatch(/^Chưa tính được/);
   });
 });

@@ -288,9 +288,13 @@ def receivables_view(quarters: dict, peers: dict | None = None, n: int = 12) -> 
         total, other = _both(q, "receivables", "receivables_lt"), _both(q, "other_receivables", "other_receivables_lt")
         (assets,) = _get(q, "total_assets")
         share = lambda v: _r(v / assets) if v is not None and assets and assets > 0 else None  # noqa: E731
+        provision = _both(q, "bad_debt_st", "bad_debt_lt")
+        # the total is net of the provision (negative): before it and the share provided for (owner, 22/11/2026)
+        gross = total - provision if total is not None and provision is not None else None
         rows.append({"quarter": period, "customers": _s(_both(q, "ar_customers", "ar_customers_lt")), "prepay": _s(_get(q, "prepay_suppliers")[0]),
                      "loans": _s(_both(q, "st_loans_receivable", "lt_loans_receivable")), "other": _s(other),
-                     "provision": _s(_both(q, "bad_debt_st", "bad_debt_lt")), "total": _s(total), "total_share": share(total),
+                     "provision": _s(provision), "total": _s(total), "gross": _s(gross),
+                     "coverage": _r(-provision / gross) if gross is not None and gross > 0 else None, "total_share": share(total),
                      "other_share": share(other), "dso": _s(_dso(quarters, period)), "prepay_days": _s(_prepay_days(quarters, period))})
     latest = max(quarters) if quarters else None
     days = _dso(quarters, latest) if latest else None

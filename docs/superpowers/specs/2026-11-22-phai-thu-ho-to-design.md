@@ -40,3 +40,7 @@ gọi AI, không đoán số. Áp dụng cho mã phi tài chính đang theo dõi
   phải thu, kèm câu nhắc xem Sổ phải thu bên liên quan. Trước 2026, thiếu dòng cho vay thì để trống; từ 2026 (Thông tư 99) coi là không có.
 - Phần 3 (22/11/2026): `provision_flow` trong khối Phải thu: dòng quý mới nhất (tăng/giảm, tỷ lệ so với LNTT; LNTT không dương thì không
   tính tỷ lệ), nhãn "Giảm dự phòng lớn so với lợi nhuận" khi giảm từ 20% LNTT, luôn kèm câu không tách được hoàn nhập với xóa nợ.
+- Phần 4, giá trị thuần và mức bao phủ (chủ sở hữu chọn 22/11/2026): tổng phải thu của VNDirect đã trừ dự phòng nên là **giá trị thuần**;
+  trước dự phòng = thuần + |dự phòng|; bao phủ = |dự phòng| ÷ trước dự phòng; thiếu một dòng dự phòng thì để trống. Bảng Phải thu thêm cột
+  Trước dự phòng và Bao phủ (cột "Tổng phải thu" đổi tên "Giá trị thuần"), vẫn 8 quý như mọi bảng; dòng tóm tắt đọc 12 quý: quý mới nhất,
+  cùng kỳ năm trước và quý đầu của 12 quý. Dự phòng chỉ có tổng, không tách theo khách hàng, cho vay, phải thu khác.

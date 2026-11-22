@@ -22,7 +22,9 @@ export type Provision = { quarter: string | null; amount: string | null; share: 
 type Balance = { symbol: string; sector: string | null; debt: { rows: DebtRow[]; flag: Flag }; sector_debt: SectorDebt | null;
   property: { rows: CashRow[]; signal: Signal } | null; liquidity: LiquidityRow[]; carry: Carry;
   receivables: { rows: ArRow[]; dso: Dso; provision: Provision; prepay_days: Dso; other_vs_sector: OtherVsSector }; raise_prepay: { flag: boolean; events: RaiseEvent[] };
-  revisions?: Revision[]; lending?: Lending };
+  revisions?: Revision[]; lending?: Lending; provision_flow?: ProvisionFlow };
+type FlowRow = { quarter: string; balance: string | null; change: string | null; pbt: string | null; share: string | null; release: boolean };
+export type ProvisionFlow = { rows: FlowRow[]; flag: boolean; quarter: string | null };
 export type Lending = { quarter: string | null; share: string | null; year_ago: string | null; flag: "high" | "rising" | null };
 export type Revision = { kind: "years" | "quarters"; period: string; line: string; label: string; old: string; new: string; seen_on: string };
 
@@ -127,6 +129,16 @@ export function lendingText(l: Lending): string {
   return `${q(l.quarter)}: cho vay và phải thu khác bằng ${rate(l.share)} vốn chủ${ago}.${why}`;
 }
 
+/** Dự phòng đi vào lợi nhuận (22/11/2026): the latest quarter's change of the provision balance against its profit before tax. */
+export function provisionFlowText(f: ProvisionFlow): string {
+  const r = f.rows[f.rows.length - 1];
+  if (!r || r.change === null) return "Chưa tính được thay đổi dự phòng phải thu trong quý (thiếu số dư dự phòng của quý này hoặc quý trước).";
+  const up = Number(r.change) >= 0;
+  const share = r.share !== null ? `, bằng ${rate(r.share)} LNTT của quý` : r.pbt !== null ? " (LNTT của quý không dương: không tính tỷ lệ)" : "";
+  const main = `${q(r.quarter)}: dự phòng phải thu ${up ? "tăng" : "giảm"} ${ty(String(Math.abs(Number(r.change))))}${share}.`;
+  return up ? main : `${main} Số dư giảm có thể do hoàn nhập (làm tăng lợi nhuận) hoặc do xóa nợ (không ảnh hưởng lợi nhuận); nguồn công khai không tách được, cần xem thuyết minh.`;
+}
+
 /** One figure the source changed for a closed period (Số đã công bố bị sửa, 22/11/2026): old → new and the day seen; no cause inferred. */
 export function revisionText(r: Revision): string {
   const when = r.kind === "years" ? `Năm ${r.period}` : `Quý ${r.period.slice(-1)}/${r.period.slice(0, 4)}`;
@@ -222,6 +234,7 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
         {data.raise_prepay.events.map((e) => <p key={e.issue_date} data-testid="raise-prepay" className={e.flag ? "notice" : undefined}>
           {e.flag && <><span className="pill warn">Trả trước tăng sau huy động vốn</span> </>}{raiseText(e)}</p>)}
         {data.lending && <p data-testid="lending">{data.lending.flag && <><span className="pill warn">Cho vay lớn so với vốn chủ</span> </>}{lendingText(data.lending)}</p>}
+        {data.provision_flow && <p data-testid="provision-flow">{data.provision_flow.flag && <><span className="pill warn">Giảm dự phòng lớn so với lợi nhuận</span> </>}{provisionFlowText(data.provision_flow)}</p>}
         <p data-testid="provision">{data.receivables.provision.kind === "jump" && <><span className="pill warn">Dự phòng tăng mạnh</span> </>}
           {provisionText(data.receivables.provision)}</p>
         <div className="tablewrap"><table className="fv-table" aria-label={`Phải thu ${symbol}`}>

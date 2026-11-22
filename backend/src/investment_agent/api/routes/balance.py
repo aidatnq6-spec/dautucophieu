@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Request
 
-from investment_agent.domain.balance_watch import borrowing_flag, carry, lending_view, liquidity_rows, net_debt_rows, property_cash, raise_prepay, receivables_view, sector_debt
+from investment_agent.domain.balance_watch import borrowing_flag, carry, lending_view, liquidity_rows, provision_flow, net_debt_rows, property_cash, raise_prepay, receivables_view, sector_debt
 from investment_agent.market.financial_ratios import kind_of
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.sectors import load_sectors
@@ -50,7 +50,7 @@ def balance(symbol: str, request: Request):
             "liquidity": liquidity_rows(quarters), "carry": carry(quarters),
             "receivables": receivables_view(quarters, {s: qs for s, qs in peers.items() if s != symbol}),
             "raise_prepay": raise_prepay(quarters, (FundamentalsStore(data_dir / "fundamentals").read(symbol) or {}).get("share_issues")),
-            "lending": lending_view(quarters), "revisions": _revisions(data_dir, symbol)}
+            "lending": lending_view(quarters), "provision_flow": provision_flow(quarters), "revisions": _revisions(data_dir, symbol)}
 
 
 def _revisions(data_dir: Path, symbol: str) -> list[dict]:

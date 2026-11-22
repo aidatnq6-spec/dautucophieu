@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advancesText, borrowingText, lendingText, carryText, dsoText, otherSectorText, prepayDaysText, provisionText, raiseText, revisionText, sectorText, type Carry } from "./balance-watch";
+import { advancesText, borrowingText, lendingText, provisionFlowText, carryText, dsoText, otherSectorText, prepayDaysText, provisionText, raiseText, revisionText, sectorText, type Carry } from "./balance-watch";
 
 describe("otherSectorText", () => {
   it("sets the ticker's other receivables and loans against the sector, and says when it stands out", () => {
@@ -108,5 +108,16 @@ describe("lendingText", () => {
     expect(lendingText({ quarter: "2026-Q1", share: "0.35", year_ago: "0.1", flag: "high" })).toMatch(/35.*vốn chủ; cùng kỳ năm trước 10.*Từ 30% vốn chủ/);
     expect(lendingText({ quarter: "2026-Q1", share: "0.21", year_ago: "0.1", flag: "rising" })).toMatch(/Tăng từ 10 điểm/);
     expect(lendingText({ quarter: "2026-Q1", share: null, year_ago: null, flag: null })).toMatch(/^Chưa tính được/);
+  });
+});
+
+describe("provisionFlowText", () => {
+  const row = (change: string | null, pbt: string | null, share: string | null) => ({ quarter: "2026-Q1", balance: "1", change, pbt, share, release: false });
+  it("says the quarter's change against its profit, and that a fall cannot be told apart", () => {
+    expect(provisionFlowText({ rows: [row("19000000000", "160000000000", "0.1188")], flag: false, quarter: "2026-Q1" })).toMatch(/tăng .* bằng 11,9% LNTT của quý\.$/);
+    const fall = provisionFlowText({ rows: [row("-40000000000", "200000000000", "0.2")], flag: true, quarter: "2026-Q1" });
+    expect(fall).toMatch(/giảm .* bằng 20,0% LNTT.*hoàn nhập.*xóa nợ/);
+    expect(provisionFlowText({ rows: [row("-4000000000", "-5000000000", null)], flag: false, quarter: "2026-Q1" })).toMatch(/không dương/);
+    expect(provisionFlowText({ rows: [row(null, null, null)], flag: false, quarter: "2026-Q1" })).toMatch(/^Chưa tính được/);
   });
 });

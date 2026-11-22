@@ -20,3 +20,15 @@ lịch sau phiên không xong trong 2 ngày; chưa diễn tập, diễn tập h�
 - `macro-sync` đọc các chỉ số theo nhóm máy chủ nguồn: các nhóm chạy song song (tối đa 6), chỉ số cùng một máy chủ vẫn đọc lần lượt;
   lãi suất thực đọc sau cùng vì dùng hai chuỗi vừa tải. Khoảng 58 giây còn khoảng 20 giây một lượt (21/11/2026).
 - Hạn của Cung tiền M2 Việt Nam: 100 ngày (trước là 80), vì NHNN công bố chậm 2–3 tháng (chủ sở hữu duyệt 21/11/2026).
+
+## Khoảng trống đã biết (kaizen, chủ sở hữu duyệt 22/11/2026)
+- Một chỉ số quá hạn **chỉ vì** nguồn để trống tháng cùng kỳ năm trước (số mới nhất là tháng ngay trước tháng bị trống) thì không phải sự
+  cố: không vào "Cần để ý", không gửi Telegram. Trang Tình trạng hệ thống ghi một dòng **Đã biết** cho các chỉ số cùng tháng trống
+  (CPI và CPI lõi Mỹ chung một dòng): lý do, "không cần làm gì", khi nào tự hết (số tháng sau; với CPI Mỹ kèm ngày BLS hẹn công bố,
+  lấy từ Lịch vĩ mô Mỹ đã lưu, không có thì không ghi), và hạn báo lại.
+- Hạn báo lại: ngày đầu tháng bị trống cộng hạn của chỉ số (CPI Mỹ: 01/10/2026 + 75 ngày = 15/12/2026). Quá hạn đó mà chưa có số mới
+  thì lại là sự cố như cũ. Chỉ số cũ hơn một tháng trước tháng trống (thiếu cả tháng khác) vẫn là sự cố.
+- Sự cố đã báo qua Telegram rồi chuyển sang "Đã biết" không bị báo "Đã hồi phục"; khi có số mới thật mới báo hồi phục một lần.
+- Kiểm 22/11/2026: BLS không công bố mức tăng 12 tháng của CPI và CPI lõi tháng 10/2026 ("BLS cannot publish 12-month percent changes
+  for October 2026 for indexes where October 2025 data are unavailable"); CPI tháng 11/2026 hẹn công bố 10/12/2026. Không có nguồn
+  chính thức thay thế, nên tháng 10/2026 để trống.

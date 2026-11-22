@@ -212,3 +212,59 @@ def test_statements_are_old_only_past_their_seven_day_refresh_and_two_days_more(
     statements = next(s for s in SOURCES if s["id"] == "statements")
     assert statements["max_days"] == MAX_AGE_DAYS + 2 == 9
     assert {s["id"]: s["max_days"] for s in SOURCES}["financial-ratios"] == 4  # the others keep the spec's limits
+
+
+def macro(out):
+    """The Vĩ mô problems only: the fixture's other sources are fresh on NOW (9/11), not on the later days these tests look at."""
+    return [p["id"] for p in out["problems"] if p["id"].startswith("macro:")]
+
+
+def _cpi_gap(data, *, last):
+    """Both US CPI series stop one month before October 2026, whose year-ago month the source left blank (as on 22/11/2026)."""
+    from investment_agent.market.leading import MacroStore
+    store = MacroStore(data)
+    for key in ("us_cpi_yoy", "us_core_cpi_yoy"):
+        store.upsert(key, [(last, "2.9")], entry="auto")
+    store.record_gaps({k: {"month": "2026-10", "base": "2025-10"} for k in ("us_cpi_yoy", "us_core_cpi_yoy")})
+
+
+def test_a_gap_that_alone_explains_the_age_is_known_once_not_a_problem_until_the_next_month_is_due(tmp_path):
+    """Owner, 22/11/2026 (kaizen): the source has October but not October 2025, so nothing is to be done. One known line for both
+    series, saying when it ends: BLS's date for November's CPI when the calendar has it, and the day it turns back into a problem."""
+    from datetime import date
+    data = healthy(tmp_path)
+    drilled(data)
+    _cpi_gap(data, last=date(2026, 9, 1))
+    (data / "macro").mkdir(exist_ok=True)
+    (data / "macro" / "us-calendar.json").write_text(json.dumps({"events": [
+        {"kind": "cpi", "et": "2026-12-10T08:30:00-05:00", "detail": "November 2026", "source": "https://www.bls.gov/schedule/news_release/cpi.htm"}]}),
+        encoding="utf-8")
+    day = datetime(2026, 11, 22, 1, 0, tzinfo=timezone.utc)
+    out = health_report(data, now=day)
+    assert macro(out) == []
+    assert out["known"] == [{"id": "gap:2026-10", "ids": ["macro:us_cpi_yoy", "macro:us_core_cpi_yoy"],
+                             "label": "Lạm phát CPI của Mỹ (so cùng kỳ); Lạm phát CPI lõi của Mỹ (bỏ lương thực, năng lượng; so cùng kỳ)",
+                             "detail": "tháng 10/2026 chưa tính được so cùng kỳ vì nguồn để trống số tháng 10/2025 (không tự lấp). Không cần làm gì: "
+                                       "tự hết khi có số tháng 11/2026 (BLS hẹn công bố 10/12/2026); đến 15/12/2026 vẫn chưa có thì báo lại thành sự cố."}]
+    (data / "macro" / "us-calendar.json").unlink()
+    assert health_report(data, now=day)["known"][0]["detail"].endswith(
+        "tự hết khi có số tháng 11/2026; đến 15/12/2026 vẫn chưa có thì báo lại thành sự cố.")
+    late = health_report(data, now=datetime(2026, 12, 16, 1, 0, tzinfo=timezone.utc))
+    assert late["known"] == [] and macro(late) == ["macro:us_cpi_yoy", "macro:us_core_cpi_yoy"]
+
+
+def test_a_gap_that_does_not_explain_the_whole_age_stays_a_problem(tmp_path):
+    from datetime import date
+    data = healthy(tmp_path)
+    drilled(data)
+    _cpi_gap(data, last=date(2026, 8, 1))  # September is missing too: not the blank year-ago month
+    out = health_report(data, now=datetime(2026, 11, 22, 1, 0, tzinfo=timezone.utc))
+    assert out["known"] == [] and set(macro(out)) == {"macro:us_cpi_yoy", "macro:us_core_cpi_yoy"}
+
+
+def test_a_problem_turned_known_is_not_announced_as_recovered_and_a_new_known_one_is_not_sent(tmp_path):
+    problems = [{"id": "macro:us_cpi_yoy", "label": "CPI", "detail": "x"}]
+    alert_changes(problems, tmp_path, save=True)
+    known = [{"id": "gap:2026-10", "ids": ["macro:us_cpi_yoy", "macro:us_core_cpi_yoy"], "label": "CPI", "detail": "y"}]
+    assert alert_changes([], tmp_path, save=True, known=known) == ([], [])
+    assert alert_changes([], tmp_path, save=False) == ([], ["macro:us_cpi_yoy"])  # the gap over and the figure back: said once

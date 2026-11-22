@@ -4,7 +4,7 @@ Readings to look into, not a finding and not advice. Public figures only."""
 
 from pathlib import Path
 
-from investment_agent.domain.balance_watch import lending_view, raise_prepay, receivables_view
+from investment_agent.domain.balance_watch import inventory_pace, lending_view, raise_prepay, receivables_view
 from investment_agent.market.financial_ratios import kind_of
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.sectors import load_sectors
@@ -16,7 +16,8 @@ from investment_agent.valuation.quality import report_quality
 SIGNS = [("other_receivables", "Phải thu khác lớn"), ("other_high", "Cao hơn ngành"), ("prepay_suppliers", "Trả trước lớn"),
          ("raise_prepay", "Trả trước sau huy động vốn"), ("paper_income", "Thu nhập tài chính chưa thu tiền"),
          ("financial_profit", "Phụ thuộc thu nhập tài chính"), ("receivables_outpace_revenue", "Phải thu tăng nhanh hơn doanh thu"),
-         ("provision_jump", "Dự phòng tăng mạnh"), ("lending", "Cho vay lớn so với vốn chủ")]
+         ("provision_jump", "Dự phòng tăng mạnh"), ("lending", "Cho vay lớn so với vốn chủ"),
+         ("inventory_fast", "Tồn kho tăng nhanh hơn giá vốn")]
 QUALITY = {"other_receivables", "prepay_suppliers", "paper_income", "financial_profit", "receivables_outpace_revenue"}
 
 
@@ -39,10 +40,16 @@ def receivable_signs(data_dir: Path) -> list[dict]:
             signs["raise_prepay"] = raise_prepay(qs, (record or {}).get("share_issues"))["flag"] if record else None
             lend = lending_view(qs)  # loans and other receivables against equity (owner, 22/11/2026)
             signs["lending"] = None if lend["share"] is None else lend["flag"] is not None
+            pace = inventory_pace(qs, peers, property=sector == "Bất động sản")  # Tồn kho tăng nhanh hơn sức bán (owner, 22/11/2026)
+            signs["inventory_fast"] = pace["flag"]
         else:
-            signs.update(other_high=None, provision_jump=None, raise_prepay=None, lending=None)
-            lend = None
+            signs.update(other_high=None, provision_jump=None, raise_prepay=None, lending=None, inventory_fast=None)
+            lend = pace = None
         details = {k: quality[k]["detail"] for k in QUALITY if k in quality and quality[k]["flag"]}
+        if signs["inventory_fast"]:
+            pct = lambda v: f"{round(float(v) * 100)}%"  # noqa: E731
+            details["inventory_fast"] = (f"Tồn kho tăng {pct(pace['inventory_growth'])} so cùng kỳ, giá vốn bốn quý tăng {pct(pace['cogs_growth'])}; "
+                                         f"tồn kho đủ {pace['days']} ngày (cùng kỳ {pace['year_ago']} ngày).")
         if signs["lending"]:
             q = lend["quarter"]
             details["lending"] = (f"Cho vay và phải thu khác bằng {round(float(lend['share']) * 100)}% vốn chủ (quý {q[-1]}/{q[:4]}); "

@@ -389,6 +389,36 @@ def inventory_view(quarters: dict, n: int = 12) -> dict:
     return {"rows": rows}
 
 
+INVENTORY_GAP = Decimal("0.20")  # inventory growing this much faster than cost of sales (owner, 22/11/2026)
+
+
+def _inventory_days(quarters: dict, period: str) -> Decimal | None:
+    return _days(quarters, period, "inventory", "cogs")
+
+
+def _cogs4(quarters: dict, period: str) -> Decimal | None:
+    flows = [_get(quarters.get(_back(period, k), {}), "cogs")[0] for k in range(4)]
+    return sum(flows) if None not in flows and sum(flows) > 0 else None
+
+
+def inventory_pace(quarters: dict, peers: dict | None, *, property: bool = False) -> dict:
+    """Tồn kho tăng nhanh hơn sức bán: the days inventory lasts against a year before and the sector, and the growth on a year of net
+    inventory against four quarters' cost of sales. flag: True, False, or None when a figure is missing; never for a property developer,
+    whose inventory is projects, not goods."""
+    out = _days_view(quarters, peers, _inventory_days)
+    latest = out["quarter"]
+    inv_growth = cogs_growth = flag = None
+    if latest:
+        ago = _back(latest, 4)
+        (inv,), (inv_ago,) = _get(quarters[latest], "inventory"), _get(quarters.get(ago, {}), "inventory")
+        cogs, cogs_ago = _cogs4(quarters, latest), _cogs4(quarters, ago)
+        if inv is not None and inv_ago is not None and inv_ago > 0 and cogs is not None and cogs_ago is not None:
+            inv_growth, cogs_growth = inv / inv_ago - 1, cogs / cogs_ago - 1
+            rising = out["change"] is not None and Decimal(out["change"]) > 0
+            flag = False if property else (inv_growth - cogs_growth >= INVENTORY_GAP and rising)
+    return {**out, "inventory_growth": _r(inv_growth), "cogs_growth": _r(cogs_growth), "flag": flag}
+
+
 def _advances(q: dict) -> Decimal | None:
     st, lt = _get(q, "advances_st", "advances_lt")
     return st + lt if st is not None and lt is not None else None

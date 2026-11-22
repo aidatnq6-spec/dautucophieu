@@ -288,3 +288,19 @@ def test_inventory_rows_give_cost_provision_net_coverage_and_share_of_assets():
                    "share": "0.4632"}
     old = inventory_view({"2021-Q4": {"inventory": str(29167 * B), "total_assets": str(62971 * B)}})["rows"][-1]
     assert old["gross"] is None and old["coverage"] is None and old["share"] == "0.4632"  # cost not fetched yet: blank, not worked back
+
+
+def test_inventory_days_and_a_stock_growing_faster_than_cost_of_sales():
+    """Tồn kho tăng nhanh hơn sức bán (owner, 22/11/2026): days = net inventory ÷ four quarters' cost of sales × 365, against a year before
+    and the sector; flagged when inventory grows 20 points faster than four quarters' cost of sales and the days rise. Property: no flag."""
+    from investment_agent.domain.balance_watch import inventory_pace
+    B = 10**9
+    q = lambda inv, cogs: {"inventory": str(inv * B), "cogs": str(cogs * B)}  # noqa: E731
+    qs = {f"2024-Q{n}": q(200, 100) for n in range(1, 5)} | {f"2025-Q{n}": q(300, 110) for n in range(1, 5)}
+    out = inventory_pace(qs, {"PEER": {f"2025-Q{n}": q(100, 100) for n in range(1, 5)}})
+    assert (out["days"], out["year_ago"], out["sector_median"]) == ("249", "183", "91")  # 300×365/440; 200×365/400; 100×365/400
+    assert (out["inventory_growth"], out["cogs_growth"], out["flag"]) == ("0.5000", "0.1000", True)  # +50% against +10%
+    assert inventory_pace(qs, None, property=True)["flag"] is False  # projects, not goods: the figure shows, no flag
+    calm = {**qs, **{f"2025-Q{n}": q(220, 110) for n in range(1, 5)}}
+    assert inventory_pace(calm, None)["flag"] is False  # +10% against +10%
+    assert inventory_pace({"2025-Q4": q(300, 110)}, None)["flag"] is None  # no year before: not read

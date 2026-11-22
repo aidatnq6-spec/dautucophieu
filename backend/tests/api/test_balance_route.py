@@ -85,3 +85,9 @@ def test_the_balance_carries_the_inventory_block(tmp_path):
     inv = call(c, clock, "GET", "/internal/stock/KDH/balance").json()["inventory"]
     assert inv["rows"][-1]["quarter"] == "2026-Q1" and inv["rows"][-1]["net"] == str(5200 * B) and inv["rows"][-1]["share"] == "2.6000"
     assert inv["rows"][-1]["gross"] is None  # cost not stored in this fixture: blank
+
+
+def test_a_property_developer_gets_inventory_days_but_no_flag(tmp_path):
+    c, clock = client(tmp_path)
+    pace = call(c, clock, "GET", "/internal/stock/KDH/balance").json()["inventory_pace"]
+    assert pace["quarter"] == "2026-Q1" and pace["flag"] in (False, None)

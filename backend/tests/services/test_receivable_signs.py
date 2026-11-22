@@ -48,3 +48,15 @@ def test_lending_against_equity_is_a_sign_with_its_figure(tmp_path):
     aaa = next(r for r in receivable_signs(d) if r["symbol"] == "AAA")
     assert ("lending", "Cho vay lớn so với vốn chủ") in SIGNS and aaa["signs"]["lending"] is True
     assert aaa["details"]["lending"] == "Cho vay và phải thu khác bằng 35% vốn chủ (quý 1/2026); xem Sổ phải thu bên liên quan trên hồ sơ mã."
+
+
+def test_inventory_growing_faster_than_cost_of_sales_is_a_sign_with_its_figures(tmp_path):
+    from investment_agent.market.statements import StatementStore
+    d = data(tmp_path)
+    B = 10**9
+    q = lambda inv, cogs: {"inventory": str(inv * B), "cogs": str(cogs * B)}  # noqa: E731
+    StatementStore(d / "statements").save({"symbol": "AAA", "years": {}, "quarters": {f"2024-Q{n}": q(200, 100) for n in range(1, 5)}
+                                           | {f"2025-Q{n}": q(300, 110) for n in range(1, 5)}})
+    aaa = next(r for r in receivable_signs(d) if r["symbol"] == "AAA")
+    assert ("inventory_fast", "Tồn kho tăng nhanh hơn giá vốn") in SIGNS and aaa["signs"]["inventory_fast"] is True
+    assert aaa["details"]["inventory_fast"] == "Tồn kho tăng 50% so cùng kỳ, giá vốn bốn quý tăng 10%; tồn kho đủ 249 ngày (cùng kỳ 183 ngày)."

@@ -23,7 +23,9 @@ export type Provision = { quarter: string | null; amount: string | null; share: 
 type Balance = { symbol: string; sector: string | null; debt: { rows: DebtRow[]; flag: Flag }; sector_debt: SectorDebt | null;
   property: { rows: CashRow[]; signal: Signal } | null; liquidity: LiquidityRow[]; carry: Carry;
   receivables: { rows: ArRow[]; dso: Dso; provision: Provision; prepay_days: Dso; other_vs_sector: OtherVsSector }; raise_prepay: { flag: boolean; events: RaiseEvent[] };
-  revisions?: Revision[]; lending?: Lending; provision_flow?: ProvisionFlow; inventory?: Inventory };
+  revisions?: Revision[]; lending?: Lending; provision_flow?: ProvisionFlow; inventory?: Inventory;
+  inventory_pace?: InventoryPace };
+export type InventoryPace = Dso & { inventory_growth: string | null; cogs_growth: string | null; flag: boolean | null };
 type InvRow = { quarter: string; gross: string | null; provision: string | null; net: string | null; coverage: string | null; share: string | null };
 export type Inventory = { rows: InvRow[] };
 type FlowRow = { quarter: string; balance: string | null; change: string | null; pbt: string | null; share: string | null; release: boolean };
@@ -153,6 +155,18 @@ export function coverageText(rows: ArRow[]): string {
   const parts = [ago ? `cùng kỳ năm trước ${rate(ago.coverage!)}` : null, first && first !== ago ? `${q(first.quarter)} ${rate(first.coverage!)}` : null].filter(Boolean);
   return `${q(last.quarter)}: dự phòng bằng ${rate(last.coverage!)} phải thu trước dự phòng (${ty(last.gross ?? null)}), giá trị thuần ${ty(last.total)}`
     + (parts.length ? `; ${parts.join("; ")}.` : ".");
+}
+
+/** Tồn kho tăng nhanh hơn sức bán (22/11/2026): the days inventory lasts, against a year before and the sector, and the growth of
+ * inventory against four quarters' cost of sales. */
+export function inventoryPaceText(p: InventoryPace): string {
+  if (!p.quarter || p.days === null) return "Chưa tính được số ngày tồn kho (thiếu tồn kho hoặc giá vốn bốn quý).";
+  const ago = p.year_ago !== null ? `; cùng kỳ năm trước ${p.year_ago} ngày` : "";
+  const sector = p.sector_median !== null ? `; trung vị ngành ${p.sector_median} ngày (${p.sector_count} mã)` : "";
+  const growth = p.inventory_growth !== null && p.cogs_growth !== null
+    ? ` Tồn kho tăng ${rate(p.inventory_growth)} so cùng kỳ, giá vốn bốn quý tăng ${rate(p.cogs_growth)}.` : "";
+  const why = p.flag ? " Hàng nhập về nhanh hơn hàng bán ra: xem thuyết minh tồn kho (loại hàng nào tăng) và dự phòng giảm giá." : "";
+  return `${q(p.quarter)}: tồn kho đủ ${p.days} ngày giá vốn${ago}${sector}.${growth}${why}`;
 }
 
 /** Khối Tồn kho (22/11/2026): the latest quarter net, its share of total assets and the share provided for, against a year before. */
@@ -307,6 +321,8 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
       {data.inventory && <section className="surface" aria-label="Tồn kho">
         <h2>Tồn kho</h2>
         <p data-testid="inventory">{inventoryText(data.inventory)}</p>
+        {data.inventory_pace && <p data-testid="inventory-pace">{data.inventory_pace.flag && <><span className="pill warn">Tồn kho tăng nhanh hơn giá vốn</span> </>}
+          {inventoryPaceText(data.inventory_pace)}</p>}
         <div className="tablewrap"><table className="fv-table" aria-label={`Tồn kho ${symbol}`}>
           <thead><tr><th>Quý</th><th className="num">Giá gốc</th><th className="num">Dự phòng giảm giá</th><th className="num">Bao phủ</th>
             <th className="num">Giá trị thuần</th><th className="num">Trên tổng tài sản</th></tr></thead>
@@ -321,7 +337,8 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
             </tr>))}</tbody>
         </table></div>
         <p className="caption">Giá gốc và dự phòng giảm giá hàng tồn kho theo bảng cân đối (VNDirect); giá trị thuần = giá gốc − dự phòng. Bao phủ = dự phòng ÷
-          giá gốc. Cơ cấu (nguyên vật liệu, dở dang, thành phẩm, hàng hóa) chỉ có trong thuyết minh, không có ở đây. Ô thiếu số để trống. Không phải khuyến nghị.</p>
+          giá gốc. Số ngày tồn kho = tồn kho thuần cuối quý ÷ giá vốn bốn quý × 365; được ghi là tăng nhanh hơn giá vốn khi tồn kho tăng so cùng kỳ
+          nhanh hơn giá vốn bốn quý từ 20 điểm % và số ngày tăng (không ghi với Bất động sản, nơi tồn kho là dự án). Cơ cấu (nguyên vật liệu, dở dang, thành phẩm, hàng hóa) chỉ có trong thuyết minh, không có ở đây. Ô thiếu số để trống. Không phải khuyến nghị.</p>
       </section>}
       {data.property && <section className="surface" aria-label="Tiền khách trả trước">
         <h2>Tiền khách trả trước</h2>

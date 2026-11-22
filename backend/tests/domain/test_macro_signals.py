@@ -186,3 +186,17 @@ def test_vn_pmi_below_50_warns_and_below_48_is_danger():
 def test_nine_lights_in_order():
     assert [s["id"] for s in macro_signals(base(), today=TODAY)] == \
         ["oil", "usd", "fx_gap", "fx_ceiling", "us10y", "foreign", "interbank", "pe", "pmi"]
+
+
+def test_foreign_interbank_and_pe_are_old_by_hose_sessions_missed_owner_22_11_2026():
+    """A 7-day limit greyed these three lights over every long holiday. They are old after 5 HOSE sessions without a figure, as a
+    normal week was before; the other lights keep their days."""
+    from investment_agent.domain.macro_signals import SIGNALS
+    assert {k: s.max_sessions for k, s in SIGNALS.items() if s.max_sessions} == {"foreign": 5, "interbank": 5, "pe": 5}
+    holidays = {date(2026, 4, 29), date(2026, 4, 30), date(2026, 5, 1)}
+    session = lambda d: d.weekday() < 5 and d not in holidays  # noqa: E731
+    data = base()
+    data["vn_interbank_on"] = [(date(2026, 4, 28), Decimal("4.5"))]
+    s = by_id(macro_signals(data, today=date(2026, 5, 6), is_session=session))  # 8 days, 3 sessions (4, 5, 6 May)
+    assert s["interbank"]["level"] != "stale" and s["interbank"]["max_age_sessions"] == 5
+    assert by_id(macro_signals(data, today=date(2026, 5, 11), is_session=session))["interbank"]["level"] == "stale"  # 6 sessions

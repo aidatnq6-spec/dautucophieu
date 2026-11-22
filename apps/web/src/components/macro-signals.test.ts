@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Signal, signalMove, signalNext, signalSince, signalSummary, signalThresholds, signalValue } from "./macro-signals";
+import { type Signal, signalAge, signalMove, signalNext, signalSince, signalSummary, signalThresholds, signalValue } from "./macro-signals";
 
 const light = (id: Signal["id"], value: string | null, yellow: string, red: string, more: Partial<Signal> = {}): Signal =>
   ({ id, name: id, level: "green", value, latest_date: "2026-11-20", yellow, red, down_yellow: null, down_red: null, since: null, max_age_days: 7,
@@ -58,5 +58,10 @@ describe("Đèn tín hiệu rủi ro vĩ mô", () => {
       .toEqual({ text: "▼ giảm 0,19 điểm % so với 30 ngày trước · chiều xấu", tone: "bad" });
     expect(signalMove(light("pmi", "52.3", "50", "48", { move: { direction: "up", bad: false, by: "0.4" } })))
       .toEqual({ text: "▲ tăng 0,4 điểm so với tháng trước · chiều tốt", tone: "good" });
+  });
+
+  it("says a market light is old by HOSE sessions and the others by days", () => {
+    expect(signalAge(light("interbank", "4.5", "5", "7", { level: "stale", max_age_sessions: 5 }))).toBe("quá 5 phiên HOSE chưa có số mới");
+    expect(signalAge(light("oil", "0.1", "0.10", "0.20", { level: "stale", max_age_days: 10 }))).toBe("quá 10 ngày");
   });
 });

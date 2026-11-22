@@ -25,6 +25,7 @@ class Spec:
     flat: Decimal       # a move smaller than this reads "flat", in the light's own unit
     kind: str           # "share" (a ratio shown in %), "points", "count"
     link: str           # where the light's name leads
+    max_sessions: int | None = None  # a HOSE-session light: old after this many sessions without a figure, not max_age days (22/11/2026)
 
 
 SIGNALS = {
@@ -35,10 +36,10 @@ SIGNALS = {
     "fx_ceiling": Spec("Tỷ giá Vietcombank so với trần", Decimal("0.02"), Decimal("0.01"), "down", False, 7, Decimal("0.001"), "share",
                        "#chi-so-usd_vnd_vcb"),
     "us10y": Spec("Lợi suất trái phiếu Mỹ 10 năm", Decimal("0.3"), Decimal("0.5"), "up", False, 10, Decimal("0.05"), "points", "#chi-so-us10y"),
-    "foreign": Spec("Khối ngoại", Decimal(5), Decimal(10), "up", False, 7, Decimal("0.5"), "count", "#chi-so-foreign_net"),
+    "foreign": Spec("Khối ngoại", Decimal(5), Decimal(10), "up", False, 7, Decimal("0.5"), "count", "#chi-so-foreign_net", 5),
     "interbank": Spec("Lãi suất liên ngân hàng qua đêm", Decimal(5), Decimal(7), "up", False, 7, Decimal("0.1"), "points",
-                      "#chi-so-vn_interbank_on"),
-    "pe": Spec("P/E VN-Index so với 5 năm", Decimal("0.80"), Decimal("0.90"), "up", False, 7, Decimal("0.02"), "share", "/fair-value"),
+                      "#chi-so-vn_interbank_on", 5),
+    "pe": Spec("P/E VN-Index so với 5 năm", Decimal("0.80"), Decimal("0.90"), "up", False, 7, Decimal("0.02"), "share", "/fair-value", 5),
     "pmi": Spec("PMI sản xuất Việt Nam", Decimal(50), Decimal(48), "down", True, 45, Decimal("0.3"), "points", "#chi-so-vn_pmi"),
 }
 LEVEL_WORD = {"green": "bình thường", "yellow": "cảnh báo", "red": "nguy hiểm"}
@@ -154,9 +155,13 @@ def _move(key: str, measured: Points) -> dict | None:
     return {"direction": direction, "bad": None if direction == "flat" else direction == s.bad, "by": _show(key, abs(change))}
 
 
-def _light(key: str, measured: Points, raw: Points, today: date) -> dict:
+def _sessions_after(latest: date, today: date, is_session) -> int:
+    return sum(1 for i in range(1, (today - latest).days + 1) if is_session(latest + timedelta(days=i)))
+
+
+def _light(key: str, measured: Points, raw: Points, today: date, is_session) -> dict:
     s = SIGNALS[key]
-    out = {"id": key, "name": s.name, "level": "missing", "value": None, "max_age_days": s.max_age, "yellow": str(s.yellow),
+    out = {"id": key, "name": s.name, "level": "missing", "value": None, "max_age_days": s.max_age, "max_age_sessions": s.max_sessions, "yellow": str(s.yellow),
            "red": str(s.red), "bad_side": s.bad, "strict": s.strict, "down_yellow": None, "down_red": None,
            "latest_date": raw[-1][0].isoformat() if raw else None, "since": None, "spark": [], "next": None,
            "level_since": None, "level_since_open": False, "link": s.link, "move": None, "pe": None}
@@ -165,7 +170,8 @@ def _light(key: str, measured: Points, raw: Points, today: date) -> dict:
     latest, value = measured[-1]
     recent = [(d, v) for d, v in measured if d >= latest - WINDOW]
     held = _level(key, value)
-    level = "stale" if (today - latest).days > s.max_age else held
+    old = _sessions_after(latest, today, is_session) > s.max_sessions if s.max_sessions else (today - latest).days > s.max_age
+    level = "stale" if old else held
     start = len(recent) - 1
     while start > 0 and _level(key, recent[start - 1][1]) == held:
         start -= 1
@@ -180,10 +186,12 @@ def _light(key: str, measured: Points, raw: Points, today: date) -> dict:
             "pe": _plain(raw[-1][1].quantize(Decimal("0.01"), ROUND_HALF_UP)) if key == "pe" else None}
 
 
-def macro_signals(series: dict[str, Points], *, today: date) -> list[dict]:
+def macro_signals(series: dict[str, Points], *, today: date, is_session=None) -> list[dict]:
     """series: factor_oil, factor_usd, usd_vnd_free, usd_vnd_vcb, usd_vnd_central, us10y, foreign_net, vn_interbank_on, vnindex_pe,
     vn_pmi (oldest first); each light reads its own latest observation, judged against today for its age."""
-    return [_light(k, _measured(k, series), series.get(SOURCES[k]) or [], today) for k in SIGNALS]
+    if is_session is None:
+        from investment_agent.market.sessions import is_session
+    return [_light(k, _measured(k, series), series.get(SOURCES[k]) or [], today, is_session) for k in SIGNALS]
 
 
 def _pct(value: str, digits: int, sign: bool = True) -> str:

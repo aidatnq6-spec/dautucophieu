@@ -59,3 +59,27 @@ def passive_income(*, target: Decimal, rate: Decimal, capital: Decimal | None, c
     return {"required": _vnd(required), "income_now": _vnd(income_now) if income_now is not None else None,
             "progress": str(progress.quantize(Decimal("0.0001"), ROUND_HALF_UP)) if progress is not None else None,
             "months": months if reached else None, "reached_on": _month_after(today, months) if reached else None}
+
+
+def real_target(*, target: Decimal, rate: Decimal, inflation: Decimal, margin: Decimal, capital: Decimal | None, contribution: Decimal,
+                today: date) -> dict:
+    """Mốc tự do tài chính theo lợi suất thực (owner, 22/11/2026): the capital whose return above inflation pays the yearly spending,
+    raised by a safety margin (percent); and the months to reach it at that real rate with the same contributions, in today's money.
+    A return not above inflation loses buying power: no target (reason not_above_inflation)."""
+    real = rate - inflation
+    if real <= 0:
+        return {"required": None, "real_rate": str(real.quantize(Decimal("0.01"), ROUND_HALF_UP)), "months": None, "reached_on": None,
+                "reason": "not_above_inflation"}
+    required = target * 12 / (real / 100) * (1 + margin / 100)
+    value, months, monthly = capital or Decimal(0), 0, real / 100 / 12
+    while value < required and months < HORIZON_MONTHS:
+        value = value * (1 + monthly) + contribution
+        months += 1
+    reached = value >= required
+    return {"required": _vnd(required), "real_rate": str(real.quantize(Decimal("0.01"), ROUND_HALF_UP)), "months": months if reached else None,
+            "reached_on": _month_after(today, months) if reached else None, "reason": None}
+
+
+def rule_of_four(*, target: Decimal, usd_vnd: Decimal | None) -> dict:
+    """The figures the VWA note sets against it: the capital the 4% rule asks for this spending, and one million USD in đồng."""
+    return {"four_percent": _vnd(target * 12 / Decimal("0.04")), "million_usd": _vnd(usd_vnd * 1_000_000) if usd_vnd is not None else None}

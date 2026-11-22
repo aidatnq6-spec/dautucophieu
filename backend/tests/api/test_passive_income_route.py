@@ -93,3 +93,22 @@ def test_a_level_must_be_a_whole_amount_above_zero(tmp_path):
     c, clock = client(tmp_path)
     for bad in ("0", "abc", "1000.5"):
         assert call(c, clock, "PUT", "/internal/passive-income", {"target": "1000000", "rate": None, "freedom": bad, "expected_version": 0, "request_id": "pi2"}).status_code == 422
+
+
+def test_the_real_target_uses_the_owners_inflation_or_vietnams_latest_cpi_and_a_safety_margin(tmp_path):
+    """Mốc tự do tài chính theo lợi suất thực (owner, 22/11/2026)."""
+    MacroStore(tmp_path).upsert("vn_cpi_yoy", [(date(2026, 12, 31), "3.5")], entry="auto")
+    MacroStore(tmp_path).upsert("usd_vnd_vcb", [(date(2027, 1, 14), "26302")], entry="auto")
+    c, clock = client(tmp_path)
+    call(c, clock, "PUT", "/internal/passive-income", {"target": "20000000", "rate": "8", "expected_version": 0, "request_id": "pi1"})
+    real = call(c, clock, "GET", "/internal/passive-income").json()["result"]["real"]
+    assert real["inflation"] == "3.5" and real["inflation_from"] == {"source": "vn_cpi_yoy", "date": "2026-12-31"} and real["margin"] == "0"
+    assert real["required"] == "5333333333"  # 240 tr ÷ 4.5%
+    four = call(c, clock, "GET", "/internal/passive-income").json()["result"]["four"]
+    assert four == {"four_percent": "6000000000", "million_usd": "26302000000"}
+    call(c, clock, "PUT", "/internal/passive-income", {"target": "20000000", "rate": "8", "inflation": "3", "margin": "10", "expected_version": 1,
+                                                       "request_id": "pi2"})
+    real = call(c, clock, "GET", "/internal/passive-income").json()["result"]["real"]
+    assert real["inflation_from"] is None and real["required"] == "5280000000"  # 240 tr ÷ 5% × 1.1
+    bad = call(c, clock, "PUT", "/internal/passive-income", {"target": "20000000", "margin": "-5", "expected_version": 2, "request_id": "pi3"})
+    assert bad.status_code == 422

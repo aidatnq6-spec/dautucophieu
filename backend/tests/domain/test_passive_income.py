@@ -65,3 +65,30 @@ def test_cover_may_pass_one_hundred_percent_and_no_spending_gives_no_cover():
     out = freedom_levels(income=Decimal("9000000"), rent=Decimal(0), safe=Decimal("6000000"), independent=None, freedom=None)
     assert out["rows"][0]["without_rent"] == "1.5000"
     assert freedom_levels(income=Decimal(1), rent=Decimal(0), safe=Decimal(0), independent=None, freedom=None)["rows"][0]["with_rent"] is None
+
+
+def test_the_real_target_divides_by_the_return_above_inflation_with_a_safety_margin():
+    """Mốc tự do tài chính theo lợi suất thực (owner, 22/11/2026; the VWA note): 1 tỷ a year at 12.5% less 4.5% inflation is 12.5 tỷ;
+    a safety margin raises it; a return not above inflation gives no target."""
+    from datetime import date
+    from decimal import Decimal
+
+    from investment_agent.domain.passive_income import real_target
+    monthly = Decimal(1_000_000_000) / 12
+    out = real_target(target=monthly, rate=Decimal("12.5"), inflation=Decimal("4.5"), margin=Decimal(0), capital=Decimal(3_100_000_000),
+                      contribution=Decimal(58_333_333), today=date(2026, 11, 22))
+    assert out["required"] == "12500000000" and out["real_rate"] == "8.00" and out["reason"] is None
+    assert out["months"] is not None and out["reached_on"] is not None
+    assert real_target(target=monthly, rate=Decimal("12.5"), inflation=Decimal("4.5"), margin=Decimal(44), capital=None, contribution=Decimal(0),
+                       today=date(2026, 11, 22))["required"] == "18000000000"
+    none = real_target(target=monthly, rate=Decimal("4"), inflation=Decimal("4.5"), margin=Decimal(0), capital=None, contribution=Decimal(0),
+                       today=date(2026, 11, 22))
+    assert none["required"] is None and none["reason"] == "not_above_inflation"
+
+
+def test_the_four_percent_rule_and_one_million_usd_are_set_beside_it():
+    from decimal import Decimal
+
+    from investment_agent.domain.passive_income import rule_of_four
+    assert rule_of_four(target=Decimal(20_000_000), usd_vnd=Decimal("26302")) == {"four_percent": "6000000000", "million_usd": "26302000000"}
+    assert rule_of_four(target=Decimal(20_000_000), usd_vnd=None)["million_usd"] is None

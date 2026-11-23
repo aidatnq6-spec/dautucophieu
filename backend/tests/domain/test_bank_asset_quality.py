@@ -32,7 +32,20 @@ def test_the_latest_quarter_is_set_against_the_last_one_a_year_before_and_the_st
 
 
 def test_warning_signs_are_named():
-    assert set(quality_trend(QUARTERS)["2026-Q3"]["flags"]) == {"llr_falling", "group2_jump", "reserve_lagging", "write_off", "accrued_jump", "real_estate_fast", "documents_jump"}
+    # cover 100% → 84,6% is a fall of 15% of its level: under the 20% the owner set on 23/11/2026, so no longer a sign
+    assert set(quality_trend(QUARTERS)["2026-Q3"]["flags"]) == {"group2_jump", "reserve_lagging", "write_off", "accrued_jump", "real_estate_fast", "documents_jump"}
+
+
+def test_cover_falling_is_weighed_against_its_own_level_and_group_2_from_half_again():
+    """Owner, 23/11/2026, from 306 bank-quarters (2018–2026): a 10-point fall flagged 40% of them, group 2 up 30% flagged 20%. Now a fall of
+    20% of the level before (against the quarter before or the end of last year) and group 2 up 50% or more on the quarter."""
+    def two(reserve_before, reserve_now, g2_before=10, g2_now=10):
+        return {"2026-Q2": q(1000, g2_before, 5, 5, 10, reserve=reserve_before), "2026-Q3": q(1000, g2_now, 5, 5, 10, reserve=reserve_now)}
+    assert "llr_falling" in quality_trend(two(40, 32))["2026-Q3"]["flags"]  # 200% → 160%: 20% of its level
+    assert "llr_falling" not in quality_trend(two(40, 32.2))["2026-Q3"]["flags"]  # 200% → 161%: 19,5%, though 39 points
+    assert "llr_falling" in quality_trend(two(10, 8))["2026-Q3"]["flags"]  # 50% → 40%: 10 points, 20% of a thin cover
+    assert "group2_jump" in quality_trend(two(20, 20, 10, 15))["2026-Q3"]["flags"]  # +50%
+    assert "group2_jump" not in quality_trend(two(20, 20, 10, 14.9))["2026-Q3"]["flags"]  # +49%
 
 
 def test_a_calm_quarter_raises_nothing_and_a_missing_figure_is_not_guessed():

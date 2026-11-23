@@ -55,7 +55,9 @@ def derive(q: dict) -> dict:
 
 
 # The application's own lines for a sign worth a closer look, stated on the page; not research cut-offs and not a finding.
-LLR_DROP, GROUP2_JUMP, ACCRUED_JUMP, DOCUMENTS_JUMP, REAL_ESTATE_PACE = Decimal("0.10"), Decimal("0.30"), Decimal("0.20"), Decimal("0.30"), Decimal("1.5")
+LLR_DROP, GROUP2_JUMP, ACCRUED_JUMP, DOCUMENTS_JUMP, REAL_ESTATE_PACE = Decimal("0.20"), Decimal("0.50"), Decimal("0.20"), Decimal("0.30"), Decimal("1.5")
+# Owner, 23/11/2026: cover falling is now a share of its own level (cover runs from about 50% to over 200% across banks, so 10 points meant
+# little to one and much to another) and group 2 from +50%; on 306 public bank-quarters of 2018–2026 the old lines flagged 40% and 20% of them.
 
 
 def _quarter_before(key: str, back: int) -> str:
@@ -96,7 +98,7 @@ def quality_trend(quarters: dict[str, dict]) -> dict[str, dict]:
         real_estate = growth(num(cur, "real_estate_loans"), num(start, "real_estate_loans"))
         reserve_now, reserve_before = num(cur, "reserve"), num(prev, "reserve")
         flags = []
-        if llr["cur"] is not None and any(llr[k] is not None and llr[k] - llr["cur"] >= LLR_DROP for k in ("prev", "start")):
+        if llr["cur"] is not None and any(llr[k] and (llr[k] - llr["cur"]) / llr[k] >= LLR_DROP for k in ("prev", "start")):
             flags.append("llr_falling")
         if g2 is not None and g2 >= GROUP2_JUMP:
             flags.append("group2_jump")

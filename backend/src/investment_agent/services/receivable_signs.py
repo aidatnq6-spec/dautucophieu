@@ -6,7 +6,7 @@ from pathlib import Path
 
 from decimal import ROUND_HALF_UP, Decimal
 
-from investment_agent.domain.balance_watch import cover_thinning, gross_loss, inventory_pace, lending_view, raise_prepay, receivables_view
+from investment_agent.domain.balance_watch import cover_thinning, gross_loss, inventory_pace, year_end_provision, lending_view, raise_prepay, receivables_view
 from investment_agent.market.financial_ratios import kind_of
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.sectors import load_sectors
@@ -20,7 +20,7 @@ SIGNS = [("other_receivables", "Phải thu khác lớn"), ("other_high", "Cao h�
          ("financial_profit", "Phụ thuộc thu nhập tài chính"), ("receivables_outpace_revenue", "Phải thu tăng nhanh hơn doanh thu"),
          ("provision_jump", "Dự phòng tăng mạnh"), ("lending", "Cho vay lớn so với vốn chủ"),
          ("inventory_fast", "Tồn kho tăng nhanh hơn giá vốn"), ("gross_loss", "Bán dưới giá vốn, dự phòng không tăng"),
-         ("cover_thinning", "Dự phòng mỏng dần, hàng tồn lâu hơn")]
+         ("cover_thinning", "Dự phòng mỏng dần, hàng tồn lâu hơn"), ("audit_gap", "Dự phòng tồn kho quý 4 khác số kiểm toán")]
 # A bank's row holds only these (Chất lượng tài sản ngân hàng, owner 23/11/2026), from VNDirect's bank lines and Vietcap's groups 1–5.
 BANK_SIGNS = [("provision_cut", "Lợi nhuận đỡ bởi giảm trích lập"), ("accrued_outpace", "Lãi dự thu tăng nhanh hơn thu nhập lãi")]
 SIGNS += BANK_SIGNS
@@ -87,7 +87,8 @@ def receivable_signs(data_dir: Path) -> list[dict]:
     sectors = load_sectors(data_dir)[0]
     statements, fundamentals = StatementStore(data_dir / "statements"), FundamentalsStore(data_dir / "fundamentals")
     watched = load_watchlist(data_dir).symbols
-    quarters = {s: (statements.read(s) or {}).get("quarters", {}) for s in watched if kind_of(sectors.get(s)) is None}
+    kept = {s: statements.read(s) or {} for s in watched if kind_of(sectors.get(s)) is None}
+    quarters = {s: rec.get("quarters", {}) for s, rec in kept.items()}
     rows = []
     for symbol, qs in quarters.items():
         record, sector = fundamentals.read(symbol), sectors.get(symbol)
@@ -107,10 +108,13 @@ def receivable_signs(data_dir: Path) -> list[dict]:
             signs["gross_loss"] = loss["flag"]
             thin = cover_thinning(qs, property=sector == "Bất động sản")  # Dự phòng mỏng dần (owner, 23/11/2026)
             signs["cover_thinning"] = thin["flag"]
+            # Dự phòng chốt khi kiểm toán (owner, 23/11/2026): Q4 as first reported against the audited year; not for a property developer
+            audit = year_end_provision(qs, kept[symbol].get("years", {}))
+            signs["audit_gap"] = False if sector == "Bất động sản" else audit["flag"]
         else:
             signs.update(other_high=None, provision_jump=None, raise_prepay=None, lending=None, inventory_fast=None, gross_loss=None,
-                         cover_thinning=None)
-            lend = pace = loss = thin = None
+                         cover_thinning=None, audit_gap=None)
+            lend = pace = loss = thin = audit = None
         details = {k: quality[k]["detail"] for k in QUALITY if k in quality and quality[k]["flag"]}
         if signs["inventory_fast"]:
             pct = lambda v: f"{round(float(v) * 100)}%"  # noqa: E731
@@ -124,6 +128,11 @@ def receivable_signs(data_dir: Path) -> list[dict]:
             q = thin["quarter"]
             details["cover_thinning"] = (f"Tồn kho đủ {thin['days']} ngày giá vốn (cùng kỳ {thin['days_year_ago']} ngày) trong khi tỷ lệ trích lập dự phòng "
                                          f"còn {_pct1(thin['coverage'])} (cùng kỳ {_pct1(thin['coverage_year_ago'])}), quý {q[-1]}/{q[:4]}.")
+        if signs["audit_gap"]:
+            r = next(r for r in audit["rows"] if r["year"] == audit["year"])
+            q4, yb = Decimal(r["q4_balance"]) / BILLION, Decimal(r["year_balance"]) / BILLION
+            details["audit_gap"] = (f"Năm {r['year']}: dự phòng giảm giá tồn kho cuối quý 4 tự lập {_ty(q4)} tỷ, trên báo cáo năm đã kiểm toán "
+                                    f"{_ty(yb)} tỷ (kiểm toán {'thêm' if yb > q4 else 'bớt'} {_ty(abs(yb - q4))} tỷ).")
         if signs["lending"]:
             q = lend["quarter"]
             details["lending"] = (f"Cho vay và phải thu khác bằng {round(float(lend['share']) * 100)}% vốn chủ (quý {q[-1]}/{q[:4]}); "

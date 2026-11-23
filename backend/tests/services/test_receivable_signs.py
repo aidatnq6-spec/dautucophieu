@@ -134,6 +134,17 @@ def test_days_up_while_the_provision_thins_is_a_sign_with_its_figures(tmp_path):
                                                 "(cùng kỳ 5,0%), quý 3/2026.")
 
 
+def test_a_q4_provision_the_audit_changed_is_a_sign_with_both_balances(tmp_path):
+    """Dự phòng chốt khi kiểm toán (owner, 23/11/2026): told once for a held ticker through the signs note."""
+    d = data(tmp_path)
+    StatementStore(d / "statements").save({"symbol": "AAA", "years": {"2025": {"inventory_provision": str(-682 * BN)}},
+                                           "quarters": {"2025-Q4": {"inventory_provision": str(-600 * BN)}}})
+    aaa = next(r for r in receivable_signs(d) if r["symbol"] == "AAA")
+    assert ("audit_gap", "Dự phòng tồn kho quý 4 khác số kiểm toán") in SIGNS and aaa["signs"]["audit_gap"] is True
+    assert aaa["details"]["audit_gap"] == ("Năm 2025: dự phòng giảm giá tồn kho cuối quý 4 tự lập 600,0 tỷ, trên báo cáo năm đã kiểm toán 682,0 tỷ "
+                                           "(kiểm toán thêm 82,0 tỷ).")
+
+
 def test_lending_against_equity_is_a_sign_with_its_figure(tmp_path):
     from investment_agent.market.statements import StatementStore
     d = data(tmp_path)

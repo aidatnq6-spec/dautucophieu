@@ -26,7 +26,11 @@ type Balance = { symbol: string; sector: string | null; debt: { rows: DebtRow[];
   revisions?: Revision[]; lending?: Lending; provision_flow?: ProvisionFlow; inventory?: Inventory;
   inventory_pace?: InventoryPace; inventory_provision_flow?: InventoryFlow; gross_loss?: GrossLoss; cover_thinning?: CoverThinning;
   year_end_provision?: YearEndProvision; price_check?: PriceCheck | null };
-export type PriceCheck = { quarter: string | null; indicator: string; label: string; price: string | null; price_year_ago: string | null;
+/** Q4 as first reported against the source's year: a gap, a match, or not comparable before the source updated the year (23/11/2026). */
+export function compareCell(gap: boolean | null): string {
+  return gap === null ? "chưa so được" : gap ? "lệch" : "khớp";
+}
+export type PriceCheck = { quarter: string | null; indicator: string; label: string; source?: string | null; price: string | null; price_year_ago: string | null;
   price_date: string | null; price_year_ago_date: string | null; change: string | null; coverage: string | null; coverage_year_ago: string | null;
   flag: boolean | null; why_not: string | null };
 type YearRow = { year: string; change: string | null; q4_change: string | null; q4_share: string | null; q4_balance: string | null;
@@ -210,10 +214,12 @@ export function grossLossText(g: GrossLoss): string | null {
 export function priceCheckText(p: PriceCheck): string {
   if (!p.quarter || p.price === null || p.price_year_ago === null || p.change === null) return `${p.label}: ${p.why_not ?? "chưa có giá."}`;
   const n = (v: string) => Number(v).toLocaleString("vi-VN");
+  const day = (d: string | null) => (d ? ` ngày ${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : "");
   const moved = `${Number(p.change) < 0 ? "giảm" : "tăng"} ${rate(p.change.replace("-", ""))}`;
   const cover = p.coverage !== null && p.coverage_year_ago !== null
     ? `; tỷ lệ trích lập dự phòng tồn kho ${rate(p.coverage)} (cùng kỳ ${rate(p.coverage_year_ago)})` : "";
-  const main = `${q(p.quarter)}: ${p.label} ${n(p.price)} (cùng kỳ ${n(p.price_year_ago)}, ${moved})${cover}.`;
+  const source = p.source ? `; nguồn ${p.source}` : "";  // the dates and source of both prices (review 23/11/2026)
+  const main = `${q(p.quarter)}: ${p.label} ${n(p.price)}${day(p.price_date)} (cùng kỳ ${n(p.price_year_ago)}${day(p.price_year_ago_date)}, ${moved}${source})${cover}.`;
   return p.flag ? `${main} Giá bán giảm mà dự phòng không tăng: giá trị thuần có thể thu hồi của hàng tồn có thể đã thấp hơn giá ghi sổ, xem thuyết minh.` : main;
 }
 
@@ -417,7 +423,7 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
         {data.year_end_provision && data.year_end_provision.rows.length > 0 && <div className="tablewrap">
           <table className="fv-table" aria-label={`Dự phòng tồn kho theo năm ${symbol}`}>
             <thead><tr><th>Năm</th><th className="num">Dự phòng tăng cả năm</th><th className="num">Trong đó quý 4</th><th className="num">Phần quý 4</th>
-              <th className="num">Quý 4 tự lập</th><th className="num">Số năm</th><th>Số năm cập nhật</th></tr></thead>
+              <th className="num">Quý 4 tự lập</th><th className="num">Số năm</th><th>Số năm cập nhật</th><th>Quý 4 so với số năm</th></tr></thead>
             <tbody>{[...data.year_end_provision.rows].reverse().map((r) => (
               <tr key={r.year}>
                 <td data-label="Năm">{r.year}</td>
@@ -427,6 +433,7 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
                 <td className="num" data-label="Quý 4 tự lập">{ty(r.q4_balance)}</td>
                 <td className="num" data-label="Số năm">{ty(r.year_balance)}{r.spike && <span title="Nhảy vọt so với các quý quanh đó: đối chiếu thuyết minh (có thể do hợp nhất kinh doanh, thoái vốn, hoặc lỗi dữ liệu nguồn)"> (?)</span>}</td>
                 <td data-label="Số năm cập nhật">{r.updated_on ? `${r.updated_on.slice(8, 10)}/${r.updated_on.slice(5, 7)}/${r.updated_on.slice(0, 4)}` : "—"}</td>
+                <td data-label="Quý 4 so với số năm" title={r.gap === null ? "Số năm chưa được cập nhật sau quý 4: chưa so được" : undefined}>{compareCell(r.gap)}</td>
               </tr>))}</tbody>
           </table></div>}
         <p className="caption">Giá gốc và dự phòng giảm giá hàng tồn kho theo bảng cân đối (VNDirect); giá trị thuần = giá gốc − dự phòng. Bao phủ = dự phòng ÷

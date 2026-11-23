@@ -34,8 +34,9 @@ PRICE_URL = "https://api-finfo.vndirect.com.vn/v4/stock_prices?sort=date&q=code:
 FIRST_START, REFRESH_DAYS, MAX_AGE_DAYS, PACE_SECONDS = "2010-01-01", 730, 7, 1.0
 # Raised when LINES gains lines: a non-financial ticker kept with an older version is due and takes its whole history once, so the new
 # lines reach back as far as the old ones. 2: customer advances and inventory.
-LINES_VERSION = 6  # 3: current assets, receivables, current and long-term liabilities, EPS; 4: the parts of receivables; 5: interest received;
-# 6: inventory at cost and its provision (Khối Tồn kho, 22/11/2026)
+LINES_VERSION = 7  # 3: current assets, receivables, current and long-term liabilities, EPS; 4: the parts of receivables; 5: interest received;
+# 6: inventory at cost and its provision (Khối Tồn kho, 22/11/2026); 7: no new line, the whole history read once for the update days of
+# years before the 2-year refresh (Dự phòng chốt khi kiểm toán, review 23/11/2026)
 FIN_LINES_VERSION = 3  # banks, securities firms and insurers: 2: basic EPS (23001 in each of their layouts); 3: the bank's loans, loan
 # reserve, accrued interest, interest income and provision expense (Chất lượng tài sản ngân hàng, 23/11/2026; the others re-read once too)
 # (model, item code) → line. Model 1 balance sheet, 2 income statement, 3 cash flow (indirect); the general layout (TT200).

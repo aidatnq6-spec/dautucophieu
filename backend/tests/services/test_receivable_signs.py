@@ -171,9 +171,23 @@ def test_an_output_price_down_is_a_sign_only_for_a_ticker_its_value_chain_ties_t
                                                                             {"date": "2026-09-01", "value": "340"}]}), encoding="utf-8")
     rows = {r["symbol"]: r for r in receivable_signs(d)}
     assert ("price_drop", "Giá bán giảm, dự phòng không tăng") in SIGNS and rows["DCM"]["signs"]["price_drop"] is True
-    assert rows["DCM"]["details"]["price_drop"] == ("Giá urê thế giới (Trung Đông, World Bank) cuối quý 3/2026 giảm 15% so cùng kỳ (400 → 340) "
+    assert rows["DCM"]["details"]["price_drop"] == ("Giá urê thế giới (Trung Đông, World Bank) cuối quý 3/2026 giảm 15% so cùng kỳ "
+                                                    "(400 ngày 01/09/2025 → 340 ngày 01/09/2026) "
                                                     "trong khi tỷ lệ trích lập dự phòng tồn kho 3,9% (cùng kỳ 5,0%).")
     assert "price_drop" not in rows["AAA"]["signs"]
+
+
+def test_a_broken_value_chain_config_leaves_the_price_sign_unread_not_the_board(tmp_path, monkeypatch):
+    """Review 23/11/2026 (tồn kho): the board did not depend on value-chains.json before; a bad edit of it must not take the board down."""
+    import investment_agent.market.value_chains as vc
+    d = data(tmp_path)
+
+    def broken():
+        raise ValueError("value-chains.json does not validate")
+    monkeypatch.setattr(vc, "load_value_chains", broken)
+    StatementStore(d / "statements").save({"symbol": "AAA", "years": {}, "quarters": {"2026-Q3": {"inventory": str(100 * BN), "total_assets": str(1000 * BN)}}})
+    rows = receivable_signs(d)
+    assert [r["symbol"] for r in rows] == ["AAA", "BBB", "VCB"] and all("price_drop" not in r["signs"] for r in rows)
 
 
 def test_lending_against_equity_is_a_sign_with_its_figure(tmp_path):

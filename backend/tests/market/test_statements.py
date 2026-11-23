@@ -30,6 +30,13 @@ def test_each_period_keeps_the_latest_day_the_source_updated_it():
     assert out["modified"] == {"2025": "2026-07-31"}  # a row without modifiedDate gives none
 
 
+def test_the_general_layout_reads_its_whole_history_again_once_for_the_update_days():
+    """Review 23/11/2026 (tồn kho): the update days only came with the 2-year refresh, so 2021–2023 could never be compared; version 7
+    makes each ticker read its whole history once."""
+    from investment_agent.market.statements import LINES_VERSION
+    assert LINES_VERSION >= 7
+
+
 def test_sync_keeps_the_update_days_by_period(tmp_path):
     def get(url):
         if "stock_prices" in url:

@@ -137,3 +137,24 @@ def test_a_price_series_too_short_or_stale_says_so_and_raises_nothing():
     stale = price_check(quarters, [(date(2025, 5, 1), Decimal("400")), (date(2026, 9, 1), Decimal("340"))], indicator="com_urea", label="x")
     assert stale["flag"] is None  # the year-before price is 153 days before 30/09/2025: more than 75 days, not used
     assert price_check(quarters, [], indicator="com_urea", label="x", property=True)["flag"] is False
+
+
+def test_two_prices_unevenly_old_are_not_set_against_each_other_and_the_reading_names_its_dates_and_source():
+    """Review 23/11/2026 (tồn kho): September's urea not out yet → 1 August against 1 September a year before is 11 months, not a year."""
+    from datetime import date
+    from decimal import Decimal
+
+    from investment_agent.domain.balance_watch import price_check
+    quarters = {"2025-Q3": q(10, 200, 10), "2026-Q3": q(10, 260, 10)}
+    uneven = price_check(quarters, [(date(2025, 9, 1), Decimal("400")), (date(2026, 8, 1), Decimal("340"))], indicator="com_urea", label="x")
+    assert uneven["flag"] is None and uneven["why_not"] == "Chưa đủ lịch sử giá: giá cuối quý này và cùng kỳ không cùng thời điểm trong kỳ."
+    v = price_check(quarters, [(date(2025, 9, 1), Decimal("400")), (date(2026, 9, 1), Decimal("340"))], indicator="com_urea", label="x",
+                    source="World Bank")
+    assert (v["price_date"], v["price_year_ago_date"], v["source"]) == ("2026-09-01", "2025-09-01", "World Bank")
+
+
+def test_a_property_developer_never_gets_the_year_end_flag_though_its_rows_show():
+    from investment_agent.domain.balance_watch import year_end_provision
+    prov = lambda v: {"inventory_provision": str(-v * B)}  # noqa: E731
+    v = year_end_provision({"2025-Q4": prov(600)}, {"2025": prov(682)}, property=True, **SEEN)
+    assert v["flag"] is False and v["rows"][-1]["gap"] is True  # the figures stay on the page, the sign is off (as on the board)

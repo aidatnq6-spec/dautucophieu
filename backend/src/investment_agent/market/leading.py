@@ -1204,11 +1204,31 @@ def parse_shfe_hrc(text: str) -> str:
 SHFE_QUARTERS, SHFE_QUARTER_BACK, SHFE_PACE_SECONDS = 12, 10, 2  # HRC cuối quý (owner, 23/11/2026)
 
 
-def _shfe_quarter_ends(store: MacroStore, today: date, known: set[str], day_price, sleep) -> list[tuple[date, str]]:
+def _shfe_state(store: MacroStore) -> Path:
+    return Path(store.root).parent / "macro-state" / "shfe-hrc-quarters.json"
+
+
+def _shfe_answer(get: Callable[[str], str], day: date) -> tuple[str, str | None]:
+    """("price", the HRC price), ("none", None) when SHFE answered there was no trading that day (a 404, or a day file without hot-rolled
+    coil), or ("error", None) when it could not be asked: a failure is not a holiday (review 23/11/2026)."""
+    import httpx
+    try:
+        return "price", parse_shfe_hrc(get(SHFE_DAILY.format(day=f"{day:%Y%m%d}")))
+    except MacroError:
+        return "none", None
+    except httpx.HTTPStatusError as exc:
+        return ("none", None) if exc.response.status_code == 404 else ("error", None)
+    except Exception:  # noqa: BLE001 - the network, a timeout, a page that does not read
+        return "error", None
+
+
+def _shfe_quarter_ends(store: MacroStore, today: date, known: set[str], answer, sleep) -> tuple[list[tuple[date, str]], set[str]]:
     """HRC cuối quý (owner, 23/11/2026): the last trading day of each of the last 12 closed quarters, the year-before price that Giá bán
-    giảm, dự phòng không tăng needs. A holiday steps back a day at a time, at most 10 days. Each quarter is tried once, found or not
-    (data/macro-state/shfe-hrc-quarters.json), so a run asks nothing it asked before; calls 2 seconds apart."""
-    state_path = Path(store.root).parent / "macro-state" / "shfe-hrc-quarters.json"
+    giảm, dự phòng không tăng needs: from the quarter's end a day at a time, at most 10 days; a day already stored is that last trading day
+    and ends the step back. A quarter is marked tried (data/macro-state/shfe-hrc-quarters.json) only once every day asked was answered, so
+    a network failure is tried again on the next run (review 23/11/2026). Calls 2 seconds apart. Returns the prices found and the quarters
+    now tried, for the caller to record once the prices are stored."""
+    state_path = _shfe_state(store)
     try:
         tried = set(json.loads(state_path.read_text(encoding="utf-8"))["tried"]) if state_path.is_file() else set()
     except (OSError, ValueError, KeyError, TypeError):
@@ -1220,28 +1240,38 @@ def _shfe_quarter_ends(store: MacroStore, today: date, known: set[str], day_pric
         month = 3 * n
         ends.append(date(y, month, 31 if month in (3, 12) else 30))
         n -= 1
-    out, called = [], False
+    out, done, called = [], set(), False
     for end in ends:
         key = end.isoformat()
         if key in tried:
             continue
-        window = [end - timedelta(days=k) for k in range(SHFE_QUARTER_BACK)]
-        if not any(d.isoformat() in known for d in window):
-            for day in window:
-                if day.weekday() >= 5:
-                    continue
-                if called:
-                    sleep(SHFE_PACE_SECONDS)
-                called = True
-                if price := day_price(day):
-                    out.append((day, price))
-                    break
-        tried.add(key)
+        answered = True
+        for day in (end - timedelta(days=k) for k in range(SHFE_QUARTER_BACK)):
+            if day.weekday() >= 5:
+                continue
+            if day.isoformat() in known:
+                break  # the quarter's last trading day is already stored
+            if called:
+                sleep(SHFE_PACE_SECONDS)
+            called = True
+            kind, price = answer(day)
+            if kind == "price":
+                out.append((day, price))
+                break
+            if kind == "error":
+                answered = False
+                break
+        if answered:
+            done.add(key)
+    return out, tried | done
+
+
+def _record_shfe_tried(store: MacroStore, tried: set[str]) -> None:
+    state_path = _shfe_state(store)
     state_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = state_path.with_suffix(".tmp")
     tmp.write_text(json.dumps({"tried": sorted(tried)}), encoding="utf-8")
     os.replace(tmp, state_path)
-    return out
 
 
 def fetch_chain_markets(store: MacroStore, *, get: Callable[[str], str], today: date | None = None,
@@ -1276,9 +1306,11 @@ def fetch_chain_markets(store: MacroStore, *, get: Callable[[str], str], today: 
                 if day.weekday() < 5 and (price := day_price(day)):
                     points.append((day, price))
                     break
-        points += _shfe_quarter_ends(store, today, known, day_price, sleep)
+        quarter_points, tried = _shfe_quarter_ends(store, today, known, lambda day: _shfe_answer(get, day), sleep)
+        points += quarter_points
         if points:
             store.upsert("com_steel_hrc", points, entry="auto", source_url=SHFE_DAILY.format(day=""))
+        _record_shfe_tried(store, tried)  # only once the prices found are stored (review 23/11/2026)
         have = store.read("com_steel_hrc")
         if not have or (today - date.fromisoformat(have[-1]["date"])).days > SHFE_RECENT:
             raise MacroError("shfe_no_recent")

@@ -54,7 +54,7 @@ def balance(symbol: str, request: Request):
             "inventory_provision_flow": inventory_provision_flow(quarters), "gross_loss": gross_loss(quarters, property=sector == PROPERTY),
             "cover_thinning": cover_thinning(quarters, property=sector == PROPERTY),
             "year_end_provision": year_end_provision(quarters, (record or {}).get("years", {}), years_modified=(record or {}).get("years_modified"),
-                                                     quarters_created=(record or {}).get("quarters_created")),
+                                                     quarters_created=(record or {}).get("quarters_created"), property=sector == PROPERTY),
             "price_check": _price_check(data_dir, symbol, quarters, sector),
             "inventory_pace": inventory_pace(quarters, {s: qs for s, qs in peers.items() if s != symbol}, property=sector == PROPERTY), "revisions": _revisions(data_dir, symbol)}
 
@@ -66,8 +66,8 @@ def _price_check(data_dir: Path, symbol: str, quarters: dict, sector: str | None
     found = inventory_price_series(data_dir, symbol)
     if found is None:
         return None
-    indicator, label, points = found
-    return price_check(quarters, points, indicator=indicator, label=label, property=sector == PROPERTY)
+    indicator, label, points, source = found
+    return price_check(quarters, points, indicator=indicator, label=label, property=sector == PROPERTY, source=source)
 
 
 def _revisions(data_dir: Path, symbol: str) -> list[dict]:

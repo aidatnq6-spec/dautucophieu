@@ -73,6 +73,8 @@ def test_a_broken_file_for_the_year_next_door_leaves_this_years_calendar_standin
     (tmp_path / "trading-calendar-hose-2025.json").write_text(json.dumps({"version": "v", "source": "synthetic", "first": "2025-01-01",
                                                                          "last": "2025-12-31", "holidays": []}), encoding="utf-8")
     assert (load_calendar(p26).first, load_calendar(p26).last) == (date(2026, 1, 1), date(2026, 12, 31))  # no "last"; no source
+    (tmp_path / "trading-calendar-hose-2027.json").write_text("[]", encoding="utf-8")  # valid JSON, not an object (review 23/11/2026 (2))
+    assert load_calendar(p26).last == date(2026, 12, 31)
 
 
 def test_the_owners_own_calendar_is_read_as_it_is(tmp_path):
@@ -93,16 +95,26 @@ def test_the_scheduled_run_and_the_brief_put_the_missing_year_sentence_in_the_lo
         assert out["reason"] == "CalendarMissing" and out["message"].startswith("chưa có lịch giao dịch HOSE 2027")
 
 
-def test_the_weekly_brief_stops_on_a_missing_calendar_instead_of_counting_every_weekday(tmp_path, capsys):
+def test_the_weekly_brief_stops_on_a_missing_calendar_instead_of_counting_every_weekday(tmp_path, capsys, monkeypatch):
     """Spec §2 (owner, 23/11/2026): no step counts every weekday as a session; the weekly brief did, so 01/01 was a session missing figures.
     It stops before reading anything personal or touching Telegram."""
     from datetime import datetime, timezone
 
-    from investment_agent.cli import weekly_brief_cli
+    import investment_agent.cli as cli
     saturday = datetime(2027, 1, 2, 3, 0, tzinfo=timezone.utc)
-    assert weekly_brief_cli(tmp_path, tmp_path / "trading-calendar-hose-2027.json", now=saturday) == 2
+    monkeypatch.setattr(cli, "_scheduled_telegram", lambda data_dir: ("send", "repo", "owner"))  # delivery on; nothing is read from them
+    assert cli.weekly_brief_cli(tmp_path, tmp_path / "trading-calendar-hose-2027.json", now=saturday) == 2
     out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert out["status"] == "not_configured" and out["message"].startswith("chưa có lịch giao dịch HOSE 2027")
+    # the week outside the calendar's range: which week and which year, not only "ValueError"
+    own = write(tmp_path, 2026, [])
+    assert cli.weekly_brief_cli(tmp_path, own, now=saturday) == 2
+    out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert out["message"] == "lịch giao dịch đang dùng không phủ tuần 28/12/2026–01/01/2027: thiếu lịch HOSE 2027; tạo từ thông báo của HOSE"
+    # delivery off: skipped as before, whatever the calendar (review 23/11/2026 (2))
+    monkeypatch.setattr(cli, "_scheduled_telegram", lambda data_dir: None)
+    assert cli.weekly_brief_cli(tmp_path, tmp_path / "trading-calendar-hose-2027.json", now=saturday) == 0
+    assert json.loads(capsys.readouterr().out.strip().splitlines()[-1]) == {"status": "skipped", "reason": "scheduled_delivery_off"}
 
 
 def test_a_missing_year_says_what_is_missing_and_what_to_do(tmp_path):

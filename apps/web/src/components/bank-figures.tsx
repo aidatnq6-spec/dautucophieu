@@ -23,7 +23,7 @@ export type Provision = { rows: { quarter: string; expense: string; ppop: string
   bad_prev: string | null; flag: boolean | null; why_not: string | null };
 /** "tăng 5,0%" or "giảm 20,0%": the word follows the figure's sign (review 23/11/2026: a fall was written as a rise). */
 const moved = (v: string | null) => (v === null ? "—" : `${v.startsWith("-") ? "giảm" : "tăng"} ${pct1(v.replace("-", ""))}`);
-const ty = (v: string | null) => (v === null ? "—" : formatDecimal(v, 0));
+const ty = (v: string | null) => (v === null ? "—" : formatDecimal(v, 1));  // one decimal, half up: 450 million is "0,5" (review 23/11/2026 (2))
 // Lãi dự thu so với thu nhập lãi (23/11/2026): accrued interest of the asset quality table against VNDirect's interest income of the quarter.
 export type Accrued = { quarter: string | null; ratio: string | null; ratio_year_ago: string | null; accrued_growth_yoy: string | null; income_growth_yoy: string | null;
   flag: boolean | null; why_not: string | null };

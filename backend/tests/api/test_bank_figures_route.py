@@ -72,6 +72,11 @@ def test_the_block_shows_the_latest_quarter_with_groups_1_to_5_and_says_when_the
     quality = call(c, clock, "GET", "/internal/bank-figures/ACB").json()["quality"]
     assert quality["quarter"] == "2026-Q3" and quality["derived"]["npl"] is not None
     assert quality["compared"] is False  # Q2 and the end of 2025 have no groups: nothing to set Q3 against
+    # Q2 with the accrued interest of VNDirect: that comparison ran, so the page does not say nothing was compared (review 23/11/2026 (2))
+    (tmp_path / "statements-financial" / "ACB.json").write_text(json.dumps({"symbol": "ACB", "kind": "bank", "quarters": {
+        "2026-Q2": {"accrued_interest": str(50 * b)}, "2026-Q3": {"accrued_interest": str(52 * b)}}}), encoding="utf-8")
+    quality = call(c, clock, "GET", "/internal/bank-figures/ACB").json()["quality"]
+    assert quality["trend"]["accrued_growth_qoq"] == "0.0400" and quality["compared"] is True
 
 
 def test_without_public_figures_or_entries_there_is_no_quality_block(tmp_path):

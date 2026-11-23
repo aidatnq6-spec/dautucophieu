@@ -25,10 +25,36 @@ def test_a_ticker_new_to_the_board_is_only_recorded_on_its_first_run_and_told_fr
     sent = []
     send = lambda text: sent.append(text) or True  # noqa: E731
     check_signs(tmp_path, rows=[ROWS[1]], held={"VCB"}, titles=TITLES, send=send)  # the board before banks
-    bank = {"symbol": "VCB", "signs": {"provision_cut": True, "accrued_outpace": False}, "details": {}}
+    bank = {"symbol": "VCB", "sector": "Ngân hàng", "signs": {"provision_cut": True, "accrued_outpace": False}, "details": {}}
     assert check_signs(tmp_path, rows=[ROWS[1], bank], held={"VCB"}, titles=TITLES, send=send)["new"] == 0 and sent == []
     later = {**bank, "signs": {"provision_cut": True, "accrued_outpace": True}}
     assert check_signs(tmp_path, rows=[ROWS[1], later], held={"VCB"}, titles=TITLES, send=send)["new"] == 1 and len(sent) == 1
+
+
+def test_only_the_banks_joining_the_board_are_silent_once_and_any_other_new_ticker_is_told(tmp_path):
+    """Review 23/11/2026 (2): the silence is for the banks' one-time arrival, never for a ticker the owner adds to the watchlist later."""
+    sent = []
+    send = lambda text: sent.append(text) or True  # noqa: E731
+    check_signs(tmp_path, rows=[ROWS[1]], held={"VCG", "VCB", "ACB"}, titles=TITLES, send=send)
+    vcg = {"symbol": "VCG", "sector": "Xây dựng", "signs": {"other_receivables": True}, "details": {}}
+    vcb = {"symbol": "VCB", "sector": "Ngân hàng", "signs": {"provision_cut": True}, "details": {}}
+    assert check_signs(tmp_path, rows=[ROWS[1], vcg, vcb], held={"VCG", "VCB", "ACB"}, titles=TITLES, send=send)["new"] == 1  # VCG, not VCB
+    assert "VCG" in sent[0] and "VCB" not in sent[0]
+    acb = {"symbol": "ACB", "sector": "Ngân hàng", "signs": {"provision_cut": True}, "details": {}}  # a bank added after the banks joined
+    assert check_signs(tmp_path, rows=[ROWS[1], vcg, vcb, acb], held={"VCG", "VCB", "ACB"}, titles=TITLES, send=send)["new"] == 1
+    assert "ACB" in sent[1]
+
+
+def test_a_ticker_that_could_not_be_read_keeps_what_was_recorded_so_nothing_is_told_twice(tmp_path):
+    sent = []
+    send = lambda text: sent.append(text) or True  # noqa: E731
+    on = {"symbol": "VCG", "signs": {"paper_income": True, "other_receivables": None}, "details": {}}
+    check_signs(tmp_path, rows=[{**on, "signs": {"paper_income": False}}], held={"VCG"}, titles=TITLES, send=send)
+    assert check_signs(tmp_path, rows=[on], held={"VCG"}, titles=TITLES, send=send)["new"] == 1
+    unread = {"symbol": "VCG", "signs": {"paper_income": None, "other_receivables": None}, "details": {}}  # its file cut short
+    check_signs(tmp_path, rows=[unread], held={"VCG"}, titles=TITLES, send=send)
+    assert json.loads((tmp_path / "alerts" / STATE).read_text(encoding="utf-8"))["symbols"]["VCG"] == ["paper_income"]
+    assert check_signs(tmp_path, rows=[on], held={"VCG"}, titles=TITLES, send=send)["new"] == 0 and len(sent) == 1
 
 
 def test_signs_of_tickers_not_held_are_never_told_and_a_failed_send_is_tried_again(tmp_path):

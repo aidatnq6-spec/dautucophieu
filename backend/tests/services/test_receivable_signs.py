@@ -109,6 +109,17 @@ def test_tỷ_amounts_keep_their_sign_and_one_decimal():
     assert (_ty("-0.45"), _ty("-1234.56"), _ty("-0.04"), _ty("0.45"), _ty("2.25")) == ("-0,5", "-1.234,6", "0,0", "0,5", "2,3")
 
 
+def test_a_gross_loss_with_the_provision_flat_is_a_sign_with_its_figures(tmp_path):
+    """Bán dưới giá vốn nhưng dự phòng không tăng (owner, 23/11/2026)."""
+    d = data(tmp_path)
+    q = lambda gp, prov: {"gross_profit": str(gp * BN), "inventory_gross": str(300 * BN), "inventory_provision": str(-prov * BN),  # noqa: E731
+                          "inventory": str((300 - prov) * BN), "total_assets": str(1000 * BN)}
+    StatementStore(d / "statements").save({"symbol": "AAA", "years": {}, "quarters": {"2026-Q2": q(20, 6), "2026-Q3": q(-5, 6)}})
+    aaa = next(r for r in receivable_signs(d) if r["symbol"] == "AAA")
+    assert ("gross_loss", "Bán dưới giá vốn, dự phòng không tăng") in SIGNS and aaa["signs"]["gross_loss"] is True
+    assert aaa["details"]["gross_loss"] == "Lỗ gộp 5,0 tỷ trong quý 3/2026; tỷ lệ trích lập dự phòng tồn kho 2,0% (quý trước 2,0%)."
+
+
 def test_lending_against_equity_is_a_sign_with_its_figure(tmp_path):
     from investment_agent.market.statements import StatementStore
     d = data(tmp_path)

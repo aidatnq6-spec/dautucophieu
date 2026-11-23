@@ -4,7 +4,9 @@ Readings to look into, not a finding and not advice. Public figures only."""
 
 from pathlib import Path
 
-from investment_agent.domain.balance_watch import inventory_pace, lending_view, raise_prepay, receivables_view
+from decimal import ROUND_HALF_UP, Decimal
+
+from investment_agent.domain.balance_watch import gross_loss, inventory_pace, lending_view, raise_prepay, receivables_view
 from investment_agent.market.financial_ratios import kind_of
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.sectors import load_sectors
@@ -17,7 +19,7 @@ SIGNS = [("other_receivables", "Phải thu khác lớn"), ("other_high", "Cao h�
          ("raise_prepay", "Trả trước sau huy động vốn"), ("paper_income", "Thu nhập tài chính chưa thu tiền"),
          ("financial_profit", "Phụ thuộc thu nhập tài chính"), ("receivables_outpace_revenue", "Phải thu tăng nhanh hơn doanh thu"),
          ("provision_jump", "Dự phòng tăng mạnh"), ("lending", "Cho vay lớn so với vốn chủ"),
-         ("inventory_fast", "Tồn kho tăng nhanh hơn giá vốn")]
+         ("inventory_fast", "Tồn kho tăng nhanh hơn giá vốn"), ("gross_loss", "Bán dưới giá vốn, dự phòng không tăng")]
 # A bank's row holds only these (Chất lượng tài sản ngân hàng, owner 23/11/2026), from VNDirect's bank lines and Vietcap's groups 1–5.
 BANK_SIGNS = [("provision_cut", "Lợi nhuận đỡ bởi giảm trích lập"), ("accrued_outpace", "Lãi dự thu tăng nhanh hơn thu nhập lãi")]
 SIGNS += BANK_SIGNS
@@ -27,6 +29,14 @@ BANK = "Ngân hàng"
 
 def _pct(v) -> str:
     return f"{abs(round(float(v) * 100))}%"
+
+
+BILLION = Decimal(1_000_000_000)
+
+
+def _pct1(v) -> str:
+    """A ratio as a percentage with one decimal, half up: "2,0%"."""
+    return f"{(Decimal(str(v)) * 100).quantize(Decimal('0.1'), ROUND_HALF_UP)}%".replace(".", ",")
 
 
 def _moved(v) -> str:
@@ -92,14 +102,20 @@ def receivable_signs(data_dir: Path) -> list[dict]:
             signs["lending"] = None if lend["share"] is None else lend["flag"] is not None
             pace = inventory_pace(qs, peers, property=sector == "Bất động sản")  # Tồn kho tăng nhanh hơn sức bán (owner, 22/11/2026)
             signs["inventory_fast"] = pace["flag"]
+            loss = gross_loss(qs, property=sector == "Bất động sản")  # Bán dưới giá vốn nhưng dự phòng không tăng (owner, 23/11/2026)
+            signs["gross_loss"] = loss["flag"]
         else:
-            signs.update(other_high=None, provision_jump=None, raise_prepay=None, lending=None, inventory_fast=None)
-            lend = pace = None
+            signs.update(other_high=None, provision_jump=None, raise_prepay=None, lending=None, inventory_fast=None, gross_loss=None)
+            lend = pace = loss = None
         details = {k: quality[k]["detail"] for k in QUALITY if k in quality and quality[k]["flag"]}
         if signs["inventory_fast"]:
             pct = lambda v: f"{round(float(v) * 100)}%"  # noqa: E731
             details["inventory_fast"] = (f"Tồn kho tăng {pct(pace['inventory_growth'])} so cùng kỳ, giá vốn bốn quý tăng {pct(pace['cogs_growth'])}; "
                                          f"tồn kho đủ {pace['days']} ngày (cùng kỳ {pace['year_ago']} ngày).")
+        if signs["gross_loss"]:
+            q = loss["quarter"]
+            details["gross_loss"] = (f"Lỗ gộp {_ty(-Decimal(loss['gross_profit']) / BILLION)} tỷ trong quý {q[-1]}/{q[:4]}; tỷ lệ trích lập dự phòng tồn kho "
+                                     f"{_pct1(loss['coverage'])} (quý trước {_pct1(loss['coverage_prev'])}).")
         if signs["lending"]:
             q = lend["quarter"]
             details["lending"] = (f"Cho vay và phải thu khác bằng {round(float(lend['share']) * 100)}% vốn chủ (quý {q[-1]}/{q[:4]}); "

@@ -427,6 +427,29 @@ def inventory_pace(quarters: dict, peers: dict | None, *, property: bool = False
     return {**out, "inventory_growth": _r(inv_growth), "cogs_growth": _r(cogs_growth), "share": _r(share), "flag": flag}
 
 
+def _coverage(q: dict | None) -> Decimal | None:
+    gross, provision = _get(q or {}, "inventory_gross", "inventory_provision")
+    return -provision / gross if gross is not None and provision is not None and gross > 0 else None
+
+
+def gross_loss(quarters: dict, *, property: bool = False) -> dict:
+    """Bán dưới giá vốn nhưng dự phòng không tăng (owner, 23/11/2026; the third ground of a stock count: goods sold below their book value):
+    the latest quarter's gross profit below nil while the share of inventory provided for did not rise on the quarter. Material inventory
+    only (from 10% of total assets), never a property developer; None when a figure is missing."""
+    if not quarters:
+        return {"quarter": None, "gross_profit": None, "coverage": None, "coverage_prev": None, "share": None, "flag": None}
+    latest = max(quarters)
+    (gp,), (net, assets) = _get(quarters[latest], "gross_profit"), _get(quarters[latest], "inventory", "total_assets")
+    cover, cover_prev = _coverage(quarters[latest]), _coverage(quarters.get(_back(latest, 1)))
+    share = net / assets if net is not None and assets is not None and assets > 0 else None
+    flag = None
+    if property:
+        flag = False
+    elif None not in (gp, cover, cover_prev, share):
+        flag = share >= INVENTORY_MATERIAL and gp < 0 and cover <= cover_prev
+    return {"quarter": latest, "gross_profit": _s(gp), "coverage": _r(cover), "coverage_prev": _r(cover_prev), "share": _r(share), "flag": flag}
+
+
 INVENTORY_FLOW_SHARE = Decimal("0.20")  # Dự phòng giảm giá tồn kho đi vào lợi nhuận (owner, 22/11/2026)
 
 

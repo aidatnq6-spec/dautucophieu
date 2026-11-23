@@ -93,6 +93,13 @@ def test_a_property_developer_gets_inventory_days_but_no_flag(tmp_path):
     assert pace["quarter"] == "2026-Q1" and pace["flag"] in (False, None)
 
 
+def test_the_balance_carries_the_gross_loss_check_and_a_property_developer_is_never_flagged(tmp_path):
+    """Bán dưới giá vốn nhưng dự phòng không tăng (owner, 23/11/2026)."""
+    c, clock = client(tmp_path)
+    assert call(c, clock, "GET", "/internal/stock/FPT/balance").json()["gross_loss"]["quarter"] == "2026-Q1"
+    assert call(c, clock, "GET", "/internal/stock/KDH/balance").json()["gross_loss"]["flag"] is False
+
+
 def test_the_balance_carries_the_inventory_provision_flow(tmp_path):
     c, clock = client(tmp_path)
     flow = call(c, clock, "GET", "/internal/stock/FPT/balance").json()["inventory_provision_flow"]

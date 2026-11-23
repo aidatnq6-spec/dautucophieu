@@ -24,7 +24,9 @@ type Balance = { symbol: string; sector: string | null; debt: { rows: DebtRow[];
   property: { rows: CashRow[]; signal: Signal } | null; liquidity: LiquidityRow[]; carry: Carry;
   receivables: { rows: ArRow[]; dso: Dso; provision: Provision; prepay_days: Dso; other_vs_sector: OtherVsSector }; raise_prepay: { flag: boolean; events: RaiseEvent[] };
   revisions?: Revision[]; lending?: Lending; provision_flow?: ProvisionFlow; inventory?: Inventory;
-  inventory_pace?: InventoryPace; inventory_provision_flow?: InventoryFlow };
+  inventory_pace?: InventoryPace; inventory_provision_flow?: InventoryFlow; gross_loss?: GrossLoss };
+export type GrossLoss = { quarter: string | null; gross_profit: string | null; coverage: string | null; coverage_prev: string | null; share: string | null;
+  flag: boolean | null };
 type InvFlowRow = { quarter: string; balance: string | null; change: string | null; pbt: string | null; share: string | null; kind: "release" | "charge" | null };
 export type InventoryFlow = { rows: InvFlowRow[]; quarter: string | null; kind: "release" | "charge" | null };
 export type InventoryPace = Dso & { inventory_growth: string | null; cogs_growth: string | null; share?: string | null; flag: boolean | null };
@@ -181,6 +183,17 @@ export function inventoryPaceText(p: InventoryPace): string {
   const small = !p.flag && p.share != null && Number(p.share) < 0.1 ? ` Tồn kho chỉ ${rate(p.share)} tổng tài sản: không ghi cờ.` : "";
   const why = p.flag ? " Hàng nhập về nhanh hơn hàng bán ra: xem thuyết minh tồn kho (loại hàng nào tăng) và dự phòng giảm giá." : small;
   return `${q(p.quarter)}: tồn kho đủ ${p.days} ngày giá vốn${ago}${sector}.${growth}${why}`;
+}
+
+/** Bán dưới giá vốn nhưng dự phòng không tăng (23/11/2026): only a quarter with a gross loss says anything. */
+export function grossLossText(g: GrossLoss): string | null {
+  if (!g.quarter || g.gross_profit === null || Number(g.gross_profit) >= 0) return null;
+  const cover = g.coverage !== null && g.coverage_prev !== null
+    ? `, tỷ lệ trích lập dự phòng tồn kho ${rate(g.coverage)} (quý trước ${rate(g.coverage_prev)})` : "";
+  const main = `${q(g.quarter)}: lỗ gộp ${ty(String(-Number(g.gross_profit)))} (bán dưới giá vốn)${cover}.`;
+  if (g.flag) return `${main} Giá trị thuần có thể thu hồi đã thấp hơn giá ghi sổ mà dự phòng chưa tăng: xem thuyết minh hàng tồn kho.`;
+  if (g.coverage !== null && g.coverage_prev !== null && Number(g.coverage) > Number(g.coverage_prev)) return `${main} Tỷ lệ trích lập dự phòng đã tăng theo.`;
+  return main;
 }
 
 /** Khối Tồn kho (22/11/2026): the latest quarter net, its share of total assets and the share provided for, against a year before. */
@@ -340,6 +353,8 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
           {inventoryFlowText(data.inventory_provision_flow)}</p>}
         {data.inventory_pace && <p data-testid="inventory-pace">{data.inventory_pace.flag && <><span className="pill warn">Tồn kho tăng nhanh hơn giá vốn</span> </>}
           {inventoryPaceText(data.inventory_pace)}</p>}
+        {data.gross_loss && grossLossText(data.gross_loss) && <p data-testid="gross-loss">{data.gross_loss.flag && <><span className="pill warn">
+          Bán dưới giá vốn, dự phòng không tăng</span> </>}{grossLossText(data.gross_loss)}</p>}
         <div className="tablewrap"><table className="fv-table" aria-label={`Tồn kho ${symbol}`}>
           <thead><tr><th>Quý</th><th className="num">Giá gốc</th><th className="num">Dự phòng giảm giá</th><th className="num">Bao phủ</th>
             <th className="num">Giá trị thuần</th><th className="num">Trên tổng tài sản</th></tr></thead>

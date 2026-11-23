@@ -93,6 +93,18 @@ def test_the_scheduled_run_and_the_brief_put_the_missing_year_sentence_in_the_lo
         assert out["reason"] == "CalendarMissing" and out["message"].startswith("chưa có lịch giao dịch HOSE 2027")
 
 
+def test_the_weekly_brief_stops_on_a_missing_calendar_instead_of_counting_every_weekday(tmp_path, capsys):
+    """Spec §2 (owner, 23/11/2026): no step counts every weekday as a session; the weekly brief did, so 01/01 was a session missing figures.
+    It stops before reading anything personal or touching Telegram."""
+    from datetime import datetime, timezone
+
+    from investment_agent.cli import weekly_brief_cli
+    saturday = datetime(2027, 1, 2, 3, 0, tzinfo=timezone.utc)
+    assert weekly_brief_cli(tmp_path, tmp_path / "trading-calendar-hose-2027.json", now=saturday) == 2
+    out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert out["status"] == "not_configured" and out["message"].startswith("chưa có lịch giao dịch HOSE 2027")
+
+
 def test_a_missing_year_says_what_is_missing_and_what_to_do(tmp_path):
     write(tmp_path, 2026, [])
     with pytest.raises(CalendarMissing) as err:

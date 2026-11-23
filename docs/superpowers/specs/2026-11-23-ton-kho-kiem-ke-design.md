@@ -59,7 +59,7 @@ có 7 điểm.
 
 ## Ngoài phạm vi
 - Tuổi hàng tồn kho và cơ cấu tồn kho (nguyên liệu, dở dang, thành phẩm): không có nguồn công khai.
-- Lấy thêm lịch sử giá HRC: việc riêng, cần tìm nguồn công khai.
+- Lấy thêm lịch sử giá HRC: đã làm ngày 23/11/2026 bằng chính nguồn SHFE (phiên cuối của 12 quý gần nhất), xem spec Chuỗi giá trị ngành.
 - Không khuyến nghị mua bán.
 
 ## Đã làm (23/11/2026)

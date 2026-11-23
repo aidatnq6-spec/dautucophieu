@@ -1201,6 +1201,49 @@ def parse_shfe_hrc(text: str) -> str:
     return _plain(Decimal(str(max(rows, key=lambda r: r.get("OPENINTEREST") or 0)["SETTLEMENTPRICE"])))
 
 
+SHFE_QUARTERS, SHFE_QUARTER_BACK, SHFE_PACE_SECONDS = 12, 10, 2  # HRC cuối quý (owner, 23/11/2026)
+
+
+def _shfe_quarter_ends(store: MacroStore, today: date, known: set[str], day_price, sleep) -> list[tuple[date, str]]:
+    """HRC cuối quý (owner, 23/11/2026): the last trading day of each of the last 12 closed quarters, the year-before price that Giá bán
+    giảm, dự phòng không tăng needs. A holiday steps back a day at a time, at most 10 days. Each quarter is tried once, found or not
+    (data/macro-state/shfe-hrc-quarters.json), so a run asks nothing it asked before; calls 2 seconds apart."""
+    state_path = Path(store.root).parent / "macro-state" / "shfe-hrc-quarters.json"
+    try:
+        tried = set(json.loads(state_path.read_text(encoding="utf-8"))["tried"]) if state_path.is_file() else set()
+    except (OSError, ValueError, KeyError, TypeError):
+        tried = set()
+    ends, y, n = [], today.year, (today.month - 1) // 3  # the quarter before the current one
+    while len(ends) < SHFE_QUARTERS:
+        if n == 0:
+            y, n = y - 1, 4
+        month = 3 * n
+        ends.append(date(y, month, 31 if month in (3, 12) else 30))
+        n -= 1
+    out, called = [], False
+    for end in ends:
+        key = end.isoformat()
+        if key in tried:
+            continue
+        window = [end - timedelta(days=k) for k in range(SHFE_QUARTER_BACK)]
+        if not any(d.isoformat() in known for d in window):
+            for day in window:
+                if day.weekday() >= 5:
+                    continue
+                if called:
+                    sleep(SHFE_PACE_SECONDS)
+                called = True
+                if price := day_price(day):
+                    out.append((day, price))
+                    break
+        tried.add(key)
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = state_path.with_suffix(".tmp")
+    tmp.write_text(json.dumps({"tried": sorted(tried)}), encoding="utf-8")
+    os.replace(tmp, state_path)
+    return out
+
+
 def fetch_chain_markets(store: MacroStore, *, get: Callable[[str], str], today: date | None = None,
                         sleep: Callable[[float], None] = time.sleep) -> dict[str, str]:
     """Container and tanker freight from the Shanghai Shipping Exchange and the hot-rolled coil price from the Shanghai Futures Exchange;
@@ -1233,6 +1276,7 @@ def fetch_chain_markets(store: MacroStore, *, get: Callable[[str], str], today: 
                 if day.weekday() < 5 and (price := day_price(day)):
                     points.append((day, price))
                     break
+        points += _shfe_quarter_ends(store, today, known, day_price, sleep)
         if points:
             store.upsert("com_steel_hrc", points, entry="auto", source_url=SHFE_DAILY.format(day=""))
         have = store.read("com_steel_hrc")

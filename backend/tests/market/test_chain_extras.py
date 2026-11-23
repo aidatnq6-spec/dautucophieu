@@ -125,6 +125,35 @@ def test_freight_and_steel_are_stored_with_a_month_back_for_steel(tmp_path):
     assert not any(u.startswith(SHFE_DAILY.split("{")[0]) for u in asked)  # stored days and the month back are not asked again
 
 
+def test_steel_takes_the_last_trading_day_of_each_of_the_last_12_quarters_once(tmp_path):
+    """HRC cuối quý (owner, 23/11/2026): the year-before price the inventory check needs; a holiday steps back, at most 10 days; a quarter
+    tried is not asked again, found or not; calls 2 seconds apart."""
+    store, asked, slept = MacroStore(tmp_path), [], []
+    # 30/09/2026 a Wednesday (traded); 30/06/2026 missing, 29/06 traded; 31/03/2026 and the 10 days before: none (left out)
+    trading = {"20261120", "20261117", "20260930", "20260629", "20251231", "20250930", "20250630", "20250331", "20241231", "20240930",
+               "20240628", "20240329", "20231229", "20230928", "20230630"}
+
+    def get(url):
+        asked.append(url)
+        if url.startswith(SSE_INDEX):
+            return sse("SCFI_T", "2026-11-20", "2026-11-13") if "scfi" in url else sse("CTFI_T", "2026-11-20", "2026-11-19")
+        day = url.removeprefix(SHFE_DAILY.split("{")[0]).removesuffix(".dat")
+        if day not in trading:
+            raise OSError("404")
+        return shfe(("hc_f", "2701", 3000 + int(day[-3:]), 100))
+    fetch_chain_markets(store, get=get, today=date(2026, 11, 21), sleep=slept.append)
+    have = {o["date"] for o in store.read("com_steel_hrc")}
+    assert {"2026-09-30", "2026-06-29", "2025-12-31", "2025-09-30", "2025-06-30", "2025-03-31", "2024-12-31", "2024-09-30", "2024-06-28",
+            "2024-03-29", "2023-12-29"} <= have
+    assert "2023-09-28" not in have  # Q3/2023 is the 13th quarter back: not asked
+    assert not any("20260321" in u for u in asked)  # 31/03/2026 steps back at most 10 days, to 21/03
+    assert 2 in slept
+    asked.clear()
+    fetch_chain_markets(store, get=get, today=date(2026, 11, 21), sleep=slept.append)
+    days = {u.removeprefix(SHFE_DAILY.split("{")[0]).removesuffix(".dat") for u in asked if u.startswith(SHFE_DAILY.split("{")[0])}
+    assert days <= {"20261116", "20261118", "20261119"}  # only the week's untraded days, as before; no quarter tried is asked again
+
+
 def test_no_recent_steel_price_is_reported(tmp_path):
     def get(url):
         if url.startswith(SSE_INDEX):

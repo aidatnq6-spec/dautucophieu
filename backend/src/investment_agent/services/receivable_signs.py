@@ -6,11 +6,12 @@ from pathlib import Path
 
 from decimal import ROUND_HALF_UP, Decimal
 
-from investment_agent.domain.balance_watch import cover_thinning, gross_loss, inventory_pace, year_end_provision, lending_view, raise_prepay, receivables_view
+from investment_agent.domain.balance_watch import cover_thinning, gross_loss, inventory_pace, price_check, year_end_provision, lending_view, raise_prepay, receivables_view
 from investment_agent.market.financial_ratios import kind_of
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.sectors import load_sectors
 from investment_agent.market.statements import StatementStore
+from investment_agent.market.value_chains import inventory_price_series
 from investment_agent.market.watchlist import load_watchlist
 from investment_agent.valuation.quality import report_quality
 
@@ -20,7 +21,8 @@ SIGNS = [("other_receivables", "Phải thu khác lớn"), ("other_high", "Cao h�
          ("financial_profit", "Phụ thuộc thu nhập tài chính"), ("receivables_outpace_revenue", "Phải thu tăng nhanh hơn doanh thu"),
          ("provision_jump", "Dự phòng tăng mạnh"), ("lending", "Cho vay lớn so với vốn chủ"),
          ("inventory_fast", "Tồn kho tăng nhanh hơn giá vốn"), ("gross_loss", "Bán dưới giá vốn, dự phòng không tăng"),
-         ("cover_thinning", "Dự phòng mỏng dần, hàng tồn lâu hơn"), ("audit_gap", "Dự phòng tồn kho quý 4 khác số kiểm toán")]
+         ("cover_thinning", "Dự phòng mỏng dần, hàng tồn lâu hơn"), ("audit_gap", "Dự phòng tồn kho quý 4 khác số kiểm toán"),
+         ("price_drop", "Giá bán giảm, dự phòng không tăng")]
 # A bank's row holds only these (Chất lượng tài sản ngân hàng, owner 23/11/2026), from VNDirect's bank lines and Vietcap's groups 1–5.
 BANK_SIGNS = [("provision_cut", "Lợi nhuận đỡ bởi giảm trích lập"), ("accrued_outpace", "Lãi dự thu tăng nhanh hơn thu nhập lãi")]
 SIGNS += BANK_SIGNS
@@ -38,6 +40,12 @@ BILLION = Decimal(1_000_000_000)
 def _pct1(v) -> str:
     """A ratio as a percentage with one decimal, half up: "2,0%"."""
     return f"{(Decimal(str(v)) * 100).quantize(Decimal('0.1'), ROUND_HALF_UP)}%".replace(".", ",")
+
+
+def _num(v) -> str:
+    """A price as the series gives it, with Vietnamese grouping: 3.340 or 412,5."""
+    whole, _, frac = format(Decimal(str(v)).normalize(), "f").partition(".")
+    return f"{int(whole):,}".replace(",", ".") + (f",{frac}" if frac else "")
 
 
 def _moved(v) -> str:
@@ -111,10 +119,16 @@ def receivable_signs(data_dir: Path) -> list[dict]:
             # Dự phòng chốt khi kiểm toán (owner, 23/11/2026): Q4 as first reported against the audited year; not for a property developer
             audit = year_end_provision(qs, kept[symbol].get("years", {}))
             signs["audit_gap"] = False if sector == "Bất động sản" else audit["flag"]
+            # Giá đầu ra giảm nhưng dự phòng không đổi (owner, 23/11/2026): only where the value chain ties a goods price to the ticker
+            found = inventory_price_series(data_dir, symbol)
+            price = None
+            if found is not None:
+                price = price_check(qs, found[2], indicator=found[0], label=found[1], property=sector == "Bất động sản")
+                signs["price_drop"] = price["flag"]
         else:
             signs.update(other_high=None, provision_jump=None, raise_prepay=None, lending=None, inventory_fast=None, gross_loss=None,
                          cover_thinning=None, audit_gap=None)
-            lend = pace = loss = thin = audit = None
+            lend = pace = loss = thin = audit = price = None
         details = {k: quality[k]["detail"] for k in QUALITY if k in quality and quality[k]["flag"]}
         if signs["inventory_fast"]:
             pct = lambda v: f"{round(float(v) * 100)}%"  # noqa: E731
@@ -128,6 +142,11 @@ def receivable_signs(data_dir: Path) -> list[dict]:
             q = thin["quarter"]
             details["cover_thinning"] = (f"Tồn kho đủ {thin['days']} ngày giá vốn (cùng kỳ {thin['days_year_ago']} ngày) trong khi tỷ lệ trích lập dự phòng "
                                          f"còn {_pct1(thin['coverage'])} (cùng kỳ {_pct1(thin['coverage_year_ago'])}), quý {q[-1]}/{q[:4]}.")
+        if signs.get("price_drop"):
+            q = price["quarter"]
+            details["price_drop"] = (f"{price['label']} cuối quý {q[-1]}/{q[:4]} {_moved(price['change'])} so cùng kỳ "
+                                     f"({_num(price['price_year_ago'])} → {_num(price['price'])}) trong khi tỷ lệ trích lập dự phòng tồn kho "
+                                     f"{_pct1(price['coverage'])} (cùng kỳ {_pct1(price['coverage_year_ago'])}).")
         if signs["audit_gap"]:
             r = next(r for r in audit["rows"] if r["year"] == audit["year"])
             q4, yb = Decimal(r["q4_balance"]) / BILLION, Decimal(r["year_balance"]) / BILLION

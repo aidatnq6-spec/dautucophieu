@@ -80,3 +80,33 @@ def test_a_q4_balance_the_audit_changed_is_flagged_from_1_ty_and_1_percent():
     small = year_end_provision({"2025-Q3": prov(10), "2025-Q4": prov(10.5)}, {"2024": prov(10), "2025": prov(10.5)})
     assert small["rows"][-1]["q4_share"] is None  # a change under 1 tỷ: no share worth stating
     assert year_end_provision({}, {})["flag"] is None and year_end_provision({"2025-Q4": prov(1)}, {})["rows"] == []
+
+
+def test_an_output_price_down_10_percent_on_a_year_while_the_share_provided_for_did_not_rise_is_flagged():
+    """Giá đầu ra giảm nhưng dự phòng không đổi (owner, 23/11/2026): the price at the quarter's end against a year before, from the series
+    the value chain ties to the ticker."""
+    from datetime import date
+    from decimal import Decimal
+
+    from investment_agent.domain.balance_watch import price_check
+    quarters = {"2025-Q3": q(10, 200, 10), "2026-Q3": q(10, 260, 10)}  # cover 5% → 3,85%
+    points = [(date(2025, 9, 1), Decimal("400")), (date(2026, 9, 1), Decimal("340"))]  # −15%
+    v = price_check(quarters, points, indicator="com_urea", label="Giá urê thế giới")
+    assert (v["quarter"], v["price"], v["price_year_ago"], v["change"], v["coverage"], v["coverage_year_ago"], v["flag"], v["why_not"]) == (
+        "2026-Q3", "340", "400", "-0.1500", "0.0385", "0.0500", True, None)
+    assert price_check(quarters, [(date(2025, 9, 1), Decimal("400")), (date(2026, 9, 1), Decimal("370"))], indicator="com_urea", label="x")["flag"] is False  # −7,5%
+    risen = {"2025-Q3": q(10, 200, 10), "2026-Q3": q(10, 200, 20)}  # cover 5% → 10%: provided for
+    assert price_check(risen, points, indicator="com_urea", label="x")["flag"] is False
+
+
+def test_a_price_series_too_short_or_stale_says_so_and_raises_nothing():
+    from datetime import date
+    from decimal import Decimal
+
+    from investment_agent.domain.balance_watch import price_check
+    quarters = {"2025-Q3": q(10, 200, 10), "2026-Q3": q(10, 260, 10)}
+    short = price_check(quarters, [(date(2026, 9, 25), Decimal("3300"))], indicator="com_steel_hrc", label="HRC")
+    assert short["flag"] is None and short["why_not"] == "Chưa đủ lịch sử giá: cần giá của cả cuối quý này và cùng kỳ năm trước."
+    stale = price_check(quarters, [(date(2025, 5, 1), Decimal("400")), (date(2026, 9, 1), Decimal("340"))], indicator="com_urea", label="x")
+    assert stale["flag"] is None  # the year-before price is 153 days before 30/09/2025: more than 75 days, not used
+    assert price_check(quarters, [], indicator="com_urea", label="x", property=True)["flag"] is False

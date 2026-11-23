@@ -103,6 +103,8 @@ def test_the_balance_carries_the_gross_loss_check_and_a_property_developer_is_ne
     assert call(c, clock, "GET", "/internal/stock/KDH/balance").json()["cover_thinning"]["flag"] is False
     # Dự phòng chốt khi kiểm toán cuối năm (owner, 23/11/2026): no years in this fixture, so no rows and no reading
     assert call(c, clock, "GET", "/internal/stock/FPT/balance").json()["year_end_provision"] == {"rows": [], "year": None, "flag": None}
+    # Giá đầu ra giảm (owner, 23/11/2026): FPT's value chain ties no goods price, so there is none
+    assert call(c, clock, "GET", "/internal/stock/FPT/balance").json()["price_check"] is None
 
 
 def test_the_balance_carries_the_inventory_provision_flow(tmp_path):

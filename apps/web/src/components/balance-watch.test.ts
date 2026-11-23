@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { auditGapText, coverThinningText, grossLossText } from "./balance-watch";
+import { auditGapText, coverThinningText, grossLossText, priceCheckText } from "./balance-watch";
+
+describe("priceCheckText", () => {
+  const base = { quarter: "2026-Q3", indicator: "com_urea", label: "Giá urê thế giới", price: "340", price_year_ago: "400", price_date: "2026-09-01",
+    price_year_ago_date: "2025-09-01", change: "-0.1500", coverage: "0.0385", coverage_year_ago: "0.0500", flag: true, why_not: null };
+  it("names the price against a year before and both shares provided for, says when there is no history, and the price alone otherwise", () => {
+    expect(priceCheckText(base)).toBe("Q3/2026: Giá urê thế giới 340 (cùng kỳ 400, giảm 15,0%); tỷ lệ trích lập dự phòng tồn kho 3,9% (cùng kỳ 5,0%). "
+      + "Giá bán giảm mà dự phòng không tăng: giá trị thuần có thể thu hồi của hàng tồn có thể đã thấp hơn giá ghi sổ, xem thuyết minh.");
+    expect(priceCheckText({ ...base, flag: false, change: "0.0500", price: "420" })).toBe("Q3/2026: Giá urê thế giới 420 (cùng kỳ 400, tăng 5,0%); "
+      + "tỷ lệ trích lập dự phòng tồn kho 3,9% (cùng kỳ 5,0%).");
+    expect(priceCheckText({ ...base, flag: null, price: null, change: null, why_not: "Chưa đủ lịch sử giá: cần giá của cả cuối quý này và cùng kỳ năm trước." }))
+      .toBe("Giá urê thế giới: Chưa đủ lịch sử giá: cần giá của cả cuối quý này và cùng kỳ năm trước.");
+  });
+});
 
 describe("auditGapText", () => {
   const row = { year: "2025", change: "178000000000", q4_change: "152000000000", q4_share: "0.8539", q4_balance: "600000000000",

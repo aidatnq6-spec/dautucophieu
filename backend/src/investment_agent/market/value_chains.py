@@ -138,3 +138,38 @@ def fingerprint(config: ValueChains, chain_id: str) -> str:
 
 def load_value_chains(path: Path = VALUE_CHAINS_PATH) -> ValueChains:
     return ValueChains.model_validate(json.loads(Path(path).read_text(encoding="utf-8")))
+
+
+# Giá đầu ra giảm nhưng dự phòng không đổi (owner, 23/11/2026): only prices of goods a company holds in stock. Coated steel ties HRC as its
+# input, but its stock is HRC, so it counts; freight, gas into power and other inputs do not.
+INVENTORY_PRICES = ("com_steel_hrc", "com_rubber", "com_urea", "com_sugar")
+
+
+def inventory_price_series(data_dir: Path, symbol: str) -> tuple[str, str, list] | None:
+    """(indicator, its label, [(date, price)] in order) for the ticker's goods price, from the stored macro series; None when the value
+    chain ties none. A point that does not read as a positive number is left out, never repaired."""
+    from datetime import date
+    from decimal import Decimal, InvalidOperation
+    from investment_agent.market.leading import MacroStore
+    indicator = inventory_price_indicator(load_value_chains(), symbol)
+    if indicator is None:
+        return None
+    points = []
+    for o in MacroStore(Path(data_dir)).read(indicator):
+        try:
+            day, value = date.fromisoformat(str(o["date"])[:10]), Decimal(str(o["value"]))
+        except (KeyError, ValueError, InvalidOperation):
+            continue
+        if value.is_finite() and value > 0:
+            points.append((day, value))
+    return indicator, COMMODITY_LABELS.get(indicator, indicator), sorted(points)
+
+
+def inventory_price_indicator(config: ValueChains, symbol: str) -> str | None:
+    """The goods price the ticker's value chain ties to it (with its refs), or None."""
+    for chain in config.chains:
+        if symbol in chain.symbols:
+            for factor in chain.factors:
+                if factor.indicator in INVENTORY_PRICES:
+                    return factor.indicator
+    return None

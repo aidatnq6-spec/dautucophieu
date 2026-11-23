@@ -41,3 +41,12 @@ def test_no_store_yet_is_nothing_to_show_not_unread(tmp_path):
 def test_a_store_of_the_wrong_shape_makes_the_bank_unread(tmp_path, folder, data):
     put(tmp_path, folder, data)
     assert load_public(tmp_path, "VCB") is None
+
+
+def test_the_inventory_price_of_a_ticker_is_a_goods_price_its_value_chain_ties_to_it():
+    """Giá đầu ra giảm (owner, 23/11/2026): steel, rubber, urea, sugar, and HRC for coated steel (their stock is HRC); not freight or gas."""
+    from investment_agent.market.value_chains import inventory_price_indicator, load_value_chains
+    cfg = load_value_chains()
+    assert [inventory_price_indicator(cfg, s) for s in ("HPG", "HSG", "GVR", "DCM", "SBT")] == ["com_steel_hrc", "com_steel_hrc", "com_rubber",
+                                                                                           "com_urea", "com_sugar"]
+    assert [inventory_price_indicator(cfg, s) for s in ("PVT", "NT2", "MWG", "XYZ")] == [None, None, None, None]

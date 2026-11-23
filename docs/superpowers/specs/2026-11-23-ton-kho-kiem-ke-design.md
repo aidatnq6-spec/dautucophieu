@@ -62,5 +62,15 @@ có 7 điểm.
 - Lấy thêm lịch sử giá HRC: việc riêng, cần tìm nguồn công khai.
 - Không khuyến nghị mua bán.
 
+## Đã làm (23/11/2026)
+- Phần 1: `gross_loss`; dòng mới trong khối Tồn kho; cột "Bán dưới giá vốn, dự phòng không tăng" trên Bảng dấu hiệu.
+- Phần 2: `cover_thinning`; cột "Dự phòng mỏng dần, hàng tồn lâu hơn".
+- Phần 3: `year_end_provision`; bảng "Dự phòng tồn kho theo năm"; cột "Dự phòng tồn kho quý 4 khác số kiểm toán"; dòng `inventory_provision`
+  trong Số đã công bố bị sửa.
+- Phần 4: `price_check`; `inventory_price_indicator` và `inventory_price_series` (`market/value_chains.py`, chỉ HRC, cao su, urê, đường);
+  cột "Giá bán giảm, dự phòng không tăng". Cột này chỉ có ở mã mà Chuỗi giá trị ngành gắn một giá hàng hóa. Giá cũ hơn 75 ngày so với ngày
+  cần so thì không dùng.
+- Mỗi cờ mới bật ở mã đang giữ được báo một lần qua lượt báo dấu hiệu hiện có.
+
 ## Thứ tự
 1 → 2 → 3 → 4, mỗi phần một nhánh, TDD, verify rồi merge. Các ngưỡng (20% và 20% ở mục 2, 10% ở mục 4, 1 tỷ và 1% ở mục 3) do chủ sở hữu chốt ngày 23/11/2026.

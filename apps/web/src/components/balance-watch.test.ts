@@ -22,7 +22,7 @@ describe("auditGapText", () => {
       .toBe("Năm 2025: dự phòng giảm giá tồn kho cuối quý 4 tự lập 600 tỷ; số năm VNDirect cập nhật ngày 01/04/2026 là 682 tỷ (thêm 82 tỷ). "
         + "Đối chiếu thuyết minh hàng tồn kho trên báo cáo năm đã kiểm toán.");
     expect(auditGapText({ rows: [{ ...row, spike: true }], year: "2025", flag: true }))
-      .toContain("Số năm gấp nhiều lần các quý quanh đó: có thể là lỗi dữ liệu nguồn, đối chiếu báo cáo gốc.");
+      .toContain("Số năm nhảy vọt so với các quý quanh đó: đối chiếu thuyết minh (có thể do hợp nhất kinh doanh, thoái vốn, hoặc lỗi dữ liệu nguồn).");
     expect(auditGapText({ rows: [{ ...row, gap: false, q4_balance: "682000000000" }], year: "2025", flag: false })).toBeNull();
   });
 });

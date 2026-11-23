@@ -80,7 +80,10 @@ có 7 điểm.
   - Chỉ so quý 4 với số năm khi số năm được cập nhật **sau** ngày báo cáo quý 4 xuất hiện. Nếu chưa, hoặc chưa biết ngày cập nhật, thì ghi
     "số năm chưa được cập nhật sau quý 4: chưa so được" và không bật cờ.
   - Trang không viết "đã kiểm toán". Thay vào đó trang ghi "số năm VNDirect cập nhật ngày …".
-- Số dư dự phòng nhảy vọt rồi quay về: ghi "có thể là lỗi dữ liệu nguồn, đối chiếu báo cáo gốc" nhưng vẫn hiện số. Quy tắc:
+- Số dư dự phòng nhảy vọt rồi quay về: ghi "nhảy vọt so với các kỳ quanh đó: đối chiếu thuyết minh (có thể do hợp nhất kinh doanh, thoái vốn,
+  hoặc lỗi dữ liệu nguồn)", và vẫn hiện số. Ban đầu câu này ghi "có thể là lỗi dữ liệu nguồn". Câu được đổi sau khi đọc báo cáo kiểm toán
+  2025 của VCG (bản scan, đọc bằng OCR): bảng cân đối trang 8, mã số 149, ghi dự phòng (405.796.046.893) đồng; thuyết minh trang 41 ghi phần
+  tăng 371.235.476.709 đồng là "tăng do hợp nhất kinh doanh". Như vậy số đó là thật. Quy tắc:
   - Với một quý: số dư từ 5 lần trở lên so với cả quý trước lẫn quý sau.
   - Với một năm: số năm từ 5 lần trở lên so với cả quý 3 cùng năm lẫn quý 2 năm sau.
   - Ví dụ VCG: năm 2025 và quý 1/2026 là −405,8 tỷ, trong khi các quý quanh đó khoảng −35 tỷ. Số năm 2025 được sửa ngày 31/07/2026, muộn

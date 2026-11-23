@@ -151,7 +151,9 @@ def test_a_q4_provision_the_audit_changed_is_a_sign_with_both_balances(tmp_path)
                                                         (("2025-Q3", 34), ("2025-Q4", 35), ("2026-Q1", 35), ("2026-Q2", 34))},
                                            "years_modified": {"2025": "2026-07-31"}, "quarters_created": {"2025-Q4": "2026-01-30"}})
     aaa = next(r for r in receivable_signs(d) if r["symbol"] == "AAA")
-    assert aaa["details"]["audit_gap"].endswith("Số năm gấp nhiều lần các quý quanh đó: có thể là lỗi dữ liệu nguồn, đối chiếu báo cáo gốc.")
+    # VCG's 405,8 tỷ was real (a business combination, audited report p.41): a jump is not called an error (owner, 23/11/2026)
+    assert aaa["details"]["audit_gap"].endswith("Số năm nhảy vọt so với các quý quanh đó: đối chiếu thuyết minh (có thể do hợp nhất kinh doanh, "
+                                                "thoái vốn, hoặc lỗi dữ liệu nguồn).")
 
 
 def test_an_output_price_down_is_a_sign_only_for_a_ticker_its_value_chain_ties_to_a_goods_price(tmp_path):

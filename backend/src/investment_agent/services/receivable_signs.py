@@ -155,7 +155,9 @@ def receivable_signs(data_dir: Path) -> list[dict]:
             details["audit_gap"] = (f"Năm {r['year']}: dự phòng giảm giá tồn kho cuối quý 4 tự lập {_ty(q4)} tỷ; số năm VNDirect cập nhật ngày "
                                     f"{on[8:10]}/{on[5:7]}/{on[:4]} là {_ty(yb)} tỷ ({'thêm' if yb > q4 else 'bớt'} {_ty(abs(yb - q4))} tỷ). "
                                     "Đối chiếu báo cáo năm đã kiểm toán."
-                                    + (" Số năm gấp nhiều lần các quý quanh đó: có thể là lỗi dữ liệu nguồn, đối chiếu báo cáo gốc." if r["spike"] else ""))
+                                    # a jump is not called an error: VCG's was a business combination (audited 2025, p.41; owner 23/11/2026)
+                                    + (" Số năm nhảy vọt so với các quý quanh đó: đối chiếu thuyết minh (có thể do hợp nhất kinh doanh, thoái vốn, "
+                                       "hoặc lỗi dữ liệu nguồn)." if r["spike"] else ""))
         if signs["lending"]:
             q = lend["quarter"]
             details["lending"] = (f"Cho vay và phải thu khác bằng {round(float(lend['share']) * 100)}% vốn chủ (quý {q[-1]}/{q[:4]}); "

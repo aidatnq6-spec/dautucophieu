@@ -62,7 +62,20 @@ def test_asset_quality_runs_on_public_figures_before_anything_is_entered_and_ent
 def test_without_public_figures_or_entries_there_is_no_quality_block(tmp_path):
     c, clock = client(tmp_path)
     body = call(c, clock, "GET", "/internal/bank-figures/ACB").json()
-    assert body["quality"] is None and body["provision"]["rows"] == []
+    assert body["quality"] is None and body["provision"]["rows"] == [] and body["accrued"]["quarter"] is None
+
+
+def test_accrued_interest_against_interest_income_reads_vndirect_and_the_owners_entry(tmp_path):
+    """Lãi dự thu so với thu nhập lãi (owner, 23/11/2026), part 4; made-up figures."""
+    b = 1_000_000_000
+    (tmp_path / "statements-financial").mkdir()
+    (tmp_path / "statements-financial" / "ACB.json").write_text(json.dumps({"symbol": "ACB", "kind": "bank", "quarters": {
+        "2025-Q3": {"interest_income": str(1000 * b), "accrued_interest": str(500 * b)},
+        "2026-Q3": {"interest_income": str(1100 * b), "accrued_interest": str(600 * b)}}}), encoding="utf-8")
+    c, clock = client(tmp_path)
+    a = call(c, clock, "GET", "/internal/bank-figures/ACB").json()["accrued"]
+    assert a["quarter"] == "2026-Q3" and a["flag"] is False  # 20% against 10%
+    assert save(c, clock, "2026-Q3", {"accrued_interest": "700"}, 0, "a1").json()["accrued"]["flag"] is True  # the entry on top: 40%
 
 
 def test_provisions_into_profit_read_vndirects_lines_and_the_asset_quality_table_with_the_owners_entries(tmp_path):

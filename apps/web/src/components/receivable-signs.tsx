@@ -28,7 +28,7 @@ export function ReceivableSigns() {
     <section className="surface" id="dau-hieu-phai-thu" aria-label="Dấu hiệu phải thu">
       <h2>Dấu hiệu phải thu</h2>
       <p className="caption">Các dấu hiệu về phải thu, trả trước và thu nhập tài chính của từng mã phi tài chính đang theo dõi, gom từ Chất lượng báo cáo (năm gần
-        nhất) và khung Phải thu (quý gần nhất), kèm số liệu của từng dấu hiệu. Ngân hàng chỉ xét dấu hiệu riêng của ngân hàng (lợi nhuận đỡ bởi giảm trích lập), từ báo
+        nhất) và khung Phải thu (quý gần nhất), kèm số liệu của từng dấu hiệu. Ngân hàng chỉ xét dấu hiệu riêng của ngân hàng (lợi nhuận đỡ bởi giảm trích lập, lãi dự thu tăng nhanh hơn thu nhập lãi), từ báo
         cáo trên VNDirect và nợ nhóm 1–5 trên Vietcap. Mỗi dấu hiệu là điều nên đọc kỹ thuyết minh, không phải kết luận hay khuyến nghị.</p>
       <p className="caption">{data.rows.filter((r) => r.count > 0).length} / {data.rows.length} mã có ít nhất một dấu hiệu.{" "}
         <button type="button" className="btn text" onClick={() => setAll(!all)}>{all ? "Chỉ hiện mã có dấu hiệu" : "Hiện mọi mã"}</button></p>

@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { fromInput, pageNote, provisionLine, quarterToEnter, sourceLine, type Provision } from "./bank-figures";
+import { accruedLine, fromInput, pageNote, provisionLine, quarterToEnter, sourceLine, type Accrued, type Provision } from "./bank-figures";
+
+describe("accruedLine", () => {
+  const base: Accrued = { quarter: "2026-Q3", ratio: "0.6364", ratio_year_ago: "0.5000", accrued_growth_yoy: "0.4000", income_growth_yoy: "0.1000", flag: true, why_not: null };
+  it("states both growths behind the sign, the growths without it, and why it could not be weighed", () => {
+    expect(accruedLine(base)).toBe("Lãi, phí phải thu tăng 40,0% so cùng kỳ, thu nhập lãi tăng 10,0%: phần lãi ghi nhận nhưng chưa thu bằng tiền tăng nhanh hơn.");
+    expect(accruedLine({ ...base, flag: false })).toBe("Chưa thấy lãi dự thu tăng nhanh hơn thu nhập lãi (lãi dự thu 40,0%, thu nhập lãi 10,0% so cùng kỳ).");
+    expect(accruedLine({ ...base, flag: null, why_not: "Chưa có lãi dự thu và thu nhập lãi của 2025-Q3 để so cùng kỳ." }))
+      .toBe("Chưa có lãi dự thu và thu nhập lãi của 2025-Q3 để so cùng kỳ.");
+  });
+});
 
 describe("provisionLine", () => {
   const base: Provision = { rows: [], quarter: "2026-Q3", share: "0.1333", credit_cost: null, credit_cost_missing: [], expense_growth_yoy: "-0.4000",

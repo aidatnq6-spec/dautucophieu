@@ -10,7 +10,7 @@ from typing import Literal
 from fastapi import APIRouter, Request
 from pydantic import Field
 
-from investment_agent.domain.bank_figures import (FIELDS, LABELS, UnsafeUrl, check_public_https, derive, merged_quarters, parse_report_pages,
+from investment_agent.domain.bank_figures import (FIELDS, LABELS, UnsafeUrl, accrued_view, check_public_https, derive, merged_quarters, parse_report_pages,
                                                   provision_view, public_quarters, quality_trend)
 from investment_agent.domain.models import ContractModel
 from investment_agent.market.sectors import load_sectors
@@ -96,8 +96,11 @@ def bank_view(record, symbol: str, data_dir=None) -> dict:
         quality = {"quarter": latest, "values": values, "sources": merged[latest]["sources"], "notes": merged[latest]["notes"],
                    "derived": derive(values), "trend": quality_trend({q: v["values"] for q, v in merged.items()})[latest],
                    "compared": len(merged) > 1}
-    provision = provision_view(statements, {q: v["values"] for q, v in merged.items()})  # Dự phòng đi vào lợi nhuận (owner, 23/11/2026)
-    return {"symbol": symbol, "version": record.version if record else 0, "quarters": rows, "labels": LABELS, "quality": quality, "provision": provision}
+    table = {q: v["values"] for q, v in merged.items()}
+    provision = provision_view(statements, table)  # Dự phòng đi vào lợi nhuận (owner, 23/11/2026)
+    accrued = accrued_view(statements, table)  # Lãi dự thu so với thu nhập lãi (owner, 23/11/2026)
+    return {"symbol": symbol, "version": record.version if record else 0, "quarters": rows, "labels": LABELS, "quality": quality, "provision": provision,
+            "accrued": accrued}
 
 
 def _clean(values: dict[str, str | None]):

@@ -1,4 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { grossLossText } from "./balance-watch";
+
+describe("grossLossText", () => {
+  const base = { quarter: "2026-Q3", gross_profit: "-5000000000", coverage: "0.0188", coverage_prev: "0.0200", share: "0.3140", flag: true };
+  it("names the loss and both shares provided for when it is a sign, and says nothing for a quarter with a gross profit", () => {
+    expect(grossLossText(base)).toMatch(/^Q3\/2026: lỗ gộp 5 tỷ \(bán dưới giá vốn\), tỷ lệ trích lập dự phòng tồn kho 1,9% \(quý trước 2,0%\)/);
+    expect(grossLossText(base)).toContain("Giá trị thuần có thể thu hồi đã thấp hơn giá ghi sổ");
+    expect(grossLossText({ ...base, gross_profit: "20000000000", flag: false })).toBeNull();
+    expect(grossLossText({ ...base, flag: false, coverage: "0.0300" })).toMatch(/dự phòng đã tăng/);
+  });
+});
 import { advancesText, borrowingText, coverageText, inventoryFlowText, inventoryPaceText, inventoryText, lendingText, provisionFlowText, carryText, dsoText, otherSectorText, prepayDaysText, provisionText, raiseText, revisionText, sectorText, type Carry } from "./balance-watch";
 
 describe("otherSectorText", () => {

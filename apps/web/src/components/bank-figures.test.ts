@@ -5,15 +5,23 @@ describe("accruedLine", () => {
   const base: Accrued = { quarter: "2026-Q3", ratio: "0.6364", ratio_year_ago: "0.5000", accrued_growth_yoy: "0.4000", income_growth_yoy: "0.1000", flag: true, why_not: null };
   it("states both growths behind the sign, the growths without it, and why it could not be weighed", () => {
     expect(accruedLine(base)).toBe("Lãi, phí phải thu tăng 40,0% so cùng kỳ, thu nhập lãi tăng 10,0%: phần lãi ghi nhận nhưng chưa thu bằng tiền tăng nhanh hơn.");
-    expect(accruedLine({ ...base, flag: false })).toBe("Chưa thấy lãi dự thu tăng nhanh hơn thu nhập lãi (lãi dự thu 40,0%, thu nhập lãi 10,0% so cùng kỳ).");
+    expect(accruedLine({ ...base, flag: false })).toBe("Chưa thấy lãi dự thu tăng nhanh hơn thu nhập lãi (lãi dự thu tăng 40,0%, thu nhập lãi tăng 10,0% so cùng kỳ).");
     expect(accruedLine({ ...base, flag: null, why_not: "Chưa có lãi dự thu và thu nhập lãi của 2025-Q3 để so cùng kỳ." }))
       .toBe("Chưa có lãi dự thu và thu nhập lãi của 2025-Q3 để so cùng kỳ.");
+  });
+  it("writes a fall as a fall (review 23/11/2026)", () => {
+    expect(accruedLine({ ...base, accrued_growth_yoy: "0.0500", income_growth_yoy: "-0.2000" }))
+      .toBe("Lãi, phí phải thu tăng 5,0% so cùng kỳ, thu nhập lãi giảm 20,0%: phần lãi ghi nhận nhưng chưa thu bằng tiền tăng nhanh hơn.");
   });
 });
 
 describe("provisionLine", () => {
   const base: Provision = { rows: [], quarter: "2026-Q3", share: "0.1333", credit_cost: null, credit_cost_missing: [], expense_growth_yoy: "-0.4000",
-    bad_growth_qoq: "0.0800", flag: true, why_not: null };
+    bad_growth_qoq: "0.0800", bad_now: "27", bad_prev: "25", flag: true, why_not: null };
+  it("states the amounts when there was no bad debt the quarter before", () => {
+    expect(provisionLine({ ...base, bad_growth_qoq: null, bad_now: "5", bad_prev: "0" }))
+      .toBe("Chi phí dự phòng giảm 40,0% so cùng kỳ trong khi nợ nhóm 3–5 tăng từ 0 lên 5 tỷ so quý trước: lợi nhuận được đỡ bởi giảm trích lập.");
+  });
   it("states the cut and the bad debt behind the sign, says when there is none, and why it could not be weighed", () => {
     expect(provisionLine(base)).toBe("Chi phí dự phòng giảm 40,0% so cùng kỳ trong khi nợ nhóm 3–5 tăng 8,0% so quý trước: lợi nhuận được đỡ bởi giảm trích lập.");
     expect(provisionLine({ ...base, flag: false })).toMatch(/^Chưa thấy lợi nhuận được đỡ/);

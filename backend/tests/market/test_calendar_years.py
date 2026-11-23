@@ -63,12 +63,34 @@ def test_a_year_alone_is_its_own_range_and_years_that_do_not_meet_are_not_joined
         cal.is_session(date(2027, 1, 4))
 
 
+def test_a_broken_file_for_the_year_next_door_leaves_this_years_calendar_standing(tmp_path):
+    """Review 23/11/2026: a 2027 file written with a trailing comma, or without "last", must not stop the 2026 calendar."""
+    p26 = write(tmp_path, 2026, ["2026-01-01"])
+    (tmp_path / "trading-calendar-hose-2027.json").write_text('{"version": "hose-2027.1", "source": "HOSE", "holidays": [],}', encoding="utf-8")
+    assert load_calendar(p26).last == date(2026, 12, 31)
+    (tmp_path / "trading-calendar-hose-2027.json").write_text(json.dumps({"version": "v", "source": "HOSE", "first": "2027-01-01", "holidays": []}),
+                                                              encoding="utf-8")
+    (tmp_path / "trading-calendar-hose-2025.json").write_text(json.dumps({"version": "v", "source": "synthetic", "first": "2025-01-01",
+                                                                         "last": "2025-12-31", "holidays": []}), encoding="utf-8")
+    assert (load_calendar(p26).first, load_calendar(p26).last) == (date(2026, 1, 1), date(2026, 12, 31))  # no "last"; no source
+
+
 def test_the_owners_own_calendar_is_read_as_it_is(tmp_path):
     write(tmp_path, 2027, [])
     own = tmp_path / "trading-calendar.json"
     own.write_text(json.dumps({"version": "own.1", "source": "chủ sở hữu, từ thông báo HOSE", "first": "2026-01-01", "last": "2026-12-31",
                                "holidays": []}), encoding="utf-8")
     assert load_calendar(own).last == date(2026, 12, 31)
+
+
+def test_the_scheduled_run_and_the_brief_put_the_missing_year_sentence_in_the_log(tmp_path, capsys):
+    """Spec §2: the sentence reaches logs/scheduler.log, not only the exception's name (review 23/11/2026)."""
+    from investment_agent.cli import brief_snapshot_cli, scheduled_run
+    missing = tmp_path / "trading-calendar-hose-2027.json"
+    for run in (lambda: scheduled_run(missing, tmp_path), lambda: brief_snapshot_cli(tmp_path, missing)):
+        run()
+        out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+        assert out["reason"] == "CalendarMissing" and out["message"].startswith("chưa có lịch giao dịch HOSE 2027")
 
 
 def test_a_missing_year_says_what_is_missing_and_what_to_do(tmp_path):

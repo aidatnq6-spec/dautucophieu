@@ -59,6 +59,21 @@ def test_asset_quality_runs_on_public_figures_before_anything_is_entered_and_ent
     assert "reserve_lagging" not in body["quality"]["trend"]["flags"]
 
 
+def test_the_block_shows_the_latest_quarter_with_groups_1_to_5_and_says_when_the_one_before_cannot_be_compared(tmp_path):
+    """Review 23/11/2026: VNDirect's statements come before Vietcap's notes; a quarter with only the reserve must not hide the last full one."""
+    b = 1_000_000_000
+    (tmp_path / "bank-notes").mkdir()
+    (tmp_path / "bank-notes" / "ACB.json").write_text(json.dumps({"symbol": "ACB", "fetched_at": "2026-11-20T00:00:00+00:00", "source": "vietcap:iq", "quarters": {
+        "2026-09-30": {**{f"group{i}": str(v * b) for i, v in enumerate((1200, 17, 10, 10, 7), 1)}, "loans": str(1244 * b)}}}), encoding="utf-8")
+    (tmp_path / "statements-financial").mkdir()
+    (tmp_path / "statements-financial" / "ACB.json").write_text(json.dumps({"symbol": "ACB", "kind": "bank", "quarters": {
+        "2026-Q2": {"loan_reserve": str(-24 * b)}, "2026-Q3": {"loan_reserve": str(-22 * b)}, "2026-Q4": {"loan_reserve": str(-21 * b)}}}), encoding="utf-8")
+    c, clock = client(tmp_path)
+    quality = call(c, clock, "GET", "/internal/bank-figures/ACB").json()["quality"]
+    assert quality["quarter"] == "2026-Q3" and quality["derived"]["npl"] is not None
+    assert quality["compared"] is False  # Q2 and the end of 2025 have no groups: nothing to set Q3 against
+
+
 def test_without_public_figures_or_entries_there_is_no_quality_block(tmp_path):
     c, clock = client(tmp_path)
     body = call(c, clock, "GET", "/internal/bank-figures/ACB").json()

@@ -19,7 +19,11 @@ type Quality = { quarter: string; values: Partial<Record<Field, string>>; source
   trend: Trend; compared: boolean };
 // Dự phòng đi vào lợi nhuận (23/11/2026): VNDirect's credit provision expense against profit before it, in tỷ đồng.
 export type Provision = { rows: { quarter: string; expense: string; ppop: string | null; share: string | null }[]; quarter: string | null; share: string | null;
-  credit_cost: string | null; credit_cost_missing: string[]; expense_growth_yoy: string | null; bad_growth_qoq: string | null; flag: boolean | null; why_not: string | null };
+  credit_cost: string | null; credit_cost_missing: string[]; expense_growth_yoy: string | null; bad_growth_qoq: string | null; bad_now: string | null;
+  bad_prev: string | null; flag: boolean | null; why_not: string | null };
+/** "tăng 5,0%" or "giảm 20,0%": the word follows the figure's sign (review 23/11/2026: a fall was written as a rise). */
+const moved = (v: string | null) => (v === null ? "—" : `${v.startsWith("-") ? "giảm" : "tăng"} ${pct1(v.replace("-", ""))}`);
+const ty = (v: string | null) => (v === null ? "—" : formatDecimal(v, 0));
 // Lãi dự thu so với thu nhập lãi (23/11/2026): accrued interest of the asset quality table against VNDirect's interest income of the quarter.
 export type Accrued = { quarter: string | null; ratio: string | null; ratio_year_ago: string | null; accrued_growth_yoy: string | null; income_growth_yoy: string | null;
   flag: boolean | null; why_not: string | null };
@@ -27,15 +31,16 @@ type View = { symbol: string; version: number; quarters: Quarter[]; labels: Reco
 
 /** What accrued interest against interest income says: the sign with its figures, no sign, or why it could not be weighed. */
 export function accruedLine(a: Accrued): string {
-  if (a.flag) return `Lãi, phí phải thu tăng ${pct1(a.accrued_growth_yoy)} so cùng kỳ, thu nhập lãi tăng ${pct1(a.income_growth_yoy)}: phần lãi ghi nhận nhưng chưa thu bằng tiền tăng nhanh hơn.`;
-  if (a.flag === false) return `Chưa thấy lãi dự thu tăng nhanh hơn thu nhập lãi (lãi dự thu ${pct1(a.accrued_growth_yoy)}, thu nhập lãi ${pct1(a.income_growth_yoy)} so cùng kỳ).`;
+  if (a.flag) return `Lãi, phí phải thu ${moved(a.accrued_growth_yoy)} so cùng kỳ, thu nhập lãi ${moved(a.income_growth_yoy)}: phần lãi ghi nhận nhưng chưa thu bằng tiền tăng nhanh hơn.`;
+  if (a.flag === false) return `Chưa thấy lãi dự thu tăng nhanh hơn thu nhập lãi (lãi dự thu ${moved(a.accrued_growth_yoy)}, thu nhập lãi ${moved(a.income_growth_yoy)} so cùng kỳ).`;
   return a.why_not ?? "Chưa đủ số để xét.";
 }
 
 /** What the latest quarter's provisions say: the sign with its figures, no sign, or why it could not be weighed. */
 export function provisionLine(p: Provision): string {
-  if (p.flag) return `Chi phí dự phòng giảm ${pct1(p.expense_growth_yoy?.replace("-", "") ?? null)} so cùng kỳ trong khi nợ nhóm 3–5 tăng ${pct1(p.bad_growth_qoq)} so quý trước: `
-    + "lợi nhuận được đỡ bởi giảm trích lập.";
+  if (p.flag) return `Chi phí dự phòng ${moved(p.expense_growth_yoy)} so cùng kỳ trong khi nợ nhóm 3–5 `
+    + (p.bad_growth_qoq !== null ? `${moved(p.bad_growth_qoq)} so quý trước` : `tăng từ ${ty(p.bad_prev)} lên ${ty(p.bad_now)} tỷ so quý trước`)
+    + ": lợi nhuận được đỡ bởi giảm trích lập.";
   if (p.flag === false) return "Chưa thấy lợi nhuận được đỡ bởi giảm trích lập (chi phí dự phòng không giảm từ 30% so cùng kỳ, hoặc nợ nhóm 3–5 không tăng).";
   return p.why_not ?? "Chưa đủ số để xét.";
 }

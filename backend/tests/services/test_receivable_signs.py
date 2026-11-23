@@ -66,6 +66,38 @@ def test_a_bank_whose_accrued_interest_outpaced_its_interest_income_has_the_sign
                                                  "của quý (cùng kỳ 50%).")
 
 
+def test_a_fall_is_written_as_a_fall_not_as_a_rise(tmp_path):
+    """Review 23/11/2026: the sign fires when interest income falls too; the words follow each figure's sign."""
+    d = data(tmp_path)
+    StatementStore(d / "statements-financial").save({"symbol": "VCB", "kind": "bank", "years": {}, "quarters": {
+        "2025-Q3": {"interest_income": str(1000 * BN), "accrued_interest": str(500 * BN)},
+        "2026-Q3": {"interest_income": str(800 * BN), "accrued_interest": str(525 * BN)}}})
+    vcb = next(r for r in receivable_signs(d) if r["symbol"] == "VCB")
+    assert vcb["signs"]["accrued_outpace"] is True
+    assert vcb["details"]["accrued_outpace"].startswith("Lãi, phí phải thu quý 3/2026 tăng 5% so cùng kỳ, thu nhập lãi giảm 20%;")
+
+
+def test_no_bad_debt_the_quarter_before_gives_no_growth_to_state_and_does_not_break_the_board(tmp_path):
+    from investment_agent.market.bank_notes import BankNoteStore
+    d = data(tmp_path)
+    StatementStore(d / "statements-financial").save({"symbol": "VCB", "kind": "bank", "years": {}, "quarters": {
+        "2025-Q3": {"provision_expense": str(1000 * BN), "ppop": str(4000 * BN)}, "2026-Q3": {"provision_expense": str(600 * BN), "ppop": str(4500 * BN)}}})
+    groups = lambda g3: {"group1": str(1000 * BN), "group2": "0", "group3": str(g3 * BN), "group4": "0", "group5": "0", "loans": str((1000 + g3) * BN)}  # noqa: E731
+    BankNoteStore(d / "bank-notes").save({"symbol": "VCB", "fetched_at": "2026-11-20T00:00:00+00:00", "source": "vietcap:iq",
+                                          "quarters": {"2026-06-30": groups(0), "2026-09-30": groups(5)}})
+    vcb = next(r for r in receivable_signs(d) if r["symbol"] == "VCB")
+    assert vcb["signs"]["provision_cut"] is True
+    assert vcb["details"]["provision_cut"].startswith("Chi phí dự phòng quý 3/2026 giảm 40% so cùng kỳ trong khi nợ nhóm 3–5 tăng từ 0 lên 5 tỷ")
+
+
+def test_one_unreadable_bank_file_leaves_that_bank_unread_and_the_board_standing(tmp_path):
+    d = data(tmp_path)
+    (d / "bank-notes").mkdir()
+    (d / "bank-notes" / "VCB.json").write_text('{"symbol": "VCB", "quart', encoding="utf-8")  # cut short by a power loss
+    rows = receivable_signs(d)
+    assert [r["symbol"] for r in rows] == ["AAA", "BBB", "VCB"] and rows[2]["signs"] == {"provision_cut": None, "accrued_outpace": None}
+
+
 def test_lending_against_equity_is_a_sign_with_its_figure(tmp_path):
     from investment_agent.market.statements import StatementStore
     d = data(tmp_path)

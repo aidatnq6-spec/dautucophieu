@@ -253,6 +253,11 @@ class CalendarMissing(FileNotFoundError):
     """The year's HOSE calendar is not in config/: said plainly, never replaced by a guessed one (owner, 23/11/2026)."""
 
 
+def _not_configured(exc: Exception) -> dict:
+    """A step that cannot start; a missing calendar also says which year and what to do, for logs/scheduler.log (owner, 23/11/2026)."""
+    return {"status": "not_configured", "reason": type(exc).__name__, **({"message": str(exc)} if isinstance(exc, CalendarMissing) else {})}
+
+
 _YEAR_FILE = re.compile(r"^trading-calendar-hose-(\d{4})\.json$")
 
 
@@ -279,10 +284,17 @@ def load_calendar(path: Path):
     if not m:
         return cal
     parts, year = [cal], int(m.group(1))
-    before, after = path.with_name(f"trading-calendar-hose-{year - 1}.json"), path.with_name(f"trading-calendar-hose-{year + 1}.json")
-    if before.is_file() and (prev := _read_calendar(before)).last + timedelta(days=1) == cal.first:
+
+    def neighbour(y: int):
+        """The year next door, or None when it is absent or cannot be read: this year's calendar never fails for it (review 23/11/2026)."""
+        other = path.with_name(f"trading-calendar-hose-{y}.json")
+        try:
+            return _read_calendar(other) if other.is_file() else None
+        except (OSError, ValueError, KeyError, TypeError):
+            return None
+    if (prev := neighbour(year - 1)) and prev.last + timedelta(days=1) == cal.first:
         parts.insert(0, prev)
-    if after.is_file() and (nxt := _read_calendar(after)).first - timedelta(days=1) == cal.last:
+    if (nxt := neighbour(year + 1)) and nxt.first - timedelta(days=1) == cal.last:
         parts.append(nxt)
     if len(parts) == 1:
         return cal
@@ -926,7 +938,7 @@ def scheduled_run(calendar_path: Path, data_dir: Path) -> int:
         cal = load_calendar(calendar_path)
         repo = personal_repository_from_env()
     except (OSError, ValueError, KeyError, RepositoryUnavailable) as exc:
-        print(json.dumps({"status": "not_configured", "reason": type(exc).__name__}))
+        print(json.dumps(_not_configured(exc), ensure_ascii=False))
         return 2
     settings = Settings.from_env()
     sender = TelegramSender(settings.telegram_bot_token, client=httpx.Client()) if settings.telegram_bot_token else None
@@ -1711,7 +1723,7 @@ def brief_snapshot_cli(data_dir: Path, calendar_path: Path, *, listing=None, boa
     try:
         cal = load_calendar(calendar_path)
     except (OSError, ValueError, KeyError) as exc:
-        print(json.dumps({"status": "not_configured", "reason": type(exc).__name__}))
+        print(json.dumps(_not_configured(exc), ensure_ascii=False))
         return 2
     now = now or datetime.now(timezone.utc)
     session = latest_session(now, cal)

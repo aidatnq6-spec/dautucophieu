@@ -20,6 +20,17 @@ def test_the_first_run_only_records_and_a_new_sign_on_a_held_ticker_is_told_once
     assert check_signs(tmp_path, rows=ROWS, held={"VCG"}, titles=TITLES, send=send)["new"] == 0 and len(sent) == 1  # told once
 
 
+def test_a_ticker_new_to_the_board_is_only_recorded_on_its_first_run_and_told_from_then_on(tmp_path):
+    """Banks joined the board on 23/11/2026 (owner review): a held bank's signs already on are not news; only what turns on after."""
+    sent = []
+    send = lambda text: sent.append(text) or True  # noqa: E731
+    check_signs(tmp_path, rows=[ROWS[1]], held={"VCB"}, titles=TITLES, send=send)  # the board before banks
+    bank = {"symbol": "VCB", "signs": {"provision_cut": True, "accrued_outpace": False}, "details": {}}
+    assert check_signs(tmp_path, rows=[ROWS[1], bank], held={"VCB"}, titles=TITLES, send=send)["new"] == 0 and sent == []
+    later = {**bank, "signs": {"provision_cut": True, "accrued_outpace": True}}
+    assert check_signs(tmp_path, rows=[ROWS[1], later], held={"VCB"}, titles=TITLES, send=send)["new"] == 1 and len(sent) == 1
+
+
 def test_signs_of_tickers_not_held_are_never_told_and_a_failed_send_is_tried_again(tmp_path):
     check_signs(tmp_path, rows=[{"symbol": "DXG", "signs": {}, "details": {}}, {"symbol": "VCG", "signs": {}, "details": {}}], held=set(), titles=TITLES,
                 send=lambda text: True)

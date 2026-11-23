@@ -57,4 +57,4 @@ def test_a_loss_before_provisions_gives_no_share_and_no_quarter_gives_an_empty_v
     assert v["rows"][0]["share"] is None and v["share"] is None
     assert provision_view({"2026-Q3": {"npat_parent": str(B)}}, {}) == {
         "rows": [], "quarter": None, "share": None, "credit_cost": None, "credit_cost_missing": [], "expense_growth_yoy": None,
-        "bad_growth_qoq": None, "flag": None, "why_not": None}
+        "bad_growth_qoq": None, "bad_now": None, "bad_prev": None, "flag": None, "why_not": None}

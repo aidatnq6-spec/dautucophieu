@@ -10,7 +10,7 @@ from typing import Literal
 from fastapi import APIRouter, Request
 from pydantic import Field
 
-from investment_agent.domain.bank_figures import (FIELDS, LABELS, UnsafeUrl, accrued_view, check_public_https, derive, merged_quarters, parse_report_pages,
+from investment_agent.domain.bank_figures import (FIELDS, GROUPS, LABELS, UnsafeUrl, accrued_view, check_public_https, derive, merged_quarters, parse_report_pages,
                                                   provision_view, public_quarters, quality_trend)
 from investment_agent.domain.models import ContractModel
 from investment_agent.market.sectors import load_sectors
@@ -91,11 +91,16 @@ def bank_view(record, symbol: str, data_dir=None) -> dict:
     merged = merged_quarters({q: v["values"] for q, v in quarters.items()}, public)
     quality = None
     if merged:
-        latest = max(merged)
+        # the latest quarter with groups 1–5: VNDirect's statements come before Vietcap's notes, and a quarter with only the reserve would
+        # hide the last full one (review 23/11/2026); none with groups: the latest at all
+        full = [q for q, v in merged.items() if all(g in v["values"] for g in GROUPS)]
+        latest = max(full) if full else max(merged)
         values = merged[latest]["values"]
+        y, n = int(latest[:4]), int(latest[-1])
+        before = [f"{y}-Q{n - 1}" if n > 1 else f"{y - 1}-Q4", f"{y - 1}-Q4"]  # the quarter before and the end of last year, as quality_trend
         quality = {"quarter": latest, "values": values, "sources": merged[latest]["sources"], "notes": merged[latest]["notes"],
                    "derived": derive(values), "trend": quality_trend({q: v["values"] for q, v in merged.items()})[latest],
-                   "compared": len(merged) > 1}
+                   "compared": any(q in full for q in before)}
     table = {q: v["values"] for q, v in merged.items()}
     provision = provision_view(statements, table)  # Dự phòng đi vào lợi nhuận (owner, 23/11/2026)
     accrued = accrued_view(statements, table)  # Lãi dự thu so với thu nhập lãi (owner, 23/11/2026)

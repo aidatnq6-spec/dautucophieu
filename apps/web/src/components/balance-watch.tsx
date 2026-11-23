@@ -25,7 +25,10 @@ type Balance = { symbol: string; sector: string | null; debt: { rows: DebtRow[];
   receivables: { rows: ArRow[]; dso: Dso; provision: Provision; prepay_days: Dso; other_vs_sector: OtherVsSector }; raise_prepay: { flag: boolean; events: RaiseEvent[] };
   revisions?: Revision[]; lending?: Lending; provision_flow?: ProvisionFlow; inventory?: Inventory;
   inventory_pace?: InventoryPace; inventory_provision_flow?: InventoryFlow; gross_loss?: GrossLoss; cover_thinning?: CoverThinning;
-  year_end_provision?: YearEndProvision };
+  year_end_provision?: YearEndProvision; price_check?: PriceCheck | null };
+export type PriceCheck = { quarter: string | null; indicator: string; label: string; price: string | null; price_year_ago: string | null;
+  price_date: string | null; price_year_ago_date: string | null; change: string | null; coverage: string | null; coverage_year_ago: string | null;
+  flag: boolean | null; why_not: string | null };
 type YearRow = { year: string; change: string | null; q4_change: string | null; q4_share: string | null; q4_balance: string | null;
   year_balance: string | null; gap: boolean | null };
 export type YearEndProvision = { rows: YearRow[]; year: string | null; flag: boolean | null };
@@ -200,6 +203,17 @@ export function grossLossText(g: GrossLoss): string | null {
   if (g.flag) return `${main} Giá trị thuần có thể thu hồi đã thấp hơn giá ghi sổ mà dự phòng chưa tăng: xem thuyết minh hàng tồn kho.`;
   if (g.coverage !== null && g.coverage_prev !== null && Number(g.coverage) > Number(g.coverage_prev)) return `${main} Tỷ lệ trích lập dự phòng đã tăng theo.`;
   return main;
+}
+
+/** Giá đầu ra giảm nhưng dự phòng không đổi (23/11/2026): the goods price the value chain ties to the ticker, against a year before. */
+export function priceCheckText(p: PriceCheck): string {
+  if (!p.quarter || p.price === null || p.price_year_ago === null || p.change === null) return `${p.label}: ${p.why_not ?? "chưa có giá."}`;
+  const n = (v: string) => Number(v).toLocaleString("vi-VN");
+  const moved = `${Number(p.change) < 0 ? "giảm" : "tăng"} ${rate(p.change.replace("-", ""))}`;
+  const cover = p.coverage !== null && p.coverage_year_ago !== null
+    ? `; tỷ lệ trích lập dự phòng tồn kho ${rate(p.coverage)} (cùng kỳ ${rate(p.coverage_year_ago)})` : "";
+  const main = `${q(p.quarter)}: ${p.label} ${n(p.price)} (cùng kỳ ${n(p.price_year_ago)}, ${moved})${cover}.`;
+  return p.flag ? `${main} Giá bán giảm mà dự phòng không tăng: giá trị thuần có thể thu hồi của hàng tồn có thể đã thấp hơn giá ghi sổ, xem thuyết minh.` : main;
 }
 
 /** Dự phòng chốt khi kiểm toán (23/11/2026): said only when Q4 as first reported differs from the audited year. */
@@ -379,6 +393,8 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
           Bán dưới giá vốn, dự phòng không tăng</span> </>}{grossLossText(data.gross_loss)}</p>}
         {data.cover_thinning && coverThinningText(data.cover_thinning) && <p data-testid="cover-thinning"><span className="pill warn">
           Dự phòng mỏng dần, hàng tồn lâu hơn</span> {coverThinningText(data.cover_thinning)}</p>}
+        {data.price_check && <p data-testid="price-check">{data.price_check.flag && <><span className="pill warn">Giá bán giảm, dự phòng không tăng</span> </>}
+          {priceCheckText(data.price_check)}</p>}
         <div className="tablewrap"><table className="fv-table" aria-label={`Tồn kho ${symbol}`}>
           <thead><tr><th>Quý</th><th className="num">Giá gốc</th><th className="num">Dự phòng giảm giá</th><th className="num">Bao phủ</th>
             <th className="num">Giá trị thuần</th><th className="num">Trên tổng tài sản</th></tr></thead>
@@ -413,7 +429,9 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
           nhanh hơn giá vốn bốn quý từ 20 điểm %, số ngày tăng và tồn kho từ 10% tổng tài sản (không ghi với Bất động sản, nơi tồn kho là dự án). Cơ cấu (nguyên vật liệu, dở dang, thành phẩm, hàng hóa) chỉ có trong thuyết minh, không có ở đây. Dự phòng theo năm: mức
           tăng cả năm theo báo cáo năm đã kiểm toán, phần quý 4 = số dư năm − số dư quý 3; dự phòng dồn vào quý 4 là thường gặp (kiểm kê ngày 31/12) nên
           không ghi cờ. Chỉ ghi khi số dư quý 4 công ty tự báo khác số kiểm toán hơn 1 tỷ và 1%. Bán dưới giá vốn: lỗ gộp của quý mà tỷ lệ trích lập không
-          tăng. Dự phòng mỏng dần: số ngày tồn kho tăng từ 20% so cùng kỳ mà tỷ lệ trích lập giảm từ 20%. Ô thiếu số để trống. Không phải khuyến nghị.</p>
+          tăng. Dự phòng mỏng dần: số ngày tồn kho tăng từ 20% so cùng kỳ mà tỷ lệ trích lập giảm từ 20%. Giá bán giảm: giá hàng hóa mà Chuỗi giá trị ngành
+          gắn với mã (thép, cao su, urê, đường) cuối quý giảm từ 10% so cùng kỳ mà tỷ lệ trích lập không tăng; giá cũ hơn 75 ngày so với ngày cần so
+          thì không dùng. Ô thiếu số để trống. Không phải khuyến nghị.</p>
       </section>}
       {data.property && <section className="surface" aria-label="Tiền khách trả trước">
         <h2>Tiền khách trả trước</h2>

@@ -145,6 +145,26 @@ def test_a_q4_provision_the_audit_changed_is_a_sign_with_both_balances(tmp_path)
                                            "(kiểm toán thêm 82,0 tỷ).")
 
 
+def test_an_output_price_down_is_a_sign_only_for_a_ticker_its_value_chain_ties_to_a_goods_price(tmp_path):
+    """Giá đầu ra giảm nhưng dự phòng không đổi (owner, 23/11/2026): DCM to urea; AAA (construction) has no such sign at all."""
+    d = data(tmp_path)
+    (d / "market-symbols.txt").write_text("AAA\nBBB\nVCB\nDCM\n", encoding="utf-8")
+    ind = json.loads((d / "industries.json").read_text(encoding="utf-8"))
+    ind["sectors"]["DCM"] = "Hóa chất"
+    (d / "industries.json").write_text(json.dumps(ind), encoding="utf-8")
+    q = lambda gross, prov: {"inventory_gross": str(gross * BN), "inventory_provision": str(-prov * BN), "inventory": str((gross - prov) * BN),  # noqa: E731
+                             "total_assets": str(1000 * BN), "gross_profit": str(10 * BN)}
+    StatementStore(d / "statements").save({"symbol": "DCM", "years": {}, "quarters": {"2025-Q3": q(200, 10), "2026-Q3": q(260, 10)}})
+    (d / "macro").mkdir()
+    (d / "macro" / "com_urea.json").write_text(json.dumps({"observations": [{"date": "2025-09-01", "value": "400"},
+                                                                            {"date": "2026-09-01", "value": "340"}]}), encoding="utf-8")
+    rows = {r["symbol"]: r for r in receivable_signs(d)}
+    assert ("price_drop", "Giá bán giảm, dự phòng không tăng") in SIGNS and rows["DCM"]["signs"]["price_drop"] is True
+    assert rows["DCM"]["details"]["price_drop"] == ("Giá urê thế giới (Trung Đông, World Bank) cuối quý 3/2026 giảm 15% so cùng kỳ (400 → 340) "
+                                                    "trong khi tỷ lệ trích lập dự phòng tồn kho 3,9% (cùng kỳ 5,0%).")
+    assert "price_drop" not in rows["AAA"]["signs"]
+
+
 def test_lending_against_equity_is_a_sign_with_its_figure(tmp_path):
     from investment_agent.market.statements import StatementStore
     d = data(tmp_path)

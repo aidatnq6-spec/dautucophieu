@@ -54,7 +54,19 @@ def balance(symbol: str, request: Request):
             "inventory_provision_flow": inventory_provision_flow(quarters), "gross_loss": gross_loss(quarters, property=sector == PROPERTY),
             "cover_thinning": cover_thinning(quarters, property=sector == PROPERTY),
             "year_end_provision": year_end_provision(quarters, (record or {}).get("years", {})),
+            "price_check": _price_check(data_dir, symbol, quarters, sector),
             "inventory_pace": inventory_pace(quarters, {s: qs for s, qs in peers.items() if s != symbol}, property=sector == PROPERTY), "revisions": _revisions(data_dir, symbol)}
+
+
+def _price_check(data_dir: Path, symbol: str, quarters: dict, sector: str | None) -> dict | None:
+    """Giá đầu ra giảm nhưng dự phòng không đổi (owner, 23/11/2026); None when the ticker's value chain ties no goods price."""
+    from investment_agent.domain.balance_watch import price_check
+    from investment_agent.market.value_chains import inventory_price_series
+    found = inventory_price_series(data_dir, symbol)
+    if found is None:
+        return None
+    indicator, label, points = found
+    return price_check(quarters, points, indicator=indicator, label=label, property=sector == PROPERTY)
 
 
 def _revisions(data_dir: Path, symbol: str) -> list[dict]:

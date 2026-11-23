@@ -475,6 +475,44 @@ def cover_thinning(quarters: dict, *, property: bool = False) -> dict:
             "coverage": _r(cover), "coverage_year_ago": _r(cover_ago), "share": _r(share), "flag": flag}
 
 
+PRICE_DROP = Decimal("-0.10")  # Giá đầu ra giảm (owner, 23/11/2026): the price down 10% or more on a year
+PRICE_MAX_GAP_DAYS = 75  # a price used for a day is at most this old (monthly averages come about a month late; value_chains)
+_QUARTER_END = {1: (3, 31), 2: (6, 30), 3: (9, 30), 4: (12, 31)}
+
+
+def price_check(quarters: dict, points: list, *, indicator: str, label: str, property: bool = False) -> dict:
+    """Giá đầu ra giảm nhưng dự phòng không đổi (owner, 23/11/2026): the goods price the value chain ties to the ticker, at the latest
+    quarter's end against the same day a year before, down 10% or more while the share of inventory provided for did not rise on the year.
+    points: (date, price) in order. A price more than 75 days before its day is not used: then "chưa đủ lịch sử giá", never a guess."""
+    from datetime import date, timedelta
+    out = {"quarter": None, "indicator": indicator, "label": label, "price": None, "price_year_ago": None, "price_date": None,
+           "price_year_ago_date": None, "change": None, "coverage": None, "coverage_year_ago": None, "flag": None, "why_not": None}
+    if not quarters:
+        return out
+    latest = max(quarters)
+    y, n = (int(x) for x in latest.split("-Q"))
+    end, end_ago = date(y, *_QUARTER_END[n]), date(y - 1, *_QUARTER_END[n])
+
+    def at(day):
+        found = [(d, v) for d, v in points if d <= day]
+        return found[-1] if found and (day - found[-1][0]) <= timedelta(days=PRICE_MAX_GAP_DAYS) else None
+
+    now, ago = at(end), at(end_ago)
+    cover, cover_ago = _coverage(quarters[latest]), _coverage(quarters.get(_back(latest, 4)))
+    (net, assets) = _get(quarters[latest], "inventory", "total_assets")
+    share = net / assets if net is not None and assets is not None and assets > 0 else None
+    out.update(quarter=latest, coverage=_r(cover), coverage_year_ago=_r(cover_ago))
+    if property:
+        return {**out, "flag": False}
+    if now is None or ago is None or ago[1] <= 0:
+        return {**out, "why_not": "Chưa đủ lịch sử giá: cần giá của cả cuối quý này và cùng kỳ năm trước."}
+    change = now[1] / ago[1] - 1
+    out.update(price=_s(now[1]), price_year_ago=_s(ago[1]), price_date=now[0].isoformat(), price_year_ago_date=ago[0].isoformat(), change=_r(change))
+    if None in (cover, cover_ago, share):
+        return out
+    return {**out, "flag": share >= INVENTORY_MATERIAL and change <= PRICE_DROP and cover <= cover_ago}
+
+
 AUDIT_GAP_FLOOR, AUDIT_GAP_SHARE = Decimal(1_000_000_000), Decimal("0.01")  # Dự phòng chốt khi kiểm toán (owner, 23/11/2026)
 
 

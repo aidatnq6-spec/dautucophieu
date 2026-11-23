@@ -18,7 +18,32 @@ SIGNS = [("other_receivables", "Phải thu khác lớn"), ("other_high", "Cao h�
          ("financial_profit", "Phụ thuộc thu nhập tài chính"), ("receivables_outpace_revenue", "Phải thu tăng nhanh hơn doanh thu"),
          ("provision_jump", "Dự phòng tăng mạnh"), ("lending", "Cho vay lớn so với vốn chủ"),
          ("inventory_fast", "Tồn kho tăng nhanh hơn giá vốn")]
+# A bank's row holds only these (Chất lượng tài sản ngân hàng, owner 23/11/2026), from VNDirect's bank lines and Vietcap's groups 1–5.
+BANK_SIGNS = [("provision_cut", "Lợi nhuận đỡ bởi giảm trích lập")]
+SIGNS += BANK_SIGNS
 QUALITY = {"other_receivables", "prepay_suppliers", "paper_income", "financial_profit", "receivables_outpace_revenue"}
+BANK = "Ngân hàng"
+
+
+def _pct(v) -> str:
+    return f"{abs(round(float(v) * 100))}%"
+
+
+def _bank_row(data_dir: Path, symbol: str, sector: str) -> dict:
+    """The bank signs of one watched bank; public figures only, like the rest of this board (the owner's entries stay on the bank's page)."""
+    from investment_agent.domain.bank_figures import provision_view, public_quarters
+    from investment_agent.market.bank_notes import BankNoteStore
+    kept = StatementStore(data_dir / "statements-financial").read(symbol) or {}
+    statements = kept.get("quarters") or {}
+    public = public_quarters((BankNoteStore(data_dir / "bank-notes").read(symbol) or {}).get("quarters") or {}, statements, kept.get("quarters_zeros") or [])
+    p = provision_view(statements, {q: v["values"] for q, v in public.items()})
+    signs, details = {"provision_cut": p["flag"]}, {}
+    if p["flag"]:
+        q = p["quarter"]
+        details["provision_cut"] = (f"Chi phí dự phòng quý {q[-1]}/{q[:4]} giảm {_pct(p['expense_growth_yoy'])} so cùng kỳ trong khi nợ nhóm 3–5 tăng "
+                                    f"{_pct(p['bad_growth_qoq'])} so quý trước"
+                                    + (f"; chi phí dự phòng bằng {_pct(p['share'])} lợi nhuận trước dự phòng." if p["share"] else "."))
+    return {"symbol": symbol, "sector": sector, "signs": signs, "count": sum(1 for v in signs.values() if v is True), "details": details}
 
 
 def receivable_signs(data_dir: Path) -> list[dict]:
@@ -55,5 +80,6 @@ def receivable_signs(data_dir: Path) -> list[dict]:
             details["lending"] = (f"Cho vay và phải thu khác bằng {round(float(lend['share']) * 100)}% vốn chủ (quý {q[-1]}/{q[:4]}); "
                                   "xem Sổ phải thu bên liên quan trên hồ sơ mã.")
         rows.append({"symbol": symbol, "sector": sector, "signs": signs, "count": sum(1 for v in signs.values() if v is True), "details": details})
+    rows += [_bank_row(data_dir, s, BANK) for s in watched if sectors.get(s) == BANK]
     order = {s: i for i, s in enumerate(watched)}
     return sorted(rows, key=lambda r: (-r["count"], order[r["symbol"]]))

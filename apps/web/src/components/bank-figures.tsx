@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { FileSearch, Pencil, Save, Trash2 } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
-import { formatRatio } from "../lib/format";
+import { formatDecimal, formatRatio } from "../lib/format";
 
 const FIELDS = ["group1", "group2", "group3", "group4", "group5", "demand_deposits", "margin_deposits", "customer_deposits", "car", "reserve", "accrued_interest",
   "real_estate_loans", "discounted_documents"] as const;
@@ -17,7 +17,18 @@ type Origin = "Vietcap" | "VNDirect" | "số nhập tay";
 // Chất lượng tài sản (23/11/2026): the latest quarter of the public figures (Vietcap's groups, VNDirect's reserve and accrued interest) with the owner's entries on top.
 type Quality = { quarter: string; values: Partial<Record<Field, string>>; sources: Partial<Record<Field, Origin>>; notes: string[]; derived: Quarter["derived"];
   trend: Trend; compared: boolean };
-type View = { symbol: string; version: number; quarters: Quarter[]; labels: Record<Field, string>; quality?: Quality | null };
+// Dự phòng đi vào lợi nhuận (23/11/2026): VNDirect's credit provision expense against profit before it, in tỷ đồng.
+export type Provision = { rows: { quarter: string; expense: string; ppop: string | null; share: string | null }[]; quarter: string | null; share: string | null;
+  credit_cost: string | null; credit_cost_missing: string[]; expense_growth_yoy: string | null; bad_growth_qoq: string | null; flag: boolean | null; why_not: string | null };
+type View = { symbol: string; version: number; quarters: Quarter[]; labels: Record<Field, string>; quality?: Quality | null; provision?: Provision };
+
+/** What the latest quarter's provisions say: the sign with its figures, no sign, or why it could not be weighed. */
+export function provisionLine(p: Provision): string {
+  if (p.flag) return `Chi phí dự phòng giảm ${pct1(p.expense_growth_yoy?.replace("-", "") ?? null)} so cùng kỳ trong khi nợ nhóm 3–5 tăng ${pct1(p.bad_growth_qoq)} so quý trước: `
+    + "lợi nhuận được đỡ bởi giảm trích lập.";
+  if (p.flag === false) return "Chưa thấy lợi nhuận được đỡ bởi giảm trích lập (chi phí dự phòng không giảm từ 30% so cùng kỳ, hoặc nợ nhóm 3–5 không tăng).";
+  return p.why_not ?? "Chưa đủ số để xét.";
+}
 
 const SHORT: Partial<Record<Field, string>> = { demand_deposits: "tiền gửi không kỳ hạn", margin_deposits: "tiền gửi ký quỹ", customer_deposits: "tiền gửi khách hàng", car: "CAR",
   reserve: "dự phòng rủi ro cho vay", accrued_interest: "lãi và phí phải thu", real_estate_loans: "dư nợ bất động sản", discounted_documents: "chiết khấu bộ chứng từ" };
@@ -179,6 +190,22 @@ export function BankFigures({ symbol }: { symbol: string }) {
         {sourceLine(view.quality.sources) && <p className="caption">Nguồn: {sourceLine(view.quality.sources)}.</p>}
         <p className="caption">So với quý trước, cùng kỳ năm trước và cuối năm trước. Ngưỡng do phần mềm đặt: bao phủ nợ xấu giảm từ 10 điểm %, nợ nhóm 2 tăng từ 30%, lãi phải thu tăng từ 20%,
           chứng từ tăng từ 30%, dư nợ bất động sản tăng từ 10% và nhanh gấp 1,5 lần tổng dư nợ. Là dấu hiệu để đọc kỹ thuyết minh, không phải kết luận hay khuyến nghị. Ô để trống thì không so.</p>
+      </div>}
+      {view?.provision?.quarter && <div className="bf-quality" data-testid="bank-provision">
+        <h3>Dự phòng đi vào lợi nhuận {view.provision.quarter}</h3>
+        {view.provision.flag ? <ul className="bf-flags"><li>{provisionLine(view.provision)}</li></ul> : <p className="caption">{provisionLine(view.provision)}</p>}
+        <p>Chi phí dự phòng bằng {pct1(view.provision.share)} lợi nhuận trước dự phòng · chi phí tín dụng bốn quý {view.provision.credit_cost
+          ? pct(view.provision.credit_cost) : `chưa tính được (thiếu số của ${view.provision.credit_cost_missing.join(", ")})`}</p>
+        <table className="fv-table" aria-label={`Dự phòng đi vào lợi nhuận ${symbol}`}>
+          <thead><tr><th>Quý</th><th className="num">Chi phí dự phòng (tỷ)</th><th className="num">Lợi nhuận trước dự phòng (tỷ)</th><th className="num">Tỷ lệ</th></tr></thead>
+          <tbody>{[...view.provision.rows].reverse().slice(0, 8).map((r) => <tr key={r.quarter}>
+            <td data-label="Quý">{r.quarter}</td><td data-label="Chi phí dự phòng (tỷ)" className="num">{formatDecimal(r.expense, 0)}</td>
+            <td data-label="Lợi nhuận trước dự phòng (tỷ)" className="num">{r.ppop ? formatDecimal(r.ppop, 0) : "—"}</td>
+            <td data-label="Tỷ lệ" className="num">{pct1(r.share)}</td></tr>)}</tbody>
+        </table>
+        <p className="caption">Chi phí tín dụng = chi phí dự phòng bốn quý gần nhất / dư nợ cho vay khách hàng bình quân (cuối quý này và cùng quý năm trước). Ngưỡng do chủ sở hữu chốt:
+          chi phí dự phòng giảm từ 30% so cùng kỳ trong khi nợ nhóm 3–5 tăng so quý trước. Báo cáo trên VNDirect; nợ nhóm như khối Chất lượng tài sản. Là dấu hiệu để đọc kỹ thuyết minh,
+          không phải kết luận hay khuyến nghị.</p>
       </div>}
       <div className="fv-search">
         <label className="field">Đường dẫn PDF báo cáo (https)<input type="url" value={url} placeholder="https://…/bctc-quy-3-2026.pdf" disabled={!view}

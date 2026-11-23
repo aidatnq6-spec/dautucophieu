@@ -61,7 +61,23 @@ def test_asset_quality_runs_on_public_figures_before_anything_is_entered_and_ent
 
 def test_without_public_figures_or_entries_there_is_no_quality_block(tmp_path):
     c, clock = client(tmp_path)
-    assert call(c, clock, "GET", "/internal/bank-figures/ACB").json()["quality"] is None
+    body = call(c, clock, "GET", "/internal/bank-figures/ACB").json()
+    assert body["quality"] is None and body["provision"]["rows"] == []
+
+
+def test_provisions_into_profit_read_vndirects_lines_and_the_asset_quality_table_with_the_owners_entries(tmp_path):
+    """Dự phòng đi vào lợi nhuận (owner, 23/11/2026), part 3; made-up figures."""
+    b = 1_000_000_000
+    (tmp_path / "statements-financial").mkdir()
+    lines = {"2025-Q3": (1000, 900_000), "2025-Q4": (1100, 950_000), "2026-Q1": (900, 960_000), "2026-Q2": (800, 980_000), "2026-Q3": (600, 1_000_000)}
+    (tmp_path / "statements-financial" / "ACB.json").write_text(json.dumps({"symbol": "ACB", "kind": "bank", "quarters": {
+        k: {"provision_expense": str(e * b), "ppop": str(4000 * b), "loans_gross": str(l * b)} for k, (e, l) in lines.items()}}), encoding="utf-8")
+    c, clock = client(tmp_path)
+    p = call(c, clock, "GET", "/internal/bank-figures/ACB").json()["provision"]
+    assert p["quarter"] == "2026-Q3" and p["share"] == "0.1500" and p["flag"] is None and p["why_not"].startswith("Chưa có nợ nhóm 3–5")
+    groups = lambda g3: {"group1": "1000", "group2": "10", "group3": str(g3), "group4": "5", "group5": "5"}  # noqa: E731
+    save(c, clock, "2026-Q2", groups(10), 0, "p1")
+    assert save(c, clock, "2026-Q3", groups(12), 1, "p2").json()["provision"]["flag"] is True
 
 
 def test_edit_delete_and_bad_input(tmp_path):

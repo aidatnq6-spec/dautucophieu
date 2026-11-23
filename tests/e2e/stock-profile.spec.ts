@@ -383,6 +383,10 @@ test("a bank's asset quality runs on Vietcap's and VNDirect's figures with nothi
   await expect(quality).toContainText("Chất lượng tài sản 2026-Q3");
   await expect(quality).toContainText("bao phủ nợ xấu 120,0%");  // 6 / (2 + 1 + 2)
   await expect(quality).toContainText("Nguồn: Nợ nhóm 1–5: Vietcap · dự phòng rủi ro cho vay, lãi và phí phải thu: VNDirect.");
+  const provision = page.getByRole("region", { name: "Số liệu ngân hàng" }).getByTestId("bank-provision");
+  await expect(provision).toContainText("Dự phòng đi vào lợi nhuận 2026-Q3");
+  await expect(provision).toContainText("Chi phí dự phòng bằng 20,0% lợi nhuận trước dự phòng");
+  await expect(provision).toContainText("Chưa có nợ nhóm 3–5 của 2026-Q3 và quý trước để xét.");  // Vietcap's groups for Q3 only
 });
 
 test("a bank with no saved quarter explains the asset quality block and fills in the quarter to enter", async ({ page }) => {

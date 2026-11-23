@@ -17,4 +17,4 @@ def test_the_receivable_signs_board(tmp_path):
                      data_dir=data(tmp_path))
     c = TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000))
     body = call(c, clock, "GET", "/internal/market/receivable-signs").json()
-    assert [r["symbol"] for r in body["rows"]] == ["AAA", "BBB"] and [s["key"] for s in body["signs"]][0] == "other_receivables"
+    assert [r["symbol"] for r in body["rows"]] == ["AAA", "BBB", "VCB"] and [s["key"] for s in body["signs"]][0] == "other_receivables"

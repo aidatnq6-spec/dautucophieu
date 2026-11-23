@@ -110,7 +110,9 @@ if __name__ == "__main__":
         "symbol": "ACB", "kind": "bank", "fetched_at": "2026-11-07T00:00:00+00:00", "source": "vndirect:finfo",
         "quarters": {p: {"npat_parent": str(2 * 10**9), "equity": str(50 * 10**9), "charter_capital": str(5 * 10**9),
                          # Chất lượng tài sản: the reserve and accrued interest of Q3 (đồng), beside Vietcap's groups below
-                         **({"loan_reserve": "-6", "accrued_interest": "12"} if p == "2026-Q3" else {})}
+                         **({"loan_reserve": "-6", "accrued_interest": "12"} if p == "2026-Q3" else {}),
+                         # Dự phòng đi vào lợi nhuận: the provision expense halved on a year, against 10 tỷ before provisions
+                         **({"provision_expense": str(4 * 10**9 if p == "2025-Q3" else 2 * 10**9), "ppop": str(10 * 10**9)} if p in ("2025-Q3", "2026-Q3") else {})}
                      for p in ("2025-Q1", "2025-Q2", "2025-Q3", "2025-Q4", "2026-Q1", "2026-Q2", "2026-Q3")},
         "years": {}, "quarters_conflicts": [], "years_conflicts": [], "year_end_close": {},
         "quarter_end_close": {"2026-Q2": {"date": "2026-06-30", "close": "20"}, "2026-Q3": {"date": "2026-09-30", "close": "30"}}})

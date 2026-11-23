@@ -51,14 +51,17 @@ test("Kho tiền ranks the watched non-financial tickers by net cash against mar
   await expect(box.getByRole("table", { name: "Xếp hạng kho tiền" })).not.toContainText("VCB");  // banks are left out
 });
 
-test("Dấu hiệu phải thu gathers the receivable signs of the watched non-financial tickers", async ({ page }) => {
+test("Dấu hiệu phải thu gathers the receivable signs of the watched non-financial tickers, and a bank's own signs", async ({ page }) => {
   await page.goto("/sectors");
   const box = page.getByRole("region", { name: "Dấu hiệu phải thu" });
   await expect(box).toContainText("mã có ít nhất một dấu hiệu");
   await box.getByRole("button", { name: "Hiện mọi mã" }).click();
   const list = box.getByRole("list", { name: "Dấu hiệu phải thu theo mã" });
   await expect(list.getByRole("link", { name: "FPT" })).toBeVisible();
-  await expect(list).not.toContainText("VCB");  // banks are left out
+  // Chất lượng tài sản ngân hàng (owner, 23/11/2026): a bank is weighed on the bank signs alone, not missing the non-financial ones
+  const acb = list.getByRole("listitem").filter({ has: page.getByRole("link", { name: "ACB" }) });
+  await expect(acb).toContainText("Chưa đủ số để xét: Lợi nhuận đỡ bởi giảm trích lập.");
+  await expect(acb).not.toContainText("Phải thu khác lớn");
 });
 
 test("Dấu hiệu phải thu reads without a sideways scroll on a phone", async ({ page }) => {

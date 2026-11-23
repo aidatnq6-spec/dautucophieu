@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { fromInput, pageNote, quarterToEnter, sourceLine } from "./bank-figures";
+import { fromInput, pageNote, provisionLine, quarterToEnter, sourceLine, type Provision } from "./bank-figures";
+
+describe("provisionLine", () => {
+  const base: Provision = { rows: [], quarter: "2026-Q3", share: "0.1333", credit_cost: null, credit_cost_missing: [], expense_growth_yoy: "-0.4000",
+    bad_growth_qoq: "0.0800", flag: true, why_not: null };
+  it("states the cut and the bad debt behind the sign, says when there is none, and why it could not be weighed", () => {
+    expect(provisionLine(base)).toBe("Chi phí dự phòng giảm 40,0% so cùng kỳ trong khi nợ nhóm 3–5 tăng 8,0% so quý trước: lợi nhuận được đỡ bởi giảm trích lập.");
+    expect(provisionLine({ ...base, flag: false })).toMatch(/^Chưa thấy lợi nhuận được đỡ/);
+    expect(provisionLine({ ...base, flag: null, why_not: "Chưa có nợ nhóm 3–5 của 2026-Q3 và quý trước để xét." })).toBe("Chưa có nợ nhóm 3–5 của 2026-Q3 và quý trước để xét.");
+  });
+});
 
 describe("sourceLine", () => {
   it("names where each figure of the quarter came from, groups 1–5 as one", () => {

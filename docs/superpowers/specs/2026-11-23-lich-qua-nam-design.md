@@ -49,5 +49,8 @@ Tình trạng hệ thống vẫn cảnh báo từ 01/12 khi chưa có lịch nă
 - Mục 3 không chạy thật các bước theo lịch ngày 04/01/2027, vì như vậy sẽ gửi Telegram và ghi vào `data/`. Thay vào đó là test trên chính các
   hàm nhìn lùi.
 
+- Bản tin tuần trước đây coi mọi ngày trong tuần là ngày giao dịch khi thiếu lịch, nên 01/01 bị đếm là một phiên thiếu số khối ngoại. Nay bước
+  này dừng với câu ở mục 2, trước khi đọc dữ liệu cá nhân hay chạm tới Telegram.
+
 ## Thứ tự
 1 → 2 → 3 trên một nhánh, TDD, verify rồi merge.

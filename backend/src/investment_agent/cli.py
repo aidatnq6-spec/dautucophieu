@@ -1398,8 +1398,9 @@ def weekly_inputs(data_dir: Path, *, ledger_events: list, held: set[str], alerts
             "events": EventStore(Path(data_dir)).events(sorted(watched)), "alerts": alerts, "held": held, "watched": watched}
 
 
-def weekly_brief_cli(data_dir: Path, calendar_path: Path, resend: bool = False) -> int:
-    """Bản tin tuần on Saturday (or the first weekend run after), once per week; skipped while scheduled delivery is off."""
+def weekly_brief_cli(data_dir: Path, calendar_path: Path, resend: bool = False, now=None) -> int:
+    """Bản tin tuần on Saturday (or the first weekend run after), once per week; skipped while scheduled delivery is off. Without the
+    week's calendar it stops, saying which (owner, 23/11/2026): counting every weekday made 01/01 a session missing its figures."""
     from datetime import datetime, timezone
 
     from investment_agent.market.insider_deals import InsiderStore, insider_deals
@@ -1411,21 +1412,22 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path, resend: bool = False) 
     from investment_agent.services.attention import attention_items
     from investment_agent.services.weekly_brief import VN, week_of, weekly_brief_run
 
-    now = datetime.now(timezone.utc)
+    now = now or datetime.now(timezone.utc)
     if now.astimezone(VN).weekday() < 5:
         print(json.dumps({"status": "skipped", "reason": "weekday"}))
         return 0
+    today = now.astimezone(VN).date()
+    start, end = week_of(today)
+    try:  # before anything personal is read or Telegram is touched
+        sessions = list(load_calendar(calendar_path).sessions(start, end))
+    except (OSError, ValueError, KeyError) as exc:
+        print(json.dumps(_not_configured(exc), ensure_ascii=False))
+        return 2
     telegram = _scheduled_telegram(data_dir)
     if telegram is None:
         print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
         return 0
     send, repo, owner = telegram
-    today = now.astimezone(VN).date()
-    start, end = week_of(today)
-    try:
-        sessions = list(load_calendar(calendar_path).sessions(start, end))
-    except Exception:
-        sessions = None  # no calendar for these dates: every weekday counts
 
     def inputs():
         events = list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)
@@ -1445,7 +1447,6 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path, resend: bool = False) 
         from investment_agent.services.weekly_brief import FUEL, NEXT_DAYS, fuel_periods, gold_week
         from investment_agent.market.us_calendar import upcoming as us_upcoming
         from investment_agent.services.us_week import us_week
-        from datetime import timedelta
         from investment_agent.brief.signals import week_signals
         from investment_agent.brief.snapshot import BriefStore
         rows = receivable_signs(Path(data_dir))
@@ -1472,8 +1473,7 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path, resend: bool = False) 
                 "us_chain": us_week(Path(data_dir), today=today),
                 "fuel": fuel_periods(Path(data_dir), [i for i in load_indicators() if i["id"] in FUEL], today=today),
                 "gold": gold_week(Path(data_dir), today=today),
-                "week_signals": week_signals([BriefStore(Path(data_dir)).read(d) or {} for d in
-                                              (sessions if sessions is not None else [start + timedelta(days=i) for i in range(5)])])}
+                "week_signals": week_signals([BriefStore(Path(data_dir)).read(d) or {} for d in sessions])}
     print(json.dumps(weekly_brief_run(data_dir, inputs=inputs, send=send, now=now, resend=resend)))
     return 0
 

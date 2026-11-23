@@ -77,6 +77,16 @@ def test_a_broken_file_for_the_year_next_door_leaves_this_years_calendar_standin
     assert load_calendar(p26).last == date(2026, 12, 31)
 
 
+@pytest.mark.parametrize("text", ["[]", '"x"', json.dumps({"version": "v", "source": "HOSE", "first": "2026-01-01", "last": "2026-12-31", "holidays": None}),
+                                  json.dumps({"version": "v", "source": "HOSE", "first": 20260101, "last": "2026-12-31", "holidays": []})])
+def test_a_calendar_file_of_the_wrong_shape_is_a_value_error_for_every_caller(tmp_path, text):
+    """Review 23/11/2026 (3): the check sits where the file is read, so every caller's (OSError, ValueError, KeyError) holds."""
+    path = tmp_path / "trading-calendar-hose-2026.json"
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(ValueError):
+        load_calendar(path)
+
+
 def test_the_owners_own_calendar_is_read_as_it_is(tmp_path):
     write(tmp_path, 2027, [])
     own = tmp_path / "trading-calendar.json"
@@ -111,10 +121,13 @@ def test_the_weekly_brief_stops_on_a_missing_calendar_instead_of_counting_every_
     assert cli.weekly_brief_cli(tmp_path, own, now=saturday) == 2
     out = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert out["message"] == "lịch giao dịch đang dùng không phủ tuần 28/12/2026–01/01/2027: thiếu lịch HOSE 2027; tạo từ thông báo của HOSE"
-    # delivery off: skipped as before, whatever the calendar (review 23/11/2026 (2))
-    monkeypatch.setattr(cli, "_scheduled_telegram", lambda data_dir: None)
-    assert cli.weekly_brief_cli(tmp_path, tmp_path / "trading-calendar-hose-2027.json", now=saturday) == 0
-    assert json.loads(capsys.readouterr().out.strip().splitlines()[-1]) == {"status": "skipped", "reason": "scheduled_delivery_off"}
+    # the calendar is checked first, as the spec says: nothing personal (the notification settings) is read and Telegram is not touched
+    # (review 23/11/2026 (3)); so with delivery off a missing calendar is still said, not "skipped"
+    def touched(data_dir):
+        raise AssertionError("notification settings read before the calendar")
+    monkeypatch.setattr(cli, "_scheduled_telegram", touched)
+    assert cli.weekly_brief_cli(tmp_path, tmp_path / "trading-calendar-hose-2027.json", now=saturday) == 2
+    assert json.loads(capsys.readouterr().out.strip().splitlines()[-1])["reason"] == "CalendarMissing"
 
 
 def test_a_missing_year_says_what_is_missing_and_what_to_do(tmp_path):

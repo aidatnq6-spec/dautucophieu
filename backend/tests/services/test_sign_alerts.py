@@ -57,6 +57,31 @@ def test_a_ticker_that_could_not_be_read_keeps_what_was_recorded_so_nothing_is_t
     assert check_signs(tmp_path, rows=[on], held={"VCG"}, titles=TITLES, send=send)["new"] == 0 and len(sent) == 1
 
 
+def test_a_sign_that_could_not_be_read_keeps_what_was_recorded_even_when_the_others_read(tmp_path):
+    """Review 23/11/2026 (3): the quarterly file missing turns `lending` to None while the yearly signs still read; it is not cleared."""
+    sent = []
+    send = lambda text: sent.append(text) or True  # noqa: E731
+    check_signs(tmp_path, rows=[{"symbol": "VCG", "signs": {"lending": False, "paper_income": False}, "details": {}}], held={"VCG"}, titles=TITLES, send=send)
+    on = {"symbol": "VCG", "signs": {"lending": True, "paper_income": False}, "details": {}}
+    assert check_signs(tmp_path, rows=[on], held={"VCG"}, titles=TITLES, send=send)["new"] == 1
+    check_signs(tmp_path, rows=[{"symbol": "VCG", "signs": {"lending": None, "paper_income": False}, "details": {}}], held={"VCG"}, titles=TITLES, send=send)
+    assert check_signs(tmp_path, rows=[on], held={"VCG"}, titles=TITLES, send=send)["new"] == 0 and len(sent) == 1
+
+
+def test_a_bank_unread_on_its_arrival_keeps_its_one_silent_run_for_when_it_reads(tmp_path):
+    """Review 23/11/2026 (3): an unread bank on the run the banks join is not recorded, so its signs already on are not news later."""
+    sent = []
+    send = lambda text: sent.append(text) or True  # noqa: E731
+    check_signs(tmp_path, rows=[ROWS[1]], held={"VCB", "ACB"}, titles=TITLES, send=send)
+    acb = {"symbol": "ACB", "sector": "Ngân hàng", "signs": {"provision_cut": False}, "details": {}}
+    unread = {"symbol": "VCB", "sector": "Ngân hàng", "signs": {"provision_cut": None, "accrued_outpace": None}, "details": {}}
+    check_signs(tmp_path, rows=[ROWS[1], acb, unread], held={"VCB", "ACB"}, titles=TITLES, send=send)
+    read = {**unread, "signs": {"provision_cut": True, "accrued_outpace": False}}
+    assert check_signs(tmp_path, rows=[ROWS[1], acb, read], held={"VCB", "ACB"}, titles=TITLES, send=send)["new"] == 0 and sent == []
+    later = {**read, "signs": {"provision_cut": True, "accrued_outpace": True}}
+    assert check_signs(tmp_path, rows=[ROWS[1], acb, later], held={"VCB", "ACB"}, titles=TITLES, send=send)["new"] == 1
+
+
 def test_signs_of_tickers_not_held_are_never_told_and_a_failed_send_is_tried_again(tmp_path):
     check_signs(tmp_path, rows=[{"symbol": "DXG", "signs": {}, "details": {}}, {"symbol": "VCG", "signs": {}, "details": {}}], held=set(), titles=TITLES,
                 send=lambda text: True)

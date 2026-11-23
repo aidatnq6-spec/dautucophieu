@@ -134,6 +134,36 @@ def bank_ratio_rows(entered: dict[str, dict], notes: dict[str, dict]) -> dict[st
     return {q: row for q, row in sorted(rows.items()) if row}
 
 
+_DAY = re.compile(r"^\d{4}-(03-31|06-30|09-30|12-31)$")
+_QUARTER = re.compile(r"^\d{4}-Q[1-4]$")
+_PERIOD = re.compile(r"^\d{4}(-Q[1-4])?$")
+
+
+def _periods(value, key: re.Pattern) -> bool:
+    return isinstance(value, dict) and all(isinstance(k, str) and key.match(k) and isinstance(v, dict) for k, v in value.items())
+
+
+def load_public(data_dir: Path, symbol: str) -> tuple[dict, dict] | None:
+    """A bank's public figures for the bank page and the signs board, read in one place (review 23/11/2026 (3)): (the asset quality quarters
+    of public_quarters, VNDirect's quarters). A store not there yet gives nothing; a store that cannot be read, or of the wrong shape, gives
+    None (the bank unread), so no wrong shape reaches the figures."""
+    from investment_agent.domain.bank_figures import public_quarters
+    from investment_agent.market.statements import StatementStore
+    try:
+        notes = BankNoteStore(Path(data_dir) / "bank-notes").read(symbol)
+        kept = StatementStore(Path(data_dir) / "statements-financial").read(symbol)
+    except (OSError, ValueError):
+        return None
+    notes, kept = {} if notes is None else notes, {} if kept is None else kept
+    if not (isinstance(notes, dict) and isinstance(kept, dict)):
+        return None
+    quarters, statements, zeros = notes.get("quarters") or {}, kept.get("quarters") or {}, kept.get("quarters_zeros") or []
+    if not (_periods(quarters, _DAY) and _periods(statements, _QUARTER) and isinstance(zeros, list)
+            and all(isinstance(z, dict) and isinstance(z.get("period"), str) and _PERIOD.match(z["period"]) for z in zeros)):
+        return None
+    return public_quarters(quarters, statements, zeros), statements
+
+
 def sync_bank_notes(store: BankNoteStore, sectors: dict[str, str | None], *, get: Callable[[str], str],
                     sleep: Callable[[float], None] = time.sleep, now: datetime | None = None, force: bool = False) -> dict[str, str]:
     """Refresh each watched bank whose record is a week old or missing; one failing is reported, the others still update."""

@@ -37,27 +37,25 @@ def _moved(v) -> str:
 def _ty(v) -> str:
     """Tỷ đồng with one decimal, half up, as printed in Vietnamese (1.234,5): 450 million is "0,5", never "0" (review 23/11/2026 (2))."""
     from decimal import ROUND_HALF_UP, Decimal
-    whole, frac = f"{Decimal(str(v)).quantize(Decimal('0.1'), ROUND_HALF_UP):f}".split(".")
-    return f"{int(whole):,}".replace(",", ".") + f",{frac}"
+    d = Decimal(str(v))
+    rounded = abs(d).quantize(Decimal("0.1"), ROUND_HALF_UP)
+    whole, frac = f"{rounded:f}".split(".")
+    # the sign of -0,45 kept (int("-0") dropped it; review 23/11/2026 (3)); none on a value that rounds to zero, as formatDecimal on the web
+    return ("-" if d < 0 and rounded else "") + f"{int(whole):,}".replace(",", ".") + f",{frac}"
 
 
 def _bank_row(data_dir: Path, symbol: str, sector: str) -> dict:
     """The bank signs of one watched bank; public figures only, like the rest of this board (the owner's entries stay on the bank's page).
-    A store that cannot be read leaves this bank unread, never the board."""
-    from investment_agent.domain.bank_figures import accrued_view, provision_view, public_quarters
-    from investment_agent.market.bank_notes import BankNoteStore
-    try:
-        kept = StatementStore(data_dir / "statements-financial").read(symbol) or {}
-        notes = (BankNoteStore(data_dir / "bank-notes").read(symbol) or {}).get("quarters") or {}
-    except (OSError, ValueError):
+    A store that cannot be read, or of the wrong shape, leaves this bank unread, never the board; the shape is checked where the stores are
+    read (bank_notes.load_public), so a fault in the figures' own code still shows (review 23/11/2026 (3))."""
+    from investment_agent.domain.bank_figures import accrued_view, provision_view
+    from investment_agent.market.bank_notes import load_public
+    loaded = load_public(data_dir, symbol)
+    if loaded is None:
         return {"symbol": symbol, "sector": sector, "signs": {k: None for k, _ in BANK_SIGNS}, "count": 0, "details": {}}
-    statements = kept.get("quarters") or {}
-    try:  # a file of the wrong shape (valid JSON) leaves this bank unread too, never the board (review 23/11/2026 (2))
-        public = public_quarters(notes, statements, kept.get("quarters_zeros") or [])
-        table = {q: v["values"] for q, v in public.items()}
-        p, a = provision_view(statements, table), accrued_view(statements, table)
-    except (ValueError, TypeError, AttributeError, KeyError, IndexError, ArithmeticError):
-        return {"symbol": symbol, "sector": sector, "signs": {k: None for k, _ in BANK_SIGNS}, "count": 0, "details": {}}
+    public, statements = loaded
+    table = {q: v["values"] for q, v in public.items()}
+    p, a = provision_view(statements, table), accrued_view(statements, table)
     signs, details = {"provision_cut": p["flag"], "accrued_outpace": a["flag"]}, {}
     if a["flag"]:
         q = a["quarter"]

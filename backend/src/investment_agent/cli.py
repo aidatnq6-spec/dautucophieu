@@ -265,8 +265,14 @@ def _read_calendar(path: Path):
     from datetime import date
     from investment_agent.market.calendar import TradingCalendar
     data = json.loads(path.read_text(encoding="utf-8"))
+    # the shape is checked where the file is read, so every caller's (OSError, ValueError, KeyError) holds (review 23/11/2026 (3))
+    if not isinstance(data, dict):
+        raise ValueError("calendar file must hold one object")
     if data.get("source") in (None, "", "synthetic"):
         raise ValueError("calendar must name its official source")
+    if not (all(isinstance(data.get(k), str) for k in ("version", "source", "first", "last")) and isinstance(data.get("holidays"), list)
+            and all(isinstance(d, str) for d in data["holidays"])):
+        raise ValueError("calendar fields must be text, and holidays a list of dates")
     return TradingCalendar(version=data["version"], source=data["source"], holidays=frozenset(date.fromisoformat(d) for d in data["holidays"]),
                            first=date.fromisoformat(data["first"]), last=date.fromisoformat(data["last"]))
 
@@ -290,7 +296,7 @@ def load_calendar(path: Path):
         other = path.with_name(f"trading-calendar-hose-{y}.json")
         try:
             return _read_calendar(other) if other.is_file() else None
-        except (OSError, ValueError, KeyError, TypeError, AttributeError):  # AttributeError: valid JSON that is not an object, e.g. []
+        except (OSError, ValueError, KeyError):  # a wrong shape is a ValueError of _read_calendar
             return None
     if (prev := neighbour(year - 1)) and prev.last + timedelta(days=1) == cal.first:
         parts.insert(0, prev)
@@ -1416,15 +1422,11 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path, resend: bool = False, 
     if now.astimezone(VN).weekday() < 5:
         print(json.dumps({"status": "skipped", "reason": "weekday"}))
         return 0
-    telegram = _scheduled_telegram(data_dir)  # delivery off: skipped, whatever the calendar (review 23/11/2026 (2))
-    if telegram is None:
-        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
-        return 0
     today = now.astimezone(VN).date()
     start, end = week_of(today)
-    try:  # before anything personal is read
+    try:  # first, as the spec says: before the notification settings are read or Telegram is touched (review 23/11/2026 (3))
         cal = load_calendar(calendar_path)
-    except (OSError, ValueError, KeyError, AttributeError) as exc:
+    except (OSError, ValueError, KeyError) as exc:
         print(json.dumps(_not_configured(exc), ensure_ascii=False))
         return 2
     if not (cal.first <= start and end <= cal.last):  # the week outside the calendar: which week, and which year is missing
@@ -1434,6 +1436,10 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path, resend: bool = False, 
                           "tạo từ thông báo của HOSE"}, ensure_ascii=False))
         return 2
     sessions = list(cal.sessions(start, end))
+    telegram = _scheduled_telegram(data_dir)
+    if telegram is None:
+        print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
+        return 0
     send, repo, owner = telegram
 
     def inputs():

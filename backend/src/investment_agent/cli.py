@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import re
 from pathlib import Path
 
 from investment_agent.market.coverage import audit_case, audit_universe, load_fixture_cases
@@ -248,7 +249,14 @@ def main() -> int:
     return 0
 
 
-def load_calendar(path: Path):
+class CalendarMissing(FileNotFoundError):
+    """The year's HOSE calendar is not in config/: said plainly, never replaced by a guessed one (owner, 23/11/2026)."""
+
+
+_YEAR_FILE = re.compile(r"^trading-calendar-hose-(\d{4})\.json$")
+
+
+def _read_calendar(path: Path):
     from datetime import date
     from investment_agent.market.calendar import TradingCalendar
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -256,6 +264,30 @@ def load_calendar(path: Path):
         raise ValueError("calendar must name its official source")
     return TradingCalendar(version=data["version"], source=data["source"], holidays=frozenset(date.fromisoformat(d) for d in data["holidays"]),
                            first=date.fromisoformat(data["first"]), last=date.fromisoformat(data["last"]))
+
+
+def load_calendar(path: Path):
+    """A HOSE calendar file; a year's file (trading-calendar-hose-<year>.json) is read with the years before and after it in the same folder
+    when they meet it (31/12 then 01/01), so a look-back crosses new year (owner, 23/11/2026). Years that do not meet are not joined."""
+    from datetime import timedelta
+    from investment_agent.market.calendar import TradingCalendar
+    path = Path(path)
+    m = _YEAR_FILE.match(path.name)
+    if m and not path.is_file():
+        raise CalendarMissing(f"chưa có lịch giao dịch HOSE {m.group(1)} (config/{path.name}); tạo từ thông báo của HOSE")
+    cal = _read_calendar(path)
+    if not m:
+        return cal
+    parts, year = [cal], int(m.group(1))
+    before, after = path.with_name(f"trading-calendar-hose-{year - 1}.json"), path.with_name(f"trading-calendar-hose-{year + 1}.json")
+    if before.is_file() and (prev := _read_calendar(before)).last + timedelta(days=1) == cal.first:
+        parts.insert(0, prev)
+    if after.is_file() and (nxt := _read_calendar(after)).first - timedelta(days=1) == cal.last:
+        parts.append(nxt)
+    if len(parts) == 1:
+        return cal
+    return TradingCalendar(version=" + ".join(p.version for p in parts), source=" · ".join(p.source for p in parts),
+                           holidays=frozenset().union(*(p.holidays for p in parts)), first=parts[0].first, last=parts[-1].last)
 
 
 def _symbols(raw: str) -> list[str]:

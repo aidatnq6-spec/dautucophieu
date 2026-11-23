@@ -285,7 +285,7 @@ def test_inventory_rows_give_cost_provision_net_coverage_and_share_of_assets():
     q = {"inventory_gross": str(29850 * B), "inventory_provision": str(-683 * B), "inventory": str(29167 * B), "total_assets": str(62971 * B)}
     row = inventory_view({"2021-Q4": q})["rows"][-1]
     assert row == {"quarter": "2021-Q4", "gross": str(29850 * B), "provision": str(683 * B), "net": str(29167 * B), "coverage": "0.0229",
-                   "share": "0.4632"}
+                   "share": "0.4632", "spike": False}
     old = inventory_view({"2021-Q4": {"inventory": str(29167 * B), "total_assets": str(62971 * B)}})["rows"][-1]
     assert old["gross"] is None and old["coverage"] is None and old["share"] == "0.4632"  # cost not fetched yet: blank, not worked back
 

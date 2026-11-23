@@ -21,6 +21,28 @@ def test_rows_become_periods_with_named_lines_and_the_day_they_first_appeared():
     assert out["created"] == {"2026-Q3": "2026-10-29"} and out["conflicts"] == []
 
 
+def test_each_period_keeps_the_latest_day_the_source_updated_it():
+    """Owner, 23/11/2026: VNDirect's year first shows the company's own Q4 figures and is updated with the audited ones later
+    (modifiedDate); the latest update of any line is kept per period, and a later sync moves it on."""
+    r1, r2 = row(23800, 4.876e12, "2025-12-31", kind="ANNUAL"), row(11490, -4.058e11, "2025-12-31", model=1, kind="ANNUAL")
+    r1["modifiedDate"], r2["modifiedDate"] = "2026-04-01 00:00:00", "2026-07-31 00:00:00"
+    out = parse_statements(text(r1, r2, row(21001, 1, "2024-12-31", kind="ANNUAL")), symbol="HPG", kind="ANNUAL")
+    assert out["modified"] == {"2025": "2026-07-31"}  # a row without modifiedDate gives none
+
+
+def test_sync_keeps_the_update_days_by_period(tmp_path):
+    def get(url):
+        if "stock_prices" in url:
+            return json.dumps({"data": []})
+        r = row(21001, 1e12, "2025-12-31", kind="ANNUAL" if "ANNUAL" in url else "QUARTER")
+        r["modifiedDate"] = "2026-04-01 00:00:00"
+        return text(r)
+    store = StatementStore(tmp_path)
+    sync_statements(store, {"HPG": "Tài nguyên Cơ bản"}, get=get, now=NOW, limit=None, sleep=lambda s: None)
+    rec = store.read("HPG")
+    assert rec["years_modified"] == {"2025": "2026-04-01"} and rec["quarters_modified"] == {"2025-Q4": "2026-04-01"}
+
+
 def test_years_are_keyed_by_year_and_two_different_values_for_one_line_are_a_conflict_not_a_choice():
     out = parse_statements(text(row(22230, 5.994e11, "2012-12-31", model=3, kind="ANNUAL"), row(22230, 5.962e11, "2012-12-31", model=3, kind="ANNUAL"),
                                 row(21001, 1.68e13, "2012-12-31", kind="ANNUAL"), row(21001, 1.68e13, "2012-12-31", kind="ANNUAL")),

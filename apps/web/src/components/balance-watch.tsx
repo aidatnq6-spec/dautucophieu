@@ -30,7 +30,7 @@ export type PriceCheck = { quarter: string | null; indicator: string; label: str
   price_date: string | null; price_year_ago_date: string | null; change: string | null; coverage: string | null; coverage_year_ago: string | null;
   flag: boolean | null; why_not: string | null };
 type YearRow = { year: string; change: string | null; q4_change: string | null; q4_share: string | null; q4_balance: string | null;
-  year_balance: string | null; gap: boolean | null };
+  year_balance: string | null; updated_on?: string | null; gap: boolean | null; spike?: boolean };
 export type YearEndProvision = { rows: YearRow[]; year: string | null; flag: boolean | null };
 export type CoverThinning = { quarter: string | null; days: number | null; days_year_ago: number | null; coverage: string | null;
   coverage_year_ago: string | null; share: string | null; flag: boolean | null };
@@ -39,7 +39,8 @@ export type GrossLoss = { quarter: string | null; gross_profit: string | null; c
 type InvFlowRow = { quarter: string; balance: string | null; change: string | null; pbt: string | null; share: string | null; kind: "release" | "charge" | null };
 export type InventoryFlow = { rows: InvFlowRow[]; quarter: string | null; kind: "release" | "charge" | null };
 export type InventoryPace = Dso & { inventory_growth: string | null; cogs_growth: string | null; share?: string | null; flag: boolean | null };
-type InvRow = { quarter: string; gross: string | null; provision: string | null; net: string | null; coverage: string | null; share: string | null };
+type InvRow = { quarter: string; gross: string | null; provision: string | null; net: string | null; coverage: string | null; share: string | null;
+  spike?: boolean };
 export type Inventory = { rows: InvRow[] };
 type FlowRow = { quarter: string; balance: string | null; change: string | null; pbt: string | null; share: string | null; release: boolean };
 export type ProvisionFlow = { rows: FlowRow[]; flag: boolean; quarter: string | null };
@@ -221,8 +222,11 @@ export function auditGapText(y: YearEndProvision): string | null {
   const r = y.flag ? y.rows.find((row) => row.year === y.year) : undefined;
   if (!r || r.q4_balance === null || r.year_balance === null) return null;
   const diff = Number(r.year_balance) - Number(r.q4_balance);
-  return `Năm ${r.year}: dự phòng giảm giá tồn kho cuối quý 4 tự lập ${ty(r.q4_balance)}, trên báo cáo năm đã kiểm toán ${ty(r.year_balance)} `
-    + `(kiểm toán ${diff > 0 ? "thêm" : "bớt"} ${ty(String(Math.abs(diff)))}). Số chốt khi kiểm kê ngày 31/12 khác số công ty tự báo: xem thuyết minh hàng tồn kho của báo cáo năm.`;
+  const on = r.updated_on ? ` cập nhật ngày ${r.updated_on.slice(8, 10)}/${r.updated_on.slice(5, 7)}/${r.updated_on.slice(0, 4)}` : "";
+  // never "đã kiểm toán": VNDirect's year first carries the company's own Q4 and is updated later (23/11/2026)
+  return `Năm ${r.year}: dự phòng giảm giá tồn kho cuối quý 4 tự lập ${ty(r.q4_balance)}; số năm VNDirect${on} là ${ty(r.year_balance)} `
+    + `(${diff > 0 ? "thêm" : "bớt"} ${ty(String(Math.abs(diff)))}). Đối chiếu thuyết minh hàng tồn kho trên báo cáo năm đã kiểm toán.`
+    + (r.spike ? " Số năm gấp nhiều lần các quý quanh đó: có thể là lỗi dữ liệu nguồn, đối chiếu báo cáo gốc." : "");
 }
 
 /** Dự phòng mỏng dần trong khi hàng tồn lâu hơn (23/11/2026): said only when it is a sign. */
@@ -402,18 +406,18 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
             <tr key={r.quarter}>
               <td data-label="Quý">{q(r.quarter)}</td>
               <td className="num" data-label="Giá gốc">{ty(r.gross)}</td>
-              <td className="num" data-label="Dự phòng giảm giá">{ty(r.provision)}</td>
+              <td className="num" data-label="Dự phòng giảm giá">{ty(r.provision)}{r.spike && <span title="Gấp nhiều lần quý trước và quý sau: có thể là lỗi dữ liệu nguồn"> (?)</span>}</td>
               <td className="num" data-label="Bao phủ">{r.coverage === null ? "—" : rate(r.coverage)}</td>
               <td className="num" data-label="Giá trị thuần">{ty(r.net)}</td>
               <td className="num" data-label="Trên tổng tài sản">{r.share === null ? "—" : rate(r.share)}</td>
             </tr>))}</tbody>
         </table></div>
         {data.year_end_provision && auditGapText(data.year_end_provision) && <p data-testid="audit-gap"><span className="pill warn">
-          Dự phòng tồn kho quý 4 khác số kiểm toán</span> {auditGapText(data.year_end_provision)}</p>}
+          Dự phòng tồn kho quý 4 khác số năm cập nhật sau</span> {auditGapText(data.year_end_provision)}</p>}
         {data.year_end_provision && data.year_end_provision.rows.length > 0 && <div className="tablewrap">
           <table className="fv-table" aria-label={`Dự phòng tồn kho theo năm ${symbol}`}>
             <thead><tr><th>Năm</th><th className="num">Dự phòng tăng cả năm</th><th className="num">Trong đó quý 4</th><th className="num">Phần quý 4</th>
-              <th className="num">Quý 4 tự lập</th><th className="num">Năm kiểm toán</th></tr></thead>
+              <th className="num">Quý 4 tự lập</th><th className="num">Số năm</th><th>Số năm cập nhật</th></tr></thead>
             <tbody>{[...data.year_end_provision.rows].reverse().map((r) => (
               <tr key={r.year}>
                 <td data-label="Năm">{r.year}</td>
@@ -421,14 +425,16 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
                 <td className="num" data-label="Trong đó quý 4">{ty(r.q4_change)}</td>
                 <td className="num" data-label="Phần quý 4">{r.q4_share === null ? "—" : rate(r.q4_share)}</td>
                 <td className="num" data-label="Quý 4 tự lập">{ty(r.q4_balance)}</td>
-                <td className="num" data-label="Năm kiểm toán">{ty(r.year_balance)}</td>
+                <td className="num" data-label="Số năm">{ty(r.year_balance)}{r.spike && <span title="Gấp nhiều lần các quý quanh đó: có thể là lỗi dữ liệu nguồn"> (?)</span>}</td>
+                <td data-label="Số năm cập nhật">{r.updated_on ? `${r.updated_on.slice(8, 10)}/${r.updated_on.slice(5, 7)}/${r.updated_on.slice(0, 4)}` : "—"}</td>
               </tr>))}</tbody>
           </table></div>}
         <p className="caption">Giá gốc và dự phòng giảm giá hàng tồn kho theo bảng cân đối (VNDirect); giá trị thuần = giá gốc − dự phòng. Bao phủ = dự phòng ÷
           giá gốc. Số ngày tồn kho = tồn kho thuần cuối quý ÷ giá vốn bốn quý × 365; được ghi là tăng nhanh hơn giá vốn khi tồn kho tăng so cùng kỳ
           nhanh hơn giá vốn bốn quý từ 20 điểm %, số ngày tăng và tồn kho từ 10% tổng tài sản (không ghi với Bất động sản, nơi tồn kho là dự án). Cơ cấu (nguyên vật liệu, dở dang, thành phẩm, hàng hóa) chỉ có trong thuyết minh, không có ở đây. Dự phòng theo năm: mức
-          tăng cả năm theo báo cáo năm đã kiểm toán, phần quý 4 = số dư năm − số dư quý 3; dự phòng dồn vào quý 4 là thường gặp (kiểm kê ngày 31/12) nên
-          không ghi cờ. Chỉ ghi khi số dư quý 4 công ty tự báo khác số kiểm toán hơn 1 tỷ và 1%. Bán dưới giá vốn: lỗ gộp của quý mà tỷ lệ trích lập không
+          tăng cả năm theo số năm của VNDirect, phần quý 4 = số dư năm − số dư quý 3; dự phòng dồn vào quý 4 là thường gặp (kiểm kê ngày 31/12) nên
+          không ghi cờ. Số năm của VNDirect lúc đầu là số quý 4 công ty tự lập, số kiểm toán chỉ thay vào sau (cột Số năm cập nhật); chỉ so khi số năm
+          được cập nhật sau ngày báo cáo quý 4 có, và ghi khi lệch hơn 1 tỷ và 1%. (?) = gấp nhiều lần các kỳ quanh đó, có thể là lỗi dữ liệu nguồn. Bán dưới giá vốn: lỗ gộp của quý mà tỷ lệ trích lập không
           tăng. Dự phòng mỏng dần: số ngày tồn kho tăng từ 20% so cùng kỳ mà tỷ lệ trích lập giảm từ 20%. Giá bán giảm: giá hàng hóa mà Chuỗi giá trị ngành
           gắn với mã (thép, cao su, urê, đường) cuối quý giảm từ 10% so cùng kỳ mà tỷ lệ trích lập không tăng; giá cũ hơn 75 ngày so với ngày cần so
           thì không dùng. Ô thiếu số để trống. Không phải khuyến nghị.</p>

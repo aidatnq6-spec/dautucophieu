@@ -112,6 +112,7 @@ def parse_statements(text: str, *, symbol: str, kind: str, lines: dict | None = 
         raise ValueError("page full: the answer may be cut")
     seen: dict[tuple[str, str], set[Decimal]] = {}
     created: dict[str, str] = {}
+    modified: dict[str, str] = {}
     for r in data:
         try:
             if r.get("code") != symbol or r.get("reportType") != kind:
@@ -127,6 +128,11 @@ def parse_statements(text: str, *, symbol: str, kind: str, lines: dict | None = 
         day = str(r.get("createdDate") or "")[:10]
         if day and (period not in created or day < created[period]):
             created[period] = day
+        # the latest day the source updated any line of the period: VNDirect's year first carries the company's own Q4 figures and the
+        # audited ones only later (owner, 23/11/2026)
+        changed = str(r.get("modifiedDate") or "")[:10]
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", changed) and changed > modified.get(period, ""):
+            modified[period] = changed
     periods: dict[str, dict[str, str]] = {}
     conflicts, zeros = [], []
     for (period, line), values in sorted(seen.items()):
@@ -140,7 +146,8 @@ def parse_statements(text: str, *, symbol: str, kind: str, lines: dict | None = 
         old = figures.pop("associates_old", None)
         if old is not None and "associates" not in figures:
             figures["associates"] = old
-    return {"periods": dict(sorted(periods.items())), "created": dict(sorted(created.items())), "conflicts": conflicts, "zeros": zeros}
+    return {"periods": dict(sorted(periods.items())), "created": dict(sorted(created.items())), "conflicts": conflicts, "zeros": zeros,
+            "modified": dict(sorted(modified.items()))}
 
 
 def parse_year_end_closes(text: str, *, symbol: str) -> dict[str, dict[str, str]]:
@@ -189,14 +196,15 @@ class StatementStore:
         os.replace(tmp, path)
 
 
-def _merge(old: dict | None, key: str, new: dict) -> tuple[dict, dict, list, list]:
+def _merge(old: dict | None, key: str, new: dict) -> tuple[dict, dict, list, list, dict]:
     periods = {**(old or {}).get(key, {}), **new["periods"]}
     created = {**(old or {}).get(f"{key}_created", {}), **new["created"]}
+    modified = dict(sorted({**(old or {}).get(f"{key}_modified", {}), **new.get("modified", {})}.items()))
     fresh = set(new["periods"]) | {c["period"] for c in new["conflicts"]} | {z["period"] for z in new["zeros"]}
 
     def kept(name: str) -> list:
         return sorted([c for c in (old or {}).get(f"{key}_{name}", []) if c["period"] not in fresh] + new[name], key=lambda c: (c["period"], c["line"]))
-    return dict(sorted(periods.items())), dict(sorted(created.items())), kept("conflicts"), kept("zeros")
+    return dict(sorted(periods.items())), dict(sorted(created.items())), kept("conflicts"), kept("zeros"), modified
 
 
 def _lines_version(sector: str | None) -> int:
@@ -246,7 +254,8 @@ def sync_statements(store: StatementStore, sectors: dict[str, str | None], *, ge
                     from investment_agent.market.statement_revisions import find_revisions, record_revisions
                     record_revisions(store.root.parent, symbol, find_revisions(old.get(key, {}), parsed[kind]["periods"]), kind=key,
                                      seen_on=now.date())
-                record[key], record[f"{key}_created"], record[f"{key}_conflicts"], record[f"{key}_zeros"] = _merge(old, key, parsed[kind])
+                (record[key], record[f"{key}_created"], record[f"{key}_conflicts"], record[f"{key}_zeros"],
+                 record[f"{key}_modified"]) = _merge(old, key, parsed[kind])
             store.save(record)
             results[symbol] = "ok"
         except Exception as exc:  # one ticker never stops the others

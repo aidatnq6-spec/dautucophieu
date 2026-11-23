@@ -6,7 +6,7 @@ from pathlib import Path
 
 from decimal import ROUND_HALF_UP, Decimal
 
-from investment_agent.domain.balance_watch import gross_loss, inventory_pace, lending_view, raise_prepay, receivables_view
+from investment_agent.domain.balance_watch import cover_thinning, gross_loss, inventory_pace, lending_view, raise_prepay, receivables_view
 from investment_agent.market.financial_ratios import kind_of
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.sectors import load_sectors
@@ -19,7 +19,8 @@ SIGNS = [("other_receivables", "Phải thu khác lớn"), ("other_high", "Cao h�
          ("raise_prepay", "Trả trước sau huy động vốn"), ("paper_income", "Thu nhập tài chính chưa thu tiền"),
          ("financial_profit", "Phụ thuộc thu nhập tài chính"), ("receivables_outpace_revenue", "Phải thu tăng nhanh hơn doanh thu"),
          ("provision_jump", "Dự phòng tăng mạnh"), ("lending", "Cho vay lớn so với vốn chủ"),
-         ("inventory_fast", "Tồn kho tăng nhanh hơn giá vốn"), ("gross_loss", "Bán dưới giá vốn, dự phòng không tăng")]
+         ("inventory_fast", "Tồn kho tăng nhanh hơn giá vốn"), ("gross_loss", "Bán dưới giá vốn, dự phòng không tăng"),
+         ("cover_thinning", "Dự phòng mỏng dần, hàng tồn lâu hơn")]
 # A bank's row holds only these (Chất lượng tài sản ngân hàng, owner 23/11/2026), from VNDirect's bank lines and Vietcap's groups 1–5.
 BANK_SIGNS = [("provision_cut", "Lợi nhuận đỡ bởi giảm trích lập"), ("accrued_outpace", "Lãi dự thu tăng nhanh hơn thu nhập lãi")]
 SIGNS += BANK_SIGNS
@@ -104,9 +105,12 @@ def receivable_signs(data_dir: Path) -> list[dict]:
             signs["inventory_fast"] = pace["flag"]
             loss = gross_loss(qs, property=sector == "Bất động sản")  # Bán dưới giá vốn nhưng dự phòng không tăng (owner, 23/11/2026)
             signs["gross_loss"] = loss["flag"]
+            thin = cover_thinning(qs, property=sector == "Bất động sản")  # Dự phòng mỏng dần (owner, 23/11/2026)
+            signs["cover_thinning"] = thin["flag"]
         else:
-            signs.update(other_high=None, provision_jump=None, raise_prepay=None, lending=None, inventory_fast=None, gross_loss=None)
-            lend = pace = loss = None
+            signs.update(other_high=None, provision_jump=None, raise_prepay=None, lending=None, inventory_fast=None, gross_loss=None,
+                         cover_thinning=None)
+            lend = pace = loss = thin = None
         details = {k: quality[k]["detail"] for k in QUALITY if k in quality and quality[k]["flag"]}
         if signs["inventory_fast"]:
             pct = lambda v: f"{round(float(v) * 100)}%"  # noqa: E731
@@ -116,6 +120,10 @@ def receivable_signs(data_dir: Path) -> list[dict]:
             q = loss["quarter"]
             details["gross_loss"] = (f"Lỗ gộp {_ty(-Decimal(loss['gross_profit']) / BILLION)} tỷ trong quý {q[-1]}/{q[:4]}; tỷ lệ trích lập dự phòng tồn kho "
                                      f"{_pct1(loss['coverage'])} (quý trước {_pct1(loss['coverage_prev'])}).")
+        if signs["cover_thinning"]:
+            q = thin["quarter"]
+            details["cover_thinning"] = (f"Tồn kho đủ {thin['days']} ngày giá vốn (cùng kỳ {thin['days_year_ago']} ngày) trong khi tỷ lệ trích lập dự phòng "
+                                         f"còn {_pct1(thin['coverage'])} (cùng kỳ {_pct1(thin['coverage_year_ago'])}), quý {q[-1]}/{q[:4]}.")
         if signs["lending"]:
             q = lend["quarter"]
             details["lending"] = (f"Cho vay và phải thu khác bằng {round(float(lend['share']) * 100)}% vốn chủ (quý {q[-1]}/{q[:4]}); "

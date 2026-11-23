@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { grossLossText } from "./balance-watch";
+import { coverThinningText, grossLossText } from "./balance-watch";
+
+describe("coverThinningText", () => {
+  const base = { quarter: "2026-Q3", days: 228, days_year_ago: 173, coverage: "0.0385", coverage_year_ago: "0.0500", share: "0.2500", flag: true };
+  it("says the days and both shares provided for when it is a sign, and nothing otherwise", () => {
+    expect(coverThinningText(base)).toBe("Q3/2026: tồn kho đủ 228 ngày giá vốn (cùng kỳ 173 ngày) trong khi tỷ lệ trích lập dự phòng còn 3,9% (cùng kỳ 5,0%). "
+      + "Hàng nằm kho lâu hơn mà phần dự phòng cho nó mỏng đi: xem thuyết minh hàng tồn kho theo tuổi hoặc theo loại.");
+    expect(coverThinningText({ ...base, flag: false })).toBeNull();
+  });
+});
 
 describe("grossLossText", () => {
   const base = { quarter: "2026-Q3", gross_profit: "-5000000000", coverage: "0.0188", coverage_prev: "0.0200", share: "0.3140", flag: true };

@@ -450,6 +450,31 @@ def gross_loss(quarters: dict, *, property: bool = False) -> dict:
     return {"quarter": latest, "gross_profit": _s(gp), "coverage": _r(cover), "coverage_prev": _r(cover_prev), "share": _r(share), "flag": flag}
 
 
+THIN_DAYS, THIN_COVER = Decimal("0.20"), Decimal("0.20")  # Dự phòng mỏng dần (owner, 23/11/2026): on 641 quarters, 10,8% of them
+
+
+def cover_thinning(quarters: dict, *, property: bool = False) -> dict:
+    """Dự phòng mỏng dần trong khi hàng tồn lâu hơn (owner, 23/11/2026; the second ground of a stock count: goods held long). No public
+    source gives the age of inventory, so the days it lasts stand for it: up from 20% on a year while the share provided for fell from 20%
+    of its level a year before. Material inventory only, never a property developer; None when a figure is missing."""
+    if not quarters:
+        return {"quarter": None, "days": None, "days_year_ago": None, "coverage": None, "coverage_year_ago": None, "share": None, "flag": None}
+    latest = max(quarters)
+    ago = _back(latest, 4)
+    days, days_ago = _inventory_days(quarters, latest), _inventory_days(quarters, ago)
+    cover, cover_ago = _coverage(quarters[latest]), _coverage(quarters.get(ago))
+    (net, assets) = _get(quarters[latest], "inventory", "total_assets")
+    share = net / assets if net is not None and assets is not None and assets > 0 else None
+    flag = None
+    if property:
+        flag = False
+    elif None not in (days, days_ago, cover, cover_ago, share) and days_ago > 0:
+        thinner = cover_ago > 0 and (cover_ago - cover) / cover_ago >= THIN_COVER
+        flag = share >= INVENTORY_MATERIAL and days / days_ago - 1 >= THIN_DAYS and thinner
+    return {"quarter": latest, "days": int(days) if days is not None else None, "days_year_ago": int(days_ago) if days_ago is not None else None,
+            "coverage": _r(cover), "coverage_year_ago": _r(cover_ago), "share": _r(share), "flag": flag}
+
+
 INVENTORY_FLOW_SHARE = Decimal("0.20")  # Dự phòng giảm giá tồn kho đi vào lợi nhuận (owner, 22/11/2026)
 
 

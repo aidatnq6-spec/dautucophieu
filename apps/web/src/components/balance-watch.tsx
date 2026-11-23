@@ -24,7 +24,9 @@ type Balance = { symbol: string; sector: string | null; debt: { rows: DebtRow[];
   property: { rows: CashRow[]; signal: Signal } | null; liquidity: LiquidityRow[]; carry: Carry;
   receivables: { rows: ArRow[]; dso: Dso; provision: Provision; prepay_days: Dso; other_vs_sector: OtherVsSector }; raise_prepay: { flag: boolean; events: RaiseEvent[] };
   revisions?: Revision[]; lending?: Lending; provision_flow?: ProvisionFlow; inventory?: Inventory;
-  inventory_pace?: InventoryPace; inventory_provision_flow?: InventoryFlow; gross_loss?: GrossLoss };
+  inventory_pace?: InventoryPace; inventory_provision_flow?: InventoryFlow; gross_loss?: GrossLoss; cover_thinning?: CoverThinning };
+export type CoverThinning = { quarter: string | null; days: number | null; days_year_ago: number | null; coverage: string | null;
+  coverage_year_ago: string | null; share: string | null; flag: boolean | null };
 export type GrossLoss = { quarter: string | null; gross_profit: string | null; coverage: string | null; coverage_prev: string | null; share: string | null;
   flag: boolean | null };
 type InvFlowRow = { quarter: string; balance: string | null; change: string | null; pbt: string | null; share: string | null; kind: "release" | "charge" | null };
@@ -196,6 +198,13 @@ export function grossLossText(g: GrossLoss): string | null {
   return main;
 }
 
+/** Dự phòng mỏng dần trong khi hàng tồn lâu hơn (23/11/2026): said only when it is a sign. */
+export function coverThinningText(c: CoverThinning): string | null {
+  if (!c.flag || !c.quarter || c.coverage === null || c.coverage_year_ago === null) return null;
+  return `${q(c.quarter)}: tồn kho đủ ${c.days} ngày giá vốn (cùng kỳ ${c.days_year_ago} ngày) trong khi tỷ lệ trích lập dự phòng còn ${rate(c.coverage)} `
+    + `(cùng kỳ ${rate(c.coverage_year_ago)}). Hàng nằm kho lâu hơn mà phần dự phòng cho nó mỏng đi: xem thuyết minh hàng tồn kho theo tuổi hoặc theo loại.`;
+}
+
 /** Khối Tồn kho (22/11/2026): the latest quarter net, its share of total assets and the share provided for, against a year before. */
 export function inventoryText(inv: Inventory): string {
   const last = inv.rows[inv.rows.length - 1];
@@ -355,6 +364,8 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
           {inventoryPaceText(data.inventory_pace)}</p>}
         {data.gross_loss && grossLossText(data.gross_loss) && <p data-testid="gross-loss">{data.gross_loss.flag && <><span className="pill warn">
           Bán dưới giá vốn, dự phòng không tăng</span> </>}{grossLossText(data.gross_loss)}</p>}
+        {data.cover_thinning && coverThinningText(data.cover_thinning) && <p data-testid="cover-thinning"><span className="pill warn">
+          Dự phòng mỏng dần, hàng tồn lâu hơn</span> {coverThinningText(data.cover_thinning)}</p>}
         <div className="tablewrap"><table className="fv-table" aria-label={`Tồn kho ${symbol}`}>
           <thead><tr><th>Quý</th><th className="num">Giá gốc</th><th className="num">Dự phòng giảm giá</th><th className="num">Bao phủ</th>
             <th className="num">Giá trị thuần</th><th className="num">Trên tổng tài sản</th></tr></thead>

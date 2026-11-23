@@ -39,5 +39,15 @@ Tình trạng hệ thống vẫn cảnh báo từ 01/12 khi chưa có lịch nă
 - Tự lấy lịch từ hsx.vn: thông báo là lời văn, được sửa sau khi công bố, và các bài đăng lại không thống nhất (kiểm 23/11/2026).
 - Công cụ tạo file lịch.
 
+## Đã làm (23/11/2026)
+- `load_calendar` (`cli.py`) gộp các năm liền nhau và báo `CalendarMissing` (một loại `FileNotFoundError`) với câu ở mục 2.
+- Test `backend/tests/market/test_calendar_years.py`:
+  - `decide` sáng 04/01 chạy bù phiên cuối năm cũ;
+  - tối 05/01 đếm đúng 2 phiên bị lỡ;
+  - kiểm tra bản tin nhìn lùi qua năm cũ.
+- Với cách cũ (chỉ một năm), ba trường hợp trên lần lượt cho `no_session`, `ValueError`, `ValueError`.
+- Mục 3 không chạy thật các bước theo lịch ngày 04/01/2027, vì như vậy sẽ gửi Telegram và ghi vào `data/`. Thay vào đó là test trên chính các
+  hàm nhìn lùi.
+
 ## Thứ tự
 1 → 2 → 3 trên một nhánh, TDD, verify rồi merge.

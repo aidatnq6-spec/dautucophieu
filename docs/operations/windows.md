@@ -53,7 +53,7 @@ Mỗi bước ghi một dòng `<thời điểm> <tên bước> exit=<mã>` vào 
 
 ### Lịch giao dịch
 
-Lịch tự động dùng `data\trading-calendar.json` nếu có, nếu không thì `config\trading-calendar-hose-<năm hiện tại>.json` (đã có năm 2026, xem `docs\decisions\market-rules.md`). Định dạng khi tự lập:
+Lịch tự động dùng `data\trading-calendar.json` nếu có, nếu không thì `config\trading-calendar-hose-<năm hiện tại>.json` (đã có năm 2026, xem `docs\decisions\market-rules.md`). File của năm hiện tại được đọc cùng file năm trước và năm sau, nếu có và nối liền nhau. Thiếu file năm hiện tại thì log ghi "chưa có lịch giao dịch HOSE <năm>". Định dạng khi tự lập:
 
 ```json
 {"version": "hose-2026", "source": "<đường dẫn thông báo chính thức>", "holidays": ["2026-09-02"], "first": "2026-01-02", "last": "2026-12-31"}

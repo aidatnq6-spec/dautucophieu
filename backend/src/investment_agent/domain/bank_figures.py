@@ -212,7 +212,7 @@ def provision_view(statements: dict[str, dict], quality: dict[str, dict], n: int
              "ppop": _ty(p) if (p := num(statements[k], "ppop")) is not None else None, "share": s(share(statements[k]))} for k in keys]
     if not keys:
         return {"rows": [], "quarter": None, "share": None, "credit_cost": None, "credit_cost_missing": [], "expense_growth_yoy": None,
-                "bad_growth_qoq": None, "flag": None, "why_not": None}
+                "bad_growth_qoq": None, "bad_now": None, "bad_prev": None, "flag": None, "why_not": None}
     latest = keys[-1]
     cur = statements[latest]
     window = [_quarter_before(latest, i) for i in (3, 2, 1, 0)]
@@ -237,7 +237,8 @@ def provision_view(statements: dict[str, dict], quality: dict[str, dict], n: int
     else:
         flag = bad_now > bad_prev
     return {"rows": rows, "quarter": latest, "share": s(share(cur)), "credit_cost": s(credit_cost), "credit_cost_missing": sorted(missing),
-            "expense_growth_yoy": s(growth), "bad_growth_qoq": s(bad_growth), "flag": flag, "why_not": why}
+            "expense_growth_yoy": s(growth), "bad_growth_qoq": s(bad_growth), "bad_now": _plain(bad_now) if bad_now is not None else None,
+            "bad_prev": _plain(bad_prev) if bad_prev is not None else None, "flag": flag, "why_not": why}  # groups 3–5 in tỷ đồng
 
 
 ACCRUED_GAP = Decimal("0.20")  # Lãi dự thu so với thu nhập lãi (owner, 23/11/2026): accrued interest growing 20 points faster on a year

@@ -21,6 +21,9 @@ Tra cứu ngày 2026-10-25. Số liệu máy đọc: `config/market-rules-hose.j
 Theo Thông báo 2294/TB-SGDHCM ngày 09/12/2025 và bản cập nhật Tết Dương lịch ngày 25/12/2025 (13 ngày nghỉ trong tuần): 01–02/01; 16–20/02 (Tết Nguyên đán); 27/04 (Giỗ Tổ, nghỉ bù); 30/04–01/05; 31/08–02/09. Thứ Bảy làm bù 10/01 và 22/08 **không giao dịch**. Đọc qua bản đăng lại của CafeF, Vietstock, Thư viện Pháp luật; chưa mở được bản gốc trên hsx.vn.
 
 Lịch năm sau: khi HOSE công bố (thường tháng 12), tạo `config/trading-calendar-hose-<năm>.json` mới. Lịch tự động dùng `data\trading-calendar.json` nếu bạn tạo riêng, nếu không thì dùng file của năm hiện tại trong `config\`.
+- File của năm hiện tại được đọc cùng file năm trước và năm sau, nếu có và nối liền nhau, để các phép tính nhìn lùi qua mốc đổi năm vẫn đúng (23/11/2026).
+- Thiếu file năm hiện tại thì các bước theo lịch dừng và ghi rõ lý do trong `logs\scheduler.log`. App không đoán ngày nghỉ.
+- Từ 01/12, Tình trạng hệ thống đã nhắc nếu chưa có lịch năm sau.
 
 ## Ứng dụng dùng các quy tắc thế nào
 

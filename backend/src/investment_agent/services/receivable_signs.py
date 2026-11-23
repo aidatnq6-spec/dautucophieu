@@ -29,24 +29,40 @@ def _pct(v) -> str:
     return f"{abs(round(float(v) * 100))}%"
 
 
+def _moved(v) -> str:
+    """"tăng 5%" or "giảm 20%": the word follows the figure's sign (review 23/11/2026: a fall was written as a rise)."""
+    return f"{'giảm' if float(v) < 0 else 'tăng'} {_pct(v)}"
+
+
+def _ty(v) -> str:
+    return f"{round(float(v)):,}".replace(",", ".")
+
+
 def _bank_row(data_dir: Path, symbol: str, sector: str) -> dict:
-    """The bank signs of one watched bank; public figures only, like the rest of this board (the owner's entries stay on the bank's page)."""
+    """The bank signs of one watched bank; public figures only, like the rest of this board (the owner's entries stay on the bank's page).
+    A store that cannot be read leaves this bank unread, never the board."""
     from investment_agent.domain.bank_figures import accrued_view, provision_view, public_quarters
     from investment_agent.market.bank_notes import BankNoteStore
-    kept = StatementStore(data_dir / "statements-financial").read(symbol) or {}
+    try:
+        kept = StatementStore(data_dir / "statements-financial").read(symbol) or {}
+        notes = (BankNoteStore(data_dir / "bank-notes").read(symbol) or {}).get("quarters") or {}
+    except (OSError, ValueError):
+        return {"symbol": symbol, "sector": sector, "signs": {k: None for k, _ in BANK_SIGNS}, "count": 0, "details": {}}
     statements = kept.get("quarters") or {}
-    public = public_quarters((BankNoteStore(data_dir / "bank-notes").read(symbol) or {}).get("quarters") or {}, statements, kept.get("quarters_zeros") or [])
+    public = public_quarters(notes, statements, kept.get("quarters_zeros") or [])
     table = {q: v["values"] for q, v in public.items()}
     p, a = provision_view(statements, table), accrued_view(statements, table)
     signs, details = {"provision_cut": p["flag"], "accrued_outpace": a["flag"]}, {}
     if a["flag"]:
         q = a["quarter"]
-        details["accrued_outpace"] = (f"Lãi, phí phải thu quý {q[-1]}/{q[:4]} tăng {_pct(a['accrued_growth_yoy'])} so cùng kỳ, thu nhập lãi tăng "
-                                      f"{_pct(a['income_growth_yoy'])}; lãi dự thu bằng {_pct(a['ratio'])} thu nhập lãi của quý (cùng kỳ {_pct(a['ratio_year_ago'])}).")
+        details["accrued_outpace"] = (f"Lãi, phí phải thu quý {q[-1]}/{q[:4]} {_moved(a['accrued_growth_yoy'])} so cùng kỳ, thu nhập lãi "
+                                      f"{_moved(a['income_growth_yoy'])}; lãi dự thu bằng {_pct(a['ratio'])} thu nhập lãi của quý (cùng kỳ {_pct(a['ratio_year_ago'])}).")
     if p["flag"]:
         q = p["quarter"]
-        details["provision_cut"] = (f"Chi phí dự phòng quý {q[-1]}/{q[:4]} giảm {_pct(p['expense_growth_yoy'])} so cùng kỳ trong khi nợ nhóm 3–5 tăng "
-                                    f"{_pct(p['bad_growth_qoq'])} so quý trước"
+        # the flag needs the expense down 30% and groups 3–5 up; with none the quarter before there is no growth to state, only the amounts
+        bad = (f"tăng {_pct(p['bad_growth_qoq'])} so quý trước" if p["bad_growth_qoq"] is not None
+               else f"tăng từ {_ty(p['bad_prev'])} lên {_ty(p['bad_now'])} tỷ so quý trước")
+        details["provision_cut"] = (f"Chi phí dự phòng quý {q[-1]}/{q[:4]} giảm {_pct(p['expense_growth_yoy'])} so cùng kỳ trong khi nợ nhóm 3–5 {bad}"
                                     + (f"; chi phí dự phòng bằng {_pct(p['share'])} lợi nhuận trước dự phòng." if p["share"] else "."))
     return {"symbol": symbol, "sector": sector, "signs": signs, "count": sum(1 for v in signs.values() if v is True), "details": details}
 

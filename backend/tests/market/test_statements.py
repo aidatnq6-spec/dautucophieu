@@ -159,6 +159,48 @@ def test_bank_and_securities_layouts_keep_their_own_lines():
         "st_debt": "50000000000", "lt_debt": "0", "operating_revenue": "30000000000", "npat_parent": "10000000000"}}
 
 
+def test_a_bank_keeps_its_loans_reserve_accrued_interest_interest_income_and_provision_expense():
+    """Chất lượng tài sản ngân hàng (owner, 23/11/2026), part 1: the TT49 lines of VNDirect, VCB Q3/2026 in tỷ đồng."""
+    from investment_agent.market.statements import FIN_LINES_VERSION, LAYOUTS
+    assert FIN_LINES_VERSION >= 3
+    page = text(row(412100, 1.8160933e15, "2026-09-30", model=101, code="VCB"), row(412200, -3.11681e13, "2026-09-30", model=101, code="VCB"),
+                row(412520, 1.18111e13, "2026-09-30", model=101, code="VCB"), row(421100, 4.00146e13, "2026-09-30", model=102, code="VCB"),
+                row(422900, 6.1841e12, "2026-09-30", model=102, code="VCB"))
+    out = parse_statements(page, symbol="VCB", kind="QUARTER", lines=LAYOUTS["bank"]["lines"], zero_missing=LAYOUTS["bank"]["zero_missing"])
+    assert out["periods"] == {"2026-Q3": {"loans_gross": "1816093300000000", "loan_reserve": "-31168100000000", "accrued_interest": "11811100000000",
+                                          "interest_income": "40014600000000", "provision_expense": "6184100000000"}}
+    assert out["zeros"] == []
+
+
+def test_a_bank_balance_the_source_gives_as_zero_is_missing_and_said_so_while_a_zero_provision_expense_is_kept():
+    from investment_agent.market.statements import LAYOUTS
+    page = text(row(412100, 7.216e12, "2006-09-30", model=101, code="ACB"), row(412200, 0, "2006-09-30", model=101, code="ACB"),
+                row(412520, 0, "2006-09-30", model=101, code="ACB"), row(422900, 0, "2006-09-30", model=102, code="ACB"))
+    out = parse_statements(page, symbol="ACB", kind="QUARTER", lines=LAYOUTS["bank"]["lines"], zero_missing=LAYOUTS["bank"]["zero_missing"])
+    assert out["periods"] == {"2006-Q3": {"loans_gross": "7216000000000", "provision_expense": "0"}}
+    assert out["zeros"] == [{"period": "2006-Q3", "line": "accrued_interest"}, {"period": "2006-Q3", "line": "loan_reserve"}]
+    assert parse_statements(page, symbol="ACB", kind="QUARTER", lines=LAYOUTS["bank"]["lines"])["zeros"] == []  # only where the layout says
+
+
+def test_sync_keeps_the_zero_balances_of_a_bank_by_period_and_a_later_figure_clears_them(tmp_path):
+    def get(url):
+        if "stock_prices" in url:
+            return json.dumps({"data": []})
+        if "ANNUAL" in url:
+            return text()
+        return text(row(412520, 0, "2026-06-30", model=101, code="VCB"), row(412520, 5e12, "2026-09-30", model=101, code="VCB"))
+    store = StatementStore(tmp_path)
+    assert sync_statements(store, {"VCB": "Ngân hàng"}, get=get, now=NOW, limit=None, sleep=lambda s: None, kinds=("bank",)) == {"VCB": "ok"}
+    rec = store.read("VCB")
+    assert rec["quarters"] == {"2026-Q3": {"accrued_interest": "5000000000000"}}
+    assert rec["quarters_zeros"] == [{"period": "2026-Q2", "line": "accrued_interest"}] and rec["years_zeros"] == []
+    later = lambda url: (json.dumps({"data": []}) if "stock_prices" in url else text() if "ANNUAL" in url
+                         else text(row(412520, 4e12, "2026-06-30", model=101, code="VCB")))
+    sync_statements(store, {"VCB": "Ngân hàng"}, get=later, now=NOW.replace(year=2027), limit=None, sleep=lambda s: None, kinds=("bank",))
+    rec = store.read("VCB")
+    assert rec["quarters"]["2026-Q2"] == {"accrued_interest": "4000000000000"} and rec["quarters_zeros"] == []
+
+
 def test_sync_of_financial_kinds_asks_for_their_models_and_skips_the_others(tmp_path):
     store, get = StatementStore(tmp_path), Get()
     sectors = {"HPG": "Tài nguyên Cơ bản", "MBB": "Ngân hàng", "SSI": "Dịch vụ tài chính", "BVH": "Bảo hiểm"}

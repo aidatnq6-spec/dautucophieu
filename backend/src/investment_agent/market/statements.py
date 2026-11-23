@@ -36,7 +36,8 @@ FIRST_START, REFRESH_DAYS, MAX_AGE_DAYS, PACE_SECONDS = "2010-01-01", 730, 7, 1.
 # lines reach back as far as the old ones. 2: customer advances and inventory.
 LINES_VERSION = 6  # 3: current assets, receivables, current and long-term liabilities, EPS; 4: the parts of receivables; 5: interest received;
 # 6: inventory at cost and its provision (Khối Tồn kho, 22/11/2026)
-FIN_LINES_VERSION = 2  # banks, securities firms and insurers: 2: basic EPS (23001 in each of their layouts)
+FIN_LINES_VERSION = 3  # banks, securities firms and insurers: 2: basic EPS (23001 in each of their layouts); 3: the bank's loans, loan
+# reserve, accrued interest, interest income and provision expense (Chất lượng tài sản ngân hàng, 23/11/2026; the others re-read once too)
 # (model, item code) → line. Model 1 balance sheet, 2 income statement, 3 cash flow (indirect); the general layout (TT200).
 LINES = {
     (2, 21000): "gross_revenue", (2, 21090): "deductions", (2, 21001): "revenue", (2, 22100): "cogs", (2, 23100): "gross_profit",
@@ -70,7 +71,15 @@ LAYOUTS = {
     None: {"models": "1,2,3", "lines": LINES},
     "bank": {"models": "101,102,103", "lines": {**{(101, c): k for k, c in _FIN_COMMON.items()}, (102, 421701): "operating_income",
                                                  (102, 88888): "ppop", (102, 23800): "pbt", (102, 23003): "npat", (102, 23000): "npat_parent",
-                                                 (102, 23001): "eps"}},
+                                                 (102, 23001): "eps",
+                                                 # Chất lượng tài sản ngân hàng (23/11/2026; names from v4/financial_models, TT49): loans to
+                                                 # customers before and their reserve (negative), accrued interest and fees, interest income,
+                                                 # credit provision expense of the period
+                                                 (101, 412100): "loans_gross", (101, 412200): "loan_reserve", (101, 412520): "accrued_interest",
+                                                 (102, 421100): "interest_income", (102, 422900): "provision_expense"},
+             # No bank has nothing lent, reserved or accrued: where the source gives 0 for these (quarters before it split them out), the
+             # figure is missing, and the record says so. A period's provision expense can be nil, so it is kept.
+             "zero_missing": frozenset({"loans_gross", "loan_reserve", "accrued_interest"})},
     "securities": {"models": "89,90,91", "lines": {**{(89, c): k for k, c in _FIN_COMMON.items()}, (89, 13110): "st_debt", (89, 13340): "lt_debt",
                                                    (90, 21000): "operating_revenue", (90, 23800): "pbt", (90, 23003): "npat", (90, 23000): "npat_parent",
                                                    (90, 23001): "eps"}},
@@ -95,7 +104,8 @@ def _period(fiscal: str, kind: str) -> str:
     return str(year) if kind == "ANNUAL" else f"{year}-Q{(month + 2) // 3}"
 
 
-def parse_statements(text: str, *, symbol: str, kind: str, lines: dict | None = None) -> dict:
+def parse_statements(text: str, *, symbol: str, kind: str, lines: dict | None = None, zero_missing: frozenset = frozenset()) -> dict:
+    """Periods of named lines; a line of `zero_missing` the source gives as 0 is left out and listed under "zeros"."""
     lines = LINES if lines is None else lines
     data = json.loads(text).get("data") or []
     if len(data) >= PAGE:
@@ -118,9 +128,11 @@ def parse_statements(text: str, *, symbol: str, kind: str, lines: dict | None = 
         if day and (period not in created or day < created[period]):
             created[period] = day
     periods: dict[str, dict[str, str]] = {}
-    conflicts = []
+    conflicts, zeros = [], []
     for (period, line), values in sorted(seen.items()):
-        if len(values) > 1:
+        if line in zero_missing and values == {Decimal(0)}:
+            zeros.append({"period": period, "line": line})
+        elif len(values) > 1:
             conflicts.append({"period": period, "line": line, "values": [_plain(v) for v in sorted(values)]})
         else:
             periods.setdefault(period, {})[line] = _plain(next(iter(values)))
@@ -128,7 +140,7 @@ def parse_statements(text: str, *, symbol: str, kind: str, lines: dict | None = 
         old = figures.pop("associates_old", None)
         if old is not None and "associates" not in figures:
             figures["associates"] = old
-    return {"periods": dict(sorted(periods.items())), "created": dict(sorted(created.items())), "conflicts": conflicts}
+    return {"periods": dict(sorted(periods.items())), "created": dict(sorted(created.items())), "conflicts": conflicts, "zeros": zeros}
 
 
 def parse_year_end_closes(text: str, *, symbol: str) -> dict[str, dict[str, str]]:
@@ -177,12 +189,14 @@ class StatementStore:
         os.replace(tmp, path)
 
 
-def _merge(old: dict | None, key: str, new: dict) -> tuple[dict, dict, list]:
+def _merge(old: dict | None, key: str, new: dict) -> tuple[dict, dict, list, list]:
     periods = {**(old or {}).get(key, {}), **new["periods"]}
     created = {**(old or {}).get(f"{key}_created", {}), **new["created"]}
-    fresh = set(new["periods"]) | {c["period"] for c in new["conflicts"]}
-    conflicts = [c for c in (old or {}).get(f"{key}_conflicts", []) if c["period"] not in fresh] + new["conflicts"]
-    return dict(sorted(periods.items())), dict(sorted(created.items())), sorted(conflicts, key=lambda c: (c["period"], c["line"]))
+    fresh = set(new["periods"]) | {c["period"] for c in new["conflicts"]} | {z["period"] for z in new["zeros"]}
+
+    def kept(name: str) -> list:
+        return sorted([c for c in (old or {}).get(f"{key}_{name}", []) if c["period"] not in fresh] + new[name], key=lambda c: (c["period"], c["line"]))
+    return dict(sorted(periods.items())), dict(sorted(created.items())), kept("conflicts"), kept("zeros")
 
 
 def _lines_version(sector: str | None) -> int:
@@ -214,7 +228,8 @@ def sync_statements(store: StatementStore, sectors: dict[str, str | None], *, ge
         try:
             layout = LAYOUTS[kind_of(sectors[symbol])]
             parsed = {kind: parse_statements(_get_with_retry(get, URL.format(symbol=symbol, kind=kind, start=start, models=layout["models"], page=PAGE),
-                                                             sleep), symbol=symbol, kind=kind, lines=layout["lines"])
+                                                             sleep), symbol=symbol, kind=kind, lines=layout["lines"],
+                                         zero_missing=layout.get("zero_missing", frozenset()))
                       for kind in ("QUARTER", "ANNUAL")}
             if not parsed["QUARTER"]["periods"] and not parsed["ANNUAL"]["periods"] and old is None:
                 results[symbol] = "error:no_observations"
@@ -231,7 +246,7 @@ def sync_statements(store: StatementStore, sectors: dict[str, str | None], *, ge
                     from investment_agent.market.statement_revisions import find_revisions, record_revisions
                     record_revisions(store.root.parent, symbol, find_revisions(old.get(key, {}), parsed[kind]["periods"]), kind=key,
                                      seen_on=now.date())
-                record[key], record[f"{key}_created"], record[f"{key}_conflicts"] = _merge(old, key, parsed[kind])
+                record[key], record[f"{key}_created"], record[f"{key}_conflicts"], record[f"{key}_zeros"] = _merge(old, key, parsed[kind])
             store.save(record)
             results[symbol] = "ok"
         except Exception as exc:  # one ticker never stops the others

@@ -55,5 +55,15 @@ ghi 0 cho dòng chưa tách.
 - Bảng dấu hiệu chỉ dùng số công khai. Mỗi ngân hàng là một dòng, chỉ xét dấu hiệu ngân hàng, và không bị ghi thiếu các dấu hiệu phi tài chính.
 - Báo mã đang giữ qua `check_signs` có sẵn, một lần khi dấu hiệu mới bật. Tiêu đề tin vẫn là "Dấu hiệu phải thu mới".
 
+## Đổi hai ngưỡng cũ (chủ sở hữu chốt 23/11/2026)
+- Sau khi bảng chạy trên số công khai, hai ngưỡng cũ bật quá thường. Đếm trên 306 lượt ngân hàng-quý (9 ngân hàng đang theo dõi, Q1/2018–Q3/2026):
+  - bao phủ giảm từ 10 điểm %: 40% số quý bật cờ;
+  - nợ nhóm 2 tăng từ 30% so với quý trước: 20% số quý bật cờ.
+- Mức bao phủ chênh nhau nhiều giữa các ngân hàng (trung vị 102%, P10–P90 từ 53% đến 219%), nên cùng 10 điểm có nghĩa rất khác nhau với mỗi ngân hàng.
+- Ngưỡng mới:
+  - **bao phủ giảm từ 20% của mức trước đó**, so với quý trước hoặc cuối năm trước (22% số quý bật cờ);
+  - **nợ nhóm 2 tăng từ 50% so với quý trước** (9% số quý bật cờ).
+- Các ngưỡng khác giữ nguyên.
+
 ## Thứ tự
 1 → 2 → 3 → 4, mỗi phần một nhánh, TDD, verify rồi merge. Các ngưỡng 30% (mục 3) và 20 điểm % (mục 4) do chủ sở hữu chốt ngày 23/11/2026.

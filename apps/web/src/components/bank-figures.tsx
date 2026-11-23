@@ -198,7 +198,7 @@ export function BankFigures({ symbol }: { symbol: string }) {
           : <ul className="bf-flags">{view.quality.trend.flags.map((f) => <li key={f}>{flagText(f, view.quality!.trend)}</li>)}</ul>}
         {view.quality.notes.map((n) => <p key={n} className="caption">{n}</p>)}
         {sourceLine(view.quality.sources) && <p className="caption">Nguồn: {sourceLine(view.quality.sources)}.</p>}
-        <p className="caption">So với quý trước, cùng kỳ năm trước và cuối năm trước. Ngưỡng do phần mềm đặt: bao phủ nợ xấu giảm từ 10 điểm %, nợ nhóm 2 tăng từ 30%, lãi phải thu tăng từ 20%,
+        <p className="caption">So với quý trước, cùng kỳ năm trước và cuối năm trước. Ngưỡng do phần mềm đặt: bao phủ nợ xấu giảm từ 20% của mức trước đó (chủ sở hữu chốt 23/11/2026), nợ nhóm 2 tăng từ 50%, lãi phải thu tăng từ 20%,
           chứng từ tăng từ 30%, dư nợ bất động sản tăng từ 10% và nhanh gấp 1,5 lần tổng dư nợ. Là dấu hiệu để đọc kỹ thuyết minh, không phải kết luận hay khuyến nghị. Ô để trống thì không so.</p>
       </div>}
       {view?.provision?.quarter && <div className="bf-quality" data-testid="bank-provision">

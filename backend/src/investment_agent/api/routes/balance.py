@@ -53,7 +53,8 @@ def balance(symbol: str, request: Request):
             "lending": lending_view(quarters), "provision_flow": provision_flow(quarters), "inventory": inventory_view(quarters),
             "inventory_provision_flow": inventory_provision_flow(quarters), "gross_loss": gross_loss(quarters, property=sector == PROPERTY),
             "cover_thinning": cover_thinning(quarters, property=sector == PROPERTY),
-            "year_end_provision": year_end_provision(quarters, (record or {}).get("years", {})),
+            "year_end_provision": year_end_provision(quarters, (record or {}).get("years", {}), years_modified=(record or {}).get("years_modified"),
+                                                     quarters_created=(record or {}).get("quarters_created")),
             "price_check": _price_check(data_dir, symbol, quarters, sector),
             "inventory_pace": inventory_pace(quarters, {s: qs for s, qs in peers.items() if s != symbol}, property=sector == PROPERTY), "revisions": _revisions(data_dir, symbol)}
 

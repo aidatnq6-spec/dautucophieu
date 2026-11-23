@@ -138,11 +138,20 @@ def test_a_q4_provision_the_audit_changed_is_a_sign_with_both_balances(tmp_path)
     """Dự phòng chốt khi kiểm toán (owner, 23/11/2026): told once for a held ticker through the signs note."""
     d = data(tmp_path)
     StatementStore(d / "statements").save({"symbol": "AAA", "years": {"2025": {"inventory_provision": str(-682 * BN)}},
-                                           "quarters": {"2025-Q4": {"inventory_provision": str(-600 * BN)}}})
+                                           "quarters": {"2025-Q4": {"inventory_provision": str(-600 * BN)}},
+                                           "years_modified": {"2025": "2026-04-01"}, "quarters_created": {"2025-Q4": "2026-01-30"}})
     aaa = next(r for r in receivable_signs(d) if r["symbol"] == "AAA")
-    assert ("audit_gap", "Dự phòng tồn kho quý 4 khác số kiểm toán") in SIGNS and aaa["signs"]["audit_gap"] is True
-    assert aaa["details"]["audit_gap"] == ("Năm 2025: dự phòng giảm giá tồn kho cuối quý 4 tự lập 600,0 tỷ, trên báo cáo năm đã kiểm toán 682,0 tỷ "
-                                           "(kiểm toán thêm 82,0 tỷ).")
+    assert ("audit_gap", "Dự phòng tồn kho quý 4 khác số năm cập nhật sau") in SIGNS and aaa["signs"]["audit_gap"] is True
+    # never "đã kiểm toán": the source's year is updated later, and the page says only when (owner, 23/11/2026)
+    assert aaa["details"]["audit_gap"] == ("Năm 2025: dự phòng giảm giá tồn kho cuối quý 4 tự lập 600,0 tỷ; số năm VNDirect cập nhật ngày 01/04/2026 "
+                                           "là 682,0 tỷ (thêm 82,0 tỷ). Đối chiếu báo cáo năm đã kiểm toán.")
+    # a year five times both its Q3 and the next Q2: marked as a possible source error
+    StatementStore(d / "statements").save({"symbol": "AAA", "years": {"2025": {"inventory_provision": str(-405 * BN)}},
+                                           "quarters": {k: {"inventory_provision": str(-v * BN)} for k, v in
+                                                        (("2025-Q3", 34), ("2025-Q4", 35), ("2026-Q1", 35), ("2026-Q2", 34))},
+                                           "years_modified": {"2025": "2026-07-31"}, "quarters_created": {"2025-Q4": "2026-01-30"}})
+    aaa = next(r for r in receivable_signs(d) if r["symbol"] == "AAA")
+    assert aaa["details"]["audit_gap"].endswith("Số năm gấp nhiều lần các quý quanh đó: có thể là lỗi dữ liệu nguồn, đối chiếu báo cáo gốc.")
 
 
 def test_an_output_price_down_is_a_sign_only_for_a_ticker_its_value_chain_ties_to_a_goods_price(tmp_path):

@@ -72,5 +72,19 @@ có 7 điểm.
   cần so thì không dùng.
 - Mỗi cờ mới bật ở mã đang giữ được báo một lần qua lượt báo dấu hiệu hiện có.
 
+## Sửa mục 3 (chủ sở hữu duyệt 23/11/2026)
+- Kiểm tra 23/11/2026: số "năm" của VNDirect **xuất hiện cùng ngày với báo cáo quý 4 và lúc đầu là số tự lập**. Số đã kiểm toán chỉ thay vào
+  sau đó, ở `modifiedDate`. Ví dụ VCG: LNTT năm 2025 xuất hiện ngày 30/01/2026 và được sửa ngày 01/04/2026; năm 2024 xuất hiện ngày
+  24/01/2025 và được sửa ngày 31/03/2025. Vì vậy:
+  - Đồng bộ báo cáo lưu thêm, cho mỗi kỳ, ngày cập nhật muộn nhất của nguồn (`quarters_modified`, `years_modified`).
+  - Chỉ so quý 4 với số năm khi số năm được cập nhật **sau** ngày báo cáo quý 4 xuất hiện. Nếu chưa, hoặc chưa biết ngày cập nhật, thì ghi
+    "số năm chưa được cập nhật sau quý 4: chưa so được" và không bật cờ.
+  - Trang không viết "đã kiểm toán". Thay vào đó trang ghi "số năm VNDirect cập nhật ngày …".
+- Số dư dự phòng nhảy vọt rồi quay về: ghi "có thể là lỗi dữ liệu nguồn, đối chiếu báo cáo gốc" nhưng vẫn hiện số. Quy tắc:
+  - Với một quý: số dư từ 5 lần trở lên so với cả quý trước lẫn quý sau.
+  - Với một năm: số năm từ 5 lần trở lên so với cả quý 3 cùng năm lẫn quý 2 năm sau.
+  - Ví dụ VCG: năm 2025 và quý 1/2026 là −405,8 tỷ, trong khi các quý quanh đó khoảng −35 tỷ. Số năm 2025 được sửa ngày 31/07/2026, muộn
+    gần 4 tháng so với LNTT.
+
 ## Thứ tự
 1 → 2 → 3 → 4, mỗi phần một nhánh, TDD, verify rồi merge. Các ngưỡng (20% và 20% ở mục 2, 10% ở mục 4, 1 tỷ và 1% ở mục 3) do chủ sở hữu chốt ngày 23/11/2026.

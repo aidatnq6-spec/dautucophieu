@@ -21,7 +21,7 @@ SIGNS = [("other_receivables", "Phải thu khác lớn"), ("other_high", "Cao h�
          ("financial_profit", "Phụ thuộc thu nhập tài chính"), ("receivables_outpace_revenue", "Phải thu tăng nhanh hơn doanh thu"),
          ("provision_jump", "Dự phòng tăng mạnh"), ("lending", "Cho vay lớn so với vốn chủ"),
          ("inventory_fast", "Tồn kho tăng nhanh hơn giá vốn"), ("gross_loss", "Bán dưới giá vốn, dự phòng không tăng"),
-         ("cover_thinning", "Dự phòng mỏng dần, hàng tồn lâu hơn"), ("audit_gap", "Dự phòng tồn kho quý 4 khác số kiểm toán"),
+         ("cover_thinning", "Dự phòng mỏng dần, hàng tồn lâu hơn"), ("audit_gap", "Dự phòng tồn kho quý 4 khác số năm cập nhật sau"),
          ("price_drop", "Giá bán giảm, dự phòng không tăng")]
 # A bank's row holds only these (Chất lượng tài sản ngân hàng, owner 23/11/2026), from VNDirect's bank lines and Vietcap's groups 1–5.
 BANK_SIGNS = [("provision_cut", "Lợi nhuận đỡ bởi giảm trích lập"), ("accrued_outpace", "Lãi dự thu tăng nhanh hơn thu nhập lãi")]
@@ -117,7 +117,8 @@ def receivable_signs(data_dir: Path) -> list[dict]:
             thin = cover_thinning(qs, property=sector == "Bất động sản")  # Dự phòng mỏng dần (owner, 23/11/2026)
             signs["cover_thinning"] = thin["flag"]
             # Dự phòng chốt khi kiểm toán (owner, 23/11/2026): Q4 as first reported against the audited year; not for a property developer
-            audit = year_end_provision(qs, kept[symbol].get("years", {}))
+            audit = year_end_provision(qs, kept[symbol].get("years", {}), years_modified=kept[symbol].get("years_modified"),
+                                       quarters_created=kept[symbol].get("quarters_created"))
             signs["audit_gap"] = False if sector == "Bất động sản" else audit["flag"]
             # Giá đầu ra giảm nhưng dự phòng không đổi (owner, 23/11/2026): only where the value chain ties a goods price to the ticker
             found = inventory_price_series(data_dir, symbol)
@@ -150,8 +151,11 @@ def receivable_signs(data_dir: Path) -> list[dict]:
         if signs["audit_gap"]:
             r = next(r for r in audit["rows"] if r["year"] == audit["year"])
             q4, yb = Decimal(r["q4_balance"]) / BILLION, Decimal(r["year_balance"]) / BILLION
-            details["audit_gap"] = (f"Năm {r['year']}: dự phòng giảm giá tồn kho cuối quý 4 tự lập {_ty(q4)} tỷ, trên báo cáo năm đã kiểm toán "
-                                    f"{_ty(yb)} tỷ (kiểm toán {'thêm' if yb > q4 else 'bớt'} {_ty(abs(yb - q4))} tỷ).")
+            on = r["updated_on"]
+            details["audit_gap"] = (f"Năm {r['year']}: dự phòng giảm giá tồn kho cuối quý 4 tự lập {_ty(q4)} tỷ; số năm VNDirect cập nhật ngày "
+                                    f"{on[8:10]}/{on[5:7]}/{on[:4]} là {_ty(yb)} tỷ ({'thêm' if yb > q4 else 'bớt'} {_ty(abs(yb - q4))} tỷ). "
+                                    "Đối chiếu báo cáo năm đã kiểm toán."
+                                    + (" Số năm gấp nhiều lần các quý quanh đó: có thể là lỗi dữ liệu nguồn, đối chiếu báo cáo gốc." if r["spike"] else ""))
         if signs["lending"]:
             q = lend["quarter"]
             details["lending"] = (f"Cho vay và phải thu khác bằng {round(float(lend['share']) * 100)}% vốn chủ (quý {q[-1]}/{q[:4]}); "

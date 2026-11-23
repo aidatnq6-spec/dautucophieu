@@ -64,22 +64,49 @@ def test_each_year_shows_its_provision_change_and_the_part_q4_carried_from_the_a
     prov = lambda v: {"inventory_provision": str(-v * B)}  # noqa: E731
     years = {"2024": prov(504), "2025": prov(682)}
     quarters = {"2025-Q3": prov(530), "2025-Q4": prov(682)}
-    v = year_end_provision(quarters, years)
+    v = year_end_provision(quarters, years, **SEEN)
     assert v["rows"] == [{"year": "2025", "change": "178000000000", "q4_change": "152000000000", "q4_share": "0.8539",
-                          "q4_balance": "682000000000", "year_balance": "682000000000", "gap": False}]
+                          "q4_balance": "682000000000", "year_balance": "682000000000", "updated_on": "2026-04-01", "gap": False,
+                          "spike": False}]
     assert v["flag"] is False and v["year"] == "2025"
+
+
+# The year updated by the source after Q4 first showed (owner, 23/11/2026: VNDirect's year first carries the company's own Q4 figures)
+SEEN = {"years_modified": {"2025": "2026-04-01"}, "quarters_created": {"2025-Q4": "2026-01-30"}}
 
 
 def test_a_q4_balance_the_audit_changed_is_flagged_from_1_ty_and_1_percent():
     from investment_agent.domain.balance_watch import year_end_provision
     prov = lambda v: {"inventory_provision": str(-v * B)}  # noqa: E731
-    v = year_end_provision({"2025-Q3": prov(530), "2025-Q4": prov(600)}, {"2024": prov(504), "2025": prov(682)})
-    assert v["flag"] is True and v["rows"][-1]["gap"] is True  # self-prepared 600, audited 682: the audit added 82 tỷ
-    assert year_end_provision({"2025-Q4": prov(681.5)}, {"2025": prov(682)})["flag"] is False  # 0,5 tỷ: under 1 tỷ
-    assert year_end_provision({"2025-Q4": prov(1000)}, {"2025": prov(1005)})["flag"] is False  # 5 tỷ but 0,5%: under 1%
-    small = year_end_provision({"2025-Q3": prov(10), "2025-Q4": prov(10.5)}, {"2024": prov(10), "2025": prov(10.5)})
+    v = year_end_provision({"2025-Q3": prov(530), "2025-Q4": prov(600)}, {"2024": prov(504), "2025": prov(682)}, **SEEN)
+    assert v["flag"] is True and v["rows"][-1]["gap"] is True  # self-prepared 600, the year as updated 682: 82 tỷ added
+    assert year_end_provision({"2025-Q4": prov(681.5)}, {"2025": prov(682)}, **SEEN)["flag"] is False  # 0,5 tỷ: under 1 tỷ
+    assert year_end_provision({"2025-Q4": prov(1000)}, {"2025": prov(1005)}, **SEEN)["flag"] is False  # 5 tỷ but 0,5%: under 1%
+    small = year_end_provision({"2025-Q3": prov(10), "2025-Q4": prov(10.5)}, {"2024": prov(10), "2025": prov(10.5)}, **SEEN)
     assert small["rows"][-1]["q4_share"] is None  # a change under 1 tỷ: no share worth stating
     assert year_end_provision({}, {})["flag"] is None and year_end_provision({"2025-Q4": prov(1)}, {})["rows"] == []
+
+
+def test_a_year_not_updated_after_q4_first_showed_is_not_compared():
+    """Owner, 23/11/2026: between January and the audit the year is the company's own Q4; no gap can be read, and none is guessed."""
+    from investment_agent.domain.balance_watch import year_end_provision
+    prov = lambda v: {"inventory_provision": str(-v * B)}  # noqa: E731
+    same_day = {"years_modified": {"2025": "2026-01-30"}, "quarters_created": {"2025-Q4": "2026-01-30"}}
+    for seen in (same_day, {}):  # updated only the day Q4 showed, or no update day kept yet
+        v = year_end_provision({"2025-Q4": prov(600)}, {"2025": prov(682)}, **seen)
+        assert v["rows"][-1]["gap"] is None and v["flag"] is None
+
+
+def test_a_balance_that_jumps_and_comes_back_is_marked_as_a_possible_source_error():
+    """VCG (public figures, 23/11/2026): the year 2025 and Q1/2026 at 405,8 tỷ between quarters of about 35 tỷ; shown, and marked."""
+    from investment_agent.domain.balance_watch import inventory_view, year_end_provision
+    prov = lambda v: {"inventory_provision": str(-v * B), "inventory_gross": str(1000 * B)}  # noqa: E731
+    quarters = {"2025-Q3": prov(34.2), "2025-Q4": prov(35.5), "2026-Q1": prov(405.8), "2026-Q2": prov(34.6), "2026-Q3": prov(34.6)}
+    rows = {r["quarter"]: r for r in inventory_view(quarters)["rows"]}
+    assert rows["2026-Q1"]["spike"] is True and rows["2025-Q4"]["spike"] is False and rows["2026-Q3"]["spike"] is False  # no quarter after
+    v = year_end_provision(quarters, {"2024": prov(34.2), "2025": prov(405.8)},
+                           years_modified={"2025": "2026-07-31"}, quarters_created={"2025-Q4": "2026-01-30"})
+    assert v["rows"][-1]["spike"] is True and v["rows"][-1]["gap"] is True  # still compared and shown: the owner checks the report
 
 
 def test_an_output_price_down_10_percent_on_a_year_while_the_share_provided_for_did_not_rise_is_flagged():

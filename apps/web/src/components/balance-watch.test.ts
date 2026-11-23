@@ -16,11 +16,13 @@ describe("priceCheckText", () => {
 
 describe("auditGapText", () => {
   const row = { year: "2025", change: "178000000000", q4_change: "152000000000", q4_share: "0.8539", q4_balance: "600000000000",
-    year_balance: "682000000000", gap: true };
-  it("names both balances and what the audit added, and nothing when Q4 matched the audited year", () => {
+    year_balance: "682000000000", updated_on: "2026-04-01", gap: true, spike: false };
+  it("names both balances and when the source updated the year, never 'đã kiểm toán', and nothing when Q4 matched", () => {
     expect(auditGapText({ rows: [row], year: "2025", flag: true }))
-      .toBe("Năm 2025: dự phòng giảm giá tồn kho cuối quý 4 tự lập 600 tỷ, trên báo cáo năm đã kiểm toán 682 tỷ (kiểm toán thêm 82 tỷ). "
-        + "Số chốt khi kiểm kê ngày 31/12 khác số công ty tự báo: xem thuyết minh hàng tồn kho của báo cáo năm.");
+      .toBe("Năm 2025: dự phòng giảm giá tồn kho cuối quý 4 tự lập 600 tỷ; số năm VNDirect cập nhật ngày 01/04/2026 là 682 tỷ (thêm 82 tỷ). "
+        + "Đối chiếu thuyết minh hàng tồn kho trên báo cáo năm đã kiểm toán.");
+    expect(auditGapText({ rows: [{ ...row, spike: true }], year: "2025", flag: true }))
+      .toContain("Số năm gấp nhiều lần các quý quanh đó: có thể là lỗi dữ liệu nguồn, đối chiếu báo cáo gốc.");
     expect(auditGapText({ rows: [{ ...row, gap: false, q4_balance: "682000000000" }], year: "2025", flag: false })).toBeNull();
   });
 });

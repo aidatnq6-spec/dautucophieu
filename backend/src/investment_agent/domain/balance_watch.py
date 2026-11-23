@@ -383,9 +383,11 @@ def inventory_view(quarters: dict, n: int = 12) -> dict:
     rows = []
     for period in sorted(quarters)[-n:]:
         gross, provision, net, assets = _get(quarters[period], "inventory_gross", "inventory_provision", "inventory", "total_assets")
+        (before,), (after,) = _get(quarters.get(_back(period, 1), {}), "inventory_provision"), _get(quarters.get(_back(period, -1), {}), "inventory_provision")
         rows.append({"quarter": period, "gross": _s(gross), "provision": _s(-provision if provision is not None else None), "net": _s(net),
                      "coverage": _r(-provision / gross) if provision is not None and gross is not None and gross > 0 else None,
-                     "share": _r(net / assets) if net is not None and assets is not None and assets > 0 else None})
+                     "share": _r(net / assets) if net is not None and assets is not None and assets > 0 else None,
+                     "spike": _spike(provision, before, after)})  # a possible source error (owner, 23/11/2026)
     return {"rows": rows}
 
 
@@ -516,11 +518,23 @@ def price_check(quarters: dict, points: list, *, indicator: str, label: str, pro
 AUDIT_GAP_FLOOR, AUDIT_GAP_SHARE = Decimal(1_000_000_000), Decimal("0.01")  # Dự phòng chốt khi kiểm toán (owner, 23/11/2026)
 
 
-def year_end_provision(quarters: dict, years: dict, n: int = 5) -> dict:
+SPIKE = Decimal(5)  # a provision balance five times both neighbours: marked as a possible source error, still shown (owner, 23/11/2026)
+
+
+def _spike(value: Decimal | None, before: Decimal | None, after: Decimal | None) -> bool:
+    return (value is not None and before is not None and after is not None and before != 0 and after != 0
+            and abs(value) >= SPIKE * abs(before) and abs(value) >= SPIKE * abs(after))
+
+
+def year_end_provision(quarters: dict, years: dict, n: int = 5, *, years_modified: dict | None = None,
+                       quarters_created: dict | None = None) -> dict:
     """Dự phòng chốt khi kiểm toán cuối năm (owner, 23/11/2026; the stock count of 31/12): for each of the last n years, the change of the
-    inventory provision over the year (from the audited year-end balances) and the part of it booked in Q4 (from Q3's balance), shown and
-    not flagged: Q4 carries most of it in many years. flag: the latest year whose Q4 balance, as the company first reported it, differs
-    from the audited year-end balance by more than 1 tỷ and 1%; None when no year has both."""
+    inventory provision over the year and the part of it booked in Q4 (from Q3's balance), shown and not flagged: Q4 carries most of it in
+    many years. VNDirect's year first carries the company's own Q4 figures and the audited ones only later, so Q4 as first reported is set
+    against the year only when the source updated the year after Q4 first showed (years_modified, quarters_created); otherwise no gap is
+    read. flag: the latest year so compared differing by more than 1 tỷ and 1%; None when none can be. A year balance five times both the
+    year's Q3 and the next year's Q2 is marked `spike` (a possible source error), and still compared and shown."""
+    years_modified, quarters_created = years_modified or {}, quarters_created or {}
     def prov(q: dict | None) -> Decimal | None:
         (v,) = _get(q or {}, "inventory_provision")
         return -v if v is not None else None  # positive: the balance provided
@@ -535,13 +549,15 @@ def year_end_provision(quarters: dict, years: dict, n: int = 5) -> dict:
         q4_change = year_bal - q3 if q3 is not None else None
         share = q4_change / change if change is not None and q4_change is not None and abs(change) >= AUDIT_GAP_FLOOR else None
         gap = None
-        if q4 is not None:
+        updated, shown = years_modified.get(y), quarters_created.get(f"{y}-Q4")
+        if q4 is not None and updated and shown and updated > shown:
             diff = abs(q4 - year_bal)
             gap = diff > AUDIT_GAP_FLOOR and diff > AUDIT_GAP_SHARE * abs(year_bal)
         if change is None and q4 is None:
             continue  # a balance with no year before and no Q4 says nothing here
         rows.append({"year": y, "change": _s(change), "q4_change": _s(q4_change), "q4_share": _r(share), "q4_balance": _s(q4),
-                     "year_balance": _s(year_bal), "gap": gap})
+                     "year_balance": _s(year_bal), "updated_on": updated, "gap": gap,
+                     "spike": _spike(year_bal, q3, prov(quarters.get(f"{int(y) + 1}-Q2")))})
     latest = next((r for r in reversed(rows) if r["gap"] is not None), None)
     return {"rows": rows, "year": latest["year"] if latest else None, "flag": latest["gap"] if latest else None}
 

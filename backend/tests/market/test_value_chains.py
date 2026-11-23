@@ -128,3 +128,22 @@ def test_hydrology_dairy_and_container_freight_are_read_from_their_series():
     assert by[next(k for k in by if k[1] == "freight_tanker")] == "com_tanker_ctfi"
     assert by[next(k for k in by if k[1] == "steel_price")] == "com_steel_hrc"
     assert by[next(k for k in by if k[1] == "overseas_demand")] == "us_software_invest"
+
+def test_the_inventory_price_of_a_ticker_is_a_goods_price_its_value_chain_ties_to_it():
+    """Giá đầu ra giảm (owner, 23/11/2026): steel, rubber, urea, sugar, and HRC for coated steel (their stock is HRC); not freight or gas."""
+    from investment_agent.market.value_chains import inventory_price_indicator, load_value_chains
+    cfg = load_value_chains()
+    assert [inventory_price_indicator(cfg, s) for s in ("HPG", "HSG", "GVR", "DCM", "SBT")] == ["com_steel_hrc", "com_steel_hrc", "com_rubber",
+                                                                                           "com_urea", "com_sugar"]
+    assert [inventory_price_indicator(cfg, s) for s in ("PVT", "NT2", "MWG", "XYZ")] == [None, None, None, None]
+
+
+def test_the_inventory_price_series_names_its_source_from_the_stored_points(tmp_path):
+    """Review 23/11/2026 (tồn kho): the reading names where the price comes from (World Bank, SHFE, FRED)."""
+    import json as _json
+    from investment_agent.market.value_chains import inventory_price_series
+    (tmp_path / "macro").mkdir()
+    (tmp_path / "macro" / "com_urea.json").write_text(_json.dumps({"indicator": "com_urea", "observations": [
+        {"date": "2026-09-01", "value": "340", "source_url": "https://www.worldbank.org/en/research/commodity-markets"}]}), encoding="utf-8")
+    indicator, label, points, source = inventory_price_series(tmp_path, "DCM")
+    assert (indicator, len(points), source) == ("com_urea", 1, "World Bank")

@@ -30,6 +30,12 @@ def evn(flows: dict[str, str]) -> str:
 NAMES = ["Lai Châu", "Sơn La", "Hòa Bình", "Tuyên Quang", "Thác Bà", "Bản Chát", "Huội Quảng", "Trung Sơn", "Ialy", "Trị An", "Hàm Thuận"]
 
 
+def no_trading(url):
+    """What SHFE answers for a day without trading: a 404 (httpx raises it from raise_for_status)."""
+    import httpx
+    raise httpx.HTTPStatusError("404", request=httpx.Request("GET", url), response=httpx.Response(404))
+
+
 def test_fao_gives_the_dairy_index_by_month_and_skips_blanks():
     assert parse_fao_dairy(FAO) == [(date(2026, 9, 1), "119.1"), (date(2026, 10, 1), "117.8")]
     with pytest.raises(MacroError):
@@ -111,7 +117,7 @@ def test_freight_and_steel_are_stored_with_a_month_back_for_steel(tmp_path):
             return sse("SCFI_T", "2026-11-20", "2026-11-13") if "scfi" in url else sse("CTFI_T", "2026-11-20", "2026-11-19")
         day = url.removeprefix(SHFE_DAILY.split("{")[0]).removesuffix(".dat")
         if day not in trading:
-            raise OSError("404")
+            no_trading(url)
         return shfe(("hc_f", "2701", 3000 + int(day[-2:]), 100))
     result = fetch_chain_markets(store, get=get, today=date(2026, 11, 21), sleep=lambda s: None)  # a Saturday
     assert result == {"com_container_scfi": "ok", "com_tanker_ctfi": "ok", "com_steel_hrc": "ok"}
@@ -139,7 +145,7 @@ def test_steel_takes_the_last_trading_day_of_each_of_the_last_12_quarters_once(t
             return sse("SCFI_T", "2026-11-20", "2026-11-13") if "scfi" in url else sse("CTFI_T", "2026-11-20", "2026-11-19")
         day = url.removeprefix(SHFE_DAILY.split("{")[0]).removesuffix(".dat")
         if day not in trading:
-            raise OSError("404")
+            no_trading(url)
         return shfe(("hc_f", "2701", 3000 + int(day[-3:]), 100))
     fetch_chain_markets(store, get=get, today=date(2026, 11, 21), sleep=slept.append)
     have = {o["date"] for o in store.read("com_steel_hrc")}
@@ -161,3 +167,34 @@ def test_no_recent_steel_price_is_reported(tmp_path):
         raise OSError("404")
     result = fetch_chain_markets(MacroStore(tmp_path), get=get, today=date(2026, 11, 20), sleep=lambda s: None)
     assert result == {"com_container_scfi": "error:OSError", "com_tanker_ctfi": "error:OSError", "com_steel_hrc": "error:MacroError"}
+
+
+
+def test_a_quarter_whose_days_failed_to_answer_is_tried_again_and_the_quarter_end_itself_is_taken(tmp_path):
+    """Review 23/11/2026 (tồn kho): a network failure is not a holiday, so the quarter is not marked tried; a point stored earlier in the
+    quarter's last ten days does not stand in for the last trading day."""
+    store = MacroStore(tmp_path)
+    store.upsert("com_steel_hrc", [(date(2026, 9, 24), "3100")], entry="auto")
+    asked, offline = [], {"on": True}
+
+    def get(url):
+        asked.append(url)
+        if url.startswith(SSE_INDEX):
+            return sse("SCFI_T", "2026-11-20", "2026-11-13") if "scfi" in url else sse("CTFI_T", "2026-11-20", "2026-11-19")
+        day = url.removeprefix(SHFE_DAILY.split("{")[0]).removesuffix(".dat")
+        if day in ("20261120", "20261117"):
+            return shfe(("hc_f", "2701", 3200, 100))
+        if day.startswith("2026-06") or day.startswith("202606"):
+            if offline["on"]:
+                raise OSError("timed out")
+            return shfe(("hc_f", "2701", 3150, 100)) if day == "20260630" else no_trading(url)
+        if day == "20260930":
+            return shfe(("hc_f", "2701", 3282, 100))
+        no_trading(url)
+    fetch_chain_markets(store, get=get, today=date(2026, 11, 21), sleep=lambda s: None)
+    have = {o["date"]: o["value"] for o in store.read("com_steel_hrc")}
+    assert have["2026-09-30"] == "3282"  # the quarter's last trading day, though 24/09 was stored
+    assert "2026-06-30" not in have
+    offline["on"] = False
+    fetch_chain_markets(store, get=get, today=date(2026, 11, 21), sleep=lambda s: None)
+    assert {o["date"]: o["value"] for o in store.read("com_steel_hrc")}["2026-06-30"] == "3150"  # tried again once SHFE answered

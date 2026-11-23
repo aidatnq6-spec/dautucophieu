@@ -145,24 +145,38 @@ def load_value_chains(path: Path = VALUE_CHAINS_PATH) -> ValueChains:
 INVENTORY_PRICES = ("com_steel_hrc", "com_rubber", "com_urea", "com_sugar")
 
 
-def inventory_price_series(data_dir: Path, symbol: str) -> tuple[str, str, list] | None:
-    """(indicator, its label, [(date, price)] in order) for the ticker's goods price, from the stored macro series; None when the value
-    chain ties none. A point that does not read as a positive number is left out, never repaired."""
+# Where a stored point came from, by the host of its source_url, for the reading's "nguồn" (review 23/11/2026)
+SOURCE_HOSTS = {"worldbank.org": "World Bank", "shfe.com.cn": "SHFE", "stlouisfed.org": "FRED", "imf.org": "IMF"}
+
+
+def _source_name(url: str | None) -> str | None:
+    from urllib.parse import urlsplit
+    host = urlsplit(url or "").hostname or ""
+    return next((name for h, name in SOURCE_HOSTS.items() if host == h or host.endswith("." + h)), host or None)
+
+
+def inventory_price_series(data_dir: Path, symbol: str, config: ValueChains | None = None) -> tuple[str, str, list, str | None] | None:
+    """(indicator, its label, [(date, price)] in order, the source of the latest point) for the ticker's goods price, from the stored macro
+    series; None when the value chain ties none. A point that does not read as a positive number is left out, never repaired. `config`:
+    the value chains already loaded, so a caller going through many tickers reads the file once."""
     from datetime import date
     from decimal import Decimal, InvalidOperation
     from investment_agent.market.leading import MacroStore
-    indicator = inventory_price_indicator(load_value_chains(), symbol)
+    indicator = inventory_price_indicator(config if config is not None else load_value_chains(), symbol)
     if indicator is None:
         return None
-    points = []
+    points, source = [], None
     for o in MacroStore(Path(data_dir)).read(indicator):
         try:
             day, value = date.fromisoformat(str(o["date"])[:10]), Decimal(str(o["value"]))
         except (KeyError, ValueError, InvalidOperation):
             continue
         if value.is_finite() and value > 0:
-            points.append((day, value))
-    return indicator, COMMODITY_LABELS.get(indicator, indicator), sorted(points)
+            points.append((day, value, o.get("source_url")))
+    points.sort(key=lambda p: p[0])
+    if points:
+        source = _source_name(points[-1][2])
+    return indicator, COMMODITY_LABELS.get(indicator, indicator), [(d, v) for d, v, _ in points], source
 
 
 def inventory_price_indicator(config: ValueChains, symbol: str) -> str | None:

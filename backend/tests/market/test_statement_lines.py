@@ -16,4 +16,4 @@ def test_inventory_at_cost_and_its_provision_are_kept_owner_22_11_2026():
     makes each ticker fetch its whole history once."""
     names = {(m, c): n for (m, c), n in LINES.items()}
     assert names[(1, 11410)] == "inventory_gross" and names[(1, 11490)] == "inventory_provision" and names[(1, 11400)] == "inventory"
-    assert LINES_VERSION == 6
+    assert LINES_VERSION >= 6  # 7 (review 23/11/2026) reads the history again for the update days

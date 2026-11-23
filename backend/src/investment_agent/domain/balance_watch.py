@@ -482,12 +482,15 @@ PRICE_MAX_GAP_DAYS = 75  # a price used for a day is at most this old (monthly a
 _QUARTER_END = {1: (3, 31), 2: (6, 30), 3: (9, 30), 4: (12, 31)}
 
 
-def price_check(quarters: dict, points: list, *, indicator: str, label: str, property: bool = False) -> dict:
+PRICE_SAME_POINT_DAYS = 7  # the two prices sit the same distance from their days, give or take this (review 23/11/2026)
+
+
+def price_check(quarters: dict, points: list, *, indicator: str, label: str, property: bool = False, source: str | None = None) -> dict:
     """Giá đầu ra giảm nhưng dự phòng không đổi (owner, 23/11/2026): the goods price the value chain ties to the ticker, at the latest
     quarter's end against the same day a year before, down 10% or more while the share of inventory provided for did not rise on the year.
     points: (date, price) in order. A price more than 75 days before its day is not used: then "chưa đủ lịch sử giá", never a guess."""
     from datetime import date, timedelta
-    out = {"quarter": None, "indicator": indicator, "label": label, "price": None, "price_year_ago": None, "price_date": None,
+    out = {"quarter": None, "indicator": indicator, "label": label, "source": source, "price": None, "price_year_ago": None, "price_date": None,
            "price_year_ago_date": None, "change": None, "coverage": None, "coverage_year_ago": None, "flag": None, "why_not": None}
     if not quarters:
         return out
@@ -508,6 +511,8 @@ def price_check(quarters: dict, points: list, *, indicator: str, label: str, pro
         return {**out, "flag": False}
     if now is None or ago is None or ago[1] <= 0:
         return {**out, "why_not": "Chưa đủ lịch sử giá: cần giá của cả cuối quý này và cùng kỳ năm trước."}
+    if abs((end - now[0]).days - (end_ago - ago[0]).days) > PRICE_SAME_POINT_DAYS:  # e.g. August's urea against September a year before
+        return {**out, "why_not": "Chưa đủ lịch sử giá: giá cuối quý này và cùng kỳ không cùng thời điểm trong kỳ."}
     change = now[1] / ago[1] - 1
     out.update(price=_s(now[1]), price_year_ago=_s(ago[1]), price_date=now[0].isoformat(), price_year_ago_date=ago[0].isoformat(), change=_r(change))
     if None in (cover, cover_ago, share):
@@ -527,7 +532,7 @@ def _spike(value: Decimal | None, before: Decimal | None, after: Decimal | None)
 
 
 def year_end_provision(quarters: dict, years: dict, n: int = 5, *, years_modified: dict | None = None,
-                       quarters_created: dict | None = None) -> dict:
+                       quarters_created: dict | None = None, property: bool = False) -> dict:
     """Dự phòng chốt khi kiểm toán cuối năm (owner, 23/11/2026; the stock count of 31/12): for each of the last n years, the change of the
     inventory provision over the year and the part of it booked in Q4 (from Q3's balance), shown and not flagged: Q4 carries most of it in
     many years. VNDirect's year first carries the company's own Q4 figures and the audited ones only later, so Q4 as first reported is set
@@ -559,7 +564,9 @@ def year_end_provision(quarters: dict, years: dict, n: int = 5, *, years_modifie
                      "year_balance": _s(year_bal), "updated_on": updated, "gap": gap,
                      "spike": _spike(year_bal, q3, prov(quarters.get(f"{int(y) + 1}-Q2")))})
     latest = next((r for r in reversed(rows) if r["gap"] is not None), None)
-    return {"rows": rows, "year": latest["year"] if latest else None, "flag": latest["gap"] if latest else None}
+    flag = latest["gap"] if latest else None
+    # never a sign for a property developer, whose inventory is projects (as on the board; review 23/11/2026): the rows still show
+    return {"rows": rows, "year": latest["year"] if latest else None, "flag": False if property and flag is not None else flag}
 
 
 INVENTORY_FLOW_SHARE = Decimal("0.20")  # Dự phòng giảm giá tồn kho đi vào lợi nhuận (owner, 22/11/2026)

@@ -97,6 +97,11 @@ def receivable_signs(data_dir: Path) -> list[dict]:
     watched = load_watchlist(data_dir).symbols
     kept = {s: statements.read(s) or {} for s in watched if kind_of(sectors.get(s)) is None}
     quarters = {s: rec.get("quarters", {}) for s, rec in kept.items()}
+    from investment_agent.market import value_chains
+    try:  # read once for every ticker; a file that does not validate leaves the price sign out, never the board
+        chains = value_chains.load_value_chains()
+    except Exception:  # noqa: BLE001 - any failure to read the hand-edited config
+        chains = None
     rows = []
     for symbol, qs in quarters.items():
         record, sector = fundamentals.read(symbol), sectors.get(symbol)
@@ -118,13 +123,14 @@ def receivable_signs(data_dir: Path) -> list[dict]:
             signs["cover_thinning"] = thin["flag"]
             # Dự phòng chốt khi kiểm toán (owner, 23/11/2026): Q4 as first reported against the audited year; not for a property developer
             audit = year_end_provision(qs, kept[symbol].get("years", {}), years_modified=kept[symbol].get("years_modified"),
-                                       quarters_created=kept[symbol].get("quarters_created"))
-            signs["audit_gap"] = False if sector == "Bất động sản" else audit["flag"]
-            # Giá đầu ra giảm nhưng dự phòng không đổi (owner, 23/11/2026): only where the value chain ties a goods price to the ticker
-            found = inventory_price_series(data_dir, symbol)
+                                       quarters_created=kept[symbol].get("quarters_created"), property=sector == "Bất động sản")
+            signs["audit_gap"] = audit["flag"]
+            # Giá đầu ra giảm nhưng dự phòng không đổi (owner, 23/11/2026): only where the value chain ties a goods price to the ticker;
+            # the value chains not readable: no price sign anywhere, the board stands (review 23/11/2026)
+            found = inventory_price_series(data_dir, symbol, chains) if chains is not None else None
             price = None
             if found is not None:
-                price = price_check(qs, found[2], indicator=found[0], label=found[1], property=sector == "Bất động sản")
+                price = price_check(qs, found[2], indicator=found[0], label=found[1], property=sector == "Bất động sản", source=found[3])
                 signs["price_drop"] = price["flag"]
         else:
             signs.update(other_high=None, provision_jump=None, raise_prepay=None, lending=None, inventory_fast=None, gross_loss=None,
@@ -145,8 +151,11 @@ def receivable_signs(data_dir: Path) -> list[dict]:
                                          f"còn {_pct1(thin['coverage'])} (cùng kỳ {_pct1(thin['coverage_year_ago'])}), quý {q[-1]}/{q[:4]}.")
         if signs.get("price_drop"):
             q = price["quarter"]
+            dmy = lambda d: f"{d[8:10]}/{d[5:7]}/{d[:4]}"  # noqa: E731
+            src = f"; nguồn {price['source']}" if price.get("source") else ""  # the dates and source of both prices (review 23/11/2026)
             details["price_drop"] = (f"{price['label']} cuối quý {q[-1]}/{q[:4]} {_moved(price['change'])} so cùng kỳ "
-                                     f"({_num(price['price_year_ago'])} → {_num(price['price'])}) trong khi tỷ lệ trích lập dự phòng tồn kho "
+                                     f"({_num(price['price_year_ago'])} ngày {dmy(price['price_year_ago_date'])} → {_num(price['price'])} ngày "
+                                     f"{dmy(price['price_date'])}{src}) trong khi tỷ lệ trích lập dự phòng tồn kho "
                                      f"{_pct1(price['coverage'])} (cùng kỳ {_pct1(price['coverage_year_ago'])}).")
         if signs["audit_gap"]:
             r = next(r for r in audit["rows"] if r["year"] == audit["year"])

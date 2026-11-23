@@ -120,6 +120,20 @@ def test_a_gross_loss_with_the_provision_flat_is_a_sign_with_its_figures(tmp_pat
     assert aaa["details"]["gross_loss"] == "Lỗ gộp 5,0 tỷ trong quý 3/2026; tỷ lệ trích lập dự phòng tồn kho 2,0% (quý trước 2,0%)."
 
 
+def test_days_up_while_the_provision_thins_is_a_sign_with_its_figures(tmp_path):
+    """Dự phòng mỏng dần trong khi hàng tồn lâu hơn (owner, 23/11/2026)."""
+    d = data(tmp_path)
+    qs = {f"{y}-Q{n}": {"cogs": str(100 * BN)} for y in (2024, 2025, 2026) for n in range(1, 5) if f"{y}-Q{n}" <= "2026-Q3"}
+    for k, gross, prov in (("2025-Q3", 200, 10), ("2026-Q3", 260, 10)):
+        qs[k].update({"inventory_gross": str(gross * BN), "inventory_provision": str(-prov * BN), "inventory": str((gross - prov) * BN),
+                      "total_assets": str(1000 * BN), "gross_profit": str(10 * BN)})
+    StatementStore(d / "statements").save({"symbol": "AAA", "years": {}, "quarters": qs})
+    aaa = next(r for r in receivable_signs(d) if r["symbol"] == "AAA")
+    assert ("cover_thinning", "Dự phòng mỏng dần, hàng tồn lâu hơn") in SIGNS and aaa["signs"]["cover_thinning"] is True
+    assert aaa["details"]["cover_thinning"] == ("Tồn kho đủ 228 ngày giá vốn (cùng kỳ 173 ngày) trong khi tỷ lệ trích lập dự phòng còn 3,9% "
+                                                "(cùng kỳ 5,0%), quý 3/2026.")
+
+
 def test_lending_against_equity_is_a_sign_with_its_figure(tmp_path):
     from investment_agent.market.statements import StatementStore
     d = data(tmp_path)

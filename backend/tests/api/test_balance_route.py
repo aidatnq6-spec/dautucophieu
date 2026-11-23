@@ -98,6 +98,9 @@ def test_the_balance_carries_the_gross_loss_check_and_a_property_developer_is_ne
     c, clock = client(tmp_path)
     assert call(c, clock, "GET", "/internal/stock/FPT/balance").json()["gross_loss"]["quarter"] == "2026-Q1"
     assert call(c, clock, "GET", "/internal/stock/KDH/balance").json()["gross_loss"]["flag"] is False
+    # Dự phòng mỏng dần (owner, 23/11/2026)
+    assert call(c, clock, "GET", "/internal/stock/FPT/balance").json()["cover_thinning"]["quarter"] == "2026-Q1"
+    assert call(c, clock, "GET", "/internal/stock/KDH/balance").json()["cover_thinning"]["flag"] is False
 
 
 def test_the_balance_carries_the_inventory_provision_flow(tmp_path):

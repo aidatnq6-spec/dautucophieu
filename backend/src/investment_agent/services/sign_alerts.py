@@ -1,5 +1,5 @@
 """Nhắc dấu hiệu phải thu mới: after the evening statement refresh, one Telegram note when a held ticker shows a receivable sign it did
-not show before (Bảng dấu hiệu phải thu). The first run only records what is on now, and so does a ticker's first run on the board; a sign is told once, and again only after it
+not show before (Bảng dấu hiệu phải thu). The first run only records what is on now, and so did the banks' one-time arrival on the board (23/11/2026); a sign is told once, and again only after it
 cleared. Signs of tickers not held are recorded and never told. The state is kept in data/alerts/receivable-signs.json."""
 
 import json
@@ -7,18 +7,26 @@ import os
 from pathlib import Path
 
 STATE = "receivable-signs.json"
+BANK = "Ngân hàng"
 
 
 def check_signs(data_dir: Path, *, rows: list[dict], held: set[str], titles: dict[str, str], send) -> dict:
     path = Path(data_dir) / "alerts" / STATE
     state = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
     now = {r["symbol"]: sorted(k for k, v in r["signs"].items() if v is True) for r in rows}
+    banks = {r["symbol"] for r in rows if r.get("sector") == BANK}
     if state is None:
-        _write(path, {"symbols": now})
+        _write(path, {"symbols": now, **({"banks_joined": True} if banks else {})})
         return {"status": "baseline", "new": 0, "sent": False}
     before = state["symbols"]
-    # a ticker new to the board (banks joined it on 23/11/2026) is only recorded on its first run, like the board's own first run
-    news = {s: [k for k in keys if k not in before[s]] for s, keys in now.items() if s in held and s in before}
+    # a row that could not be read (every sign None, e.g. its file cut short) keeps what was recorded: not cleared, so not told again
+    unread = {r["symbol"] for r in rows if r["signs"] and all(v is None for v in r["signs"].values())}
+    now |= {s: before[s] for s in unread if s in before}
+    # the banks joined the board on 23/11/2026: their signs already on are recorded once, not told; any other ticker new to the board
+    # (one the owner adds to the watchlist) is told as before (review 23/11/2026)
+    arriving = set() if state.get("banks_joined") else {s for s in banks if s not in before}
+    news = {s: [k for k in keys if k not in before.get(s, [])] for s, keys in now.items()
+            if s in held and s not in arriving and s not in unread}
     news = {s: ks for s, ks in news.items() if ks}
     detail = {r["symbol"]: r.get("details", {}) for r in rows}
     sent = False
@@ -32,7 +40,7 @@ def check_signs(data_dir: Path, *, rows: list[dict], held: set[str], titles: dic
                          + "\nXem Phân tích ngành → Ngành theo quý → Dấu hiệu phải thu, và thuyết minh của mã."))
     # what Telegram did not take stays new for the held tickers, to be tried next run; everything else is recorded as it is now
     kept = {s: (before.get(s, []) if s in news and not sent else keys) for s, keys in now.items()}
-    _write(path, {"symbols": kept})
+    _write(path, {"symbols": kept, **({"banks_joined": True} if banks or state.get("banks_joined") else {})})
     return {"status": "ok", "new": sum(len(ks) for ks in news.values()), "sent": sent}
 
 

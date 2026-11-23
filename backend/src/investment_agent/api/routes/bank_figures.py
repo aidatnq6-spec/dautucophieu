@@ -96,11 +96,11 @@ def bank_view(record, symbol: str, data_dir=None) -> dict:
         full = [q for q, v in merged.items() if all(g in v["values"] for g in GROUPS)]
         latest = max(full) if full else max(merged)
         values = merged[latest]["values"]
-        y, n = int(latest[:4]), int(latest[-1])
-        before = [f"{y}-Q{n - 1}" if n > 1 else f"{y - 1}-Q4", f"{y - 1}-Q4"]  # the quarter before and the end of last year, as quality_trend
+        trend = quality_trend({q: v["values"] for q, v in merged.items()})[latest]
         quality = {"quarter": latest, "values": values, "sources": merged[latest]["sources"], "notes": merged[latest]["notes"],
-                   "derived": derive(values), "trend": quality_trend({q: v["values"] for q, v in merged.items()})[latest],
-                   "compared": any(q in full for q in before)}
+                   "derived": derive(values), "trend": trend,
+                   # compared when quality_trend set at least one figure against an earlier quarter (review 23/11/2026 (2))
+                   "compared": any(v is not None for k, v in trend.items() if k != "flags" and k != "llr")}
     table = {q: v["values"] for q, v in merged.items()}
     provision = provision_view(statements, table)  # Dự phòng đi vào lợi nhuận (owner, 23/11/2026)
     accrued = accrued_view(statements, table)  # Lãi dự thu so với thu nhập lãi (owner, 23/11/2026)

@@ -19,8 +19,8 @@ describe("provisionLine", () => {
   const base: Provision = { rows: [], quarter: "2026-Q3", share: "0.1333", credit_cost: null, credit_cost_missing: [], expense_growth_yoy: "-0.4000",
     bad_growth_qoq: "0.0800", bad_now: "27", bad_prev: "25", flag: true, why_not: null };
   it("states the amounts when there was no bad debt the quarter before", () => {
-    expect(provisionLine({ ...base, bad_growth_qoq: null, bad_now: "5", bad_prev: "0" }))
-      .toBe("Chi phí dự phòng giảm 40,0% so cùng kỳ trong khi nợ nhóm 3–5 tăng từ 0 lên 5 tỷ so quý trước: lợi nhuận được đỡ bởi giảm trích lập.");
+    expect(provisionLine({ ...base, bad_growth_qoq: null, bad_now: "0.45", bad_prev: "0" }))  // 450 million is not "0 tỷ"
+      .toBe("Chi phí dự phòng giảm 40,0% so cùng kỳ trong khi nợ nhóm 3–5 tăng từ 0,0 lên 0,5 tỷ so quý trước: lợi nhuận được đỡ bởi giảm trích lập.");
   });
   it("states the cut and the bad debt behind the sign, says when there is none, and why it could not be weighed", () => {
     expect(provisionLine(base)).toBe("Chi phí dự phòng giảm 40,0% so cùng kỳ trong khi nợ nhóm 3–5 tăng 8,0% so quý trước: lợi nhuận được đỡ bởi giảm trích lập.");

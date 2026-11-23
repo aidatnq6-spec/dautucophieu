@@ -290,7 +290,7 @@ def load_calendar(path: Path):
         other = path.with_name(f"trading-calendar-hose-{y}.json")
         try:
             return _read_calendar(other) if other.is_file() else None
-        except (OSError, ValueError, KeyError, TypeError):
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):  # AttributeError: valid JSON that is not an object, e.g. []
             return None
     if (prev := neighbour(year - 1)) and prev.last + timedelta(days=1) == cal.first:
         parts.insert(0, prev)
@@ -1416,17 +1416,24 @@ def weekly_brief_cli(data_dir: Path, calendar_path: Path, resend: bool = False, 
     if now.astimezone(VN).weekday() < 5:
         print(json.dumps({"status": "skipped", "reason": "weekday"}))
         return 0
-    today = now.astimezone(VN).date()
-    start, end = week_of(today)
-    try:  # before anything personal is read or Telegram is touched
-        sessions = list(load_calendar(calendar_path).sessions(start, end))
-    except (OSError, ValueError, KeyError) as exc:
-        print(json.dumps(_not_configured(exc), ensure_ascii=False))
-        return 2
-    telegram = _scheduled_telegram(data_dir)
+    telegram = _scheduled_telegram(data_dir)  # delivery off: skipped, whatever the calendar (review 23/11/2026 (2))
     if telegram is None:
         print(json.dumps({"status": "skipped", "reason": "scheduled_delivery_off"}))
         return 0
+    today = now.astimezone(VN).date()
+    start, end = week_of(today)
+    try:  # before anything personal is read
+        cal = load_calendar(calendar_path)
+    except (OSError, ValueError, KeyError, AttributeError) as exc:
+        print(json.dumps(_not_configured(exc), ensure_ascii=False))
+        return 2
+    if not (cal.first <= start and end <= cal.last):  # the week outside the calendar: which week, and which year is missing
+        years = sorted({d.year for d in (start, end) if not cal.first <= d <= cal.last})
+        print(json.dumps({"status": "not_configured", "reason": "calendar_range", "message":
+                          f"lịch giao dịch đang dùng không phủ tuần {start:%d/%m/%Y}–{end:%d/%m/%Y}: thiếu lịch HOSE {', '.join(map(str, years))}; "
+                          "tạo từ thông báo của HOSE"}, ensure_ascii=False))
+        return 2
+    sessions = list(cal.sessions(start, end))
     send, repo, owner = telegram
 
     def inputs():

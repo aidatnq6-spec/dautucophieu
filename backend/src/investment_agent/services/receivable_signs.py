@@ -35,7 +35,10 @@ def _moved(v) -> str:
 
 
 def _ty(v) -> str:
-    return f"{round(float(v)):,}".replace(",", ".")
+    """Tỷ đồng with one decimal, half up, as printed in Vietnamese (1.234,5): 450 million is "0,5", never "0" (review 23/11/2026 (2))."""
+    from decimal import ROUND_HALF_UP, Decimal
+    whole, frac = f"{Decimal(str(v)).quantize(Decimal('0.1'), ROUND_HALF_UP):f}".split(".")
+    return f"{int(whole):,}".replace(",", ".") + f",{frac}"
 
 
 def _bank_row(data_dir: Path, symbol: str, sector: str) -> dict:
@@ -49,9 +52,12 @@ def _bank_row(data_dir: Path, symbol: str, sector: str) -> dict:
     except (OSError, ValueError):
         return {"symbol": symbol, "sector": sector, "signs": {k: None for k, _ in BANK_SIGNS}, "count": 0, "details": {}}
     statements = kept.get("quarters") or {}
-    public = public_quarters(notes, statements, kept.get("quarters_zeros") or [])
-    table = {q: v["values"] for q, v in public.items()}
-    p, a = provision_view(statements, table), accrued_view(statements, table)
+    try:  # a file of the wrong shape (valid JSON) leaves this bank unread too, never the board (review 23/11/2026 (2))
+        public = public_quarters(notes, statements, kept.get("quarters_zeros") or [])
+        table = {q: v["values"] for q, v in public.items()}
+        p, a = provision_view(statements, table), accrued_view(statements, table)
+    except (ValueError, TypeError, AttributeError, KeyError, IndexError, ArithmeticError):
+        return {"symbol": symbol, "sector": sector, "signs": {k: None for k, _ in BANK_SIGNS}, "count": 0, "details": {}}
     signs, details = {"provision_cut": p["flag"], "accrued_outpace": a["flag"]}, {}
     if a["flag"]:
         q = a["quarter"]

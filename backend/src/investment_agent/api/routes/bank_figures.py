@@ -11,7 +11,7 @@ from fastapi import APIRouter, Request
 from pydantic import Field
 
 from investment_agent.domain.bank_figures import (FIELDS, LABELS, UnsafeUrl, check_public_https, derive, merged_quarters, parse_report_pages,
-                                                  public_quarters, quality_trend)
+                                                  provision_view, public_quarters, quality_trend)
 from investment_agent.domain.models import ContractModel
 from investment_agent.market.sectors import load_sectors
 from investment_agent.market.watchlist import load_watchlist
@@ -63,12 +63,13 @@ def _watched_bank(request: Request, symbol: str) -> str | None:
     return symbol if symbol in load_watchlist(Path(data_dir)).symbols and sectors.get(symbol) == "Ngân hàng" else None
 
 
-def _public(data_dir, symbol: str) -> dict[str, dict]:
-    """Vietcap's notes and VNDirect's bank lines as kept by their syncs; a store missing or unreadable gives nothing."""
+def _public(data_dir, symbol: str) -> tuple[dict[str, dict], dict[str, dict]]:
+    """Vietcap's notes and VNDirect's bank lines as kept by their syncs, as the asset quality quarters and VNDirect's quarters; a store
+    missing or unreadable gives nothing."""
     from investment_agent.market.bank_notes import BankNoteStore
     from investment_agent.market.statements import StatementStore
     if data_dir is None:
-        return {}
+        return {}, {}
     try:
         notes = (BankNoteStore(Path(data_dir) / "bank-notes").read(symbol) or {}).get("quarters") or {}
     except (OSError, ValueError):
@@ -77,7 +78,8 @@ def _public(data_dir, symbol: str) -> dict[str, dict]:
         kept = StatementStore(Path(data_dir) / "statements-financial").read(symbol) or {}
     except (OSError, ValueError):
         kept = {}
-    return public_quarters(notes, kept.get("quarters") or {}, kept.get("quarters_zeros") or [])
+    statements = kept.get("quarters") or {}
+    return public_quarters(notes, statements, kept.get("quarters_zeros") or []), statements
 
 
 def bank_view(record, symbol: str, data_dir=None) -> dict:
@@ -85,7 +87,8 @@ def bank_view(record, symbol: str, data_dir=None) -> dict:
     trend = quality_trend({q: v["values"] for q, v in quarters.items()})
     rows = [{"quarter": q, "values": v["values"], "derived": derive(v["values"]), "trend": trend[q], "source": v["source"]} for q, v in sorted(quarters.items(), reverse=True)]
     # Chất lượng tài sản (owner, 23/11/2026): the latest quarter of the public figures with the owner's entries on top, each figure with its source
-    merged = merged_quarters({q: v["values"] for q, v in quarters.items()}, _public(data_dir, symbol))
+    public, statements = _public(data_dir, symbol)
+    merged = merged_quarters({q: v["values"] for q, v in quarters.items()}, public)
     quality = None
     if merged:
         latest = max(merged)
@@ -93,7 +96,8 @@ def bank_view(record, symbol: str, data_dir=None) -> dict:
         quality = {"quarter": latest, "values": values, "sources": merged[latest]["sources"], "notes": merged[latest]["notes"],
                    "derived": derive(values), "trend": quality_trend({q: v["values"] for q, v in merged.items()})[latest],
                    "compared": len(merged) > 1}
-    return {"symbol": symbol, "version": record.version if record else 0, "quarters": rows, "labels": LABELS, "quality": quality}
+    provision = provision_view(statements, {q: v["values"] for q, v in merged.items()})  # Dự phòng đi vào lợi nhuận (owner, 23/11/2026)
+    return {"symbol": symbol, "version": record.version if record else 0, "quarters": rows, "labels": LABELS, "quality": quality, "provision": provision}
 
 
 def _clean(values: dict[str, str | None]):

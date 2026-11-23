@@ -8,4 +8,8 @@ describe("parts", () => {
     const row = { symbol: "VCG", sector: "Xây dựng", signs: { a: true, b: null, c: false }, count: 1, details: { a: "8.451 tỷ, 27,0% tổng tài sản" } };
     expect(parts(row, SIGNS)).toEqual({ on: [{ key: "a", title: "Phải thu khác lớn", detail: "8.451 tỷ, 27,0% tổng tài sản" }], missing: ["Thu nhập trên giấy"] });
   });
+  it("weighs only the signs a row has: a bank is not missing the non-financial ones", () => {
+    const bank = { symbol: "VCB", sector: "Ngân hàng", signs: { c: null }, count: 0, details: {} };
+    expect(parts(bank, SIGNS)).toEqual({ on: [], missing: ["Trả trước tăng"] });
+  });
 });

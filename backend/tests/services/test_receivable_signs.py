@@ -30,12 +30,29 @@ def data(tmp_path):
 
 def test_each_watched_non_financial_ticker_gets_its_receivable_signs_most_first(tmp_path):
     rows = receivable_signs(data(tmp_path))
-    assert [r["symbol"] for r in rows] == ["AAA", "BBB"]  # the bank is left out
-    aaa, bbb = rows
+    assert [r["symbol"] for r in rows] == ["AAA", "BBB", "VCB"]
+    aaa, bbb, vcb = rows
+    assert vcb["signs"] == {"provision_cut": None}  # a bank has only the bank signs (Chất lượng tài sản ngân hàng, owner 23/11/2026)
     assert aaa["signs"]["other_receivables"] is True and aaa["signs"]["paper_income"] is True and aaa["signs"]["financial_profit"] is True
     assert aaa["count"] == 3 and bbb["count"] == 0
     assert aaa["signs"]["other_high"] is None  # no quarters stored: not read
     assert [k for k, _ in SIGNS][:3] == ["other_receivables", "other_high", "prepay_suppliers"]
+
+
+def test_a_bank_whose_provisions_were_cut_while_bad_debt_grew_has_the_sign_with_its_figures(tmp_path):
+    """Dự phòng đi vào lợi nhuận (owner, 23/11/2026): VNDirect's lines and Vietcap's groups only, as all of this board is public figures."""
+    from investment_agent.market.bank_notes import BankNoteStore
+    d = data(tmp_path)
+    StatementStore(d / "statements-financial").save({"symbol": "VCB", "kind": "bank", "years": {}, "quarters": {
+        "2025-Q3": {"provision_expense": str(1000 * BN), "ppop": str(4000 * BN)}, "2026-Q3": {"provision_expense": str(600 * BN), "ppop": str(4500 * BN)}}})
+    groups = lambda g3: {"group1": str(1000 * BN), "group2": str(10 * BN), "group3": str(g3 * BN), "group4": str(5 * BN), "group5": str(5 * BN),  # noqa: E731
+                         "loans": str((1020 + g3) * BN)}
+    BankNoteStore(d / "bank-notes").save({"symbol": "VCB", "fetched_at": "2026-11-20T00:00:00+00:00", "source": "vietcap:iq",
+                                          "quarters": {"2026-06-30": groups(10), "2026-09-30": groups(15)}})
+    vcb = next(r for r in receivable_signs(d) if r["symbol"] == "VCB")
+    assert ("provision_cut", "Lợi nhuận đỡ bởi giảm trích lập") in SIGNS and vcb["signs"] == {"provision_cut": True} and vcb["count"] == 1
+    assert vcb["details"]["provision_cut"] == ("Chi phí dự phòng quý 3/2026 giảm 40% so cùng kỳ trong khi nợ nhóm 3–5 tăng 25% so quý trước; "
+                                               "chi phí dự phòng bằng 13% lợi nhuận trước dự phòng.")
 
 
 def test_lending_against_equity_is_a_sign_with_its_figure(tmp_path):

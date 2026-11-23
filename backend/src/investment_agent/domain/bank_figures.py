@@ -184,6 +184,60 @@ def merged_quarters(entered: dict[str, dict], public: dict[str, dict]) -> dict[s
     return dict(sorted(out.items()))
 
 
+PROVISION_CUT = Decimal("-0.30")  # Dự phòng đi vào lợi nhuận (owner, 23/11/2026): the quarter's provision expense down 30% or more on a year
+
+
+def provision_view(statements: dict[str, dict], quality: dict[str, dict], n: int = 12) -> dict:
+    """Dự phòng đi vào lợi nhuận: each quarter's credit provision expense against profit before it (VNDirect, đồng); the latest quarter's
+    credit cost (four quarters of the expense over the average of its loans to customers and a year before's); and a flag when the expense
+    fell 30% or more on a year while groups 3–5 (`quality`, tỷ đồng, the asset quality table) grew on the quarter. Nothing is filled in."""
+    def num(q: dict | None, line: str) -> Decimal | None:
+        return _d(q.get(line)) if q else None
+
+    def s(v: Decimal | None) -> str | None:
+        return str(v.quantize(_Q4, ROUND_HALF_UP)) if v is not None else None
+
+    def bad(key: str) -> Decimal | None:
+        groups = [num(quality.get(key), g) for g in GROUPS[2:]]
+        return sum(groups) if None not in groups else None
+
+    def share(q: dict) -> Decimal | None:
+        expense, ppop = num(q, "provision_expense"), num(q, "ppop")
+        return expense / ppop if expense is not None and ppop is not None and ppop > 0 else None
+
+    keys = sorted(k for k, q in statements.items() if "-Q" in k and num(q, "provision_expense") is not None)[-n:]
+    rows = [{"quarter": k, "expense": _ty(num(statements[k], "provision_expense")),
+             "ppop": _ty(p) if (p := num(statements[k], "ppop")) is not None else None, "share": s(share(statements[k]))} for k in keys]
+    if not keys:
+        return {"rows": [], "quarter": None, "share": None, "credit_cost": None, "credit_cost_missing": [], "expense_growth_yoy": None,
+                "bad_growth_qoq": None, "flag": None, "why_not": None}
+    latest = keys[-1]
+    cur = statements[latest]
+    window = [_quarter_before(latest, i) for i in (3, 2, 1, 0)]
+    year_ago = _quarter_before(latest, 4)
+    missing = [k for k in window if num(statements.get(k), "provision_expense") is None]
+    loans_now, loans_before = num(cur, "loans_gross"), num(statements.get(year_ago), "loans_gross")
+    missing += [k for k, v in ((latest, loans_now), (year_ago, loans_before)) if not v and k not in missing]
+    credit_cost = None
+    if not missing:
+        credit_cost = sum(num(statements[k], "provision_expense") for k in window) / ((loans_now + loans_before) / 2)
+    before = num(statements.get(year_ago), "provision_expense")
+    growth = num(cur, "provision_expense") / before - 1 if before is not None and before > 0 else None
+    bad_now, bad_prev = bad(latest), bad(_quarter_before(latest, 1))
+    bad_growth = bad_now / bad_prev - 1 if bad_now is not None and bad_prev else None
+    flag, why = None, None
+    if growth is None:
+        why = "Cùng kỳ năm trước không có chi phí dự phòng dương để so."
+    elif growth > PROVISION_CUT:
+        flag = False
+    elif bad_now is None or bad_prev is None:
+        why = f"Chưa có nợ nhóm 3–5 của {latest} và quý trước để xét."
+    else:
+        flag = bad_now > bad_prev
+    return {"rows": rows, "quarter": latest, "share": s(share(cur)), "credit_cost": s(credit_cost), "credit_cost_missing": sorted(missing),
+            "expense_growth_yoy": s(growth), "bad_growth_qoq": s(bad_growth), "flag": flag, "why_not": why}
+
+
 # ---- reading a public PDF of the quarterly statements -------------------------------------------------------------
 
 _NUMBER = re.compile(r"\(?-?\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?\)?|\(?-?\d+(?:[.,]\d+)?\)?%?")

@@ -11,7 +11,7 @@ from fastapi import APIRouter, Request
 from pydantic import Field
 
 from investment_agent.domain.bank_figures import (FIELDS, GROUPS, LABELS, UnsafeUrl, accrued_view, check_public_https, derive, merged_quarters, parse_report_pages,
-                                                  provision_view, public_quarters, quality_trend)
+                                                  provision_view, quality_trend)
 from investment_agent.domain.models import ContractModel
 from investment_agent.market.sectors import load_sectors
 from investment_agent.market.watchlist import load_watchlist
@@ -64,22 +64,12 @@ def _watched_bank(request: Request, symbol: str) -> str | None:
 
 
 def _public(data_dir, symbol: str) -> tuple[dict[str, dict], dict[str, dict]]:
-    """Vietcap's notes and VNDirect's bank lines as kept by their syncs, as the asset quality quarters and VNDirect's quarters; a store
-    missing or unreadable gives nothing."""
-    from investment_agent.market.bank_notes import BankNoteStore
-    from investment_agent.market.statements import StatementStore
+    """Vietcap's notes and VNDirect's bank lines as kept by their syncs, as the asset quality quarters and VNDirect's quarters, read as the
+    signs board reads them (bank_notes.load_public); a store missing, unreadable or of the wrong shape gives nothing."""
+    from investment_agent.market.bank_notes import load_public
     if data_dir is None:
         return {}, {}
-    try:
-        notes = (BankNoteStore(Path(data_dir) / "bank-notes").read(symbol) or {}).get("quarters") or {}
-    except (OSError, ValueError):
-        notes = {}
-    try:
-        kept = StatementStore(Path(data_dir) / "statements-financial").read(symbol) or {}
-    except (OSError, ValueError):
-        kept = {}
-    statements = kept.get("quarters") or {}
-    return public_quarters(notes, statements, kept.get("quarters_zeros") or []), statements
+    return load_public(Path(data_dir), symbol) or ({}, {})
 
 
 def bank_view(record, symbol: str, data_dir=None) -> dict:
@@ -99,8 +89,10 @@ def bank_view(record, symbol: str, data_dir=None) -> dict:
         trend = quality_trend({q: v["values"] for q, v in merged.items()})[latest]
         quality = {"quarter": latest, "values": values, "sources": merged[latest]["sources"], "notes": merged[latest]["notes"],
                    "derived": derive(values), "trend": trend,
-                   # compared when quality_trend set at least one figure against an earlier quarter (review 23/11/2026 (2))
-                   "compared": any(v is not None for k, v in trend.items() if k != "flags" and k != "llr")}
+                   # compared when a sign could weigh something: a growth against an earlier quarter, or this quarter's cover against the
+                   # quarter before or the end of last year (llr_year_ago is shown, never weighed; review 23/11/2026 (2), (3))
+                   "compared": any(v is not None for k, v in trend.items() if k.endswith(("_qoq", "_ytd")))
+                   or (trend["llr"] is not None and (trend["llr_prev"] is not None or trend["llr_start"] is not None))}
     table = {q: v["values"] for q, v in merged.items()}
     provision = provision_view(statements, table)  # Dự phòng đi vào lợi nhuận (owner, 23/11/2026)
     accrued = accrued_view(statements, table)  # Lãi dự thu so với thu nhập lãi (owner, 23/11/2026)

@@ -19,12 +19,16 @@ def check_signs(data_dir: Path, *, rows: list[dict], held: set[str], titles: dic
         _write(path, {"symbols": now, **({"banks_joined": True} if banks else {})})
         return {"status": "baseline", "new": 0, "sent": False}
     before = state["symbols"]
-    # a row that could not be read (every sign None, e.g. its file cut short) keeps what was recorded: not cleared, so not told again
+    # a sign that could not be read this run (None) keeps what was recorded: not cleared, so not told again when it reads; this holds
+    # for one sign as for a whole row whose file was cut short (review 23/11/2026 (2), (3))
+    now = {r["symbol"]: sorted({k for k, v in r["signs"].items() if v is True}
+                               | {k for k, v in r["signs"].items() if v is None and k in before.get(r["symbol"], [])}) for r in rows}
     unread = {r["symbol"] for r in rows if r["signs"] and all(v is None for v in r["signs"].values())}
-    now |= {s: before[s] for s in unread if s in before}
     # the banks joined the board on 23/11/2026: their signs already on are recorded once, not told; any other ticker new to the board
-    # (one the owner adds to the watchlist) is told as before (review 23/11/2026)
+    # (one the owner adds to the watchlist) is told as before (review 23/11/2026). A bank unread on that run is not recorded, so its
+    # one silent run comes when it reads (review 23/11/2026 (3)).
     arriving = set() if state.get("banks_joined") else {s for s in banks if s not in before}
+    waiting = arriving & unread
     news = {s: [k for k in keys if k not in before.get(s, [])] for s, keys in now.items()
             if s in held and s not in arriving and s not in unread}
     news = {s: ks for s, ks in news.items() if ks}
@@ -39,8 +43,9 @@ def check_signs(data_dir: Path, *, rows: list[dict], held: set[str], titles: dic
         sent = bool(send("🔎 Dấu hiệu báo cáo mới ở mã đang nắm\n" + "\n".join(lines)
                          + "\nXem Phân tích ngành → Ngành theo quý → Dấu hiệu phải thu, và thuyết minh của mã."))
     # what Telegram did not take stays new for the held tickers, to be tried next run; everything else is recorded as it is now
-    kept = {s: (before.get(s, []) if s in news and not sent else keys) for s, keys in now.items()}
-    _write(path, {"symbols": kept, **({"banks_joined": True} if banks or state.get("banks_joined") else {})})
+    kept = {s: (before.get(s, []) if s in news and not sent else keys) for s, keys in now.items() if s not in waiting}
+    joined = state.get("banks_joined") or (bool(banks) and not waiting)
+    _write(path, {"symbols": kept, **({"banks_joined": True} if joined else {})})
     return {"status": "ok", "new": sum(len(ks) for ks in news.values()), "sent": sent}
 
 

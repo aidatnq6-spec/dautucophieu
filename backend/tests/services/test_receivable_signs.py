@@ -103,6 +103,12 @@ def test_one_unreadable_bank_file_leaves_that_bank_unread_and_the_board_standing
         assert receivable_signs(d)[2]["signs"] == {"provision_cut": None, "accrued_outpace": None}
 
 
+def test_tỷ_amounts_keep_their_sign_and_one_decimal():
+    from investment_agent.services.receivable_signs import _ty
+    # -0,45 kept its sign only as "-0" before (review 23/11/2026 (3)); a value that rounds to zero shows no sign, as formatDecimal on the web
+    assert (_ty("-0.45"), _ty("-1234.56"), _ty("-0.04"), _ty("0.45"), _ty("2.25")) == ("-0,5", "-1.234,6", "0,0", "0,5", "2,3")
+
+
 def test_lending_against_equity_is_a_sign_with_its_figure(tmp_path):
     from investment_agent.market.statements import StatementStore
     d = data(tmp_path)

@@ -77,6 +77,23 @@ def test_the_block_shows_the_latest_quarter_with_groups_1_to_5_and_says_when_the
         "2026-Q2": {"accrued_interest": str(50 * b)}, "2026-Q3": {"accrued_interest": str(52 * b)}}}), encoding="utf-8")
     quality = call(c, clock, "GET", "/internal/bank-figures/ACB").json()["quality"]
     assert quality["trend"]["accrued_growth_qoq"] == "0.0400" and quality["compared"] is True
+    # a year before with cover, and nothing in between: llr_year_ago is set but no sign weighs it (review 23/11/2026 (3))
+    full = lambda d: {**{f"group{i}": str(v * b) for i, v in enumerate((1200, 17, 10, 10, 7), 1)}, "loans": str(1244 * b)}  # noqa: E731
+    (tmp_path / "bank-notes" / "ACB.json").write_text(json.dumps({"symbol": "ACB", "fetched_at": "2026-11-20T00:00:00+00:00", "source": "vietcap:iq",
+                                                                  "quarters": {"2025-09-30": full(0), "2026-09-30": full(0)}}), encoding="utf-8")
+    (tmp_path / "statements-financial" / "ACB.json").write_text(json.dumps({"symbol": "ACB", "kind": "bank", "quarters": {
+        "2025-Q3": {"loan_reserve": str(-20 * b)}, "2026-Q3": {"loan_reserve": str(-22 * b)}}}), encoding="utf-8")
+    quality = call(c, clock, "GET", "/internal/bank-figures/ACB").json()["quality"]
+    assert quality["trend"]["llr_year_ago"] is not None and quality["compared"] is False
+
+
+def test_a_bank_file_of_the_wrong_shape_leaves_the_page_open_without_public_figures(tmp_path):
+    """Review 23/11/2026 (3): the board already took this; the page returned 500."""
+    (tmp_path / "bank-notes").mkdir()
+    (tmp_path / "bank-notes" / "ACB.json").write_text(json.dumps({"symbol": "ACB", "quarters": ["2026-09-30"]}), encoding="utf-8")
+    c, clock = client(tmp_path)
+    r = call(c, clock, "GET", "/internal/bank-figures/ACB")
+    assert r.status_code == 200 and r.json()["quality"] is None and r.json()["provision"]["rows"] == []
 
 
 def test_without_public_figures_or_entries_there_is_no_quality_block(tmp_path):

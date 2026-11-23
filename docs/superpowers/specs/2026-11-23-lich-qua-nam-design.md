@@ -50,7 +50,9 @@ Tình trạng hệ thống vẫn cảnh báo từ 01/12 khi chưa có lịch nă
   hàm nhìn lùi.
 
 - Bản tin tuần trước đây coi mọi ngày trong tuần là ngày giao dịch khi thiếu lịch, nên 01/01 bị đếm là một phiên thiếu số khối ngoại. Nay bước
-  này dừng với câu ở mục 2, trước khi đọc dữ liệu cá nhân hay chạm tới Telegram.
+  này dừng với câu ở mục 2, trước khi đọc dữ liệu cá nhân hay chạm tới Telegram. Lịch được kiểm tra trước cả cài đặt gửi, nên khi đang tắt
+  gửi tự động mà thiếu lịch, log vẫn ghi thiếu lịch (`not_configured`) chứ không ghi `skipped`.
+- File lịch sai cấu trúc (không phải object, trường sai kiểu) báo `ValueError` ngay lúc đọc, nên mọi bước đều xử lý giống như file thiếu nguồn.
 
 ## Thứ tự
 1 → 2 → 3 trên một nhánh, TDD, verify rồi merge.

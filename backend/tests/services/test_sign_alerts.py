@@ -15,7 +15,7 @@ def test_the_first_run_only_records_and_a_new_sign_on_a_held_ticker_is_told_once
     assert sent == []
     out = check_signs(tmp_path, rows=ROWS, held={"VCG"}, titles=TITLES, send=send)
     assert out == {"status": "ok", "new": 1, "sent": True}
-    assert sent == ["🔎 Dấu hiệu phải thu mới ở mã đang nắm\n• VCG: Thu nhập tài chính chưa thu tiền — Năm 2025: 9,2%\n"
+    assert sent == ["🔎 Dấu hiệu báo cáo mới ở mã đang nắm\n• VCG: Thu nhập tài chính chưa thu tiền — Năm 2025: 9,2%\n"
                     "Xem Phân tích ngành → Ngành theo quý → Dấu hiệu phải thu, và thuyết minh của mã."]
     assert check_signs(tmp_path, rows=ROWS, held={"VCG"}, titles=TITLES, send=send)["new"] == 0 and len(sent) == 1  # told once
 

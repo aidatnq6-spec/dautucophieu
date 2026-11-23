@@ -26,7 +26,8 @@ def check_signs(data_dir: Path, *, rows: list[dict], held: set[str], titles: dic
         for s, ks in news.items():
             parts = [titles.get(k, k) + (f" — {detail[s][k]}" if detail[s].get(k) else "") for k in ks]
             lines.append(f"• {s}: " + "; ".join(parts))
-        sent = bool(send("🔎 Dấu hiệu phải thu mới ở mã đang nắm\n" + "\n".join(lines)
+        # "báo cáo", not "phải thu": a bank's signs (provisions, accrued interest; owner 23/11/2026) come in the same note
+        sent = bool(send("🔎 Dấu hiệu báo cáo mới ở mã đang nắm\n" + "\n".join(lines)
                          + "\nXem Phân tích ngành → Ngành theo quý → Dấu hiệu phải thu, và thuyết minh của mã."))
     # what Telegram did not take stays new for the held tickers, to be tried next run; everything else is recorded as it is now
     kept = {s: (before.get(s, []) if s in news and not sent else keys) for s, keys in now.items()}

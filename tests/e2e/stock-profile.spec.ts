@@ -377,12 +377,20 @@ test("a bank's asset quality names the warning signs of its latest quarter", asy
   }
 });
 
+test("a bank's asset quality runs on Vietcap's and VNDirect's figures with nothing entered, naming each source", async ({ page }) => {
+  await page.goto("/research/ACB");
+  const quality = page.getByRole("region", { name: "Số liệu ngân hàng" }).getByTestId("bank-quality");
+  await expect(quality).toContainText("Chất lượng tài sản 2026-Q3");
+  await expect(quality).toContainText("bao phủ nợ xấu 120,0%");  // 6 / (2 + 1 + 2)
+  await expect(quality).toContainText("Nguồn: Nợ nhóm 1–5: Vietcap · dự phòng rủi ro cho vay, lãi và phí phải thu: VNDirect.");
+});
+
 test("a bank with no saved quarter explains the asset quality block and fills in the quarter to enter", async ({ page }) => {
   await page.route("**/api/internal/bank-figures/VCB", async (route) => {
     if (route.request().method() !== "GET") return route.continue();
     try {
       const response = await route.fetch();
-      await route.fulfill({ response, json: { ...(await response.json()), quarters: [] } });  // the e2e store persists: shown as if none were saved
+      await route.fulfill({ response, json: { ...(await response.json()), quarters: [], quality: null } });  // the e2e store persists: shown as if none were saved
     } catch { /* the page moved on */ }
   });
   await page.goto("/research/VCB");

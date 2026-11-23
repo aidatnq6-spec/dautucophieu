@@ -10,7 +10,8 @@ from typing import Literal
 from fastapi import APIRouter, Request
 from pydantic import Field
 
-from investment_agent.domain.bank_figures import FIELDS, LABELS, UnsafeUrl, check_public_https, derive, parse_report_pages, quality_trend
+from investment_agent.domain.bank_figures import (FIELDS, LABELS, UnsafeUrl, check_public_https, derive, merged_quarters, parse_report_pages,
+                                                  public_quarters, quality_trend)
 from investment_agent.domain.models import ContractModel
 from investment_agent.market.sectors import load_sectors
 from investment_agent.market.watchlist import load_watchlist
@@ -62,11 +63,37 @@ def _watched_bank(request: Request, symbol: str) -> str | None:
     return symbol if symbol in load_watchlist(Path(data_dir)).symbols and sectors.get(symbol) == "Ngân hàng" else None
 
 
-def bank_view(record, symbol: str) -> dict:
+def _public(data_dir, symbol: str) -> dict[str, dict]:
+    """Vietcap's notes and VNDirect's bank lines as kept by their syncs; a store missing or unreadable gives nothing."""
+    from investment_agent.market.bank_notes import BankNoteStore
+    from investment_agent.market.statements import StatementStore
+    if data_dir is None:
+        return {}
+    try:
+        notes = (BankNoteStore(Path(data_dir) / "bank-notes").read(symbol) or {}).get("quarters") or {}
+    except (OSError, ValueError):
+        notes = {}
+    try:
+        kept = StatementStore(Path(data_dir) / "statements-financial").read(symbol) or {}
+    except (OSError, ValueError):
+        kept = {}
+    return public_quarters(notes, kept.get("quarters") or {}, kept.get("quarters_zeros") or [])
+
+
+def bank_view(record, symbol: str, data_dir=None) -> dict:
     quarters = (record.payload if record else {}).get("quarters", {})
     trend = quality_trend({q: v["values"] for q, v in quarters.items()})
     rows = [{"quarter": q, "values": v["values"], "derived": derive(v["values"]), "trend": trend[q], "source": v["source"]} for q, v in sorted(quarters.items(), reverse=True)]
-    return {"symbol": symbol, "version": record.version if record else 0, "quarters": rows, "labels": LABELS}
+    # Chất lượng tài sản (owner, 23/11/2026): the latest quarter of the public figures with the owner's entries on top, each figure with its source
+    merged = merged_quarters({q: v["values"] for q, v in quarters.items()}, _public(data_dir, symbol))
+    quality = None
+    if merged:
+        latest = max(merged)
+        values = merged[latest]["values"]
+        quality = {"quarter": latest, "values": values, "sources": merged[latest]["sources"], "notes": merged[latest]["notes"],
+                   "derived": derive(values), "trend": quality_trend({q: v["values"] for q, v in merged.items()})[latest],
+                   "compared": len(merged) > 1}
+    return {"symbol": symbol, "version": record.version if record else 0, "quarters": rows, "labels": LABELS, "quality": quality}
 
 
 def _clean(values: dict[str, str | None]):
@@ -97,7 +124,7 @@ def _change(request: Request, symbol: str, expected_version: int, request_id: st
         record = read_version(repo, owner, "settings", bank_record_id(symbol), None)
         data = edit(dict(record.payload) if record else {"symbol": symbol, "quarters": {}})
         repo.write(owner, "settings", bank_record_id(symbol), data, expected_version=expected_version, request_id=request_id)
-        return bank_view(read_version(repo, owner, "settings", bank_record_id(symbol), None), symbol)
+        return bank_view(read_version(repo, owner, "settings", bank_record_id(symbol), None), symbol, request.app.state.data_dir)
     except WRITE_ERRORS as exc:
         return write_error(exc)
 
@@ -110,7 +137,7 @@ def get_bank_figures(symbol: str, request: Request):
     if repo is None:
         return unavailable()
     try:
-        return bank_view(read_version(repo, owner, "settings", bank_record_id(sym), None), sym)
+        return bank_view(read_version(repo, owner, "settings", bank_record_id(sym), None), sym, request.app.state.data_dir)
     except RepositoryUnavailable:
         return unavailable()
 

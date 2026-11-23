@@ -13,7 +13,26 @@ type Quarter = { quarter: string; values: Record<Field, string | null>; source: 
   derived: { npl: string | null; group2_ratio: string | null; casa: string | null; car: string | null; llr?: string | null; real_estate_share?: string | null }; trend?: Trend };
 type Trend = { llr: string | null; llr_prev: string | null; llr_year_ago: string | null; llr_start: string | null; group2_growth_qoq: string | null; loans_growth_qoq: string | null;
   loans_growth_ytd: string | null; accrued_growth_qoq: string | null; documents_growth_qoq: string | null; real_estate_growth_ytd: string | null; flags: string[] };
-type View = { symbol: string; version: number; quarters: Quarter[]; labels: Record<Field, string> };
+type Origin = "Vietcap" | "VNDirect" | "số nhập tay";
+// Chất lượng tài sản (23/11/2026): the latest quarter of the public figures (Vietcap's groups, VNDirect's reserve and accrued interest) with the owner's entries on top.
+type Quality = { quarter: string; values: Partial<Record<Field, string>>; sources: Partial<Record<Field, Origin>>; notes: string[]; derived: Quarter["derived"];
+  trend: Trend; compared: boolean };
+type View = { symbol: string; version: number; quarters: Quarter[]; labels: Record<Field, string>; quality?: Quality | null };
+
+const SHORT: Partial<Record<Field, string>> = { demand_deposits: "tiền gửi không kỳ hạn", margin_deposits: "tiền gửi ký quỹ", customer_deposits: "tiền gửi khách hàng", car: "CAR",
+  reserve: "dự phòng rủi ro cho vay", accrued_interest: "lãi và phí phải thu", real_estate_loans: "dư nợ bất động sản", discounted_documents: "chiết khấu bộ chứng từ" };
+/** Where each figure of the quarter came from, one source after another; groups 1–5 named together. */
+export function sourceLine(sources: Partial<Record<Field, Origin>>): string {
+  const parts = (["Vietcap", "VNDirect", "số nhập tay"] as const).flatMap((origin) => {
+    const fields = FIELDS.filter((f) => sources[f] === origin);
+    const groups = fields.filter((f) => f.startsWith("group")).map((f) => f.slice(5));
+    const names = [...(groups.length === 5 ? ["nợ nhóm 1–5"] : groups.length ? [`nợ nhóm ${groups.join(", ")}`] : []),
+      ...fields.filter((f) => !f.startsWith("group")).map((f) => SHORT[f] ?? f)];
+    return names.length ? [`${names.join(", ")}: ${origin}`] : [];
+  });
+  const line = parts.join(" · ");
+  return line.charAt(0).toUpperCase() + line.slice(1);
+}
 // `ocr`: read from a scanned page by OCR on this machine, already checked against the printed total where there is one.
 type Read = { url: string; fields: Partial<Record<Field, { value: string; page: number; ocr?: boolean }>>; missing: Field[]; warnings: string[];
   ocr_pages?: number[] };
@@ -128,10 +147,10 @@ export function BankFigures({ symbol }: { symbol: string }) {
   return (
     <section className="surface" aria-label="Số liệu ngân hàng">
       <h2>Số liệu ngân hàng (nhập tay)</h2>
-      <p className="caption">Nợ nhóm 1–5, tiền gửi, CAR và các số về chất lượng tài sản không có ở nguồn miễn phí: nhập từ thuyết minh báo cáo tài chính quý (tỷ đồng), hoặc dán đường dẫn PDF
+      <p className="caption">Nợ nhóm 1–5 tự lấy từ thuyết minh trên Vietcap, dự phòng rủi ro cho vay và lãi, phí phải thu tự lấy từ báo cáo trên VNDirect; dư nợ bất động sản và chiết khấu
+        bộ chứng từ không có nguồn công khai. Nhập ở đây (tỷ đồng, từ thuyết minh báo cáo tài chính quý) để thêm số còn thiếu hoặc dùng thay số tự lấy, hoặc dán đường dẫn PDF
         công khai để phần mềm đọc và điền sẵn — kiểm tra lại rồi mới lưu. File scan dạng ảnh được nhận dạng chữ (OCR) ngay trên máy, mất khoảng 1–2 phút;
-        số đọc từ ảnh được cộng thử với dòng tổng, ô nào không khớp thì để trống. CASA = (không kỳ hạn + ký quỹ) / tiền gửi khách hàng. Nợ nhóm 2 và CASA
-        đã tự lấy từ thuyết minh trên Vietcap (Điểm sức khỏe dùng cho tiêu chí CASA tăng, nợ nhóm 2 giảm); quý nhập ở đây được dùng thay số Vietcap.</p>
+        số đọc từ ảnh được cộng thử với dòng tổng, ô nào không khớp thì để trống. CASA = (không kỳ hạn + ký quỹ) / tiền gửi khách hàng.</p>
       {view && view.quarters.length > 0 && <table className="fv-table" aria-label={`Số liệu ngân hàng ${symbol}`}>
         <thead><tr><th>Quý</th><th className="num">NPL</th><th className="num">Nợ nhóm 2</th><th className="num">CASA</th><th className="num">CAR</th><th className="num">Bao phủ nợ xấu</th><th>Nguồn</th><th /></tr></thead>
         <tbody>{view.quarters.map((q) => <tr key={q.quarter}>
@@ -145,16 +164,19 @@ export function BankFigures({ symbol }: { symbol: string }) {
             <button type="button" className="btn" aria-label={`Xóa ${q.quarter}`} onClick={() => void remove(q.quarter)}><Trash2 size={14} aria-hidden="true" />Xóa</button></td>
         </tr>)}</tbody>
       </table>}
-      {view && view.quarters.length === 0 && <div className="bf-quality" data-testid="bank-quality">
+      {view && !view.quality && <div className="bf-quality" data-testid="bank-quality">
         <h3>Chất lượng tài sản</h3>
-        <p className="caption">Chưa có quý nào. Nhập và lưu quý gần nhất ở dưới (ô Quý đã điền sẵn) để xem tỷ lệ bao phủ nợ xấu; lưu thêm quý liền trước để phần mềm so và chỉ ra
-          dấu hiệu cần xem kỹ: bao phủ giảm, nợ nhóm 2 tăng vọt, dự phòng không theo kịp, lãi phải thu hay dư nợ bất động sản tăng nhanh.</p>
+        <p className="caption">Chưa có quý nào: chưa tự lấy được số từ Vietcap, VNDirect và chưa nhập tay. Nhập và lưu quý gần nhất ở dưới (ô Quý đã điền sẵn) để xem tỷ lệ bao phủ nợ xấu;
+          lưu thêm quý liền trước để phần mềm so và chỉ ra dấu hiệu cần xem kỹ: bao phủ giảm, nợ nhóm 2 tăng vọt, dự phòng không theo kịp, lãi phải thu hay dư nợ bất động sản tăng nhanh.</p>
       </div>}
-      {view && view.quarters[0]?.trend && <div className="bf-quality" data-testid="bank-quality">
-        <h3>Chất lượng tài sản {view.quarters[0].quarter}</h3>
-        {view.quarters[0].trend.flags.length === 0
-          ? <p className="caption">Chưa thấy dấu hiệu cần xem kỹ theo các ngưỡng bên dưới{view.quarters.length < 2 ? " (cần ít nhất hai quý liền nhau để so)" : ""}.</p>
-          : <ul className="bf-flags">{view.quarters[0].trend.flags.map((f) => <li key={f}>{flagText(f, view.quarters[0].trend!)}</li>)}</ul>}
+      {view?.quality && <div className="bf-quality" data-testid="bank-quality">
+        <h3>Chất lượng tài sản {view.quality.quarter}</h3>
+        <p>NPL {pct(view.quality.derived.npl)} · nợ nhóm 2 {pct(view.quality.derived.group2_ratio)} · bao phủ nợ xấu {pct1(view.quality.derived.llr)}</p>
+        {view.quality.trend.flags.length === 0
+          ? <p className="caption">Chưa thấy dấu hiệu cần xem kỹ theo các ngưỡng bên dưới{view.quality.compared ? "" : " (cần ít nhất hai quý liền nhau để so)"}.</p>
+          : <ul className="bf-flags">{view.quality.trend.flags.map((f) => <li key={f}>{flagText(f, view.quality!.trend)}</li>)}</ul>}
+        {view.quality.notes.map((n) => <p key={n} className="caption">{n}</p>)}
+        {sourceLine(view.quality.sources) && <p className="caption">Nguồn: {sourceLine(view.quality.sources)}.</p>}
         <p className="caption">So với quý trước, cùng kỳ năm trước và cuối năm trước. Ngưỡng do phần mềm đặt: bao phủ nợ xấu giảm từ 10 điểm %, nợ nhóm 2 tăng từ 30%, lãi phải thu tăng từ 20%,
           chứng từ tăng từ 30%, dư nợ bất động sản tăng từ 10% và nhanh gấp 1,5 lần tổng dư nợ. Là dấu hiệu để đọc kỹ thuyết minh, không phải kết luận hay khuyến nghị. Ô để trống thì không so.</p>
       </div>}

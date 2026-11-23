@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { fromInput, pageNote, quarterToEnter } from "./bank-figures";
+import { fromInput, pageNote, quarterToEnter, sourceLine } from "./bank-figures";
+
+describe("sourceLine", () => {
+  it("names where each figure of the quarter came from, groups 1–5 as one", () => {
+    const vietcap = { group1: "Vietcap", group2: "Vietcap", group3: "Vietcap", group4: "Vietcap", group5: "Vietcap" } as const;
+    expect(sourceLine({ ...vietcap, reserve: "VNDirect", accrued_interest: "VNDirect" }))
+      .toBe("Nợ nhóm 1–5: Vietcap · dự phòng rủi ro cho vay, lãi và phí phải thu: VNDirect");
+    expect(sourceLine({ ...vietcap, group2: "số nhập tay", reserve: "số nhập tay", real_estate_loans: "số nhập tay" }))
+      .toBe("Nợ nhóm 1, 3, 4, 5: Vietcap · nợ nhóm 2, dự phòng rủi ro cho vay, dư nợ bất động sản: số nhập tay");
+    expect(sourceLine({})).toBe("");
+  });
+});
 
 describe("fromInput", () => {
   it("reads Vietnamese, thousands-only and decimal-point numbers without scaling them", () => {

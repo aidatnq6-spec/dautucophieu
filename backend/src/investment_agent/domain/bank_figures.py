@@ -116,6 +116,74 @@ def quality_trend(quarters: dict[str, dict]) -> dict[str, dict]:
     return out
 
 
+# ---- the same table on public figures (Chất lượng tài sản ngân hàng, owner 23/11/2026) ----------------------------
+
+_BILLION = Decimal(1_000_000_000)
+LOANS_GAP = Decimal("0.01")  # Vietcap's groups against VNDirect's loans to customers: further apart than this, both are shown
+# VNDirect's balance lines (market/statements.py, bank layout) → the fields of this table; the reserve comes negative.
+_STATEMENT_FIELDS = {"loan_reserve": "reserve", "accrued_interest": "accrued_interest"}
+_ZERO_LABELS = {"loan_reserve": "dự phòng rủi ro cho vay khách hàng", "accrued_interest": "lãi và phí phải thu"}
+
+
+def _ty(dong: Decimal) -> str:
+    return _plain(dong / _BILLION)
+
+
+def _ty_printed(dong: Decimal) -> str:
+    return f"{int((dong / _BILLION).to_integral_value(ROUND_HALF_UP)):,}".replace(",", ".")
+
+
+def public_quarters(notes: dict[str, dict], statements: dict[str, dict], zeros: list[dict]) -> dict[str, dict]:
+    """{"2026-Q3": {values (tỷ đồng), sources, notes}} from Vietcap's notes (quarter-end day → field → đồng, bank_notes) and VNDirect's bank lines
+    (quarter → line → đồng, with the balances it gave as 0). Groups 1–5 are taken only where they add up to Vietcap's total."""
+    out: dict[str, dict] = {}
+
+    def quarter(key: str) -> dict:
+        return out.setdefault(key, {"values": {}, "sources": {}, "notes": []})
+
+    for day, fields in notes.items():
+        groups = [_d(fields.get(g)) for g in GROUPS]
+        if None in groups:
+            continue
+        q, total = quarter(f"{day[:4]}-Q{(int(day[5:7]) + 2) // 3}"), _d(fields.get("loans"))
+        if total is not None and sum(groups) != total:
+            q["notes"].append(f"Nợ nhóm 1–5 trên Vietcap cộng ra {_ty_printed(sum(groups))} tỷ, khác tổng dư nợ {_ty_printed(total)} tỷ Vietcap ghi: để trống.")
+            continue
+        for g, v in zip(GROUPS, groups):
+            q["values"][g], q["sources"][g] = _ty(v), "Vietcap"
+    for key, lines in statements.items():
+        q = quarter(key)
+        for line, field in _STATEMENT_FIELDS.items():
+            if (v := _d(lines.get(line))) is not None:
+                q["values"][field], q["sources"][field] = _ty(abs(v)), "VNDirect"
+        loans = _d(lines.get("loans_gross"))
+        if loans and all(g in q["values"] for g in GROUPS):
+            added = sum(Decimal(q["values"][g]) for g in GROUPS) * _BILLION
+            if abs(added - loans) / loans > LOANS_GAP:
+                gap = format((abs(added - loans) / loans * 100).quantize(Decimal("0.1"), ROUND_HALF_UP), "f").replace(".", ",")
+                q["notes"].append(f"Tổng nợ nhóm 1–5 (Vietcap, {_ty_printed(added)} tỷ) lệch {gap}% so với cho vay khách hàng (VNDirect, "
+                                  f"{_ty_printed(loans)} tỷ): ghi cả hai, không chọn bên nào.")
+    by_period: dict[str, list[str]] = {}
+    for z in zeros:
+        if z.get("line") in _ZERO_LABELS and "-Q" in str(z.get("period")):
+            by_period.setdefault(z["period"], []).append(z["line"])
+    for key, lines in by_period.items():
+        names = [_ZERO_LABELS[line] for line in _ZERO_LABELS if line in lines]
+        quarter(key)["notes"].append(f"VNDirect ghi 0 cho {', '.join(names)}: coi là chưa có số.")
+    return {k: q for k, q in sorted(out.items()) if q["values"] or q["notes"]}  # the store's other quarters (profit only) are none here
+
+
+def merged_quarters(entered: dict[str, dict], public: dict[str, dict]) -> dict[str, dict]:
+    """The public quarters with the owner's entries on top, field by field; an empty entry leaves the public figure."""
+    out = {k: {"values": dict(v["values"]), "sources": dict(v["sources"]), "notes": list(v["notes"])} for k, v in public.items()}
+    for key, values in entered.items():
+        q = out.setdefault(key, {"values": {}, "sources": {}, "notes": []})
+        for field, value in values.items():
+            if field in FIELDS and value is not None:
+                q["values"][field], q["sources"][field] = value, "số nhập tay"
+    return dict(sorted(out.items()))
+
+
 # ---- reading a public PDF of the quarterly statements -------------------------------------------------------------
 
 _NUMBER = re.compile(r"\(?-?\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?\)?|\(?-?\d+(?:[.,]\d+)?\)?%?")

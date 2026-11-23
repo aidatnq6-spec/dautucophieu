@@ -32,7 +32,7 @@ def test_each_watched_non_financial_ticker_gets_its_receivable_signs_most_first(
     rows = receivable_signs(data(tmp_path))
     assert [r["symbol"] for r in rows] == ["AAA", "BBB", "VCB"]
     aaa, bbb, vcb = rows
-    assert vcb["signs"] == {"provision_cut": None}  # a bank has only the bank signs (Chất lượng tài sản ngân hàng, owner 23/11/2026)
+    assert vcb["signs"] == {"provision_cut": None, "accrued_outpace": None}  # a bank has only the bank signs (Chất lượng tài sản ngân hàng, owner 23/11/2026)
     assert aaa["signs"]["other_receivables"] is True and aaa["signs"]["paper_income"] is True and aaa["signs"]["financial_profit"] is True
     assert aaa["count"] == 3 and bbb["count"] == 0
     assert aaa["signs"]["other_high"] is None  # no quarters stored: not read
@@ -50,9 +50,20 @@ def test_a_bank_whose_provisions_were_cut_while_bad_debt_grew_has_the_sign_with_
     BankNoteStore(d / "bank-notes").save({"symbol": "VCB", "fetched_at": "2026-11-20T00:00:00+00:00", "source": "vietcap:iq",
                                           "quarters": {"2026-06-30": groups(10), "2026-09-30": groups(15)}})
     vcb = next(r for r in receivable_signs(d) if r["symbol"] == "VCB")
-    assert ("provision_cut", "Lợi nhuận đỡ bởi giảm trích lập") in SIGNS and vcb["signs"] == {"provision_cut": True} and vcb["count"] == 1
+    assert ("provision_cut", "Lợi nhuận đỡ bởi giảm trích lập") in SIGNS and vcb["signs"]["provision_cut"] is True and vcb["count"] == 1
     assert vcb["details"]["provision_cut"] == ("Chi phí dự phòng quý 3/2026 giảm 40% so cùng kỳ trong khi nợ nhóm 3–5 tăng 25% so quý trước; "
                                                "chi phí dự phòng bằng 13% lợi nhuận trước dự phòng.")
+
+
+def test_a_bank_whose_accrued_interest_outpaced_its_interest_income_has_the_sign_with_its_figures(tmp_path):
+    d = data(tmp_path)
+    StatementStore(d / "statements-financial").save({"symbol": "VCB", "kind": "bank", "years": {}, "quarters": {
+        "2025-Q3": {"interest_income": str(1000 * BN), "accrued_interest": str(500 * BN)},
+        "2026-Q3": {"interest_income": str(1100 * BN), "accrued_interest": str(700 * BN)}}})
+    vcb = next(r for r in receivable_signs(d) if r["symbol"] == "VCB")
+    assert ("accrued_outpace", "Lãi dự thu tăng nhanh hơn thu nhập lãi") in SIGNS and vcb["signs"]["accrued_outpace"] is True
+    assert vcb["details"]["accrued_outpace"] == ("Lãi, phí phải thu quý 3/2026 tăng 40% so cùng kỳ, thu nhập lãi tăng 10%; lãi dự thu bằng 64% thu nhập lãi "
+                                                 "của quý (cùng kỳ 50%).")
 
 
 def test_lending_against_equity_is_a_sign_with_its_figure(tmp_path):

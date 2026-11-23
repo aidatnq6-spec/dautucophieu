@@ -19,7 +19,7 @@ SIGNS = [("other_receivables", "Phải thu khác lớn"), ("other_high", "Cao h�
          ("provision_jump", "Dự phòng tăng mạnh"), ("lending", "Cho vay lớn so với vốn chủ"),
          ("inventory_fast", "Tồn kho tăng nhanh hơn giá vốn")]
 # A bank's row holds only these (Chất lượng tài sản ngân hàng, owner 23/11/2026), from VNDirect's bank lines and Vietcap's groups 1–5.
-BANK_SIGNS = [("provision_cut", "Lợi nhuận đỡ bởi giảm trích lập")]
+BANK_SIGNS = [("provision_cut", "Lợi nhuận đỡ bởi giảm trích lập"), ("accrued_outpace", "Lãi dự thu tăng nhanh hơn thu nhập lãi")]
 SIGNS += BANK_SIGNS
 QUALITY = {"other_receivables", "prepay_suppliers", "paper_income", "financial_profit", "receivables_outpace_revenue"}
 BANK = "Ngân hàng"
@@ -31,13 +31,18 @@ def _pct(v) -> str:
 
 def _bank_row(data_dir: Path, symbol: str, sector: str) -> dict:
     """The bank signs of one watched bank; public figures only, like the rest of this board (the owner's entries stay on the bank's page)."""
-    from investment_agent.domain.bank_figures import provision_view, public_quarters
+    from investment_agent.domain.bank_figures import accrued_view, provision_view, public_quarters
     from investment_agent.market.bank_notes import BankNoteStore
     kept = StatementStore(data_dir / "statements-financial").read(symbol) or {}
     statements = kept.get("quarters") or {}
     public = public_quarters((BankNoteStore(data_dir / "bank-notes").read(symbol) or {}).get("quarters") or {}, statements, kept.get("quarters_zeros") or [])
-    p = provision_view(statements, {q: v["values"] for q, v in public.items()})
-    signs, details = {"provision_cut": p["flag"]}, {}
+    table = {q: v["values"] for q, v in public.items()}
+    p, a = provision_view(statements, table), accrued_view(statements, table)
+    signs, details = {"provision_cut": p["flag"], "accrued_outpace": a["flag"]}, {}
+    if a["flag"]:
+        q = a["quarter"]
+        details["accrued_outpace"] = (f"Lãi, phí phải thu quý {q[-1]}/{q[:4]} tăng {_pct(a['accrued_growth_yoy'])} so cùng kỳ, thu nhập lãi tăng "
+                                      f"{_pct(a['income_growth_yoy'])}; lãi dự thu bằng {_pct(a['ratio'])} thu nhập lãi của quý (cùng kỳ {_pct(a['ratio_year_ago'])}).")
     if p["flag"]:
         q = p["quarter"]
         details["provision_cut"] = (f"Chi phí dự phòng quý {q[-1]}/{q[:4]} giảm {_pct(p['expense_growth_yoy'])} so cùng kỳ trong khi nợ nhóm 3–5 tăng "

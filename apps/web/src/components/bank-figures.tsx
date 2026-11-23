@@ -20,7 +20,17 @@ type Quality = { quarter: string; values: Partial<Record<Field, string>>; source
 // Dự phòng đi vào lợi nhuận (23/11/2026): VNDirect's credit provision expense against profit before it, in tỷ đồng.
 export type Provision = { rows: { quarter: string; expense: string; ppop: string | null; share: string | null }[]; quarter: string | null; share: string | null;
   credit_cost: string | null; credit_cost_missing: string[]; expense_growth_yoy: string | null; bad_growth_qoq: string | null; flag: boolean | null; why_not: string | null };
-type View = { symbol: string; version: number; quarters: Quarter[]; labels: Record<Field, string>; quality?: Quality | null; provision?: Provision };
+// Lãi dự thu so với thu nhập lãi (23/11/2026): accrued interest of the asset quality table against VNDirect's interest income of the quarter.
+export type Accrued = { quarter: string | null; ratio: string | null; ratio_year_ago: string | null; accrued_growth_yoy: string | null; income_growth_yoy: string | null;
+  flag: boolean | null; why_not: string | null };
+type View = { symbol: string; version: number; quarters: Quarter[]; labels: Record<Field, string>; quality?: Quality | null; provision?: Provision; accrued?: Accrued };
+
+/** What accrued interest against interest income says: the sign with its figures, no sign, or why it could not be weighed. */
+export function accruedLine(a: Accrued): string {
+  if (a.flag) return `Lãi, phí phải thu tăng ${pct1(a.accrued_growth_yoy)} so cùng kỳ, thu nhập lãi tăng ${pct1(a.income_growth_yoy)}: phần lãi ghi nhận nhưng chưa thu bằng tiền tăng nhanh hơn.`;
+  if (a.flag === false) return `Chưa thấy lãi dự thu tăng nhanh hơn thu nhập lãi (lãi dự thu ${pct1(a.accrued_growth_yoy)}, thu nhập lãi ${pct1(a.income_growth_yoy)} so cùng kỳ).`;
+  return a.why_not ?? "Chưa đủ số để xét.";
+}
 
 /** What the latest quarter's provisions say: the sign with its figures, no sign, or why it could not be weighed. */
 export function provisionLine(p: Provision): string {
@@ -206,6 +216,13 @@ export function BankFigures({ symbol }: { symbol: string }) {
         <p className="caption">Chi phí tín dụng = chi phí dự phòng bốn quý gần nhất / dư nợ cho vay khách hàng bình quân (cuối quý này và cùng quý năm trước). Ngưỡng do chủ sở hữu chốt:
           chi phí dự phòng giảm từ 30% so cùng kỳ trong khi nợ nhóm 3–5 tăng so quý trước. Báo cáo trên VNDirect; nợ nhóm như khối Chất lượng tài sản. Là dấu hiệu để đọc kỹ thuyết minh,
           không phải kết luận hay khuyến nghị.</p>
+      </div>}
+      {view?.accrued?.quarter && <div className="bf-quality" data-testid="bank-accrued">
+        <h3>Lãi dự thu so với thu nhập lãi {view.accrued.quarter}</h3>
+        {view.accrued.flag ? <ul className="bf-flags"><li>{accruedLine(view.accrued)}</li></ul> : <p className="caption">{accruedLine(view.accrued)}</p>}
+        <p>Lãi, phí phải thu bằng {pct1(view.accrued.ratio)} thu nhập lãi của quý (cùng kỳ {pct1(view.accrued.ratio_year_ago)})</p>
+        <p className="caption">Ngưỡng do chủ sở hữu chốt: lãi dự thu tăng so cùng kỳ nhanh hơn thu nhập lãi từ 20 điểm %. Lãi dự thu như khối Chất lượng tài sản; thu nhập lãi từ báo cáo
+          trên VNDirect. Là dấu hiệu để đọc kỹ thuyết minh, không phải kết luận hay khuyến nghị.</p>
       </div>}
       <div className="fv-search">
         <label className="field">Đường dẫn PDF báo cáo (https)<input type="url" value={url} placeholder="https://…/bctc-quy-3-2026.pdf" disabled={!view}

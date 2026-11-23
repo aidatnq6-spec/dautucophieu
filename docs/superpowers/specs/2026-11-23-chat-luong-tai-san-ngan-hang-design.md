@@ -47,5 +47,13 @@ ghi 0 cho dòng chưa tách.
 - Không quy đổi lãi dự thu ra số ngày lãi chưa thu, vì như vậy phải giả định một lãi suất.
 - Không khuyến nghị mua bán.
 
+## Đã làm (23/11/2026)
+- Phần 1: bố cục ngân hàng trong `market/statements.py` có thêm 5 dòng; `zero_missing` cùng `quarters_zeros` và `years_zeros` ghi các số dư nguồn ghi 0. `FIN_LINES_VERSION` 3.
+- Phần 2: `public_quarters`, `merged_quarters` (`domain/bank_figures.py`); route trả `quality` (quý mới nhất, nguồn từng ô, ghi chú); bảng nhập tay giữ nguyên.
+- Phần 3: `provision_view`; route trả `provision`; dấu hiệu `provision_cut` trên Bảng dấu hiệu.
+- Phần 4: `accrued_view`; route trả `accrued`; dấu hiệu `accrued_outpace`.
+- Bảng dấu hiệu chỉ dùng số công khai. Mỗi ngân hàng là một dòng, chỉ xét dấu hiệu ngân hàng, và không bị ghi thiếu các dấu hiệu phi tài chính.
+- Báo mã đang giữ qua `check_signs` có sẵn, một lần khi dấu hiệu mới bật. Tiêu đề tin vẫn là "Dấu hiệu phải thu mới".
+
 ## Thứ tự
 1 → 2 → 3 → 4, mỗi phần một nhánh, TDD, verify rồi merge. Các ngưỡng 30% (mục 3) và 20 điểm % (mục 4) do chủ sở hữu chốt ngày 23/11/2026.

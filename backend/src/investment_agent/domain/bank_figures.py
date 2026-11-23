@@ -238,6 +238,35 @@ def provision_view(statements: dict[str, dict], quality: dict[str, dict], n: int
             "expense_growth_yoy": s(growth), "bad_growth_qoq": s(bad_growth), "flag": flag, "why_not": why}
 
 
+ACCRUED_GAP = Decimal("0.20")  # Lãi dự thu so với thu nhập lãi (owner, 23/11/2026): accrued interest growing 20 points faster on a year
+
+
+def accrued_view(statements: dict[str, dict], quality: dict[str, dict]) -> dict:
+    """Lãi dự thu so với thu nhập lãi: the latest quarter holding both, accrued interest and fees (`quality`, tỷ đồng, the asset quality table)
+    against the quarter's interest income (VNDirect, đồng), beside the same quarter a year before; a sign when accrued interest grew on a
+    year 20 points or more faster than interest income. Nothing is filled in."""
+    def pair(key: str) -> tuple[Decimal, Decimal] | None:
+        a = _d((quality.get(key) or {}).get("accrued_interest"))
+        i = _d((statements.get(key) or {}).get("interest_income"))
+        return (a, i / _BILLION) if a is not None and i is not None and i > 0 else None
+
+    def s(v: Decimal | None) -> str | None:
+        return str(v.quantize(_Q4, ROUND_HALF_UP)) if v is not None else None
+
+    keys = sorted(k for k in set(statements) & set(quality) if "-Q" in k and pair(k))
+    if not keys:
+        return {"quarter": None, "ratio": None, "ratio_year_ago": None, "accrued_growth_yoy": None, "income_growth_yoy": None, "flag": None,
+                "why_not": None}
+    latest = keys[-1]
+    (a, i), ago = pair(latest), pair(_quarter_before(latest, 4))
+    if ago is None or ago[0] <= 0:
+        return {"quarter": latest, "ratio": s(a / i), "ratio_year_ago": None, "accrued_growth_yoy": None, "income_growth_yoy": None, "flag": None,
+                "why_not": f"Chưa có lãi dự thu và thu nhập lãi của {_quarter_before(latest, 4)} để so cùng kỳ."}
+    accrued_g, income_g = a / ago[0] - 1, i / ago[1] - 1
+    return {"quarter": latest, "ratio": s(a / i), "ratio_year_ago": s(ago[0] / ago[1]), "accrued_growth_yoy": s(accrued_g),
+            "income_growth_yoy": s(income_g), "flag": accrued_g - income_g >= ACCRUED_GAP, "why_not": None}
+
+
 # ---- reading a public PDF of the quarterly statements -------------------------------------------------------------
 
 _NUMBER = re.compile(r"\(?-?\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?\)?|\(?-?\d+(?:[.,]\d+)?\)?%?")

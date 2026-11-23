@@ -60,7 +60,7 @@ test("Dấu hiệu phải thu gathers the receivable signs of the watched non-fi
   await expect(list.getByRole("link", { name: "FPT" })).toBeVisible();
   // Chất lượng tài sản ngân hàng (owner, 23/11/2026): a bank is weighed on the bank signs alone, not missing the non-financial ones
   const acb = list.getByRole("listitem").filter({ has: page.getByRole("link", { name: "ACB" }) });
-  await expect(acb).toContainText("Chưa đủ số để xét: Lợi nhuận đỡ bởi giảm trích lập.");
+  await expect(acb).toContainText("Chưa đủ số để xét: Lợi nhuận đỡ bởi giảm trích lập, Lãi dự thu tăng nhanh hơn thu nhập lãi.");
   await expect(acb).not.toContainText("Phải thu khác lớn");
 });
 

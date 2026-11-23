@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { coverThinningText, grossLossText } from "./balance-watch";
+import { auditGapText, coverThinningText, grossLossText } from "./balance-watch";
+
+describe("auditGapText", () => {
+  const row = { year: "2025", change: "178000000000", q4_change: "152000000000", q4_share: "0.8539", q4_balance: "600000000000",
+    year_balance: "682000000000", gap: true };
+  it("names both balances and what the audit added, and nothing when Q4 matched the audited year", () => {
+    expect(auditGapText({ rows: [row], year: "2025", flag: true }))
+      .toBe("Năm 2025: dự phòng giảm giá tồn kho cuối quý 4 tự lập 600 tỷ, trên báo cáo năm đã kiểm toán 682 tỷ (kiểm toán thêm 82 tỷ). "
+        + "Số chốt khi kiểm kê ngày 31/12 khác số công ty tự báo: xem thuyết minh hàng tồn kho của báo cáo năm.");
+    expect(auditGapText({ rows: [{ ...row, gap: false, q4_balance: "682000000000" }], year: "2025", flag: false })).toBeNull();
+  });
+});
 
 describe("coverThinningText", () => {
   const base = { quarter: "2026-Q3", days: 228, days_year_ago: 173, coverage: "0.0385", coverage_year_ago: "0.0500", share: "0.2500", flag: true };

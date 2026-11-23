@@ -24,7 +24,11 @@ type Balance = { symbol: string; sector: string | null; debt: { rows: DebtRow[];
   property: { rows: CashRow[]; signal: Signal } | null; liquidity: LiquidityRow[]; carry: Carry;
   receivables: { rows: ArRow[]; dso: Dso; provision: Provision; prepay_days: Dso; other_vs_sector: OtherVsSector }; raise_prepay: { flag: boolean; events: RaiseEvent[] };
   revisions?: Revision[]; lending?: Lending; provision_flow?: ProvisionFlow; inventory?: Inventory;
-  inventory_pace?: InventoryPace; inventory_provision_flow?: InventoryFlow; gross_loss?: GrossLoss; cover_thinning?: CoverThinning };
+  inventory_pace?: InventoryPace; inventory_provision_flow?: InventoryFlow; gross_loss?: GrossLoss; cover_thinning?: CoverThinning;
+  year_end_provision?: YearEndProvision };
+type YearRow = { year: string; change: string | null; q4_change: string | null; q4_share: string | null; q4_balance: string | null;
+  year_balance: string | null; gap: boolean | null };
+export type YearEndProvision = { rows: YearRow[]; year: string | null; flag: boolean | null };
 export type CoverThinning = { quarter: string | null; days: number | null; days_year_ago: number | null; coverage: string | null;
   coverage_year_ago: string | null; share: string | null; flag: boolean | null };
 export type GrossLoss = { quarter: string | null; gross_profit: string | null; coverage: string | null; coverage_prev: string | null; share: string | null;
@@ -196,6 +200,15 @@ export function grossLossText(g: GrossLoss): string | null {
   if (g.flag) return `${main} Giá trị thuần có thể thu hồi đã thấp hơn giá ghi sổ mà dự phòng chưa tăng: xem thuyết minh hàng tồn kho.`;
   if (g.coverage !== null && g.coverage_prev !== null && Number(g.coverage) > Number(g.coverage_prev)) return `${main} Tỷ lệ trích lập dự phòng đã tăng theo.`;
   return main;
+}
+
+/** Dự phòng chốt khi kiểm toán (23/11/2026): said only when Q4 as first reported differs from the audited year. */
+export function auditGapText(y: YearEndProvision): string | null {
+  const r = y.flag ? y.rows.find((row) => row.year === y.year) : undefined;
+  if (!r || r.q4_balance === null || r.year_balance === null) return null;
+  const diff = Number(r.year_balance) - Number(r.q4_balance);
+  return `Năm ${r.year}: dự phòng giảm giá tồn kho cuối quý 4 tự lập ${ty(r.q4_balance)}, trên báo cáo năm đã kiểm toán ${ty(r.year_balance)} `
+    + `(kiểm toán ${diff > 0 ? "thêm" : "bớt"} ${ty(String(Math.abs(diff)))}). Số chốt khi kiểm kê ngày 31/12 khác số công ty tự báo: xem thuyết minh hàng tồn kho của báo cáo năm.`;
 }
 
 /** Dự phòng mỏng dần trong khi hàng tồn lâu hơn (23/11/2026): said only when it is a sign. */
@@ -379,9 +392,28 @@ export function BalanceWatch({ symbol }: { symbol: string }) {
               <td className="num" data-label="Trên tổng tài sản">{r.share === null ? "—" : rate(r.share)}</td>
             </tr>))}</tbody>
         </table></div>
+        {data.year_end_provision && auditGapText(data.year_end_provision) && <p data-testid="audit-gap"><span className="pill warn">
+          Dự phòng tồn kho quý 4 khác số kiểm toán</span> {auditGapText(data.year_end_provision)}</p>}
+        {data.year_end_provision && data.year_end_provision.rows.length > 0 && <div className="tablewrap">
+          <table className="fv-table" aria-label={`Dự phòng tồn kho theo năm ${symbol}`}>
+            <thead><tr><th>Năm</th><th className="num">Dự phòng tăng cả năm</th><th className="num">Trong đó quý 4</th><th className="num">Phần quý 4</th>
+              <th className="num">Quý 4 tự lập</th><th className="num">Năm kiểm toán</th></tr></thead>
+            <tbody>{[...data.year_end_provision.rows].reverse().map((r) => (
+              <tr key={r.year}>
+                <td data-label="Năm">{r.year}</td>
+                <td className="num" data-label="Dự phòng tăng cả năm">{ty(r.change)}</td>
+                <td className="num" data-label="Trong đó quý 4">{ty(r.q4_change)}</td>
+                <td className="num" data-label="Phần quý 4">{r.q4_share === null ? "—" : rate(r.q4_share)}</td>
+                <td className="num" data-label="Quý 4 tự lập">{ty(r.q4_balance)}</td>
+                <td className="num" data-label="Năm kiểm toán">{ty(r.year_balance)}</td>
+              </tr>))}</tbody>
+          </table></div>}
         <p className="caption">Giá gốc và dự phòng giảm giá hàng tồn kho theo bảng cân đối (VNDirect); giá trị thuần = giá gốc − dự phòng. Bao phủ = dự phòng ÷
           giá gốc. Số ngày tồn kho = tồn kho thuần cuối quý ÷ giá vốn bốn quý × 365; được ghi là tăng nhanh hơn giá vốn khi tồn kho tăng so cùng kỳ
-          nhanh hơn giá vốn bốn quý từ 20 điểm %, số ngày tăng và tồn kho từ 10% tổng tài sản (không ghi với Bất động sản, nơi tồn kho là dự án). Cơ cấu (nguyên vật liệu, dở dang, thành phẩm, hàng hóa) chỉ có trong thuyết minh, không có ở đây. Ô thiếu số để trống. Không phải khuyến nghị.</p>
+          nhanh hơn giá vốn bốn quý từ 20 điểm %, số ngày tăng và tồn kho từ 10% tổng tài sản (không ghi với Bất động sản, nơi tồn kho là dự án). Cơ cấu (nguyên vật liệu, dở dang, thành phẩm, hàng hóa) chỉ có trong thuyết minh, không có ở đây. Dự phòng theo năm: mức
+          tăng cả năm theo báo cáo năm đã kiểm toán, phần quý 4 = số dư năm − số dư quý 3; dự phòng dồn vào quý 4 là thường gặp (kiểm kê ngày 31/12) nên
+          không ghi cờ. Chỉ ghi khi số dư quý 4 công ty tự báo khác số kiểm toán hơn 1 tỷ và 1%. Bán dưới giá vốn: lỗ gộp của quý mà tỷ lệ trích lập không
+          tăng. Dự phòng mỏng dần: số ngày tồn kho tăng từ 20% so cùng kỳ mà tỷ lệ trích lập giảm từ 20%. Ô thiếu số để trống. Không phải khuyến nghị.</p>
       </section>}
       {data.property && <section className="surface" aria-label="Tiền khách trả trước">
         <h2>Tiền khách trả trước</h2>

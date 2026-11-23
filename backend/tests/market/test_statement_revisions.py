@@ -22,6 +22,12 @@ def test_a_closed_period_changed_beyond_both_limits_is_found_and_the_latest_peri
     assert find_revisions({}, new) == []  # the first sync only sets the baseline
 
 
+def test_the_inventory_provision_of_a_closed_period_is_watched_too():
+    """Dự phòng chốt khi kiểm toán (owner, 23/11/2026): the inventory provision joins the lines whose revisions are logged."""
+    got = find_revisions({"2024": {"inventory_provision": "-504000000000"}, "2025": {}}, {"2024": {"inventory_provision": "-560000000000"}})
+    assert got == [{"period": "2024", "line": "inventory_provision", "old": "-504000000000", "new": "-560000000000"}]
+
+
 def test_the_log_keeps_each_revision_once_with_the_day_seen(tmp_path):
     rev = [{"period": "2024", "line": "npat_parent", "old": "100000000000", "new": "80000000000"}]
     record_revisions(tmp_path, "HAG", rev, kind="years", seen_on=date(2026, 11, 22))

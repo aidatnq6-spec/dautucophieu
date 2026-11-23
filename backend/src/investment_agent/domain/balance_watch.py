@@ -475,6 +475,39 @@ def cover_thinning(quarters: dict, *, property: bool = False) -> dict:
             "coverage": _r(cover), "coverage_year_ago": _r(cover_ago), "share": _r(share), "flag": flag}
 
 
+AUDIT_GAP_FLOOR, AUDIT_GAP_SHARE = Decimal(1_000_000_000), Decimal("0.01")  # Dự phòng chốt khi kiểm toán (owner, 23/11/2026)
+
+
+def year_end_provision(quarters: dict, years: dict, n: int = 5) -> dict:
+    """Dự phòng chốt khi kiểm toán cuối năm (owner, 23/11/2026; the stock count of 31/12): for each of the last n years, the change of the
+    inventory provision over the year (from the audited year-end balances) and the part of it booked in Q4 (from Q3's balance), shown and
+    not flagged: Q4 carries most of it in many years. flag: the latest year whose Q4 balance, as the company first reported it, differs
+    from the audited year-end balance by more than 1 tỷ and 1%; None when no year has both."""
+    def prov(q: dict | None) -> Decimal | None:
+        (v,) = _get(q or {}, "inventory_provision")
+        return -v if v is not None else None  # positive: the balance provided
+
+    rows = []
+    for y in sorted(k for k in years if k.isdigit())[-n:]:
+        year_bal = prov(years[y])
+        if year_bal is None:
+            continue
+        before, q3, q4 = prov(years.get(str(int(y) - 1))), prov(quarters.get(f"{y}-Q3")), prov(quarters.get(f"{y}-Q4"))
+        change = year_bal - before if before is not None else None
+        q4_change = year_bal - q3 if q3 is not None else None
+        share = q4_change / change if change is not None and q4_change is not None and abs(change) >= AUDIT_GAP_FLOOR else None
+        gap = None
+        if q4 is not None:
+            diff = abs(q4 - year_bal)
+            gap = diff > AUDIT_GAP_FLOOR and diff > AUDIT_GAP_SHARE * abs(year_bal)
+        if change is None and q4 is None:
+            continue  # a balance with no year before and no Q4 says nothing here
+        rows.append({"year": y, "change": _s(change), "q4_change": _s(q4_change), "q4_share": _r(share), "q4_balance": _s(q4),
+                     "year_balance": _s(year_bal), "gap": gap})
+    latest = next((r for r in reversed(rows) if r["gap"] is not None), None)
+    return {"rows": rows, "year": latest["year"] if latest else None, "flag": latest["gap"] if latest else None}
+
+
 INVENTORY_FLOW_SHARE = Decimal("0.20")  # Dự phòng giảm giá tồn kho đi vào lợi nhuận (owner, 22/11/2026)
 
 

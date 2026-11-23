@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Request
 
-from investment_agent.domain.balance_watch import borrowing_flag, carry, cover_thinning, gross_loss, inventory_pace, inventory_provision_flow, inventory_view, lending_view, liquidity_rows, provision_flow, net_debt_rows, property_cash, raise_prepay, receivables_view, sector_debt
+from investment_agent.domain.balance_watch import borrowing_flag, carry, cover_thinning, gross_loss, year_end_provision, inventory_pace, inventory_provision_flow, inventory_view, lending_view, liquidity_rows, provision_flow, net_debt_rows, property_cash, raise_prepay, receivables_view, sector_debt
 from investment_agent.market.financial_ratios import kind_of
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.sectors import load_sectors
@@ -53,6 +53,7 @@ def balance(symbol: str, request: Request):
             "lending": lending_view(quarters), "provision_flow": provision_flow(quarters), "inventory": inventory_view(quarters),
             "inventory_provision_flow": inventory_provision_flow(quarters), "gross_loss": gross_loss(quarters, property=sector == PROPERTY),
             "cover_thinning": cover_thinning(quarters, property=sector == PROPERTY),
+            "year_end_provision": year_end_provision(quarters, (record or {}).get("years", {})),
             "inventory_pace": inventory_pace(quarters, {s: qs for s, qs in peers.items() if s != symbol}, property=sector == PROPERTY), "revisions": _revisions(data_dir, symbol)}
 
 

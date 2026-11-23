@@ -56,3 +56,27 @@ def test_cover_thinning_needs_its_figures_material_inventory_and_no_property():
     qs = year(100, 260, 10)
     del qs["2025-Q3"]["inventory_provision"]
     assert cover_thinning(qs)["flag"] is None and cover_thinning({})["quarter"] is None
+
+
+def test_each_year_shows_its_provision_change_and_the_part_q4_carried_from_the_audited_year():
+    """Dự phòng chốt khi kiểm toán cuối năm (owner, 23/11/2026): shown, not flagged (Q4 carries 80% or more in 40% of years)."""
+    from investment_agent.domain.balance_watch import year_end_provision
+    prov = lambda v: {"inventory_provision": str(-v * B)}  # noqa: E731
+    years = {"2024": prov(504), "2025": prov(682)}
+    quarters = {"2025-Q3": prov(530), "2025-Q4": prov(682)}
+    v = year_end_provision(quarters, years)
+    assert v["rows"] == [{"year": "2025", "change": "178000000000", "q4_change": "152000000000", "q4_share": "0.8539",
+                          "q4_balance": "682000000000", "year_balance": "682000000000", "gap": False}]
+    assert v["flag"] is False and v["year"] == "2025"
+
+
+def test_a_q4_balance_the_audit_changed_is_flagged_from_1_ty_and_1_percent():
+    from investment_agent.domain.balance_watch import year_end_provision
+    prov = lambda v: {"inventory_provision": str(-v * B)}  # noqa: E731
+    v = year_end_provision({"2025-Q3": prov(530), "2025-Q4": prov(600)}, {"2024": prov(504), "2025": prov(682)})
+    assert v["flag"] is True and v["rows"][-1]["gap"] is True  # self-prepared 600, audited 682: the audit added 82 tỷ
+    assert year_end_provision({"2025-Q4": prov(681.5)}, {"2025": prov(682)})["flag"] is False  # 0,5 tỷ: under 1 tỷ
+    assert year_end_provision({"2025-Q4": prov(1000)}, {"2025": prov(1005)})["flag"] is False  # 5 tỷ but 0,5%: under 1%
+    small = year_end_provision({"2025-Q3": prov(10), "2025-Q4": prov(10.5)}, {"2024": prov(10), "2025": prov(10.5)})
+    assert small["rows"][-1]["q4_share"] is None  # a change under 1 tỷ: no share worth stating
+    assert year_end_provision({}, {})["flag"] is None and year_end_provision({"2025-Q4": prov(1)}, {})["rows"] == []

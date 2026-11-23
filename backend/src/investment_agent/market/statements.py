@@ -217,6 +217,16 @@ def _old_lines(record: dict, sector: str | None) -> bool:
     return record.get("lines_version", 1) < _lines_version(sector)
 
 
+# The first version of each layout with its present set of lines: a later version only re-reads the history (7: the update days), so a
+# record from it can still be compared and its revisions logged (review 23/11/2026 (4))
+SAME_LINES_SINCE = {None: 6}
+
+
+def _same_lines(record: dict, sector: str | None) -> bool:
+    kind = kind_of(sector)
+    return record.get("lines_version", 1) >= SAME_LINES_SINCE.get(kind, _lines_version(sector))
+
+
 def sync_statements(store: StatementStore, sectors: dict[str, str | None], *, get: Callable[[str], str], now: datetime, limit: int | None,
                     max_age_days: int = MAX_AGE_DAYS, sleep: Callable[[float], None] = time.sleep, kinds: tuple = (None,)) -> dict[str, str]:
     """Refresh the stalest watched tickers of `kinds` (None: non-financial; "bank", "securities"), never fetched first; one failing is
@@ -251,7 +261,7 @@ def sync_statements(store: StatementStore, sectors: dict[str, str | None], *, ge
             for key, parse in (("year_end_close", parse_year_end_closes), ("quarter_end_close", parse_quarter_end_closes)):
                 record[key] = dict(sorted({**(old or {}).get(key, {}), **parse(prices, symbol=symbol)}.items()))
             for kind, key in (("QUARTER", "quarters"), ("ANNUAL", "years")):
-                if old is not None and not _old_lines(old, sectors[symbol]):  # Số đã công bố bị sửa: logged before it is overwritten
+                if old is not None and _same_lines(old, sectors[symbol]):  # Số đã công bố bị sửa: logged before it is overwritten
                     from investment_agent.market.statement_revisions import find_revisions, record_revisions
                     record_revisions(store.root.parent, symbol, find_revisions(old.get(key, {}), parsed[kind]["periods"]), kind=key,
                                      seen_on=now.date())

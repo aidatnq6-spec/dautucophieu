@@ -67,7 +67,7 @@ def test_each_year_shows_its_provision_change_and_the_part_q4_carried_from_the_a
     v = year_end_provision(quarters, years, **SEEN)
     assert v["rows"] == [{"year": "2025", "change": "178000000000", "q4_change": "152000000000", "q4_share": "0.8539",
                           "q4_balance": "682000000000", "year_balance": "682000000000", "updated_on": "2026-04-01", "gap": False,
-                          "spike": False}]
+                          "why_not": None, "spike": False}]
     assert v["flag"] is False and v["year"] == "2025"
 
 
@@ -147,9 +147,9 @@ def test_two_prices_unevenly_old_are_not_set_against_each_other_and_the_reading_
     from investment_agent.domain.balance_watch import price_check
     quarters = {"2025-Q3": q(10, 200, 10), "2026-Q3": q(10, 260, 10)}
     uneven = price_check(quarters, [(date(2025, 9, 1), Decimal("400")), (date(2026, 8, 1), Decimal("340"))], indicator="com_urea", label="x")
-    assert uneven["flag"] is None and uneven["why_not"] == "Chưa đủ lịch sử giá: giá cuối quý này và cùng kỳ không cùng thời điểm trong kỳ."
+    assert uneven["flag"] is None and uneven["why_not"] == "Giá cuối quý này và cùng kỳ không cùng thời điểm trong kỳ: chưa so được."
     v = price_check(quarters, [(date(2025, 9, 1), Decimal("400")), (date(2026, 9, 1), Decimal("340"))], indicator="com_urea", label="x",
-                    source="World Bank")
+                    sources={date(2025, 9, 1): "World Bank", date(2026, 9, 1): "World Bank"})
     assert (v["price_date"], v["price_year_ago_date"], v["source"]) == ("2026-09-01", "2025-09-01", "World Bank")
 
 
@@ -158,3 +158,27 @@ def test_a_property_developer_never_gets_the_year_end_flag_though_its_rows_show(
     prov = lambda v: {"inventory_provision": str(-v * B)}  # noqa: E731
     v = year_end_provision({"2025-Q4": prov(600)}, {"2025": prov(682)}, property=True, **SEEN)
     assert v["flag"] is False and v["rows"][-1]["gap"] is True  # the figures stay on the page, the sign is off (as on the board)
+
+
+def test_review_4_property_off_whatever_the_year_reason_per_row_and_prices_out_of_step_named_plainly():
+    """Review 23/11/2026 (4): a property developer's sign is off even with no comparable year; each row says why it was not compared;
+    prices at different points of the period are not called a missing history; each compared price names its own source."""
+    from datetime import date
+    from decimal import Decimal
+
+    from investment_agent.domain.balance_watch import price_check, year_end_provision
+    prov = lambda v: {"inventory_provision": str(-v * B)}  # noqa: E731
+    assert year_end_provision({"2025-Q4": prov(600)}, {"2025": prov(682)}, property=True)["flag"] is False  # no update days: still off
+    rows = year_end_provision({"2024-Q4": prov(500), "2025-Q3": prov(530)}, {"2023": prov(400), "2024": prov(504), "2025": prov(682)},
+                              years_modified={"2024": "2025-01-24"}, quarters_created={"2024-Q4": "2025-01-24"})["rows"]
+    assert {r["year"]: r["why_not"] for r in rows} == {"2024": "not_updated", "2025": "no_q4"}
+    quarters = {"2025-Q3": q(10, 200, 10), "2026-Q3": q(10, 260, 10)}
+    uneven = price_check(quarters, [(date(2025, 9, 1), Decimal("400")), (date(2026, 8, 1), Decimal("340"))], indicator="com_urea", label="x")
+    assert uneven["why_not"] == "Giá cuối quý này và cùng kỳ không cùng thời điểm trong kỳ: chưa so được."
+    sources = {date(2025, 9, 1): "World Bank", date(2026, 9, 1): "World Bank", date(2026, 10, 1): "nhập tay"}
+    v = price_check(quarters, [(date(2025, 9, 1), Decimal("400")), (date(2026, 9, 1), Decimal("340")), (date(2026, 10, 1), Decimal("330"))],
+                    indicator="com_urea", label="x", sources=sources)
+    assert v["source"] == "World Bank"  # the two compared points, not the newest one
+    mixed = price_check(quarters, [(date(2025, 9, 1), Decimal("400")), (date(2026, 9, 1), Decimal("340"))], indicator="com_urea", label="x",
+                        sources={date(2025, 9, 1): "FRED", date(2026, 9, 1): "World Bank"})
+    assert mixed["source"] == "World Bank; cùng kỳ FRED"

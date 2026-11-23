@@ -145,5 +145,13 @@ def test_the_inventory_price_series_names_its_source_from_the_stored_points(tmp_
     (tmp_path / "macro").mkdir()
     (tmp_path / "macro" / "com_urea.json").write_text(_json.dumps({"indicator": "com_urea", "observations": [
         {"date": "2026-09-01", "value": "340", "source_url": "https://www.worldbank.org/en/research/commodity-markets"}]}), encoding="utf-8")
-    indicator, label, points, source = inventory_price_series(tmp_path, "DCM")
-    assert (indicator, len(points), source) == ("com_urea", 1, "World Bank")
+    indicator, label, points, sources = inventory_price_series(tmp_path, "DCM")
+    assert (indicator, len(points), list(sources.values())) == ("com_urea", 1, ["World Bank"])  # each point's own source
+
+
+def test_a_price_series_file_that_does_not_read_gives_no_series_not_an_error(tmp_path):
+    """Review 23/11/2026 (4): a cut-short macro file must not take the board or the page down."""
+    from investment_agent.market.value_chains import inventory_price_series
+    (tmp_path / "macro").mkdir()
+    (tmp_path / "macro" / "com_urea.json").write_text('{"indicator": "com_urea", "observ', encoding="utf-8")
+    assert inventory_price_series(tmp_path, "DCM") is None

@@ -107,6 +107,18 @@ def test_the_balance_carries_the_gross_loss_check_and_a_property_developer_is_ne
     assert call(c, clock, "GET", "/internal/stock/FPT/balance").json()["price_check"] is None
 
 
+def test_a_broken_value_chain_config_leaves_the_balance_page_open(tmp_path, monkeypatch):
+    """Review 23/11/2026 (4): the board was guarded, the page was not."""
+    import investment_agent.market.value_chains as vc
+
+    def broken():
+        raise ValueError("value-chains.json does not validate")
+    monkeypatch.setattr(vc, "load_value_chains", broken)
+    c, clock = client(tmp_path)
+    r = call(c, clock, "GET", "/internal/stock/FPT/balance")
+    assert r.status_code == 200 and r.json()["price_check"] is None
+
+
 def test_the_balance_carries_the_inventory_provision_flow(tmp_path):
     c, clock = client(tmp_path)
     flow = call(c, clock, "GET", "/internal/stock/FPT/balance").json()["inventory_provision_flow"]

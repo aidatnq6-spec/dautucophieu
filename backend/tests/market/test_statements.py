@@ -37,6 +37,24 @@ def test_the_general_layout_reads_its_whole_history_again_once_for_the_update_da
     assert LINES_VERSION >= 7
 
 
+def test_a_reread_for_a_version_with_the_same_lines_still_logs_revisions(tmp_path):
+    """Review 23/11/2026 (4): version 7 re-reads the history with the lines of version 6, so a figure the source changed is still logged."""
+    from investment_agent.market.statement_revisions import read_revisions
+    store = StatementStore(tmp_path / "statements")
+    store.save({"symbol": "HPG", "fetched_at": "2026-11-06T00:00:00+00:00", "source": "vndirect:finfo", "lines_version": 6,
+                "quarters": {}, "years": {"2024": {"npat_parent": str(100 * 10**9)}, "2025": {"npat_parent": str(150 * 10**9)}},
+                "year_end_close": {}, "quarter_end_close": {}})
+
+    def get(url):
+        if "stock_prices" in url:
+            return json.dumps({"data": []})
+        if "ANNUAL" in url:
+            return text(row(23000, 8e10, "2024-12-31", kind="ANNUAL"), row(23000, 1.5e11, "2025-12-31", kind="ANNUAL"))
+        return text()
+    sync_statements(store, {"HPG": "Tài nguyên Cơ bản"}, get=get, now=NOW, limit=None, sleep=lambda s: None)
+    assert [(r["period"], r["line"]) for r in read_revisions(tmp_path, "HPG")] == [("2024", "npat_parent")]
+
+
 def test_sync_keeps_the_update_days_by_period(tmp_path):
     def get(url):
         if "stock_prices" in url:

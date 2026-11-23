@@ -1205,7 +1205,9 @@ SHFE_QUARTERS, SHFE_QUARTER_BACK, SHFE_PACE_SECONDS = 12, 10, 2  # HRC cuối qu
 
 
 def _shfe_state(store: MacroStore) -> Path:
-    return Path(store.root).parent / "macro-state" / "shfe-hrc-quarters.json"
+    # v2 (review 23/11/2026 (4)): the first rules marked quarters tried on a network failure or a nearby stored day, so their file is not
+    # trusted and each quarter is tried once again under the present rules
+    return Path(store.root).parent / "macro-state" / "shfe-hrc-quarters-v2.json"
 
 
 def _shfe_answer(get: Callable[[str], str], day: date) -> tuple[str, str | None]:

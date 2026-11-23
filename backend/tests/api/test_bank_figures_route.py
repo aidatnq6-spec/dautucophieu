@@ -36,6 +36,34 @@ def test_a_quarter_is_saved_with_its_ratios_and_listed_newest_first(tmp_path):
     assert latest["source"] == {"kind": "pdf", "url": "https://acb.com.vn/bctc.pdf", "pages": {"group1": 12}, "urls": {}}
 
 
+def test_asset_quality_runs_on_public_figures_before_anything_is_entered_and_entries_go_on_top(tmp_path):
+    """Chất lượng tài sản ngân hàng (owner, 23/11/2026), part 2; made-up figures in the shape of the two stores."""
+    b = 1_000_000_000
+    (tmp_path / "bank-notes").mkdir()
+    (tmp_path / "bank-notes" / "ACB.json").write_text(json.dumps({"symbol": "ACB", "fetched_at": "2026-11-20T00:00:00+00:00", "source": "vietcap:iq", "quarters": {
+        "2026-06-30": {**{f"group{i}": str(v * b) for i, v in enumerate((1100, 10, 8, 8, 9), 1)}, "loans": str(1135 * b)},
+        "2026-09-30": {**{f"group{i}": str(v * b) for i, v in enumerate((1200, 17, 10, 10, 7), 1)}, "loans": str(1244 * b)}}}), encoding="utf-8")
+    (tmp_path / "statements-financial").mkdir()
+    (tmp_path / "statements-financial" / "ACB.json").write_text(json.dumps({"symbol": "ACB", "kind": "bank", "quarters": {
+        "2026-Q2": {"loan_reserve": str(-24 * b), "accrued_interest": str(56 * b)}, "2026-Q3": {"loan_reserve": str(-22 * b), "accrued_interest": str(70 * b)}},
+        "quarters_zeros": []}), encoding="utf-8")
+    c, clock = client(tmp_path)
+    body = call(c, clock, "GET", "/internal/bank-figures/ACB").json()
+    assert body["quarters"] == []  # the entry table stays the owner's
+    quality = body["quality"]
+    assert quality["quarter"] == "2026-Q3" and quality["values"]["reserve"] == "22" and quality["sources"]["group1"] == "Vietcap"
+    assert {"group2_jump", "reserve_lagging", "accrued_jump"} <= set(quality["trend"]["flags"]) and quality["notes"] == []
+    assert quality["derived"]["llr"] == "0.8148"  # 22 / 27
+    body = save(c, clock, "2026-Q3", {"reserve": "30"}, 0, "q1").json()
+    assert body["quality"]["values"]["reserve"] == "30" and body["quality"]["sources"]["reserve"] == "số nhập tay"
+    assert "reserve_lagging" not in body["quality"]["trend"]["flags"]
+
+
+def test_without_public_figures_or_entries_there_is_no_quality_block(tmp_path):
+    c, clock = client(tmp_path)
+    assert call(c, clock, "GET", "/internal/bank-figures/ACB").json()["quality"] is None
+
+
 def test_edit_delete_and_bad_input(tmp_path):
     c, clock = client(tmp_path)
     save(c, clock, "2024-Q4", ACB, 0, "e1")

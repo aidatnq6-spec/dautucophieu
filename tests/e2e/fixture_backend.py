@@ -108,7 +108,9 @@ if __name__ == "__main__":
     # So sánh cùng ngành: ACB, a second bank, with Q2 and Q3/2026 where VCB has only Q3 ratios (P/B 0,30x at Q3, 0,20x at Q2).
     StatementStore(os.path.join(data, "statements-financial")).save({
         "symbol": "ACB", "kind": "bank", "fetched_at": "2026-11-07T00:00:00+00:00", "source": "vndirect:finfo",
-        "quarters": {p: {"npat_parent": str(2 * 10**9), "equity": str(50 * 10**9), "charter_capital": str(5 * 10**9)}
+        "quarters": {p: {"npat_parent": str(2 * 10**9), "equity": str(50 * 10**9), "charter_capital": str(5 * 10**9),
+                         # Chất lượng tài sản: the reserve and accrued interest of Q3 (đồng), beside Vietcap's groups below
+                         **({"loan_reserve": "-6", "accrued_interest": "12"} if p == "2026-Q3" else {})}
                      for p in ("2025-Q1", "2025-Q2", "2025-Q3", "2025-Q4", "2026-Q1", "2026-Q2", "2026-Q3")},
         "years": {}, "quarters_conflicts": [], "years_conflicts": [], "year_end_close": {},
         "quarter_end_close": {"2026-Q2": {"date": "2026-06-30", "close": "20"}, "2026-Q3": {"date": "2026-09-30", "close": "30"}}})

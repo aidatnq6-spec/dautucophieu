@@ -190,6 +190,20 @@ def test_a_broken_value_chain_config_leaves_the_price_sign_unread_not_the_board(
     assert [r["symbol"] for r in rows] == ["AAA", "BBB", "VCB"] and all("price_drop" not in r["signs"] for r in rows)
 
 
+def test_review_4_a_property_developer_is_off_and_a_source_already_in_the_label_is_not_named_twice(tmp_path):
+    from investment_agent.services.receivable_signs import _source_note
+    d = data(tmp_path)
+    ind = json.loads((d / "industries.json").read_text(encoding="utf-8"))
+    ind["sectors"]["BBB"] = "Bất động sản"
+    (d / "industries.json").write_text(json.dumps(ind), encoding="utf-8")
+    StatementStore(d / "statements").save({"symbol": "BBB", "years": {"2025": {"inventory_provision": str(-682 * BN)}},
+                                           "quarters": {"2025-Q4": {"inventory_provision": str(-600 * BN)}}})  # no update days
+    bbb = next(r for r in receivable_signs(d) if r["symbol"] == "BBB")
+    assert bbb["signs"]["audit_gap"] is False
+    assert _source_note("Giá urê thế giới (Trung Đông, World Bank)", "World Bank") == ""
+    assert _source_note("Giá cao su thế giới", "FRED") == "; nguồn FRED"
+
+
 def test_lending_against_equity_is_a_sign_with_its_figure(tmp_path):
     from investment_agent.market.statements import StatementStore
     d = data(tmp_path)

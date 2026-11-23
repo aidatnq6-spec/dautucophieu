@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { auditGapText, compareCell, coverThinningText, grossLossText, priceCheckText } from "./balance-watch";
+import { auditGapText, compareCell, compareWhy, coverThinningText, grossLossText, priceCheckText } from "./balance-watch";
 
 describe("compareCell", () => {
   it("says how Q4 stood against the year, and that it could not be compared before the source updated the year (review 23/11/2026)", () => {
     expect([compareCell(true), compareCell(false), compareCell(null)]).toEqual(["lệch", "khớp", "chưa so được"]);
+    // each reason as it is (review 23/11/2026 (4)), and a source already in the label not named twice
+    expect([compareWhy("no_q4"), compareWhy("no_dates"), compareWhy("not_updated")]).toEqual(["Không có số dư quý 4 tự lập: chưa so được",
+      "Chưa biết ngày cập nhật của nguồn: chưa so được", "Số năm chưa được cập nhật sau quý 4: chưa so được"]);
   });
 });
 
@@ -15,6 +18,7 @@ describe("priceCheckText", () => {
     expect(priceCheckText({ ...base, source: "World Bank" })).toBe("Q3/2026: Giá urê thế giới 340 ngày 01/09/2026 (cùng kỳ 400 ngày 01/09/2025, giảm 15,0%; "
       + "nguồn World Bank); tỷ lệ trích lập dự phòng tồn kho 3,9% (cùng kỳ 5,0%). "
       + "Giá bán giảm mà dự phòng không tăng: giá trị thuần có thể thu hồi của hàng tồn có thể đã thấp hơn giá ghi sổ, xem thuyết minh.");
+    expect(priceCheckText({ ...base, label: "Giá urê thế giới (Trung Đông, World Bank)", source: "World Bank" })).not.toContain("nguồn World Bank");
     expect(priceCheckText({ ...base, flag: false, change: "0.0500", price: "420" })).toBe("Q3/2026: Giá urê thế giới 420 ngày 01/09/2026 (cùng kỳ 400 "
       + "ngày 01/09/2025, tăng 5,0%); tỷ lệ trích lập dự phòng tồn kho 3,9% (cùng kỳ 5,0%).");
     expect(priceCheckText({ ...base, flag: null, price: null, change: null, why_not: "Chưa đủ lịch sử giá: cần giá của cả cuối quý này và cùng kỳ năm trước." }))

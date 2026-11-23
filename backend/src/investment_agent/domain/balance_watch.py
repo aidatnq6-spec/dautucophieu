@@ -485,12 +485,12 @@ _QUARTER_END = {1: (3, 31), 2: (6, 30), 3: (9, 30), 4: (12, 31)}
 PRICE_SAME_POINT_DAYS = 7  # the two prices sit the same distance from their days, give or take this (review 23/11/2026)
 
 
-def price_check(quarters: dict, points: list, *, indicator: str, label: str, property: bool = False, source: str | None = None) -> dict:
+def price_check(quarters: dict, points: list, *, indicator: str, label: str, property: bool = False, sources: dict | None = None) -> dict:
     """Giá đầu ra giảm nhưng dự phòng không đổi (owner, 23/11/2026): the goods price the value chain ties to the ticker, at the latest
     quarter's end against the same day a year before, down 10% or more while the share of inventory provided for did not rise on the year.
     points: (date, price) in order. A price more than 75 days before its day is not used: then "chưa đủ lịch sử giá", never a guess."""
     from datetime import date, timedelta
-    out = {"quarter": None, "indicator": indicator, "label": label, "source": source, "price": None, "price_year_ago": None, "price_date": None,
+    out = {"quarter": None, "indicator": indicator, "label": label, "source": None, "price": None, "price_year_ago": None, "price_date": None,
            "price_year_ago_date": None, "change": None, "coverage": None, "coverage_year_ago": None, "flag": None, "why_not": None}
     if not quarters:
         return out
@@ -512,9 +512,13 @@ def price_check(quarters: dict, points: list, *, indicator: str, label: str, pro
     if now is None or ago is None or ago[1] <= 0:
         return {**out, "why_not": "Chưa đủ lịch sử giá: cần giá của cả cuối quý này và cùng kỳ năm trước."}
     if abs((end - now[0]).days - (end_ago - ago[0]).days) > PRICE_SAME_POINT_DAYS:  # e.g. August's urea against September a year before
-        return {**out, "why_not": "Chưa đủ lịch sử giá: giá cuối quý này và cùng kỳ không cùng thời điểm trong kỳ."}
+        return {**out, "why_not": "Giá cuối quý này và cùng kỳ không cùng thời điểm trong kỳ: chưa so được."}
     change = now[1] / ago[1] - 1
-    out.update(price=_s(now[1]), price_year_ago=_s(ago[1]), price_date=now[0].isoformat(), price_year_ago_date=ago[0].isoformat(), change=_r(change))
+    # the sources of the two compared prices, not of the newest point (review 23/11/2026 (4))
+    src_now, src_ago = (sources or {}).get(now[0]), (sources or {}).get(ago[0])
+    source = src_now if src_now == src_ago else "; cùng kỳ ".join(s for s in (src_now or "không rõ", src_ago or "không rõ"))
+    out.update(price=_s(now[1]), price_year_ago=_s(ago[1]), price_date=now[0].isoformat(), price_year_ago_date=ago[0].isoformat(), change=_r(change),
+               source=source)
     if None in (cover, cover_ago, share):
         return out
     return {**out, "flag": share >= INVENTORY_MATERIAL and change <= PRICE_DROP and cover <= cover_ago}
@@ -553,20 +557,27 @@ def year_end_provision(quarters: dict, years: dict, n: int = 5, *, years_modifie
         change = year_bal - before if before is not None else None
         q4_change = year_bal - q3 if q3 is not None else None
         share = q4_change / change if change is not None and q4_change is not None and abs(change) >= AUDIT_GAP_FLOOR else None
-        gap = None
+        gap, why = None, None
         updated, shown = years_modified.get(y), quarters_created.get(f"{y}-Q4")
-        if q4 is not None and updated and shown and updated > shown:
+        if q4 is None:
+            why = "no_q4"  # each reason said as it is (review 23/11/2026 (4))
+        elif not updated or not shown:
+            why = "no_dates"
+        elif updated <= shown:
+            why = "not_updated"
+        else:
             diff = abs(q4 - year_bal)
             gap = diff > AUDIT_GAP_FLOOR and diff > AUDIT_GAP_SHARE * abs(year_bal)
         if change is None and q4 is None:
             continue  # a balance with no year before and no Q4 says nothing here
         rows.append({"year": y, "change": _s(change), "q4_change": _s(q4_change), "q4_share": _r(share), "q4_balance": _s(q4),
-                     "year_balance": _s(year_bal), "updated_on": updated, "gap": gap,
+                     "year_balance": _s(year_bal), "updated_on": updated, "gap": gap, "why_not": why,
                      "spike": _spike(year_bal, q3, prov(quarters.get(f"{int(y) + 1}-Q2")))})
     latest = next((r for r in reversed(rows) if r["gap"] is not None), None)
     flag = latest["gap"] if latest else None
-    # never a sign for a property developer, whose inventory is projects (as on the board; review 23/11/2026): the rows still show
-    return {"rows": rows, "year": latest["year"] if latest else None, "flag": False if property and flag is not None else flag}
+    # never a sign for a property developer, whose inventory is projects, whether or not a year could be compared (as on the board;
+    # review 23/11/2026 (4)): the rows still show
+    return {"rows": rows, "year": latest["year"] if latest else None, "flag": False if property else flag}
 
 
 INVENTORY_FLOW_SHARE = Decimal("0.20")  # Dự phòng giảm giá tồn kho đi vào lợi nhuận (owner, 22/11/2026)

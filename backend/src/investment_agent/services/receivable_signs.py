@@ -42,6 +42,11 @@ def _pct1(v) -> str:
     return f"{(Decimal(str(v)) * 100).quantize(Decimal('0.1'), ROUND_HALF_UP)}%".replace(".", ",")
 
 
+def _source_note(label: str, source: str | None) -> str:
+    """"; nguồn …", unless the series' label already names that source (review 23/11/2026 (4): "World Bank" twice)."""
+    return f"; nguồn {source}" if source and source not in label else ""
+
+
 def _num(v) -> str:
     """A price as the series gives it, with Vietnamese grouping: 3.340 or 412,5."""
     whole, _, frac = format(Decimal(str(v)).normalize(), "f").partition(".")
@@ -130,7 +135,7 @@ def receivable_signs(data_dir: Path) -> list[dict]:
             found = inventory_price_series(data_dir, symbol, chains) if chains is not None else None
             price = None
             if found is not None:
-                price = price_check(qs, found[2], indicator=found[0], label=found[1], property=sector == "Bất động sản", source=found[3])
+                price = price_check(qs, found[2], indicator=found[0], label=found[1], property=sector == "Bất động sản", sources=found[3])
                 signs["price_drop"] = price["flag"]
         else:
             signs.update(other_high=None, provision_jump=None, raise_prepay=None, lending=None, inventory_fast=None, gross_loss=None,
@@ -152,7 +157,7 @@ def receivable_signs(data_dir: Path) -> list[dict]:
         if signs.get("price_drop"):
             q = price["quarter"]
             dmy = lambda d: f"{d[8:10]}/{d[5:7]}/{d[:4]}"  # noqa: E731
-            src = f"; nguồn {price['source']}" if price.get("source") else ""  # the dates and source of both prices (review 23/11/2026)
+            src = _source_note(price["label"], price.get("source"))  # the dates and source of both prices (review 23/11/2026)
             details["price_drop"] = (f"{price['label']} cuối quý {q[-1]}/{q[:4]} {_moved(price['change'])} so cùng kỳ "
                                      f"({_num(price['price_year_ago'])} ngày {dmy(price['price_year_ago_date'])} → {_num(price['price'])} ngày "
                                      f"{dmy(price['price_date'])}{src}) trong khi tỷ lệ trích lập dự phòng tồn kho "

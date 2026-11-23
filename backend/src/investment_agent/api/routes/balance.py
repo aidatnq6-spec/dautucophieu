@@ -63,11 +63,14 @@ def _price_check(data_dir: Path, symbol: str, quarters: dict, sector: str | None
     """Giá đầu ra giảm nhưng dự phòng không đổi (owner, 23/11/2026); None when the ticker's value chain ties no goods price."""
     from investment_agent.domain.balance_watch import price_check
     from investment_agent.market.value_chains import inventory_price_series
-    found = inventory_price_series(data_dir, symbol)
+    try:  # a value-chains.json that does not validate leaves the price reading out, never the page (review 23/11/2026 (4))
+        found = inventory_price_series(data_dir, symbol)
+    except Exception:  # noqa: BLE001 - any failure to read the hand-edited config
+        return None
     if found is None:
         return None
-    indicator, label, points, source = found
-    return price_check(quarters, points, indicator=indicator, label=label, property=sector == PROPERTY, source=source)
+    indicator, label, points, sources = found
+    return price_check(quarters, points, indicator=indicator, label=label, property=sector == PROPERTY, sources=sources)
 
 
 def _revisions(data_dir: Path, symbol: str) -> list[dict]:

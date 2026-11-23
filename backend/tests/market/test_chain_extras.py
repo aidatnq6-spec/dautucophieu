@@ -198,3 +198,23 @@ def test_a_quarter_whose_days_failed_to_answer_is_tried_again_and_the_quarter_en
     offline["on"] = False
     fetch_chain_markets(store, get=get, today=date(2026, 11, 21), sleep=lambda s: None)
     assert {o["date"]: o["value"] for o in store.read("com_steel_hrc")}["2026-06-30"] == "3150"  # tried again once SHFE answered
+
+
+def test_the_tried_quarters_of_the_first_rules_are_not_trusted(tmp_path):
+    """Review 23/11/2026 (4): the first rules marked quarters tried on a network failure or a nearby stored day; their file is not read."""
+    import json as _json
+    store = MacroStore(tmp_path)
+    (tmp_path / "macro-state").mkdir()
+    (tmp_path / "macro-state" / "shfe-hrc-quarters.json").write_text(_json.dumps({"tried": ["2026-09-30"]}), encoding="utf-8")
+    asked = []
+
+    def get(url):
+        asked.append(url)
+        if url.startswith(SSE_INDEX):
+            return sse("SCFI_T", "2026-11-20", "2026-11-13") if "scfi" in url else sse("CTFI_T", "2026-11-20", "2026-11-19")
+        day = url.removeprefix(SHFE_DAILY.split("{")[0]).removesuffix(".dat")
+        if day in ("20261120", "20260930"):
+            return shfe(("hc_f", "2701", 3282, 100))
+        no_trading(url)
+    fetch_chain_markets(store, get=get, today=date(2026, 11, 21), sleep=lambda s: None)
+    assert "2026-09-30" in {o["date"] for o in store.read("com_steel_hrc")}

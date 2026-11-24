@@ -10,7 +10,8 @@ test("Danh mục shows the peak gain and what went back for each holding, withou
   await page.goto("/portfolio");
   const box = page.getByRole("region", { name: "Lãi đã trả lại thị trường" });
   await expect(box.getByRole("table", { name: "Lãi đã trả lại theo mã" }).getByRole("row", { name: /FPT/ })).toBeVisible();
-  await expect(box).toContainText("Chưa nhắc: đặt hai ngưỡng trong Cài đặt");
+  await expect(box).toContainText("Mức chung chưa đặt: đặt hai ngưỡng trong Cài đặt");
+  await expect(box).toContainText("ngưỡng mức chung: chưa đặt");
   await expect(box).toContainText("không phải khuyến nghị");
 });
 
@@ -28,7 +29,7 @@ test("a spending goal is added and can be closed", async ({ page }) => {
 
 test("the two thresholds are set together in Cài đặt", async ({ page }) => {
   await page.goto("/settings");
-  const first = page.getByLabel("Lãi đã trả lại: mã từng lãi ít nhất (% giá vốn)");
+  const first = page.getByLabel("Lãi đã trả lại, mức chung: mã từng lãi ít nhất (% giá vốn)");
   await expect(first).toHaveValue("");
   await first.fill("30");
   await page.getByRole("button", { name: "Lưu ngưỡng" }).click();

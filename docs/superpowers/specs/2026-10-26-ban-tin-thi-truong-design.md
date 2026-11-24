@@ -80,6 +80,9 @@ Chủ sở hữu đọc bản tin sau phiên để biết nhanh phiên vừa r�
 - **Giới hạn Vnstock:** gói Cộng đồng chỉ cho 60 lần gọi/phút. Bảng giá cả sàn chỉ cần 1 lần gọi (tối đa 500 mã mỗi lần). Danh sách mã và ngành chỉ cần làm mới hằng tuần, cùng lúc với `industries`.
 - **Thời điểm:**
   - Bản tin lập ở lượt 15:30 (hoặc lượt sau đó nếu giá chưa về).
+  - Mỗi phiên có 2 lượt thử. Lượt chỉ dừng ở "chưa đủ" vì nguồn chưa có giá của phiên (mã đang nắm chỉ có giá phiên trước) không bị tính
+    lượt, nên lượt sau, kể cả 08:30 sáng hôm sau, vẫn thử lại. Qua lượt đầu (15:30) của phiên kế tiếp thì phiên cũ chỉ được đếm là bị lỡ,
+    như trước. Chủ sở hữu duyệt ngày 24/11/2026, sau khi VNDirect chưa có phiên 24/11 đến 21:41.
   - Số liệu phiên lấy từ bảng giá cả sàn, có ngay sau giờ đóng cửa.
   - Báo cáo khối ngoại của HOSE thường chưa có trong ngày, nên chỉ dùng để đối chiếu khi đã có. Không chờ báo cáo này.
 - **Lưu trữ:**

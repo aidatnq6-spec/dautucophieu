@@ -64,6 +64,11 @@ class JobStore:
             self._db.execute("INSERT INTO session_attempts VALUES (?, 1) ON CONFLICT(session) DO UPDATE SET count = count + 1", (session,))
             return self._db.execute("SELECT count FROM session_attempts WHERE session = ?", (session,)).fetchone()[0]
 
+    def uncount_attempt(self, session: str) -> None:
+        """Give back an attempt that ended only because the source had not yet published the session."""
+        with self._lock:
+            self._db.execute("UPDATE session_attempts SET count = MAX(count - 1, 0) WHERE session = ?", (session,))
+
     def attempts(self) -> dict[str, int]:
         return dict(self._db.execute("SELECT session, count FROM session_attempts").fetchall())
 

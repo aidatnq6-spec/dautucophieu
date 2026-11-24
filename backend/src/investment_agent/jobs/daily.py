@@ -69,7 +69,8 @@ def run_after_close(*, repo, owner, market, jobs: JobStore, outbox, session_date
         if existing.payload["status"] == "published":
             outbox.enqueue(report_id)
         known = jobs.by_key(run_key)
-        return JobResult(job_id=known["job_id"] if known else "", report_id=report_id, status=existing.payload["status"])
+        return JobResult(job_id=known["job_id"] if known else "", report_id=report_id, status=existing.payload["status"],
+                         reason=_behind_reason(existing.payload["status"], existing.payload.get("verification_flags", [])))
     job_id = jobs.acquire(run_key, worker_id=worker_id, now=now.timestamp(), ttl=LEASE_SECONDS)
     try:
         return _run(repo, owner, market, jobs, outbox, job_id, content, versions, snapshot, report_id, session_date, now, narrate,
@@ -130,4 +131,12 @@ def _run(repo, owner, market, jobs, outbox, job_id, content, versions, snapshot,
         outbox.enqueue(report_id)
         jobs.stage(job_id, "notify")
     jobs.finish(job_id, status, report_id=report_id)
-    return JobResult(job_id=job_id, report_id=report_id, status=status)
+    return JobResult(job_id=job_id, report_id=report_id, status=status, reason=_behind_reason(status, flags))
+
+
+SOURCE_BEHIND = "source_behind"
+
+
+def _behind_reason(status: str, flags: list[str]) -> str | None:
+    """An incomplete report whose holdings are priced only for an earlier session: the source has not published this one yet."""
+    return SOURCE_BEHIND if status == "incomplete" and any(f.startswith("price_not_for_session:") for f in flags) else None

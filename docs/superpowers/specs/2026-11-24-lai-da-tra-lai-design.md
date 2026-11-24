@@ -19,12 +19,13 @@ Kế hoạch sụt giảm. Dữ liệu cá nhân, tính trên máy, không gửi
   - phần đã trả lại = lãi cao nhất − lãi hôm nay (đồng), và bằng bao nhiêu % của lãi cao nhất;
   - số phiên từ ngày đạt lãi cao nhất.
   Lãi cao nhất không dương (chưa từng có lãi) thì ghi "chưa từng có lãi trong đợt nắm này", không có phần trả lại.
-- **Cả danh mục**: cộng lãi từng ngày của các mã đang nắm hôm đó. Chỉ tính ngày mọi mã đang nắm hôm đó đều có giá; số ngày bị bỏ vì thiếu
-  giá được ghi kèm. Chỉ là lãi chưa chốt của phần đang nắm; lãi đã chốt của mã đã bán không thuộc phép tính này.
+- **Cả danh mục**: cộng lãi từng ngày của các mã đang nắm hôm nay, mỗi mã từ đầu đợt nắm hiện tại của nó. Chỉ tính ngày mọi mã đã vào
+  đợt nắm đều có giá; số ngày bị bỏ vì thiếu giá được ghi kèm. Một mã không tính được (thiếu giá ngày mua) thì cả danh mục ghi "chưa tính
+  được" kèm tên mã. Chỉ là lãi chưa chốt của phần đang nắm; lãi đã chốt của mã đã bán không thuộc phép tính này.
 - **Nhắc** (Telegram, trong tin gộp "Danh mục hôm nay", và một dòng ở Việc cần xem nhóm cần quyết định): khi một mã có lãi cao nhất từ
   mức tối thiểu A% giá vốn trở lên và đã trả lại từ B% lãi cao nhất trở lên. Chủ sở hữu tự đặt A và B ở Cài đặt danh mục; phần mềm không
   đặt sẵn, để trống thì không nhắc. Mỗi mã nhắc một lần mỗi đợt; chỉ nhắc lại sau khi phần trả lại đã xuống dưới B%. Trạng thái ở kho cá
-  nhân `settings/giveback_alerts`. Tin nhắc nêu số đồng, % và ngày đạt lãi cao nhất, kèm lý do mua trong Luận điểm nếu có.
+  nhân `settings/giveback_alerts`. Tin nhắc nêu số đồng, % và ngày đạt lãi cao nhất, kèm lý do mới nhất đã ghi trong Nhật ký nếu có (như Kế hoạch sụt giảm).
 
 ## Khối 2: Mục tiêu đã đủ tiền
 - Chủ sở hữu ghi tối đa 10 mục tiêu chi tiêu: tên, số tiền (đồng), và cách đếm: **lãi chưa chốt của danh mục** hoặc **giá trị danh mục
@@ -34,7 +35,9 @@ Kế hoạch sụt giảm. Dữ liệu cá nhân, tính trên máy, không gửi
   - lần gần nhất bắt đầu đủ, đã đủ bao nhiêu ngày;
   - nếu từng đủ rồi lại thiếu: đủ từ ngày nào đến ngày nào, và mức cao nhất đã vượt mục tiêu bao nhiêu.
   Ngày tạo mục tiêu được ghi kèm; trạng thái trước ngày đó vẫn hiện nhưng ghi "trước khi bạn đặt mục tiêu".
-- Nhắc một lần khi mục tiêu bắt đầu đủ, và một lần khi đã đủ rồi lại thiếu, theo lượt chạy lịch (Telegram như trên, cùng Việc cần xem).
+- Nhắc một lần khi mục tiêu bắt đầu đủ, và một lần khi đã đủ rồi lại thiếu, theo lượt chạy lịch (Telegram như trên). Lần đầu thấy một mục
+  tiêu đang thiếu thì không nhắc. Trạng thái nhắc lưu cùng `settings/giveback_alerts`. Việc cần xem có một dòng (cần quyết định) cho mỗi
+  mục tiêu đang mở đã đủ.
 - Chủ sở hữu bấm "đã thực hiện" hoặc "bỏ mục tiêu", có ghi ngày; mục tiêu đã đóng không còn nhắc nhưng còn trong danh sách.
 - Không đụng Sổ tài sản, Tháp tài sản, Mục đích từng khoản tiền hay số tiền dành cho cổ phiếu.
 

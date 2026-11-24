@@ -3,10 +3,11 @@ import { useEffect, useState } from "react";
 import { Check, Plus, X } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatRatio, formatVnd, groupDigitsInput, hanoiDate, parseMoneyInput } from "../lib/format";
+import { ruleLabel, type Rule } from "./basket-rules";
 
 type Point = { gain: string; ratio: string | null; on: string };
 export type Row = { symbol: string; since: string; reason: string | null; never_gained: boolean; sessions_since_peak: number | null;
-  peak: Point | null; now: Point | null; given_back: string | null; share: string | null; days: { on: string; gain: string }[] };
+  peak: Point | null; now: Point | null; given_back: string | null; share: string | null; days: { on: string; gain: string }[]; rule?: Rule };
 type Portfolio = Omit<Row, "symbol" | "since" | "reason" | "days"> & { skipped: number; missing: string[]; days: { on: string; gain: string; value: string }[] };
 export type GoalStatus = { enough: boolean | null; short: string | null; since: string | null; days: number | null; before_goal: boolean | null;
   last: { from: string; to: string; excess: string } | null; last_before_goal: boolean | null };
@@ -135,12 +136,14 @@ export function GivebackView() {
         <p className="caption">Lãi cao nhất mỗi mã đã có trong đợt nắm hiện tại, lãi hôm nay và phần đã trả lại. Tính trên giá điều chỉnh nên gồm cả cổ tức và
           cổ phiếu thưởng đã nhận; có thể khác cột lãi chưa chốt của bảng danh mục. {t.min_gain && t.share
             ? `Nhắc qua Telegram một lần khi một mã từng lãi từ ${formatRatio(t.min_gain, 0)} và đã trả lại từ ${formatRatio(t.share, 0)} lãi đó (sửa trong Cài đặt).`
-            : "Chưa nhắc: đặt hai ngưỡng trong Cài đặt nếu muốn được nhắc."} Chỉ là số đã xảy ra, không phải khuyến nghị.</p>
+            : "Mức chung chưa đặt: đặt hai ngưỡng trong Cài đặt nếu muốn được nhắc."} Giỏ chiến lược có thể đặt ngưỡng riêng hoặc không nhắc; ngưỡng
+          đang áp ghi dưới từng mã. Chỉ là số đã xảy ra, không phải khuyến nghị.</p>
         {d.rows.length === 0 ? <p className="muted">Chưa có cổ phiếu đang nắm.</p> : <>
           <table className="fv-table cc-table" aria-label="Lãi đã trả lại theo mã">
             <thead><tr><th>Mã</th><th>Lãi cao nhất</th><th className="num">Lãi hôm nay</th><th>Đã trả lại</th><th /></tr></thead>
             <tbody>{[...d.rows].sort(byGivenBack).map((r) => <tr key={r.symbol}>
-              <td data-label="Mã"><strong>{r.symbol}</strong><div className="caption">nắm từ {day(r.since)}</div></td>
+              <td data-label="Mã"><strong>{r.symbol}</strong><div className="caption">nắm từ {day(r.since)}</div>
+                {r.rule && <div className="caption">ngưỡng {ruleLabel(r.rule)}</div>}</td>
               <td data-label="Lãi cao nhất">{peakLine(r)}</td>
               <td data-label="Lãi hôm nay" className="num">{r.now ? <>{formatVnd(r.now.gain)}{r.now.ratio && <div className="caption">{signed(r.now.ratio)} · {day(r.now.on)}</div>}</> : "—"}</td>
               <td data-label="Đã trả lại">{backLine(r)}</td>

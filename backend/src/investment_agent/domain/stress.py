@@ -29,7 +29,10 @@ def _dmy(iso: str) -> str:
 
 
 def stress_inputs(*, shares: dict[str, int], costs: dict[str, Decimal], prices: dict[str, Decimal | None], betas: dict[str, dict],
-                  sensitivity: dict[str, dict], index: list, answer10: str | None, threshold: Decimal, watched: set[str] | None = None) -> dict:
+                  sensitivity: dict[str, dict], index: list, answer10: str | None, threshold: Decimal, watched: set[str] | None = None,
+                  rules: dict[str, dict] | None = None) -> dict:
+    """rules: each holding's drawdown level and where it comes from (its basket's, or none for a basket that does not remind); the
+    common threshold for a holding without one."""
     rows = []
     for symbol in sorted(shares, key=lambda s: -(shares[s] * (prices.get(s) or 0))):
         price = prices.get(symbol)
@@ -40,7 +43,8 @@ def stress_inputs(*, shares: dict[str, int], costs: dict[str, Decimal], prices: 
             else "VNDirect chưa có beta"
         rows.append({"symbol": symbol, "shares": shares[symbol], "price": _s(price), "value": _s(None if price is None else price * shares[symbol]),
                      "cost": _s(costs.get(symbol)), "beta": beta, "beta_note": beta_note, "oil": oil, "usd": usd,
-                     "oil_note": oil_note, "usd_note": usd_note})
+                     "oil_note": oil_note, "usd_note": usd_note,
+                     "rule": (rules or {}).get(symbol) or {"source": "default", "basket": None, "threshold": str(threshold)}})
     deepest = max_drawdown(index)
     worst = None if deepest is None or Decimal(deepest["depth"]) >= 0 else {"depth": deepest["depth"], "peak": deepest["peak"], "trough": deepest["trough"]}
     presets = [{"id": "vn10", "label": "VN-Index −10%", "market": "-0.10", "oil": "0", "usd": "0"},

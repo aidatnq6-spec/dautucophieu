@@ -43,15 +43,22 @@ def current_drawdown(points: list[tuple[datetime, float]]) -> dict | None:
 
 
 def threshold_alerts(holdings: dict[str, dict], *, threshold: str, alerted: set[str]) -> tuple[list[dict], set[str]]:
-    """holdings: {symbol: {price, cost}} in đồng. A ticker at or below −threshold from its average cost alerts once; it re-arms
-    when it climbs back above. Returns (new alerts, symbols currently alerted)."""
-    limit, alerts, now = -Decimal(threshold), [], set(alerted)
+    """holdings: {symbol: {price, cost, threshold?}} in đồng. A ticker at or below −threshold from its average cost alerts once; it re-arms
+    when it climbs back above. A holding's own "threshold" (its basket's) replaces the common one, and None means no reminder: the ticker
+    is dropped from the alerted set so it is told once if turned back on. Returns (new alerts, symbols currently alerted)."""
+    alerts, now = [], set(alerted)
     for symbol, h in sorted(holdings.items()):
+        own = h.get("threshold", threshold)
+        if own is None:
+            now.discard(symbol)
+            continue
+        limit = -Decimal(own)
         if h.get("price") is None or not h.get("cost") or Decimal(h["cost"]) <= 0:
             continue
         change = Decimal(h["price"]) / Decimal(h["cost"]) - 1
         if change <= limit and symbol not in now:
-            alerts.append({"symbol": symbol, "change": str(change.quantize(_Q4, ROUND_HALF_UP)), "price": h["price"], "cost": h["cost"]})
+            alerts.append({"symbol": symbol, "change": str(change.quantize(_Q4, ROUND_HALF_UP)), "price": h["price"], "cost": h["cost"],
+                           **({"rule": h["rule"]} if "rule" in h else {})})
             now.add(symbol)
         elif change > limit:
             now.discard(symbol)

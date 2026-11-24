@@ -34,10 +34,24 @@ def test_holdings_values_betas_and_the_owners_answer_ten(tmp_path):
     out = call(c, clock, "GET", "/internal/stress").json()
     assert out["rows"][0] | {"oil_note": None, "usd_note": None} == {
         "symbol": "FPT", "shares": 100, "price": "60000", "value": "6000000", "cost": "50000", "beta": "1.2", "beta_note": None, "oil": None, "usd": None,
-        "oil_note": None, "usd_note": None}
+        "oil_note": None, "usd_note": None, "rule": {"source": "default", "basket": None, "threshold": "0.30"}}
     assert out["tolerance"]["answer"] == "B" and out["worst"]["depth"] == "-0.2500" and out["threshold"] == "0.30"
 
 
 def test_without_personal_store_it_is_unavailable(tmp_path):
     clock = Clock()
     assert call(client(tmp_path, clock, repo=False), clock, "GET", "/internal/stress").status_code == 503
+
+
+def test_each_holding_carries_its_baskets_drawdown_level(tmp_path):
+    clock = Clock()
+    c = client(tmp_path, clock)
+    call(c, clock, "POST", "/internal/ledger/events", {"event": {"event_id": "d1", "type": "deposit", "effective_at": "2026-02-02", "sequence": 0,
+                                                                 "amount": "100000000"}, "expected_version": 0, "request_id": "l1"})
+    call(c, clock, "POST", "/internal/ledger/events", {"event": {"event_id": "b1", "type": "buy", "effective_at": "2026-02-03", "sequence": 0,
+                                                                 "security_id": "FPT", "quantity": 100, "price": "50000", "fee": "0", "tax": "0"},
+                                                       "expected_version": 1, "request_id": "l2"})
+    call(c, clock, "PUT", "/internal/baskets", {"baskets": [{"id": "b1", "name": "Dài hạn", "drawdown": {"mode": "off"}}],
+                                                "tags": {"FPT@2026-02-03": "b1"}, "expected_version": 0, "request_id": "k1"})
+    (row,) = call(c, clock, "GET", "/internal/stress").json()["rows"]
+    assert row["rule"] == {"source": "off", "basket": "Dài hạn", "threshold": None}

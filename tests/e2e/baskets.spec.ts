@@ -18,6 +18,26 @@ test("a suggested basket is created and the FPT period tagged into it", async ({
   await expect(box).toContainText("không phải khuyến nghị");
 });
 
+test("a basket's own drawdown level is saved and shown under the holding in Kế hoạch sụt giảm", async ({ page }) => {
+  await page.goto("/portfolio");
+  const box = page.getByRole("region", { name: "Giỏ chiến lược" });
+  const levels = box.getByRole("table", { name: "Ngưỡng nhắc theo giỏ" });
+  await levels.getByRole("combobox", { name: "Sụt giảm của giỏ Dài hạn" }).selectOption({ label: "Riêng" });
+  await levels.getByLabel("Ngưỡng (%)").fill("96");
+  await levels.getByRole("button", { name: "Lưu" }).click();
+  await expect(levels.getByRole("alert")).toContainText("từ 1% đến 95%");
+  await levels.getByLabel("Ngưỡng (%)").fill("12");
+  await levels.getByRole("button", { name: "Lưu" }).click();
+  await expect(box.getByRole("status").filter({ hasText: "Đã lưu ngưỡng nhắc của giỏ «Dài hạn»" })).toBeVisible();
+  await page.reload();
+  const drawdown = page.getByRole("region", { name: "Kế hoạch sụt giảm" });
+  await expect(drawdown.getByRole("table", { name: "Sụt giảm theo mã" }).getByRole("row", { name: /FPT/ })).toContainText("ngưỡng giỏ Dài hạn: 12%");
+  const back = page.getByRole("region", { name: "Giỏ chiến lược" }).getByRole("table", { name: "Ngưỡng nhắc theo giỏ" });
+  await back.getByRole("combobox", { name: "Sụt giảm của giỏ Dài hạn" }).selectOption({ label: "Mức chung" });
+  await back.getByRole("button", { name: "Lưu" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Đã lưu ngưỡng nhắc của giỏ «Dài hạn»" })).toBeVisible();
+});
+
 test("Hậu kiểm shows the pyramid section without advice", async ({ page }) => {
   await page.goto("/journal");
   const box = page.getByRole("region", { name: "Hậu kiểm quyết định" });

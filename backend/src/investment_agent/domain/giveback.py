@@ -97,17 +97,21 @@ def giveback(events, *, closes: dict, today: date) -> dict:
     return {"rows": rows, "portfolio": portfolio}
 
 
-def giveback_alerts(rows: list[dict], *, min_gain: Decimal | None, share: Decimal | None, alerted: set[str]) -> tuple[list[dict], set[str]]:
+def giveback_alerts(rows: list[dict], *, min_gain: Decimal | None, share: Decimal | None, alerted: set[str],
+                    own: dict[str, tuple[Decimal | None, Decimal | None]] | None = None) -> tuple[list[dict], set[str]]:
     """A holding whose peak gain reached min_gain of its cost and that has given back at least share of it is reminded once per holding
-    period ("SYMBOL@since"); it re-arms when the share falls back below. Without both thresholds nothing is reminded."""
-    if min_gain is None or share is None:
-        return [], set()
+    period ("SYMBOL@since"); it re-arms when the share falls back below. own: a ticker's levels from its basket, replacing the common ones
+    ((None, None) for no reminder). Without both levels a holding is not reminded."""
     alerts, now = [], set()
     for r in rows:
+        a, b = (own or {}).get(r["symbol"], (min_gain, share))
+        if a is None or b is None:
+            continue
+        a, b = Decimal(a), Decimal(b)
         if not r.get("peak") or r["peak"].get("ratio") is None or r.get("share") is None:
             continue
         key = f"{r['symbol']}@{r['since']}"
-        if Decimal(r["peak"]["ratio"]) >= min_gain and Decimal(r["share"]) >= share:
+        if Decimal(r["peak"]["ratio"]) >= a and Decimal(r["share"]) >= b:
             if key not in alerted:
                 alerts.append(r)
             now.add(key)

@@ -87,7 +87,7 @@ export function HindsightView() {
         </table></div>}
 
         <h3>Giữ khi đang lỗ quá {pct(data.threshold).replace("+", "")} so với giá vốn</h3>
-        <p className="caption">Dùng ngưỡng Kế hoạch sụt giảm hiện tại cho mọi khoảng trong quá khứ. Giá đã lưu được điều chỉnh theo cổ tức và phát hành,
+        <p className="caption">Dùng ngưỡng chung của Kế hoạch sụt giảm hiện tại cho mọi khoảng trong quá khứ; ngưỡng theo giỏ chỉ áp cho nhắc từ nay. Giá đã lưu được điều chỉnh theo cổ tức và phát hành,
           nên giá vốn ở đây là bình quân giá đóng cửa (đã điều chỉnh) của các ngày mua, không phải giá khớp.</p>
         {data.loss_holds.length === 0 ? <p className="muted">Chưa có lần nào.</p> : <div className="tablewrap"><table aria-label="Giữ khi đang lỗ">
           <thead><tr><th>Mã</th><th>Từ</th><th>Đến</th><th className="num">Sâu nhất</th><th>Kết thúc</th></tr></thead>

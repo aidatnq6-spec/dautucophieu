@@ -12,7 +12,8 @@ test("Danh mục shows the deepest fall, the fall now and price against cost for
   const table = box.getByRole("table", { name: "Sụt giảm theo mã" });
   await expect(table.getByRole("row", { name: /VN-Index/ })).toBeVisible();
   await expect(table.getByRole("row", { name: /FPT/ })).toContainText(/[+−]\d+,\d%/);
-  await expect(box).toContainText("ngưỡng 30% dưới giá vốn");
+  await expect(box).toContainText("mức chung 30%");
+  await expect(table.getByRole("row", { name: /FPT/ })).toContainText("ngưỡng mức chung: 30%");
   await expect(box).toContainText("không phải khuyến nghị");
 });
 
@@ -28,7 +29,7 @@ test("the watched tickers are listed apart, folded until opened", async ({ page 
 
 test("the threshold is set in Cài đặt", async ({ page }) => {
   await page.goto("/settings");
-  await expect(page.getByLabel("Kế hoạch sụt giảm: nhắc khi giá thấp hơn giá vốn (%)")).toHaveValue("30");
+  await expect(page.getByLabel("Kế hoạch sụt giảm, mức chung: nhắc khi giá thấp hơn giá vốn (%)")).toHaveValue("30");
 });
 
 test("no horizontal scroll with the drawdown block at 375px", async ({ page }) => {

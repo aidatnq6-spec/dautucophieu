@@ -53,3 +53,12 @@ it("reads percentages as typed: a unicode minus, a comma, and nothing at all", (
   expect(percentField("-0.4567")).toBe("-45.67");
   expect(percentField("0.07")).toBe("7");
 });
+
+it("holds each holding to its basket's level, and names one whose basket does not remind", () => {
+  const rows = [row("FPT", { price: "40000", value: "4000000", rule: { source: "basket", basket: "Ngắn hạn", threshold: "0.40" } }),
+    row("HPG", { price: "40000", value: "4000000", rule: { source: "off", basket: "Dài hạn", threshold: null } })];
+  const out = applyScenario({ rows, threshold: "0.30", tolerance: null }, { market: -0.15, oil: 0, usd: 0 });
+  expect(out.rows[0]).toMatchObject({ crossesThreshold: false, threshold: 0.4 });  // −34,4% is inside the basket's 40%
+  expect(out.rows[1]).toMatchObject({ crossesThreshold: false, threshold: null });
+  expect(out.rows[1].notes).toContain("Không có ngưỡng (giỏ Dài hạn: không nhắc)");
+});

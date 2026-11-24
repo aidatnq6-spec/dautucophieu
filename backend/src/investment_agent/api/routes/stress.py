@@ -13,6 +13,7 @@ from investment_agent.market.leading import MacroStore
 from investment_agent.market.series import SeriesStore
 from investment_agent.market.watchlist import load_watchlist
 from investment_agent.repositories.personal import RepositoryUnavailable
+from investment_agent.services.baskets import rules_for
 from investment_agent.services.drawdown import held_costs, last_close
 from investment_agent.services.records import StoredRisk, portfolio_settings, read_version
 from investment_agent.services.theses import position_shares
@@ -38,6 +39,7 @@ def stress(request: Request):
     try:
         shares, costs = position_shares(repo, owner), {s: Decimal(c) for s, c in held_costs(repo, owner).items()}
         threshold, answer = portfolio_settings(repo, owner)[0].drawdown_threshold, _answer10(repo, owner)
+        rules = {s: r["drawdown"] for s, r in rules_for(repo, owner).items()}
     except RepositoryUnavailable:
         return unavailable()
     series, market, macro = SeriesStore(Path(data_dir) / "trend-sources"), request.app.state.market, MacroStore(data_dir)
@@ -52,4 +54,4 @@ def stress(request: Request):
     sens = {s: sensitivity(closes(f"{s}-1d"), index=index, oil=factor["oil"], usd=factor["usd"], weeks=SPANS["3y"]) for s in shares}
     return stress_inputs(shares=shares, costs=costs, prices=prices, betas=BetaStore(data_dir).read()["values"], sensitivity=sens,
                          index=series.read("VNINDEX-1d"), answer10=answer, threshold=threshold,
-                         watched=set(load_watchlist(Path(data_dir)).symbols))
+                         watched=set(load_watchlist(Path(data_dir)).symbols), rules=rules)

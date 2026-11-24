@@ -52,3 +52,14 @@ def test_bad_baskets_are_refused():
 def test_without_personal_store_baskets_are_unavailable():
     c, clock = client(repo=False)
     assert call(c, clock, "GET", "/internal/baskets").status_code == 503
+
+
+def test_a_baskets_reminder_levels_are_saved_with_it():
+    c, clock = client()
+    data = {"baskets": [{"id": "b1", "name": "Ngắn hạn", "drawdown": {"mode": "custom", "threshold": "0.07"},
+                         "giveback": {"mode": "custom", "min_gain": "0.2", "share": "0.5"}}], "tags": {}}
+    saved = call(c, clock, "PUT", "/internal/baskets", {**data, "expected_version": 0, "request_id": "k1"}).json()
+    assert saved["data"]["baskets"][0]["drawdown"] == {"mode": "custom", "threshold": "0.07"}
+    assert saved["data"]["baskets"][0]["giveback"] == {"mode": "custom", "min_gain": "0.2", "share": "0.5"}
+    half = {"baskets": [{"id": "b1", "name": "Ngắn hạn", "giveback": {"mode": "custom", "min_gain": "0.2"}}], "tags": {}}
+    assert call(c, clock, "PUT", "/internal/baskets", {**half, "expected_version": 1, "request_id": "k2"}).status_code == 422

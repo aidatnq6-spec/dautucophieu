@@ -12,7 +12,8 @@ from investment_agent.domain.thesis import KINDS
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.series import SeriesStore
 from investment_agent.market.watchlist import load_watchlist
-from investment_agent.services.drawdown import held_costs, last_close
+from investment_agent.services.baskets import rule_label
+from investment_agent.services.drawdown import held_costs, held_levels
 from investment_agent.services.earnings_season import review_lines
 from investment_agent.services.accumulation import due_lines
 from investment_agent.services.deposit_book import book_quotes
@@ -54,8 +55,10 @@ def attention_items(repo, owner, data_dir: Path, *, now: datetime) -> list[dict]
                 items.append({"level": "high", "kind": "thesis", "symbol": t["symbol"], "text": f"{t['symbol']}: điều kiện luận điểm bị phá ({label})", "href": "/portfolio"})
     series = SeriesStore(data_dir / "trend-sources")
     costs = held_costs(repo, owner)
-    alerts, _ = threshold_alerts({s: {"price": last_close(series, s), "cost": c} for s, c in costs.items()}, threshold=str(portfolio_settings(repo, owner)[0].drawdown_threshold), alerted=set())
-    items += [{"level": "high", "kind": "drawdown", "symbol": a["symbol"], "text": f"{a['symbol']}: đang {_pct(a['change'])} so với giá vốn, quá ngưỡng sụt giảm", "href": "/portfolio"} for a in alerts]
+    common = portfolio_settings(repo, owner)[0].drawdown_threshold
+    alerts, _ = threshold_alerts(held_levels(repo, owner, series, costs, common), threshold=str(common), alerted=set())
+    items += [{"level": "high", "kind": "drawdown", "symbol": a["symbol"], "href": "/portfolio",
+               "text": f"{a['symbol']}: đang {_pct(a['change'])} so với giá vốn, quá ngưỡng sụt giảm ({rule_label(a['rule'], 'drawdown')})"} for a in alerts]
     property_book, vn_today = read_property_book(repo, owner), now.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date()
     items += [{"level": "high", "kind": kind, "symbol": symbol, "text": text, "href": "/portfolio"}
               for kind, symbol, text in giveback_lines(repo, owner, data_dir, today=vn_today)]

@@ -54,15 +54,16 @@ export function PortfolioSettingsSection() {
         <input inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} disabled={!data} /></label>
         <label className="field">Nhật ký: nhắc xem lại khi giá đi thêm (%)
         <input inputMode="decimal" value={review} onChange={(e) => setReview(e.target.value)} disabled={!data} /></label>
-        <label className="field">Kế hoạch sụt giảm: nhắc khi giá thấp hơn giá vốn (%)
+        <label className="field">Kế hoạch sụt giảm, mức chung: nhắc khi giá thấp hơn giá vốn (%)
         <input inputMode="decimal" value={drawdown} onChange={(e) => setDrawdown(e.target.value)} disabled={!data} /></label>
-        <label className="field">Lãi đã trả lại: mã từng lãi ít nhất (% giá vốn)
+        <label className="field">Lãi đã trả lại, mức chung: mã từng lãi ít nhất (% giá vốn)
         <input inputMode="decimal" value={minGain} onChange={(e) => setMinGain(e.target.value)} disabled={!data} /></label>
-        <label className="field">Lãi đã trả lại: nhắc khi đã trả lại (% lãi cao nhất)
+        <label className="field">Lãi đã trả lại, mức chung: nhắc khi đã trả lại (% lãi cao nhất)
         <input inputMode="decimal" value={share} onChange={(e) => setShare(e.target.value)} disabled={!data} /></label></div>
       <p className="caption">Mỗi lần giá đi thêm mức này so với giá lúc ghi nhật ký (lên hoặc xuống), ứng dụng gửi Telegram một lần kèm lý do đã ghi;
         theo «Gửi tự động theo lịch». Lãi đã trả lại: nhắc một lần khi một mã từng lãi tới ngưỡng thứ nhất và đã trả lại tới ngưỡng thứ hai;
-        để trống cả hai thì không nhắc.</p>
+        để trống cả hai thì không nhắc. Hai mức chung này áp cho mọi mã, trừ khi giỏ chiến lược của đợt nắm đặt ngưỡng riêng hoặc không nhắc
+        (khối Giỏ chiến lược, trang Danh mục & Giao dịch).</p>
       <div className="actions"><button className="btn primary" onClick={() => void save()} disabled={!data}><Save size={16} aria-hidden="true" />Lưu ngưỡng</button></div>
       {message && <p className="caption" role="status">{message}</p>}
     </section>

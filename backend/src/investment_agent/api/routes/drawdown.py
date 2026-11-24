@@ -6,6 +6,7 @@ from fastapi import APIRouter, Request
 
 from investment_agent.market.series import SeriesStore
 from investment_agent.repositories.personal import RepositoryUnavailable
+from investment_agent.services.baskets import rules_for
 from investment_agent.services.drawdown import INDICES, drawdown_rows, held_costs, last_close, watch_rows, watched
 from investment_agent.services.records import portfolio_settings
 
@@ -24,6 +25,7 @@ def get_drawdown(request: Request):
     try:
         costs = held_costs(repo, owner)
         settings, _ = portfolio_settings(repo, owner)
+        rules = {s: r["drawdown"] for s, r in rules_for(repo, owner).items()}
     except RepositoryUnavailable:
         return unavailable()
     series, market = SeriesStore(Path(data_dir) / "trend-sources"), request.app.state.market
@@ -31,5 +33,5 @@ def get_drawdown(request: Request):
     for symbol in costs:
         point = market.price(symbol)
         prices[symbol] = format(point.price, "f") if point is not None else last_close(series, symbol)
-    return {"threshold": str(settings.drawdown_threshold), "rows": drawdown_rows(data_dir, costs, prices, settings.drawdown_threshold),
+    return {"threshold": str(settings.drawdown_threshold), "rows": drawdown_rows(data_dir, costs, prices, settings.drawdown_threshold, rules),
             "watch": watch_rows(data_dir, watched(data_dir, costs))}

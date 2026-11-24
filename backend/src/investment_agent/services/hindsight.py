@@ -4,6 +4,7 @@ from datetime import date
 from pathlib import Path
 
 from investment_agent.domain.hindsight import hindsight, imported_hindsight
+from investment_agent.domain.holding_periods import holding_periods, pyramids
 from investment_agent.market.series import SeriesStore
 from investment_agent.services.journal import read_journal
 from investment_agent.services.records import LedgerBook, portfolio_settings, read_version
@@ -25,4 +26,5 @@ def hindsight_for(repo, owner, data_dir: Path, *, today: date) -> dict:
     imported = imported_hindsight(old, closes={s: [(t.date(), v) for t, v in store.read(f"{s}-1d")] for s in {r["symbol"] for r in old}}, index=index, today=today) if old else None
     out = hindsight(events, closes=closes, index=index, journal=journal,
                     theses=read_theses(repo, owner)[0], threshold=threshold, today=today)
+    out["pyramids"] = pyramids(holding_periods(events), closes=closes, today=today)  # Soi hình tháp khi mua thêm
     return {**out, "imported": imported, "threshold": str(threshold), "as_of": today.isoformat()}

@@ -4,6 +4,7 @@ import { ApiError, api } from "../lib/api";
 import { formatDecimal } from "../lib/format";
 import { Pager } from "./journal-view";
 import { pageOf } from "./journal-tools";
+import { PyramidView, type Pyramids } from "./pyramid-view";
 
 type Horizon = { status: "ok" | "not_yet" | "missing"; on: string; change: string | null; index: string | null; diff: string | null;
   reason: string | null };
@@ -14,7 +15,7 @@ type Break = { symbol: string; kind: string; label: string; broken_on: string; b
 type Group = { key: string; count: number; matured: number; enough: boolean; mean: string | null; mean_diff: string | null };
 type OldTrade = Omit<Trade, "event_id" | "price" | "quantity"> & { entry_id: string; price: string | null; quantity: string | null };
 type Imported = { trades: OldTrade[]; count: number; measured: number; missing_symbols: string[]; biases: { chasing: { chasing: Group; other: Group }; sold: { gain: Group; loss: Group } } };
-type Data = { imported?: Imported | null; trades: Trade[]; opening_skipped: number; loss_holds: LossHold[]; breaks: Break[]; threshold: string;
+type Data = { imported?: Imported | null; pyramids?: Pyramids; trades: Trade[]; opening_skipped: number; loss_holds: LossHold[]; breaks: Break[]; threshold: string;
   biases: { disposition: { days: number; pgr: string | null; plr: string | null; enough: boolean }; by_emotion: Group[]; by_reason: Group[];
     chasing: { chasing: Group; other: Group } } };
 
@@ -93,6 +94,8 @@ export function HindsightView() {
           <tbody>{data.loss_holds.map((h) => <tr key={`${h.symbol}-${h.start}`}><td>{h.symbol}</td><td>{day(h.start)}</td>
             <td>{h.end ? `${day(h.end)} (${h.days} ngày)` : "—"}</td><td className="num">{pct(h.deepest)}</td><td>{OUTCOME[h.outcome]}</td></tr>)}</tbody>
         </table></div>}
+
+        {data.pyramids && <PyramidView data={data.pyramids} />}
 
         <h3>Từng lệnh</h3>
         {data.opening_skipped > 0 && <p className="caption">{data.opening_skipped} vị thế số dư đầu kỳ không có ngày mua nên không hậu kiểm.</p>}

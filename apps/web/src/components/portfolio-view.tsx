@@ -8,6 +8,7 @@ import { FormErrors } from "./form-errors";
 import { LEDGER_ERRORS, TYPE_LABEL, TransactionForm, type LedgerEvent } from "./transaction-form";
 import { ConcentrationView } from "./concentration-view";
 import { DrawdownView } from "./drawdown-view";
+import { GivebackView } from "./giveback-view";
 import { StressView } from "./stress-view";
 import { PerformanceView } from "./performance-view";
 import { AssetMapView, MonthBridgeView } from "./asset-views";
@@ -101,6 +102,7 @@ export function PortfolioView() {
       <AssetMapView />
       <BuyPlan />
       <DrawdownView />
+      <GivebackView />
       <StressView ledgerVersion={ledger.version} />
 
       <section className="surface">

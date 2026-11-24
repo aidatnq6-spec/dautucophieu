@@ -1578,7 +1578,8 @@ def thesis_check_cli(data_dir: Path, calendar_path: Path, scope: str, now=None) 
 
 
 def portfolio_alerts_cli(data_dir: Path, calendar_path: Path, now=None) -> int:
-    """Danh mục hôm nay (owner, 21/11/2026): Kế hoạch giải ngân, giao dịch nội bộ mới, Kế hoạch sụt giảm and Luận điểm đầu tư (all
+    """Danh mục hôm nay (owner, 21/11/2026): Kế hoạch giải ngân, giao dịch nội bộ mới, Kế hoạch sụt giảm, Lãi đã trả lại thị trường (with
+    Mục tiêu đã đủ tiền, 24/11/2026) and Luận điểm đầu tư (all
     conditions, stored data) in one Telegram note. While scheduled delivery is off the price history is still filled and the theses'
     states still recorded, nothing is sent, as before. Prints counts only."""
     import uuid
@@ -1586,6 +1587,7 @@ def portfolio_alerts_cli(data_dir: Path, calendar_path: Path, now=None) -> int:
 
     from investment_agent.market.statement_revisions import revisions_note_run
     from investment_agent.services.buy_plan import check_plan
+    from investment_agent.services.giveback import giveback_run
     from investment_agent.services.holdings_view import held_from_repo
     from investment_agent.services.insider_alerts import insider_alerts_run
     from investment_agent.services.wealth_alerts import combined_run
@@ -1605,6 +1607,7 @@ def portfolio_alerts_cli(data_dir: Path, calendar_path: Path, now=None) -> int:
         ("buy_plan", lambda s: check_plan(repo, owner, data_dir, send=s, today=today, request_id=f"buy-plan-{uuid.uuid4().hex[:16]}")),
         ("insider", lambda s: insider_alerts_run(data_dir, held=held_from_repo(repo, owner), get=_http_text, send=s, now=now)),
         ("drawdown", lambda s: _drawdown_run(data_dir, repo, owner, send=s)),
+        ("giveback", lambda s: giveback_run(repo, owner, data_dir, send=s, today=today, request_id=f"giveback-{uuid.uuid4().hex[:16]}")),
         ("thesis", lambda s: _thesis_run(data_dir, calendar_path, "data", repo, owner, send=s, now=now)),
         ("revisions", lambda s: revisions_note_run(data_dir, held=held_from_repo(repo, owner), send=s, today=today)),
     ]

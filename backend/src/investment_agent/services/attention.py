@@ -17,6 +17,7 @@ from investment_agent.services.earnings_season import review_lines
 from investment_agent.services.accumulation import due_lines
 from investment_agent.services.deposit_book import book_quotes
 from investment_agent.services.equity_budget import budget_view
+from investment_agent.services.giveback import attention_lines as giveback_lines
 from investment_agent.services.insurance_alerts import due_items as payment_items
 from investment_agent.services.loan_alerts import promo_lines, read_property_book
 from investment_agent.domain.rental_book import due_items as rental_items
@@ -56,6 +57,8 @@ def attention_items(repo, owner, data_dir: Path, *, now: datetime) -> list[dict]
     alerts, _ = threshold_alerts({s: {"price": last_close(series, s), "cost": c} for s, c in costs.items()}, threshold=str(portfolio_settings(repo, owner)[0].drawdown_threshold), alerted=set())
     items += [{"level": "high", "kind": "drawdown", "symbol": a["symbol"], "text": f"{a['symbol']}: đang {_pct(a['change'])} so với giá vốn, quá ngưỡng sụt giảm", "href": "/portfolio"} for a in alerts]
     property_book, vn_today = read_property_book(repo, owner), now.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date()
+    items += [{"level": "high", "kind": kind, "symbol": symbol, "text": text, "href": "/portfolio"}
+              for kind, symbol, text in giveback_lines(repo, owner, data_dir, today=vn_today)]
     items += [{"level": "high", "kind": "loan_promo", "symbol": None, "text": line, "href": "/profile?tab=tai-san"} for line in promo_lines(property_book, vn_today)]
     items += [{"level": "high", "kind": kind, "symbol": None, "text": line, "href": "/profile?tab=tai-san"} for kind, line in payment_items(property_book, vn_today)]
     items += [{"level": "high", "kind": kind, "symbol": None, "text": line, "href": "/profile?tab=tai-san"} for kind, _, line in rental_items(read_rental_book(repo, owner), vn_today)]

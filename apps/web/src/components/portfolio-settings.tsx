@@ -3,8 +3,10 @@ import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatRatio, percentToRatio } from "../lib/format";
+import { percentInput } from "./giveback-view";
 
-type PortfolioSettings = { version: number; settings: { concentration_limit: string; journal_review_threshold: string; drawdown_threshold: string } };
+type PortfolioSettings = { version: number; settings: { concentration_limit: string; journal_review_threshold: string; drawdown_threshold: string;
+  giveback_min_gain: string | null; giveback_share: string | null } };
 
 /** Concentration threshold for the Danh mục page (display only; does not change allocation rules). */
 export function PortfolioSettingsSection() {
@@ -12,12 +14,15 @@ export function PortfolioSettingsSection() {
   const [value, setValue] = useState("");
   const [review, setReview] = useState("");
   const [drawdown, setDrawdown] = useState("");
+  const [minGain, setMinGain] = useState("");
+  const [share, setShare] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => {
     let live = true;  // a cancelled load (React runs effects twice in development) never overwrites what is being typed
     const percent = (r: string) => formatRatio(r, 1).replace("%", "").replace(/,0$/, "");
     api<PortfolioSettings>("settings/portfolio").then((d) => { if (!live) return; setData(d); setValue(percent(d.settings.concentration_limit));
-      setReview(percent(d.settings.journal_review_threshold)); setDrawdown(percent(d.settings.drawdown_threshold)); },
+      setReview(percent(d.settings.journal_review_threshold)); setDrawdown(percent(d.settings.drawdown_threshold));
+      setMinGain(d.settings.giveback_min_gain ? percent(d.settings.giveback_min_gain) : ""); setShare(d.settings.giveback_share ? percent(d.settings.giveback_share) : ""); },
       (e) => { if (live) setMessage(e instanceof ApiError ? e.failure.message : "Lỗi tải."); });
     return () => { live = false; };
   }, []);
@@ -27,9 +32,14 @@ export function PortfolioSettingsSection() {
     const reviewRatio = percentToRatio(review);
     const drawdownRatio = percentToRatio(drawdown);
     if (ratio === null || reviewRatio === null || drawdownRatio === null) { setMessage("Nhập phần trăm, ví dụ 25."); return; }
+    const minGainRatio = minGain.trim() ? percentInput(minGain) : null, shareRatio = share.trim() ? percentToRatio(share) : null;
+    if ((minGain.trim() && minGainRatio === null) || (share.trim() && shareRatio === null) || (minGainRatio === null) !== (shareRatio === null)) {
+      setMessage("Lãi đã trả lại: nhập cả hai ngưỡng (phần trăm), hoặc để trống cả hai."); return;
+    }
     try {
       const saved = await api<PortfolioSettings>("settings/portfolio", { method: "PUT",
-        body: { settings: { concentration_limit: ratio, journal_review_threshold: reviewRatio, drawdown_threshold: drawdownRatio }, expected_version: data.version, request_id: requestId() } });
+        body: { settings: { concentration_limit: ratio, journal_review_threshold: reviewRatio, drawdown_threshold: drawdownRatio,
+          giveback_min_gain: minGainRatio, giveback_share: shareRatio }, expected_version: data.version, request_id: requestId() } });
       setData(saved); setMessage("Đã lưu các ngưỡng.");
     } catch (e) {
       setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu.");
@@ -45,9 +55,14 @@ export function PortfolioSettingsSection() {
         <label className="field">Nhật ký: nhắc xem lại khi giá đi thêm (%)
         <input inputMode="decimal" value={review} onChange={(e) => setReview(e.target.value)} disabled={!data} /></label>
         <label className="field">Kế hoạch sụt giảm: nhắc khi giá thấp hơn giá vốn (%)
-        <input inputMode="decimal" value={drawdown} onChange={(e) => setDrawdown(e.target.value)} disabled={!data} /></label></div>
+        <input inputMode="decimal" value={drawdown} onChange={(e) => setDrawdown(e.target.value)} disabled={!data} /></label>
+        <label className="field">Lãi đã trả lại: mã từng lãi ít nhất (% giá vốn)
+        <input inputMode="decimal" value={minGain} onChange={(e) => setMinGain(e.target.value)} disabled={!data} /></label>
+        <label className="field">Lãi đã trả lại: nhắc khi đã trả lại (% lãi cao nhất)
+        <input inputMode="decimal" value={share} onChange={(e) => setShare(e.target.value)} disabled={!data} /></label></div>
       <p className="caption">Mỗi lần giá đi thêm mức này so với giá lúc ghi nhật ký (lên hoặc xuống), ứng dụng gửi Telegram một lần kèm lý do đã ghi;
-        theo «Gửi tự động theo lịch».</p>
+        theo «Gửi tự động theo lịch». Lãi đã trả lại: nhắc một lần khi một mã từng lãi tới ngưỡng thứ nhất và đã trả lại tới ngưỡng thứ hai;
+        để trống cả hai thì không nhắc.</p>
       <div className="actions"><button className="btn primary" onClick={() => void save()} disabled={!data}><Save size={16} aria-hidden="true" />Lưu ngưỡng</button></div>
       {message && <p className="caption" role="status">{message}</p>}
     </section>

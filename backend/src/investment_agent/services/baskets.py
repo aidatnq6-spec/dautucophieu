@@ -1,11 +1,14 @@
 """Giỏ chiến lược: the owner's own baskets of holding periods and what each made, from the ledger. Personal data, never sent to a model."""
 
+from datetime import date
 from decimal import Decimal
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, model_validator
 
-from investment_agent.domain.holding_periods import basket_view, holding_periods
+from investment_agent.domain.holding_periods import basket_view, holding_periods, pyramids
+from investment_agent.market.series import SeriesStore
 from investment_agent.domain.models import ContractModel, Ratio, UnsignedAmount
 from investment_agent.services.records import LedgerBook, PortfolioSettings, portfolio_settings, read_version
 
@@ -76,17 +79,24 @@ def read_baskets(repo, owner) -> tuple[TradeBaskets, int]:
     return (TradeBaskets.model_validate(record.payload), record.version) if record else (TradeBaskets(), 0)
 
 
-def baskets_for(repo, owner, market) -> dict:
-    """Raises RepositoryUnavailable. Open periods are valued at the market's last price, as the Danh mục table."""
+def baskets_for(repo, owner, market, data_dir: Path | None = None, today: date | None = None) -> dict:
+    """Raises RepositoryUnavailable. Open periods are valued at the market's last price, as the Danh mục table. With the stored closes,
+    each basket also counts the pyramid shapes Hậu kiểm gives its periods."""
     data, version = read_baskets(repo, owner)
-    periods = holding_periods(list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events))
+    events = list(LedgerBook(read_version(repo, owner, "ledger_events", "main", None)).effective().events)
+    periods = holding_periods(events)
+    shapes = None
+    if data_dir is not None:
+        store = SeriesStore(Path(data_dir) / "trend-sources")
+        closes = {s: [(t.date(), v) for t, v in store.read(f"{s}-1d")] for s in {p["symbol"] for p in periods}}
+        shapes = pyramids(periods, closes=closes, today=today or date.today())["rows"]
     prices: dict[str, Decimal] = {}
     for symbol in {p["symbol"] for p in periods if not p["end"]}:
         point = market.price(symbol) if market is not None else None
         if point is not None:
             prices[symbol] = point.price
     dumped = data.model_dump(mode="json")
-    return {"version": version, "data": dumped, "view": basket_view(periods, dumped, prices=prices)}
+    return {"version": version, "data": dumped, "view": basket_view(periods, dumped, prices=prices, pyramids=shapes)}
 
 
 def _s(value: Decimal | None) -> str | None:

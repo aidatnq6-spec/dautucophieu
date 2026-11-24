@@ -112,3 +112,32 @@ def test_five_closed_periods_give_the_share_with_a_gain_and_the_mean_days_held()
     out = basket_view(periods, {**BASKETS, "tags": {p["key"]: "b1" for p in periods}}, prices={})
     short = out["rows"][0]
     assert short["closed"] == 5 and short["enough"] is True and short["win_rate"] == "0.6000" and short["mean_days"] == "4.0"
+
+
+def test_each_basket_counts_the_pyramid_shapes_of_its_periods_as_hau_kiem_labels_them():
+    closes = {"FPT": _days(date(2025, 1, 1), [50, 50, 60, 60, 40, 40, 40, 40, 40, 40]), "HPG": _days(date(2025, 2, 1), [20, 25])}
+    events = _ev(("buy", "2025-01-01", "FPT", 100, "50000"), ("buy", "2025-01-05", "FPT", 500, "40000"), ("sell", "2025-01-06", "FPT", 600, "40000"),
+                 ("buy", "2025-01-07", "FPT", 100, "40000"), ("sell", "2025-01-08", "FPT", 100, "40000"),
+                 ("buy", "2025-02-01", "HPG", 100, "20000"), ("buy", "2025-02-02", "HPG", 500, "25000"),
+                 ("buy", "2025-01-20", "VCB", 100, "90000"), ("buy", "2025-01-21", "VCB", 100, "90000"))
+    periods = holding_periods(events)
+    shapes = pyramids(periods, closes=closes, today=TODAY)["rows"]
+    tags = {"FPT@2025-01-01": "b1", "FPT@2025-01-07": "b1", "HPG@2025-02-01": "b1", "VCB@2025-01-20": "b2"}
+    short, long_, untagged = basket_view(periods, {**BASKETS, "tags": tags}, prices={}, pyramids=shapes)["rows"]
+    assert short["pyramid"] == {"counts": {"upright": 1, "inverted": 1, "mixed": 0}, "compared": 2, "uncompared": 0, "mean_above_share": None, "enough": False}
+    assert long_["pyramid"]["compared"] == 0 and long_["pyramid"]["uncompared"] == 1  # VCB has no stored close
+    assert untagged["pyramid"] == {"counts": {"upright": 0, "inverted": 0, "mixed": 0}, "compared": 0, "uncompared": 0, "mean_above_share": None, "enough": False}
+
+
+def test_five_compared_periods_in_a_basket_give_its_mean_share_put_in_above_the_first_buy():
+    closes = {"FPT": _days(date(2025, 1, 1), [50, 60] * 30)}
+    rows = []
+    for k in range(5):
+        a, b = date(2025, 1, 1) + timedelta(days=4 * k), date(2025, 1, 2) + timedelta(days=4 * k)
+        rows += [("buy", a.isoformat(), "FPT", 100, "50000"), ("buy", b.isoformat(), "FPT", 100, "60000"),
+                 ("sell", (b + timedelta(days=1)).isoformat(), "FPT", 200, "60000")]
+    periods = holding_periods(_ev(*rows))
+    tags = {p["key"]: "b1" for p in periods}
+    short = basket_view(periods, {**BASKETS, "tags": tags}, prices={}, pyramids=pyramids(periods, closes=closes, today=TODAY)["rows"])["rows"][0]
+    assert short["pyramid"]["enough"] is True and short["pyramid"]["mean_above_share"] == "0.5454"
+    assert basket_view(periods, {**BASKETS, "tags": tags}, prices={})["rows"][0]["pyramid"] is None  # not asked for

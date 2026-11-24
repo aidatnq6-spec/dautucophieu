@@ -5,9 +5,10 @@ from pydantic import Field
 
 from investment_agent.repositories.personal import RepositoryUnavailable
 from investment_agent.services.baskets import RECORD, TradeBaskets, baskets_for
+from investment_agent.services.weekly_brief import VN
 
 from ..auth import require_owner
-from .common import WRITE_ERRORS, unavailable, write_error
+from .common import WRITE_ERRORS, now, unavailable, write_error
 
 router = APIRouter(prefix="/internal")
 
@@ -17,13 +18,17 @@ class BasketsRequest(TradeBaskets):
     request_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
 
 
+def _view(request: Request, repo, owner) -> dict:
+    return baskets_for(repo, owner, request.app.state.market, request.app.state.data_dir, today=now(request).astimezone(VN).date())
+
+
 @router.get("/baskets")
 def get_baskets(request: Request):
     owner, repo = require_owner(request), request.app.state.personal_repository
     if repo is None:
         return unavailable()
     try:
-        return baskets_for(repo, owner, request.app.state.market)
+        return _view(request, repo, owner)
     except RepositoryUnavailable:
         return unavailable()
 
@@ -36,6 +41,6 @@ def put_baskets(request: Request, body: BasketsRequest):
     payload = TradeBaskets.model_validate(body.model_dump(exclude={"expected_version", "request_id"})).model_dump(mode="json")
     try:
         repo.write(owner, *RECORD, payload, expected_version=body.expected_version, request_id=body.request_id)
-        return baskets_for(repo, owner, request.app.state.market)
+        return _view(request, repo, owner)
     except WRITE_ERRORS as exc:
         return write_error(exc)

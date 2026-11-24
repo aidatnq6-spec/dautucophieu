@@ -97,20 +97,30 @@ def pyramids(periods: list[dict], *, closes: dict, today: date) -> dict:
     empty = _Series([], today, 1000)
     rows = [_pyramid(p, series.get(p["symbol"], empty)) for p in periods if len(p["buys"]) + p["opening"] >= 2]
     rows.sort(key=lambda r: r["start"], reverse=True)
+    return {"rows": rows, "summary": _shapes(rows)}
+
+
+def _shapes(rows: list[dict]) -> dict:
+    """The label counts of pyramid rows, how many could not be compared, and the mean share put in above the first buy from five compared."""
     compared = [r for r in rows if r["label"]]
     enough = len(compared) >= MIN_PERIODS
-    return {"rows": rows, "summary": {"counts": {k: sum(r["label"] == k for r in compared) for k in LABELS}, "compared": len(compared),
-                                      "mean_above_share": _r(sum(Decimal(r["above_share"]) for r in compared) / len(compared)) if enough else None,
-                                      "enough": enough}}
+    return {"counts": {k: sum(r["label"] == k for r in compared) for k in LABELS}, "compared": len(compared),
+            "mean_above_share": _r(sum(Decimal(r["above_share"]) for r in compared) / len(compared)) if enough else None, "enough": enough}
+
+
+def _with_uncompared(rows: list[dict]) -> dict:
+    out = _shapes(rows)
+    return {**out, "uncompared": len(rows) - out["compared"]}
 
 
 def _days_held(p: dict) -> int:
     return (date.fromisoformat(p["end"]) - date.fromisoformat(p["start"])).days
 
 
-def basket_view(periods: list[dict], baskets: dict, *, prices: dict[str, Decimal]) -> dict:
-    """baskets: {baskets: [{id, name}], tags: {period key: basket id}}; prices: last price per share in đồng. One row per basket and one for
-    the untagged periods; tags that no longer match a period are listed so they can be set again."""
+def basket_view(periods: list[dict], baskets: dict, *, prices: dict[str, Decimal], pyramids: list[dict] | None = None) -> dict:
+    """baskets: {baskets: [{id, name}], tags: {period key: basket id}}; prices: last price per share in đồng; pyramids: the Hậu kiểm pyramid
+    rows, counted per basket when given. One row per basket and one for the untagged periods; tags that no longer match a period are listed
+    so they can be set again."""
     tags, keys = baskets.get("tags", {}), {p["key"] for p in periods}
     known = {b["id"] for b in baskets.get("baskets", [])}
     rows = []
@@ -129,7 +139,8 @@ def basket_view(periods: list[dict], baskets: dict, *, prices: dict[str, Decimal
                      "realised": _d(realised), "released": _d(released), "realised_ratio": _r(realised / released) if released else None,
                      "win_rate": _r(Decimal(wins) / len(closed)) if enough else None,
                      "mean_days": format((Decimal(sum(_days_held(p) for p in closed)) / len(closed)).quantize(Decimal("0.1"), ROUND_HALF_UP), "f") if enough else None,
-                     "enough": enough, "open_cost": _d(open_cost), "unrealised": None if missing or not held else _d(value - open_cost), "missing": missing})
+                     "enough": enough, "open_cost": _d(open_cost), "unrealised": None if missing or not held else _d(value - open_cost), "missing": missing,
+                     "pyramid": None if pyramids is None else _with_uncompared([r for r in pyramids if r["key"] in {p["key"] for p in mine}])})
     view = [{"key": p["key"], "symbol": p["symbol"], "start": p["start"], "end": p["end"],
              "basket": tags.get(p["key"]) if tags.get(p["key"]) in known else None} for p in periods]
     return {"rows": rows, "periods": view, "stale": sorted(k for k in tags if k not in keys)}

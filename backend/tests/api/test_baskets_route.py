@@ -63,3 +63,17 @@ def test_a_baskets_reminder_levels_are_saved_with_it():
     assert saved["data"]["baskets"][0]["giveback"] == {"mode": "custom", "min_gain": "0.2", "share": "0.5"}
     half = {"baskets": [{"id": "b1", "name": "Ngắn hạn", "giveback": {"mode": "custom", "min_gain": "0.2"}}], "tags": {}}
     assert call(c, clock, "PUT", "/internal/baskets", {**half, "expected_version": 1, "request_id": "k2"}).status_code == 422
+
+
+def test_each_basket_counts_its_pyramid_shapes_from_the_stored_closes(tmp_path):
+    from datetime import datetime
+    from investment_agent.market.series import SeriesStore
+    clock = Clock()
+    app = create_app(InternalAuthSettings("owner-1", TOKEN, SECRET), clock=clock, personal_repository=PersonalRepository("owner-1", MemoryDocumentStore()),
+                     market=MARKET, data_dir=tmp_path)
+    c = TestClient(app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000))
+    setup_owner(c, clock)
+    buy_fpt(c, clock)
+    SeriesStore(tmp_path / "trend-sources").upsert("FPT-1d", [(datetime(2027, 1, 5), "50")])
+    (untagged,) = call(c, clock, "GET", "/internal/baskets").json()["view"]["rows"]
+    assert untagged["pyramid"]["compared"] == 0 and untagged["pyramid"]["uncompared"] == 0  # one buy: no pyramid

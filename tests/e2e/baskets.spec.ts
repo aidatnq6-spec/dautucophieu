@@ -15,6 +15,7 @@ test("a suggested basket is created and the FPT period tagged into it", async ({
   await expect(box.getByRole("status").filter({ hasText: "Đã gắn giỏ." })).toBeVisible();
   const result = box.getByRole("table", { name: "Kết quả theo giỏ" }).getByRole("row", { name: /Dài hạn/ });
   await expect(result).toContainText("0 / 1");
+  await expect(result).toContainText("chưa có đợt mua thêm");  // one buy: no pyramid
   await expect(box).toContainText("không phải khuyến nghị");
 });
 

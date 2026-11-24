@@ -7,7 +7,8 @@ import { draftOf, rulesFrom, type Basket, type Draft, type Mode } from "./basket
 
 type Stored = { baskets: Basket[]; tags: Record<string, string> };
 export type BasketRow = { id: string | null; name: string | null; closed: number; open: number; realised: string; released: string; realised_ratio: string | null;
-  win_rate: string | null; mean_days: string | null; enough: boolean; open_cost: string; unrealised: string | null; missing: string[] };
+  win_rate: string | null; mean_days: string | null; enough: boolean; open_cost: string; unrealised: string | null; missing: string[]; pyramid?: Shapes | null };
+type Shapes = { counts: { upright: number; inverted: number; mixed: number }; compared: number; uncompared: number; mean_above_share: string | null; enough: boolean };
 type Period = { key: string; symbol: string; start: string; end: string | null; basket: string | null };
 type Data = { version: number; data: Stored; view: { rows: BasketRow[]; periods: Period[]; stale: string[] } };
 
@@ -54,6 +55,17 @@ function Levels({ basket, busy, onSave }: { basket: Basket; busy: boolean; onSav
     <td><button className="btn" disabled={busy} onClick={() => void save()}><Save size={16} aria-hidden="true" />Lưu</button>
       {note && <div className="caption" role="alert">{note}</div>}</td>
   </tr>;
+}
+
+/** The Hậu kiểm pyramid shapes of a basket's periods with a second buy; the mean share above the first buy only from five compared. */
+export function basketPyramid(r: BasketRow): string {
+  const p = r.pyramid;
+  if (!p) return "—";
+  if (p.compared + p.uncompared === 0) return "chưa có đợt mua thêm";
+  const parts = [`${p.counts.upright} xuôi`, `${p.counts.inverted} ngược`, `${p.counts.mixed} xen kẽ`];
+  if (p.uncompared) parts.push(`${p.uncompared} chưa so được`);
+  parts.push(p.enough && p.mean_above_share !== null ? `bình quân ${formatRatio(p.mean_above_share, 1)} tiền bỏ vào ở giá cao hơn lần mua đầu` : "chưa đủ 5 đợt");
+  return parts.join(" · ");
 }
 
 /** Giỏ chiến lược: the owner's own baskets of holding periods and what each made. Figures only. */
@@ -133,14 +145,18 @@ export function BasketsView() {
 
         <h3>Kết quả theo giỏ</h3>
         <div className="tablewrap"><table className="fv-table cc-table" aria-label="Kết quả theo giỏ">
-          <thead><tr><th>Giỏ</th><th className="num">Đợt đã đóng / đang nắm</th><th>Đã chốt</th><th>Đang nắm</th></tr></thead>
+          <thead><tr><th>Giỏ</th><th className="num">Đợt đã đóng / đang nắm</th><th>Đã chốt</th><th>Đang nắm</th><th>Hình tháp</th></tr></thead>
           <tbody>{d.view.rows.map((r) => <tr key={r.id ?? "none"}>
             <td data-label="Giỏ"><strong>{r.name ?? "Chưa gắn giỏ"}</strong></td>
             <td data-label="Đợt đã đóng / đang nắm" className="num">{r.closed} / {r.open}</td>
             <td data-label="Đã chốt">{basketResult(r)}</td>
             <td data-label="Đang nắm">{basketHeld(r)}</td>
+            <td data-label="Hình tháp">{basketPyramid(r)}</td>
           </tr>)}</tbody>
         </table></div>
+
+        <p className="caption">Hình tháp: đợt có từ 2 lần mua trở lên, nhãn lấy từ Soi hình tháp khi mua thêm (Hậu kiểm, trang Nhật ký). Xuôi là lần mua nhiều
+          tiền nhất ở giá thấp nhất của đợt; ngược là lần mua nhiều tiền nhất ở giá cao nhất và cao hơn lần mua đầu. Chỉ mô tả hình dạng, không chấm điểm.</p>
 
         <h3>Các đợt nắm</h3>
         {d.view.periods.length === 0 ? <p className="muted">Chưa có lệnh mua trong sổ.</p> : <>

@@ -21,3 +21,7 @@ gửi cho AI. Chỉ đếm hình dạng đã xảy ra, không chấm điểm, kh
 
 ## Không làm
 - Không thêm nhắc Telegram, không đổi Hậu kiểm.
+
+## Đã làm (24/11/2026)
+- `basket_view(..., pyramids=)` thêm `pyramid` cho mỗi giỏ (`_shapes` dùng chung với tổng kết của Hậu kiểm); `baskets_for` đọc giá đã lưu.
+- Cột "Hình tháp" ở bảng Kết quả theo giỏ (`basketPyramid`).

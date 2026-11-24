@@ -57,3 +57,19 @@ def test_tickers_only_in_the_opening_balance_get_their_closes(tmp_path):
                                                        "expected_version": 0, "request_id": "l1"})
     out = call(c, clock, "GET", "/internal/hindsight").json()
     assert [h["symbol"] for h in out["loss_holds"]] == ["HPG"]  # 18 against the close of 30 on the opening day: down 40%
+
+
+def test_hindsight_carries_the_pyramid_of_each_period_with_two_buys(tmp_path):
+    store = SeriesStore(tmp_path / "trend-sources")
+    store.upsert("FPT-1d", [(datetime(2026, 2, 1) + timedelta(days=i), "50" if i < 10 else "60") for i in range(60)])
+    clock = Clock()
+    c = client(tmp_path, clock)
+    call(c, clock, "POST", "/internal/ledger/events", {"event": {"event_id": "d1", "type": "deposit", "effective_at": "2026-02-01", "sequence": 0,
+                                                                 "amount": "100000000"}, "expected_version": 0, "request_id": "l1"})
+    for i, (day, qty, price) in enumerate((("2026-02-02", 100, "50000"), ("2026-02-20", 300, "60000"))):
+        call(c, clock, "POST", "/internal/ledger/events", {"event": {"event_id": f"b{i}", "type": "buy", "effective_at": day, "sequence": 0,
+                                                                     "security_id": "FPT", "quantity": qty, "price": price, "fee": "0", "tax": "0"},
+                                                           "expected_version": i + 1, "request_id": f"l{i + 2}"})
+    out = call(c, clock, "GET", "/internal/hindsight").json()["pyramids"]
+    assert out["rows"][0]["key"] == "FPT@2026-02-02" and out["rows"][0]["label"] == "inverted"
+    assert out["summary"]["counts"] == {"upright": 0, "inverted": 1, "mixed": 0}

@@ -1,6 +1,6 @@
 # Soi hình tháp khi mua thêm và Giỏ chiến lược (24/11/2026)
 
-Bản nháp chờ chủ sở hữu duyệt. Kaizen từ podcast "Đỉnh – Đáy" (Nguyễn Trần Hải, Trần Quang Hiến): mục 7.1 (lần mua đầu ở vùng thấp phải
+Chủ sở hữu duyệt ngày 24/11/2026 (gắn giỏ theo đợt nắm; giữ nhãn hình tháp). Kaizen từ podcast "Đỉnh – Đáy" (Nguyễn Trần Hải, Trần Quang Hiến): mục 7.1 (lần mua đầu ở vùng thấp phải
 là lần lớn nhất, cấm "tháp ngược": mua ít lúc rẻ rồi mua nhiều khi giá đã lên) và mục 7.2 (chia vốn theo cách đánh: ngắn hạn, dài hạn,
 theo môi giới, tự quyết, bắt đáy, để biết cách nào thật sự hiệu quả). Dữ liệu cá nhân, tính trên máy, không gửi cho AI. Chỉ đưa số đã
 xảy ra, không chấm điểm, không khuyến nghị.
@@ -44,8 +44,3 @@ của đợt là `MÃ@ngày bắt đầu`. Sửa sổ làm đổi ngày bắt đ
 - Không chia lô theo lệnh, không gắn giỏ cho lệnh cũ trong nhật ký đã nhập (chưa có số cổ phiếu đang nắm để dựng đợt).
 - Không đổi Kế hoạch sụt giảm hay ngưỡng nhắc theo giỏ ở bản này (đó là mục 5, làm sau khi có giỏ).
 - Không gửi Telegram: hai phần này chỉ để tự xem lại.
-
-## Câu hỏi cần chủ sở hữu chốt
-1. Gắn giỏ theo **đợt nắm** như trên (đơn giản, khớp số của sổ), hay theo **từng lệnh mua** (một mã chia được nhiều giỏ cùng lúc, nhưng phải
-   tự chia lô theo thứ tự mua trước bán trước, nên lãi theo giỏ sẽ khác lãi đã chốt của sổ)?
-2. Nhãn "Tháp xuôi / Tháp ngược / Xen kẽ" có được không, hay chỉ hiện ba con số, không có nhãn?

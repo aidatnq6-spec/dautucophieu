@@ -2,14 +2,15 @@
 import { useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
 import { formatVnd } from "../lib/format";
+import { ruleLabel, type Rule } from "./basket-rules";
 
 type Row = { symbol: string; shares: number; price: string | null; value: string | null; cost: string | null; beta: string | null; beta_note?: string | null;
-  oil: string | null; usd: string | null; oil_note: string | null; usd_note: string | null };
+  oil: string | null; usd: string | null; oil_note: string | null; usd_note: string | null; rule?: Rule };
 type Preset = { id: string; label: string; market: string; oil: string; usd: string };
 type Tolerance = { answer: string; limit: string | null; label: string };
 type Data = { rows: Row[]; presets: Preset[]; worst: { depth: string; peak: string; trough: string } | null; tolerance: Tolerance | null; threshold: string };
 type Shock = { market: number; oil: number; usd: number };
-type Priced = { symbol: string; value: number; move: number; change: number; notes: string[]; crossesThreshold: boolean };
+type Priced = { symbol: string; value: number; move: number; change: number; notes: string[]; crossesThreshold: boolean; threshold: number | null };
 
 const round = (x: number) => Math.round(x * 1e6) / 1e6;
 
@@ -32,12 +33,15 @@ export function applyScenario(inputs: { rows: Row[]; threshold: string; toleranc
     move = round(move);
     if (move < -1) { move = -1; notes.push("Ước tính vượt −100%, đã chặn ở −100%"); }  // a holding cannot lose more than it is worth
     const value = Number(r.value), price = Number(r.price), cost = r.cost === null ? null : Number(r.cost);
-    const threshold = Number(inputs.threshold);
+    // Each holding is held to its basket's level; a basket that does not remind gives none.
+    const own = r.rule ? r.rule.threshold ?? null : inputs.threshold;
+    const threshold = own === null ? null : Number(own);
     const after = price * (1 + move);
-    const pastAlready = cost !== null && cost > 0 && price / cost - 1 <= -threshold;
+    const pastAlready = threshold !== null && cost !== null && cost > 0 && price / cost - 1 <= -threshold;
     if (pastAlready) notes.push("Đã thấp hơn giá vốn quá ngưỡng từ trước");
-    const crossesThreshold = cost !== null && cost > 0 && !pastAlready && after / cost - 1 <= -threshold;
-    rows.push({ symbol: r.symbol, value, move, change: Math.round(value * move), notes, crossesThreshold });
+    if (threshold === null && r.rule) notes.push(`Không có ngưỡng (${ruleLabel(r.rule)})`);
+    const crossesThreshold = threshold !== null && cost !== null && cost > 0 && !pastAlready && after / cost - 1 <= -threshold;
+    rows.push({ symbol: r.symbol, value, move, change: Math.round(value * move), notes, crossesThreshold, threshold });
   }
   const counted = rows.reduce((a, r) => a + r.value, 0);
   const uncounted = inputs.rows.filter((r) => excluded.some((e) => e.symbol === r.symbol) && r.value !== null).reduce((a, r) => a + Number(r.value), 0);
@@ -104,7 +108,7 @@ export function StressView({ ledgerVersion }: { ledgerVersion?: number }) {
             <thead><tr><th>Mã</th><th className="num">Giá trị hiện tại</th><th className="num">Thay đổi ước tính</th><th className="num">Số tiền</th><th>Ghi chú</th></tr></thead>
             <tbody>{out.rows.map((r) => <tr key={r.symbol}><td><strong>{r.symbol}</strong></td><td className="num">{formatVnd(String(r.value))}</td>
               <td className="num">{pctText(r.move)}</td><td className="num">{vnd(r.change)}</td>
-              <td className="wrap">{[r.crossesThreshold ? `Sẽ thấp hơn giá vốn quá ${pctText(-Number(data.threshold)).replace("−", "")} (Kế hoạch sụt giảm)` : "",
+              <td className="wrap">{[r.crossesThreshold && r.threshold !== null ? `Sẽ thấp hơn giá vốn quá ${pctText(-r.threshold).replace("−", "")} (Kế hoạch sụt giảm)` : "",
                 ...r.notes].filter(Boolean).join("; ")}</td></tr>)}</tbody>
           </table></div>
           {out.excluded.length > 0 && <p className="caption" data-testid="stress-excluded">Không tính: {out.excluded.map((e) => `${e.symbol} (${e.reason})`).join(", ")}.</p>}

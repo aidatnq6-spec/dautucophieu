@@ -62,3 +62,10 @@ Hậu kiểm ghi rõ: "dùng ngưỡng chung; ngưỡng theo giỏ chỉ áp cho
    sức chịu đựng. TDD.
 2. Web: ô chọn ngưỡng ở Giỏ chiến lược, nguồn ngưỡng ở hai khối và ở Cài đặt.
 Mỗi phần một commit trên nhánh `feat/nguong-theo-gio`, verify rồi merge.
+
+## Đã làm (24/11/2026)
+- Backend: `DrawdownRule`, `GivebackRule` trên mỗi giỏ (`services/baskets.py`); `resolve_rules`/`rules_for` tra ngưỡng của từng mã theo đợt nắm hiện tại;
+  `rule_label` ghi nguồn ngưỡng. `threshold_alerts` và `giveback_alerts` nhận ngưỡng riêng từng mã. Route `drawdown`, `giveback`, `stress`
+  trả `rule` cho từng mã; Hậu kiểm không đổi.
+- Web: bảng "Ngưỡng nhắc theo giỏ" trong Giỏ chiến lược (`basket-rules.ts`); nguồn ngưỡng dưới từng mã ở Kế hoạch sụt giảm và Lãi đã trả
+  lại; Kiểm tra sức chịu đựng theo ngưỡng từng mã; "mức chung" ở Cài đặt; câu ghi chú ở Hậu kiểm.

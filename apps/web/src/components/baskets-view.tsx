@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, Tag, Trash2 } from "lucide-react";
+import { Plus, Save, Tag, Trash2 } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
 import { formatRatio, formatVnd } from "../lib/format";
+import { draftOf, rulesFrom, type Basket, type Draft, type Mode } from "./basket-rules";
 
-type Basket = { id: string; name: string };
 type Stored = { baskets: Basket[]; tags: Record<string, string> };
 export type BasketRow = { id: string | null; name: string | null; closed: number; open: number; realised: string; released: string; realised_ratio: string | null;
   win_rate: string | null; mean_days: string | null; enough: boolean; open_cost: string; unrealised: string | null; missing: string[] };
@@ -27,6 +27,35 @@ export function basketHeld(r: BasketRow): string {
   return r.missing.length ? `${cost}; chưa có giá: ${r.missing.join(", ")}` : r.unrealised === null ? cost : `${cost}, lãi chưa chốt ${formatVnd(r.unrealised)}`;
 }
 
+const MODES: [Mode, string][] = [["default", "Mức chung"], ["custom", "Riêng"], ["off", "Không nhắc"]];
+
+/** One basket's two reminder levels: the common level in Cài đặt, its own, or no reminder. Saved with the baskets. */
+function Levels({ basket, busy, onSave }: { basket: Basket; busy: boolean; onSave: (b: Basket) => Promise<boolean> }) {
+  const [draft, setDraft] = useState<Draft>(() => draftOf(basket));
+  const [note, setNote] = useState<string | null>(null);
+  const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
+  async function save() {
+    const rules = rulesFrom(draft);
+    if (typeof rules === "string") { setNote(rules); return; }
+    setNote(null);
+    await onSave({ ...basket, ...rules });
+  }
+  return <tr>
+    <td data-label="Giỏ"><strong>{basket.name}</strong></td>
+    <td data-label="Sụt giảm dưới giá vốn"><select aria-label={`Sụt giảm của giỏ ${basket.name}`} value={draft.drawdown} disabled={busy}
+      onChange={(e) => set({ drawdown: e.target.value as Mode })}>{MODES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+      {draft.drawdown === "custom" && <label className="field">Ngưỡng (%)<input inputMode="decimal" value={draft.threshold} disabled={busy}
+        onChange={(e) => set({ threshold: e.target.value })} /></label>}</td>
+    <td data-label="Lãi đã trả lại"><select aria-label={`Lãi đã trả lại của giỏ ${basket.name}`} value={draft.giveback} disabled={busy}
+      onChange={(e) => set({ giveback: e.target.value as Mode })}>{MODES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+      {draft.giveback === "custom" && <>
+        <label className="field">Lãi ít nhất (% giá vốn)<input inputMode="decimal" value={draft.minGain} disabled={busy} onChange={(e) => set({ minGain: e.target.value })} /></label>
+        <label className="field">Đã trả lại (% lãi cao nhất)<input inputMode="decimal" value={draft.share} disabled={busy} onChange={(e) => set({ share: e.target.value })} /></label></>}</td>
+    <td><button className="btn" disabled={busy} onClick={() => void save()}><Save size={16} aria-hidden="true" />Lưu</button>
+      {note && <div className="caption" role="alert">{note}</div>}</td>
+  </tr>;
+}
+
 /** Giỏ chiến lược: the owner's own baskets of holding periods and what each made. Figures only. */
 export function BasketsView() {
   const [d, setD] = useState<Data | null>(null);
@@ -37,16 +66,20 @@ export function BasketsView() {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [target, setTarget] = useState("");
   useEffect(() => { api<Data>("baskets").then(setD, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
-  async function save(next: Stored, done: string) {
-    if (!d) return;
+  async function save(next: Stored, done: string): Promise<boolean> {
+    if (!d) return false;
     setBusy(true);
     try {
       setD(await api<Data>("baskets", { method: "PUT", body: { ...next, expected_version: d.version, request_id: requestId() } }));
       setMessage(done);
+      return true;
     } catch (e) {
       setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu.");
+      return false;
     } finally { setBusy(false); }
   }
+  const saveLevels = (b: Basket) => d ? save({ ...d.data, baskets: d.data.baskets.map((x) => x.id === b.id ? b : x) }, `Đã lưu ngưỡng nhắc của giỏ «${b.name}».`)
+    : Promise.resolve(false);
   function add(text: string) {
     if (!d) return;
     const clean = text.trim();
@@ -87,6 +120,16 @@ export function BasketsView() {
               <button key={s} className="btn" disabled={busy} onClick={() => add(s)}>+ {s}</button>)}</div>
         </>}
         {d.view.stale.length > 0 && <p className="caption" role="status">{d.view.stale.length} nhãn không còn khớp đợt nào (sổ đã sửa ngày mua): {d.view.stale.join(", ")}. Gắn lại ở bảng dưới.</p>}
+
+        {d.data.baskets.length > 0 && <>
+          <h3>Ngưỡng nhắc theo giỏ</h3>
+          <p className="caption">Mỗi giỏ dùng mức chung ở Cài đặt, ngưỡng riêng, hoặc không nhắc. Áp cho mã đang nắm theo giỏ của đợt nắm hiện tại: nhắc Telegram,
+            Việc cần xem, Kế hoạch sụt giảm, Lãi đã trả lại thị trường và Kiểm tra sức chịu đựng. Hậu kiểm vẫn dùng mức chung. Đợt chưa gắn giỏ dùng mức chung.</p>
+          <div className="tablewrap"><table className="fv-table cc-table" aria-label="Ngưỡng nhắc theo giỏ">
+            <thead><tr><th>Giỏ</th><th>Sụt giảm dưới giá vốn</th><th>Lãi đã trả lại</th><th /></tr></thead>
+            <tbody>{d.data.baskets.map((b) => <Levels key={`${b.id}-${d.version}`} basket={b} busy={busy} onSave={saveLevels} />)}</tbody>
+          </table></div>
+        </>}
 
         <h3>Kết quả theo giỏ</h3>
         <div className="tablewrap"><table className="fv-table cc-table" aria-label="Kết quả theo giỏ">

@@ -2,10 +2,11 @@
 import { useEffect, useState } from "react";
 import { ApiError, api } from "../lib/api";
 import { formatRatio, formatVnd } from "../lib/format";
+import { offList, ruleLabel, type Rule } from "./basket-rules";
 
 type Fall = { depth: string; peak: string; trough: string; recovered: string | null };
 type Row = { symbol: string; since: string | null; max: Fall | null; current: { depth: string; peak: string } | null; price: string | null;
-  cost: string | null; vs_cost: string | null; hit: boolean };
+  cost: string | null; vs_cost: string | null; hit: boolean; rule?: Rule };
 type Watch = { symbol: string; since: string | null; max: Fall | null; current: { depth: string; peak: string } | null };
 type Data = { threshold: string; rows: Row[]; watch?: Watch[] };
 
@@ -41,6 +42,7 @@ export function DrawdownView() {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { api<Data>("drawdown").then(setD, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải.")); }, []);
   const limit = d ? formatRatio(d.threshold, 1).replace(",0%", "%") : "";
+  const off = d ? offList(d.rows) : "";
   return (
     <section className="surface" aria-label="Kế hoạch sụt giảm">
       <h2>Kế hoạch sụt giảm</h2>
@@ -48,8 +50,8 @@ export function DrawdownView() {
       {!d && !error && <p className="muted fx-loading" role="status">Đang tải…</p>}
       {d && <>
         <p className="caption">Mức giảm sâu nhất từ một đỉnh trong toàn bộ lịch sử giá đã lưu, mức đang giảm so với đỉnh, và giá so với giá vốn.
-          Khi một mã xuống tới ngưỡng {limit} dưới giá vốn (sửa trong Cài đặt), ứng dụng nhắc qua Telegram một lần. Chỉ để tự xem lại kế hoạch,
-          không phải khuyến nghị.</p>
+          Khi một mã xuống tới ngưỡng dưới giá vốn, ứng dụng nhắc qua Telegram một lần. Ngưỡng là mức chung {limit} (sửa trong Cài đặt), hoặc ngưỡng
+          riêng của giỏ chiến lược mà đợt nắm của mã thuộc về.{off && ` Không nhắc: ${off}.`} Chỉ để tự xem lại kế hoạch, không phải khuyến nghị.</p>
         <table className="fv-table cc-table" aria-label="Sụt giảm theo mã">
           <thead><tr><th>Mã</th><th>Giảm sâu nhất</th><th>Đang giảm từ đỉnh</th><th className="num">So với giá vốn</th></tr></thead>
           <tbody>{d.rows.map((r) => <tr key={r.symbol} className={r.hit ? "cc-over" : ""}>
@@ -58,7 +60,8 @@ export function DrawdownView() {
             <Falls r={r} />
             <td data-label="So với giá vốn" className="num">{INDEX_NAME[r.symbol] ? <span className="muted">—</span> : <>
               <Signed value={r.vs_cost} />{r.hit && <span className="pill bad"> chạm ngưỡng</span>}
-              {r.cost && <div className="caption">giá vốn {formatVnd(r.cost, { unit: false })}</div>}</>}</td>
+              {r.cost && <div className="caption">giá vốn {formatVnd(r.cost, { unit: false })}</div>}
+              {r.rule && <div className="caption">ngưỡng {ruleLabel(r.rule)}</div>}</>}</td>
           </tr>)}</tbody>
         </table>
         {d.watch && d.watch.length > 0 && <details className="dd-watch">

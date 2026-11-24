@@ -57,3 +57,12 @@ def test_vn30_and_the_watched_tickers_are_listed_apart_from_holdings(tmp_path):
     watch = body["watch"]
     assert [r["symbol"] for r in watch] == ["HPG", "VCB"]  # deepest current fall first; FPT is held so not repeated
     assert watch[0]["current"]["depth"] == "-0.5000" and watch[1]["max"] is None  # VCB has no stored closes yet
+
+
+def test_each_holding_shows_the_level_it_is_held_to_and_where_it_comes_from(tmp_path):
+    c, clock = client(tmp_path)
+    assert call(c, clock, "GET", "/internal/drawdown").json()["rows"][1]["rule"] == {"source": "default", "basket": None, "threshold": "0.30"}
+    call(c, clock, "PUT", "/internal/baskets", {"baskets": [{"id": "b1", "name": "Ngắn hạn", "drawdown": {"mode": "custom", "threshold": "0.1"}}],
+                                                "tags": {"FPT@2027-01-05": "b1"}, "expected_version": 0, "request_id": "k1"})
+    fpt = call(c, clock, "GET", "/internal/drawdown").json()["rows"][1]
+    assert fpt["rule"] == {"source": "basket", "basket": "Ngắn hạn", "threshold": "0.1"} and fpt["hit"] is False  # +20% against cost

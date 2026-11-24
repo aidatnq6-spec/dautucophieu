@@ -14,7 +14,7 @@ def test_each_holding_gets_its_value_beta_and_only_clear_factor_relations():
                         sensitivity=sens, index=[], answer10=None, threshold=D("0.3"))
     fpt, hpg, vcb = out["rows"]
     assert fpt == {"symbol": "FPT", "shares": 100, "price": "60000", "value": "6000000", "cost": "50000", "beta": "1.2", "beta_note": None,
-                   "oil": "-0.150", "usd": None, "oil_note": None, "usd_note": "Quan hệ không rõ (|t| < 2)"}
+                   "oil": "-0.150", "usd": None, "oil_note": None, "usd_note": "Quan hệ không rõ (|t| < 2)", "rule": {"source": "default", "basket": None, "threshold": "0.3"}}
     assert hpg["beta"] is None and hpg["oil"] is None and hpg["oil_note"] == "Chưa đủ dữ liệu để đo"
     assert vcb["value"] is None and vcb["price"] is None
     assert out["tolerance"] is None and out["worst"] is None and out["threshold"] == "0.3"

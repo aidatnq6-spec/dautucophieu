@@ -12,6 +12,7 @@ from investment_agent.market.history import backfill_history, history_complete
 from investment_agent.market.series import SeriesStore
 from investment_agent.market.watchlist import load_watchlist
 from investment_agent.notifications.render import _num, vnd
+from investment_agent.services.baskets import rule_label, rules_for
 from investment_agent.services.journal import read_journal
 from investment_agent.services.records import LedgerBook, portfolio_settings, read_version
 
@@ -55,7 +56,13 @@ def watch_rows(data_dir: Path, symbols: list[str]) -> list[dict]:
     return sorted(rows, key=lambda r: Decimal(r["current"]["depth"]) if r["current"] else Decimal(1))
 
 
-def drawdown_rows(data_dir: Path, costs: dict[str, str], prices: dict[str, str | None], threshold: Decimal) -> list[dict]:
+def _common(threshold: Decimal) -> dict:
+    return {"source": "default", "basket": None, "threshold": format(threshold, "f")}
+
+
+def drawdown_rows(data_dir: Path, costs: dict[str, str], prices: dict[str, str | None], threshold: Decimal,
+                  rules: dict[str, dict] | None = None) -> list[dict]:
+    """rules: each held ticker's drawdown level and where it comes from (its basket or the common level); without one, the common level."""
     series = SeriesStore(Path(data_dir) / "trend-sources")
     rows = []
     for symbol in [*INDICES, *sorted(costs)]:
@@ -64,17 +71,33 @@ def drawdown_rows(data_dir: Path, costs: dict[str, str], prices: dict[str, str |
         vs_cost = (Decimal(price) / Decimal(cost) - 1).quantize(Decimal("0.0001")) if cost and price and Decimal(cost) > 0 else None
         if symbol in INDICES and symbol != INDEX and not points:
             continue  # VN30 appears once its closes are stored
-        rows.append({"symbol": symbol, "since": points[0][0].date().isoformat() if points else None, "max": max_drawdown(points),
-                     "current": current_drawdown(points), "price": price, "cost": cost,
-                     "vs_cost": str(vs_cost) if vs_cost is not None else None, "hit": vs_cost is not None and vs_cost <= -threshold})
+        row = {"symbol": symbol, "since": points[0][0].date().isoformat() if points else None, "max": max_drawdown(points),
+               "current": current_drawdown(points), "price": price, "cost": cost, "vs_cost": str(vs_cost) if vs_cost is not None else None,
+               "hit": False}
+        if symbol in costs:
+            rule = (rules or {}).get(symbol) or _common(threshold)
+            row["rule"] = rule
+            row["hit"] = vs_cost is not None and rule["threshold"] is not None and vs_cost <= -Decimal(rule["threshold"])
+        rows.append(row)
     return rows
 
 
-def render_alerts(alerts: list[dict], *, threshold: Decimal, reasons: dict[str, str]) -> str:
-    """Plain-text reminder: how far below cost, and the owner's own threshold and reason. No advice."""
-    lines = [f"Kế hoạch sụt giảm — đã chạm ngưỡng bạn đặt ({_num(threshold * 100, 0)}% dưới giá vốn)"]
+def held_levels(repo, owner, series: SeriesStore, costs: dict[str, str], threshold: Decimal) -> dict[str, dict]:
+    """{symbol: {price, cost, threshold, rule}} for threshold_alerts, each at its basket's level. Raises RepositoryUnavailable."""
+    rules = rules_for(repo, owner)
+    out = {}
+    for s, c in costs.items():
+        rule = rules.get(s, {}).get("drawdown") or _common(threshold)
+        out[s] = {"price": last_close(series, s), "cost": c, "threshold": rule["threshold"], "rule": rule}
+    return out
+
+
+def render_alerts(alerts: list[dict], *, threshold: Decimal | None = None, reasons: dict[str, str]) -> str:
+    """Plain-text reminder: how far below cost, each ticker's own threshold (its basket's or the common one) and reason. No advice."""
+    lines = ["Kế hoạch sụt giảm — đã chạm ngưỡng bạn đặt dưới giá vốn"]
     for a in alerts:
-        lines += ["", f"{a['symbol']}: {_num(Decimal(a['change']) * 100, 1, sign=True)}% so với giá vốn",
+        rule = a.get("rule") or _common(threshold)
+        lines += ["", f"{a['symbol']}: {_num(Decimal(a['change']) * 100, 1, sign=True)}% so với giá vốn (ngưỡng {rule_label(rule, 'drawdown')})",
                   f"Giá {vnd(a['price'])} · giá vốn bình quân {vnd(a['cost'])}"]
         if reason := reasons.get(a["symbol"]):
             lines.append(f"Lý do bạn đã ghi: {reason}")
@@ -134,14 +157,14 @@ def drawdown_run(repo, owner, data_dir: Path, *, fetch, send, request_id: str, b
     settings, _ = portfolio_settings(repo, owner)
     record = read_version(repo, owner, *ALERTS, None)
     before = set(record.payload.get("alerted", [])) if record else set()
-    holdings = {s: {"price": last_close(series, s), "cost": c} for s, c in costs.items()}
+    holdings = held_levels(repo, owner, series, costs, settings.drawdown_threshold)
     alerts, alerted = threshold_alerts(holdings, threshold=str(settings.drawdown_threshold), alerted=before)
     sent = False
     if alerts:
         entries, _ = read_journal(repo, owner)
         # The latest decision per ticker wins, by its date: an older journal imported later is saved last but happened first.
         reasons = {e.symbol: e.reason for e in sorted(entries, key=lambda e: e.created_on) if e.reason}
-        sent = bool(send(render_alerts(alerts, threshold=settings.drawdown_threshold, reasons=reasons)))
+        sent = bool(send(render_alerts(alerts, reasons=reasons)))
         if not sent:
             alerted -= {a["symbol"] for a in alerts}  # not delivered: try again next run
     if alerted != before:

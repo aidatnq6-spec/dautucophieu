@@ -12,6 +12,7 @@ from investment_agent.domain.giveback import giveback, giveback_alerts, goal_ale
 from investment_agent.domain.models import ContractModel, UnsignedAmount
 from investment_agent.market.series import SeriesStore
 from investment_agent.notifications.render import _num, vnd
+from investment_agent.services.baskets import rule_label, rules_for
 from investment_agent.services.journal import read_journal
 from investment_agent.services.records import LedgerBook, portfolio_settings, read_version
 
@@ -72,6 +73,12 @@ def _figures(repo, owner, data_dir: Path, today: date) -> dict:
     return giveback(events, closes=closes, today=today)
 
 
+def _levels(repo, owner) -> tuple[dict[str, dict], dict[str, tuple]]:
+    """Each held ticker's giveback levels and where they come from, and the (A, B) pairs giveback_alerts takes. Raises RepositoryUnavailable."""
+    rules = {s: r["giveback"] for s, r in rules_for(repo, owner).items()}
+    return rules, {s: (r["min_gain"], r["share"]) for s, r in rules.items()}
+
+
 def _with_status(goals: list[dict], days: list[dict]) -> list[dict]:
     return [{**g, "status": goal_status(g, days)} for g in goals]
 
@@ -82,6 +89,8 @@ def giveback_for(repo, owner, data_dir: Path, *, today: date) -> dict:
     settings = portfolio_settings(repo, owner)[0]
     goals, version = read_goals(repo, owner)
     min_gain, share = settings.giveback_min_gain, settings.giveback_share
+    rules, _ = _levels(repo, owner)
+    out["rows"] = [{**r, "rule": rules[r["symbol"]]} if r["symbol"] in rules else r for r in out["rows"]]
     return {**out, "thresholds": {"min_gain": None if min_gain is None else format(min_gain, "f"), "share": None if share is None else format(share, "f")},
             "goals": _with_status(goals, out["portfolio"]["days"]), "goals_version": version, "as_of": today.isoformat()}
 
@@ -108,6 +117,8 @@ def render_note(rows: list[dict], goals: list[dict], *, reasons: dict[str, str])
             lines += ["", f"{r['symbol']}: lãi cao nhất {vnd(p['gain'])} ({_pct(p['ratio'], True)}) ngày {_dmy(p['on'])}; "
                           f"ngày {_dmy(n['on'])} còn {vnd(n['gain'])} ({_pct(n['ratio'], True)})",
                       f"Đã trả lại {vnd(r['given_back'])}, bằng {_pct(r['share'])} lãi cao nhất."]
+            if r.get("rule"):
+                lines.append(f"Ngưỡng {rule_label(r['rule'], 'giveback')}")
             if reason := reasons.get(r["symbol"]):
                 lines.append(f"Lý do bạn đã ghi: {reason}")
     if goals:
@@ -132,7 +143,9 @@ def giveback_run(repo, owner, data_dir: Path, *, send, request_id: str, today: d
     record = read_version(repo, owner, *ALERTS, None)
     before = record.payload if record else {"alerted": [], "goals": {}}
     alerted_before, states_before = set(before.get("alerted", [])), dict(before.get("goals", {}))
-    rows, alerted = giveback_alerts(out["rows"], min_gain=settings.giveback_min_gain, share=settings.giveback_share, alerted=alerted_before)
+    rules, own = _levels(repo, owner)
+    rows, alerted = giveback_alerts(out["rows"], min_gain=settings.giveback_min_gain, share=settings.giveback_share, alerted=alerted_before, own=own)
+    rows = [{**r, "rule": rules[r["symbol"]]} if r["symbol"] in rules else r for r in rows]
     pairs = [(g, goal_status(g, out["portfolio"]["days"])) for g in goals]
     reached, states = goal_alerts(pairs, states=states_before)
     sent = False
@@ -158,7 +171,7 @@ def attention_lines(repo, owner, data_dir: Path, *, today: date) -> list[tuple[s
     """(kind, symbol, text) for Việc cần xem: holdings past both thresholds now, open goals covered now."""
     out = _figures(repo, owner, data_dir, today)
     settings = portfolio_settings(repo, owner)[0]
-    rows, _ = giveback_alerts(out["rows"], min_gain=settings.giveback_min_gain, share=settings.giveback_share, alerted=set())
+    rows, _ = giveback_alerts(out["rows"], min_gain=settings.giveback_min_gain, share=settings.giveback_share, alerted=set(), own=_levels(repo, owner)[1])
     lines = [("giveback", r["symbol"], f"{r['symbol']}: đã trả lại {_pct(r['share'])} lãi cao nhất ({vnd(r['peak']['gain'])} ngày "
                                        f"{_dmy(r['peak']['on'])}), lãi hôm nay {vnd(r['now']['gain'])}.") for r in rows]
     for g in read_goals(repo, owner)[0]:

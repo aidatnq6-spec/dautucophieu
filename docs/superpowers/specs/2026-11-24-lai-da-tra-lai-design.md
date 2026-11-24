@@ -1,6 +1,6 @@
 # Lãi đã trả lại thị trường và Mục tiêu đã đủ tiền (24/11/2026)
 
-Bản nháp chờ chủ sở hữu duyệt. Kaizen từ podcast "Đỉnh – Đáy" (Nguyễn Trần Hải, Trần Quang Hiến), mục 4.1: lãi tạm tính 80 tỷ trả
+Chủ sở hữu duyệt ngày 24/11/2026 (cổ tức tính theo giá điều chỉnh; ngưỡng A, B để trống đến khi đặt ở Cài đặt). Kaizen từ podcast "Đỉnh – Đáy" (Nguyễn Trần Hải, Trần Quang Hiến), mục 4.1: lãi tạm tính 80 tỷ trả
 lại gần hết vì chờ thêm, và chuyện lùi mua chiếc xe đã đủ tiền mua để chờ giá lên 300. Hai khối mới ở trang Danh mục & Giao dịch, ngay sau
 Kế hoạch sụt giảm. Dữ liệu cá nhân, tính trên máy, không gửi cho AI. Chỉ đưa số đã xảy ra: không nói nên bán, không dự báo.
 
@@ -49,8 +49,3 @@ Kế hoạch sụt giảm. Dữ liệu cá nhân, tính trên máy, không gửi
 - Không tính khuyến nghị chốt lời, không ước "nếu bán ở đỉnh thì được bao nhiêu".
 - Không đọc sổ giao dịch trước đợt nắm hiện tại cho Khối 1.
 - Không gửi danh mục, mục tiêu hay số tiền cho AI.
-
-## Câu hỏi cần chủ sở hữu chốt
-1. Cách tính giá trị có gồm cổ tức (giá điều chỉnh, như Hậu kiểm) là được, hay cần bám đúng cột "Lãi chưa chốt"? Bám đúng cột thì chỉ
-   tính được từ ngày có giá chưa điều chỉnh, mà kho giá hiện không lưu.
-2. Ngưỡng A, B để trống (không nhắc) đến khi bạn đặt, hay bạn đặt luôn số khi duyệt?

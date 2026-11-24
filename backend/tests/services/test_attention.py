@@ -72,3 +72,19 @@ def test_a_gold_layer_outside_its_range_is_listed_with_a_link_to_the_pyramid(tmp
     assert len(gold) == 1 and gold[0]["level"] == "low" and gold[0]["href"] == "/profile?tab=tai-san" and gold[0]["text"].startswith("Vàng chiếm 6,0%")
     monkeypatch.setattr(attention, "budget_view", lambda repo, owner, quotes: ({"status": "no_total"}, 0))
     assert not [i for i in attention_items(repo, OWNER, data, now=NOW) if i["kind"] == "gold_rebalance"]
+
+
+def test_a_holding_past_both_giveback_thresholds_and_a_covered_goal_need_a_decision(tmp_path):
+    from investment_agent.services.giveback import write_goals
+    repo, data = setup(tmp_path)
+    SeriesStore(data / "trend-sources").upsert("KDH-1d", [(datetime(2026, 10, 2), "30"), (datetime(2026, 10, 3), "45")])
+    repo.write(OWNER, "settings", "portfolio", {"concentration_limit": "0.25", "journal_review_threshold": "0.15", "drawdown_threshold": "0.6",
+                                                "giveback_min_gain": "0.3", "giveback_share": "0.5"}, expected_version=0, request_id="s1")
+    write_goals(repo, OWNER, [{"id": "g1", "name": "Mua xe", "amount": "40000000", "basis": "value", "created_on": "2026-10-01", "closed": None}],
+                expected_version=0, request_id="g1")
+    items = [i for i in attention_items(repo, OWNER, data, now=NOW) if i["kind"] in ("giveback", "goal")]
+    assert kinds(items) == [("high", "giveback", "KDH")]  # 45 → 15 against 30: the peak gain and as much again went back; 15 000 000 is short of the goal
+    assert items[0]["href"] == "/portfolio" and "200,0%" in items[0]["text"]
+    SeriesStore(data / "trend-sources").upsert("KDH-1d", [(datetime(2026, 11, 7), "42")])
+    items = [i for i in attention_items(repo, OWNER, data, now=NOW) if i["kind"] in ("giveback", "goal")]
+    assert kinds(items) == [("high", "goal", None)] and "Mua xe" in items[0]["text"]

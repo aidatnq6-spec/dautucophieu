@@ -9,7 +9,7 @@ from typing import Literal
 from pydantic import AwareDatetime, model_validator
 
 from investment_agent.domain.ledger import parse_events
-from investment_agent.domain.models import ContractModel, Ratio
+from investment_agent.domain.models import ContractModel, Ratio, UnsignedAmount
 from investment_agent.domain.reconciliation import Change, apply_amendments, parse_amendments
 from investment_agent.domain.risk import RiskAssessment
 from investment_agent.notifications.outbox import NotificationSettings
@@ -104,9 +104,19 @@ class PortfolioSettings(ContractModel):
     concentration_limit: Ratio = Decimal("0.25")
     journal_review_threshold: Ratio = Decimal("0.15")  # Nhật ký: remind again each time the price moves this much from the recorded price
     drawdown_threshold: Ratio = Decimal("0.30")  # Kế hoạch sụt giảm: remind once when a held ticker is this far below its average cost
+    # Lãi đã trả lại thị trường: remind when a holding's peak gain reached giveback_min_gain of its cost and it has given back
+    # giveback_share of that peak. The owner sets both or neither; nothing is reminded until then (no default).
+    giveback_min_gain: UnsignedAmount | None = None
+    giveback_share: Ratio | None = None
 
     @model_validator(mode="after")
     def _sensible(self):
+        if (self.giveback_min_gain is None) != (self.giveback_share is None):
+            raise ValueError("set both giveback thresholds or neither")
+        if self.giveback_min_gain is not None and not Decimal("0.01") <= self.giveback_min_gain <= Decimal("10"):
+            raise ValueError("giveback minimum gain must be between 1% and 1000%")
+        if self.giveback_share is not None and not Decimal("0.01") <= self.giveback_share <= Decimal("1"):
+            raise ValueError("giveback share must be between 1% and 100%")
         if not Decimal("0") < self.concentration_limit <= Decimal("1"):
             raise ValueError("concentration limit must be above 0 and at most 100%")
         if not Decimal("0.01") <= self.journal_review_threshold <= Decimal("1"):

@@ -18,7 +18,7 @@ from investment_agent.services.records import notification_settings as current_s
 from investment_agent.market.calendar import TradingCalendar
 from investment_agent.notifications.outbox import deliver
 
-from .daily import run_after_close
+from .daily import SOURCE_BEHIND, run_after_close
 from .publication import get_report, list_reports
 from .runner import JobStore
 
@@ -127,10 +127,16 @@ def scheduled_tick(*, repo, owner, market, jobs: JobStore, deliveries, sender, c
             delivered = _send_queued(repo, owner, deliveries, sender, session=decision.session_date, market_for=market_for)
         return TickResult(decision, statuses, delivered)
     jobs.count_attempt(decision.session_date.isoformat())
+    behind = False
     for kind in decision.kinds:
         result = run_after_close(repo=repo, owner=owner, market=market, jobs=jobs, outbox=deliveries, session_date=decision.session_date,
                                  now=now, worker_id=worker_id, report_kind=kind, reminders=reminders)
         statuses.append(result.status)
+        behind = behind or (kind == "after_close" and result.reason == SOURCE_BEHIND)
+    if behind:
+        # The source had not published the session yet: not the report's fault, so the next wake-up tries again. The session is still
+        # dropped once the next session's first slot passes (decide then targets the new session).
+        jobs.uncount_attempt(decision.session_date.isoformat())
     if decision.send:
         delivered = _send_queued(repo, owner, deliveries, sender, market_for=market_for)
     return TickResult(decision, statuses, delivered)

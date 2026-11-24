@@ -224,3 +224,31 @@ def test_a_report_whose_parts_were_all_sent_before_is_not_counted_as_delivered_a
                             sender=sender, cal=CAL, now=at("2026-10-27", "17:31"), worker_id="sched")
     assert result.delivered == [] and len(sender.sent) == 1
     assert store.queued() == []  # still taken off the queue
+
+
+def holding_fpt():
+    repo = PersonalRepository("owner-1", MemoryDocumentStore())
+    repo.write(OWNER, "ledger_events", "main", {"events": [
+        {"event_id": "d1", "type": "deposit", "effective_at": "2026-10-01", "sequence": 0, "amount": "100000000"},
+        {"event_id": "b1", "type": "buy", "effective_at": "2026-10-02", "sequence": 0, "security_id": "FPT", "quantity": 100, "price": "50000",
+         "fee": "0", "tax": "0"}], "amendments": []}, expected_version=0, request_id="l1")
+    return repo
+
+
+def test_a_run_the_source_is_behind_for_does_not_use_up_an_attempt(tmp_path):
+    repo = holding_fpt()
+    behind = SyntheticMarket(prices={"FPT": PricePoint(Decimal(60000), date(2026, 10, 26))})  # the source has not published 27/10 yet
+    for hhmm in ("15:31", "20:01"):
+        assert tick(tmp_path, repo, at("2026-10-27", hhmm), market=behind).statuses == ["incomplete"], hhmm
+    assert JobStore(tmp_path / "jobs.sqlite").attempts().get("2026-10-27", 0) == 0
+    morning = tick(tmp_path, repo, at("2026-10-28", "08:31"), market=behind)
+    assert morning.decision.reason == "catch_up" and morning.statuses == ["incomplete"]
+    later = tick(tmp_path, repo, at("2026-10-28", "15:31"), market=behind)
+    assert later.decision.session_date == date(2026, 10, 28)  # once the next session's first slot passes, 27/10 is only counted as missed
+
+
+def test_an_incomplete_run_for_another_reason_still_uses_up_an_attempt(tmp_path):
+    repo = holding_fpt()
+    current = SyntheticMarket(prices={"FPT": PricePoint(Decimal(60000), date(2026, 10, 27))})  # priced for the session; no profile
+    assert tick(tmp_path, repo, at("2026-10-27", "15:31"), market=current).statuses == ["incomplete"]
+    assert JobStore(tmp_path / "jobs.sqlite").attempts()["2026-10-27"] == 1

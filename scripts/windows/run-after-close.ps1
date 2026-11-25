@@ -128,6 +128,10 @@ if ((Get-Date).Hour -ge 20) {
     # weekly per bank), for the group-2 share and CASA in Chi so ngan hang.
     $bn = & $python -W ignore -m investment_agent.jobs.step bank-notes-sync --data-dir $data 2>$null
     "$(Get-Date -Format o) bank-notes-sync exit=$LASTEXITCODE $bn" | Add-Content -LiteralPath $log -Encoding UTF8
+    # Thuyet minh tu dong: borrowings, financial income and costs by kind, fixed-asset movements of watched companies from Vietcap's notes
+    # (after the bank notes: 10 s before each call, weekly per company, at most 15 a run).
+    $cn = & $python -W ignore -m investment_agent.jobs.step company-notes-sync --data-dir $data 2>$null
+    "$(Get-Date -Format o) company-notes-sync exit=$LASTEXITCODE $cn" | Add-Content -LiteralPath $log -Encoding UTF8
     # Ke hoach nam: the current year's business plan of each watched ticker from CafeF (one public call each, weekly per ticker).
     $ps = & $python -W ignore -m investment_agent.jobs.step plans-sync --data-dir $data 2>$null
     "$(Get-Date -Format o) plans-sync exit=$LASTEXITCODE $ps" | Add-Content -LiteralPath $log -Encoding UTF8

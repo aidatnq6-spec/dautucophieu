@@ -108,6 +108,8 @@ def main() -> int:
     bns = commands.add_parser("bank-notes-sync", help="loans by group and deposits by kind of watched banks (Vietcap notes, 10 s apart, weekly) into data/bank-notes")
     bns.add_argument("--data-dir", type=Path, required=True)
     bns.add_argument("--force", action="store_true", help="refresh every watched bank now, however recent its record")
+    cns = commands.add_parser("company-notes-sync", help="notes of watched non-financial companies (Vietcap, 10 s apart, weekly, 15 a run) into data/company-notes")
+    cns.add_argument("--data-dir", type=Path, required=True)
     vcs = commands.add_parser("valuation-check-sync", help="VNDirect's market value, P/E and P/B of each watched ticker, to compare with Bảng số tài chính")
     vcs.add_argument("--data-dir", type=Path, required=True)
     ivs = commands.add_parser("index-valuation-sync", help="fetch daily P/E and P/B of VNINDEX and VN30 (VNDirect) into data/index-valuation")
@@ -227,6 +229,8 @@ def main() -> int:
         return valuation_check_sync(args.data_dir)
     if args.command == "bank-notes-sync":
         return bank_notes_sync(args.data_dir, force=args.force)
+    if args.command == "company-notes-sync":
+        return company_notes_sync(args.data_dir)
     if args.command == "industries":
         return industries(_symbols(args.symbols), args.output)
     if args.command == "backup":
@@ -778,6 +782,30 @@ def bank_notes_sync(data_dir: Path, get=None, sleep=None, force: bool = False) -
     results = sync_bank_notes(BankNoteStore(data_dir / "bank-notes"), watched, get=get, sleep=sleep or time.sleep, force=force)
     failed = {k: v for k, v in results.items() if v.startswith("error")}
     print(json.dumps({"status": "ok" if not failed else "partial", "results": results}))
+    return 0 if not failed else 1
+
+
+def company_notes_sync(data_dir: Path, get=None, sleep=None) -> int:
+    """Thuyết minh tự động (25/11/2026): exit 0 when every due company updated or waits its turn, 1 when one failed (each is reported)."""
+    import time
+
+    from investment_agent.market.company_notes import CompanyNoteStore, sync_company_notes
+    from investment_agent.market.sectors import load_sectors
+    from investment_agent.market.watchlist import load_watchlist
+    if get is None:
+        import httpx
+
+        def get(url):
+            # This application's own name; no browser headers. Vietcap answers 418 to callers faster than its Crawl-delay.
+            response = httpx.get(url, timeout=60, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+            response.raise_for_status()
+            return response.text
+    sectors = load_sectors(data_dir)[0]
+    watched = {s: sectors.get(s) for s in load_watchlist(data_dir).symbols}
+    results = sync_company_notes(CompanyNoteStore(data_dir / "company-notes"), watched, get=get, sleep=sleep or time.sleep)
+    failed = {k: v for k, v in results.items() if v.startswith("error")}
+    counts = {state: sum(1 for v in results.values() if v == state) for state in ("ok", "fresh", "later", "skipped")}
+    print(json.dumps({"status": "ok" if not failed else "partial", **counts, "errors": failed}))
     return 0 if not failed else 1
 
 

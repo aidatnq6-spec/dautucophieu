@@ -284,3 +284,24 @@ def test_shares_that_may_be_issued_give_eps_before_and_after_dilution_owner_25_1
         with pytest.raises(NoteError) as err:
             validate_dilution(raw)
         assert err.value.code == code
+
+
+def test_the_automatic_notes_give_borrowings_by_kind_financial_lines_and_fixed_asset_movements_owner_25_11_2026():
+    """Thuyết minh tự động (Vietcap), HPG 2021: vay ngắn hạn 37.547, dài hạn đến hạn 6.200,6; lãi thanh lý 504,2 + tỷ giá chưa thực hiện 46,6."""
+    from investment_agent.domain.fixed_asset_notes import auto_view
+    record = {"fetched_at": "2026-11-25T13:00:00+00:00", "source": "vietcap:iq",
+              "years": {str(y): {"st_loans_contract": str(100 * B)} for y in range(2015, 2021)}
+              | {"2021": {"st_loans_contract": str(37547 * B), "lt_due": str(int(6200.6 * 10) * 10**8), "lt_bank": str(int(13464.9 * 10) * 10**8), "bonds": "0",
+                          "fin_interest": str(int(1194.4 * 10) * 10**8), "fin_disposals": str(int(504.2 * 10) * 10**8), "fin_fx_unrealised": str(int(46.6 * 10) * 10**8),
+                          "exp_interest": str(int(2525.8 * 10) * 10**8), "ppe_cost_open": str(int(82616.6 * 10) * 10**8), "ppe_cost_add": str(int(9767.3 * 10) * 10**8),
+                          "ppe_cost_out": str(int(-1357.8 * 10) * 10**8)}}}
+    statements = {"years": {"2021": {"pbt": str(int(37056.8 * 10) * 10**8)}}}
+    v = auto_view(record, statements, debt_notes={"period": "2021", "current_portion": "6200"})
+    assert v["fetched_at"] == "2026-11-25T13:00:00+00:00" and [y["year"] for y in v["years"]] == ["2021", "2020", "2019", "2018", "2017"]  # five, newest first
+    y = v["years"][0]
+    assert y["loans"] == {"st_loans_contract": "37547", "lt_due": "6200.6", "lt_bank": "13464.9", "bonds": "0"} and y["loans_total"] == "57212.5"
+    assert y["manual_current_portion"] == "6200"
+    assert y["fin_income"]["fin_interest"] == "1194.4" and y["fin_expense"] == {"exp_interest": "2525.8"}
+    assert y["hard_to_repeat"] == "550.8" and y["share"] == "0.0149"
+    assert y["ppe"] == {"ppe_cost_open": "82616.6", "ppe_cost_add": "9767.3", "ppe_cost_out": "-1357.8"}
+    assert auto_view(None, statements, debt_notes={}) is None

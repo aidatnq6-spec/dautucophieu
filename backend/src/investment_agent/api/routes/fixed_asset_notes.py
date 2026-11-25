@@ -11,6 +11,8 @@ from pydantic import Field
 from investment_agent.domain.fixed_asset_notes import FIN_KINDS, fin_notes_view, validate_fin_notes
 from investment_agent.domain.fixed_asset_notes import INCENTIVE_KINDS, MAX_INCENTIVES, incentives_view, validate_incentives
 from investment_agent.domain.fixed_asset_notes import MAX_DILUTION, dilution_view, validate_dilution
+from investment_agent.domain.fixed_asset_notes import AUTO_LABELS, auto_view
+from investment_agent.market.company_notes import CompanyNoteStore
 from investment_agent.domain.fixed_asset_notes import (CURRENCIES, GROUPS, MAX_DEALS, MAX_LOANS, MAX_PROJECTS, PREPAID_KINDS, TERMS, NoteError,
                                                          bargain_years, complete, deals_view, debt_view, due_view, goodwill_moves, postpone, prepaid_view,
                                                          segments_view, validate_amort, validate_deals, validate_debt_notes, validate_loans,
@@ -85,7 +87,9 @@ def _view(request: Request, repo, owner, symbol: str) -> dict:
             "segments": segments_view(_stored(record, "segments", {}), statements),
             "fin_income_notes": fin_notes_view(_stored(record, "fin_income_notes", {}), statements), "fin_kinds": FIN_KINDS,
             "tax_incentives": incentives_view(_stored(record, "tax_incentives", []), today=_today(request)), "incentive_kinds": INCENTIVE_KINDS,
-            "dilution": _stored(record, "dilution", []), "dilution_view": dilution_view(_stored(record, "dilution", []), statements)}
+            "dilution": _stored(record, "dilution", []), "dilution_view": dilution_view(_stored(record, "dilution", []), statements),
+            "auto": auto_view(CompanyNoteStore(Path(request.app.state.data_dir) / "company-notes").read(symbol), statements,
+                              debt_notes=_stored(record, "debt_notes", {})), "auto_labels": AUTO_LABELS}
 
 
 def _deal_parts(record, statements: dict, today) -> dict:

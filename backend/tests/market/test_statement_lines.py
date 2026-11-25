@@ -65,3 +65,10 @@ def test_tax_parts_cash_and_deferred_balances_are_kept_owner_25_11_2026():
     assert names[(2, 22051)] == "tax_current" and names[(2, 22052)] == "tax_deferred" and names[(3, 31180)] == "tax_paid"
     assert names[(1, 12620)] == "deferred_tax_assets" and names[(1, 13350)] == "deferred_tax_liabilities"
     assert LINES_VERSION >= 13
+
+
+def test_convertible_bonds_and_conversion_options_are_kept_owner_25_11_2026():
+    """Trên mỗi cổ phiếu (spec 25/11/2026): 13343 convertible bonds, 14149 conversion options in equity: a later dilution."""
+    names = {(m, c): n for (m, c), n in LINES.items()}
+    assert names[(1, 13343)] == "convertible_bonds" and names[(1, 14149)] == "conversion_option"
+    assert LINES_VERSION >= 14

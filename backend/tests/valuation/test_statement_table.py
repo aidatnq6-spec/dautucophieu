@@ -276,7 +276,7 @@ def test_the_fixed_assets_group_gives_balances_wear_pipeline_reinvestment_and_tu
     years = {"2024": q(1000, 84, **fixed(400, 600, 100)), "2025": q(2000, 164, **fixed(600, 1000, 150), capex=-120, depreciation=80)}
     quarters = {p: q(100, 10, **fixed(400, 600, 100)) for p in ("2024-Q4", "2025-Q1", "2025-Q2", "2025-Q3")}
     quarters["2025-Q4"] = q(100, 10, **fixed(600, 1000, 150))
-    t = statement_table({**RECORD, "years": years, "quarters": quarters, "lines_version": 13}, closes=CLOSES, vnstock=None)
+    t = statement_table({**RECORD, "years": years, "quarters": quarters, "lines_version": 14}, closes=CLOSES, vnstock=None)
     keys = [r["key"] for r in t["years"]["rows"]]
     assert keys.index("fcff") < keys.index("ppe_net") < keys.index("market_cap")  # after Dòng tiền, before Quy mô và định giá
     r, i = rows(t, "years"), t["years"]["periods"].index("2025")
@@ -310,7 +310,7 @@ def test_fixed_asset_ratios_stay_blank_without_their_parts_and_balances_that_do_
 def test_the_prepaid_group_gives_both_parts_their_total_and_its_weight_against_assets_and_profit_owner_25_11_2026():
     years = {"2025": q(2000, 164, prepaid_st=30, prepaid_lt=170, prepaid_change=-50, total_assets=4000)}
     quarters = {p: q(100, 10, prepaid_st=30, prepaid_lt=170, total_assets=4000) for p in ("2025-Q1", "2025-Q2", "2025-Q3", "2025-Q4")}
-    t = statement_table({**RECORD, "years": years, "quarters": quarters, "lines_version": 13}, closes=CLOSES, vnstock=None)
+    t = statement_table({**RECORD, "years": years, "quarters": quarters, "lines_version": 14}, closes=CLOSES, vnstock=None)
     keys = [r["key"] for r in t["years"]["rows"]]
     assert keys.index("ppe_turnover") < keys.index("prepaid_st") < keys.index("market_cap")  # after Tài sản cố định
     r = rows(t, "years")
@@ -327,7 +327,7 @@ def test_the_prepaid_group_gives_both_parts_their_total_and_its_weight_against_a
 
 def test_goodwill_against_parent_equity_and_book_value_without_it_owner_25_11_2026():
     years = {"2025": q(2000, 164, goodwill=99, goodwill_amort=11, equity=1000, charter_capital=100)}
-    t = statement_table({**RECORD, "years": years, "quarters": {}, "lines_version": 13}, closes=CLOSES, vnstock=None)
+    t = statement_table({**RECORD, "years": years, "quarters": {}, "lines_version": 14}, closes=CLOSES, vnstock=None)
     keys = [r["key"] for r in t["years"]["rows"]]
     assert keys.index("property_net") < keys.index("goodwill") < keys.index("cip")
     assert keys.index("pb") < keys.index("pb_ex_goodwill") < keys.index("ev_ebitda")
@@ -335,7 +335,7 @@ def test_goodwill_against_parent_equity_and_book_value_without_it_owner_25_11_20
     assert r["goodwill"][0] == "99000000000" and r["goodwill_amort"][0] == "11000000000"
     assert r["goodwill_to_equity"][0] == "0.1000"  # 99 / (1000 − minority 10)
     assert r["pb"][0] == "0.30" and r["pb_ex_goodwill"][0] == "0.34"  # 300 / 990 ; 300 / 891
-    none = statement_table({**RECORD, "years": {"2025": q(2000, 164, charter_capital=100)}, "quarters": {}, "lines_version": 13}, closes=CLOSES, vnstock=None)
+    none = statement_table({**RECORD, "years": {"2025": q(2000, 164, charter_capital=100)}, "quarters": {}, "lines_version": 14}, closes=CLOSES, vnstock=None)
     assert rows(none, "years")["pb_ex_goodwill"][0] is None  # no goodwill line: blank, not taken as nil
     assert statement_table({**RECORD, "lines_version": 9}, closes=CLOSES, vnstock=None)["fixed_assets_pending"] is True
 
@@ -343,7 +343,7 @@ def test_goodwill_against_parent_equity_and_book_value_without_it_owner_25_11_20
 def test_the_borrowing_group_gives_the_split_the_average_rate_cover_and_cash_against_short_debt_owner_25_11_2026():
     years = {"2024": YEARS["2024"], "2025": {**YEARS["2025"], **q(2000, 164, borrow_in=500, borrow_out=-450, fx_unrealised=-3, interest=24, equity=1000,
                                                                     cfo=210, capex=-130, depreciation=80, charter_capital=100)}}
-    t = statement_table({**RECORD, "years": years, "lines_version": 13}, closes=CLOSES, vnstock=None)
+    t = statement_table({**RECORD, "years": years, "lines_version": 14}, closes=CLOSES, vnstock=None)
     keys = [r["key"] for r in t["years"]["rows"]]
     assert keys.index("prepaid_change") < keys.index("st_debt") < keys.index("market_cap")  # after Chi phí trả trước
     r, i = rows(t, "years"), t["years"]["periods"].index("2025")
@@ -366,7 +366,7 @@ def test_the_equity_group_gives_its_parts_parent_equity_against_capital_and_the_
     years = {"2024": q(1000, 84, equity=1000, minority_equity=400, charter_capital=900),
              "2025": q(2000, 50, equity=500, minority_equity=20, charter_capital=900, share_premium=0, treasury_shares=-1, equity_fx=-60, dev_fund=28,
                        retained=-450, issue_cash=10, buyback_cash=-2, dividends_paid=-5)}
-    t = statement_table({**RECORD, "years": years, "quarters": {}, "lines_version": 13}, closes=CLOSES, vnstock=None)
+    t = statement_table({**RECORD, "years": years, "quarters": {}, "lines_version": 14}, closes=CLOSES, vnstock=None)
     keys = [r["key"] for r in t["years"]["rows"]]
     assert keys.index("fx_unrealised") < keys.index("charter_capital") < keys.index("market_cap")  # after Nợ vay
     r, i = rows(t, "years"), t["years"]["periods"].index("2025")
@@ -377,14 +377,14 @@ def test_the_equity_group_gives_its_parts_parent_equity_against_capital_and_the_
     assert r["equity_other"][i] == "-553000000000"  # 500 − 1000 − 50 − 10 − (−2) − (−5)
     assert r["equity_other"][t["years"]["periods"].index("2024")] is None  # no year before
     gap = {**years, "2025": {k: v for k, v in years["2025"].items() if k != "issue_cash"}}
-    assert rows(statement_table({**RECORD, "years": gap, "quarters": {}, "lines_version": 13}, closes=CLOSES, vnstock=None), "years")["equity_other"][1] is None
+    assert rows(statement_table({**RECORD, "years": gap, "quarters": {}, "lines_version": 14}, closes=CLOSES, vnstock=None), "years")["equity_other"][1] is None
     assert statement_table({**RECORD, "lines_version": 11}, closes=CLOSES, vnstock=None)["fixed_assets_pending"] is True
 
 
 def test_gross_margin_against_the_four_years_before_and_deductions_against_gross_revenue_owner_25_11_2026():
     margins = {"2021": 30, "2022": 40, "2023": 30, "2024": 40, "2025": 11}  # HAG 2019 shape: a margin far under the years before
     years = {y: q(1000, 84, gross_profit=m * 10, gross_revenue=1010, deductions=10) for y, m in margins.items()}
-    t = statement_table({**RECORD, "years": years, "quarters": {}, "lines_version": 13}, closes=CLOSES, vnstock=None)
+    t = statement_table({**RECORD, "years": years, "quarters": {}, "lines_version": 14}, closes=CLOSES, vnstock=None)
     keys = [r["key"] for r in t["years"]["rows"]]
     assert keys.index("gross_margin") < keys.index("gross_margin_vs_avg") < keys.index("deductions_share") < keys.index("selling")
     r = rows(t, "years")
@@ -395,12 +395,12 @@ def test_gross_margin_against_the_four_years_before_and_deductions_against_gross
 
 def test_net_financial_income_other_financial_costs_and_cash_received_against_financial_income_owner_25_11_2026():
     years = {"2025": q(2000, 164, fin_income=100, fin_expense=80, interest=60, interest_received=34)}
-    t = statement_table({**RECORD, "years": years, "quarters": {}, "lines_version": 13}, closes=CLOSES, vnstock=None)
+    t = statement_table({**RECORD, "years": years, "quarters": {}, "lines_version": 14}, closes=CLOSES, vnstock=None)
     keys = [r["key"] for r in t["years"]["rows"]]
     assert keys.index("interest") < keys.index("net_financial") < keys.index("fin_expense_other") < keys.index("fin_cash_share") < keys.index("associates")
     r = rows(t, "years")
     assert r["net_financial"][0] == "20000000000" and r["fin_expense_other"][0] == "-20000000000" and r["fin_cash_share"][0] == "0.3400"
-    none = rows(statement_table({**RECORD, "years": {"2025": q(2000, 164, fin_income=0)}, "quarters": {}, "lines_version": 13}, closes=CLOSES, vnstock=None), "years")
+    none = rows(statement_table({**RECORD, "years": {"2025": q(2000, 164, fin_income=0)}, "quarters": {}, "lines_version": 14}, closes=CLOSES, vnstock=None), "years")
     assert none["fin_cash_share"][0] is None
 
 
@@ -408,7 +408,7 @@ def test_the_tax_group_gives_current_and_deferred_the_effective_rate_and_tax_pai
     """HPG 2021 shape: current 2.855,3, deferred −319,5 (a benefit), 2.535,8 in all on 37.056,8 before tax: 6,8%."""
     years = {"2025": q(2000, 164, tax=41, tax_current=45, tax_deferred=-4, tax_paid=-39, deferred_tax_assets=5, deferred_tax_liabilities=2)}
     quarters = {p: q(100, 10, tax=2.5) for p in ("2025-Q1", "2025-Q2", "2025-Q3", "2025-Q4")}
-    t = statement_table({**RECORD, "years": years, "quarters": quarters, "lines_version": 13}, closes=CLOSES, vnstock=None)
+    t = statement_table({**RECORD, "years": years, "quarters": quarters, "lines_version": 14}, closes=CLOSES, vnstock=None)
     keys = [r["key"] for r in t["years"]["rows"]]
     assert keys.index("equity_other") < keys.index("tax_current") < keys.index("market_cap")  # after Vốn chủ sở hữu
     r = rows(t, "years")
@@ -420,3 +420,16 @@ def test_the_tax_group_gives_current_and_deferred_the_effective_rate_and_tax_pai
     assert rq["etr"][-1] == "0.2000"  # 4 × 2,5 / (4 × 12,5)
     assert {x["key"]: x["label"] for x in t["quarters"]["rows"]}["etr"].endswith("(4 quý)")
     assert statement_table({**RECORD, "lines_version": 12}, closes=CLOSES, vnstock=None)["fixed_assets_pending"] is True
+
+
+def test_the_per_share_group_sets_reported_eps_against_parent_profit_over_year_end_shares_owner_25_11_2026():
+    """VNM 2020 shape: EPS 4.770 đ against 11.098,9 tỷ over 2.089,96 million shares (5.311 đ): the bonus and welfare fund and the weighting."""
+    years = {"2025": {**q(2000, 164, charter_capital=1000, convertible_bonds=50), "eps": "1500"}}  # 100 million shares; EPS in đồng
+    t = statement_table({**RECORD, "years": years, "quarters": {}, "lines_version": 14}, closes=CLOSES, vnstock=None)
+    keys = [r["key"] for r in t["years"]["rows"]]
+    assert keys.index("deferred_tax_liabilities") < keys.index("eps") < keys.index("market_cap")  # after Thuế TNDN
+    r = rows(t, "years")
+    assert r["eps_implied"][0] == "1640"  # 164 tỷ / 100 million shares
+    assert r["eps_ratio"][0] == "0.91"  # 1.500 / 1.640
+    assert r["convertible_bonds"][0] == "50000000000"
+    assert statement_table({**RECORD, "lines_version": 13}, closes=CLOSES, vnstock=None)["fixed_assets_pending"] is True

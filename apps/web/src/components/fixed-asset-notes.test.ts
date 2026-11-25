@@ -1,5 +1,12 @@
 import { expect, it } from "vitest";
-import { bargainText, coverText, dealText, finText, fxText, gapText, incentiveState, interestText, quarterInput, segmentCheckText, stateText, yearsLeftText } from "./fixed-asset-notes";
+import { bargainText, coverText, dealText, dilutionText, finText, fxText, gapText, incentiveState, interestText, quarterInput, segmentCheckText, stateText, yearsLeftText } from "./fixed-asset-notes";
+
+it("shares that may be issued give EPS before and after dilution", () => {
+  expect(dilutionText({ quarter: "2026-Q1", shares: "100000000", extra: "20000000", share: "0.2000", npat_ttm: "100", eps: "1000", eps_diluted: "833" }))
+    .toBe("LNST công ty mẹ 4 quý đến Q1/2026: 100 tỷ; 100.000.000 cổ phiếu: EPS 1.000 đ. Thêm 20.000.000 cổ phiếu (20,0%): EPS 833 đ");
+  expect(dilutionText({ quarter: null, shares: null, extra: "1", share: null, npat_ttm: null, eps: null, eps_diluted: null }))
+    .toBe("Chưa có LNST 4 quý và số cổ phiếu trong báo cáo đã lưu");
+});
 
 it("a tax incentive says whether it is still running", () => {
   expect(incentiveState({ state: "ending", until: "2026" })).toBe("Hết trong năm 2026: thuế suất thực tế có thể tăng từ năm sau");

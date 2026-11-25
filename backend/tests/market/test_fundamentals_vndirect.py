@@ -222,3 +222,10 @@ def test_the_record_carries_the_tax_lines_of_the_tax_rate_sign_owner_25_11_2026(
     s["years"]["2025"].update({"tax": str(2536 * B), "tax_current": str(2855 * B), "tax_deferred": str(-319 * B)})
     annual = build_record("FPT", s, EVENTS, shares=None, now=NOW)["annual"]["2025"]
     assert (annual["tax"], annual["tax_current"], annual["tax_deferred"]) == (str(2536 * B), str(2855 * B), str(-319 * B))
+
+
+def test_the_record_carries_convertible_bonds_for_the_dilution_sign_owner_25_11_2026():
+    s = statements()
+    s["years"]["2025"].update({"convertible_bonds": str(500 * B), "conversion_option": "0"})
+    annual = build_record("FPT", s, EVENTS, shares=None, now=NOW)["annual"]["2025"]
+    assert (annual["convertible_bonds"], annual["conversion_option"]) == (str(500 * B), "0")

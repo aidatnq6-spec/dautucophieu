@@ -56,6 +56,18 @@ test("the owner writes a deal and sees its goodwill by the lesson's formula", as
   await expect(box.getByTestId("fan-charging")).toContainText("40 tỷ mỗi năm");
 });
 
+test("the owner writes shares that may be issued", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Thuyết minh TSCĐ (nhập tay)" });
+  await box.getByRole("button", { name: "Ghi số cổ phiếu có thể phát hành thêm" }).click();
+  const form = box.getByRole("form", { name: "Pha loãng cổ phiếu" });
+  await form.getByLabel("Nguồn 1").fill("ESOP mẫu");
+  await form.getByLabel("Số cổ phiếu").fill("5.000.000");
+  await form.getByRole("button", { name: "Lưu" }).click();
+  await expect(box.getByTestId("fan-dilution")).toContainText("ESOP mẫu: 5.000.000 cổ phiếu");
+  await expect(box.getByTestId("fan-dilution-eps")).toBeVisible();
+});
+
 test("the owner writes a tax incentive and sees until when it runs", async ({ page }) => {
   await page.goto("/research/FPT");
   const box = page.getByRole("region", { name: "Thuyết minh TSCĐ (nhập tay)" });

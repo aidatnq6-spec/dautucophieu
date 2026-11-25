@@ -66,7 +66,11 @@ FIXED = [
 ]
 FIXED_RATIOS = ("ppe_wear", "cip_to_ppe", "capex_to_depreciation", "ppe_turnover", "prepaid_to_assets", "prepaid_to_pbt", "goodwill_to_equity",
                 "st_debt_share", "avg_rate", "icr", "cash_to_st_debt", "parent_to_capital", "nci_share", "gross_margin_vs_avg", "deductions_share",
-                "fin_cash_share", "etr", "tax_paid_share")
+                "fin_cash_share", "etr", "tax_paid_share", "eps_ratio")
+PER_SHARE = [
+    ("g", "Trên mỗi cổ phiếu"), ("eps", "EPS cơ bản (báo cáo)", "vnd", 0), ("eps_implied", "LNST công ty mẹ ÷ cổ phiếu cuối kỳ", "vnd", 1),
+    ("eps_ratio", "EPS báo cáo ÷ phần tự tính", "x", 1), ("convertible_bonds", "Trái phiếu chuyển đổi", "money", 1),
+]
 TAX = [
     ("g", "Thuế TNDN"), ("tax_current", "Thuế TNDN hiện hành", "money", 1), ("tax_deferred", "Thuế TNDN hoãn lại", "money", 1),
     ("etr", "Thuế suất thực tế", "pct", 1), ("tax_paid_share", "Thuế đã nộp ÷ chi phí thuế", "pct", 1),
@@ -300,6 +304,14 @@ def _tax(f: dict, flows: dict) -> dict:
             "tax_paid_share": _ratio(abs(paid), charge) if paid is not None and charge is not None and charge > 0 else None}
 
 
+def _per_share(f: dict) -> dict:
+    """Parent profit of the period over its end's shares (charter capital ÷ 10.000 đ par), and the reported basic EPS against it: lower when
+    the bonus and welfare fund is taken off or shares were issued in the period (a weighted average), higher when shares rose after."""
+    npat, capital, eps = _d(f.get("npat_parent")), _d(f.get("charter_capital")), _d(f.get("eps"))
+    implied = npat / (capital / PAR) if npat is not None and capital is not None and capital > 0 else None
+    return {"eps_implied": implied, "eps_ratio": _ratio(eps, implied, _Q2) if eps is not None and implied is not None and implied > 0 else None}
+
+
 def _years_back(period: str, n: int) -> str:
     return f"{int(period[:4]) - n}{period[4:]}"
 
@@ -309,7 +321,7 @@ def _fixed_years(years: dict) -> dict[str, dict]:
             | _debt(f, {k: _derived(f).get(k) for k in ("interest", "ebit")}, years.get(str(int(y) - 1)))
             | _equity(f, years.get(str(int(y) - 1)))
             | {"gross_margin_vs_avg": _margin_gap(_derived(f), [_derived(years[b]) for b in (str(int(y) - k) for k in (1, 2, 3, 4)) if b in years]),
-               "deductions_share": _deductions(f)} | _financial(f) | _tax(f, {k: _d(f.get(k)) for k in ("tax", "pbt")}) for y, f in years.items()}
+               "deductions_share": _deductions(f)} | _financial(f) | _tax(f, {k: _d(f.get(k)) for k in ("tax", "pbt")}) | _per_share(f) for y, f in years.items()}
 
 
 def _fixed_quarters(quarters: dict) -> dict[str, dict]:
@@ -318,7 +330,7 @@ def _fixed_quarters(quarters: dict) -> dict[str, dict]:
             | _equity(f, quarters.get(_previous_quarter(p)))
             | {"gross_margin_vs_avg": _margin_gap(_four(quarters, p, ("revenue", "gross_profit")),
                                                   [_four(quarters, _years_back(p, k), ("revenue", "gross_profit")) for k in (1, 2, 3, 4)]),
-               "deductions_share": _deductions(f)} | _financial(f) | _tax(f, _four(quarters, p, ("tax", "pbt"))) for p, f in quarters.items()}
+               "deductions_share": _deductions(f)} | _financial(f) | _tax(f, _four(quarters, p, ("tax", "pbt"))) | _per_share(f) for p, f in quarters.items()}
 
 
 def _merge(*parts: dict[str, dict]) -> dict[str, dict]:
@@ -430,7 +442,7 @@ def _ins_checks(periods: dict) -> list[dict]:
 
 
 CAP_GAP = Decimal("0.10")
-FIXED_LINES_SINCE = 13  # the statements' LINES_VERSION that brought the fixed-asset (8), prepaid-expense (9), goodwill (10), borrowing (11), equity (12) and tax (13) lines
+FIXED_LINES_SINCE = 14  # the statements' LINES_VERSION that brought the fixed-asset (8), prepaid-expense (9), goodwill (10), borrowing (11), equity (12), tax (13) and convertible (14) lines
 
 
 def _invested(f: dict) -> Decimal | None:
@@ -586,9 +598,9 @@ def statement_table(record: dict, *, closes, vnstock: dict | None, kind: str | N
                 "pe_context": pe_context(record.get("quarters", {}))}
     quarters, years = record.get("quarters", {}), record.get("years", {})
     year_part = _part(years, sorted(years), extra=_merge(_valuation(years, record.get("year_end_close", {})), _fixed_years(years)),
-                      spec=P_AND_L + FIXED + PREPAID + DEBT + EQUITY + TAX + SCALE)
+                      spec=P_AND_L + FIXED + PREPAID + DEBT + EQUITY + TAX + PER_SHARE + SCALE)
     quarter_part = _part(quarters, sorted(quarters), extra=_merge(_quarter_valuation(quarters, record.get("quarter_end_close", {})),
-                                                                  _fixed_quarters(quarters)), spec=P_AND_L + FIXED + PREPAID + DEBT + EQUITY + TAX + SCALE)
+                                                                  _fixed_quarters(quarters)), spec=P_AND_L + FIXED + PREPAID + DEBT + EQUITY + TAX + PER_SHARE + SCALE)
     for row in quarter_part["rows"]:  # these two ratios run over the four quarters to each quarter
         if row["key"] in ("capex_to_depreciation", "ppe_turnover", "prepaid_to_pbt", "avg_rate", "icr", "gross_margin_vs_avg", "etr"):
             row["label"] = f"{row['label']} (4 quý)"

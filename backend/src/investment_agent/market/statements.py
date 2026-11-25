@@ -34,12 +34,13 @@ PRICE_URL = "https://api-finfo.vndirect.com.vn/v4/stock_prices?sort=date&q=code:
 FIRST_START, REFRESH_DAYS, MAX_AGE_DAYS, PACE_SECONDS = "2010-01-01", 730, 7, 1.0
 # Raised when LINES gains lines: a non-financial ticker kept with an older version is due and takes its whole history once, so the new
 # lines reach back as far as the old ones. 2: customer advances and inventory.
-LINES_VERSION = 13  # 3: current assets, receivables, current and long-term liabilities, EPS; 4: the parts of receivables; 5: interest received;
+LINES_VERSION = 14  # 3: current assets, receivables, current and long-term liabilities, EPS; 4: the parts of receivables; 5: interest received;
 # 6: inventory at cost and its provision (Khối Tồn kho, 22/11/2026); 7: no new line, the whole history read once for the update days of
 # years before the 2-year refresh (Dự phòng chốt khi kiểm toán, review 23/11/2026)
 # 8: fixed assets, investment property and construction in progress (Tài sản cố định, 25/11/2026); 9: prepaid expenses (Chi phí trả trước);
 # 10: goodwill and its amortisation (Lợi thế thương mại); 11: borrowing cash flows, unrealised exchange differences (Nợ vay);
-# 12: parts of equity and the cash to and from shareholders (Vốn chủ sở hữu); 13: current and deferred tax, tax paid, deferred balances (Thuế TNDN)
+# 12: parts of equity and the cash to and from shareholders (Vốn chủ sở hữu); 13: current and deferred tax, tax paid, deferred balances (Thuế TNDN);
+# 14: convertible bonds and conversion options (Trên mỗi cổ phiếu)
 FIN_LINES_VERSION = 3  # banks, securities firms and insurers: 2: basic EPS (23001 in each of their layouts); 3: the bank's loans, loan
 # reserve, accrued interest, interest income and provision expense (Chất lượng tài sản ngân hàng, 23/11/2026; the others re-read once too)
 # (model, item code) → line. Model 1 balance sheet, 2 income statement, 3 cash flow (indirect); the general layout (TT200).
@@ -83,6 +84,8 @@ LINES = {
     (3, 33100): "issue_cash", (3, 33200): "buyback_cash",
     # Thuế TNDN (25/11/2026; names checked the same day): current and deferred tax expense, tax paid (negative), deferred tax assets and liabilities
     (2, 22051): "tax_current", (2, 22052): "tax_deferred", (3, 31180): "tax_paid", (1, 12620): "deferred_tax_assets", (1, 13350): "deferred_tax_liabilities",
+    # Trên mỗi cổ phiếu (25/11/2026; names checked the same day): convertible bonds and the conversion option in equity, a later dilution
+    (1, 13343): "convertible_bonds", (1, 14149): "conversion_option",
     (3, 22230): "depreciation", (3, 32000): "cfo", (3, 32100): "capex", (3, 33000): "cfi", (3, 34000): "cff", (3, 33600): "dividends_paid",
 }
 # Banks (TT49 layout: models 101 balance sheet, 102 income statement) and securities firms (TT334: 89, 90): only what their scale

@@ -23,8 +23,8 @@ def test_all_nine_criteria_pass_for_a_company_improving_on_every_line():
     assert [c["passed"] for c in f["criteria"]] == [True] * 9
     assert f["criteria"][0]["detail"] == "ROA 9,0% (lợi nhuận 9 tỷ / tài sản đầu kỳ 100 tỷ)"
     assert f["criteria"][6]["detail"] == "Không có đợt huy động vốn bằng cổ phiếu năm 2025 (cổ phiếu thưởng, cổ tức bằng cổ phiếu không tính)"
-    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None, None, None, None, None, None, None, None, None, None, None]  # financial income and its cash,
-    # other receivables, prepayments, construction in progress, prepaid expenses, goodwill, interest, equity; three years: no margin swing; no tax line
+    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None, None, None, None, None, None, None, None, None, None, None, None]  # financial income and its cash,
+    # other receivables, prepayments, construction in progress, prepaid expenses, goodwill, interest, equity; three years: no margin swing; no tax line; no convertibles
 
 
 def test_a_capital_raise_and_worse_lines_fail_and_the_signs_show_their_numbers():
@@ -449,3 +449,15 @@ def test_an_effective_tax_rate_under_ten_percent_while_profitable_is_a_sign_owne
     assert sign(report_quality(tax_years(100, 20, 100, 15), "x"), "low_tax_rate")["flag"] is False
     assert sign(report_quality(tax_years(100, 20, -10, 0), "x"), "low_tax_rate")["flag"] is None  # a loss
     assert sign(report_quality(STRONG, "x"), "low_tax_rate")["flag"] is None
+
+
+def test_convertible_bonds_or_options_are_a_dilution_sign_owner_25_11_2026():
+    def with_(**more):
+        out = {y: dict(r) for y, r in STRONG["annual"].items()}
+        out["2025"].update({k: str(v * BN) for k, v in more.items()})
+        return {**STRONG, "annual": out}
+    s = sign(report_quality(with_(convertible_bonds=500, conversion_option=20), "x"), "dilution_risk")
+    assert s["label"] == "Có thể bị pha loãng" and s["flag"] is True
+    assert s["detail"] == "Năm 2025: trái phiếu chuyển đổi 500 tỷ; quyền chọn chuyển đổi trái phiếu 20 tỷ"
+    assert sign(report_quality(with_(convertible_bonds=0, conversion_option=0), "x"), "dilution_risk")["flag"] is False
+    assert sign(report_quality(STRONG, "x"), "dilution_risk")["flag"] is None

@@ -20,16 +20,19 @@ type Data = { symbol: string; version: number; projects: Project[]; ranges: Rang
   segments: SegmentPeriod[]; fin_income_notes: FinYear[]; fin_kinds: Record<string, string>; tax_incentives: Incentive[]; incentive_kinds: Record<string, string>;
   dilution: { source: string; shares: string }[]; dilution_view: DilutionView; auto: Auto | null; auto_labels: Record<string, string> };
 type AutoYear = { year: string; loans: Record<string, string>; loans_total: string | null; manual_current_portion: string | null; fin_income: Record<string, string>;
-  fin_expense: Record<string, string>; hard_to_repeat: string; pbt: string | null; share: string | null; ppe: Record<string, string> };
+  fin_expense: Record<string, string>; hard_to_repeat: string; pbt: string | null; share: string | null; ppe: Record<string, string>;
+  costs: Record<string, string>; inventory: Record<string, string>; labour_share: string | null; materials_share: string | null };
 type Auto = { fetched_at: string | null; source: string | null; years: AutoYear[] };
-type AutoPart = "loans" | "fin_income" | "fin_expense" | "ppe";
+type AutoPart = "loans" | "fin_income" | "fin_expense" | "ppe" | "costs" | "inventory";
 const AUTO_KEYS: Record<AutoPart, string[]> = {
   loans: ["st_loans_contract", "lt_due", "lt_bank", "lt_other", "bonds", "finance_lease"],
   fin_income: ["fin_interest", "fin_bond_interest", "fin_dividends", "fin_disposals", "fin_fx_sale", "fin_fx_realised", "fin_fx_unrealised", "fin_other"],
   fin_expense: ["exp_interest", "exp_disposals", "exp_fx_realised", "exp_fx_unrealised", "exp_provision", "exp_other"],
-  ppe: ["ppe_cost_open", "ppe_cost_add", "ppe_cost_out"] };
+  ppe: ["ppe_cost_open", "ppe_cost_add", "ppe_cost_out"],
+  costs: ["cost_materials", "cost_labour", "cost_depreciation", "cost_services", "cost_other", "cost_total"],
+  inventory: ["inv_transit", "inv_materials", "inv_tools", "inv_wip", "inv_finished", "inv_goods", "inv_consigned", "inv_bonded", "inv_property"] };
 const AUTO_TITLES: Record<AutoPart, string> = { loans: "Vay theo loại", fin_income: "Doanh thu tài chính theo loại", fin_expense: "Chi phí tài chính theo loại",
-  ppe: "Biến động TSCĐ hữu hình" };
+  ppe: "Biến động TSCĐ hữu hình", costs: "Chi phí sản xuất, kinh doanh theo yếu tố", inventory: "Hàng tồn kho theo loại" };
 type DilutionView = { quarter: string | null; shares: string | null; extra: string; share: string | null; npat_ttm: string | null; eps: string | null; eps_diluted: string | null };
 type Incentive = { id: string; entity: string; kind: string; rate: string | null; until: string; source_url: string | null; note: string; state: "active" | "ending" | "ended" };
 type IncentiveDraft = { id?: string; entity: string; kind: string; rate: string; until: string; source_url: string; note: string };
@@ -280,6 +283,8 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
           </table>;
         })}
         <ul className="quality-list">
+          {data.auto.years.filter((y) => y.labour_share !== null || y.materials_share !== null).slice(0, 1).map((y) => <li key={`c${y.year}`}>Năm {y.year}: nguyên
+            liệu, vật liệu {y.materials_share === null ? "chưa có" : pct(y.materials_share)}, nhân công {y.labour_share === null ? "chưa có" : pct(y.labour_share)} tổng chi phí theo yếu tố</li>)}
           {data.auto.years.filter((y) => y.manual_current_portion !== null).map((y) => <li key={y.year}>Năm {y.year}: vay dài hạn đến hạn trả theo Vietcap {y.loans.lt_due ? num(y.loans.lt_due) : "chưa có"} tỷ,
             bạn ghi {num(y.manual_current_portion!)} tỷ</li>)}
           {data.auto.years.filter((y) => y.pbt !== null && Number(y.hard_to_repeat) > 0).map((y) => <li key={`h${y.year}`}>Năm {y.year}: lãi thanh lý đầu tư + lãi tỷ giá chưa

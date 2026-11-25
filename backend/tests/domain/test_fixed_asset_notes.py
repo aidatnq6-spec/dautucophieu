@@ -305,3 +305,12 @@ def test_the_automatic_notes_give_borrowings_by_kind_financial_lines_and_fixed_a
     assert y["hard_to_repeat"] == "550.8" and y["share"] == "0.0149"
     assert y["ppe"] == {"ppe_cost_open": "82616.6", "ppe_cost_add": "9767.3", "ppe_cost_out": "-1357.8"}
     assert auto_view(None, statements, debt_notes={}) is None
+
+
+def test_the_automatic_notes_give_costs_by_element_with_their_shares_and_inventory_by_kind_owner_25_11_2026():
+    from investment_agent.domain.fixed_asset_notes import auto_view
+    record = {"fetched_at": "x", "source": "vietcap:iq", "years": {"2025": {"cost_total": str(100 * B), "cost_materials": str(60 * B), "cost_labour": str(15 * B),
+                                                                           "inv_materials": str(30 * B), "inv_finished": str(20 * B)}}}
+    y = auto_view(record, {"years": {}}, debt_notes={})["years"][0]
+    assert y["costs"] == {"cost_total": "100", "cost_materials": "60", "cost_labour": "15"} and y["labour_share"] == "0.1500" and y["materials_share"] == "0.6000"
+    assert y["inventory"] == {"inv_materials": "30", "inv_finished": "20"}

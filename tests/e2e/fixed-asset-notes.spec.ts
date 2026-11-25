@@ -62,6 +62,8 @@ test("the automatic notes show borrowings and fixed-asset movements read from Vi
   await expect(auto.getByRole("table", { name: "Vay theo loại FPT" })).toContainText("Vay dài hạn đến hạn trả");
   await expect(auto.getByRole("table", { name: "Vay theo loại FPT" })).toContainText("350");  // 300 + 50
   await expect(auto.getByRole("table", { name: "Biến động TSCĐ hữu hình FPT" })).toContainText("120");
+  await expect(auto.getByRole("table", { name: "Chi phí sản xuất, kinh doanh theo yếu tố FPT" })).toContainText("Nhân công");
+  await expect(auto).toContainText("nhân công 25,0% tổng chi phí theo yếu tố");  // 100 of 400
 });
 
 test("the owner writes shares that may be issued", async ({ page }) => {

@@ -60,3 +60,17 @@ là số của cả công ty; báo cáo không tách theo dự án".
   hết vào ngày mua + số năm; không ghi số năm thì không có lịch. Âm: **lãi mua rẻ**, lợi nhuận một lần năm mua, cần loại ra khi so lợi nhuận.
 - Dưới bảng: tổng mức phân bổ mỗi năm của các thương vụ đang phân bổ hôm nay (theo số năm chủ sở hữu ghi).
 - Ghi phần khác không gửi `deals` thì giữ nguyên thương vụ đã lưu.
+
+## Hợp nhất kinh doanh (bổ sung 25/11/2026, chủ sở hữu duyệt cả ba bước của bài "Giao dịch M&A và hợp nhất kinh doanh", ngưỡng 10% LNTT)
+Đối chiếu NVL 2021 (thuyết minh 3.1, 17): Final Solution theo công thức 5.598 − 99,98% × 7.315 = −1.715,5, thuyết minh ghi −1.670; lợi thế thương mại
+5.950,8 + 103 − 821 = 5.232,8 so với 5.104,0 cuối năm (VNDirect), còn 128,8 giảm khác; dòng phân bổ VNDirect (31111) ghi 0, chi phí quản lý 1.325,6;
+lãi mua rẻ bằng 32,8% LNTT 5.086,2. Dấu hiệu sẵn có "Lợi nhuận phụ thuộc thu nhập tài chính" không bắt được vì chi phí tài chính lớn hơn.
+1. **Thương vụ**: thêm **lợi thế thương mại theo thuyết minh** (tùy chọn, có thể âm) và **phần của cổ đông không kiểm soát** (tùy chọn, ≥ 0). Có số
+   thuyết minh thì dùng số đó cho loại, lịch phân bổ và lãi mua rẻ; hiện cạnh số công thức và phần lệch (công thức − thuyết minh).
+2. **Biến động lợi thế thương mại** theo năm (khóa `goodwill_amort`: năm → phân bổ theo thuyết minh, tỷ đồng): mỗi năm có năm trước trong báo cáo
+   đã lưu và có lợi thế thương mại ở một đầu: đầu năm, cuối năm (VNDirect), tăng = lợi thế thương mại dương của thương vụ bạn ghi trong năm, phân bổ
+   (bạn ghi), giảm = đầu + tăng − cuối, **giảm khác** = giảm − phân bổ (thoái vốn, xóa sổ, thương vụ chưa ghi; không tách được), phân bổ ÷ chi phí
+   quản lý, phân bổ ÷ LNTT. Chưa ghi phân bổ thì chỉ hiện mức giảm.
+3. **Lợi nhuận có lãi mua rẻ**: mỗi năm có thương vụ mua rẻ bạn ghi: tổng lãi mua rẻ (không có tiền), LNTT năm đó, tỷ trọng, **LNTT loại lãi mua rẻ**;
+   nhãn **cần xem kỹ** khi từ **10% LNTT** hoặc doanh nghiệp lỗ trước thuế; chưa có LNTT năm đó: không đánh giá. Dùng số nhập tay ở kho cá nhân nên
+   chỉ hiện trong khối này ở hồ sơ mã, không ở Chất lượng báo cáo (dùng chung với trang Định giá, chỉ số công khai).

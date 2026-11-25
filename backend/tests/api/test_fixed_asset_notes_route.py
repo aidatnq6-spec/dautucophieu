@@ -53,3 +53,14 @@ def test_deals_are_kept_beside_the_other_notes_and_survive_writes_that_leave_the
     assert saved["deals"][0]["goodwill"] == "400" and saved["deals"][0]["per_year"] == "40"
     kept = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "prepaid": {}, "expected_version": 1, "request_id": "dl-2"}).json()
     assert kept["deals"][0]["goodwill"] == "400" and kept["prepaid"] == []  # prepaid sent empty is cleared; deals left out are kept
+
+
+def test_the_goodwill_amortisation_is_kept_and_the_view_carries_the_movement_and_the_bargains(tmp_path):
+    c, clock = client(tmp_path)
+    saved = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "goodwill_amort": {"2021": "821"},
+                                       "deals": [{"name": "Final", "date": "30/06/2021", "share": "99.98", "price": "5598", "net_assets": "7315",
+                                                  "note_goodwill": "-1670"}], "expected_version": 0, "request_id": "hn-1"}).json()
+    assert saved["deals"][0]["gap"] == "-45.537" and saved["bargains"][0]["gain"] == "1670" and saved["bargains"][0]["flag"] is None  # no statements here
+    assert saved["goodwill_moves"] == []
+    kept = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "expected_version": 1, "request_id": "hn-2"}).json()
+    assert kept["deals"][0]["note_goodwill"] == "-1670"

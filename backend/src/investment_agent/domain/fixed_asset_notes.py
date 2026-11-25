@@ -238,7 +238,9 @@ def validate_deals(raw: list) -> list[dict]:
             raise NoteError("invalid_source", "Link nguồn phải bắt đầu bằng http:// hoặc https://.")
         out.append({"id": str(d.get("id") or uuid.uuid4().hex[:12])[:32], "name": name, "date": day, "share": format(share.normalize(), "f"),
                     "price": _signed(d.get("price")), "net_assets": _signed(d.get("net_assets")), "years": years, "source_url": url or None,
-                    "note": str(d.get("note") or "").strip()[:500]})
+                    "note": str(d.get("note") or "").strip()[:500],
+                    # Hợp nhất kinh doanh (25/11/2026): the goodwill as the notes give it, and the part of non-controlling interests
+                    "note_goodwill": _signed(d.get("note_goodwill"), required=False), "nci_part": _money(d.get("nci_part"))})
     return sorted(out, key=lambda d: d["date"])
 
 
@@ -247,13 +249,82 @@ def deals_view(deals: list[dict], *, today: date) -> list[dict]:
     whether it still charges profit today, and for a bargain the year of its one-off gain."""
     out = []
     for d in deals:
-        goodwill = Decimal(d["price"]) - Decimal(d["share"]) / 100 * Decimal(d["net_assets"])
+        computed = Decimal(d["price"]) - Decimal(d["share"]) / 100 * Decimal(d["net_assets"])
+        note = Decimal(d["note_goodwill"]) if d.get("note_goodwill") is not None else None
+        goodwill = computed if note is None else note  # the notes' figure, when written, is the one the statements carry
         bought = date.fromisoformat(d["date"])
-        row = {**d, "goodwill": format(goodwill.normalize(), "f") if goodwill else "0", "kind": "goodwill" if goodwill > 0 else "bargain" if goodwill < 0 else "none",
+        row = {**d, "note_goodwill": d.get("note_goodwill"), "nci_part": d.get("nci_part"), "computed": _text(computed),
+               "gap": None if note is None else _text(computed - note),
+               "goodwill": _text(goodwill), "kind": "goodwill" if goodwill > 0 else "bargain" if goodwill < 0 else "none",
                "per_year": None, "ends": None, "charging": False, "gain_year": str(bought.year) if goodwill < 0 else None}
         if goodwill > 0 and d["years"]:
             ends = bought.replace(year=bought.year + d["years"]) if not (bought.month == 2 and bought.day == 29) else date(bought.year + d["years"], 2, 28)
             row |= {"per_year": format((goodwill / d["years"]).quantize(Decimal("0.1"), ROUND_HALF_UP).normalize(), "f"), "ends": ends.isoformat(),
                     "charging": bought <= today < ends}
         out.append(row)
+    return out
+
+
+def _text(v: Decimal) -> str:
+    return format(v.normalize(), "f") if v else "0"
+
+
+def validate_amort(raw: dict) -> dict[str, str]:
+    """year → goodwill amortised that year as the notes give it (tỷ đồng); VNDirect's line is mostly empty."""
+    if len(raw) > MAX_PREPAID_YEARS:
+        raise NoteError("too_many", f"Tối đa {MAX_PREPAID_YEARS} năm.")
+    out = {}
+    for year, value in raw.items():
+        if not _YEAR.fullmatch(str(year)):
+            raise NoteError("invalid_year", "Năm dạng 2021.")
+        if (amount := _money(value)) is not None:
+            out[str(year)] = amount
+    return dict(sorted(out.items()))
+
+
+def _bn(row: dict, key: str) -> Decimal | None:
+    v = row.get(key)
+    return None if v is None else Decimal(v) / 10**9
+
+
+def goodwill_moves(deals: list[dict], amort: dict[str, str], statements: dict) -> list[dict]:
+    """Each year with a stored year before it and goodwill at either end: opening and closing (stored), added (the positive goodwill of
+    the owner's deals that year), amortised (the owner's figure from the notes), the decline opening + added − closing, and what
+    amortisation leaves of it (disposals, write-offs: the statements do not tell them apart); amortisation against administrative
+    expenses and profit before tax. In tỷ đồng."""
+    years = statements.get("years") or {}
+    out = []
+    for y in sorted(years):
+        before = years.get(str(int(y) - 1))
+        if before is None:
+            continue
+        opening, closing = _bn(before, "goodwill"), _bn(years[y], "goodwill")
+        if opening is None or closing is None or (opening == 0 and closing == 0 and y not in amort):
+            continue
+        added = sum((Decimal(d["goodwill"]) for d in deals if d["kind"] == "goodwill" and d["date"][:4] == y), Decimal(0))
+        amortised = Decimal(amort[y]) if y in amort else None
+        decline = opening + added - closing
+        admin, pbt = _bn(years[y], "admin"), _bn(years[y], "pbt")
+        q = lambda a, b: str((a / b).quantize(Decimal("0.0001"), ROUND_HALF_UP)) if a is not None and b is not None and b > 0 else None  # noqa: E731
+        out.append({"year": y, "opening": _text(opening), "added": _text(added), "amortised": None if amortised is None else _text(amortised), "closing": _text(closing),
+                    "decline": _text(decline), "other": None if amortised is None else _text(decline - amortised),
+                    "to_admin": q(amortised, admin), "to_pbt": q(amortised, pbt)})
+    return out
+
+
+BARGAIN_SHARE = Decimal("0.10")  # bargain gains against profit before tax (owner, 25/11/2026)
+
+
+def bargain_years(deals: list[dict], statements: dict) -> list[dict]:
+    """Each year with a bargain purchase among the owner's deals: the gain (no cash came with it), profit before tax with and without it,
+    and the sign: the gain from a tenth of profit before tax, or any gain in a year of loss before tax; none without the year's profit."""
+    years, out = statements.get("years") or {}, []
+    for y in sorted({d["gain_year"] for d in deals if d["kind"] == "bargain"}):
+        mine = [d for d in deals if d["kind"] == "bargain" and d["gain_year"] == y]
+        gain = -sum((Decimal(d["goodwill"]) for d in mine), Decimal(0))
+        pbt = _bn(years.get(y) or {}, "pbt")
+        share = None if pbt is None or pbt <= 0 else str((gain / pbt).quantize(Decimal("0.0001"), ROUND_HALF_UP))
+        out.append({"year": y, "gain": _text(gain), "deals": [d["name"] for d in mine], "pbt": None if pbt is None else _text(pbt), "share": share,
+                    "pbt_without": None if pbt is None else _text(pbt - gain),
+                    "flag": None if pbt is None else (pbt <= 0 or gain >= BARGAIN_SHARE * pbt)})
     return out

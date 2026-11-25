@@ -28,3 +28,10 @@ def test_fixed_asset_investment_property_and_construction_lines_are_kept_owner_2
     assert names[(1, 12400)] == "property_net" and names[(1, 12410)] == "property_gross" and names[(1, 12420)] == "property_depreciation"
     assert names[(1, 12460)] == "cip" and names[(1, 12300)] == "cip_old"
     assert LINES_VERSION >= 8
+
+
+def test_prepaid_expense_lines_are_kept_owner_25_11_2026():
+    """Chi phí trả trước (spec 25/11/2026): HPG 2021 11510 296,7 and 12610 3.171,4 tỷ; 31160 the cash flow change."""
+    names = {(m, c): n for (m, c), n in LINES.items()}
+    assert names[(1, 11510)] == "prepaid_st" and names[(1, 12610)] == "prepaid_lt" and names[(3, 31160)] == "prepaid_change"
+    assert LINES_VERSION >= 9

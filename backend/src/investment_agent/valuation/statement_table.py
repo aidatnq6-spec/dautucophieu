@@ -59,7 +59,12 @@ FIXED = [
     ("ppe_wear", "Mức hao mòn TSCĐ hữu hình", "pct", 1), ("cip_to_ppe", "XDCB ÷ TSCĐ hữu hình", "pct", 1),
     ("capex_to_depreciation", "Capex ÷ khấu hao", "x", 1), ("ppe_turnover", "Vòng quay TSCĐ hữu hình", "x", 1),
 ]
-FIXED_RATIOS = ("ppe_wear", "cip_to_ppe", "capex_to_depreciation", "ppe_turnover")
+FIXED_RATIOS = ("ppe_wear", "cip_to_ppe", "capex_to_depreciation", "ppe_turnover", "prepaid_to_assets", "prepaid_to_pbt")
+PREPAID = [
+    ("g", "Chi phí trả trước"), ("prepaid_st", "Chi phí trả trước ngắn hạn", "money", 1), ("prepaid_lt", "Chi phí trả trước dài hạn", "money", 1),
+    ("prepaid_total", "Tổng chi phí trả trước", "money", 0), ("prepaid_to_assets", "Chi phí trả trước ÷ tổng tài sản", "pct", 1),
+    ("prepaid_to_pbt", "Chi phí trả trước ÷ LNTT", "x", 1), ("prepaid_change", "Tăng, giảm chi phí trả trước (dòng tiền)", "money", 1),
+]
 # (net, at cost, accumulated depreciation, label) for the check net = cost + accumulated depreciation
 FIXED_BALANCES = (("ppe_net", "ppe_gross", "ppe_depreciation", "TSCĐ hữu hình"), ("intangible_net", "intangible_gross", "intangible_amortisation", "TSCĐ vô hình"),
                   ("property_net", "property_gross", "property_depreciation", "BĐS đầu tư"))
@@ -195,12 +200,22 @@ def _fixed(f: dict, flows: dict[str, Decimal | None], before: dict | None) -> di
             "ppe_turnover": _ratio(revenue, average, _Q2) if revenue is not None and average is not None and average > 0 else None}
 
 
+def _prepaid(f: dict, pbt: Decimal | None) -> dict:
+    """Prepaid expenses at a period's end against total assets and the profit before tax of `pbt` (the period's, or four quarters')."""
+    total, assets = _sum(_d(f.get("prepaid_st")), _d(f.get("prepaid_lt"))), _d(f.get("total_assets"))
+    return {"prepaid_total": total,
+            "prepaid_to_assets": _ratio(total, assets) if total is not None and assets is not None and assets > 0 else None,
+            "prepaid_to_pbt": _ratio(total, pbt, _Q2) if total is not None and pbt is not None and pbt > 0 else None}
+
+
 def _fixed_years(years: dict) -> dict[str, dict]:
-    return {y: _fixed(f, {k: _d(f.get(k)) for k in ("capex", "depreciation", "revenue")}, years.get(str(int(y) - 1))) for y, f in years.items()}
+    return {y: _fixed(f, {k: _d(f.get(k)) for k in ("capex", "depreciation", "revenue")}, years.get(str(int(y) - 1))) | _prepaid(f, _d(f.get("pbt")))
+            for y, f in years.items()}
 
 
 def _fixed_quarters(quarters: dict) -> dict[str, dict]:
-    return {p: _fixed(f, _four(quarters, p, ("capex", "depreciation", "revenue")), quarters.get(_prior(p))) for p, f in quarters.items()}
+    return {p: _fixed(f, _four(quarters, p, ("capex", "depreciation", "revenue")), quarters.get(_prior(p))) | _prepaid(f, _four(quarters, p, ("pbt",))["pbt"])
+            for p, f in quarters.items()}
 
 
 def _merge(*parts: dict[str, dict]) -> dict[str, dict]:
@@ -312,7 +327,7 @@ def _ins_checks(periods: dict) -> list[dict]:
 
 
 CAP_GAP = Decimal("0.10")
-FIXED_LINES_SINCE = 8  # the statements' LINES_VERSION that brought the fixed-asset lines
+FIXED_LINES_SINCE = 9  # the statements' LINES_VERSION that brought the fixed-asset (8) and prepaid-expense (9) lines
 
 
 def _invested(f: dict) -> Decimal | None:
@@ -468,11 +483,11 @@ def statement_table(record: dict, *, closes, vnstock: dict | None, kind: str | N
                 "pe_context": pe_context(record.get("quarters", {}))}
     quarters, years = record.get("quarters", {}), record.get("years", {})
     year_part = _part(years, sorted(years), extra=_merge(_valuation(years, record.get("year_end_close", {})), _fixed_years(years)),
-                      spec=P_AND_L + FIXED + SCALE)
+                      spec=P_AND_L + FIXED + PREPAID + SCALE)
     quarter_part = _part(quarters, sorted(quarters), extra=_merge(_quarter_valuation(quarters, record.get("quarter_end_close", {})),
-                                                                  _fixed_quarters(quarters)), spec=P_AND_L + FIXED + SCALE)
+                                                                  _fixed_quarters(quarters)), spec=P_AND_L + FIXED + PREPAID + SCALE)
     for row in quarter_part["rows"]:  # these two ratios run over the four quarters to each quarter
-        if row["key"] in ("capex_to_depreciation", "ppe_turnover"):
+        if row["key"] in ("capex_to_depreciation", "ppe_turnover", "prepaid_to_pbt"):
             row["label"] = f"{row['label']} (4 quý)"
     for row in year_part["rows"] + quarter_part["rows"]:  # money lines of the valuation block arrive as Decimals
         if row["kind"] == "money":

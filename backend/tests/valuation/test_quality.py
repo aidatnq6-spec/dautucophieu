@@ -23,8 +23,8 @@ def test_all_nine_criteria_pass_for_a_company_improving_on_every_line():
     assert [c["passed"] for c in f["criteria"]] == [True] * 9
     assert f["criteria"][0]["detail"] == "ROA 9,0% (lợi nhuận 9 tỷ / tài sản đầu kỳ 100 tỷ)"
     assert f["criteria"][6]["detail"] == "Không có đợt huy động vốn bằng cổ phiếu năm 2025 (cổ phiếu thưởng, cổ tức bằng cổ phiếu không tính)"
-    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None, None, None, None]  # financial income and its cash, other
-    # receivables, prepayments, construction in progress: not kept
+    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None, None, None, None, None]  # financial income and its cash, other
+    # receivables, prepayments, construction in progress, prepaid expenses: not kept
 
 
 def test_a_capital_raise_and_worse_lines_fail_and_the_signs_show_their_numbers():
@@ -321,3 +321,26 @@ def test_construction_signs_without_their_lines_are_not_read():
     q = report_quality(STRONG, "Công nghệ Thông tin")
     assert sign(q, "cip_growth")["flag"] is None and "XDCB dở dang" in sign(q, "cip_growth")["detail"]
     assert sign(q, "cip_transfer")["flag"] is None
+
+
+def prepaid_years(st0, lt0, st1, lt1, revenue1=110, pbt1=None):
+    out = {y: dict(r) for y, r in STRONG["annual"].items()}
+    out["2024"].update(prepaid_st=str(st0 * BN), prepaid_lt=str(lt0 * BN))
+    out["2025"].update(prepaid_st=str(st1 * BN), prepaid_lt=str(lt1 * BN), revenue=str(revenue1 * BN))
+    if pbt1 is not None:
+        out["2025"]["pbt"] = str(pbt1 * BN)
+    return {**STRONG, "annual": out}
+
+
+def test_prepaid_expenses_growing_faster_than_revenue_by_a_material_amount_is_a_sign_owner_25_11_2026():
+    q = report_quality(prepaid_years(1, 9, 3, 17, pbt1=50), "Tài nguyên Cơ bản")  # 10 → 20 (+100%) against revenue 90 → 110 (+22,2%)
+    s = sign(q, "prepaid_outpace_revenue")
+    assert s["label"] == "Chi phí trả trước tăng nhanh hơn doanh thu" and s["flag"] is True
+    assert "20 điểm %" in s["rule"] and "10%" in s["rule"]
+    assert s["detail"] == ("Năm 2025: chi phí trả trước 20 tỷ (ngắn hạn 3 tỷ, dài hạn 17 tỷ), +100,0% so với 10 tỷ năm 2024; doanh thu +22,2%; "
+                           "phần tăng thêm 10 tỷ bằng 20,0% lợi nhuận trước thuế 50 tỷ")
+    assert sign(report_quality(prepaid_years(1, 9, 3, 17, pbt1=200), "x"), "prepaid_outpace_revenue")["flag"] is False  # 10 is 5% of 200
+    assert sign(report_quality(prepaid_years(1, 9, 3, 17, pbt1=-5), "x"), "prepaid_outpace_revenue")["flag"] is True  # a loss: growth alone
+    assert sign(report_quality(prepaid_years(1, 9, 1, 10, pbt1=5), "x"), "prepaid_outpace_revenue")["flag"] is False  # +10% against +22%
+    assert sign(report_quality(prepaid_years(0, 0, 3, 17, pbt1=50), "x"), "prepaid_outpace_revenue")["flag"] is None  # nothing a year before
+    assert sign(report_quality(STRONG, "x"), "prepaid_outpace_revenue")["flag"] is None

@@ -443,3 +443,60 @@ def debt_view(loans: list[dict], notes: dict, statements: dict) -> dict:
             "current_portion": notes.get("current_portion"), "fx_shock": notes.get("fx_shock"), "foreign": _text(foreign),
             "fx_loss": None if loss is None else _text(loss),
             "fx_to_pbt": str((loss / pbt).quantize(Decimal("0.0001"), ROUND_HALF_UP)) if loss is not None and pbt is not None and pbt > 0 else None}
+
+
+# Doanh thu, giá vốn theo mảng (25/11/2026), from the notes on revenue and cost of sales (HPG 2021: notes 31, 32), which VNDirect does not
+# split: each period's segments with their revenue and cost of sales (tỷ đồng); gross profit, margin and share of the total gross profit
+# follow, and the totals are checked against the stored net revenue and cost of sales.
+MAX_SEGMENTS, MAX_SEGMENT_PERIODS = 12, 15
+
+
+def validate_segments(raw: dict) -> dict[str, list[dict]]:
+    if len(raw) > MAX_SEGMENT_PERIODS:
+        raise NoteError("too_many", f"Tối đa {MAX_SEGMENT_PERIODS} kỳ.")
+    out = {}
+    for period_raw, items in raw.items():
+        period = _period(period_raw)
+        if period is None:
+            raise NoteError("invalid_period", "Kỳ báo cáo dạng 2025 hoặc Q2/2026.")
+        if not items:
+            raise NoteError("empty_year", f"Kỳ {period_raw}: ghi ít nhất một mảng.")
+        if len(items) > MAX_SEGMENTS:
+            raise NoteError("too_many", f"Tối đa {MAX_SEGMENTS} mảng mỗi kỳ.")
+        rows = []
+        for item in items:
+            name = str(item.get("name") or "").strip()
+            if not name or len(name) > 120:
+                raise NoteError("invalid_name", "Tên mảng từ 1 đến 120 ký tự.")
+            revenue, cogs = _money(item.get("revenue")), _money(item.get("cogs"))
+            if revenue is None or cogs is None:
+                raise NoteError("invalid_amount", "Nhập doanh thu và giá vốn của mảng (tỷ đồng).")
+            rows.append({"name": name, "revenue": revenue, "cogs": cogs})
+        out[period] = rows
+    return dict(sorted(out.items()))
+
+
+def _share(a: Decimal, b: Decimal) -> str | None:
+    return str((a / b).quantize(Decimal("0.0001"), ROUND_HALF_UP)) if b else None
+
+
+def segments_view(segments: dict[str, list[dict]], statements: dict) -> list[dict]:
+    out = []
+    for period, items in segments.items():
+        rows, revenue, cogs = [], Decimal(0), Decimal(0)
+        for item in items:
+            r, c = Decimal(item["revenue"]), Decimal(item["cogs"])
+            revenue, cogs = revenue + r, cogs + c
+            rows.append({**item, "gross": _text(r - c), "margin": _share(r - c, r) if r > 0 else None})
+        gross = revenue - cogs
+        for row in rows:
+            row["share"] = _share(Decimal(row["gross"]), gross) if gross > 0 else None
+        stored = (statements.get("years" if _YEAR.fullmatch(period) else "quarters") or {}).get(period) or {}
+        reported_revenue, reported_cogs = _bn(stored, "revenue"), _bn(stored, "cogs")
+        out.append({"period": period, "rows": rows, "revenue": _text(revenue), "cogs": _text(cogs), "gross": _text(gross),
+                    "margin": _share(gross, revenue) if revenue > 0 else None,
+                    "reported_revenue": None if reported_revenue is None else _text(reported_revenue),
+                    "reported_cogs": None if reported_cogs is None else _text(reported_cogs),
+                    "revenue_gap": None if reported_revenue is None else _text(revenue - reported_revenue),
+                    "cogs_gap": None if reported_cogs is None else _text(cogs - reported_cogs)})
+    return out

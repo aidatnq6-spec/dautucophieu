@@ -204,3 +204,25 @@ def test_without_a_period_or_a_shock_the_check_and_scenario_stay_blank():
     from investment_agent.domain.fixed_asset_notes import debt_view, validate_debt_notes, validate_loans
     v = debt_view(validate_loans(HPG_LOANS[:1]), validate_debt_notes({}), {"years": {}})
     assert v["reported"] is None and v["covered"] is None and v["fx_loss"] is None and v["foreign"] == "0"
+
+
+def test_segments_from_the_notes_give_each_segment_s_gross_profit_margin_and_share_and_a_check_owner_25_11_2026():
+    """Bài doanh thu, giá vốn (HPG 2021, thuyết minh 31, 32): steel 149.000 revenue, 107.000 cost; the rest small; total 149.680 / 108.571."""
+    from investment_agent.domain.fixed_asset_notes import segments_view, validate_segments
+    kept = validate_segments({"2021": [{"name": " Thép, hàng hóa ", "revenue": "149.000", "cogs": "107000"}, {"name": "Dịch vụ, BĐS, cho thuê đất", "revenue": "680", "cogs": "1571"}]})
+    assert kept == {"2021": [{"name": "Thép, hàng hóa", "revenue": "149000", "cogs": "107000"}, {"name": "Dịch vụ, BĐS, cho thuê đất", "revenue": "680", "cogs": "1571"}]}
+    statements = {"years": {"2021": {"revenue": str(149680 * B), "cogs": str(108571 * B)}}}
+    (v,) = segments_view(kept, statements)
+    steel, other = v["rows"]
+    assert (steel["gross"], steel["margin"], steel["share"]) == ("42000", "0.2819", "1.0217")
+    assert (other["gross"], other["margin"], other["share"]) == ("-891", "-1.3103", "-0.0217")
+    assert (v["revenue"], v["cogs"], v["gross"], v["margin"]) == ("149680", "108571", "41109", "0.2746")
+    assert (v["reported_revenue"], v["reported_cogs"], v["revenue_gap"], v["cogs_gap"]) == ("149680", "108571", "0", "0")
+    for raw, code in (({"20x1": [{"name": "A", "revenue": "1", "cogs": "1"}]}, "invalid_period"), ({"2021": [{"name": "", "revenue": "1", "cogs": "1"}]}, "invalid_name"),
+                      ({"2021": [{"name": "A", "revenue": "", "cogs": "1"}]}, "invalid_amount"), ({"2021": []}, "empty_year"),
+                      ({"2021": [{"name": str(i), "revenue": "1", "cogs": "1"} for i in range(13)]}, "too_many")):
+        with pytest.raises(NoteError) as err:
+            validate_segments(raw)
+        assert err.value.code == code
+    (blank,) = segments_view(kept, {"years": {}})
+    assert blank["reported_revenue"] is None and blank["revenue_gap"] is None

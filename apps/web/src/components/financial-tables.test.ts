@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { cell, checkLines, lastN, periodLabel } from "./financial-tables";
+import { cell, checkLines, fixedNotes, lastN, periodLabel } from "./financial-tables";
 
 it("money is shown in tỷ đồng, growth with its sign, margins and returns as percentages, multiples with an x", () => {
   expect(cell("62214200000000", "money", "revenue")).toBe("62.214");
@@ -62,4 +62,10 @@ it("ratios VNDirect gives to two places keep them", () => {
   expect(cell("0.0166", "pct", "BAD_LOANS_RATIO_AQ")).toBe("1,66%");
   expect(cell("0.97", "x", "LOANS_TO_EQUITY_AQ")).toBe("0,97x");
   expect(cell("0.2120", "pct", "ROAE_TR_AVG4Q")).toBe("21,2%");
+});
+
+it("the fixed-asset group says when a ticker has not taken its lines yet and where a finance lease has no line of its own", () => {
+  expect(fixedNotes({ fixed_assets_pending: true, finance_lease: [] })).toEqual(["Chưa đồng bộ dòng tài sản cố định: nhóm Tài sản cố định để trống đến lượt 20:00 lấy lại lịch sử của mã này."]);
+  expect(fixedNotes({ fixed_assets_pending: false, finance_lease: ["2024", "2025-Q1"] })).toEqual(["Có TSCĐ thuê tài chính (không có dòng riêng) ở 2024, Q1/25."]);
+  expect(fixedNotes({})).toEqual([]);
 });

@@ -20,9 +20,15 @@ Derived lines (đồng; costs shown negative):
   investments (cash, short and long-term financial investments) ÷ equity, and the insurance and investment results (four quarters
   in the quarterly view); the insurance result only where the parts add up to profit before tax, listed as a check where they do
   not. No net debt, EV, EBITDA or FCFF.
+- Tài sản cố định (25/11/2026), non-financial companies, after the cash flow lines: period-end balances of tangible fixed assets (net,
+  at cost, accumulated depreciation), intangibles, investment property and construction in progress; wear = accumulated depreciation ÷
+  cost; construction in progress ÷ net tangible assets; capital spending ÷ depreciation and revenue ÷ average net tangible assets
+  (quarters: four quarters to it over the average of the quarter's end and the same quarter a year before; years: the year over the
+  average of its end and the year before's). Balances only: the source has no additions or transfers of the notes.
 - Summary: the last four quarters and today's close.
 Checks (more than 0.5 % apart): gross profit against revenue − cost of sales; four quarters against the year for revenue, parent
-profit, depreciation, capital spending and operating cash flow; parent profit against the free Vnstock statements.
+profit, depreciation, capital spending and operating cash flow; parent profit against the free Vnstock statements; net = cost +
+accumulated depreciation for tangible and intangible fixed assets and investment property.
 """
 
 from decimal import ROUND_HALF_UP, Decimal
@@ -46,6 +52,17 @@ P_AND_L = [
     ("g", "Dòng tiền"), ("cfo", "Lưu chuyển tiền từ HĐKD", "money", 0), ("capex", "Mua sắm TSCĐ (capex)", "money", 1),
     ("fcff", "FCFF", "money", 0),
 ]
+FIXED = [
+    ("g", "Tài sản cố định"), ("ppe_net", "TSCĐ hữu hình (còn lại)", "money", 0), ("ppe_gross", "Nguyên giá TSCĐ hữu hình", "money", 1),
+    ("ppe_depreciation", "Hao mòn lũy kế TSCĐ hữu hình", "money", 1), ("intangible_net", "TSCĐ vô hình (còn lại)", "money", 0),
+    ("property_net", "BĐS đầu tư (còn lại)", "money", 0), ("cip", "Chi phí XDCB dở dang", "money", 0),
+    ("ppe_wear", "Mức hao mòn TSCĐ hữu hình", "pct", 1), ("cip_to_ppe", "XDCB ÷ TSCĐ hữu hình", "pct", 1),
+    ("capex_to_depreciation", "Capex ÷ khấu hao", "x", 1), ("ppe_turnover", "Vòng quay TSCĐ hữu hình", "x", 1),
+]
+FIXED_RATIOS = ("ppe_wear", "cip_to_ppe", "capex_to_depreciation", "ppe_turnover")
+# (net, at cost, accumulated depreciation, label) for the check net = cost + accumulated depreciation
+FIXED_BALANCES = (("ppe_net", "ppe_gross", "ppe_depreciation", "TSCĐ hữu hình"), ("intangible_net", "intangible_gross", "intangible_amortisation", "TSCĐ vô hình"),
+                  ("property_net", "property_gross", "property_depreciation", "BĐS đầu tư"))
 SCALE = [
     ("g", "Quy mô và định giá"), ("market_cap", "Vốn hoá", "money", 0), ("debt", "Nợ vay", "money", 1),
     ("cash_like", "Tiền và đầu tư tài chính ngắn hạn", "money", 1), ("net_debt", "Nợ ròng", "money", 0), ("ev", "EV", "money", 0),
@@ -129,7 +146,7 @@ def _part(periods: dict, keys: list[str], extra: dict[str, dict] | None = None, 
             return _ratio(cur.get({"net_margin": "npat_parent", "ebit_margin": "ebit", "ebitda_margin": "ebitda"}[key]), cur.get("revenue"))
         if key in ("pe", "pb", "ev_ebitda", "ev_revenue", "debt_to_equity"):
             return cur.get(key)
-        if key in ("fcff_yield", "roe"):
+        if key in ("fcff_yield", "roe") or key in FIXED_RATIOS:
             return cur.get(key)
         v = cur.get(key)
         return _money(-v if key in NEGATIVE and v is not None else v)
@@ -163,6 +180,35 @@ def _block(f: dict, close: Decimal | None, flows: dict[str, Decimal | None], par
 
 
 FLOWS = ("npat_parent", "ebitda", "revenue", "fcff")
+
+
+def _fixed(f: dict, flows: dict[str, Decimal | None], before: dict | None) -> dict:
+    """Ratios of fixed assets at a period's end; `flows` the capital spending, depreciation and revenue of the period (four quarters in the
+    quarterly view), `before` the figures a year before for the average. Blank without a part or a positive divisor."""
+    net, gross, dep, cip = (_d(f.get(k)) for k in ("ppe_net", "ppe_gross", "ppe_depreciation", "cip"))
+    capex, depreciation, revenue = flows.get("capex"), flows.get("depreciation"), flows.get("revenue")
+    net_before = _d((before or {}).get("ppe_net"))
+    average = None if net is None or net_before is None else (net + net_before) / 2
+    return {"ppe_wear": _ratio(abs(dep), gross) if dep is not None and gross is not None and gross > 0 else None,
+            "cip_to_ppe": _ratio(cip, net) if cip is not None and net is not None and net > 0 else None,
+            "capex_to_depreciation": _ratio(abs(capex), depreciation, _Q2) if capex is not None and depreciation is not None and depreciation > 0 else None,
+            "ppe_turnover": _ratio(revenue, average, _Q2) if revenue is not None and average is not None and average > 0 else None}
+
+
+def _fixed_years(years: dict) -> dict[str, dict]:
+    return {y: _fixed(f, {k: _d(f.get(k)) for k in ("capex", "depreciation", "revenue")}, years.get(str(int(y) - 1))) for y, f in years.items()}
+
+
+def _fixed_quarters(quarters: dict) -> dict[str, dict]:
+    return {p: _fixed(f, _four(quarters, p, ("capex", "depreciation", "revenue")), quarters.get(_prior(p))) for p, f in quarters.items()}
+
+
+def _merge(*parts: dict[str, dict]) -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    for part in parts:
+        for p, v in part.items():
+            out.setdefault(p, {}).update(v)
+    return out
 
 
 def _valuation(years: dict, year_end_close: dict) -> dict[str, dict]:
@@ -266,6 +312,7 @@ def _ins_checks(periods: dict) -> list[dict]:
 
 
 CAP_GAP = Decimal("0.10")
+FIXED_LINES_SINCE = 8  # the statements' LINES_VERSION that brought the fixed-asset lines
 
 
 def _invested(f: dict) -> Decimal | None:
@@ -349,6 +396,11 @@ def _checks(quarters: dict, years: dict, vnstock: dict | None) -> list[dict]:
             rev, cogs, gp = _d(f.get("revenue")), _d(f.get("cogs")), _d(f.get("gross_profit"))
             if None not in (rev, cogs, gp) and _off(gp, rev - cogs, rev):
                 out.append({"period": p, "check": "gross_profit", "label": "Lợi nhuận gộp ≠ doanh thu thuần − giá vốn", "a": _money(gp), "b": _money(rev - cogs)})
+            for net_key, gross_key, dep_key, label in FIXED_BALANCES:
+                net, gross, dep = (_d(f.get(k)) for k in (net_key, gross_key, dep_key))
+                if None not in (net, gross, dep) and _off(net, gross + dep, gross):
+                    out.append({"period": p, "check": net_key, "label": f"{label}: giá trị còn lại ≠ nguyên giá + hao mòn lũy kế",
+                                "a": _money(net), "b": _money(gross + dep)})
     for y, f in years.items():
         for key, label in SUMMED:
             parts = [_d(quarters.get(f"{y}-Q{k}", {}).get(key)) for k in (1, 2, 3, 4)]
@@ -415,8 +467,13 @@ def statement_table(record: dict, *, closes, vnstock: dict | None, kind: str | N
         return {**_fin_table(record, kind, vnstock), "current": _current(record, closes, check), "ttm_parent": _ttm_parent(record.get("quarters", {})),
                 "pe_context": pe_context(record.get("quarters", {}))}
     quarters, years = record.get("quarters", {}), record.get("years", {})
-    year_part = _part(years, sorted(years), extra=_valuation(years, record.get("year_end_close", {})), spec=P_AND_L + SCALE)
-    quarter_part = _part(quarters, sorted(quarters), extra=_quarter_valuation(quarters, record.get("quarter_end_close", {})), spec=P_AND_L + SCALE)
+    year_part = _part(years, sorted(years), extra=_merge(_valuation(years, record.get("year_end_close", {})), _fixed_years(years)),
+                      spec=P_AND_L + FIXED + SCALE)
+    quarter_part = _part(quarters, sorted(quarters), extra=_merge(_quarter_valuation(quarters, record.get("quarter_end_close", {})),
+                                                                  _fixed_quarters(quarters)), spec=P_AND_L + FIXED + SCALE)
+    for row in quarter_part["rows"]:  # these two ratios run over the four quarters to each quarter
+        if row["key"] in ("capex_to_depreciation", "ppe_turnover"):
+            row["label"] = f"{row['label']} (4 quý)"
     for row in year_part["rows"] + quarter_part["rows"]:  # money lines of the valuation block arrive as Decimals
         if row["kind"] == "money":
             row["values"] = [_money(v) if isinstance(v, Decimal) else v for v in row["values"]]
@@ -424,4 +481,7 @@ def statement_table(record: dict, *, closes, vnstock: dict | None, kind: str | N
             "quarters": quarter_part, "years": year_part, "summary": _summary(record, closes, check),
             "current": _current(record, closes, check), "ttm_parent": _ttm_parent(quarters), "pe_context": pe_context(quarters),
             "checks": _checks(quarters, years, vnstock),
-            "conflicts": record.get("quarters_conflicts", []) + record.get("years_conflicts", [])}
+            "conflicts": record.get("quarters_conflicts", []) + record.get("years_conflicts", []),
+            # a record kept before the fixed-asset lines (version 8) has none yet; periods with a finance lease, which has no line of its own
+            "fixed_assets_pending": record.get("lines_version", 1) < FIXED_LINES_SINCE,
+            "finance_lease": sorted({p for part in (quarters, years) for p, f in part.items() if (_d(f.get("ppe_lease_net")) or 0) != 0})}

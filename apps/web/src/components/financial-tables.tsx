@@ -248,7 +248,8 @@ export function FinancialTables({ symbol }: { symbol: string }) {
         Nợ vay: lãi suất vay bình quân = chi phí lãi vay ÷ nợ vay bình quân cuối kỳ và cùng kỳ năm trước; khả năng trả lãi = EBIT ÷ lãi vay (quý: 4 quý). Vay thuần =
         tiền vay nhận được + tiền trả nợ gốc. Lãi suất từng khoản, loại tiền, nợ dài hạn đến hạn trả chỉ có trong thuyết minh.
         Biên gộp so với trung bình 4 năm trước: biên gộp kỳ đó trừ trung bình biên gộp của cùng kỳ 4 năm trước (quý: 4 quý tới quý đó); lệch nhiều thì đọc
-        thuyết minh giá vốn. Giảm trừ ÷ doanh thu bán hàng: chiết khấu, giảm giá, hàng bán bị trả lại.
+        thuyết minh giá vốn. Giảm trừ ÷ doanh thu bán hàng: chiết khấu, giảm giá, hàng bán bị trả lại. Chi phí tài chính ngoài lãi vay: lỗ tỷ giá, dự phòng
+        đầu tư, lỗ thanh lý. Tiền thu lãi, cổ tức ÷ doanh thu tài chính: phần đã thu bằng tiền (lãi tỷ giá, lãi thanh lý thu tiền ở dòng khác).
         Vốn chủ sở hữu: vốn chủ công ty mẹ ÷ vốn góp dưới 1 là đã mất một phần vốn góp. Thay đổi vốn chủ ngoài lợi nhuận = vốn chủ cuối kỳ − kỳ trước (quý: quý liền
         trước) − LNST − tiền phát hành − tiền mua lại cổ phiếu + cổ tức đã trả: thoái vốn công ty con, điều chỉnh hồi tố, chênh lệch tỷ giá, trích quỹ…; số lớn thì đọc thuyết minh thay đổi vốn chủ.
       </p>}

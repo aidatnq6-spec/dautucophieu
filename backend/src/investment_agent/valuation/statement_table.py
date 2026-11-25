@@ -45,7 +45,9 @@ P_AND_L = [
     ("g", "Chi phí hoạt động"), ("selling", "Chi phí bán hàng", "money", 1), ("admin", "Chi phí quản lý doanh nghiệp", "money", 1),
     ("core_profit", "LN HĐKD lõi", "money", 0),
     ("g", "Tài chính và khác"), ("fin_income", "Doanh thu tài chính", "money", 1), ("fin_expense", "Chi phí tài chính", "money", 1),
-    ("interest", "trong đó: lãi vay", "money", 1), ("associates", "LN liên doanh, liên kết", "money", 1), ("other_profit", "LN khác", "money", 1),
+    ("interest", "trong đó: lãi vay", "money", 1), ("net_financial", "Lãi tài chính ròng", "money", 1),
+    ("fin_expense_other", "Chi phí tài chính ngoài lãi vay", "money", 1), ("fin_cash_share", "Tiền thu lãi, cổ tức ÷ doanh thu tài chính", "pct", 1),
+    ("associates", "LN liên doanh, liên kết", "money", 1), ("other_profit", "LN khác", "money", 1),
     ("pbt", "Lợi nhuận trước thuế", "money", 0), ("npat_parent", "LNST công ty mẹ", "money", 0), ("npat_parent_yoy", "% so cùng kỳ", "pct", 1),
     ("net_margin", "Biên ròng", "pct", 1),
     ("g", "EBIT · EBITDA"), ("ebit", "EBIT", "money", 0), ("ebit_margin", "Biên EBIT", "pct", 1), ("depreciation", "Khấu hao", "money", 1),
@@ -63,7 +65,8 @@ FIXED = [
     ("capex_to_depreciation", "Capex ÷ khấu hao", "x", 1), ("ppe_turnover", "Vòng quay TSCĐ hữu hình", "x", 1),
 ]
 FIXED_RATIOS = ("ppe_wear", "cip_to_ppe", "capex_to_depreciation", "ppe_turnover", "prepaid_to_assets", "prepaid_to_pbt", "goodwill_to_equity",
-                "st_debt_share", "avg_rate", "icr", "cash_to_st_debt", "parent_to_capital", "nci_share", "gross_margin_vs_avg", "deductions_share")
+                "st_debt_share", "avg_rate", "icr", "cash_to_st_debt", "parent_to_capital", "nci_share", "gross_margin_vs_avg", "deductions_share",
+                "fin_cash_share")
 EQUITY = [
     ("g", "Vốn chủ sở hữu"), ("charter_capital", "Vốn góp", "money", 0), ("share_premium", "Thặng dư vốn cổ phần", "money", 1),
     ("treasury_shares", "Cổ phiếu quỹ", "money", 1), ("equity_fx", "Chênh lệch tỷ giá hối đoái", "money", 1), ("dev_fund", "Quỹ đầu tư phát triển", "money", 1),
@@ -274,6 +277,15 @@ def _deductions(f: dict) -> str | None:
     return _ratio(deductions, gross_revenue) if gross_revenue is not None and deductions is not None and gross_revenue > 0 else None
 
 
+def _financial(f: dict) -> dict:
+    """The period's financial income less financial costs, the costs beyond interest (shown negative, as the other costs), and the interest
+    and dividends received in cash against financial income (which also holds exchange gains and gains on disposals, cashed elsewhere)."""
+    income, expense, interest, received = (_d(f.get(k)) for k in ("fin_income", "fin_expense", "interest", "interest_received"))
+    return {"net_financial": _sum(income, -expense if expense is not None else None),
+            "fin_expense_other": None if expense is None or interest is None else interest - expense,
+            "fin_cash_share": _ratio(received, income) if received is not None and income is not None and income > 0 else None}
+
+
 def _years_back(period: str, n: int) -> str:
     return f"{int(period[:4]) - n}{period[4:]}"
 
@@ -283,7 +295,7 @@ def _fixed_years(years: dict) -> dict[str, dict]:
             | _debt(f, {k: _derived(f).get(k) for k in ("interest", "ebit")}, years.get(str(int(y) - 1)))
             | _equity(f, years.get(str(int(y) - 1)))
             | {"gross_margin_vs_avg": _margin_gap(_derived(f), [_derived(years[b]) for b in (str(int(y) - k) for k in (1, 2, 3, 4)) if b in years]),
-               "deductions_share": _deductions(f)} for y, f in years.items()}
+               "deductions_share": _deductions(f)} | _financial(f) for y, f in years.items()}
 
 
 def _fixed_quarters(quarters: dict) -> dict[str, dict]:
@@ -292,7 +304,7 @@ def _fixed_quarters(quarters: dict) -> dict[str, dict]:
             | _equity(f, quarters.get(_previous_quarter(p)))
             | {"gross_margin_vs_avg": _margin_gap(_four(quarters, p, ("revenue", "gross_profit")),
                                                   [_four(quarters, _years_back(p, k), ("revenue", "gross_profit")) for k in (1, 2, 3, 4)]),
-               "deductions_share": _deductions(f)} for p, f in quarters.items()}
+               "deductions_share": _deductions(f)} | _financial(f) for p, f in quarters.items()}
 
 
 def _merge(*parts: dict[str, dict]) -> dict[str, dict]:

@@ -391,3 +391,14 @@ def test_gross_margin_against_the_four_years_before_and_deductions_against_gross
     assert r["gross_margin_vs_avg"][4] == "-0.2400"  # 11% against the average 35% of 2021–2024
     assert r["gross_margin_vs_avg"][3] is None  # 2024 has only three years before it
     assert r["deductions_share"][4] == "0.0099"  # 10 / 1010
+
+
+def test_net_financial_income_other_financial_costs_and_cash_received_against_financial_income_owner_25_11_2026():
+    years = {"2025": q(2000, 164, fin_income=100, fin_expense=80, interest=60, interest_received=34)}
+    t = statement_table({**RECORD, "years": years, "quarters": {}, "lines_version": 12}, closes=CLOSES, vnstock=None)
+    keys = [r["key"] for r in t["years"]["rows"]]
+    assert keys.index("interest") < keys.index("net_financial") < keys.index("fin_expense_other") < keys.index("fin_cash_share") < keys.index("associates")
+    r = rows(t, "years")
+    assert r["net_financial"][0] == "20000000000" and r["fin_expense_other"][0] == "-20000000000" and r["fin_cash_share"][0] == "0.3400"
+    none = rows(statement_table({**RECORD, "years": {"2025": q(2000, 164, fin_income=0)}, "quarters": {}, "lines_version": 12}, closes=CLOSES, vnstock=None), "years")
+    assert none["fin_cash_share"][0] is None

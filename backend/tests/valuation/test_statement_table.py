@@ -276,7 +276,7 @@ def test_the_fixed_assets_group_gives_balances_wear_pipeline_reinvestment_and_tu
     years = {"2024": q(1000, 84, **fixed(400, 600, 100)), "2025": q(2000, 164, **fixed(600, 1000, 150), capex=-120, depreciation=80)}
     quarters = {p: q(100, 10, **fixed(400, 600, 100)) for p in ("2024-Q4", "2025-Q1", "2025-Q2", "2025-Q3")}
     quarters["2025-Q4"] = q(100, 10, **fixed(600, 1000, 150))
-    t = statement_table({**RECORD, "years": years, "quarters": quarters, "lines_version": 9}, closes=CLOSES, vnstock=None)
+    t = statement_table({**RECORD, "years": years, "quarters": quarters, "lines_version": 10}, closes=CLOSES, vnstock=None)
     keys = [r["key"] for r in t["years"]["rows"]]
     assert keys.index("fcff") < keys.index("ppe_net") < keys.index("market_cap")  # after Dòng tiền, before Quy mô và định giá
     r, i = rows(t, "years"), t["years"]["periods"].index("2025")
@@ -310,7 +310,7 @@ def test_fixed_asset_ratios_stay_blank_without_their_parts_and_balances_that_do_
 def test_the_prepaid_group_gives_both_parts_their_total_and_its_weight_against_assets_and_profit_owner_25_11_2026():
     years = {"2025": q(2000, 164, prepaid_st=30, prepaid_lt=170, prepaid_change=-50, total_assets=4000)}
     quarters = {p: q(100, 10, prepaid_st=30, prepaid_lt=170, total_assets=4000) for p in ("2025-Q1", "2025-Q2", "2025-Q3", "2025-Q4")}
-    t = statement_table({**RECORD, "years": years, "quarters": quarters, "lines_version": 9}, closes=CLOSES, vnstock=None)
+    t = statement_table({**RECORD, "years": years, "quarters": quarters, "lines_version": 10}, closes=CLOSES, vnstock=None)
     keys = [r["key"] for r in t["years"]["rows"]]
     assert keys.index("ppe_turnover") < keys.index("prepaid_st") < keys.index("market_cap")  # after Tài sản cố định
     r = rows(t, "years")
@@ -323,3 +323,18 @@ def test_the_prepaid_group_gives_both_parts_their_total_and_its_weight_against_a
     assert {x["key"]: x["label"] for x in t["quarters"]["rows"]}["prepaid_to_pbt"].endswith("(4 quý)")
     assert t["fixed_assets_pending"] is False
     assert statement_table({**RECORD, "lines_version": 8}, closes=CLOSES, vnstock=None)["fixed_assets_pending"] is True
+
+
+def test_goodwill_against_parent_equity_and_book_value_without_it_owner_25_11_2026():
+    years = {"2025": q(2000, 164, goodwill=99, goodwill_amort=11, equity=1000, charter_capital=100)}
+    t = statement_table({**RECORD, "years": years, "quarters": {}, "lines_version": 10}, closes=CLOSES, vnstock=None)
+    keys = [r["key"] for r in t["years"]["rows"]]
+    assert keys.index("property_net") < keys.index("goodwill") < keys.index("cip")
+    assert keys.index("pb") < keys.index("pb_ex_goodwill") < keys.index("ev_ebitda")
+    r = rows(t, "years")
+    assert r["goodwill"][0] == "99000000000" and r["goodwill_amort"][0] == "11000000000"
+    assert r["goodwill_to_equity"][0] == "0.1000"  # 99 / (1000 − minority 10)
+    assert r["pb"][0] == "0.30" and r["pb_ex_goodwill"][0] == "0.34"  # 300 / 990 ; 300 / 891
+    none = statement_table({**RECORD, "years": {"2025": q(2000, 164, charter_capital=100)}, "quarters": {}, "lines_version": 10}, closes=CLOSES, vnstock=None)
+    assert rows(none, "years")["pb_ex_goodwill"][0] is None  # no goodwill line: blank, not taken as nil
+    assert statement_table({**RECORD, "lines_version": 9}, closes=CLOSES, vnstock=None)["fixed_assets_pending"] is True

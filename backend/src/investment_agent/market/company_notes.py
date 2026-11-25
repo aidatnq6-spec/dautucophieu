@@ -32,7 +32,14 @@ FIELDS = {
     "exp_interest": "noc132", "exp_disposals": "noc134", "exp_fx_realised": "noc136", "exp_fx_unrealised": "noc137", "exp_provision": "noc138",
     "exp_other": "noc139",
     "ppe_cost_open": "noc36", "ppe_cost_add": "noc37", "ppe_cost_out": "noc38", "ppe_dep_add": "noc41",
+    # Chi phí theo yếu tố, hàng tồn kho theo loại (25/11/2026)
+    "cost_total": "noc140", "cost_materials": "noc141", "cost_labour": "noc142", "cost_depreciation": "noc143", "cost_services": "noc144",
+    "cost_other": "noc145",
+    "inv_transit": "noc16", "inv_materials": "noc17", "inv_tools": "noc18", "inv_wip": "noc19", "inv_finished": "noc20", "inv_goods": "noc21",
+    "inv_consigned": "noc22", "inv_bonded": "noc23", "inv_property": "noc24",
 }
+# Raised when FIELDS gains lines: a record kept with an older set is due before its week is out. 2: costs by element, inventory by kind.
+FIELDS_VERSION = 2
 _SYMBOL = re.compile(r"^[A-Z0-9]{1,10}$")
 
 
@@ -94,7 +101,7 @@ def sync_company_notes(store: CompanyNoteStore, sectors: dict[str, str | None], 
     results, due = {}, []
     for symbol in sorted(s for s, sector in sectors.items() if kind_of(sector) is None):
         old = store.read(symbol)
-        if old and now - datetime.fromisoformat(old["fetched_at"]) < MAX_AGE:
+        if old and old.get("fields_version", 1) >= FIELDS_VERSION and now - datetime.fromisoformat(old["fetched_at"]) < MAX_AGE:
             results[symbol] = "fresh"
         else:
             due.append((old["fetched_at"] if old else "", symbol))
@@ -116,6 +123,6 @@ def sync_company_notes(store: CompanyNoteStore, sectors: dict[str, str | None], 
         if not parsed["years"] and not parsed["quarters"]:
             results[symbol] = "error:no_observations"
             continue
-        store.save({"symbol": symbol, "fetched_at": now.isoformat(), "source": SOURCE, **parsed})
+        store.save({"symbol": symbol, "fetched_at": now.isoformat(), "source": SOURCE, "fields_version": FIELDS_VERSION, **parsed})
         results[symbol] = "ok"
     return dict(sorted(results.items()))

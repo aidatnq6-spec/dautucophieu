@@ -102,7 +102,8 @@ if __name__ == "__main__":
     from investment_agent.market.company_notes import CompanyNoteStore
     CompanyNoteStore(os.path.join(data, "company-notes")).save({"symbol": "FPT", "fetched_at": "2026-11-25T13:00:00+00:00", "source": "vietcap:iq", "quarters": {},
         "years": {"2025": {"st_loans_contract": str(300 * 10**9), "lt_due": str(50 * 10**9), "bonds": "0", "fin_interest": str(20 * 10**9),
-                           "fin_disposals": str(5 * 10**9), "ppe_cost_open": str(900 * 10**9), "ppe_cost_add": str(120 * 10**9)}}})
+                           "fin_disposals": str(5 * 10**9), "ppe_cost_open": str(900 * 10**9), "ppe_cost_add": str(120 * 10**9),
+                           "cost_total": str(400 * 10**9), "cost_labour": str(100 * 10**9), "cost_materials": str(200 * 10**9)}}})
     # Quy mo va dinh gia of a bank: VCB's own layout, apart from the general statements; 1 tỷ parent profit a quarter, 100 tỷ equity.
     StatementStore(os.path.join(data, "statements-financial")).save({
         "symbol": "VCB", "kind": "bank", "fetched_at": "2026-11-07T00:00:00+00:00", "source": "vndirect:finfo",

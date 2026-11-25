@@ -35,3 +35,10 @@ Phần nhập tay giữ nguyên.
 Bản ghi cơ bản lấy thêm **nguyên giá TSCĐ hữu hình tăng trong năm** (noc37) khi có thuyết minh Vietcap. Điều kiện "nguyên giá tăng ít nhất một nửa phần
 XDCB giảm" dùng số tăng này thay cho chênh lệch nguyên giá cuối năm (chênh lệch bị trừ bớt phần thanh lý, giảm); chưa có thuyết minh thì giữ cách cũ.
 Phần chi tiết ghi rõ số nào được dùng.
+
+## Chi phí theo yếu tố, hàng tồn kho theo loại (bổ sung 25/11/2026, chủ sở hữu duyệt bước 3)
+- Thêm mục từ cùng nguồn: chi phí sản xuất, kinh doanh theo yếu tố (noc140 tổng, 141 nguyên liệu vật liệu, 142 nhân công, 143 khấu hao, 144 dịch vụ mua
+  ngoài, 145 khác bằng tiền); hàng tồn kho theo loại (noc16–24: đi đường, nguyên liệu, công cụ, dở dang, thành phẩm, hàng hóa, gửi bán, kho bảo thuế,
+  hàng bất động sản).
+- Số phiên bản bộ mục (`fields_version`, nay 2): bản ghi lấy với bộ mục cũ hơn được lấy lại ở lượt sau, không chờ hết tuần.
+- Mục tự động có thêm hai bảng và một dòng: nguyên liệu, vật liệu và nhân công so với tổng chi phí theo yếu tố (năm gần nhất có số).

@@ -641,6 +641,8 @@ AUTO_LOANS = ("st_loans_contract", "lt_due", "lt_bank", "lt_other", "bonds", "fi
 AUTO_FIN_INCOME = ("fin_interest", "fin_bond_interest", "fin_dividends", "fin_disposals", "fin_fx_sale", "fin_fx_realised", "fin_fx_unrealised", "fin_other")
 AUTO_FIN_EXPENSE = ("exp_interest", "exp_disposals", "exp_fx_realised", "exp_fx_unrealised", "exp_provision", "exp_other")
 AUTO_PPE = ("ppe_cost_open", "ppe_cost_add", "ppe_cost_out")
+AUTO_COSTS = ("cost_total", "cost_materials", "cost_labour", "cost_depreciation", "cost_services", "cost_other")
+AUTO_INVENTORY = ("inv_transit", "inv_materials", "inv_tools", "inv_wip", "inv_finished", "inv_goods", "inv_consigned", "inv_bonded", "inv_property")
 AUTO_LABELS = {
     "st_loans_contract": "Vay ngắn hạn (theo hợp đồng)", "lt_due": "Vay dài hạn đến hạn trả", "lt_bank": "Vay dài hạn ngân hàng",
     "lt_other": "Vay dài hạn đối tượng khác", "bonds": "Trái phiếu phát hành", "finance_lease": "Thuê tài chính",
@@ -650,8 +652,21 @@ AUTO_LABELS = {
     "exp_interest": "Lãi tiền vay", "exp_disposals": "Lỗ thanh lý đầu tư", "exp_fx_realised": "Lỗ tỷ giá đã thực hiện",
     "exp_fx_unrealised": "Lỗ tỷ giá chưa thực hiện", "exp_provision": "Dự phòng giảm giá đầu tư", "exp_other": "Chi phí tài chính khác",
     "ppe_cost_open": "Nguyên giá TSCĐ hữu hình đầu năm", "ppe_cost_add": "Tăng trong năm (mua mới, kết chuyển XDCB)", "ppe_cost_out": "Giảm trong năm",
+    "cost_total": "Tổng chi phí theo yếu tố", "cost_materials": "Nguyên liệu, vật liệu", "cost_labour": "Nhân công", "cost_depreciation": "Khấu hao TSCĐ",
+    "cost_services": "Dịch vụ mua ngoài", "cost_other": "Chi phí khác bằng tiền",
+    "inv_transit": "Hàng mua đang đi đường", "inv_materials": "Nguyên liệu, vật liệu", "inv_tools": "Công cụ, dụng cụ", "inv_wip": "Chi phí SX, KD dở dang",
+    "inv_finished": "Thành phẩm", "inv_goods": "Hàng hóa", "inv_consigned": "Hàng gửi đi bán", "inv_bonded": "Hàng hóa kho bảo thuế",
+    "inv_property": "Hàng hóa bất động sản",
 }
 AUTO_YEARS = 5
+
+
+def _cost_shares(row: dict) -> dict:
+    """Labour and materials against the total cost by element: how much of the cost moves with wages, how much with raw material prices."""
+    total = Decimal(row["cost_total"]) if "cost_total" in row else None
+    def share(key):
+        return _share(Decimal(row[key]), total) if key in row and total is not None and total > 0 else None
+    return {"labour_share": share("cost_labour"), "materials_share": share("cost_materials")}
 
 
 def auto_view(record: dict | None, statements: dict, *, debt_notes: dict) -> dict | None:
@@ -671,5 +686,6 @@ def auto_view(record: dict | None, statements: dict, *, debt_notes: dict) -> dic
         out.append({"year": year, "loans": loans, "loans_total": _text(sum((Decimal(v) for v in loans.values()), Decimal(0))) if loans else None,
                     "manual_current_portion": debt_notes.get("current_portion") if debt_notes.get("period") == year else None,
                     "fin_income": pick(AUTO_FIN_INCOME), "fin_expense": pick(AUTO_FIN_EXPENSE), "hard_to_repeat": _text(hard),
-                    "pbt": None if pbt is None else _text(pbt), "share": _share(hard, pbt) if pbt is not None and pbt > 0 else None, "ppe": pick(AUTO_PPE)})
+                    "pbt": None if pbt is None else _text(pbt), "share": _share(hard, pbt) if pbt is not None and pbt > 0 else None, "ppe": pick(AUTO_PPE),
+                    "costs": pick(AUTO_COSTS), "inventory": pick(AUTO_INVENTORY), **_cost_shares(row)})
     return {"fetched_at": record.get("fetched_at"), "source": record.get("source"), "years": out}

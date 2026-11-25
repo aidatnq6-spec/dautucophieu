@@ -34,7 +34,7 @@ def test_the_notes_kept_are_named_in_whole_dong_and_missing_figures_are_left_out
 def test_the_sync_waits_ten_seconds_before_every_call_takes_the_oldest_fifteen_and_stops_when_refused(tmp_path):
     store = CompanyNoteStore(tmp_path)
     for s in ("AAA", "BBB"):
-        store.save({"symbol": s, "fetched_at": (NOW - timedelta(days=2)).isoformat(), "source": "vietcap:iq", "years": {}, "quarters": {}})
+        store.save({"symbol": s, "fetched_at": (NOW - timedelta(days=2)).isoformat(), "source": "vietcap:iq", "fields_version": 2, "years": {}, "quarters": {}})
     sleeps, calls = [], []
 
     def get(url):
@@ -51,3 +51,18 @@ def test_the_sync_waits_ten_seconds_before_every_call_takes_the_oldest_fifteen_a
     many = {f"T{i:02d}": "Thép" for i in range(20)}
     done = sync_company_notes(CompanyNoteStore(tmp_path / "m"), many, get=get, sleep=lambda s: None, now=NOW)
     assert sum(1 for v in done.values() if v == "ok") == 15 and sum(1 for v in done.values() if v == "later") == 5  # at most 15 a run
+
+
+def test_costs_by_element_and_inventory_by_kind_are_kept_and_an_older_set_of_lines_is_read_again_owner_25_11_2026(tmp_path):
+    """Chi phí theo yếu tố (noc140–145) and hàng tồn kho theo loại (noc15–24); a record kept with fewer lines is due before its week is out."""
+    from investment_agent.market.company_notes import FIELDS_VERSION
+    out = parse_company_notes(body(noc140=100.0 * B, noc141=60.0 * B, noc142=15.0 * B, noc143=10.0 * B, noc144=10.0 * B, noc145=5.0 * B,
+                                   noc17=30.0 * B, noc20=20.0 * B, noc24=7.0 * B), symbol="HPG")["years"]["2021"]
+    assert (out["cost_total"], out["cost_materials"], out["cost_labour"], out["cost_depreciation"], out["cost_services"], out["cost_other"]) == tuple(
+        str(v * B) for v in (100, 60, 15, 10, 10, 5))
+    assert (out["inv_materials"], out["inv_finished"], out["inv_property"]) == (str(30 * B), str(20 * B), str(7 * B))
+    store = CompanyNoteStore(tmp_path)
+    store.save({"symbol": "HPG", "fetched_at": (NOW - timedelta(days=1)).isoformat(), "source": "vietcap:iq", "years": {}, "quarters": {}})  # no version: the first set
+    got = sync_company_notes(store, {"HPG": "Thép"}, get=lambda url: body(), sleep=lambda s: None, now=NOW)
+    assert got == {"HPG": "ok"} and store.read("HPG")["fields_version"] == FIELDS_VERSION >= 2
+    assert sync_company_notes(store, {"HPG": "Thép"}, get=lambda url: body(), sleep=lambda s: None, now=NOW) == {"HPG": "fresh"}

@@ -16,3 +16,9 @@ Nhóm **Thuế TNDN**, sau Vốn chủ sở hữu, trước Quy mô và định 
 dương, như các chi phí khác); **thuế suất thực tế** = chi phí thuế TNDN ÷ LNTT (quý: 4 quý; LNTT không dương: để trống); **thuế đã nộp ÷ chi phí
 thuế** (số của kỳ; chi phí thuế không dương: để trống); tài sản thuế thu nhập hoãn lại; thuế thu nhập hoãn lại phải trả (số dư cuối kỳ). Ghi chú
 "Chưa đồng bộ" cho bản ghi trước phiên bản 13.
+
+## Dấu hiệu "Thuế suất thực tế thấp" (bổ sung 25/11/2026, chủ sở hữu duyệt bước 2, ngưỡng dưới 10%)
+- Chất lượng báo cáo, sau "Biên gộp lệch mạnh". Bản ghi cơ bản lấy thêm theo năm: chi phí thuế TNDN, thuế hiện hành, thuế hoãn lại.
+- Bật khi LNTT năm gần nhất dương mà chi phí thuế TNDN ÷ LNTT **dưới 10%** (một nửa thuế suất phổ thông 20%). Hiện chi phí thuế, phần hiện hành và
+  hoãn lại, thuế suất hai năm. Nhắc đọc thuyết minh thuế: ưu đãi theo dự án, địa bàn, chuyển lỗ, phần lợi nhuận không chịu thuế (ví dụ lãi mua rẻ).
+- Lỗ trước thuế, hoặc thiếu chi phí thuế: không đánh giá được. Thử 42 mã: 3 mã bật (HPG 2021: 6,8%). Chỉ hiện trên trang.

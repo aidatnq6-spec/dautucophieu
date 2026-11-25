@@ -26,6 +26,7 @@ GOODWILL_SHARE = Decimal("0.10")  # goodwill against parent equity (owner, 25/11
 INTEREST_COVER = Decimal(3)  # EBIT over interest expense below this (owner, 25/11/2026)
 EQUITY_OUTSIDE = Decimal("0.10")  # equity's change outside profit and shareholder cash against opening equity (owner, 25/11/2026)
 MARGIN_SWING = Decimal("0.10")  # the latest gross margin away from the four years before's average, in points (owner, 25/11/2026)
+LOW_TAX_RATE = Decimal("0.10")  # tax expense against profit before tax, a profitable year (owner, 25/11/2026)
 CIP_DROP, CIP_MATERIAL, CIP_COST_SHARE = Decimal("0.50"), Decimal("0.10"), Decimal("0.50")
 BN = Decimal(1_000_000_000)
 # Sector context shown with the signs, where a sign is usual for the business rather than a warning by itself.
@@ -256,8 +257,29 @@ def _signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:
     signs.append(_prepaid_sign(cur, prev, y))
     signs.append(_goodwill_sign(cur, prev, y))
     signs.append(_cover_sign(cur, prev, y))
-    signs += [_equity_outside_sign(cur, prev, y), _accumulated_loss_sign(cur, y), _margin_swing_sign(a, y)]
+    signs += [_equity_outside_sign(cur, prev, y), _accumulated_loss_sign(cur, y), _margin_swing_sign(a, y), _tax_rate_sign(cur, prev, y)]
     return signs
+
+
+def _tax_rate(row: dict) -> Decimal | None:
+    return row["tax"] / row["pbt"] if "tax" in row and row.get("pbt", Decimal(0)) > 0 else None
+
+
+def _tax_rate_sign(cur: dict, prev: dict, y: int) -> dict:
+    """A profitable year whose tax expense is under a tenth of profit before tax: incentives by project or place, losses carried forward,
+    profit that bears no tax (a bargain purchase gain); the notes on income tax tell which."""
+    label = "Thuế suất thực tế thấp"
+    if "tax" not in cur or "pbt" not in cur:
+        return {"id": "low_tax_rate", "label": label, "flag": None, "detail": f"Thiếu chi phí thuế TNDN hoặc LNTT năm {y} (có sau lần cập nhật báo cáo tới)"}
+    if cur["pbt"] <= 0:
+        return {"id": "low_tax_rate", "label": label, "flag": None, "detail": f"Năm {y}: lỗ trước thuế {_bn(cur['pbt'])}; thuế suất không có nghĩa khi lỗ"}
+    rate, before = _tax_rate(cur), _tax_rate(prev)
+    parts = f" (hiện hành {_bn(cur['tax_current'])}, hoãn lại {_bn(cur['tax_deferred'])})" if "tax_current" in cur and "tax_deferred" in cur else ""
+    then = f"; năm {y - 1}: {_pct(before)}" if before is not None else ""
+    return {"id": "low_tax_rate", "label": label, "flag": rate < LOW_TAX_RATE,
+            "rule": f"có lãi trước thuế nhưng chi phí thuế TNDN dưới {_num(LOW_TAX_RATE * 100, 0)}% LNTT (thuế suất phổ thông 20%): ưu đãi theo dự án, địa bàn, "
+                    "chuyển lỗ, hay phần lợi nhuận không chịu thuế; đọc thuyết minh thuế TNDN",
+            "detail": f"Năm {y}: chi phí thuế TNDN {_bn(cur['tax'])}{parts} trên LNTT {_bn(cur['pbt'])}: {_pct(rate)}{then}"}
 
 
 def _gross_margin(row: dict) -> Decimal | None:

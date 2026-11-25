@@ -23,8 +23,8 @@ def test_all_nine_criteria_pass_for_a_company_improving_on_every_line():
     assert [c["passed"] for c in f["criteria"]] == [True] * 9
     assert f["criteria"][0]["detail"] == "ROA 9,0% (lợi nhuận 9 tỷ / tài sản đầu kỳ 100 tỷ)"
     assert f["criteria"][6]["detail"] == "Không có đợt huy động vốn bằng cổ phiếu năm 2025 (cổ phiếu thưởng, cổ tức bằng cổ phiếu không tính)"
-    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None, None, None, None, None, None, None, None, None, None]  # financial income and its cash,
-    # other receivables, prepayments, construction in progress, prepaid expenses, goodwill, interest, equity; three years: no margin swing
+    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None, None, None, None, None, None, None, None, None, None, None]  # financial income and its cash,
+    # other receivables, prepayments, construction in progress, prepaid expenses, goodwill, interest, equity; three years: no margin swing; no tax line
 
 
 def test_a_capital_raise_and_worse_lines_fail_and_the_signs_show_their_numbers():
@@ -429,3 +429,23 @@ def test_a_gross_margin_ten_points_away_from_the_four_years_before_is_a_sign_own
     assert sign(report_quality(margin_years({"2021": 30, "2022": 40, "2023": 36, "2024": 44, "2025": 48}), "x"), "gross_margin_swing")["flag"] is True  # up too
     assert sign(report_quality(margin_years({"2021": 30, "2022": 40, "2023": 36, "2024": 44, "2025": 30}), "x"), "gross_margin_swing")["flag"] is False  # −7,5
     assert sign(report_quality(STRONG, "x"), "gross_margin_swing")["flag"] is None  # three years only
+
+
+def tax_years(pbt0, tax0, pbt1, tax1, current=None, deferred=None):
+    out = {y: dict(r) for y, r in STRONG["annual"].items()}
+    out["2024"].update(pbt=str(pbt0 * BN), tax=str(tax0 * BN))
+    out["2025"].update(pbt=str(pbt1 * BN), tax=str(tax1 * BN))
+    if current is not None:
+        out["2025"].update(tax_current=str(current * BN), tax_deferred=str(deferred * BN))
+    return {**STRONG, "annual": out}
+
+
+def test_an_effective_tax_rate_under_ten_percent_while_profitable_is_a_sign_owner_25_11_2026():
+    """HPG 2021 shape: 2.535,8 (current 2.855,3, deferred −319,5) on 37.056,8 before tax: 6,8%."""
+    s = sign(report_quality(tax_years(15357, 1851, 37057, 2536, current=2855, deferred=-319), "Tài nguyên Cơ bản"), "low_tax_rate")
+    assert s["label"] == "Thuế suất thực tế thấp" and s["flag"] is True and "10%" in s["rule"]
+    assert s["detail"] == ("Năm 2025: chi phí thuế TNDN 2.536 tỷ (hiện hành 2.855 tỷ, hoãn lại −319 tỷ) trên LNTT 37.057 tỷ: 6,8%; "
+                           "năm 2024: 12,1%")
+    assert sign(report_quality(tax_years(100, 20, 100, 15), "x"), "low_tax_rate")["flag"] is False
+    assert sign(report_quality(tax_years(100, 20, -10, 0), "x"), "low_tax_rate")["flag"] is None  # a loss
+    assert sign(report_quality(STRONG, "x"), "low_tax_rate")["flag"] is None

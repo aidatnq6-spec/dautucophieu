@@ -41,6 +41,7 @@ P_AND_L = [
     ("g", "Doanh thu"), ("gross_revenue", "Doanh thu bán hàng", "money", 0), ("deductions", "Các khoản giảm trừ", "money", 1),
     ("revenue", "Doanh thu thuần", "money", 0), ("revenue_yoy", "% so cùng kỳ", "pct", 1), ("cogs", "Giá vốn hàng bán", "money", 0),
     ("gross_profit", "Lợi nhuận gộp", "money", 0), ("gross_profit_yoy", "% so cùng kỳ", "pct", 1), ("gross_margin", "Biên gộp", "pct", 1),
+    ("gross_margin_vs_avg", "Biên gộp so với trung bình 4 năm trước (điểm %)", "pct", 1), ("deductions_share", "Giảm trừ ÷ doanh thu bán hàng", "pct", 1),
     ("g", "Chi phí hoạt động"), ("selling", "Chi phí bán hàng", "money", 1), ("admin", "Chi phí quản lý doanh nghiệp", "money", 1),
     ("core_profit", "LN HĐKD lõi", "money", 0),
     ("g", "Tài chính và khác"), ("fin_income", "Doanh thu tài chính", "money", 1), ("fin_expense", "Chi phí tài chính", "money", 1),
@@ -62,7 +63,7 @@ FIXED = [
     ("capex_to_depreciation", "Capex ÷ khấu hao", "x", 1), ("ppe_turnover", "Vòng quay TSCĐ hữu hình", "x", 1),
 ]
 FIXED_RATIOS = ("ppe_wear", "cip_to_ppe", "capex_to_depreciation", "ppe_turnover", "prepaid_to_assets", "prepaid_to_pbt", "goodwill_to_equity",
-                "st_debt_share", "avg_rate", "icr", "cash_to_st_debt", "parent_to_capital", "nci_share")
+                "st_debt_share", "avg_rate", "icr", "cash_to_st_debt", "parent_to_capital", "nci_share", "gross_margin_vs_avg", "deductions_share")
 EQUITY = [
     ("g", "Vốn chủ sở hữu"), ("charter_capital", "Vốn góp", "money", 0), ("share_premium", "Thặng dư vốn cổ phần", "money", 1),
     ("treasury_shares", "Cổ phiếu quỹ", "money", 1), ("equity_fx", "Chênh lệch tỷ giá hối đoái", "money", 1), ("dev_fund", "Quỹ đầu tư phát triển", "money", 1),
@@ -255,16 +256,43 @@ def _equity(f: dict, before: dict | None) -> dict:
             "nci_share": _ratio(nci, equity) if nci is not None and equity is not None and equity > 0 else None, "equity_other": other}
 
 
+def _margin_of(flows: dict) -> Decimal | None:
+    revenue, gross = flows.get("revenue"), flows.get("gross_profit")
+    return None if revenue is None or gross is None or revenue <= 0 else gross / revenue
+
+
+def _margin_gap(now: dict, before: list[dict]) -> str | None:
+    """The period's gross margin against the average of the four periods a year apart before it (points); none without all four."""
+    margin, earlier = _margin_of(now), [_margin_of(b) for b in before]
+    if margin is None or len(earlier) < 4 or None in earlier:
+        return None
+    return str((margin - sum(earlier) / 4).quantize(_Q4, ROUND_HALF_UP))
+
+
+def _deductions(f: dict) -> str | None:
+    gross_revenue, deductions = _d(f.get("gross_revenue")), _d(f.get("deductions"))
+    return _ratio(deductions, gross_revenue) if gross_revenue is not None and deductions is not None and gross_revenue > 0 else None
+
+
+def _years_back(period: str, n: int) -> str:
+    return f"{int(period[:4]) - n}{period[4:]}"
+
+
 def _fixed_years(years: dict) -> dict[str, dict]:
     return {y: _fixed(f, {k: _d(f.get(k)) for k in ("capex", "depreciation", "revenue")}, years.get(str(int(y) - 1))) | _prepaid(f, _d(f.get("pbt")))
             | _debt(f, {k: _derived(f).get(k) for k in ("interest", "ebit")}, years.get(str(int(y) - 1)))
-            | _equity(f, years.get(str(int(y) - 1))) for y, f in years.items()}
+            | _equity(f, years.get(str(int(y) - 1)))
+            | {"gross_margin_vs_avg": _margin_gap(_derived(f), [_derived(years[b]) for b in (str(int(y) - k) for k in (1, 2, 3, 4)) if b in years]),
+               "deductions_share": _deductions(f)} for y, f in years.items()}
 
 
 def _fixed_quarters(quarters: dict) -> dict[str, dict]:
     return {p: _fixed(f, _four(quarters, p, ("capex", "depreciation", "revenue")), quarters.get(_prior(p))) | _prepaid(f, _four(quarters, p, ("pbt",))["pbt"])
             | _debt(f, _four(quarters, p, ("interest", "ebit")), quarters.get(_prior(p)))
-            | _equity(f, quarters.get(_previous_quarter(p))) for p, f in quarters.items()}
+            | _equity(f, quarters.get(_previous_quarter(p)))
+            | {"gross_margin_vs_avg": _margin_gap(_four(quarters, p, ("revenue", "gross_profit")),
+                                                  [_four(quarters, _years_back(p, k), ("revenue", "gross_profit")) for k in (1, 2, 3, 4)]),
+               "deductions_share": _deductions(f)} for p, f in quarters.items()}
 
 
 def _merge(*parts: dict[str, dict]) -> dict[str, dict]:
@@ -536,7 +564,7 @@ def statement_table(record: dict, *, closes, vnstock: dict | None, kind: str | N
     quarter_part = _part(quarters, sorted(quarters), extra=_merge(_quarter_valuation(quarters, record.get("quarter_end_close", {})),
                                                                   _fixed_quarters(quarters)), spec=P_AND_L + FIXED + PREPAID + DEBT + EQUITY + SCALE)
     for row in quarter_part["rows"]:  # these two ratios run over the four quarters to each quarter
-        if row["key"] in ("capex_to_depreciation", "ppe_turnover", "prepaid_to_pbt", "avg_rate", "icr"):
+        if row["key"] in ("capex_to_depreciation", "ppe_turnover", "prepaid_to_pbt", "avg_rate", "icr", "gross_margin_vs_avg"):
             row["label"] = f"{row['label']} (4 quý)"
     for row in year_part["rows"] + quarter_part["rows"]:  # money lines of the valuation block arrive as Decimals
         if row["kind"] == "money":

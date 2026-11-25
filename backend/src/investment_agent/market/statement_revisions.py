@@ -14,7 +14,9 @@ from typing import Callable
 
 LINES = {"npat_parent": "LNST công ty mẹ", "pbt": "LNTT", "equity": "Vốn chủ sở hữu", "bad_debt_st": "Dự phòng phải thu ngắn hạn",
          "bad_debt_lt": "Dự phòng phải thu dài hạn",
-         "inventory_provision": "Dự phòng giảm giá hàng tồn kho"}  # Dự phòng chốt khi kiểm toán (owner, 23/11/2026)
+         "inventory_provision": "Dự phòng giảm giá hàng tồn kho",  # Dự phòng chốt khi kiểm toán (owner, 23/11/2026)
+         # Doanh thu, giá vốn (owner, 25/11/2026): a restatement can move costs back into earlier years' cost of sales (HAG)
+         "revenue": "Doanh thu thuần", "cogs": "Giá vốn hàng bán", "gross_profit": "Lợi nhuận gộp"}
 SHARE, FLOOR = Decimal("0.01"), Decimal("1000000000")
 DIR, TOLD = "statement-revisions", ("alerts", "statement-revisions.json")
 FOOTER = "Có thể do điều chỉnh hồi tố hoặc nguồn sửa lỗi nhập; xem thuyết minh và báo cáo kiểm toán."

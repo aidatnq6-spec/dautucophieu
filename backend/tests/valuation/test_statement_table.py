@@ -379,3 +379,15 @@ def test_the_equity_group_gives_its_parts_parent_equity_against_capital_and_the_
     gap = {**years, "2025": {k: v for k, v in years["2025"].items() if k != "issue_cash"}}
     assert rows(statement_table({**RECORD, "years": gap, "quarters": {}, "lines_version": 12}, closes=CLOSES, vnstock=None), "years")["equity_other"][1] is None
     assert statement_table({**RECORD, "lines_version": 11}, closes=CLOSES, vnstock=None)["fixed_assets_pending"] is True
+
+
+def test_gross_margin_against_the_four_years_before_and_deductions_against_gross_revenue_owner_25_11_2026():
+    margins = {"2021": 30, "2022": 40, "2023": 30, "2024": 40, "2025": 11}  # HAG 2019 shape: a margin far under the years before
+    years = {y: q(1000, 84, gross_profit=m * 10, gross_revenue=1010, deductions=10) for y, m in margins.items()}
+    t = statement_table({**RECORD, "years": years, "quarters": {}, "lines_version": 12}, closes=CLOSES, vnstock=None)
+    keys = [r["key"] for r in t["years"]["rows"]]
+    assert keys.index("gross_margin") < keys.index("gross_margin_vs_avg") < keys.index("deductions_share") < keys.index("selling")
+    r = rows(t, "years")
+    assert r["gross_margin_vs_avg"][4] == "-0.2400"  # 11% against the average 35% of 2021–2024
+    assert r["gross_margin_vs_avg"][3] is None  # 2024 has only three years before it
+    assert r["deductions_share"][4] == "0.0099"  # 10 / 1010

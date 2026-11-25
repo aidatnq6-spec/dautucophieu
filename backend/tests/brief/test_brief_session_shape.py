@@ -62,25 +62,56 @@ def value(million: str) -> str:
     return json.dumps({"data": [{"trading_type_name": "Mua", "market_value": million, "foreign_trading_value": "1"}], "success": True})
 
 
-def test_hose_value_against_the_previous_session_and_the_20_session_total():
-    asked = []
+def day_url(d) -> str:
+    return f"fromDate={d.isoformat()}&toDate={d.isoformat()}"
+
+
+def test_hose_value_against_the_previous_session_and_the_average_of_the_sessions_with_a_figure(tmp_path):
+    """Fix (25/11/2026): each of the 20 sessions is asked on its own and kept, so a session HOSE has no figure for (24/11/2026) is left out of
+    the average instead of counting as nil; past days are not asked again."""
+    asked, cache = [], tmp_path / "hose-values.json"
 
     def get(url):
         asked.append(url)
-        return value("15,000,000.00") if "fromDate=2026-11-04&toDate=2026-11-04" in url else value("330,000,000.00")
-    out = hose_liquidity({"status": "ok", "total_value_bn": "15963.62"}, earlier=EARLIER, hose_get=get)
-    assert out == {"status": "ok", "today_bn": "15963.62", "previous_bn": "15000.00", "change_pct": "0.0642", "avg20_bn": "16500.00",
-                   "ratio20": "0.97"}
-    assert any(f"fromDate={EARLIER[-20].isoformat()}&toDate={EARLIER[-1].isoformat()}" in u for u in asked) and len(asked) == 2
+        return value("15,000,000.00") if day_url(EARLIER[-1]) in url else value("16,000,000.00")
+    out = hose_liquidity({"status": "ok", "total_value_bn": "15963.62"}, earlier=EARLIER, hose_get=get, cache_path=cache, today=S)
+    assert out == {"status": "ok", "today_bn": "15963.62", "previous_bn": "15000.00", "previous_session": EARLIER[-1].isoformat(), "previous_skipped": False,
+                   "change_pct": "0.0642",
+                   "avg20_bn": "15950.00", "avg_sessions": 20, "ratio20": "1.00"}  # (15.000 + 19 × 16.000) / 20
+    assert len(asked) == 20
+    asked.clear()
+    assert hose_liquidity({"status": "ok", "total_value_bn": "15963.62"}, earlier=EARLIER, hose_get=get, cache_path=cache, today=S) == out
+    assert asked == []  # every day kept
 
 
-def test_hose_value_is_missing_until_hose_publishes_the_session_and_its_history():
-    assert hose_liquidity({"status": "missing", "reason": "HOSE chưa công bố"}, earlier=EARLIER, hose_get=lambda u: value("1")) == {
-        "status": "missing", "reason": "HOSE chưa công bố"}
+def test_a_session_without_a_figure_is_left_out_and_the_previous_one_with_a_figure_is_used(tmp_path):
     empty = json.dumps({"data": [], "success": True})
-    assert hose_liquidity({"status": "ok", "total_value_bn": "1"}, earlier=EARLIER, hose_get=lambda u: empty) == {
+
+    def get(url):
+        return empty if day_url(EARLIER[-1]) in url else value("16,000,000.00")
+    out = hose_liquidity({"status": "ok", "total_value_bn": "16000"}, earlier=EARLIER, hose_get=get, cache_path=tmp_path / "h.json", today=S)
+    assert out["previous_session"] == EARLIER[-2].isoformat() and out["previous_skipped"] is True and out["previous_bn"] == "16000.00"
+    assert out["avg_sessions"] == 19 and out["avg20_bn"] == "16000.00"  # 19 sessions, not 19 × 16.000 / 20
+    asked = []
+
+    def later(url):
+        asked.append(url)
+        return value("15,000,000.00")
+    hose_liquidity({"status": "ok", "total_value_bn": "16000"}, earlier=EARLIER, hose_get=later, cache_path=tmp_path / "h.json", today=S + timedelta(days=1))
+    assert asked == [f"https://api.hsx.vn/mk/api/v1/market/foreign-trading-value-report?{day_url(EARLIER[-1])}"]  # the empty day, asked again a day later
+
+
+def test_hose_value_is_missing_until_hose_publishes_the_session_and_enough_of_its_history(tmp_path):
+    assert hose_liquidity({"status": "missing", "reason": "HOSE chưa công bố"}, earlier=EARLIER, hose_get=lambda u: value("1"), cache_path=tmp_path / "a.json",
+                          today=S) == {"status": "missing", "reason": "HOSE chưa công bố"}
+    empty = json.dumps({"data": [], "success": True})
+    assert hose_liquidity({"status": "ok", "total_value_bn": "1"}, earlier=EARLIER, hose_get=lambda u: empty, cache_path=tmp_path / "b.json", today=S) == {
         "status": "missing", "reason": "HOSE chưa có số các phiên trước"}
-    assert hose_liquidity({"status": "ok", "total_value_bn": "1"}, earlier=EARLIER[-5:], hose_get=lambda u: value("1"))["status"] == "missing"
+    assert hose_liquidity({"status": "ok", "total_value_bn": "1"}, earlier=EARLIER[-5:], hose_get=lambda u: value("1"), cache_path=tmp_path / "c.json",
+                          today=S)["status"] == "missing"
+    few = lambda u: value("1") if any(day_url(d) in u for d in EARLIER[-10:]) else empty  # noqa: E731
+    assert hose_liquidity({"status": "ok", "total_value_bn": "1"}, earlier=EARLIER, hose_get=few, cache_path=tmp_path / "d.json", today=S) == {
+        "status": "missing", "reason": "HOSE chỉ có số 10/20 phiên trước"}  # under 15 of 20: no average
 
 
 def test_ma20_is_the_mean_close_of_the_session_and_the_19_before_and_missing_when_a_bar_is():

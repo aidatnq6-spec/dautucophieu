@@ -57,10 +57,16 @@ def _session_lines(shape: dict | None) -> list[str]:
 
 def _base_line(head: str, figures: dict, change_key: str) -> str:
     parts = [head]
+    # HOSE's value (fix 25/11/2026): the previous session with a figure and the sessions with one, named when they differ
+    previous = "phiên trước"
+    if figures.get("previous_skipped") and figures.get("previous_session"):
+        y, m, d = figures["previous_session"].split("-")
+        previous = f"phiên {d}/{m}"
     if figures.get(change_key) is not None:
-        parts.append(f"{_pct(figures[change_key])} so với phiên trước")
+        parts.append(f"{_pct(figures[change_key])} so với {previous}")
     if figures.get("ratio20") is not None:
-        parts.append(f"bằng {_num(figures['ratio20'])} lần trung bình 20 phiên")
+        n = figures.get("avg_sessions", 20)
+        parts.append(f"bằng {_num(figures['ratio20'])} lần trung bình {n} phiên" + (" có số" if n != 20 else ""))
     return ", ".join(parts)
 
 

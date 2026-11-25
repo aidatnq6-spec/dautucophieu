@@ -148,3 +148,11 @@ def test_a_shock_of_the_session_gets_its_line_after_the_markets_abroad():
     assert "Cú sốc hôm nay: VN-Index giảm từ 3% trong một phiên. Trong quá khứ" in text
     assert text.index("Mỹ (FRED)") < text.index("Cú sốc hôm nay") < text.index("Giá trị khớp lệnh")
     assert "Cú sốc" not in render_report(REPORT, market=MARKET)
+
+
+def test_a_base_on_fewer_sessions_or_an_older_previous_session_says_so_fix_25_11_2026():
+    from investment_agent.notifications.render import _base_line
+    line = _base_line("HOSE công bố tổng", {"change_pct": "0.05", "ratio20": "1.02", "avg_sessions": 19, "previous_session": "2026-11-23",
+                                                  "previous_skipped": True}, "change_pct")
+    assert line == "HOSE công bố tổng, +5,00% so với phiên 23/11, bằng 1,02 lần trung bình 19 phiên có số"
+    assert _base_line("X", {"change_pct": "0.05", "ratio20": "1.02", "avg_sessions": 20}, "change_pct") == "X, +5,00% so với phiên trước, bằng 1,02 lần trung bình 20 phiên"

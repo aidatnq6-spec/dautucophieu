@@ -25,3 +25,8 @@ it("counts the recovery conditions met and names those without figures", () => {
   expect(recoveryHead({ met: 2, known: 4, total: 4 })).toBe("2/4 điều kiện đạt");
   expect(recoveryHead({ met: 1, known: 3, total: 4 })).toBe("1/4 điều kiện đạt, 1 điều kiện chưa có số");
 });
+
+it("a base on fewer sessions or an older previous session says so (fix 25/11/2026)", () => {
+  expect(baseText({ change_pct: "0.05", ratio20: "1.02", avg_sessions: 19, previous_session: "2026-11-23", previous_skipped: true }))
+    .toBe("+5,00% so với phiên 23/11 · bằng 1,02 lần trung bình 19 phiên có số");
+});

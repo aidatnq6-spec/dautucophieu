@@ -36,7 +36,7 @@ from decimal import ROUND_HALF_UP, Decimal
 _Q2, _Q4 = Decimal("0.01"), Decimal("0.0001")
 TOLERANCE = Decimal("0.005")
 PAR = Decimal(10000)  # đồng per share: charter capital ÷ par = shares at the period's end
-NEGATIVE = {"deductions", "cogs", "selling", "admin", "fin_expense", "interest", "tax"}
+NEGATIVE = {"deductions", "cogs", "selling", "admin", "fin_expense", "interest", "tax", "tax_current", "tax_deferred"}
 P_AND_L = [
     ("g", "Doanh thu"), ("gross_revenue", "Doanh thu bán hàng", "money", 0), ("deductions", "Các khoản giảm trừ", "money", 1),
     ("revenue", "Doanh thu thuần", "money", 0), ("revenue_yoy", "% so cùng kỳ", "pct", 1), ("cogs", "Giá vốn hàng bán", "money", 0),
@@ -66,7 +66,12 @@ FIXED = [
 ]
 FIXED_RATIOS = ("ppe_wear", "cip_to_ppe", "capex_to_depreciation", "ppe_turnover", "prepaid_to_assets", "prepaid_to_pbt", "goodwill_to_equity",
                 "st_debt_share", "avg_rate", "icr", "cash_to_st_debt", "parent_to_capital", "nci_share", "gross_margin_vs_avg", "deductions_share",
-                "fin_cash_share")
+                "fin_cash_share", "etr", "tax_paid_share")
+TAX = [
+    ("g", "Thuế TNDN"), ("tax_current", "Thuế TNDN hiện hành", "money", 1), ("tax_deferred", "Thuế TNDN hoãn lại", "money", 1),
+    ("etr", "Thuế suất thực tế", "pct", 1), ("tax_paid_share", "Thuế đã nộp ÷ chi phí thuế", "pct", 1),
+    ("deferred_tax_assets", "Tài sản thuế thu nhập hoãn lại", "money", 1), ("deferred_tax_liabilities", "Thuế thu nhập hoãn lại phải trả", "money", 1),
+]
 EQUITY = [
     ("g", "Vốn chủ sở hữu"), ("charter_capital", "Vốn góp", "money", 0), ("share_premium", "Thặng dư vốn cổ phần", "money", 1),
     ("treasury_shares", "Cổ phiếu quỹ", "money", 1), ("equity_fx", "Chênh lệch tỷ giá hối đoái", "money", 1), ("dev_fund", "Quỹ đầu tư phát triển", "money", 1),
@@ -286,6 +291,15 @@ def _financial(f: dict) -> dict:
             "fin_cash_share": _ratio(received, income) if received is not None and income is not None and income > 0 else None}
 
 
+def _tax(f: dict, flows: dict) -> dict:
+    """The effective rate on `flows` (the period's tax and profit before tax, or four quarters'), and the period's tax paid in cash against its
+    tax expense."""
+    tax, pbt = flows.get("tax"), flows.get("pbt")
+    charge, paid = _d(f.get("tax")), _d(f.get("tax_paid"))
+    return {"etr": _ratio(tax, pbt) if tax is not None and pbt is not None and pbt > 0 else None,
+            "tax_paid_share": _ratio(abs(paid), charge) if paid is not None and charge is not None and charge > 0 else None}
+
+
 def _years_back(period: str, n: int) -> str:
     return f"{int(period[:4]) - n}{period[4:]}"
 
@@ -295,7 +309,7 @@ def _fixed_years(years: dict) -> dict[str, dict]:
             | _debt(f, {k: _derived(f).get(k) for k in ("interest", "ebit")}, years.get(str(int(y) - 1)))
             | _equity(f, years.get(str(int(y) - 1)))
             | {"gross_margin_vs_avg": _margin_gap(_derived(f), [_derived(years[b]) for b in (str(int(y) - k) for k in (1, 2, 3, 4)) if b in years]),
-               "deductions_share": _deductions(f)} | _financial(f) for y, f in years.items()}
+               "deductions_share": _deductions(f)} | _financial(f) | _tax(f, {k: _d(f.get(k)) for k in ("tax", "pbt")}) for y, f in years.items()}
 
 
 def _fixed_quarters(quarters: dict) -> dict[str, dict]:
@@ -304,7 +318,7 @@ def _fixed_quarters(quarters: dict) -> dict[str, dict]:
             | _equity(f, quarters.get(_previous_quarter(p)))
             | {"gross_margin_vs_avg": _margin_gap(_four(quarters, p, ("revenue", "gross_profit")),
                                                   [_four(quarters, _years_back(p, k), ("revenue", "gross_profit")) for k in (1, 2, 3, 4)]),
-               "deductions_share": _deductions(f)} | _financial(f) for p, f in quarters.items()}
+               "deductions_share": _deductions(f)} | _financial(f) | _tax(f, _four(quarters, p, ("tax", "pbt"))) for p, f in quarters.items()}
 
 
 def _merge(*parts: dict[str, dict]) -> dict[str, dict]:
@@ -416,7 +430,7 @@ def _ins_checks(periods: dict) -> list[dict]:
 
 
 CAP_GAP = Decimal("0.10")
-FIXED_LINES_SINCE = 12  # the statements' LINES_VERSION that brought the fixed-asset (8), prepaid-expense (9), goodwill (10), borrowing (11) and equity (12) lines
+FIXED_LINES_SINCE = 13  # the statements' LINES_VERSION that brought the fixed-asset (8), prepaid-expense (9), goodwill (10), borrowing (11), equity (12) and tax (13) lines
 
 
 def _invested(f: dict) -> Decimal | None:
@@ -572,11 +586,11 @@ def statement_table(record: dict, *, closes, vnstock: dict | None, kind: str | N
                 "pe_context": pe_context(record.get("quarters", {}))}
     quarters, years = record.get("quarters", {}), record.get("years", {})
     year_part = _part(years, sorted(years), extra=_merge(_valuation(years, record.get("year_end_close", {})), _fixed_years(years)),
-                      spec=P_AND_L + FIXED + PREPAID + DEBT + EQUITY + SCALE)
+                      spec=P_AND_L + FIXED + PREPAID + DEBT + EQUITY + TAX + SCALE)
     quarter_part = _part(quarters, sorted(quarters), extra=_merge(_quarter_valuation(quarters, record.get("quarter_end_close", {})),
-                                                                  _fixed_quarters(quarters)), spec=P_AND_L + FIXED + PREPAID + DEBT + EQUITY + SCALE)
+                                                                  _fixed_quarters(quarters)), spec=P_AND_L + FIXED + PREPAID + DEBT + EQUITY + TAX + SCALE)
     for row in quarter_part["rows"]:  # these two ratios run over the four quarters to each quarter
-        if row["key"] in ("capex_to_depreciation", "ppe_turnover", "prepaid_to_pbt", "avg_rate", "icr", "gross_margin_vs_avg"):
+        if row["key"] in ("capex_to_depreciation", "ppe_turnover", "prepaid_to_pbt", "avg_rate", "icr", "gross_margin_vs_avg", "etr"):
             row["label"] = f"{row['label']} (4 quý)"
     for row in year_part["rows"] + quarter_part["rows"]:  # money lines of the valuation block arrive as Decimals
         if row["kind"] == "money":

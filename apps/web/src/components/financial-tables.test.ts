@@ -65,7 +65,7 @@ it("ratios VNDirect gives to two places keep them", () => {
 });
 
 it("the fixed-asset group says when a ticker has not taken its lines yet and where a finance lease has no line of its own", () => {
-  expect(fixedNotes({ fixed_assets_pending: true, finance_lease: [] })).toEqual(["Chưa đồng bộ dòng tài sản cố định, chi phí trả trước, lợi thế thương mại, nợ vay và vốn chủ sở hữu: các dòng này để trống đến lượt 20:00 lấy lại lịch sử của mã này."]);
+  expect(fixedNotes({ fixed_assets_pending: true, finance_lease: [] })).toEqual(["Chưa đồng bộ dòng tài sản cố định, chi phí trả trước, lợi thế thương mại, nợ vay, vốn chủ sở hữu và thuế TNDN: các dòng này để trống đến lượt 20:00 lấy lại lịch sử của mã này."]);
   expect(fixedNotes({ fixed_assets_pending: false, finance_lease: ["2024", "2025-Q1"] })).toEqual(["Có TSCĐ thuê tài chính (không có dòng riêng) ở 2024, Q1/25."]);
   expect(fixedNotes({})).toEqual([]);
 });

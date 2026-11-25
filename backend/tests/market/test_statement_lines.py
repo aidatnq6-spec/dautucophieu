@@ -57,3 +57,11 @@ def test_equity_parts_and_share_cash_flows_are_kept_owner_25_11_2026():
     assert names[(1, 14120)] == "share_premium" and names[(1, 14140)] == "treasury_shares" and names[(1, 14160)] == "equity_fx"
     assert names[(1, 14170)] == "dev_fund" and names[(1, 14200)] == "retained" and names[(3, 33100)] == "issue_cash" and names[(3, 33200)] == "buyback_cash"
     assert LINES_VERSION >= 12
+
+
+def test_tax_parts_cash_and_deferred_balances_are_kept_owner_25_11_2026():
+    """Thuế TNDN (spec 25/11/2026): HPG 2021 22051 2.855,3, 22052 −319,5; 31180 tax paid; 12620 deferred tax assets; 13350 deferred tax liabilities."""
+    names = {(m, c): n for (m, c), n in LINES.items()}
+    assert names[(2, 22051)] == "tax_current" and names[(2, 22052)] == "tax_deferred" and names[(3, 31180)] == "tax_paid"
+    assert names[(1, 12620)] == "deferred_tax_assets" and names[(1, 13350)] == "deferred_tax_liabilities"
+    assert LINES_VERSION >= 13

@@ -549,3 +549,45 @@ def fin_notes_view(notes: dict[str, dict[str, str]], statements: dict) -> list[d
                     "interest_total": None if interest is None or capitalised is None else _text(interest + capitalised),
                     "capitalised_share": _share(capitalised, pbt) if capitalised is not None and pbt is not None and pbt > 0 else None})
     return out
+
+
+# Ưu đãi thuế (25/11/2026), from the notes on income tax (HPG 2021: note 40.3): which subsidiary or project is taxed below the standard 20%,
+# exempt or halved, and until which year; in that year Việc cần xem says the effective rate may rise from the next.
+INCENTIVE_KINDS = {"rate": "thuế suất ưu đãi", "exempt": "miễn thuế", "half": "giảm 50% thuế"}
+MAX_INCENTIVES = 20
+STANDARD_RATE = Decimal(20)
+
+
+def validate_incentives(raw: list) -> list[dict]:
+    if len(raw) > MAX_INCENTIVES:
+        raise NoteError("too_many", f"Tối đa {MAX_INCENTIVES} ưu đãi mỗi mã.")
+    out = []
+    for item in raw:
+        entity = str(item.get("entity") or "").strip()
+        if not entity or len(entity) > 120:
+            raise NoteError("invalid_name", "Công ty con hoặc dự án từ 1 đến 120 ký tự.")
+        kind = str(item.get("kind") or "").strip()
+        if kind not in INCENTIVE_KINDS:
+            raise NoteError("invalid_kind", "Loại ưu đãi: thuế suất ưu đãi, miễn thuế hoặc giảm 50%.")
+        rate = _rate(item.get("rate")) if kind == "rate" else None
+        if kind == "rate" and (rate is None or not 0 < rate < STANDARD_RATE):
+            raise NoteError("invalid_rate", "Thuế suất ưu đãi từ trên 0 đến dưới 20%.")
+        until = str(item.get("until") or "").strip()
+        if not _YEAR.fullmatch(until):
+            raise NoteError("invalid_year", "Năm hết ưu đãi dạng 2026.")
+        url = str(item.get("source_url") or "").strip()
+        if url and not re.fullmatch(r"https?://\S{3,500}", url):
+            raise NoteError("invalid_source", "Link nguồn phải bắt đầu bằng http:// hoặc https://.")
+        out.append({"id": str(item.get("id") or uuid.uuid4().hex[:12])[:32], "entity": entity, "kind": kind,
+                    "rate": None if rate is None else _pct_text(rate), "until": until, "source_url": url or None, "note": str(item.get("note") or "").strip()[:500]})
+    return sorted(out, key=lambda i: i["until"])
+
+
+def incentives_view(incentives: list[dict], *, today: date) -> list[dict]:
+    """Each incentive with its state: ending (its last year is this one), ended, or active."""
+    year = str(today.year)
+    return [{**i, "state": "ending" if i["until"] == year else "ended" if i["until"] < year else "active"} for i in incentives]
+
+
+def incentive_text(i: dict) -> str:
+    return f"thuế suất ưu đãi {i['rate'].replace('.', ',')}%" if i["kind"] == "rate" else INCENTIVE_KINDS[i["kind"]]

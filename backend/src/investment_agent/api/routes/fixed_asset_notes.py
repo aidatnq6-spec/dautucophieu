@@ -9,6 +9,7 @@ from fastapi import APIRouter, Request
 from pydantic import Field
 
 from investment_agent.domain.fixed_asset_notes import FIN_KINDS, fin_notes_view, validate_fin_notes
+from investment_agent.domain.fixed_asset_notes import INCENTIVE_KINDS, MAX_INCENTIVES, incentives_view, validate_incentives
 from investment_agent.domain.fixed_asset_notes import (CURRENCIES, GROUPS, MAX_DEALS, MAX_LOANS, MAX_PROJECTS, PREPAID_KINDS, TERMS, NoteError,
                                                          bargain_years, complete, deals_view, debt_view, due_view, goodwill_moves, postpone, prepaid_view,
                                                          segments_view, validate_amort, validate_deals, validate_debt_notes, validate_loans,
@@ -40,6 +41,7 @@ class NotesRequest(ContractModel):
     debt_notes: dict | None = None  # period read, long-term debt due within a year, the owner's fall of the đồng; left out: kept
     segments: dict | None = None  # Doanh thu, giá vốn theo mảng: period → segments; left out: kept
     fin_income_notes: dict | None = None  # Doanh thu tài chính theo loại, lãi vay vốn hóa: year → kinds; left out: kept
+    tax_incentives: list[dict] | None = Field(default=None, max_length=MAX_INCENTIVES)  # Ưu đãi thuế; left out: kept
     expected_version: int = Field(strict=True, ge=0)
     request_id: str = Field(pattern=_REQUEST)
 
@@ -79,7 +81,8 @@ def _view(request: Request, repo, owner, symbol: str) -> dict:
             **_deal_parts(record, statements, _today(request)), "loans": _stored(record, "loans", []), "debt_notes": _stored(record, "debt_notes", {}),
             "debt": debt_view(_stored(record, "loans", []), _stored(record, "debt_notes", {}), statements), "currencies": list(CURRENCIES), "terms": TERMS,
             "segments": segments_view(_stored(record, "segments", {}), statements),
-            "fin_income_notes": fin_notes_view(_stored(record, "fin_income_notes", {}), statements), "fin_kinds": FIN_KINDS}
+            "fin_income_notes": fin_notes_view(_stored(record, "fin_income_notes", {}), statements), "fin_kinds": FIN_KINDS,
+            "tax_incentives": incentives_view(_stored(record, "tax_incentives", []), today=_today(request)), "incentive_kinds": INCENTIVE_KINDS}
 
 
 def _deal_parts(record, statements: dict, today) -> dict:
@@ -111,7 +114,7 @@ def _run(request: Request, symbol: str, change):
         return unavailable()
 
 
-EXTRAS = {"prepaid": {}, "deals": [], "goodwill_amort": {}, "loans": [], "debt_notes": {}, "segments": {}, "fin_income_notes": {}}  # parts a write may leave out: the stored ones are kept
+EXTRAS = {"prepaid": {}, "deals": [], "goodwill_amort": {}, "loans": [], "debt_notes": {}, "segments": {}, "fin_income_notes": {}, "tax_incentives": []}  # parts a write may leave out: the stored ones are kept
 
 
 def _write(repo, owner, sym: str, projects: list, ranges: dict, body, **extras) -> None:
@@ -138,7 +141,8 @@ def put_notes(symbol: str, request: Request, body: NotesRequest):
                loans=None if body.loans is None else validate_loans(body.loans),
                debt_notes=None if body.debt_notes is None else validate_debt_notes(body.debt_notes),
                segments=None if body.segments is None else validate_segments(body.segments),
-               fin_income_notes=None if body.fin_income_notes is None else validate_fin_notes(body.fin_income_notes))
+               fin_income_notes=None if body.fin_income_notes is None else validate_fin_notes(body.fin_income_notes),
+               tax_incentives=None if body.tax_incentives is None else validate_incentives(body.tax_incentives))
     return _run(request, symbol, change)
 
 

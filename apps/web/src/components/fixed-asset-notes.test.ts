@@ -1,5 +1,11 @@
 import { expect, it } from "vitest";
-import { bargainText, coverText, dealText, finText, fxText, gapText, interestText, quarterInput, segmentCheckText, stateText, yearsLeftText } from "./fixed-asset-notes";
+import { bargainText, coverText, dealText, finText, fxText, gapText, incentiveState, interestText, quarterInput, segmentCheckText, stateText, yearsLeftText } from "./fixed-asset-notes";
+
+it("a tax incentive says whether it is still running", () => {
+  expect(incentiveState({ state: "ending", until: "2026" })).toBe("Hết trong năm 2026: thuế suất thực tế có thể tăng từ năm sau");
+  expect(incentiveState({ state: "active", until: "2030" })).toBe("Còn đến hết năm 2030");
+  expect(incentiveState({ state: "ended", until: "2024" })).toBe("Đã hết từ năm 2025");
+});
 
 it("financial income hard to repeat is set against profit before tax", () => {
   expect(finText({ year: "2021", hard_to_repeat: "709", pbt: "-130.6", share: null, pbt_without: "-839.6" }))

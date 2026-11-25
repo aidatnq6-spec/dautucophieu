@@ -251,3 +251,21 @@ def test_a_profitable_year_shows_the_shares_against_profit_before_tax():
                           {"years": {"2021": {"fin_income": str(3071 * B), "pbt": str(37057 * B), "interest": str(2526 * B)}}})
     assert v["hard_to_repeat"] == "46" and v["share"] == "0.0012" and v["pbt_without"] == "37011" and v["capitalised_share"] == "0.0027"
     assert v["gap"] == "-1831"  # the kinds written so far against the statements' financial income
+
+
+def test_tax_incentives_from_the_notes_say_when_they_end_owner_25_11_2026():
+    """Bài thuế TNDN (HPG 2021, thuyết minh 40.3): subsidiaries taxed at 10% or exempt for a time; when the incentive ends the rate rises."""
+    from investment_agent.domain.fixed_asset_notes import incentives_view, validate_incentives
+    kept = validate_incentives([{"entity": " Thép Dung Quất ", "kind": "rate", "rate": "10", "until": "2026", "source_url": "https://example.com/bctc.pdf"},
+                                {"entity": "Dự án B", "kind": "exempt", "until": "2030"}, {"entity": "Dự án C", "kind": "half", "until": "2024"}])
+    assert [i["entity"] for i in kept] == ["Dự án C", "Thép Dung Quất", "Dự án B"]  # by the year the incentive ends
+    assert {k: kept[1][k] for k in ("entity", "kind", "rate", "until")} == {"entity": "Thép Dung Quất", "kind": "rate", "rate": "10", "until": "2026"}
+    assert kept[2]["rate"] is None
+    c, a, b = incentives_view(kept, today=date(2026, 11, 25))
+    assert (a["state"], b["state"], c["state"]) == ("ending", "active", "ended")
+    for raw, code in (([{"entity": "", "kind": "rate", "rate": "10", "until": "2026"}], "invalid_name"), ([{"entity": "A", "kind": "gift", "until": "2026"}], "invalid_kind"),
+                      ([{"entity": "A", "kind": "rate", "until": "2026"}], "invalid_rate"), ([{"entity": "A", "kind": "rate", "rate": "25", "until": "2026"}], "invalid_rate"),
+                      ([{"entity": "A", "kind": "exempt", "until": "20x6"}], "invalid_year")):
+        with pytest.raises(NoteError) as err:
+            validate_incentives(raw)
+        assert err.value.code == code

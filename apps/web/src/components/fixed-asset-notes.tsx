@@ -17,7 +17,9 @@ type Bargain = { year: string; gain: string; deals: string[]; pbt: string | null
 type Data = { symbol: string; version: number; projects: Project[]; ranges: Ranges; groups: Record<string, string>; prepaid: Prepaid[]; prepaid_kinds: Record<string, string>;
   deals: Deal[]; goodwill_amort: Record<string, string>; goodwill_moves: Move[]; bargains: Bargain[];
   loans: Loan[]; debt_notes: { period?: string; current_portion?: string; fx_shock?: string }; debt: Debt; currencies: string[]; terms: Record<string, string>;
-  segments: SegmentPeriod[]; fin_income_notes: FinYear[]; fin_kinds: Record<string, string> };
+  segments: SegmentPeriod[]; fin_income_notes: FinYear[]; fin_kinds: Record<string, string>; tax_incentives: Incentive[]; incentive_kinds: Record<string, string> };
+type Incentive = { id: string; entity: string; kind: string; rate: string | null; until: string; source_url: string | null; note: string; state: "active" | "ending" | "ended" };
+type IncentiveDraft = { id?: string; entity: string; kind: string; rate: string; until: string; source_url: string; note: string };
 type FinYear = { year: string; items: Record<string, string>; entered: string; reported: string | null; gap: string | null; hard_to_repeat: string; pbt: string | null;
   share: string | null; pbt_without: string | null; interest_expensed: string | null; interest_total: string | null; capitalised_share: string | null };
 type SegmentRow = { name: string; revenue: string; cogs: string; gross: string; margin: string | null; share: string | null };
@@ -107,6 +109,15 @@ const rateText = (l: Pick<Loan, "rate_from" | "rate_to" | "base" | "margin">) =>
   return [fixed, floating].filter(Boolean).join("; ") || "—";
 };
 
+/** Whether a tax incentive is still running, ends this year or has ended. */
+export function incentiveState(i: Pick<Incentive, "state" | "until">): string {
+  return i.state === "ending" ? `Hết trong năm ${i.until}: thuế suất thực tế có thể tăng từ năm sau`
+    : i.state === "ended" ? `Đã hết từ năm ${Number(i.until) + 1}` : `Còn đến hết năm ${i.until}`;
+}
+
+const incentiveRaw = (i: IncentiveDraft | Incentive) => ({ ...(i.id ? { id: i.id } : {}), entity: i.entity, kind: i.kind, rate: i.rate ?? "", until: i.until,
+  source_url: i.source_url || null, note: i.note });
+
 /** The financial income hard to repeat or not yet cashed, against profit before tax. */
 export function finText(v: Pick<FinYear, "year" | "hard_to_repeat" | "pbt" | "share" | "pbt_without">): string {
   if (v.pbt === null || v.pbt_without === null) return `Năm ${v.year}: chưa có LNTT năm này trong báo cáo đã lưu`;
@@ -163,6 +174,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
   const [deal, setDeal] = useState<DealDraft | null>(null);
   const [loan, setLoan] = useState<LoanDraft | null>(null);
   const [debtNotes, setDebtNotes] = useState<{ period: string; current_portion: string; fx_shock: string } | null>(null);
+  const [incentive, setIncentive] = useState<IncentiveDraft | null>(null);
   const [finNote, setFinNote] = useState<{ old?: string; year: string; values: Record<string, string> } | null>(null);
   const [segment, setSegment] = useState<{ old?: string; period: string; rows: { name: string; revenue: string; cogs: string }[] } | null>(null);
   const base = `stock/${encodeURIComponent(symbol)}/fixed-asset-notes`;
@@ -184,6 +196,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
       setDebtNotes(null);
       setSegment(null);
       setFinNote(null);
+      setIncentive(null);
       setMessage(null);
     } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); }
   }
@@ -199,6 +212,8 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
   const savePrepaid = (prepaid: Record<string, Record<string, string>>) => send(base, "PUT", { projects: others(), ranges: keptRanges(), prepaid });
   const otherLoans = (id?: string) => (data?.loans ?? []).filter((l) => l.id !== id).map(loanRaw);
   const saveLoans = (loans: ReturnType<typeof loanRaw>[]) => send(base, "PUT", { projects: others(), ranges: keptRanges(), loans });
+  const otherIncentives = (id?: string) => (data?.tax_incentives ?? []).filter((i) => i.id !== id).map(incentiveRaw);
+  const saveIncentives = (tax_incentives: ReturnType<typeof incentiveRaw>[]) => send(base, "PUT", { projects: others(), ranges: keptRanges(), tax_incentives });
   const keptFin = (skip?: string) => Object.fromEntries((data?.fin_income_notes ?? []).filter((f) => f.year !== skip).map((f) => [f.year, f.items]));
   const saveFin = (fin_income_notes: Record<string, Record<string, string>>) => send(base, "PUT", { projects: others(), ranges: keptRanges(), fin_income_notes });
   const keptSegments = (skip?: string) => Object.fromEntries((data?.segments ?? []).filter((s) => s.period !== skip)
@@ -454,6 +469,35 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
       </form>}
       <p className="caption">Ghi doanh thu và giá vốn từng mảng từ thuyết minh (VNDirect chỉ có tổng). Phần mềm tính lãi gộp, biên gộp, % đóng góp vào tổng lãi gộp và đối chiếu tổng
         với doanh thu thuần, giá vốn của báo cáo đã lưu; thuyết minh thường ghi doanh thu trước giảm trừ nên tổng có thể lệch phần giảm trừ.</p>
+      <h3>Ưu đãi thuế</h3>
+      {data && data.tax_incentives.length > 0 ? <table className="fv-table" aria-label={`Ưu đãi thuế ${symbol}`}>
+        <thead><tr><th>Công ty con, dự án</th><th>Ưu đãi</th><th>Tình trạng</th><th></th></tr></thead>
+        <tbody>{data.tax_incentives.map((i) => <tr key={i.id} data-testid="fan-incentive">
+          <td data-label="Công ty con, dự án">{i.source_url ? <a href={i.source_url} target="_blank" rel="noreferrer noopener">{i.entity}</a> : i.entity}
+            {i.note && <div className="caption">{i.note}</div>}</td>
+          <td data-label="Ưu đãi">{i.kind === "rate" && i.rate ? `${data.incentive_kinds.rate} ${num(i.rate)}%` : data.incentive_kinds[i.kind]}</td>
+          <td data-label="Tình trạng" className={i.state === "ending" ? "negative" : ""}>{incentiveState(i)}</td>
+          <td className="actions">
+            <button type="button" className="btn" aria-label={`Sửa ưu đãi ${i.entity}`} onClick={() => setIncentive({ ...incentiveRaw(i), source_url: i.source_url ?? "" })}>
+              <Pencil size={14} aria-hidden="true" />Sửa</button>
+            <button type="button" className="btn" aria-label={`Xóa ưu đãi ${i.entity}`} onClick={() => { if (window.confirm(`Xóa ưu đãi của ${i.entity}?`)) void saveIncentives(otherIncentives(i.id)); }}>
+              <Trash2 size={14} aria-hidden="true" />Xóa</button></td>
+        </tr>)}</tbody>
+      </table> : data && <p className="muted">Chưa ghi ưu đãi thuế. Lấy từ thuyết minh thuế thu nhập doanh nghiệp (thuế suất áp dụng, miễn giảm của các công ty con).</p>}
+      {data && !incentive && <button type="button" className="btn" onClick={() => setIncentive({ entity: "", kind: "rate", rate: "", until: "", source_url: "", note: "" })}>
+        <Plus size={15} aria-hidden="true" />Thêm ưu đãi thuế</button>}
+      {data && incentive && <form className="pp-form" aria-label="Ưu đãi thuế" onSubmit={(e) => { e.preventDefault(); void saveIncentives([...otherIncentives(incentive.id), incentiveRaw(incentive)]); }}>
+        <label className="field">Công ty con hoặc dự án<input value={incentive.entity} maxLength={120} required onChange={(e) => setIncentive({ ...incentive, entity: e.target.value })} /></label>
+        <label className="field">Loại ưu đãi<select value={incentive.kind} onChange={(e) => setIncentive({ ...incentive, kind: e.target.value })}>
+          {Object.entries(data.incentive_kinds).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+        {incentive.kind === "rate" && <label className="field">Thuế suất ưu đãi (%)<input inputMode="decimal" value={incentive.rate} required
+          onChange={(e) => setIncentive({ ...incentive, rate: e.target.value })} /></label>}
+        <label className="field">Năm hết ưu đãi<input inputMode="numeric" maxLength={4} value={incentive.until} required onChange={(e) => setIncentive({ ...incentive, until: e.target.value })} /></label>
+        <label className="field">Link tài liệu nguồn<input type="url" value={incentive.source_url} onChange={(e) => setIncentive({ ...incentive, source_url: e.target.value })} placeholder="https://…" /></label>
+        <label className="field">Ghi chú<input value={incentive.note} maxLength={500} onChange={(e) => setIncentive({ ...incentive, note: e.target.value })} /></label>
+        <div className="row"><button className="btn primary" type="submit">Lưu ưu đãi</button><button className="btn" type="button" onClick={() => setIncentive(null)}>Hủy</button></div>
+      </form>}
+      <p className="caption">Trong năm hết ưu đãi, Việc cần xem có một dòng nhắc (không gửi Telegram): từ năm sau thuế suất thực tế có thể tăng về gần 20%.</p>
       <h3>Doanh thu tài chính theo loại, lãi vay vốn hóa</h3>
       {data && data.fin_income_notes.length > 0 ? <>
         <table className="fv-table fan-wide" aria-label={`Doanh thu tài chính theo loại ${symbol}`}>

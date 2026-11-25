@@ -56,6 +56,19 @@ test("the owner writes a deal and sees its goodwill by the lesson's formula", as
   await expect(box.getByTestId("fan-charging")).toContainText("40 tỷ mỗi năm");
 });
 
+test("the owner writes a tax incentive and sees until when it runs", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Thuyết minh TSCĐ (nhập tay)" });
+  await box.getByRole("button", { name: "Thêm ưu đãi thuế" }).click();
+  const form = box.getByRole("form", { name: "Ưu đãi thuế" });
+  await form.getByLabel("Công ty con hoặc dự án").fill("Dự án mẫu");
+  await form.getByLabel("Thuế suất ưu đãi (%)").fill("10");
+  await form.getByLabel("Năm hết ưu đãi").fill("2099");
+  await form.getByRole("button", { name: "Lưu ưu đãi" }).click();
+  await expect(box.getByTestId("fan-incentive")).toContainText("thuế suất ưu đãi 10%");
+  await expect(box.getByTestId("fan-incentive")).toContainText("Còn đến hết năm 2099");
+});
+
 test("the owner writes financial income by kind and sees the part hard to repeat", async ({ page }) => {
   await page.goto("/research/FPT");
   const box = page.getByRole("region", { name: "Thuyết minh TSCĐ (nhập tay)" });

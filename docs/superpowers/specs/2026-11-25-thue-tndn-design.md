@@ -22,3 +22,10 @@ thuế** (số của kỳ; chi phí thuế không dương: để trống); tài 
 - Bật khi LNTT năm gần nhất dương mà chi phí thuế TNDN ÷ LNTT **dưới 10%** (một nửa thuế suất phổ thông 20%). Hiện chi phí thuế, phần hiện hành và
   hoãn lại, thuế suất hai năm. Nhắc đọc thuyết minh thuế: ưu đãi theo dự án, địa bàn, chuyển lỗ, phần lợi nhuận không chịu thuế (ví dụ lãi mua rẻ).
 - Lỗ trước thuế, hoặc thiếu chi phí thuế: không đánh giá được. Thử 42 mã: 3 mã bật (HPG 2021: 6,8%). Chỉ hiện trên trang.
+
+## Ưu đãi thuế nhập tay (bổ sung 25/11/2026, chủ sở hữu duyệt bước 3)
+- Khối Thuyết minh TSCĐ (nhập tay), khóa `tax_incentives` (tối đa 20, xếp theo năm hết ưu đãi): công ty con hoặc dự án (bắt buộc), loại ưu đãi
+  (thuế suất ưu đãi, miễn thuế, giảm 50%), thuế suất ưu đãi (trên 0 đến dưới 20%, bắt buộc khi là thuế suất ưu đãi), năm hết ưu đãi (bắt buộc),
+  link nguồn, ghi chú; theo thuyết minh thuế TNDN (HPG 2021: 40.3).
+- Tình trạng: còn ưu đãi, hết trong năm nay, đã hết. Trong **năm hết ưu đãi**, Việc cần xem có một dòng mức thấp dẫn tới hồ sơ mã ("thuế suất thực
+  tế có thể tăng từ năm sau"); không vào Bản tin tuần, nên không gửi Telegram. Ghi phần khác không gửi `tax_incentives` thì giữ nguyên.

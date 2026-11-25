@@ -4,12 +4,25 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
-from investment_agent.domain.fixed_asset_notes import due_view
+from investment_agent.domain.fixed_asset_notes import due_view, incentive_text, incentives_view
 from investment_agent.market.statements import StatementStore
 from investment_agent.market.watchlist import load_watchlist
 from investment_agent.services.records import read_version
 
 KIND = "cip_project"
+TAX_KIND = "tax_incentive"
+
+
+def incentive_lines(repo, owner, data_dir: Path, *, today: date) -> list[tuple[str, str]]:
+    """(symbol, text) of each tax incentive whose last year is this one (Ưu đãi thuế, 25/11/2026)."""
+    out = []
+    for symbol in load_watchlist(Path(data_dir)).symbols:
+        record = read_version(repo, owner, "settings", record_id(symbol), None)
+        for i in incentives_view((record.payload if record else {}).get("tax_incentives", []), today=today):
+            if i["state"] == "ending":
+                out.append((symbol, f"{symbol}: ưu đãi thuế của {i['entity']} ({incentive_text(i)}) hết trong năm {i['until']}; từ năm sau thuế suất thực tế "
+                                    "có thể tăng. Xem thuyết minh thuế TNDN của báo cáo năm."))
+    return out
 
 
 def record_id(symbol: str) -> str:

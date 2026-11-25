@@ -106,3 +106,17 @@ def test_a_project_due_this_quarter_is_listed_with_the_company_s_figures_and_lef
     assert items[0]["text"] == ("HPG: dự án Dung Quất 2 đến quý hoàn thành dự kiến Q3/26. XDCB dở dang cuối Q3/26: 16.113 tỷ (kỳ đã đọc 2025: 10.721 tỷ); "
                                 "nguyên giá TSCĐ hữu hình: chưa có (182.309 tỷ). Xác nhận đã hoàn thành hoặc lùi hạn.")
     assert weekly_todo(items + [{"kind": "thesis", "text": "x"}]) == ["x"]
+
+
+def test_a_tax_incentive_ending_this_year_is_listed_and_left_out_of_the_weekly_note(tmp_path):
+    """Ưu đãi thuế (25/11/2026): a low line in the year the incentive ends; not on Telegram."""
+    from investment_agent.domain.fixed_asset_notes import validate_incentives
+    from investment_agent.services.attention import weekly_todo
+    repo, data = setup(tmp_path)
+    incentives = validate_incentives([{"entity": "Thép Dung Quất", "kind": "rate", "rate": "10", "until": "2026"}, {"entity": "Dự án B", "kind": "exempt", "until": "2030"}])
+    repo.write(OWNER, "settings", "fixed_asset_notes_HPG", {"symbol": "HPG", "projects": [], "ranges": {}, "tax_incentives": incentives}, expected_version=0, request_id="ti1")
+    items = [i for i in attention_items(repo, OWNER, data, now=NOW) if i["kind"] == "tax_incentive"]
+    assert [(i["level"], i["symbol"], i["href"]) for i in items] == [("low", "HPG", "/research/HPG")]
+    assert items[0]["text"] == ("HPG: ưu đãi thuế của Thép Dung Quất (thuế suất ưu đãi 10%) hết trong năm 2026; từ năm sau thuế suất thực tế có thể tăng. "
+                                "Xem thuyết minh thuế TNDN của báo cáo năm.")
+    assert weekly_todo(items) == []

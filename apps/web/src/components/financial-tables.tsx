@@ -71,7 +71,7 @@ export function lastN<T>(periods: T[], n: number): number[] {
 /** Notes under the fixed-asset group: lines not synced yet, and periods with a finance lease (no line of its own). */
 export function fixedNotes(d: { fixed_assets_pending?: boolean; finance_lease?: string[] }): string[] {
   const out: string[] = [];
-  if (d.fixed_assets_pending) out.push("Chưa đồng bộ dòng tài sản cố định, chi phí trả trước, lợi thế thương mại và nợ vay: các dòng này để trống đến lượt 20:00 lấy lại lịch sử của mã này.");
+  if (d.fixed_assets_pending) out.push("Chưa đồng bộ dòng tài sản cố định, chi phí trả trước, lợi thế thương mại, nợ vay và vốn chủ sở hữu: các dòng này để trống đến lượt 20:00 lấy lại lịch sử của mã này.");
   if (d.finance_lease?.length) out.push(`Có TSCĐ thuê tài chính (không có dòng riêng) ở ${d.finance_lease.map(periodLabel).join(", ")}.`);
   return out;
 }
@@ -247,6 +247,8 @@ export function FinancialTables({ symbol }: { symbol: string }) {
         thương mại = vốn hoá ÷ (vốn chủ công ty mẹ − lợi thế thương mại); không trừ TSCĐ vô hình vì ở Việt Nam phần lớn là quyền sử dụng đất.
         Nợ vay: lãi suất vay bình quân = chi phí lãi vay ÷ nợ vay bình quân cuối kỳ và cùng kỳ năm trước; khả năng trả lãi = EBIT ÷ lãi vay (quý: 4 quý). Vay thuần =
         tiền vay nhận được + tiền trả nợ gốc. Lãi suất từng khoản, loại tiền, nợ dài hạn đến hạn trả chỉ có trong thuyết minh.
+        Vốn chủ sở hữu: vốn chủ công ty mẹ ÷ vốn góp dưới 1 là đã mất một phần vốn góp. Thay đổi vốn chủ ngoài lợi nhuận = vốn chủ cuối kỳ − kỳ trước (quý: quý liền
+        trước) − LNST − tiền phát hành − tiền mua lại cổ phiếu + cổ tức đã trả: thoái vốn công ty con, điều chỉnh hồi tố, chênh lệch tỷ giá, trích quỹ…; số lớn thì đọc thuyết minh thay đổi vốn chủ.
       </p>}
     </div>
   );

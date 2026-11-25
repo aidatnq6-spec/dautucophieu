@@ -34,11 +34,12 @@ PRICE_URL = "https://api-finfo.vndirect.com.vn/v4/stock_prices?sort=date&q=code:
 FIRST_START, REFRESH_DAYS, MAX_AGE_DAYS, PACE_SECONDS = "2010-01-01", 730, 7, 1.0
 # Raised when LINES gains lines: a non-financial ticker kept with an older version is due and takes its whole history once, so the new
 # lines reach back as far as the old ones. 2: customer advances and inventory.
-LINES_VERSION = 11  # 3: current assets, receivables, current and long-term liabilities, EPS; 4: the parts of receivables; 5: interest received;
+LINES_VERSION = 12  # 3: current assets, receivables, current and long-term liabilities, EPS; 4: the parts of receivables; 5: interest received;
 # 6: inventory at cost and its provision (Khối Tồn kho, 22/11/2026); 7: no new line, the whole history read once for the update days of
 # years before the 2-year refresh (Dự phòng chốt khi kiểm toán, review 23/11/2026)
 # 8: fixed assets, investment property and construction in progress (Tài sản cố định, 25/11/2026); 9: prepaid expenses (Chi phí trả trước);
-# 10: goodwill and its amortisation (Lợi thế thương mại); 11: borrowing cash flows, unrealised exchange differences (Nợ vay)
+# 10: goodwill and its amortisation (Lợi thế thương mại); 11: borrowing cash flows, unrealised exchange differences (Nợ vay);
+# 12: parts of equity and the cash to and from shareholders (Vốn chủ sở hữu)
 FIN_LINES_VERSION = 3  # banks, securities firms and insurers: 2: basic EPS (23001 in each of their layouts); 3: the bank's loans, loan
 # reserve, accrued interest, interest income and provision expense (Chất lượng tài sản ngân hàng, 23/11/2026; the others re-read once too)
 # (model, item code) → line. Model 1 balance sheet, 2 income statement, 3 cash flow (indirect); the general layout (TT200).
@@ -76,6 +77,10 @@ LINES = {
     (1, 12690): "goodwill", (3, 31111): "goodwill_amort",
     # Nợ vay (25/11/2026; names checked the same day): borrowings received, principal repaid (negative), unrealised exchange gains and losses
     (3, 33300): "borrow_in", (3, 33400): "borrow_out", (3, 31100): "fx_unrealised",
+    # Vốn chủ sở hữu (25/11/2026; names checked the same day): share premium, treasury shares (negative), exchange differences, development fund,
+    # retained earnings; cash from shares issued and paid to buy them back (negative)
+    (1, 14120): "share_premium", (1, 14140): "treasury_shares", (1, 14160): "equity_fx", (1, 14170): "dev_fund", (1, 14200): "retained",
+    (3, 33100): "issue_cash", (3, 33200): "buyback_cash",
     (3, 22230): "depreciation", (3, 32000): "cfo", (3, 32100): "capex", (3, 33000): "cfi", (3, 34000): "cff", (3, 33600): "dividends_paid",
 }
 # Banks (TT49 layout: models 101 balance sheet, 102 income statement) and securities firms (TT334: 89, 90): only what their scale

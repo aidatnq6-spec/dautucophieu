@@ -187,3 +187,10 @@ def test_sources_that_disagree_keep_the_held_count_and_say_so(tmp_path):
 def test_a_new_ticker_takes_hoses_count(tmp_path):
     rec = _sync_shares(tmp_path, None, "3000500833", None)
     assert rec["shares_outstanding"] == "3000500833" and rec["shares_check"]["decision"] == "hose"
+
+
+def test_the_record_carries_the_fixed_asset_lines_of_the_construction_signs_owner_25_11_2026():
+    s = statements()
+    s["years"]["2025"].update({"cip": str(10721 * B), "ppe_net": str(133421 * B), "ppe_gross": str(182309 * B), "depreciation": str(8000 * B)})
+    annual = build_record("FPT", s, EVENTS, shares=None, now=NOW)["annual"]["2025"]
+    assert (annual["cip"], annual["ppe_net"], annual["ppe_gross"], annual["depreciation"]) == (str(10721 * B), str(133421 * B), str(182309 * B), str(8000 * B))

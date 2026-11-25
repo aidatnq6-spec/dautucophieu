@@ -56,6 +56,8 @@ Không áp dụng cho ngân hàng, dịch vụ tài chính, bảo hiểm (cấu 
 
   Khoản này được thu hồi bằng hàng hóa hoặc dịch vụ, không thu hồi bằng tiền.
 
+- **XDCB dở dang phình kéo dài** và **XDCB dở dang vừa kết chuyển** (chủ sở hữu duyệt 25/11/2026): xem [Hai dấu hiệu XDCB dở dang](2026-11-25-tin-hieu-xdcb-design.md).
+
 Mỗi dấu hiệu hiện số thật của các năm liên quan. Không gộp thành một điểm.
 
 ## Giao diện

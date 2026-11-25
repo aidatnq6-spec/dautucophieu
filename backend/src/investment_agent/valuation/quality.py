@@ -18,6 +18,10 @@ ACCRUAL_SHARE = Decimal("0.10")  # three years of (profit − operating cash flo
 FIN_PROFIT_SHARE = Decimal("0.30")  # financial income less financial expenses against profit before tax, latest year
 PAPER_RECEIVED, PAPER_MATERIAL = Decimal("0.50"), Decimal("0.10")  # cash received against financial income; income against profit before tax
 OTHER_RECEIVABLES_SHARE, OTHER_RECEIVABLES_FLOOR = Decimal("0.10"), Decimal("0.01")  # of total assets; doubling counts above the floor
+# Construction in progress (owner, 25/11/2026): growing CIP_YEARS years running to CIP_SHARE of net tangible assets; moved into fixed assets
+# when it falls by CIP_DROP from a year it was CIP_MATERIAL of them and the cost of tangible assets rose by at least CIP_COST_SHARE of the fall
+CIP_YEARS, CIP_SHARE = 3, Decimal("0.20")
+CIP_DROP, CIP_MATERIAL, CIP_COST_SHARE = Decimal("0.50"), Decimal("0.10"), Decimal("0.50")
 BN = Decimal(1_000_000_000)
 # Sector context shown with the signs, where a sign is usual for the business rather than a warning by itself.
 NOTES = {"Bất động sản": "Bất động sản: chủ đầu tư thường lãi nhưng dòng tiền kinh doanh âm khi đang đổ tiền vào quỹ đất, dự án (hàng tồn kho); "
@@ -243,7 +247,47 @@ def _signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:
     else:
         signs.append({"id": "prepay_suppliers", "label": label, "flag": None,
                       "detail": f"Thiếu trả trước cho người bán hoặc tổng tài sản năm {y} (có sau lần cập nhật báo cáo tới)"})
+    signs += _cip_signs(a, y)
     return signs
+
+
+def _cip_signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:
+    """Construction in progress growing for years (a project late, or costs kept as an asset), and moved into fixed assets (depreciation
+    will rise). VNDirect has only year-end balances, not the additions and transfers of the notes."""
+    out = []
+    span = list(range(y - CIP_YEARS, y + 1))
+    label = "XDCB dở dang phình kéo dài"
+    if all("cip" in a.get(yr, {}) for yr in span) and a[y].get("ppe_net", Decimal(0)) > 0:
+        cip, net = [a[yr]["cip"] for yr in span], a[y]["ppe_net"]
+        share = cip[-1] / net
+        out.append({"id": "cip_growth", "label": label, "flag": all(b > c for c, b in zip(cip, cip[1:])) and share >= CIP_SHARE,
+                    "rule": f"XDCB dở dang tăng {CIP_YEARS} năm liên tiếp và năm gần nhất từ {_num(CIP_SHARE * 100, 0)}% TSCĐ hữu hình còn lại; "
+                            "dự án có thể chậm, hoặc chi phí đang giữ ở tài sản thay vì ghi vào chi phí: đọc thuyết minh XDCB",
+                    "detail": "XDCB dở dang " + " · ".join(f"{yr}: {_bn(v)}" for yr, v in zip(span, cip))
+                              + f"; năm {y} bằng {_pct(share)} TSCĐ hữu hình còn lại {_bn(net)}"})
+    else:
+        out.append({"id": "cip_growth", "label": label, "flag": None,
+                    "detail": f"Thiếu XDCB dở dang {y - CIP_YEARS}–{y} hoặc TSCĐ hữu hình năm {y} (có sau lần cập nhật báo cáo tới)"})
+    label = "XDCB dở dang vừa kết chuyển"
+    cur, prev = a.get(y, {}), a.get(y - 1, {})
+    if all(k in cur for k in ("cip", "ppe_gross")) and all(k in prev for k in ("cip", "ppe_gross")) and prev.get("ppe_net", Decimal(0)) > 0:
+        before, now, base = prev["cip"], cur["cip"], prev["ppe_net"]
+        fall, rise = before - now, cur["ppe_gross"] - prev["ppe_gross"]
+        material = before >= CIP_MATERIAL * base
+        dep = (f"; khấu hao {y - 1}: {_bn(prev['depreciation'])}, {y}: {_bn(cur['depreciation'])}"
+               if "depreciation" in cur and "depreciation" in prev else "")
+        change = f"giảm {_pct(fall / before)}" if before > 0 and fall >= 0 else "không giảm"
+        out.append({"id": "cip_transfer", "label": label,
+                    "flag": material and before > 0 and fall >= CIP_DROP * before and rise >= CIP_COST_SHARE * fall,
+                    "rule": f"XDCB dở dang giảm từ {_num(CIP_DROP * 100, 0)}% so với năm trước, khi năm trước đã từ {_num(CIP_MATERIAL * 100, 0)}% TSCĐ "
+                            f"hữu hình còn lại, và nguyên giá TSCĐ hữu hình tăng ít nhất {_num(CIP_COST_SHARE * 100, 0)}% phần giảm đó: dự án đã đưa vào "
+                            "dùng, khấu hao các kỳ sau sẽ tăng",
+                    "detail": f"Năm {y}: XDCB dở dang {_bn(now)}, năm {y - 1}: {_bn(before)} ({change}, bằng {_pct(before / base)} TSCĐ hữu hình "
+                              f"còn lại năm {y - 1}); nguyên giá TSCĐ hữu hình {'tăng' if rise >= 0 else 'giảm'} {_bn(abs(rise))}{dep}"})
+    else:
+        out.append({"id": "cip_transfer", "label": label, "flag": None,
+                    "detail": f"Thiếu XDCB dở dang, nguyên giá hoặc TSCĐ hữu hình năm {y - 1}–{y} (có sau lần cập nhật báo cáo tới)"})
+    return out
 
 
 # Financial sectors: Piotroski's criteria do not fit their statements, so a health score of the app's own choosing from the

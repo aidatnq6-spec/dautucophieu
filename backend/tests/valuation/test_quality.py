@@ -23,8 +23,8 @@ def test_all_nine_criteria_pass_for_a_company_improving_on_every_line():
     assert [c["passed"] for c in f["criteria"]] == [True] * 9
     assert f["criteria"][0]["detail"] == "ROA 9,0% (lợi nhuận 9 tỷ / tài sản đầu kỳ 100 tỷ)"
     assert f["criteria"][6]["detail"] == "Không có đợt huy động vốn bằng cổ phiếu năm 2025 (cổ phiếu thưởng, cổ tức bằng cổ phiếu không tính)"
-    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None, None]  # financial income and its cash, other receivables,
-    # prepayments: not kept
+    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None, None, None, None]  # financial income and its cash, other
+    # receivables, prepayments, construction in progress: not kept
 
 
 def test_a_capital_raise_and_worse_lines_fail_and_the_signs_show_their_numbers():
@@ -270,3 +270,54 @@ def test_without_the_cash_line_or_financial_income_the_sign_is_not_read():
     assert next(s for s in report_quality(STRONG, "Công nghệ Thông tin")["signs"] if s["id"] == "paper_income")["flag"] is None
     none = paper(0, 0, 50)
     assert none["flag"] is None and "không có doanh thu tài chính" in none["detail"]
+
+
+def cip_years(cip: dict, ppe_net: dict, ppe_gross: dict | None = None, depreciation: dict | None = None) -> dict:
+    """STRONG's years with construction in progress, net and gross tangible fixed assets (tỷ)."""
+    out = {y: dict(r) for y, r in STRONG["annual"].items()}
+    for y in cip:
+        out.setdefault(y, dict(STRONG["annual"]["2023"]))
+        out[y]["cip"] = str(cip[y] * BN)
+        if y in ppe_net:
+            out[y]["ppe_net"] = str(ppe_net[y] * BN)
+        if ppe_gross and y in ppe_gross:
+            out[y]["ppe_gross"] = str(ppe_gross[y] * BN)
+        if depreciation and y in depreciation:
+            out[y]["depreciation"] = str(depreciation[y] * BN)
+    return {**STRONG, "annual": out}
+
+
+def sign(q, id_):
+    return next(s for s in q["signs"] if s["id"] == id_)
+
+
+def test_construction_growing_three_years_running_to_a_fifth_of_fixed_assets_is_a_sign_owner_25_11_2026():
+    """HPG: 5.329 (2020), 8.289, 13.334, 26.053 (2023) against tangible assets of 71.787 tỷ: 36 %."""
+    q = report_quality(cip_years({"2022": 5329, "2023": 8289, "2024": 13334, "2025": 26053}, {"2025": 71787}), "Tài nguyên Cơ bản")
+    s = sign(q, "cip_growth")
+    assert s["label"] == "XDCB dở dang phình kéo dài" and s["flag"] is True
+    assert "3 năm liên tiếp" in s["rule"] and "20%" in s["rule"]
+    assert s["detail"] == "XDCB dở dang 2022: 5.329 tỷ · 2023: 8.289 tỷ · 2024: 13.334 tỷ · 2025: 26.053 tỷ; năm 2025 bằng 36,3% TSCĐ hữu hình còn lại 71.787 tỷ"
+    # below a fifth of fixed assets, or one year without growth: no sign
+    assert sign(report_quality(cip_years({"2022": 5329, "2023": 8289, "2024": 13334, "2025": 13400}, {"2025": 70199}), "x"), "cip_growth")["flag"] is False
+    assert sign(report_quality(cip_years({"2022": 9000, "2023": 8289, "2024": 13334, "2025": 26053}, {"2025": 71787}), "x"), "cip_growth")["flag"] is False
+
+
+def test_construction_moved_into_fixed_assets_is_a_sign_that_depreciation_will_rise_owner_25_11_2026():
+    """HPG 2025: 63.656 → 10.721 tỷ (−83 %), cost of tangible assets 108.147 → 182.309 tỷ."""
+    q = report_quality(cip_years({"2024": 63656, "2025": 10721}, {"2024": 67244, "2025": 133421}, {"2024": 108147, "2025": 182309},
+                                 {"2024": 6000, "2025": 8000}), "Tài nguyên Cơ bản")
+    s = sign(q, "cip_transfer")
+    assert s["label"] == "XDCB dở dang vừa kết chuyển" and s["flag"] is True
+    assert "50%" in s["rule"] and "10%" in s["rule"]
+    assert s["detail"] == ("Năm 2025: XDCB dở dang 10.721 tỷ, năm 2024: 63.656 tỷ (giảm 83,2%, bằng 94,7% TSCĐ hữu hình còn lại năm 2024); "
+                           "nguyên giá TSCĐ hữu hình tăng 74.162 tỷ; khấu hao 2024: 6.000 tỷ, 2025: 8.000 tỷ")
+    # the cost did not rise by half the drop (sold or written off), or the project was small: no sign
+    assert sign(report_quality(cip_years({"2024": 63656, "2025": 10721}, {"2024": 67244}, {"2024": 108147, "2025": 120000}), "x"), "cip_transfer")["flag"] is False
+    assert sign(report_quality(cip_years({"2024": 5000, "2025": 100}, {"2024": 67244}, {"2024": 108147, "2025": 120000}), "x"), "cip_transfer")["flag"] is False
+
+
+def test_construction_signs_without_their_lines_are_not_read():
+    q = report_quality(STRONG, "Công nghệ Thông tin")
+    assert sign(q, "cip_growth")["flag"] is None and "XDCB dở dang" in sign(q, "cip_growth")["detail"]
+    assert sign(q, "cip_transfer")["flag"] is None

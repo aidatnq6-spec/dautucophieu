@@ -66,6 +66,23 @@ test("the automatic notes show borrowings and fixed-asset movements read from Vi
   await expect(auto).toContainText("nhân công 25,0% tổng chi phí theo yếu tố");  // 100 of 400
 });
 
+test("an AI draft from an annual report is shown with its pages and saved only when the owner says so", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Thuyết minh TSCĐ (nhập tay)" });
+  const form = box.getByRole("form", { name: "AI soạn nháp thuyết minh" });
+  await form.getByLabel("Link BCTC năm (PDF, https)").fill("https://example.vn/fpt-bctc-2025.pdf");
+  await form.getByLabel("Năm báo cáo").fill("2025");
+  await form.getByRole("button", { name: "AI soạn nháp" }).click();
+  const draft = box.getByTestId("fan-ai-draft");
+  await expect(draft).toContainText("Dự án XDCB: Nhà máy mẫu");
+  await expect(draft).toContainText("Ưu đãi thuế: Công ty con mẫu");
+  await expect(draft.getByLabel(/Quý hoàn thành dự kiến/)).toHaveValue("Q2/2027");
+  await expect(box.getByTestId("fan-project").filter({ hasText: "Nhà máy mẫu" })).toHaveCount(0);  // nothing saved yet
+  await draft.getByRole("button", { name: "Lưu vào thuyết minh" }).click();
+  await expect(box.getByTestId("fan-project").filter({ hasText: "Nhà máy mẫu" })).toContainText("dự kiến xong Q2/2027");
+  await expect(box.getByTestId("fan-incentive").filter({ hasText: "Công ty con mẫu" })).toContainText("Còn đến hết năm 2028");
+});
+
 test("the owner writes shares that may be issued", async ({ page }) => {
   await page.goto("/research/FPT");
   const box = page.getByRole("region", { name: "Thuyết minh TSCĐ (nhập tay)" });
@@ -87,8 +104,9 @@ test("the owner writes a tax incentive and sees until when it runs", async ({ pa
   await form.getByLabel("Thuế suất ưu đãi (%)").fill("10");
   await form.getByLabel("Năm hết ưu đãi").fill("2099");
   await form.getByRole("button", { name: "Lưu ưu đãi" }).click();
-  await expect(box.getByTestId("fan-incentive")).toContainText("thuế suất ưu đãi 10%");
-  await expect(box.getByTestId("fan-incentive")).toContainText("Còn đến hết năm 2099");
+  const row = box.getByTestId("fan-incentive").filter({ hasText: "Dự án mẫu" });
+  await expect(row).toContainText("thuế suất ưu đãi 10%");
+  await expect(row).toContainText("Còn đến hết năm 2099");
 });
 
 test("the owner writes financial income by kind and sees the part hard to repeat", async ({ page }) => {

@@ -134,6 +134,17 @@ def related(symbol: str, request: Request, body: RelatedRequest):
     return {**out, "url": body.url.strip()} if isinstance(out, dict) else out
 
 
+@router.post("/{symbol}/notes-draft")
+def notes_draft(symbol: str, request: Request, body: RelatedRequest):
+    """AI soạn nháp Thuyết minh TSCĐ (25/11/2026): a draft for the notes block from one annual report, shown to the owner, never saved."""
+    ready = _prepare(request, symbol, body.url)
+    if not isinstance(ready, tuple):
+        return ready
+    sym, data_dir, pages, _ = ready
+    out = _run(request, data_dir, lambda gw: doc_ai.propose_notes(gw, symbol=sym, year=body.year, pages=pages))
+    return {**out, "url": body.url.strip(), "year": body.year} if isinstance(out, dict) else out
+
+
 @router.get("/status")
 def status(request: Request):
     require_owner(request)

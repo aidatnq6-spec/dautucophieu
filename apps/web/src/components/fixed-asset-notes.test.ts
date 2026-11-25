@@ -1,5 +1,25 @@
 import { expect, it } from "vitest";
-import { autoTable, bargainText, coverText, dealText, dilutionText, finText, fxText, gapText, incentiveState, interestText, quarterInput, segmentCheckText, stateText, yearsLeftText } from "./fixed-asset-notes";
+import { autoTable, mergeDraft, bargainText, coverText, dealText, dilutionText, finText, fxText, gapText, incentiveState, interestText, quarterInput, segmentCheckText, stateText, yearsLeftText } from "./fixed-asset-notes";
+
+it("an AI draft merges only the picked lines into the parts of the notes, keeping what was there", () => {
+  const draft = {
+    projects: [{ name: "Dung Quất 2", cip_value: "8289.3", due: "Q4/2024", due_text: "quý 4 năm 2024", page: 2 }, { name: "B", cip_value: "1", due: "", due_text: "", page: 2 }],
+    ranges: { buildings: { from: 5, to: 50, page: 3 } }, prepaid: { tools: { amount: "109", page: 4 } },
+    deals: [{ name: "Greenland", date: "29/03/2021", share: "69.87", price: "2859.9", net_assets: "3896.1", note_goodwill: "103", page: 5 }],
+    capitalised_interest: { amount: "412", page: 4 }, incentives: [{ entity: "Thép DQ", kind: "rate", rate: "10", until: "2026", page: 6 }] };
+  const picked = new Set(["projects:0", "ranges:buildings", "prepaid:tools", "deals:0", "capitalised_interest", "incentives:0"]);
+  const merged = mergeDraft(draft, picked, "2021", { projects: [{ name: "cũ", due: "Q1/2030" }], prepaid: { "2020": { total: "1" } }, deals: [], incentives: [],
+    fin: { "2021": { deposit: "5" } } });
+  expect(merged.projects).toEqual([{ name: "cũ", due: "Q1/2030" }, { name: "Dung Quất 2", due: "Q4/2024", read_period: "2021", cip_value: "8289.3", budget: null,
+    source_url: null, note: "AI soạn nháp từ BCTC 2021, trang 2 (quý 4 năm 2024)" }]);
+  expect(merged.ranges).toEqual({ buildings: { from: 5, to: 50 }, period: "2021" });
+  expect(merged.prepaid).toEqual({ "2020": { total: "1" }, "2021": { tools: "109" } });
+  expect(merged.deals).toEqual([{ name: "Greenland", date: "29/03/2021", share: "69.87", price: "2859.9", net_assets: "3896.1", years: "", note_goodwill: "103",
+    nci_part: "", source_url: null, note: "AI soạn nháp từ BCTC 2021, trang 5" }]);
+  expect(merged.fin_income_notes).toEqual({ "2021": { deposit: "5", capitalised_interest: "412" } });
+  expect(merged.tax_incentives).toEqual([{ entity: "Thép DQ", kind: "rate", rate: "10", until: "2026", source_url: null, note: "AI soạn nháp từ BCTC 2021, trang 6" }]);
+  expect(mergeDraft(draft, new Set(), "2021", { projects: [], prepaid: {}, deals: [], incentives: [], fin: {} }).ranges).toBe(undefined);  // nothing picked: kept
+});
 
 it("the automatic notes become a table with the lines as rows and the years as columns, empty lines left out", () => {
   const year = (y: string, loans: Record<string, string>) => ({ year: y, loans, loans_total: null, manual_current_portion: null, fin_income: {}, fin_expense: {},

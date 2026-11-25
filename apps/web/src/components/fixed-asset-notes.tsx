@@ -125,6 +125,40 @@ const rateText = (l: Pick<Loan, "rate_from" | "rate_to" | "base" | "margin">) =>
   return [fixed, floating].filter(Boolean).join("; ") || "—";
 };
 
+export type NotesDraft = {
+  projects: { name: string; cip_value: string | null; due: string; due_text: string; page: number }[];
+  ranges: Record<string, { from: number; to: number; page: number }>; prepaid: Record<string, { amount: string | null; page: number }>;
+  deals: { name: string; date: string; share: string | null; price: string | null; net_assets: string | null; note_goodwill: string | null; page: number }[];
+  capitalised_interest: { amount: string | null; page: number } | null;
+  incentives: { entity: string; kind: string; rate: string | null; until: string; page: number }[] };
+type AiResult = { status: string; reason?: string; draft: NotesDraft | null; dropped: { part: string; name: string; reason: string }[]; cost_usd: string;
+  spend?: { month: string; used_usd: string; monthly_usd: string }; year: string };
+const DROP_REASONS: Record<string, string> = { number_not_on_page: "số không có ở trang ghi", page_not_sent: "trang không có trong đoạn đã gửi",
+  missing_figure: "thiếu số", date_not_on_page: "ngày không có ở trang ghi" };
+type DraftCurrent = { projects: object[]; prepaid: Record<string, Record<string, string>>; deals: object[]; incentives: object[]; fin: Record<string, Record<string, string>> };
+
+/** The picked lines of an AI draft merged into the parts of the notes; a part with nothing picked is left out (the stored one is kept). */
+export function mergeDraft(draft: NotesDraft, picked: Set<string>, year: string, current: DraftCurrent) {
+  const note = (page: number, extra = "") => `AI soạn nháp từ BCTC ${year}, trang ${page}${extra}`;
+  const out: Record<string, unknown> = {};
+  const projects = draft.projects.filter((_, i) => picked.has(`projects:${i}`));
+  if (projects.length) out.projects = [...current.projects, ...projects.map((p) => ({ name: p.name, due: p.due, read_period: year, cip_value: p.cip_value,
+    budget: null, source_url: null, note: note(p.page, p.due_text ? ` (${p.due_text})` : "") }))];
+  const ranges = Object.entries(draft.ranges).filter(([g]) => picked.has(`ranges:${g}`));
+  if (ranges.length) out.ranges = { ...Object.fromEntries(ranges.map(([g, r]) => [g, { from: r.from, to: r.to }])), period: year };
+  const prepaid = Object.entries(draft.prepaid).filter(([k, v]) => picked.has(`prepaid:${k}`) && v.amount !== null);
+  if (prepaid.length) out.prepaid = { ...current.prepaid, [year]: Object.fromEntries(prepaid.map(([k, v]) => [k, v.amount as string])) };
+  const deals = draft.deals.filter((_, i) => picked.has(`deals:${i}`));
+  if (deals.length) out.deals = [...current.deals, ...deals.map((d) => ({ name: d.name, date: d.date, share: d.share, price: d.price, net_assets: d.net_assets,
+    years: "", note_goodwill: d.note_goodwill ?? "", nci_part: "", source_url: null, note: note(d.page) }))];
+  if (draft.capitalised_interest && draft.capitalised_interest.amount !== null && picked.has("capitalised_interest"))
+    out.fin_income_notes = { ...current.fin, [year]: { ...(current.fin[year] ?? {}), capitalised_interest: draft.capitalised_interest.amount } };
+  const incentives = draft.incentives.filter((_, i) => picked.has(`incentives:${i}`));
+  if (incentives.length) out.tax_incentives = [...current.incentives, ...incentives.map((i) => ({ entity: i.entity, kind: i.kind, rate: i.rate ?? "", until: i.until,
+    source_url: null, note: note(i.page) }))];
+  return out as { projects?: object[]; ranges?: object; prepaid?: object; deals?: object[]; fin_income_notes?: object; tax_incentives?: object[] };
+}
+
 /** One part of the automatic notes as a table: the lines as rows (those with a figure in some year), the years as columns. */
 export function autoTable(auto: Auto, part: AutoPart, keys: string[], labels: Record<string, string>) {
   const years = auto.years.map((y) => y.year);
@@ -207,6 +241,8 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
   const [loan, setLoan] = useState<LoanDraft | null>(null);
   const [debtNotes, setDebtNotes] = useState<{ period: string; current_portion: string; fx_shock: string } | null>(null);
   const [incentive, setIncentive] = useState<IncentiveDraft | null>(null);
+  const [ai, setAi] = useState<{ url: string; year: string; busy: boolean; result: AiResult | null; picked: Set<string>; dues: Record<number, string> }>(
+    { url: "", year: String(new Date().getFullYear() - 1), busy: false, result: null, picked: new Set(), dues: {} });
   const [dilution, setDilution] = useState<{ source: string; shares: string }[] | null>(null);
   const [finNote, setFinNote] = useState<{ old?: string; year: string; values: Record<string, string> } | null>(null);
   const [segment, setSegment] = useState<{ old?: string; period: string; rows: { name: string; revenue: string; cogs: string }[] } | null>(null);
@@ -246,6 +282,29 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
   const savePrepaid = (prepaid: Record<string, Record<string, string>>) => send(base, "PUT", { projects: others(), ranges: keptRanges(), prepaid });
   const otherLoans = (id?: string) => (data?.loans ?? []).filter((l) => l.id !== id).map(loanRaw);
   const saveLoans = (loans: ReturnType<typeof loanRaw>[]) => send(base, "PUT", { projects: others(), ranges: keptRanges(), loans });
+  async function draftNotes() {
+    setAi({ ...ai, busy: true, result: null, picked: new Set(), dues: {} });
+    try {
+      const result = await api<AiResult>(`ai-docs/${encodeURIComponent(symbol)}/notes-draft`, { method: "POST", body: { url: ai.url.trim(), year: ai.year.trim() } });
+      const d = result.draft;
+      const picked = new Set<string>(d ? [...d.projects.map((_, i) => `projects:${i}`), ...Object.keys(d.ranges).map((g) => `ranges:${g}`),
+        ...Object.keys(d.prepaid).map((k) => `prepaid:${k}`), ...d.deals.map((_, i) => `deals:${i}`), ...(d.capitalised_interest ? ["capitalised_interest"] : []),
+        ...d.incentives.map((_, i) => `incentives:${i}`)] : []);
+      setAi((a) => ({ ...a, busy: false, result, picked }));
+      setMessage(null);
+    } catch (e) {
+      setAi((a) => ({ ...a, busy: false }));
+      setMessage(e instanceof ApiError ? e.failure.message : "AI chưa soạn được.");
+    }
+  }
+  function saveDraft() {
+    const d = ai.result?.draft;
+    if (!d) return;
+    const draft = { ...d, projects: d.projects.map((p, i) => ({ ...p, due: (ai.dues[i] ?? p.due).trim() })) };
+    const merged = mergeDraft(draft, ai.picked, ai.result!.year, { projects: others(), prepaid: keptPrepaid(), deals: otherDeals(), incentives: otherIncentives(), fin: keptFin() });
+    void send(base, "PUT", { ...merged, projects: merged.projects ?? others(), ranges: merged.ranges ?? keptRanges() });
+  }
+  const toggle = (key: string) => setAi((a) => { const p = new Set(a.picked); if (p.has(key)) p.delete(key); else p.add(key); return { ...a, picked: p }; });
   const otherIncentives = (id?: string) => (data?.tax_incentives ?? []).filter((i) => i.id !== id).map(incentiveRaw);
   const saveIncentives = (tax_incentives: ReturnType<typeof incentiveRaw>[]) => send(base, "PUT", { projects: others(), ranges: keptRanges(), tax_incentives });
   const keptFin = (skip?: string) => Object.fromEntries((data?.fin_income_notes ?? []).filter((f) => f.year !== skip).map((f) => [f.year, f.items]));
@@ -293,6 +352,41 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
         <p className="caption">Đọc từ thuyết minh báo cáo tài chính trên API công khai của Vietcap{data.auto.fetched_at ? `, ngày ${new Date(data.auto.fetched_at).toLocaleDateString("vi-VN")}` : ""}; làm
           mới hằng tuần. Vietcap gộp lãi tiền gửi và cho vay (không tách bên liên quan); &quot;tăng trong năm&quot; của TSCĐ gồm cả mua mới và kết chuyển XDCB. Phần nhập tay bên dưới giữ nguyên.</p>
       </div> : data && <p className="muted">Chưa có thuyết minh tự động cho mã này (lượt 20:00 lấy dần, mỗi lượt tối đa 15 mã).</p>}
+      <h3>AI soạn nháp từ BCTC</h3>
+      {data && <form className="pp-form" aria-label="AI soạn nháp thuyết minh" onSubmit={(e) => { e.preventDefault(); void draftNotes(); }}>
+        <label className="field">Link BCTC năm (PDF, https)<input type="url" value={ai.url} required placeholder="https://…" onChange={(e) => setAi({ ...ai, url: e.target.value })} /></label>
+        <label className="field">Năm báo cáo<input inputMode="numeric" maxLength={4} value={ai.year} required onChange={(e) => setAi({ ...ai, year: e.target.value })} /></label>
+        <div className="row"><button className="btn primary" type="submit" disabled={ai.busy}>{ai.busy ? "Đang đọc…" : "AI soạn nháp"}</button></div>
+      </form>}
+      {ai.result && <div data-testid="fan-ai-draft">
+        {ai.result.status !== "ok" || !ai.result.draft ? <p className="notice">{ai.result.status === "no_passages" ? "Tài liệu không có đoạn nào về các phần này."
+          : `AI trả lời không kiểm chứng được (${ai.result.reason ?? ai.result.status}); không có bản nháp.`}</p> : <>
+          <ul className="quality-list">
+            {ai.result.draft.projects.map((p, i) => <li key={`p${i}`}><label><input type="checkbox" checked={ai.picked.has(`projects:${i}`)} onChange={() => toggle(`projects:${i}`)} /> Dự án XDCB: {p.name}
+              {p.cip_value && ` · ${num(p.cip_value)} tỷ`} · trang {p.page}</label>
+              <label className="field">Quý hoàn thành dự kiến{p.due_text && ` (tài liệu: ${p.due_text})`}<input value={ai.dues[i] ?? p.due} placeholder="Q3/2027"
+                onChange={(e) => setAi({ ...ai, dues: { ...ai.dues, [i]: e.target.value } })} /></label></li>)}
+            {Object.entries(ai.result.draft.ranges).map(([g, r]) => <li key={`r${g}`}><label><input type="checkbox" checked={ai.picked.has(`ranges:${g}`)} onChange={() => toggle(`ranges:${g}`)} /> Khung
+              khấu hao: {data?.groups[g] ?? g} {r.from}–{r.to} năm · trang {r.page}</label></li>)}
+            {Object.entries(ai.result.draft.prepaid).map(([k, v]) => <li key={`pp${k}`}><label><input type="checkbox" checked={ai.picked.has(`prepaid:${k}`)} onChange={() => toggle(`prepaid:${k}`)} /> Phân
+              bổ chi phí trả trước: {k === "total" ? "tổng" : data?.prepaid_kinds[k] ?? k} {v.amount === null ? "—" : num(v.amount)} tỷ · trang {v.page}</label></li>)}
+            {ai.result.draft.deals.map((d, i) => <li key={`d${i}`}><label><input type="checkbox" checked={ai.picked.has(`deals:${i}`)} onChange={() => toggle(`deals:${i}`)} /> Thương vụ: {d.name}
+              {` · ${d.date} · ${d.share ? num(d.share) : "—"}% · giá ${d.price ? num(d.price) : "—"} tỷ · tài sản thuần ${d.net_assets ? num(d.net_assets) : "—"} tỷ`}
+              {d.note_goodwill && ` · lợi thế thương mại ${signed(d.note_goodwill)} tỷ`} · trang {d.page}</label></li>)}
+            {ai.result.draft.capitalised_interest && <li><label><input type="checkbox" checked={ai.picked.has("capitalised_interest")} onChange={() => toggle("capitalised_interest")} /> Lãi vay vốn
+              hóa năm {ai.result.year}: {ai.result.draft.capitalised_interest.amount === null ? "—" : num(ai.result.draft.capitalised_interest.amount)} tỷ · trang {ai.result.draft.capitalised_interest.page}</label></li>}
+            {ai.result.draft.incentives.map((x, i) => <li key={`i${i}`}><label><input type="checkbox" checked={ai.picked.has(`incentives:${i}`)} onChange={() => toggle(`incentives:${i}`)} /> Ưu đãi thuế:
+              {` ${x.entity} · ${data?.incentive_kinds[x.kind] ?? x.kind}${x.rate ? ` ${num(x.rate)}%` : ""} đến hết ${x.until}`} · trang {x.page}</label></li>)}
+          </ul>
+          {ai.result.dropped.length > 0 && <p className="caption">Bỏ {ai.result.dropped.length} dòng không qua kiểm tra: {ai.result.dropped.map((d) =>
+            `${d.name || d.part} (${DROP_REASONS[d.reason] ?? d.reason})`).join("; ")}.</p>}
+          <div className="row"><button type="button" className="btn primary" disabled={ai.picked.size === 0} onClick={saveDraft}>Lưu vào thuyết minh</button>
+            <button type="button" className="btn" onClick={() => setAi({ ...ai, result: null })}>Bỏ bản nháp</button></div>
+        </>}
+        <p className="caption">Chi phí lần này {ai.result.cost_usd} USD{ai.result.spend ? `; tháng ${ai.result.spend.month} đã dùng ${ai.result.spend.used_usd}/${ai.result.spend.monthly_usd} USD` : ""}.</p>
+      </div>}
+      <p className="caption">AI chỉ nhận mã cổ phiếu, năm báo cáo và các đoạn trích từ tài liệu công khai (không gửi danh mục hay số liệu của bạn). Mỗi số phải có nguyên văn ở trang
+        AI ghi, không thì dòng đó bị bỏ. Không có gì được lưu cho đến khi bạn bấm Lưu vào thuyết minh; dự án cần quý hoàn thành dự kiến mới lưu được.</p>
       <h3>Dự án XDCB</h3>
       {data && data.projects.length > 0 ? <table className="fv-table" aria-label={`Dự án XDCB ${symbol}`}>
         <thead><tr><th>Dự án</th><th>Tình trạng</th><th className="num">XDCB bạn ghi (tỷ)</th><th className="num">Tổng vốn dự kiến (tỷ)</th><th>Số của cả công ty</th><th></th></tr></thead>

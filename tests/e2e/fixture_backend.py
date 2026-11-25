@@ -314,4 +314,24 @@ if __name__ == "__main__":
             json.dump({"week": week, "sent_at": f"{week[:8]}{int(week[8:]) + 1:02d}T01:32:00+00:00", "text": text}, f, ensure_ascii=False)
     app = create_app(InternalAuthSettings.from_env(), personal_repository=repository, market=MARKET,
                      jobs=JobStore(os.path.join(data, "jobs.sqlite")), outbox=deliveries, deliveries=deliveries, data_dir=data)
+    # AI soạn nháp Thuyết minh TSCĐ: a canned model answer for notes drafts only (any other task is "no key", as without OpenRouter),
+    # and a synthetic public document instead of a download; nothing reaches the network.
+    from investment_agent.ai.openrouter import AIUnavailable
+
+    class _Done:
+        content = json.dumps({"unit": "tỷ đồng", "projects": [{"name": "Nhà máy mẫu", "cip_text": "120", "due_text": "quý 2 năm 2027", "page": 2}],
+                              "ranges": [], "prepaid": [], "deals": [], "capitalised_interest": None,
+                              "incentives": [{"entity": "Công ty con mẫu", "kind": "rate", "rate_text": "10", "until_text": "2028", "page": 3}]})
+        cost_usd = Decimal("0.004")
+
+    class _Gateway:
+        def complete(self, task, messages, *, job_id, response_format=None):
+            if task != "notes_extract":
+                raise AIUnavailable("key_missing")
+            return _Done()
+    app.state.ai_gateway = _Gateway()
+    app.state.ai_document = lambda url: ["Báo cáo tài chính năm 2025 (số liệu mẫu). Đơn vị tính: tỷ đồng.",
+                                         "Chi phí xây dựng cơ bản dở dang: dự án Nhà máy mẫu 120, dự kiến hoàn thành quý 2 năm 2027.",
+                                         "Thuế thu nhập doanh nghiệp: Công ty con mẫu được hưởng thuế suất ưu đãi 10% đến hết năm 2028."]
+    app.state.ai_resolve = lambda host: ["93.184.216.34"]
     uvicorn.run(app, host="127.0.0.1", port=int(os.environ["E2E_PYTHON_PORT"]), workers=1, access_log=False)

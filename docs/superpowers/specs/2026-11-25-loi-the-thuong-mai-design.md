@@ -17,3 +17,12 @@ dữ liệu công khai, không gọi AI.
 - Nhóm Quy mô và định giá, sau P/B: **P/B loại lợi thế thương mại** = vốn hoá ÷ (vốn chủ công ty mẹ − lợi thế thương mại), quý và năm như P/B.
   Không trừ TSCĐ vô hình: ở Việt Nam chủ yếu là quyền sử dụng đất, tài sản có giá trị thật. Kỳ không có dòng lợi thế thương mại: để trống.
 - Ghi chú "Chưa đồng bộ" cho bản ghi trước phiên bản 10.
+
+## Dấu hiệu "Lợi thế thương mại lớn" (bổ sung 25/11/2026, chủ sở hữu duyệt bước 3, chọn ngưỡng 10%)
+- Chất lượng báo cáo, sau "Chi phí trả trước tăng nhanh hơn doanh thu". Bản ghi cơ bản lấy thêm theo năm: lợi thế thương mại, vốn chủ sở hữu,
+  lợi ích cổ đông không kiểm soát.
+- Bật khi lợi thế thương mại năm gần nhất từ **10% vốn chủ công ty mẹ** (vốn chủ − lợi ích cổ đông không kiểm soát). NVL 2021: 14,6%.
+- Ý nghĩa: phần trả cao hơn tài sản thuần khi mua công ty; nếu thương vụ không như kỳ vọng, khoản này có thể bị xóa sổ và làm giảm vốn chủ.
+  Hiện số hai năm. Nhắc đọc thuyết minh hợp nhất kinh doanh (có thể ghi ở Thương vụ mua bán, sáp nhập).
+- Thiếu dòng hoặc vốn chủ công ty mẹ không dương: không đánh giá được. Lợi thế thương mại bằng 0: không bật.
+- Chỉ hiện trên trang. Hiện chưa mã nào trong 41 mã theo dõi bật.

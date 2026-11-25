@@ -194,3 +194,10 @@ def test_the_record_carries_the_fixed_asset_lines_of_the_construction_signs_owne
     s["years"]["2025"].update({"cip": str(10721 * B), "ppe_net": str(133421 * B), "ppe_gross": str(182309 * B), "depreciation": str(8000 * B)})
     annual = build_record("FPT", s, EVENTS, shares=None, now=NOW)["annual"]["2025"]
     assert (annual["cip"], annual["ppe_net"], annual["ppe_gross"], annual["depreciation"]) == (str(10721 * B), str(133421 * B), str(182309 * B), str(8000 * B))
+
+
+def test_the_record_carries_goodwill_and_equity_for_the_goodwill_sign_owner_25_11_2026():
+    s = statements()
+    s["years"]["2025"].update({"goodwill": str(5104 * B), "minority_equity": str(6000 * B)})
+    annual = build_record("FPT", s, EVENTS, shares=None, now=NOW)["annual"]["2025"]
+    assert (annual["goodwill"], annual["equity"], annual["minority_equity"]) == (str(5104 * B), str(40000 * B), str(6000 * B))

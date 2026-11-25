@@ -43,3 +43,13 @@ def test_the_prepaid_allocation_is_kept_beside_the_projects_and_survives_a_postp
     assert later["prepaid"][0]["total"] == "425"
     kept = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "expected_version": 2, "request_id": "pp-3"}).json()  # an older page sends none
     assert kept["prepaid"][0]["total"] == "425"
+
+
+def test_deals_are_kept_beside_the_other_notes_and_survive_writes_that_leave_them_out(tmp_path):
+    c, clock = client(tmp_path)
+    saved = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "prepaid": {"2021": {"total": "425"}},
+                                       "deals": [{"name": "Công ty B", "date": "2024-03-15", "share": "60", "price": "1000", "net_assets": "1000", "years": "10"}],
+                                       "expected_version": 0, "request_id": "dl-1"}).json()
+    assert saved["deals"][0]["goodwill"] == "400" and saved["deals"][0]["per_year"] == "40"
+    kept = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "prepaid": {}, "expected_version": 1, "request_id": "dl-2"}).json()
+    assert kept["deals"][0]["goodwill"] == "400" and kept["prepaid"] == []  # prepaid sent empty is cleared; deals left out are kept

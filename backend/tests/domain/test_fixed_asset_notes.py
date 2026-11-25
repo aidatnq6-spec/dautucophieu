@@ -86,3 +86,30 @@ def test_the_yearly_allocation_of_prepaid_expenses_gives_the_years_left_at_that_
         with pytest.raises(NoteError) as err:
             validate_prepaid(raw)
         assert err.value.code == code
+
+
+def test_a_deal_gives_its_goodwill_by_the_lesson_s_formula_and_its_yearly_charge_owner_25_11_2026():
+    """Bài lợi thế thương mại: goodwill = price − share × fair value of net assets; positive: an asset amortised over at most 10 years;
+    negative: a bargain purchase, a one-off gain in that year."""
+    from investment_agent.domain.fixed_asset_notes import deals_view, validate_deals
+    kept = validate_deals([{"name": " Công ty B ", "date": "15/03/2024", "share": "60", "price": "1.000", "net_assets": "1000", "years": "10"},
+                           {"name": "Công ty C", "date": "2025-06-30", "share": "100", "price": "300", "net_assets": "-50,5"},
+                           {"name": "Công ty D", "date": "01/01/2025", "share": "51", "price": "100", "net_assets": "400"}])
+    assert {k: kept[0][k] for k in ("name", "date", "share", "price", "net_assets", "years")} == {
+        "name": "Công ty B", "date": "2024-03-15", "share": "60", "price": "1000", "net_assets": "1000", "years": 10}
+    assert [d["name"] for d in kept] == ["Công ty B", "Công ty D", "Công ty C"]  # by the day bought
+    assert kept[2]["net_assets"] == "-50.5" and kept[2]["years"] is None
+    b, d, c = deals_view(kept, today=date(2026, 11, 25))
+    assert b["goodwill"] == "400" and b["kind"] == "goodwill" and b["per_year"] == "40" and b["ends"] == "2034-03-15" and b["charging"] is True
+    assert c["goodwill"] == "350.5" and c["kind"] == "goodwill" and c["per_year"] is None  # no years written: no schedule
+    assert d["goodwill"] == "-104" and d["kind"] == "bargain" and d["gain_year"] == "2025" and d["per_year"] is None
+    for raw, code in (([{"name": "", "date": "2024-01-01", "share": "60", "price": "1", "net_assets": "1"}], "invalid_name"),
+                      ([{"name": "B", "date": "32/01/2024", "share": "60", "price": "1", "net_assets": "1"}], "invalid_date"),
+                      ([{"name": "B", "date": "2024-01-01", "share": "0", "price": "1", "net_assets": "1"}], "invalid_share"),
+                      ([{"name": "B", "date": "2024-01-01", "share": "101", "price": "1", "net_assets": "1"}], "invalid_share"),
+                      ([{"name": "B", "date": "2024-01-01", "share": "60", "price": "", "net_assets": "1"}], "invalid_amount"),
+                      ([{"name": "B", "date": "2024-01-01", "share": "60", "price": "1", "net_assets": "x"}], "invalid_amount"),
+                      ([{"name": "B", "date": "2024-01-01", "share": "60", "price": "1", "net_assets": "1", "years": "11"}], "invalid_years")):
+        with pytest.raises(NoteError) as err:
+            validate_deals(raw)
+        assert err.value.code == code

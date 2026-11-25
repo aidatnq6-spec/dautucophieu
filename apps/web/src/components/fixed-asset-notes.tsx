@@ -9,7 +9,11 @@ type Project = { id: string; name: string; due: string; read_period: string | nu
   state: "upcoming" | "waiting_report" | "due" | "done"; at_read: Figures; at_due: Figures; latest: Figures };
 type Ranges = { period: string | null; groups: Record<string, { from: number; to: number }> };
 type Prepaid = { year: string; items: Record<string, string>; total: string; summed: boolean; prepaid_lt: string | null; years_left: string | null; to_pbt: string | null };
-type Data = { symbol: string; version: number; projects: Project[]; ranges: Ranges; groups: Record<string, string>; prepaid: Prepaid[]; prepaid_kinds: Record<string, string> };
+type Deal = { id: string; name: string; date: string; share: string; price: string; net_assets: string; years: number | null; source_url: string | null; note: string;
+  goodwill: string; kind: "goodwill" | "bargain" | "none"; per_year: string | null; ends: string | null; charging: boolean; gain_year: string | null };
+type Data = { symbol: string; version: number; projects: Project[]; ranges: Ranges; groups: Record<string, string>; prepaid: Prepaid[]; prepaid_kinds: Record<string, string>;
+  deals: Deal[] };
+type DealDraft = { id?: string; name: string; date: string; share: string; price: string; net_assets: string; years: string; source_url: string; note: string };
 type Draft = { id?: string; name: string; due: string; read_period: string; cip_value: string; budget: string; source_url: string; note: string };
 
 const requestId = () => `fan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -36,6 +40,19 @@ export function yearsLeftText(r: Pick<Prepaid, "year" | "years_left">): string {
   return r.years_left === null ? "—" : `≈ ${Number(r.years_left).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} năm nếu giữ nhịp phân bổ năm ${r.year}`;
 }
 
+const num = (v: string) => Number(v).toLocaleString("vi-VN", { maximumFractionDigits: 1 });
+
+/** What the deal's goodwill does to profit: a yearly charge until it ends, or a one-off gain for a bargain purchase. */
+export function dealText(d: Pick<Deal, "kind" | "goodwill" | "per_year" | "ends" | "gain_year">): string {
+  if (d.kind === "bargain") return `Lãi mua rẻ ${num(d.goodwill.replace("-", ""))} tỷ: lợi nhuận một lần năm ${d.gain_year}, loại ra khi so lợi nhuận các năm`;
+  if (d.kind === "none") return "Giá mua bằng phần tài sản thuần: không có lợi thế thương mại";
+  return d.per_year && d.ends ? `Lợi thế thương mại ${num(d.goodwill)} tỷ, phân bổ ${num(d.per_year)} tỷ/năm vào chi phí đến ${day(d.ends)}`
+    : `Lợi thế thương mại ${num(d.goodwill)} tỷ; ghi số năm phân bổ để thấy mức trừ vào lợi nhuận mỗi năm`;
+}
+
+const dealRaw = (d: DealDraft | Deal) => ({ ...(d.id ? { id: d.id } : {}), name: d.name, date: d.date, share: d.share, price: d.price, net_assets: d.net_assets,
+  years: d.years === null ? "" : String(d.years), source_url: d.source_url || null, note: d.note });
+
 const fig = (f: Figures) => (f ? `${periodInput(f.period)}: XDCB ${bn(f.cip)}, nguyên giá ${bn(f.ppe_gross)}` : null);
 
 function toRaw(d: Draft) {
@@ -58,6 +75,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
   const [rangePeriod, setRangePeriod] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [allocation, setAllocation] = useState<{ old?: string; year: string; values: Record<string, string> } | null>(null);
+  const [deal, setDeal] = useState<DealDraft | null>(null);
   const base = `stock/${encodeURIComponent(symbol)}/fixed-asset-notes`;
   useEffect(() => {
     api<Data>(base).then(setData, (e) => {
@@ -72,6 +90,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
       setDraft(null);
       setRanges(null);
       setAllocation(null);
+      setDeal(null);
       setMessage(null);
     } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); }
   }
@@ -81,6 +100,9 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
   const saveProjects = (projects: ReturnType<typeof toRaw>[]) => send(base, "PUT", { projects, ranges: keptRanges() });
   const keptPrepaid = (skip?: string) => Object.fromEntries((data?.prepaid ?? []).filter((r) => r.year !== skip)
     .map((r) => [r.year, { ...r.items, ...(r.summed ? {} : { total: r.total }) }]));
+  const otherDeals = (id?: string) => (data?.deals ?? []).filter((d) => d.id !== id).map(dealRaw);
+  const saveDeals = (deals: ReturnType<typeof dealRaw>[]) => send(base, "PUT", { projects: others(), ranges: keptRanges(), deals });
+  const charging = (data?.deals ?? []).filter((d) => d.charging && d.per_year).reduce((s, d) => s + Number(d.per_year), 0);
   const savePrepaid = (prepaid: Record<string, Record<string, string>>) => send(base, "PUT", { projects: others(), ranges: keptRanges(), prepaid });
   function later(p: Project) {
     const to = window.prompt(`Quý hoàn thành mới cho ${p.name} (dạng Q2/2027):`);
@@ -183,6 +205,44 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
       </form>}
       <p className="caption">Số năm phân bổ còn lại = chi phí trả trước dài hạn cuối năm (báo cáo đã lưu) ÷ tổng phân bổ năm đó, chỉ đúng nếu doanh nghiệp giữ nhịp phân bổ
         như năm đó. Phần phân bổ là chi phí ghi vào lợi nhuận mà không tốn thêm tiền (tiền đã chi từ trước). Không ghi tổng thì phần mềm cộng các loại bạn đã nhập.</p>
+      <h3>Thương vụ mua bán, sáp nhập</h3>
+      {data && data.deals.length > 0 ? <>
+        <table className="fv-table" aria-label={`Thương vụ mua bán ${symbol}`}>
+          <thead><tr><th>Công ty được mua</th><th>Ngày mua</th><th className="num">Tỷ lệ mua</th><th className="num">Giá mua (tỷ)</th><th className="num">Tài sản thuần hợp lý (tỷ)</th>
+            <th>Lợi thế thương mại</th><th></th></tr></thead>
+          <tbody>{data.deals.map((d) => <tr key={d.id} data-testid="fan-deal">
+            <td data-label="Công ty được mua">{d.source_url ? <a href={d.source_url} target="_blank" rel="noreferrer noopener">{d.name}</a> : d.name}
+              {d.note && <div className="caption">{d.note}</div>}</td>
+            <td data-label="Ngày mua">{day(d.date)}</td>
+            <td className="num" data-label="Tỷ lệ mua">{num(d.share)}%</td>
+            <td className="num" data-label="Giá mua">{num(d.price)}</td>
+            <td className="num" data-label="Tài sản thuần hợp lý">{num(d.net_assets)}</td>
+            <td data-label="Lợi thế thương mại" className={d.kind === "bargain" ? "negative" : ""}>{dealText(d)}</td>
+            <td className="actions">
+              <button type="button" className="btn" aria-label={`Sửa thương vụ ${d.name}`} onClick={() => setDeal({ ...dealRaw(d), date: day(d.date), source_url: d.source_url ?? "" })}>
+                <Pencil size={14} aria-hidden="true" />Sửa</button>
+              <button type="button" className="btn" aria-label={`Xóa thương vụ ${d.name}`} onClick={() => { if (window.confirm(`Xóa thương vụ ${d.name}?`)) void saveDeals(otherDeals(d.id)); }}>
+                <Trash2 size={14} aria-hidden="true" />Xóa</button></td>
+          </tr>)}</tbody>
+        </table>
+        {charging > 0 && <p className="caption" data-testid="fan-charging">Các thương vụ đang phân bổ trừ vào lợi nhuận khoảng {num(String(charging))} tỷ mỗi năm (theo số năm bạn ghi).</p>}
+      </> : data && <p className="muted">Chưa ghi thương vụ nào. Lấy từ thuyết minh hợp nhất kinh doanh (mua công ty con) của báo cáo tài chính.</p>}
+      {data && !deal && <button type="button" className="btn" onClick={() => setDeal({ name: "", date: "", share: "", price: "", net_assets: "", years: "", source_url: "", note: "" })}>
+        <Plus size={15} aria-hidden="true" />Thêm thương vụ</button>}
+      {data && deal && <form className="pp-form" aria-label="Thương vụ mua bán" onSubmit={(e) => { e.preventDefault(); void saveDeals([...otherDeals(deal.id), dealRaw(deal)]); }}>
+        <label className="field">Công ty được mua<input value={deal.name} maxLength={120} required onChange={(e) => setDeal({ ...deal, name: e.target.value })} /></label>
+        <label className="field">Ngày mua<input value={deal.date} placeholder="15/03/2024" required onChange={(e) => setDeal({ ...deal, date: e.target.value })} /></label>
+        <label className="field">Tỷ lệ mua (%)<input inputMode="decimal" value={deal.share} required onChange={(e) => setDeal({ ...deal, share: e.target.value })} /></label>
+        <label className="field">Giá mua (tỷ đồng)<input inputMode="decimal" value={deal.price} required onChange={(e) => setDeal({ ...deal, price: e.target.value })} /></label>
+        <label className="field">Giá trị hợp lý tài sản thuần của công ty được mua (tỷ đồng, cả công ty)<input inputMode="decimal" value={deal.net_assets} required
+          onChange={(e) => setDeal({ ...deal, net_assets: e.target.value })} /></label>
+        <label className="field">Số năm phân bổ (tối đa 10)<input inputMode="numeric" value={deal.years} onChange={(e) => setDeal({ ...deal, years: e.target.value })} /></label>
+        <label className="field">Link tài liệu nguồn<input type="url" value={deal.source_url} onChange={(e) => setDeal({ ...deal, source_url: e.target.value })} placeholder="https://…" /></label>
+        <label className="field">Ghi chú<input value={deal.note} maxLength={500} onChange={(e) => setDeal({ ...deal, note: e.target.value })} /></label>
+        <div className="row"><button className="btn primary" type="submit">Lưu thương vụ</button><button className="btn" type="button" onClick={() => setDeal(null)}>Hủy</button></div>
+      </form>}
+      <p className="caption">Lợi thế thương mại = giá mua − tỷ lệ mua × giá trị hợp lý tài sản thuần của công ty được mua. Dương: ghi thành tài sản, phân bổ đều vào chi phí trong số năm
+        bạn ghi (VAS tối đa 10 năm). Âm: giao dịch mua rẻ, ghi ngay vào lợi nhuận năm mua, là lợi nhuận một lần. Số do bạn nhập từ thuyết minh; phần mềm chỉ tính theo công thức.</p>
       <p className="caption">Bạn tự đọc thuyết minh báo cáo tài chính và nhập; VNDirect không có nội dung thuyết minh. XDCB và nguyên giá ở cột &quot;Số của cả công ty&quot; là số dư
         của cả doanh nghiệp từ báo cáo đã lưu, báo cáo không tách theo dự án, nên phần mềm không tự kết luận dự án đã xong. Khi báo cáo của quý hoàn thành dự kiến về, Việc cần
         xem có một dòng nhắc (không gửi Telegram) đến khi bạn bấm Đã hoàn thành hoặc Lùi hạn. Khung khấu hao chỉ để đọc lại. Không phải khuyến nghị.</p>

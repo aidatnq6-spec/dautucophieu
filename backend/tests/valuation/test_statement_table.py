@@ -276,7 +276,7 @@ def test_the_fixed_assets_group_gives_balances_wear_pipeline_reinvestment_and_tu
     years = {"2024": q(1000, 84, **fixed(400, 600, 100)), "2025": q(2000, 164, **fixed(600, 1000, 150), capex=-120, depreciation=80)}
     quarters = {p: q(100, 10, **fixed(400, 600, 100)) for p in ("2024-Q4", "2025-Q1", "2025-Q2", "2025-Q3")}
     quarters["2025-Q4"] = q(100, 10, **fixed(600, 1000, 150))
-    t = statement_table({**RECORD, "years": years, "quarters": quarters, "lines_version": 8}, closes=CLOSES, vnstock=None)
+    t = statement_table({**RECORD, "years": years, "quarters": quarters, "lines_version": 9}, closes=CLOSES, vnstock=None)
     keys = [r["key"] for r in t["years"]["rows"]]
     assert keys.index("fcff") < keys.index("ppe_net") < keys.index("market_cap")  # after Dòng tiền, before Quy mô và định giá
     r, i = rows(t, "years"), t["years"]["periods"].index("2025")
@@ -305,3 +305,21 @@ def test_fixed_asset_ratios_stay_blank_without_their_parts_and_balances_that_do_
     assert any(c["period"] == "2025" and c["check"] == "ppe_net" for c in t["checks"])  # 600 ≠ 1000 − 300
     assert t["finance_lease"] == ["2025"]
     assert t["fixed_assets_pending"] is True  # a record kept before the lines came
+
+
+def test_the_prepaid_group_gives_both_parts_their_total_and_its_weight_against_assets_and_profit_owner_25_11_2026():
+    years = {"2025": q(2000, 164, prepaid_st=30, prepaid_lt=170, prepaid_change=-50, total_assets=4000)}
+    quarters = {p: q(100, 10, prepaid_st=30, prepaid_lt=170, total_assets=4000) for p in ("2025-Q1", "2025-Q2", "2025-Q3", "2025-Q4")}
+    t = statement_table({**RECORD, "years": years, "quarters": quarters, "lines_version": 9}, closes=CLOSES, vnstock=None)
+    keys = [r["key"] for r in t["years"]["rows"]]
+    assert keys.index("ppe_turnover") < keys.index("prepaid_st") < keys.index("market_cap")  # after Tài sản cố định
+    r = rows(t, "years")
+    assert r["prepaid_st"][0] == "30000000000" and r["prepaid_lt"][0] == "170000000000" and r["prepaid_total"][0] == "200000000000"
+    assert r["prepaid_to_assets"][0] == "0.0500"  # 200 / 4000
+    assert r["prepaid_to_pbt"][0] == "0.98"  # 200 / (164 × 1.25)
+    assert r["prepaid_change"][0] == "-50000000000"
+    rq = rows(t, "quarters")
+    assert rq["prepaid_to_pbt"][-1] == "4.00"  # 200 / four quarters of 12.5
+    assert {x["key"]: x["label"] for x in t["quarters"]["rows"]}["prepaid_to_pbt"].endswith("(4 quý)")
+    assert t["fixed_assets_pending"] is False
+    assert statement_table({**RECORD, "lines_version": 8}, closes=CLOSES, vnstock=None)["fixed_assets_pending"] is True

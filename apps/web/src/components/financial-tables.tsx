@@ -71,7 +71,7 @@ export function lastN<T>(periods: T[], n: number): number[] {
 /** Notes under the fixed-asset group: lines not synced yet, and periods with a finance lease (no line of its own). */
 export function fixedNotes(d: { fixed_assets_pending?: boolean; finance_lease?: string[] }): string[] {
   const out: string[] = [];
-  if (d.fixed_assets_pending) out.push("Chưa đồng bộ dòng tài sản cố định: nhóm Tài sản cố định để trống đến lượt 20:00 lấy lại lịch sử của mã này.");
+  if (d.fixed_assets_pending) out.push("Chưa đồng bộ dòng tài sản cố định và chi phí trả trước: hai nhóm này để trống đến lượt 20:00 lấy lại lịch sử của mã này.");
   if (d.finance_lease?.length) out.push(`Có TSCĐ thuê tài chính (không có dòng riêng) ở ${d.finance_lease.map(periodLabel).join(", ")}.`);
   return out;
 }
@@ -241,6 +241,8 @@ export function FinancialTables({ symbol }: { symbol: string }) {
         chuyển sang nguyên giá và khấu hao sẽ tăng. Capex ÷ khấu hao lớn hơn 1: đang đầu tư nhiều hơn phần hao mòn. Vòng quay TSCĐ hữu hình =
         doanh thu thuần ÷ TSCĐ hữu hình còn lại bình quân đầu và cuối kỳ. Quý: hai tỷ lệ sau tính trên 4 quý tới quý đó. VNDirect chỉ có số dư,
         không có số phát sinh tăng, giảm của thuyết minh, nên phần mềm không tính số kết chuyển.
+        Chi phí trả trước: chi phí đã trả tiền nhưng ghi thành tài sản, phân bổ dần vào chi phí các kỳ sau (không tốn thêm tiền khi phân bổ); ÷ LNTT là LNTT
+        của kỳ (quý: 4 quý). Tăng, giảm chi phí trả trước lấy từ lưu chuyển tiền tệ, chỉ phần vận hành, nên có thể khác chênh lệch số dư. VNDirect không có số phân bổ trong năm.
       </p>}
     </div>
   );

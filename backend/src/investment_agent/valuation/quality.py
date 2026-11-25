@@ -21,6 +21,7 @@ OTHER_RECEIVABLES_SHARE, OTHER_RECEIVABLES_FLOOR = Decimal("0.10"), Decimal("0.0
 # Construction in progress (owner, 25/11/2026): growing CIP_YEARS years running to CIP_SHARE of net tangible assets; moved into fixed assets
 # when it falls by CIP_DROP from a year it was CIP_MATERIAL of them and the cost of tangible assets rose by at least CIP_COST_SHARE of the fall
 CIP_YEARS, CIP_SHARE = 3, Decimal("0.20")
+PREPAID_GAP, PREPAID_MATERIAL = Decimal("0.20"), Decimal("0.10")  # growth above revenue's, in share points; the increase against profit before tax
 CIP_DROP, CIP_MATERIAL, CIP_COST_SHARE = Decimal("0.50"), Decimal("0.10"), Decimal("0.50")
 BN = Decimal(1_000_000_000)
 # Sector context shown with the signs, where a sign is usual for the business rather than a warning by itself.
@@ -248,7 +249,30 @@ def _signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:
         signs.append({"id": "prepay_suppliers", "label": label, "flag": None,
                       "detail": f"Thiếu trả trước cho người bán hoặc tổng tài sản năm {y} (có sau lần cập nhật báo cáo tới)"})
     signs += _cip_signs(a, y)
+    signs.append(_prepaid_sign(cur, prev, y))
     return signs
+
+
+def _prepaid_sign(cur: dict, prev: dict, y: int) -> dict:
+    """Prepaid expenses (short + long term) growing faster than revenue by a material amount: costs paid and kept as an asset, to be
+    expensed in later years; the notes say what went in and over how many years."""
+    label, keys = "Chi phí trả trước tăng nhanh hơn doanh thu", ("prepaid_st", "prepaid_lt", "revenue")
+    if not (all(k in cur for k in keys + ("pbt",)) and all(k in prev for k in keys)) or prev["prepaid_st"] + prev["prepaid_lt"] <= 0 or prev["revenue"] <= 0:
+        return {"id": "prepaid_outpace_revenue", "label": label, "flag": None,
+                "detail": f"Thiếu chi phí trả trước, doanh thu hoặc lợi nhuận trước thuế năm {y - 1}–{y}, hoặc năm {y - 1} không có chi phí trả trước "
+                          "(có sau lần cập nhật báo cáo tới)"}
+    now, before, pbt = cur["prepaid_st"] + cur["prepaid_lt"], prev["prepaid_st"] + prev["prepaid_lt"], cur["pbt"]
+    growth, revenue = now / before - 1, cur["revenue"] / prev["revenue"] - 1
+    rise = now - before
+    material = pbt <= 0 or rise >= PREPAID_MATERIAL * pbt
+    sign_ = lambda x: "+" if x >= 0 else ""  # noqa: E731
+    weight = f"bằng {_pct(rise / pbt)} lợi nhuận trước thuế {_bn(pbt)}" if pbt > 0 else f"doanh nghiệp lỗ trước thuế {_bn(pbt)}"
+    return {"id": "prepaid_outpace_revenue", "label": label, "flag": growth - revenue >= PREPAID_GAP and rise > 0 and material,
+            "rule": f"tổng chi phí trả trước (ngắn và dài hạn) tăng nhanh hơn doanh thu từ {_num(PREPAID_GAP * 100, 0)} điểm % trở lên và phần tăng thêm từ "
+                    f"{_num(PREPAID_MATERIAL * 100, 0)}% lợi nhuận trước thuế (lỗ thì chỉ cần tăng nhanh hơn): chi phí đã trả được giữ ở tài sản, sẽ phân bổ "
+                    "vào các năm sau; đọc thuyết minh xem khoản gì và phân bổ bao nhiêu năm",
+            "detail": f"Năm {y}: chi phí trả trước {_bn(now)} (ngắn hạn {_bn(cur['prepaid_st'])}, dài hạn {_bn(cur['prepaid_lt'])}), {sign_(growth)}{_pct(growth)} "
+                      f"so với {_bn(before)} năm {y - 1}; doanh thu {sign_(revenue)}{_pct(revenue)}; phần tăng thêm {_bn(rise)} {weight}"}
 
 
 def _cip_signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:

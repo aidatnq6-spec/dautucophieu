@@ -30,7 +30,8 @@ ANNUAL = {"revenue": "revenue", "gross_profit": "gross_profit", "selling": "sell
           "prepay_suppliers": "prepay_suppliers", "st_loans_receivable": "st_loans_receivable", "lt_loans_receivable": "lt_loans_receivable",
           "interest_received": "interest_received",
           # XDCB dở dang phình kéo dài, vừa kết chuyển (25/11/2026): construction in progress, net and gross tangible assets, depreciation
-          "cip": "cip", "ppe_net": "ppe_net", "ppe_gross": "ppe_gross", "depreciation": "depreciation"}
+          "cip": "cip", "ppe_net": "ppe_net", "ppe_gross": "ppe_gross", "depreciation": "depreciation",
+          "prepaid_st": "prepaid_st", "prepaid_lt": "prepaid_lt"}  # Chi phí trả trước tăng nhanh hơn doanh thu (25/11/2026)
 COSTS = ("selling", "admin")  # VNDirect: positive; Vnstock (and Chất lượng báo cáo): negative
 BONUS, RAISE = ("STOCKDIV", "KINDDIV"), ("ISSUE",)
 

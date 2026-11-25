@@ -6,7 +6,7 @@ progress and cost of tangible assets are shown beside it, for the owner to judge
 import re
 import uuid
 from datetime import date
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from investment_agent.domain.property_projects import ProjectError, _amount
 
@@ -181,4 +181,79 @@ def prepaid_view(prepaid: dict[str, dict[str, str]], statements: dict) -> list[d
         out.append({"year": year, "items": kinds, "total": format(total.normalize(), "f"), "summed": summed, "prepaid_lt": lt,
                     "years_left": str((Decimal(lt) / per_year).quantize(Decimal("0.1"), ROUND_HALF_UP)) if lt is not None and per_year > 0 else None,
                     "to_pbt": str((per_year / Decimal(pbt)).quantize(Decimal("0.0001"), ROUND_HALF_UP)) if pbt is not None and Decimal(pbt) > 0 else None})
+    return out
+
+
+# Thương vụ mua bán, sáp nhập (25/11/2026), from the notes on business combinations, which VNDirect does not carry. Goodwill by the
+# lesson's formula: price − share × fair value of the net assets bought; positive, an asset amortised straight-line over the years the
+# owner writes (VAS: at most 10); negative, a bargain purchase booked as a one-off gain in the year of the deal.
+MAX_DEALS, MAX_YEARS = 20, 10
+_DMY = re.compile(r"^(\d{1,2})/(\d{1,2})/(20\d{2})$")
+
+
+def _signed(raw, *, required: bool = True) -> str:
+    text = str(raw or "").strip()
+    negative = text.startswith(("-", "−"))
+    value = _money(text[1:] if negative else text)
+    if value is None:
+        if required:
+            raise NoteError("invalid_amount", "Nhập số tỷ đồng.")
+        return None
+    return format((-Decimal(value) if negative else Decimal(value)).normalize(), "f")
+
+
+def _day(raw) -> str:
+    text = str(raw or "").strip()
+    m = _DMY.fullmatch(text)
+    try:
+        return (date(int(m.group(3)), int(m.group(2)), int(m.group(1))) if m else date.fromisoformat(text)).isoformat()
+    except (TypeError, ValueError):
+        raise NoteError("invalid_date", "Ngày mua dạng 15/03/2024.") from None
+
+
+def validate_deals(raw: list) -> list[dict]:
+    if len(raw) > MAX_DEALS:
+        raise NoteError("too_many", f"Tối đa {MAX_DEALS} thương vụ mỗi mã.")
+    out = []
+    for d in raw:
+        name = str(d.get("name") or "").strip()
+        if not name or len(name) > 120:
+            raise NoteError("invalid_name", "Tên công ty được mua từ 1 đến 120 ký tự.")
+        day = _day(d.get("date"))
+        try:
+            share = Decimal(str(d.get("share") or "").strip().replace(",", "."))
+        except InvalidOperation:
+            share = Decimal(-1)
+        if not share.is_finite() or not 0 < share <= 100:
+            raise NoteError("invalid_share", "Tỷ lệ mua từ trên 0 đến 100%.")
+        years_raw = str(d.get("years") or "").strip()
+        try:
+            years = int(years_raw) if years_raw else None
+        except ValueError:
+            years = 0
+        if years is not None and not 1 <= years <= MAX_YEARS:
+            raise NoteError("invalid_years", f"Số năm phân bổ từ 1 đến {MAX_YEARS} (VAS).")
+        url = str(d.get("source_url") or "").strip()
+        if url and not re.fullmatch(r"https?://\S{3,500}", url):
+            raise NoteError("invalid_source", "Link nguồn phải bắt đầu bằng http:// hoặc https://.")
+        out.append({"id": str(d.get("id") or uuid.uuid4().hex[:12])[:32], "name": name, "date": day, "share": format(share.normalize(), "f"),
+                    "price": _signed(d.get("price")), "net_assets": _signed(d.get("net_assets")), "years": years, "source_url": url or None,
+                    "note": str(d.get("note") or "").strip()[:500]})
+    return sorted(out, key=lambda d: d["date"])
+
+
+def deals_view(deals: list[dict], *, today: date) -> list[dict]:
+    """Each deal with its goodwill (tỷ), kind (goodwill or bargain), yearly charge and end of the schedule when the years are written,
+    whether it still charges profit today, and for a bargain the year of its one-off gain."""
+    out = []
+    for d in deals:
+        goodwill = Decimal(d["price"]) - Decimal(d["share"]) / 100 * Decimal(d["net_assets"])
+        bought = date.fromisoformat(d["date"])
+        row = {**d, "goodwill": format(goodwill.normalize(), "f") if goodwill else "0", "kind": "goodwill" if goodwill > 0 else "bargain" if goodwill < 0 else "none",
+               "per_year": None, "ends": None, "charging": False, "gain_year": str(bought.year) if goodwill < 0 else None}
+        if goodwill > 0 and d["years"]:
+            ends = bought.replace(year=bought.year + d["years"]) if not (bought.month == 2 and bought.day == 29) else date(bought.year + d["years"], 2, 28)
+            row |= {"per_year": format((goodwill / d["years"]).quantize(Decimal("0.1"), ROUND_HALF_UP).normalize(), "f"), "ends": ends.isoformat(),
+                    "charging": bought <= today < ends}
+        out.append(row)
     return out

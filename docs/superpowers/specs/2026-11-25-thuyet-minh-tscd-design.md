@@ -51,3 +51,12 @@ là số của cả công ty; báo cáo không tách theo dự án".
 - **Số năm phân bổ còn lại** = chi phí trả trước dài hạn cuối năm đó (báo cáo đã lưu, dòng 12610) ÷ tổng phân bổ năm đó, một chữ số thập phân,
   ghi "nếu giữ nhịp phân bổ năm đó" (HPG 2021: 3.171 ÷ 425 ≈ 7,5). **Phân bổ ÷ LNTT** năm đó. Thiếu số dư, LNTT hoặc LNTT không dương: để trống.
 - Lùi hạn, hoàn thành dự án và lưu bảng dự án từ trang cũ (không gửi `prepaid`) giữ nguyên số phân bổ đã lưu.
+
+## Thương vụ mua bán, sáp nhập (bổ sung 25/11/2026, chủ sở hữu duyệt bước 2 của đề xuất lợi thế thương mại)
+- Cùng bản ghi, khóa `deals` (tối đa 20, xếp theo ngày mua), từ thuyết minh hợp nhất kinh doanh: công ty được mua (bắt buộc), ngày mua
+  (15/03/2024), tỷ lệ mua (trên 0 đến 100%), giá mua và giá trị hợp lý tài sản thuần của cả công ty được mua (tỷ đồng, tài sản thuần có thể âm),
+  số năm phân bổ (tùy chọn, 1–10 theo VAS), link nguồn, ghi chú.
+- **Lợi thế thương mại = giá mua − tỷ lệ × giá trị hợp lý tài sản thuần** (công thức của bài). Dương: phân bổ đều = lợi thế thương mại ÷ số năm,
+  hết vào ngày mua + số năm; không ghi số năm thì không có lịch. Âm: **lãi mua rẻ**, lợi nhuận một lần năm mua, cần loại ra khi so lợi nhuận.
+- Dưới bảng: tổng mức phân bổ mỗi năm của các thương vụ đang phân bổ hôm nay (theo số năm chủ sở hữu ghi).
+- Ghi phần khác không gửi `deals` thì giữ nguyên thương vụ đã lưu.

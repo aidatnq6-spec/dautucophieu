@@ -215,3 +215,10 @@ def test_the_record_carries_the_equity_lines_of_the_two_equity_signs_owner_25_11
     annual = build_record("FPT", s, EVENTS, shares=None, now=NOW)["annual"]["2025"]
     assert (annual["charter_capital"], annual["retained"], annual["issue_cash"], annual["buyback_cash"], annual["dividends_paid"]) == (
         str(9274 * B), str(-4467 * B), "0", "0", str(-5 * B))
+
+
+def test_the_record_carries_the_tax_lines_of_the_tax_rate_sign_owner_25_11_2026():
+    s = statements()
+    s["years"]["2025"].update({"tax": str(2536 * B), "tax_current": str(2855 * B), "tax_deferred": str(-319 * B)})
+    annual = build_record("FPT", s, EVENTS, shares=None, now=NOW)["annual"]["2025"]
+    assert (annual["tax"], annual["tax_current"], annual["tax_deferred"]) == (str(2536 * B), str(2855 * B), str(-319 * B))

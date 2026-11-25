@@ -20,3 +20,10 @@ nhắc Telegram cho mã đang giữ. Chỉ bắt các lần sửa từ nay, tron
 - Bật khi biên gộp năm gần nhất lệch (cao hơn hoặc thấp hơn) trung bình biên gộp 4 năm liền trước từ **10 điểm %**. Hiện biên gộp 5 năm. Nhắc
   đọc thuyết minh giá vốn: giá nguyên liệu, thay đổi cơ cấu mảng, điều chỉnh hồi tố (HAG 2019: −19,2 điểm).
 - Thiếu một năm hoặc doanh thu không dương: không đánh giá được. Thử 42 mã: 3 mã bật. Chỉ hiện trên trang.
+
+## 4. Doanh thu, giá vốn theo mảng nhập tay (bổ sung 25/11/2026, chủ sở hữu duyệt bước 4)
+- Khối Thuyết minh TSCĐ (nhập tay), khóa `segments`: kỳ (năm hoặc quý, tối đa 15 kỳ) → các mảng (tối đa 12): tên, doanh thu, giá vốn (tỷ đồng),
+  theo thuyết minh doanh thu và giá vốn hàng bán (HPG 2021: thuyết minh 31, 32).
+- Phần mềm tính lãi gộp, biên gộp từng mảng, **% đóng góp vào tổng lãi gộp** (chỉ khi tổng lãi gộp dương; mảng lỗ gộp có tỷ trọng âm), tổng và
+  biên gộp chung; đối chiếu tổng với doanh thu thuần và giá vốn của báo cáo đã lưu cùng kỳ (thuyết minh thường ghi doanh thu trước giảm trừ, nên
+  lệch dương ở doanh thu được ghi chú "có thể chưa trừ các khoản giảm trừ"). Ghi phần khác không gửi `segments` thì giữ nguyên.

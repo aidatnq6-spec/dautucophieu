@@ -16,7 +16,11 @@ type Move = { year: string; opening: string; added: string; amortised: string | 
 type Bargain = { year: string; gain: string; deals: string[]; pbt: string | null; share: string | null; pbt_without: string | null; flag: boolean | null };
 type Data = { symbol: string; version: number; projects: Project[]; ranges: Ranges; groups: Record<string, string>; prepaid: Prepaid[]; prepaid_kinds: Record<string, string>;
   deals: Deal[]; goodwill_amort: Record<string, string>; goodwill_moves: Move[]; bargains: Bargain[];
-  loans: Loan[]; debt_notes: { period?: string; current_portion?: string; fx_shock?: string }; debt: Debt; currencies: string[]; terms: Record<string, string> };
+  loans: Loan[]; debt_notes: { period?: string; current_portion?: string; fx_shock?: string }; debt: Debt; currencies: string[]; terms: Record<string, string>;
+  segments: SegmentPeriod[] };
+type SegmentRow = { name: string; revenue: string; cogs: string; gross: string; margin: string | null; share: string | null };
+type SegmentPeriod = { period: string; rows: SegmentRow[]; revenue: string; cogs: string; gross: string; margin: string | null; reported_revenue: string | null;
+  reported_cogs: string | null; revenue_gap: string | null; cogs_gap: string | null };
 type Loan = { id: string; lender: string; currency: string; term: "short" | "long"; balance: string; rate_from: string | null; rate_to: string | null; base: string | null;
   margin: string | null; maturity: string | null; collateral: string; note: string };
 type Debt = { period: string | null; total: string; by_currency: Record<string, string>; by_term: Record<string, string>; maturities: Record<string, string>;
@@ -101,6 +105,14 @@ const rateText = (l: Pick<Loan, "rate_from" | "rate_to" | "base" | "margin">) =>
   return [fixed, floating].filter(Boolean).join("; ") || "—";
 };
 
+/** The segments' totals against the stored net revenue and cost of sales of the period. */
+export function segmentCheckText(v: Pick<SegmentPeriod, "period" | "revenue" | "cogs" | "reported_revenue" | "reported_cogs" | "revenue_gap" | "cogs_gap">): string {
+  if (v.revenue_gap === null || v.cogs_gap === null) return "Chưa có số của kỳ này trong báo cáo đã lưu để đối chiếu";
+  if (Number(v.revenue_gap) === 0 && Number(v.cogs_gap) === 0) return `Tổng các mảng khớp doanh thu thuần và giá vốn của báo cáo ${periodInput(v.period)}`;
+  const plus = (x: string) => (Number(x) > 0 ? `+${num(x)}` : signed(x));
+  return `Tổng các mảng lệch báo cáo ${periodInput(v.period)}: doanh thu ${plus(v.revenue_gap)} tỷ${Number(v.revenue_gap) > 0 ? " (có thể chưa trừ các khoản giảm trừ)" : ""}, giá vốn ${plus(v.cogs_gap)} tỷ`;
+}
+
 const loanRaw = (l: LoanDraft | Loan) => ({ ...(l.id ? { id: l.id } : {}), lender: l.lender, currency: l.currency, term: l.term, balance: l.balance,
   rate_from: l.rate_from ?? "", rate_to: l.rate_to ?? "", base: l.base ?? "", margin: l.margin ?? "", maturity: l.maturity ?? "", collateral: l.collateral, note: l.note });
 const loanDraft = (l: Loan): LoanDraft => ({ id: l.id, lender: l.lender, currency: l.currency, term: l.term, balance: l.balance, rate_from: l.rate_from ?? "",
@@ -134,6 +146,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
   const [deal, setDeal] = useState<DealDraft | null>(null);
   const [loan, setLoan] = useState<LoanDraft | null>(null);
   const [debtNotes, setDebtNotes] = useState<{ period: string; current_portion: string; fx_shock: string } | null>(null);
+  const [segment, setSegment] = useState<{ old?: string; period: string; rows: { name: string; revenue: string; cogs: string }[] } | null>(null);
   const base = `stock/${encodeURIComponent(symbol)}/fixed-asset-notes`;
   useEffect(() => {
     api<Data>(base).then(setData, (e) => {
@@ -151,6 +164,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
       setDeal(null);
       setLoan(null);
       setDebtNotes(null);
+      setSegment(null);
       setMessage(null);
     } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); }
   }
@@ -166,6 +180,10 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
   const savePrepaid = (prepaid: Record<string, Record<string, string>>) => send(base, "PUT", { projects: others(), ranges: keptRanges(), prepaid });
   const otherLoans = (id?: string) => (data?.loans ?? []).filter((l) => l.id !== id).map(loanRaw);
   const saveLoans = (loans: ReturnType<typeof loanRaw>[]) => send(base, "PUT", { projects: others(), ranges: keptRanges(), loans });
+  const keptSegments = (skip?: string) => Object.fromEntries((data?.segments ?? []).filter((s) => s.period !== skip)
+    .map((s) => [periodInput(s.period), s.rows.map((r) => ({ name: r.name, revenue: r.revenue, cogs: r.cogs }))]));
+  const saveSegments = (segments: Record<string, { name: string; revenue: string; cogs: string }[]>) =>
+    send(base, "PUT", { projects: others(), ranges: keptRanges(), segments });
   function amortise(year: string, current: string | null) {
     const value = window.prompt(`Phân bổ lợi thế thương mại năm ${year} theo thuyết minh (tỷ đồng; để trống để xóa):`, current ?? "");
     if (value === null || !data) return;
@@ -376,6 +394,45 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
       </form>}
       <p className="caption">Ghi các khoản vay từ thuyết minh (ngân hàng, loại tiền, kỳ hạn, lãi suất, đáo hạn, tài sản đảm bảo); VNDirect chỉ có tổng vay ngắn hạn và dài hạn. Lãi suất hiện
         theo khoảng, không lấy trung bình. Kịch bản tỷ giá là mức mất giá bạn tự giả định, không phải dự báo; lỗ tỷ giá thực tế còn tùy cách doanh nghiệp phòng ngừa.</p>
+      <h3>Doanh thu, giá vốn theo mảng</h3>
+      {data && data.segments.length > 0 ? data.segments.map((s) => <div key={s.period} data-testid="fan-segments">
+        <table className="fv-table" aria-label={`Doanh thu theo mảng ${symbol} ${periodInput(s.period)}`}>
+          <caption>{periodInput(s.period)}</caption>
+          <thead><tr><th>Mảng</th><th className="num">Doanh thu (tỷ)</th><th className="num">Giá vốn (tỷ)</th><th className="num">Lãi gộp (tỷ)</th><th className="num">Biên gộp</th>
+            <th className="num">Đóng góp lãi gộp</th></tr></thead>
+          <tbody>{s.rows.map((r) => <tr key={r.name}><td data-label="Mảng">{r.name}</td><td className="num" data-label="Doanh thu">{num(r.revenue)}</td>
+            <td className="num" data-label="Giá vốn">{num(r.cogs)}</td><td className={`num${Number(r.gross) < 0 ? " negative" : ""}`} data-label="Lãi gộp">{signed(r.gross)}</td>
+            <td className="num" data-label="Biên gộp">{r.margin === null ? "—" : pct(r.margin)}</td>
+            <td className="num" data-label="Đóng góp lãi gộp">{r.share === null ? "—" : pct(r.share)}</td></tr>)}
+            <tr><td><strong>Tổng</strong></td><td className="num">{num(s.revenue)}</td><td className="num">{num(s.cogs)}</td><td className="num">{signed(s.gross)}</td>
+              <td className="num">{s.margin === null ? "—" : pct(s.margin)}</td><td className="num">100,0%</td></tr></tbody>
+        </table>
+        <p className="caption">{segmentCheckText(s)}</p>
+        <div className="row">
+          <button type="button" className="btn" aria-label={`Sửa mảng ${periodInput(s.period)}`} onClick={() => setSegment({ old: periodInput(s.period), period: periodInput(s.period),
+            rows: s.rows.map((r) => ({ name: r.name, revenue: r.revenue, cogs: r.cogs })) })}><Pencil size={14} aria-hidden="true" />Sửa</button>
+          <button type="button" className="btn" aria-label={`Xóa mảng ${periodInput(s.period)}`} onClick={() => {
+            if (window.confirm(`Xóa các mảng kỳ ${periodInput(s.period)}?`)) void saveSegments(keptSegments(s.period)); }}><Trash2 size={14} aria-hidden="true" />Xóa</button>
+        </div>
+      </div>) : data && <p className="muted">Chưa ghi mảng nào. Lấy từ thuyết minh doanh thu và giá vốn hàng bán của báo cáo tài chính.</p>}
+      {data && !segment && <button type="button" className="btn" onClick={() => setSegment({ period: String(new Date().getFullYear() - 1),
+        rows: [{ name: "", revenue: "", cogs: "" }] })}><Plus size={15} aria-hidden="true" />Thêm kỳ theo mảng</button>}
+      {data && segment && <form className="pp-form" aria-label="Doanh thu theo mảng" onSubmit={(e) => {
+        e.preventDefault();
+        const rows = segment.rows.filter((r) => r.name.trim() || r.revenue.trim() || r.cogs.trim());
+        void saveSegments({ ...Object.fromEntries(Object.entries(keptSegments()).filter(([p]) => p !== segment.old)), [segment.period.trim()]: rows });
+      }}>
+        <label className="field">Kỳ báo cáo<input value={segment.period} placeholder="2021 hoặc Q2/2026" required onChange={(e) => setSegment({ ...segment, period: e.target.value })} /></label>
+        {segment.rows.map((r, i) => <div key={i} className="row">
+          <label className="field">Mảng {i + 1}<input value={r.name} maxLength={120} onChange={(e) => setSegment({ ...segment, rows: segment.rows.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)) })} /></label>
+          <label className="field">Doanh thu (tỷ)<input inputMode="decimal" value={r.revenue} onChange={(e) => setSegment({ ...segment, rows: segment.rows.map((x, j) => (j === i ? { ...x, revenue: e.target.value } : x)) })} /></label>
+          <label className="field">Giá vốn (tỷ)<input inputMode="decimal" value={r.cogs} onChange={(e) => setSegment({ ...segment, rows: segment.rows.map((x, j) => (j === i ? { ...x, cogs: e.target.value } : x)) })} /></label>
+        </div>)}
+        <button type="button" className="btn" onClick={() => setSegment({ ...segment, rows: [...segment.rows, { name: "", revenue: "", cogs: "" }] })}><Plus size={15} aria-hidden="true" />Thêm mảng</button>
+        <div className="row"><button className="btn primary" type="submit">Lưu các mảng</button><button className="btn" type="button" onClick={() => setSegment(null)}>Hủy</button></div>
+      </form>}
+      <p className="caption">Ghi doanh thu và giá vốn từng mảng từ thuyết minh (VNDirect chỉ có tổng). Phần mềm tính lãi gộp, biên gộp, % đóng góp vào tổng lãi gộp và đối chiếu tổng
+        với doanh thu thuần, giá vốn của báo cáo đã lưu; thuyết minh thường ghi doanh thu trước giảm trừ nên tổng có thể lệch phần giảm trừ.</p>
       {data && data.bargains.length > 0 && <>
         <h3>Lợi nhuận có lãi mua rẻ</h3>
         <ul className="quality-list">{data.bargains.map((b) => <li key={b.year} data-testid="fan-bargain">

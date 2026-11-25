@@ -1,5 +1,14 @@
 import { expect, it } from "vitest";
-import { bargainText, coverText, dealText, fxText, gapText, quarterInput, stateText, yearsLeftText } from "./fixed-asset-notes";
+import { bargainText, coverText, dealText, fxText, gapText, quarterInput, segmentCheckText, stateText, yearsLeftText } from "./fixed-asset-notes";
+
+it("the segments written are checked against the stored net revenue and cost of sales", () => {
+  expect(segmentCheckText({ period: "2021", revenue: "149680", cogs: "108571", reported_revenue: "149680", reported_cogs: "108571", revenue_gap: "0", cogs_gap: "0" }))
+    .toBe("Tổng các mảng khớp doanh thu thuần và giá vốn của báo cáo 2021");
+  expect(segmentCheckText({ period: "2021", revenue: "150865", cogs: "108571", reported_revenue: "149680", reported_cogs: "108571", revenue_gap: "1185", cogs_gap: "0" }))
+    .toBe("Tổng các mảng lệch báo cáo 2021: doanh thu +1.185 tỷ (có thể chưa trừ các khoản giảm trừ), giá vốn 0 tỷ");
+  expect(segmentCheckText({ period: "Q2/2026", revenue: "1", cogs: "1", reported_revenue: null, reported_cogs: null, revenue_gap: null, cogs_gap: null }))
+    .toBe("Chưa có số của kỳ này trong báo cáo đã lưu để đối chiếu");
+});
 
 it("the loans written are checked against the borrowings on the balance sheet", () => {
   expect(coverText({ period: "2021", total: "20858", reported: "57212.5", covered: "0.3646" }))

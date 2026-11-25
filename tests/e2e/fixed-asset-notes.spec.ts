@@ -56,6 +56,26 @@ test("the owner writes a deal and sees its goodwill by the lesson's formula", as
   await expect(box.getByTestId("fan-charging")).toContainText("40 tỷ mỗi năm");
 });
 
+test("the owner writes a year's segments and sees each one's share of gross profit", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Thuyết minh TSCĐ (nhập tay)" });
+  await box.getByRole("button", { name: "Thêm kỳ theo mảng" }).click();
+  const form = box.getByRole("form", { name: "Doanh thu theo mảng" });
+  await form.getByLabel("Kỳ báo cáo").fill("2021");
+  await form.getByLabel("Mảng 1").fill("Mảng mẫu A");
+  await form.getByLabel("Doanh thu (tỷ)").fill("100");
+  await form.getByLabel("Giá vốn (tỷ)").fill("70");
+  await form.getByRole("button", { name: "Thêm mảng" }).click();
+  await form.getByLabel("Mảng 2").fill("Mảng mẫu B");
+  await form.getByLabel("Doanh thu (tỷ)").nth(1).fill("50");
+  await form.getByLabel("Giá vốn (tỷ)").nth(1).fill("40");
+  await form.getByRole("button", { name: "Lưu các mảng" }).click();
+  const table = box.getByTestId("fan-segments");
+  await expect(table).toContainText("Mảng mẫu A");
+  await expect(table).toContainText("75,0%");  // A: 30 of the 40 gross profit
+  await expect(table).toContainText("25,0%");
+});
+
 test("the owner writes a foreign-currency loan and sees the exchange scenario", async ({ page }) => {
   await page.goto("/research/FPT");
   const box = page.getByRole("region", { name: "Thuyết minh TSCĐ (nhập tay)" });

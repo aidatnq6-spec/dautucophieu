@@ -73,3 +73,12 @@ def test_loans_and_their_notes_are_kept_and_summed_and_survive_writes_that_leave
     assert saved["debt"]["total"] == "503" and saved["debt"]["fx_loss"] == "25.15" and saved["loans"][0]["lender"] == "HSBC" and "USD" in saved["currencies"]
     kept = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "expected_version": 1, "request_id": "ln-2"}).json()
     assert kept["debt"]["total"] == "503" and kept["debt_notes"]["fx_shock"] == "5"
+
+
+def test_segments_are_kept_summed_and_survive_writes_that_leave_them_out(tmp_path):
+    c, clock = client(tmp_path)
+    saved = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "segments": {"2021": [{"name": "Thép", "revenue": "100", "cogs": "70"}]},
+                                       "expected_version": 0, "request_id": "sg-1"}).json()
+    assert saved["segments"][0]["gross"] == "30" and saved["segments"][0]["rows"][0]["share"] == "1.0000"
+    kept = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "expected_version": 1, "request_id": "sg-2"}).json()
+    assert kept["segments"][0]["period"] == "2021"

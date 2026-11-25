@@ -17,7 +17,9 @@ type Bargain = { year: string; gain: string; deals: string[]; pbt: string | null
 type Data = { symbol: string; version: number; projects: Project[]; ranges: Ranges; groups: Record<string, string>; prepaid: Prepaid[]; prepaid_kinds: Record<string, string>;
   deals: Deal[]; goodwill_amort: Record<string, string>; goodwill_moves: Move[]; bargains: Bargain[];
   loans: Loan[]; debt_notes: { period?: string; current_portion?: string; fx_shock?: string }; debt: Debt; currencies: string[]; terms: Record<string, string>;
-  segments: SegmentPeriod[] };
+  segments: SegmentPeriod[]; fin_income_notes: FinYear[]; fin_kinds: Record<string, string> };
+type FinYear = { year: string; items: Record<string, string>; entered: string; reported: string | null; gap: string | null; hard_to_repeat: string; pbt: string | null;
+  share: string | null; pbt_without: string | null; interest_expensed: string | null; interest_total: string | null; capitalised_share: string | null };
 type SegmentRow = { name: string; revenue: string; cogs: string; gross: string; margin: string | null; share: string | null };
 type SegmentPeriod = { period: string; rows: SegmentRow[]; revenue: string; cogs: string; gross: string; margin: string | null; reported_revenue: string | null;
   reported_cogs: string | null; revenue_gap: string | null; cogs_gap: string | null };
@@ -105,6 +107,21 @@ const rateText = (l: Pick<Loan, "rate_from" | "rate_to" | "base" | "margin">) =>
   return [fixed, floating].filter(Boolean).join("; ") || "—";
 };
 
+/** The financial income hard to repeat or not yet cashed, against profit before tax. */
+export function finText(v: Pick<FinYear, "year" | "hard_to_repeat" | "pbt" | "share" | "pbt_without">): string {
+  if (v.pbt === null || v.pbt_without === null) return `Năm ${v.year}: chưa có LNTT năm này trong báo cáo đã lưu`;
+  const head = `Năm ${v.year}: phần khó lặp lại hoặc chưa thu tiền ${num(v.hard_to_repeat)} tỷ`;
+  return v.share === null ? `${head}; doanh nghiệp lỗ trước thuế ${signed(v.pbt)} tỷ, loại phần này thì lỗ ${signed(v.pbt_without)} tỷ`
+    : `${head}, bằng ${pct(v.share)} LNTT ${num(v.pbt)} tỷ; LNTT loại phần này ${signed(v.pbt_without)} tỷ`;
+}
+
+/** The interest really borne: expensed plus capitalised into construction in progress. */
+export function interestText(v: Pick<FinYear, "interest_expensed" | "interest_total" | "capitalised_share">): string | null {
+  if (v.interest_total === null || v.interest_expensed === null) return null;
+  return `Lãi vay thực tế ${num(v.interest_total)} tỷ = ${num(v.interest_expensed)} tỷ ghi vào chi phí + phần vốn hóa`
+    + (v.capitalised_share === null ? "" : ` (phần vốn hóa bằng ${pct(v.capitalised_share)} LNTT)`) + "; phần vốn hóa sẽ vào chi phí khi dự án hoàn thành";
+}
+
 /** The segments' totals against the stored net revenue and cost of sales of the period. */
 export function segmentCheckText(v: Pick<SegmentPeriod, "period" | "revenue" | "cogs" | "reported_revenue" | "reported_cogs" | "revenue_gap" | "cogs_gap">): string {
   if (v.revenue_gap === null || v.cogs_gap === null) return "Chưa có số của kỳ này trong báo cáo đã lưu để đối chiếu";
@@ -146,6 +163,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
   const [deal, setDeal] = useState<DealDraft | null>(null);
   const [loan, setLoan] = useState<LoanDraft | null>(null);
   const [debtNotes, setDebtNotes] = useState<{ period: string; current_portion: string; fx_shock: string } | null>(null);
+  const [finNote, setFinNote] = useState<{ old?: string; year: string; values: Record<string, string> } | null>(null);
   const [segment, setSegment] = useState<{ old?: string; period: string; rows: { name: string; revenue: string; cogs: string }[] } | null>(null);
   const base = `stock/${encodeURIComponent(symbol)}/fixed-asset-notes`;
   useEffect(() => {
@@ -165,6 +183,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
       setLoan(null);
       setDebtNotes(null);
       setSegment(null);
+      setFinNote(null);
       setMessage(null);
     } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); }
   }
@@ -180,6 +199,8 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
   const savePrepaid = (prepaid: Record<string, Record<string, string>>) => send(base, "PUT", { projects: others(), ranges: keptRanges(), prepaid });
   const otherLoans = (id?: string) => (data?.loans ?? []).filter((l) => l.id !== id).map(loanRaw);
   const saveLoans = (loans: ReturnType<typeof loanRaw>[]) => send(base, "PUT", { projects: others(), ranges: keptRanges(), loans });
+  const keptFin = (skip?: string) => Object.fromEntries((data?.fin_income_notes ?? []).filter((f) => f.year !== skip).map((f) => [f.year, f.items]));
+  const saveFin = (fin_income_notes: Record<string, Record<string, string>>) => send(base, "PUT", { projects: others(), ranges: keptRanges(), fin_income_notes });
   const keptSegments = (skip?: string) => Object.fromEntries((data?.segments ?? []).filter((s) => s.period !== skip)
     .map((s) => [periodInput(s.period), s.rows.map((r) => ({ name: r.name, revenue: r.revenue, cogs: r.cogs }))]));
   const saveSegments = (segments: Record<string, { name: string; revenue: string; cogs: string }[]>) =>
@@ -260,7 +281,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
         <div className="row"><button className="btn primary" type="submit">Lưu khung khấu hao</button><button className="btn" type="button" onClick={() => setRanges(null)}>Hủy</button></div>
       </form>}
       <h3>Chi phí trả trước: phân bổ trong năm</h3>
-      {data && data.prepaid.length > 0 ? <table className="fv-table" aria-label={`Phân bổ chi phí trả trước ${symbol}`}>
+      {data && data.prepaid.length > 0 ? <table className="fv-table fan-wide" aria-label={`Phân bổ chi phí trả trước ${symbol}`}>
         <thead><tr><th>Năm</th>{Object.entries(data.prepaid_kinds).map(([k, label]) => <th key={k} className="num">{label}</th>)}<th className="num">Tổng phân bổ (tỷ)</th>
           <th className="num">CPTT dài hạn cuối năm</th><th>Số năm phân bổ còn lại</th><th className="num">Phân bổ ÷ LNTT</th><th></th></tr></thead>
         <tbody>{data.prepaid.map((r) => <tr key={r.year} data-testid="fan-prepaid">
@@ -294,7 +315,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
         như năm đó. Phần phân bổ là chi phí ghi vào lợi nhuận mà không tốn thêm tiền (tiền đã chi từ trước). Không ghi tổng thì phần mềm cộng các loại bạn đã nhập.</p>
       <h3>Thương vụ mua bán, sáp nhập</h3>
       {data && data.deals.length > 0 ? <>
-        <table className="fv-table" aria-label={`Thương vụ mua bán ${symbol}`}>
+        <table className="fv-table fan-wide" aria-label={`Thương vụ mua bán ${symbol}`}>
           <thead><tr><th>Công ty được mua</th><th>Ngày mua</th><th className="num">Tỷ lệ mua</th><th className="num">Giá mua (tỷ)</th><th className="num">Tài sản thuần hợp lý (tỷ)</th>
             <th>Lợi thế thương mại</th><th></th></tr></thead>
           <tbody>{data.deals.map((d) => <tr key={d.id} data-testid="fan-deal">
@@ -340,7 +361,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
         Ghi số thuyết minh thì phần mềm dùng số đó và hiện phần lệch so với công thức.</p>
       <h3>Các khoản vay</h3>
       {data && data.loans.length > 0 ? <>
-        <table className="fv-table" aria-label={`Các khoản vay ${symbol}`}>
+        <table className="fv-table fan-wide" aria-label={`Các khoản vay ${symbol}`}>
           <thead><tr><th>Bên cho vay</th><th>Loại tiền</th><th>Kỳ hạn</th><th className="num">Dư nợ (tỷ)</th><th>Lãi suất</th><th>Đáo hạn</th><th>Tài sản đảm bảo</th><th></th></tr></thead>
           <tbody>{data.loans.map((l) => <tr key={l.id} data-testid="fan-loan">
             <td data-label="Bên cho vay">{l.lender}{l.note && <div className="caption">{l.note}</div>}</td>
@@ -433,6 +454,40 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
       </form>}
       <p className="caption">Ghi doanh thu và giá vốn từng mảng từ thuyết minh (VNDirect chỉ có tổng). Phần mềm tính lãi gộp, biên gộp, % đóng góp vào tổng lãi gộp và đối chiếu tổng
         với doanh thu thuần, giá vốn của báo cáo đã lưu; thuyết minh thường ghi doanh thu trước giảm trừ nên tổng có thể lệch phần giảm trừ.</p>
+      <h3>Doanh thu tài chính theo loại, lãi vay vốn hóa</h3>
+      {data && data.fin_income_notes.length > 0 ? <>
+        <table className="fv-table fan-wide" aria-label={`Doanh thu tài chính theo loại ${symbol}`}>
+          <thead><tr><th>Năm</th>{Object.entries(data.fin_kinds).map(([k, label]) => <th key={k} className="num">{label}</th>)}<th className="num">Tổng bạn ghi</th>
+            <th className="num">Báo cáo</th><th></th></tr></thead>
+          <tbody>{data.fin_income_notes.map((f) => <tr key={f.year} data-testid="fan-fin">
+            <td data-label="Năm">{f.year}</td>
+            {Object.keys(data.fin_kinds).map((k) => <td key={k} className="num" data-label={data.fin_kinds[k]}>{f.items[k] ? num(f.items[k]) : "—"}</td>)}
+            <td className="num" data-label="Tổng bạn ghi">{num(f.entered)}</td>
+            <td className="num" data-label="Báo cáo">{f.reported === null ? "chưa có" : num(f.reported)}{f.gap !== null && Number(f.gap) !== 0 && <div className="caption">lệch {signed(f.gap)}</div>}</td>
+            <td className="actions">
+              <button type="button" className="btn" aria-label={`Sửa doanh thu tài chính ${f.year}`} onClick={() => setFinNote({ old: f.year, year: f.year, values: { ...f.items } })}>
+                <Pencil size={14} aria-hidden="true" />Sửa</button>
+              <button type="button" className="btn" aria-label={`Xóa doanh thu tài chính ${f.year}`} onClick={() => { if (window.confirm(`Xóa năm ${f.year}?`)) void saveFin(keptFin(f.year)); }}>
+                <Trash2 size={14} aria-hidden="true" />Xóa</button></td>
+          </tr>)}</tbody>
+        </table>
+        <ul className="quality-list" data-testid="fan-fin-summary">{data.fin_income_notes.map((f) => <li key={f.year}>{finText(f)}
+          {interestText(f) && <div className="caption">{interestText(f)}</div>}</li>)}</ul>
+      </> : data && <p className="muted">Chưa ghi doanh thu tài chính theo loại. Lấy từ thuyết minh doanh thu hoạt động tài chính và chi phí đi vay.</p>}
+      {data && !finNote && <button type="button" className="btn" onClick={() => setFinNote({ year: String(new Date().getFullYear() - 1), values: {} })}>
+        <Plus size={15} aria-hidden="true" />Thêm năm doanh thu tài chính</button>}
+      {data && finNote && <form className="pp-form" aria-label="Doanh thu tài chính theo loại" onSubmit={(e) => {
+        e.preventDefault();
+        const values = Object.fromEntries(Object.entries(finNote.values).filter(([, v]) => v.trim()));
+        void saveFin({ ...keptFin(finNote.old), [finNote.year.trim()]: values });
+      }}>
+        <label className="field">Năm<input inputMode="numeric" maxLength={4} value={finNote.year} required onChange={(e) => setFinNote({ ...finNote, year: e.target.value })} /></label>
+        {Object.entries(data.fin_kinds).map(([k, label]) => <label key={k} className="field">{label} (tỷ đồng)<input inputMode="decimal" value={finNote.values[k] ?? ""}
+          onChange={(e) => setFinNote({ ...finNote, values: { ...finNote.values, [k]: e.target.value } })} /></label>)}
+        <div className="row"><button className="btn primary" type="submit">Lưu doanh thu tài chính</button><button className="btn" type="button" onClick={() => setFinNote(null)}>Hủy</button></div>
+      </form>}
+      <p className="caption">Phần khó lặp lại hoặc chưa thu tiền = lãi cho bên liên quan vay + lãi thanh lý đầu tư + lãi tỷ giá chưa thực hiện. Lãi cho bên liên quan vay là một phần của lãi
+        cho vay; lãi vay vốn hóa không phải doanh thu, nên không cộng vào tổng. Lãi vay thực tế = chi phí lãi vay trên báo cáo + phần vốn hóa bạn ghi từ thuyết minh chi phí đi vay.</p>
       {data && data.bargains.length > 0 && <>
         <h3>Lợi nhuận có lãi mua rẻ</h3>
         <ul className="quality-list">{data.bargains.map((b) => <li key={b.year} data-testid="fan-bargain">
@@ -443,7 +498,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
       </>}
       {data && data.goodwill_moves.length > 0 && <>
         <h3>Biến động lợi thế thương mại</h3>
-        <table className="fv-table" aria-label={`Biến động lợi thế thương mại ${symbol}`}>
+        <table className="fv-table fan-wide" aria-label={`Biến động lợi thế thương mại ${symbol}`}>
           <thead><tr><th>Năm</th><th className="num">Đầu năm</th><th className="num">Tăng (thương vụ bạn ghi)</th><th className="num">Phân bổ (thuyết minh)</th>
             <th className="num">Cuối năm</th><th className="num">Giảm khác</th><th className="num">Phân bổ ÷ chi phí quản lý</th><th className="num">Phân bổ ÷ LNTT</th><th></th></tr></thead>
           <tbody>{data.goodwill_moves.map((m) => <tr key={m.year} data-testid="fan-move">

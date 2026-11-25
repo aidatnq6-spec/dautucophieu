@@ -56,6 +56,20 @@ test("the owner writes a deal and sees its goodwill by the lesson's formula", as
   await expect(box.getByTestId("fan-charging")).toContainText("40 tỷ mỗi năm");
 });
 
+test("the owner writes financial income by kind and sees the part hard to repeat", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Thuyết minh TSCĐ (nhập tay)" });
+  await box.getByRole("button", { name: "Thêm năm doanh thu tài chính" }).click();
+  const form = box.getByRole("form", { name: "Doanh thu tài chính theo loại" });
+  await form.getByLabel("Năm", { exact: true }).fill("2021");
+  await form.getByLabel("Lãi cho vay (tỷ đồng)").fill("490,8");
+  await form.getByLabel("trong đó: cho bên liên quan vay (tỷ đồng)").fill("469");
+  await form.getByLabel("Lãi thanh lý, chuyển nhượng đầu tư (tỷ đồng)").fill("240");
+  await form.getByRole("button", { name: "Lưu doanh thu tài chính" }).click();
+  await expect(box.getByTestId("fan-fin")).toContainText("730,8");  // 490,8 + 240; related parties are part of lending
+  await expect(box.getByTestId("fan-fin-summary")).toContainText("Năm 2021");
+});
+
 test("the owner writes a year's segments and sees each one's share of gross profit", async ({ page }) => {
   await page.goto("/research/FPT");
   const box = page.getByRole("region", { name: "Thuyết minh TSCĐ (nhập tay)" });

@@ -82,3 +82,12 @@ def test_segments_are_kept_summed_and_survive_writes_that_leave_them_out(tmp_pat
     assert saved["segments"][0]["gross"] == "30" and saved["segments"][0]["rows"][0]["share"] == "1.0000"
     kept = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "expected_version": 1, "request_id": "sg-2"}).json()
     assert kept["segments"][0]["period"] == "2021"
+
+
+def test_financial_income_by_kind_is_kept_and_survives_writes_that_leave_it_out(tmp_path):
+    c, clock = client(tmp_path)
+    saved = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "fin_income_notes": {"2021": {"lending": "490.8", "lending_related": "469", "disposals": "240"}},
+                                       "expected_version": 0, "request_id": "fi-1"}).json()
+    assert saved["fin_income_notes"][0]["hard_to_repeat"] == "709" and saved["fin_kinds"]["capitalised_interest"] == "Lãi vay đã vốn hóa trong năm"
+    kept = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "expected_version": 1, "request_id": "fi-2"}).json()
+    assert kept["fin_income_notes"][0]["year"] == "2021"

@@ -500,3 +500,52 @@ def segments_view(segments: dict[str, list[dict]], statements: dict) -> list[dic
                     "revenue_gap": None if reported_revenue is None else _text(revenue - reported_revenue),
                     "cogs_gap": None if reported_cogs is None else _text(cogs - reported_cogs)})
     return out
+
+
+# Doanh thu tài chính theo loại và lãi vay vốn hóa (25/11/2026), from the notes on financial income and borrowing costs, which VNDirect does
+# not split: the part hard to repeat or not yet cashed (interest on loans to related parties, gains on disposals, unrealised exchange gains),
+# profit before tax without it, and the interest the company really bore (expensed + capitalised into construction in progress).
+FIN_KINDS = {"deposit": "Lãi tiền gửi", "lending": "Lãi cho vay", "lending_related": "trong đó: cho bên liên quan vay", "dividends": "Cổ tức, lợi nhuận được chia",
+             "fx_realised": "Lãi tỷ giá đã thực hiện", "fx_unrealised": "Lãi tỷ giá chưa thực hiện", "disposals": "Lãi thanh lý, chuyển nhượng đầu tư",
+             "other": "Doanh thu tài chính khác", "capitalised_interest": "Lãi vay đã vốn hóa trong năm"}
+_NOT_INCOME = ("lending_related", "capitalised_interest")  # a part of lending; not financial income at all
+HARD_TO_REPEAT = ("lending_related", "disposals", "fx_unrealised")
+
+
+def validate_fin_notes(raw: dict) -> dict[str, dict[str, str]]:
+    if len(raw) > MAX_PREPAID_YEARS:
+        raise NoteError("too_many", f"Tối đa {MAX_PREPAID_YEARS} năm.")
+    out = {}
+    for year, items in raw.items():
+        if not _YEAR.fullmatch(str(year)):
+            raise NoteError("invalid_year", "Năm dạng 2021.")
+        kept = {}
+        for kind, value in (items or {}).items():
+            if kind not in FIN_KINDS:
+                raise NoteError("invalid_kind", "Loại doanh thu tài chính không có trong danh sách.")
+            if (amount := _money(value)) is not None:
+                kept[kind] = amount
+        if not kept:
+            raise NoteError("empty_year", f"Năm {year}: nhập ít nhất một số.")
+        if "lending_related" in kept and Decimal(kept["lending_related"]) > Decimal(kept.get("lending", "0")):
+            raise NoteError("related_over_lending", "Lãi cho bên liên quan vay là một phần của lãi cho vay, không lớn hơn lãi cho vay.")
+        out[str(year)] = {k: kept[k] for k in FIN_KINDS if k in kept}
+    return dict(sorted(out.items()))
+
+
+def fin_notes_view(notes: dict[str, dict[str, str]], statements: dict) -> list[dict]:
+    years, out = statements.get("years") or {}, []
+    for year, items in notes.items():
+        d = {k: Decimal(v) for k, v in items.items()}
+        entered = sum((v for k, v in d.items() if k not in _NOT_INCOME), Decimal(0))
+        hard = sum((d.get(k, Decimal(0)) for k in HARD_TO_REPEAT), Decimal(0))
+        row = years.get(year) or {}
+        reported, pbt, interest = _bn(row, "fin_income"), _bn(row, "pbt"), _bn(row, "interest")
+        capitalised = d.get("capitalised_interest")
+        out.append({"year": year, "items": items, "entered": _text(entered), "reported": None if reported is None else _text(reported),
+                    "gap": None if reported is None else _text(entered - reported), "hard_to_repeat": _text(hard),
+                    "pbt": None if pbt is None else _text(pbt), "share": _share(hard, pbt) if pbt is not None and pbt > 0 else None,
+                    "pbt_without": None if pbt is None else _text(pbt - hard), "interest_expensed": None if interest is None else _text(interest),
+                    "interest_total": None if interest is None or capitalised is None else _text(interest + capitalised),
+                    "capitalised_share": _share(capitalised, pbt) if capitalised is not None and pbt is not None and pbt > 0 else None})
+    return out

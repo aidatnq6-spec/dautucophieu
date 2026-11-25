@@ -62,7 +62,14 @@ FIXED = [
     ("capex_to_depreciation", "Capex ÷ khấu hao", "x", 1), ("ppe_turnover", "Vòng quay TSCĐ hữu hình", "x", 1),
 ]
 FIXED_RATIOS = ("ppe_wear", "cip_to_ppe", "capex_to_depreciation", "ppe_turnover", "prepaid_to_assets", "prepaid_to_pbt", "goodwill_to_equity",
-                "st_debt_share", "avg_rate", "icr", "cash_to_st_debt")
+                "st_debt_share", "avg_rate", "icr", "cash_to_st_debt", "parent_to_capital", "nci_share")
+EQUITY = [
+    ("g", "Vốn chủ sở hữu"), ("charter_capital", "Vốn góp", "money", 0), ("share_premium", "Thặng dư vốn cổ phần", "money", 1),
+    ("treasury_shares", "Cổ phiếu quỹ", "money", 1), ("equity_fx", "Chênh lệch tỷ giá hối đoái", "money", 1), ("dev_fund", "Quỹ đầu tư phát triển", "money", 1),
+    ("retained", "LNST chưa phân phối", "money", 1), ("nci", "Lợi ích cổ đông không kiểm soát", "money", 1),
+    ("parent_to_capital", "Vốn chủ công ty mẹ ÷ vốn góp", "x", 1), ("nci_share", "Lợi ích cổ đông không kiểm soát ÷ vốn chủ", "pct", 1),
+    ("equity_other", "Thay đổi vốn chủ ngoài lợi nhuận", "money", 0),
+]
 DEBT = [
     ("g", "Nợ vay"), ("st_debt", "Vay ngắn hạn", "money", 0), ("lt_debt", "Vay dài hạn", "money", 0), ("st_debt_share", "Tỷ trọng vay ngắn hạn", "pct", 1),
     ("avg_rate", "Lãi suất vay bình quân", "pct", 1), ("icr", "Khả năng trả lãi (EBIT ÷ lãi vay)", "x", 1),
@@ -236,14 +243,28 @@ def _debt(f: dict, flows: dict[str, Decimal | None], before: dict | None) -> dic
             "net_borrowing": _sum(_d(f.get("borrow_in")), _d(f.get("borrow_out")))}
 
 
+def _equity(f: dict, before: dict | None) -> dict:
+    """Parent equity against charter capital, non-controlling interests' share, and the change in equity since `before` (the year or the
+    quarter before) that profit, shares issued or bought back and dividends paid do not explain."""
+    equity, capital, parent = _d(f.get("equity")), _d(f.get("charter_capital")), _parent_equity(f)
+    nci = _d(f.get("minority_equity")) if f.get("minority_equity") is not None else _d(f.get("minority_equity_outside"))
+    parts = [_d(f.get(k)) for k in ("npat", "issue_cash", "buyback_cash", "dividends_paid")]
+    previous = _d((before or {}).get("equity"))
+    other = None if equity is None or previous is None or None in parts else equity - previous - sum(parts, Decimal(0))
+    return {"nci": nci, "parent_to_capital": _ratio(parent, capital, _Q2) if parent is not None and capital is not None and capital > 0 else None,
+            "nci_share": _ratio(nci, equity) if nci is not None and equity is not None and equity > 0 else None, "equity_other": other}
+
+
 def _fixed_years(years: dict) -> dict[str, dict]:
     return {y: _fixed(f, {k: _d(f.get(k)) for k in ("capex", "depreciation", "revenue")}, years.get(str(int(y) - 1))) | _prepaid(f, _d(f.get("pbt")))
-            | _debt(f, {k: _derived(f).get(k) for k in ("interest", "ebit")}, years.get(str(int(y) - 1))) for y, f in years.items()}
+            | _debt(f, {k: _derived(f).get(k) for k in ("interest", "ebit")}, years.get(str(int(y) - 1)))
+            | _equity(f, years.get(str(int(y) - 1))) for y, f in years.items()}
 
 
 def _fixed_quarters(quarters: dict) -> dict[str, dict]:
     return {p: _fixed(f, _four(quarters, p, ("capex", "depreciation", "revenue")), quarters.get(_prior(p))) | _prepaid(f, _four(quarters, p, ("pbt",))["pbt"])
-            | _debt(f, _four(quarters, p, ("interest", "ebit")), quarters.get(_prior(p))) for p, f in quarters.items()}
+            | _debt(f, _four(quarters, p, ("interest", "ebit")), quarters.get(_prior(p)))
+            | _equity(f, quarters.get(_previous_quarter(p))) for p, f in quarters.items()}
 
 
 def _merge(*parts: dict[str, dict]) -> dict[str, dict]:
@@ -355,7 +376,7 @@ def _ins_checks(periods: dict) -> list[dict]:
 
 
 CAP_GAP = Decimal("0.10")
-FIXED_LINES_SINCE = 11  # the statements' LINES_VERSION that brought the fixed-asset (8), prepaid-expense (9), goodwill (10) and borrowing (11) lines
+FIXED_LINES_SINCE = 12  # the statements' LINES_VERSION that brought the fixed-asset (8), prepaid-expense (9), goodwill (10), borrowing (11) and equity (12) lines
 
 
 def _invested(f: dict) -> Decimal | None:
@@ -511,9 +532,9 @@ def statement_table(record: dict, *, closes, vnstock: dict | None, kind: str | N
                 "pe_context": pe_context(record.get("quarters", {}))}
     quarters, years = record.get("quarters", {}), record.get("years", {})
     year_part = _part(years, sorted(years), extra=_merge(_valuation(years, record.get("year_end_close", {})), _fixed_years(years)),
-                      spec=P_AND_L + FIXED + PREPAID + DEBT + SCALE)
+                      spec=P_AND_L + FIXED + PREPAID + DEBT + EQUITY + SCALE)
     quarter_part = _part(quarters, sorted(quarters), extra=_merge(_quarter_valuation(quarters, record.get("quarter_end_close", {})),
-                                                                  _fixed_quarters(quarters)), spec=P_AND_L + FIXED + PREPAID + DEBT + SCALE)
+                                                                  _fixed_quarters(quarters)), spec=P_AND_L + FIXED + PREPAID + DEBT + EQUITY + SCALE)
     for row in quarter_part["rows"]:  # these two ratios run over the four quarters to each quarter
         if row["key"] in ("capex_to_depreciation", "ppe_turnover", "prepaid_to_pbt", "avg_rate", "icr"):
             row["label"] = f"{row['label']} (4 quý)"

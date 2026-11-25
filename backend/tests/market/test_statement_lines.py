@@ -49,3 +49,11 @@ def test_borrowing_cash_flows_and_unrealised_exchange_differences_are_kept_owner
     names = {(m, c): n for (m, c), n in LINES.items()}
     assert names[(3, 33300)] == "borrow_in" and names[(3, 33400)] == "borrow_out" and names[(3, 31100)] == "fx_unrealised"
     assert LINES_VERSION >= 11
+
+
+def test_equity_parts_and_share_cash_flows_are_kept_owner_25_11_2026():
+    """Vốn chủ sở hữu (spec 25/11/2026): HAG 2021 14120 0 (2020: 3.263,9), 14200 −4.467,1; 33100 shares issued, 33200 bought back."""
+    names = {(m, c): n for (m, c), n in LINES.items()}
+    assert names[(1, 14120)] == "share_premium" and names[(1, 14140)] == "treasury_shares" and names[(1, 14160)] == "equity_fx"
+    assert names[(1, 14170)] == "dev_fund" and names[(1, 14200)] == "retained" and names[(3, 33100)] == "issue_cash" and names[(3, 33200)] == "buyback_cash"
+    assert LINES_VERSION >= 12

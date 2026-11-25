@@ -71,7 +71,7 @@ export function lastN<T>(periods: T[], n: number): number[] {
 /** Notes under the fixed-asset group: lines not synced yet, and periods with a finance lease (no line of its own). */
 export function fixedNotes(d: { fixed_assets_pending?: boolean; finance_lease?: string[] }): string[] {
   const out: string[] = [];
-  if (d.fixed_assets_pending) out.push("Chưa đồng bộ dòng tài sản cố định, chi phí trả trước, lợi thế thương mại, nợ vay, vốn chủ sở hữu và thuế TNDN: các dòng này để trống đến lượt 20:00 lấy lại lịch sử của mã này.");
+  if (d.fixed_assets_pending) out.push("Chưa đồng bộ dòng tài sản cố định, chi phí trả trước, lợi thế thương mại, nợ vay, vốn chủ sở hữu, thuế TNDN và trái phiếu chuyển đổi: các dòng này để trống đến lượt 20:00 lấy lại lịch sử của mã này.");
   if (d.finance_lease?.length) out.push(`Có TSCĐ thuê tài chính (không có dòng riêng) ở ${d.finance_lease.map(periodLabel).join(", ")}.`);
   return out;
 }
@@ -254,6 +254,8 @@ export function FinancialTables({ symbol }: { symbol: string }) {
         trước) − LNST − tiền phát hành − tiền mua lại cổ phiếu + cổ tức đã trả: thoái vốn công ty con, điều chỉnh hồi tố, chênh lệch tỷ giá, trích quỹ…; số lớn thì đọc thuyết minh thay đổi vốn chủ.
         Thuế TNDN: thuế suất thực tế = chi phí thuế ÷ LNTT (quý: 4 quý), thường khác 20% vì ưu đãi thuế, chi phí không được trừ, chuyển lỗ; thuế hoãn lại âm là lợi
         ích thuế. Thuế đã nộp ÷ chi phí thuế: phần thuế của kỳ đã nộp bằng tiền.
+        Trên mỗi cổ phiếu: EPS cơ bản là số doanh nghiệp công bố, không điều chỉnh lại khi sau đó có cổ phiếu thưởng (so các năm cũ cần chú ý); EPS báo cáo ÷ phần
+        tự tính thấp hơn 1 khi trừ quỹ khen thưởng, phúc lợi hoặc có phát hành trong kỳ (số cổ phiếu bình quân gia quyền).
       </p>}
     </div>
   );

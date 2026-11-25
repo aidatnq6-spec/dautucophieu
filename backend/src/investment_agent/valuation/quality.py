@@ -257,8 +257,21 @@ def _signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:
     signs.append(_prepaid_sign(cur, prev, y))
     signs.append(_goodwill_sign(cur, prev, y))
     signs.append(_cover_sign(cur, prev, y))
-    signs += [_equity_outside_sign(cur, prev, y), _accumulated_loss_sign(cur, y), _margin_swing_sign(a, y), _tax_rate_sign(cur, prev, y)]
+    signs += [_equity_outside_sign(cur, prev, y), _accumulated_loss_sign(cur, y), _margin_swing_sign(a, y), _tax_rate_sign(cur, prev, y),
+              _dilution_sign(cur, y)]
     return signs
+
+
+def _dilution_sign(cur: dict, y: int) -> dict:
+    """Convertible bonds or a conversion option in equity at the year's end: shares may be issued, so the same profit spreads over more."""
+    label = "Có thể bị pha loãng"
+    if "convertible_bonds" not in cur and "conversion_option" not in cur:
+        return {"id": "dilution_risk", "label": label, "flag": None, "detail": f"Thiếu dòng trái phiếu chuyển đổi năm {y} (có sau lần cập nhật báo cáo tới)"}
+    bonds, option = cur.get("convertible_bonds", Decimal(0)), cur.get("conversion_option", Decimal(0))
+    return {"id": "dilution_risk", "label": label, "flag": bonds > 0 or option > 0,
+            "rule": "có trái phiếu chuyển đổi hoặc quyền chọn chuyển đổi trái phiếu: khi chuyển đổi, số cổ phiếu tăng và EPS giảm với cùng lợi nhuận; đọc "
+                    "thuyết minh trái phiếu và EPS suy giảm, có thể ghi số cổ phiếu dự kiến ở Thuyết minh nhập tay",
+            "detail": f"Năm {y}: trái phiếu chuyển đổi {_bn(bonds)}; quyền chọn chuyển đổi trái phiếu {_bn(option)}"}
 
 
 def _tax_rate(row: dict) -> Decimal | None:

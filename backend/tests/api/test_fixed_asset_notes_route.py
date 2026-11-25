@@ -100,3 +100,11 @@ def test_tax_incentives_are_kept_with_their_state_and_survive_writes_that_leave_
     assert saved["tax_incentives"][0]["state"] == "active" and saved["incentive_kinds"]["half"] == "giảm 50% thuế"
     kept = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "expected_version": 1, "request_id": "ti-2"}).json()
     assert kept["tax_incentives"][0]["entity"] == "Dự án A"
+
+
+def test_dilution_is_kept_and_survives_writes_that_leave_it_out(tmp_path):
+    c, clock = client(tmp_path)
+    saved = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "dilution": [{"source": "ESOP", "shares": "1000000"}], "expected_version": 0, "request_id": "dl2-1"}).json()
+    assert saved["dilution"][0]["shares"] == "1000000" and saved["dilution_view"]["extra"] == "1000000" and saved["dilution_view"]["eps"] is None
+    kept = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "expected_version": 1, "request_id": "dl2-2"}).json()
+    assert kept["dilution"][0]["source"] == "ESOP"

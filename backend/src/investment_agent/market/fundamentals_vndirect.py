@@ -37,7 +37,8 @@ ANNUAL = {"revenue": "revenue", "gross_profit": "gross_profit", "selling": "sell
           # Vốn chủ thay đổi ngoài lợi nhuận; Lỗ lũy kế, vốn chủ dưới vốn góp (25/11/2026)
           "charter_capital": "charter_capital", "retained": "retained", "issue_cash": "issue_cash", "buyback_cash": "buyback_cash",
           "dividends_paid": "dividends_paid",
-          "tax": "tax", "tax_current": "tax_current", "tax_deferred": "tax_deferred"}  # Thuế suất thực tế thấp (25/11/2026)
+          "tax": "tax", "tax_current": "tax_current", "tax_deferred": "tax_deferred",  # Thuế suất thực tế thấp (25/11/2026)
+          "convertible_bonds": "convertible_bonds", "conversion_option": "conversion_option"}  # Có thể bị pha loãng (25/11/2026)
 COSTS = ("selling", "admin")  # VNDirect: positive; Vnstock (and Chất lượng báo cáo): negative
 BONUS, RAISE = ("STOCKDIV", "KINDDIV"), ("ISSUE",)
 

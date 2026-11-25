@@ -269,3 +269,18 @@ def test_tax_incentives_from_the_notes_say_when_they_end_owner_25_11_2026():
         with pytest.raises(NoteError) as err:
             validate_incentives(raw)
         assert err.value.code == code
+
+
+def test_shares_that_may_be_issued_give_eps_before_and_after_dilution_owner_25_11_2026():
+    """Bài EPS: convertible bonds, options, ESOP turn into new shares; with profit unchanged EPS falls."""
+    from investment_agent.domain.fixed_asset_notes import dilution_view, validate_dilution
+    kept = validate_dilution([{"source": " ESOP 2026 ", "shares": "5.000.000"}, {"source": "Trái phiếu chuyển đổi", "shares": "15000000"}])
+    assert kept == [{"source": "ESOP 2026", "shares": "5000000"}, {"source": "Trái phiếu chuyển đổi", "shares": "15000000"}]
+    quarters = {p: {"npat_parent": str(25 * B), "charter_capital": str(1000 * B)} for p in ("2025-Q2", "2025-Q3", "2025-Q4", "2026-Q1")}
+    v = dilution_view(kept, {"quarters": quarters})
+    assert v == {"quarter": "2026-Q1", "shares": "100000000", "extra": "20000000", "share": "0.2000", "npat_ttm": "100", "eps": "1000", "eps_diluted": "833"}
+    assert dilution_view(kept, {"quarters": {}})["eps"] is None
+    for raw, code in (([{"source": "", "shares": "1"}], "invalid_name"), ([{"source": "A", "shares": "0"}], "invalid_shares"), ([{"source": "A", "shares": "1,5"}], "invalid_shares")):
+        with pytest.raises(NoteError) as err:
+            validate_dilution(raw)
+        assert err.value.code == code

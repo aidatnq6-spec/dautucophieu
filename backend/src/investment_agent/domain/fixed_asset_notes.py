@@ -591,3 +591,46 @@ def incentives_view(incentives: list[dict], *, today: date) -> list[dict]:
 
 def incentive_text(i: dict) -> str:
     return f"thuế suất ưu đãi {i['rate'].replace('.', ',')}%" if i["kind"] == "rate" else INCENTIVE_KINDS[i["kind"]]
+
+
+# Pha loãng (25/11/2026), from the notes on EPS and on convertibles, options, ESOP or a shareholders' resolution: shares that may be issued.
+# EPS before and after uses the stored parent profit of the latest four quarters and that quarter's shares (charter capital ÷ 10.000 đ).
+MAX_DILUTION = 10
+_SHARES = re.compile(r"^\d{1,3}(\.\d{3})+$|^\d+$")
+
+
+def validate_dilution(raw: list) -> list[dict]:
+    if len(raw) > MAX_DILUTION:
+        raise NoteError("too_many", f"Tối đa {MAX_DILUTION} nguồn pha loãng mỗi mã.")
+    out = []
+    for item in raw:
+        source = str(item.get("source") or "").strip()
+        if not source or len(source) > 120:
+            raise NoteError("invalid_name", "Nguồn pha loãng từ 1 đến 120 ký tự (ví dụ ESOP 2026, trái phiếu chuyển đổi).")
+        text = str(item.get("shares") or "").strip().replace(" ", "")
+        if not _SHARES.fullmatch(text) or int(text.replace(".", "")) <= 0:
+            raise NoteError("invalid_shares", "Số cổ phiếu là số nguyên dương, ví dụ 5.000.000.")
+        out.append({"source": source, "shares": str(int(text.replace(".", "")))})
+    return out
+
+
+def dilution_view(dilution: list[dict], statements: dict) -> dict:
+    quarters = statements.get("quarters") or {}
+    latest = max((q for q, row in quarters.items() if row.get("charter_capital")), default=None)
+    extra = sum((int(d["shares"]) for d in dilution), 0)
+    blank = {"quarter": latest, "shares": None, "extra": str(extra), "share": None, "npat_ttm": None, "eps": None, "eps_diluted": None}
+    if latest is None:
+        return blank
+    shares = Decimal(quarters[latest]["charter_capital"]) / 10000
+    window, q = [latest], latest
+    while len(window) < 4:
+        y, n = int(q[:4]), int(q[-1])
+        q = f"{y}-Q{n - 1}" if n > 1 else f"{y - 1}-Q4"
+        window.append(q)
+    profits = [quarters.get(w, {}).get("npat_parent") for w in window]
+    if None in profits or shares <= 0:
+        return {**blank, "shares": _text(shares)}
+    npat = sum((Decimal(p) for p in profits), Decimal(0))
+    eps = lambda n: str((npat / n).quantize(Decimal(1), ROUND_HALF_UP))  # noqa: E731
+    return {"quarter": latest, "shares": _text(shares), "extra": str(extra), "share": _share(Decimal(extra), shares),
+            "npat_ttm": _text(npat / 10**9), "eps": eps(shares), "eps_diluted": eps(shares + extra)}

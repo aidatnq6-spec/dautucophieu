@@ -17,7 +17,9 @@ type Bargain = { year: string; gain: string; deals: string[]; pbt: string | null
 type Data = { symbol: string; version: number; projects: Project[]; ranges: Ranges; groups: Record<string, string>; prepaid: Prepaid[]; prepaid_kinds: Record<string, string>;
   deals: Deal[]; goodwill_amort: Record<string, string>; goodwill_moves: Move[]; bargains: Bargain[];
   loans: Loan[]; debt_notes: { period?: string; current_portion?: string; fx_shock?: string }; debt: Debt; currencies: string[]; terms: Record<string, string>;
-  segments: SegmentPeriod[]; fin_income_notes: FinYear[]; fin_kinds: Record<string, string>; tax_incentives: Incentive[]; incentive_kinds: Record<string, string> };
+  segments: SegmentPeriod[]; fin_income_notes: FinYear[]; fin_kinds: Record<string, string>; tax_incentives: Incentive[]; incentive_kinds: Record<string, string>;
+  dilution: { source: string; shares: string }[]; dilution_view: DilutionView };
+type DilutionView = { quarter: string | null; shares: string | null; extra: string; share: string | null; npat_ttm: string | null; eps: string | null; eps_diluted: string | null };
 type Incentive = { id: string; entity: string; kind: string; rate: string | null; until: string; source_url: string | null; note: string; state: "active" | "ending" | "ended" };
 type IncentiveDraft = { id?: string; entity: string; kind: string; rate: string; until: string; source_url: string; note: string };
 type FinYear = { year: string; items: Record<string, string>; entered: string; reported: string | null; gap: string | null; hard_to_repeat: string; pbt: string | null;
@@ -109,6 +111,14 @@ const rateText = (l: Pick<Loan, "rate_from" | "rate_to" | "base" | "margin">) =>
   return [fixed, floating].filter(Boolean).join("; ") || "—";
 };
 
+/** EPS on the latest four quarters before and after the shares that may be issued. */
+export function dilutionText(v: DilutionView): string {
+  if (v.eps === null || v.eps_diluted === null || v.shares === null || v.quarter === null || v.npat_ttm === null) return "Chưa có LNST 4 quý và số cổ phiếu trong báo cáo đã lưu";
+  const n = (x: string) => Number(x).toLocaleString("vi-VN");
+  return `LNST công ty mẹ 4 quý đến ${quarterInput(v.quarter)}: ${num(v.npat_ttm)} tỷ; ${n(v.shares)} cổ phiếu: EPS ${n(v.eps)} đ. Thêm ${n(v.extra)} cổ phiếu`
+    + `${v.share === null ? "" : ` (${pct(v.share)})`}: EPS ${n(v.eps_diluted)} đ`;
+}
+
 /** Whether a tax incentive is still running, ends this year or has ended. */
 export function incentiveState(i: Pick<Incentive, "state" | "until">): string {
   return i.state === "ending" ? `Hết trong năm ${i.until}: thuế suất thực tế có thể tăng từ năm sau`
@@ -175,6 +185,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
   const [loan, setLoan] = useState<LoanDraft | null>(null);
   const [debtNotes, setDebtNotes] = useState<{ period: string; current_portion: string; fx_shock: string } | null>(null);
   const [incentive, setIncentive] = useState<IncentiveDraft | null>(null);
+  const [dilution, setDilution] = useState<{ source: string; shares: string }[] | null>(null);
   const [finNote, setFinNote] = useState<{ old?: string; year: string; values: Record<string, string> } | null>(null);
   const [segment, setSegment] = useState<{ old?: string; period: string; rows: { name: string; revenue: string; cogs: string }[] } | null>(null);
   const base = `stock/${encodeURIComponent(symbol)}/fixed-asset-notes`;
@@ -197,6 +208,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
       setSegment(null);
       setFinNote(null);
       setIncentive(null);
+      setDilution(null);
       setMessage(null);
     } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); }
   }
@@ -469,6 +481,24 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
       </form>}
       <p className="caption">Ghi doanh thu và giá vốn từng mảng từ thuyết minh (VNDirect chỉ có tổng). Phần mềm tính lãi gộp, biên gộp, % đóng góp vào tổng lãi gộp và đối chiếu tổng
         với doanh thu thuần, giá vốn của báo cáo đã lưu; thuyết minh thường ghi doanh thu trước giảm trừ nên tổng có thể lệch phần giảm trừ.</p>
+      <h3>Pha loãng cổ phiếu</h3>
+      {data && data.dilution.length > 0 ? <>
+        <ul className="quality-list" data-testid="fan-dilution">{data.dilution.map((d) => <li key={d.source}>{d.source}: {Number(d.shares).toLocaleString("vi-VN")} cổ phiếu</li>)}</ul>
+        <p className="caption" data-testid="fan-dilution-eps">{dilutionText(data.dilution_view)}</p>
+      </> : data && <p className="muted">Chưa ghi số cổ phiếu có thể phát hành thêm (ESOP, trái phiếu chuyển đổi, phát hành theo nghị quyết ĐHCĐ).</p>}
+      {data && !dilution && <button type="button" className="btn" onClick={() => setDilution(data.dilution.length ? data.dilution.map((d) => ({ ...d })) : [{ source: "", shares: "" }])}>
+        <Pencil size={14} aria-hidden="true" />Ghi số cổ phiếu có thể phát hành thêm</button>}
+      {data && dilution && <form className="pp-form" aria-label="Pha loãng cổ phiếu" onSubmit={(e) => {
+        e.preventDefault(); void send(base, "PUT", { projects: others(), ranges: keptRanges(), dilution: dilution.filter((d) => d.source.trim() || d.shares.trim()) }); }}>
+        {dilution.map((d, i) => <div key={i} className="row">
+          <label className="field">Nguồn {i + 1}<input value={d.source} maxLength={120} placeholder="ESOP 2026" onChange={(e) => setDilution(dilution.map((x, j) => (j === i ? { ...x, source: e.target.value } : x)))} /></label>
+          <label className="field">Số cổ phiếu<input inputMode="numeric" value={d.shares} placeholder="5.000.000" onChange={(e) => setDilution(dilution.map((x, j) => (j === i ? { ...x, shares: e.target.value } : x)))} /></label>
+        </div>)}
+        <button type="button" className="btn" onClick={() => setDilution([...dilution, { source: "", shares: "" }])}><Plus size={15} aria-hidden="true" />Thêm nguồn</button>
+        <div className="row"><button className="btn primary" type="submit">Lưu</button><button className="btn" type="button" onClick={() => setDilution(null)}>Hủy</button></div>
+      </form>}
+      <p className="caption">EPS tính trên LNST công ty mẹ 4 quý gần nhất và số cổ phiếu cuối quý (vốn góp ÷ 10.000 đ) của báo cáo đã lưu; EPS sau pha loãng giả định lợi nhuận
+        không đổi, chỉ để thấy mức pha loãng, không phải dự báo. Để trống hết rồi bấm Lưu thì xóa.</p>
       <h3>Ưu đãi thuế</h3>
       {data && data.tax_incentives.length > 0 ? <table className="fv-table" aria-label={`Ưu đãi thuế ${symbol}`}>
         <thead><tr><th>Công ty con, dự án</th><th>Ưu đãi</th><th>Tình trạng</th><th></th></tr></thead>

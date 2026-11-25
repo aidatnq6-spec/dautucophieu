@@ -1,5 +1,19 @@
 import { expect, it } from "vitest";
-import { bargainText, coverText, dealText, fxText, gapText, quarterInput, segmentCheckText, stateText, yearsLeftText } from "./fixed-asset-notes";
+import { bargainText, coverText, dealText, finText, fxText, gapText, interestText, quarterInput, segmentCheckText, stateText, yearsLeftText } from "./fixed-asset-notes";
+
+it("financial income hard to repeat is set against profit before tax", () => {
+  expect(finText({ year: "2021", hard_to_repeat: "709", pbt: "-130.6", share: null, pbt_without: "-839.6" }))
+    .toBe("Năm 2021: phần khó lặp lại hoặc chưa thu tiền 709 tỷ; doanh nghiệp lỗ trước thuế −130,6 tỷ, loại phần này thì lỗ −839,6 tỷ");
+  expect(finText({ year: "2021", hard_to_repeat: "46", pbt: "37057", share: "0.0012", pbt_without: "37011" }))
+    .toBe("Năm 2021: phần khó lặp lại hoặc chưa thu tiền 46 tỷ, bằng 0,1% LNTT 37.057 tỷ; LNTT loại phần này 37.011 tỷ");
+  expect(finText({ year: "2021", hard_to_repeat: "0", pbt: null, share: null, pbt_without: null })).toBe("Năm 2021: chưa có LNTT năm này trong báo cáo đã lưu");
+});
+
+it("the interest really borne adds what was capitalised", () => {
+  expect(interestText({ interest_expensed: "971.9", interest_total: "1021.9", capitalised_share: null }))
+    .toBe("Lãi vay thực tế 1.021,9 tỷ = 971,9 tỷ ghi vào chi phí + phần vốn hóa; phần vốn hóa sẽ vào chi phí khi dự án hoàn thành");
+  expect(interestText({ interest_expensed: "971.9", interest_total: null, capitalised_share: null })).toBe(null);
+});
 
 it("the segments written are checked against the stored net revenue and cost of sales", () => {
   expect(segmentCheckText({ period: "2021", revenue: "149680", cogs: "108571", reported_revenue: "149680", reported_cogs: "108571", revenue_gap: "0", cogs_gap: "0" }))

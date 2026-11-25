@@ -226,3 +226,28 @@ def test_segments_from_the_notes_give_each_segment_s_gross_profit_margin_and_sha
         assert err.value.code == code
     (blank,) = segments_view(kept, {"years": {}})
     assert blank["reported_revenue"] is None and blank["revenue_gap"] is None
+
+
+def test_financial_income_by_kind_gives_the_part_hard_to_repeat_profit_without_it_and_the_true_interest_cost_owner_25_11_2026():
+    """Bài doanh thu, chi phí tài chính: HAG 2021 lending 490,8 of which related parties 469, disposals 240, total 735,1; loss before tax 130,6."""
+    from investment_agent.domain.fixed_asset_notes import fin_notes_view, validate_fin_notes
+    kept = validate_fin_notes({"2021": {"lending": "490,8", "lending_related": "469", "disposals": "240", "deposit": "4,3", "capitalised_interest": "50"}})
+    assert kept == {"2021": {"deposit": "4.3", "lending": "490.8", "lending_related": "469", "disposals": "240", "capitalised_interest": "50"}}
+    statements = {"years": {"2021": {"fin_income": str(int(735.1 * 10) * 10**8), "pbt": str(int(-130.6 * 10) * 10**8), "interest": str(int(971.9 * 10) * 10**8)}}}
+    (v,) = fin_notes_view(kept, statements)
+    assert v["entered"] == "735.1" and v["reported"] == "735.1" and v["gap"] == "0"  # deposit + lending + disposals; related parties are part of lending
+    assert v["hard_to_repeat"] == "709" and v["pbt"] == "-130.6" and v["share"] is None and v["pbt_without"] == "-839.6"
+    assert v["interest_expensed"] == "971.9" and v["interest_total"] == "1021.9" and v["capitalised_share"] is None  # a loss: no share
+    for raw, code in (({"20x1": {"deposit": "1"}}, "invalid_year"), ({"2021": {"bonus": "1"}}, "invalid_kind"), ({"2021": {}}, "empty_year"),
+                      ({"2021": {"lending": "10", "lending_related": "20"}}, "related_over_lending")):
+        with pytest.raises(NoteError) as err:
+            validate_fin_notes(raw)
+        assert err.value.code == code
+
+
+def test_a_profitable_year_shows_the_shares_against_profit_before_tax():
+    from investment_agent.domain.fixed_asset_notes import fin_notes_view, validate_fin_notes
+    (v,) = fin_notes_view(validate_fin_notes({"2021": {"deposit": "1194", "fx_unrealised": "46", "capitalised_interest": "100"}}),
+                          {"years": {"2021": {"fin_income": str(3071 * B), "pbt": str(37057 * B), "interest": str(2526 * B)}}})
+    assert v["hard_to_repeat"] == "46" and v["share"] == "0.0012" and v["pbt_without"] == "37011" and v["capitalised_share"] == "0.0027"
+    assert v["gap"] == "-1831"  # the kinds written so far against the statements' financial income

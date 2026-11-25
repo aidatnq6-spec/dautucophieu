@@ -136,4 +136,19 @@ def propose_related(gateway, *, symbol: str, year: str, pages: list[str]) -> dic
     return {"status": "ok", "rows": rows, "dropped": dropped, "cost_usd": str(done.cost_usd)}
 
 
-__all__ = ["Blocked", "DocError", "ask", "document_pages", "live_fetch", "month_spend", "personal_names", "propose_related"]
+def propose_notes(gateway, *, symbol: str, year: str, pages: list[str]) -> dict:
+    """AI soạn nháp Thuyết minh TSCĐ (25/11/2026): one call for the whole report; lines whose figures are not on their page are dropped."""
+    from investment_agent.ai.notes_draft import check_notes, notes_messages, notes_passages
+    passages = notes_passages(pages)
+    if not passages:
+        return {"status": "no_passages", "draft": None, "dropped": [], "cost_usd": "0"}
+    done = gateway.complete("notes_extract", notes_messages(symbol, year, passages), job_id=f"notes-draft-{uuid.uuid4().hex[:12]}",
+                            response_format=JSON_FORMAT)
+    try:
+        draft, dropped = check_notes(done.content, passages, document_text=" ".join(pages))
+    except Unverified as exc:
+        return {"status": "unverified", "reason": exc.code, "draft": None, "dropped": [], "cost_usd": str(done.cost_usd)}
+    return {"status": "ok", "draft": draft, "dropped": dropped, "cost_usd": str(done.cost_usd)}
+
+
+__all__ = ["Blocked", "DocError", "ask", "document_pages", "live_fetch", "month_spend", "personal_names", "propose_notes", "propose_related"]

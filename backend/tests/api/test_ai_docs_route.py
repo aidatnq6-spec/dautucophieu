@@ -89,3 +89,17 @@ def test_unsafe_links_and_unwatched_tickers_are_refused(tmp_path):
     c, clock = client(tmp_path, FakeGateway())
     assert call(c, clock, "POST", "/internal/ai-docs/VJC/ask", {"url": "http://example.vn/a.pdf", "question": "Có gì?"}).json()["code"] == "unsafe_url"
     assert call(c, clock, "POST", "/internal/ai-docs/FPT/ask", {"url": URL, "question": "Có gì?"}).status_code == 404
+
+
+def test_a_draft_for_the_notes_block_is_proposed_with_its_pages_never_saved_owner_25_11_2026(tmp_path):
+    """AI soạn nháp Thuyết minh TSCĐ: one notes_extract call; only the ticker, the year and passages go out; nothing is saved."""
+    gw = FakeGateway(json.dumps({"unit": "triệu đồng", "projects": [], "ranges": [], "prepaid": [], "deals": [], "capitalised_interest": None,
+                                 "incentives": [], "extra": "ignored"}))
+    c, clock = client(tmp_path, gw)
+    body = call(c, clock, "POST", "/internal/ai-docs/HPG/notes-draft", {"url": URL, "year": "2021"}).json()
+    assert body["status"] == "ok" and body["draft"]["projects"] == [] and body["cost_usd"] == "0.01" and "spend" in body
+    task, messages = gw.sent[0]
+    assert task == "notes_extract" and set(json.loads(messages[1]["content"])) == {"ticker", "year", "passages"}
+    assert "Quỹ hưu" not in json.dumps(messages, ensure_ascii=False)  # the owner's own rows never go out
+    bad = call(c, clock, "POST", "/internal/ai-docs/HPG/notes-draft", {"url": URL, "year": "21"})
+    assert bad.status_code == 422

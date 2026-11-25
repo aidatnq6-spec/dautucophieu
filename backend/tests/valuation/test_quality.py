@@ -23,8 +23,8 @@ def test_all_nine_criteria_pass_for_a_company_improving_on_every_line():
     assert [c["passed"] for c in f["criteria"]] == [True] * 9
     assert f["criteria"][0]["detail"] == "ROA 9,0% (lợi nhuận 9 tỷ / tài sản đầu kỳ 100 tỷ)"
     assert f["criteria"][6]["detail"] == "Không có đợt huy động vốn bằng cổ phiếu năm 2025 (cổ phiếu thưởng, cổ tức bằng cổ phiếu không tính)"
-    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None, None, None, None, None]  # financial income and its cash, other
-    # receivables, prepayments, construction in progress, prepaid expenses: not kept
+    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None, None, None, None, None, None]  # financial income and its cash,
+    # other receivables, prepayments, construction in progress, prepaid expenses, goodwill: not kept
 
 
 def test_a_capital_raise_and_worse_lines_fail_and_the_signs_show_their_numbers():
@@ -344,3 +344,21 @@ def test_prepaid_expenses_growing_faster_than_revenue_by_a_material_amount_is_a_
     assert sign(report_quality(prepaid_years(1, 9, 1, 10, pbt1=5), "x"), "prepaid_outpace_revenue")["flag"] is False  # +10% against +22%
     assert sign(report_quality(prepaid_years(0, 0, 3, 17, pbt1=50), "x"), "prepaid_outpace_revenue")["flag"] is None  # nothing a year before
     assert sign(report_quality(STRONG, "x"), "prepaid_outpace_revenue")["flag"] is None
+
+
+def goodwill_years(gw0, gw1, equity1=1000, minority1=10, equity0=900, minority0=10):
+    out = {y: dict(r) for y, r in STRONG["annual"].items()}
+    out["2024"].update(goodwill=str(gw0 * BN), equity=str(equity0 * BN), minority_equity=str(minority0 * BN))
+    out["2025"].update(goodwill=str(gw1 * BN), equity=str(equity1 * BN), minority_equity=str(minority1 * BN))
+    return {**STRONG, "annual": out}
+
+
+def test_goodwill_from_a_tenth_of_parent_equity_is_a_sign_owner_25_11_2026():
+    """NVL 2021: 5.104 tỷ, 14,6% of parent equity."""
+    s = sign(report_quality(goodwill_years(80, 120), "Bất động sản"), "goodwill_large")
+    assert s["label"] == "Lợi thế thương mại lớn" and s["flag"] is True and "10%" in s["rule"]
+    assert s["detail"] == "Năm 2025: lợi thế thương mại 120 tỷ, bằng 12,1% vốn chủ công ty mẹ 990 tỷ; năm 2024: 80 tỷ (9,0%)"
+    assert sign(report_quality(goodwill_years(80, 90), "x"), "goodwill_large")["flag"] is False  # 9,1%
+    assert sign(report_quality(goodwill_years(0, 0), "x"), "goodwill_large")["flag"] is False
+    assert sign(report_quality(goodwill_years(0, 50, equity1=10, minority1=20), "x"), "goodwill_large")["flag"] is None  # parent equity not positive
+    assert sign(report_quality(STRONG, "x"), "goodwill_large")["flag"] is None

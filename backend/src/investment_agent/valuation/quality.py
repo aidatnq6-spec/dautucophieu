@@ -22,6 +22,7 @@ OTHER_RECEIVABLES_SHARE, OTHER_RECEIVABLES_FLOOR = Decimal("0.10"), Decimal("0.0
 # when it falls by CIP_DROP from a year it was CIP_MATERIAL of them and the cost of tangible assets rose by at least CIP_COST_SHARE of the fall
 CIP_YEARS, CIP_SHARE = 3, Decimal("0.20")
 PREPAID_GAP, PREPAID_MATERIAL = Decimal("0.20"), Decimal("0.10")  # growth above revenue's, in share points; the increase against profit before tax
+GOODWILL_SHARE = Decimal("0.10")  # goodwill against parent equity (owner, 25/11/2026)
 CIP_DROP, CIP_MATERIAL, CIP_COST_SHARE = Decimal("0.50"), Decimal("0.10"), Decimal("0.50")
 BN = Decimal(1_000_000_000)
 # Sector context shown with the signs, where a sign is usual for the business rather than a warning by itself.
@@ -250,7 +251,28 @@ def _signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:
                       "detail": f"Thiếu trả trước cho người bán hoặc tổng tài sản năm {y} (có sau lần cập nhật báo cáo tới)"})
     signs += _cip_signs(a, y)
     signs.append(_prepaid_sign(cur, prev, y))
+    signs.append(_goodwill_sign(cur, prev, y))
     return signs
+
+
+def _parent(row: dict) -> Decimal | None:
+    return row["equity"] - row.get("minority_equity", Decimal(0)) if "equity" in row else None
+
+
+def _goodwill_sign(cur: dict, prev: dict, y: int) -> dict:
+    """Goodwill from a tenth of parent equity: paid above the net assets bought; written off if the deal disappoints, it cuts equity."""
+    label = "Lợi thế thương mại lớn"
+    parent = _parent(cur)
+    if "goodwill" not in cur or parent is None or parent <= 0:
+        return {"id": "goodwill_large", "label": label, "flag": None,
+                "detail": f"Thiếu lợi thế thương mại hoặc vốn chủ năm {y}, hoặc vốn chủ công ty mẹ không dương (có sau lần cập nhật báo cáo tới)"}
+    goodwill, before, before_parent = cur["goodwill"], prev.get("goodwill"), _parent(prev)
+    share = goodwill / parent
+    then = (f"; năm {y - 1}: {_bn(before)}" + (f" ({_pct(before / before_parent)})" if before_parent and before_parent > 0 else "")) if before is not None else ""
+    return {"id": "goodwill_large", "label": label, "flag": goodwill > 0 and share >= GOODWILL_SHARE,
+            "rule": f"lợi thế thương mại từ {_num(GOODWILL_SHARE * 100, 0)}% vốn chủ công ty mẹ: phần trả cao hơn tài sản thuần khi mua công ty; nếu thương "
+                    "vụ không như kỳ vọng, khoản này có thể bị xóa sổ và làm giảm vốn chủ; đọc thuyết minh hợp nhất kinh doanh",
+            "detail": f"Năm {y}: lợi thế thương mại {_bn(goodwill)}, bằng {_pct(share)} vốn chủ công ty mẹ {_bn(parent)}{then}"}
 
 
 def _prepaid_sign(cur: dict, prev: dict, y: int) -> dict:

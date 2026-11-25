@@ -14,3 +14,9 @@ nhắc Telegram cho mã đang giữ. Chỉ bắt các lần sửa từ nay, tron
 - **Biên gộp so với trung bình 4 năm trước** (điểm %): biên gộp năm đó − trung bình biên gộp 4 năm liền trước; quý: biên gộp 4 quý tới quý đó −
   trung bình của 4 khung 4 quý kết thúc cùng quý các năm trước. Thiếu một năm: để trống. HAG 2019: −19,2 điểm; HPG 2022: −9,9 điểm.
 - **Giảm trừ ÷ doanh thu bán hàng** (chiết khấu, giảm giá, hàng bán bị trả lại). HPG 2021: 0,8%; HAG 2021: 4,1%.
+
+## 3. Dấu hiệu "Biên gộp lệch mạnh" (bổ sung 25/11/2026, chủ sở hữu duyệt bước 3, ngưỡng 10 điểm %)
+- Chất lượng báo cáo, sau "Lỗ lũy kế, vốn chủ dưới vốn góp". Từ doanh thu thuần và lãi gộp đã có trong bản ghi cơ bản.
+- Bật khi biên gộp năm gần nhất lệch (cao hơn hoặc thấp hơn) trung bình biên gộp 4 năm liền trước từ **10 điểm %**. Hiện biên gộp 5 năm. Nhắc
+  đọc thuyết minh giá vốn: giá nguyên liệu, thay đổi cơ cấu mảng, điều chỉnh hồi tố (HAG 2019: −19,2 điểm).
+- Thiếu một năm hoặc doanh thu không dương: không đánh giá được. Thử 42 mã: 3 mã bật. Chỉ hiện trên trang.

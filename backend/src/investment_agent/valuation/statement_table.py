@@ -61,7 +61,14 @@ FIXED = [
     ("ppe_wear", "Mức hao mòn TSCĐ hữu hình", "pct", 1), ("cip_to_ppe", "XDCB ÷ TSCĐ hữu hình", "pct", 1),
     ("capex_to_depreciation", "Capex ÷ khấu hao", "x", 1), ("ppe_turnover", "Vòng quay TSCĐ hữu hình", "x", 1),
 ]
-FIXED_RATIOS = ("ppe_wear", "cip_to_ppe", "capex_to_depreciation", "ppe_turnover", "prepaid_to_assets", "prepaid_to_pbt", "goodwill_to_equity")
+FIXED_RATIOS = ("ppe_wear", "cip_to_ppe", "capex_to_depreciation", "ppe_turnover", "prepaid_to_assets", "prepaid_to_pbt", "goodwill_to_equity",
+                "st_debt_share", "avg_rate", "icr", "cash_to_st_debt")
+DEBT = [
+    ("g", "Nợ vay"), ("st_debt", "Vay ngắn hạn", "money", 0), ("lt_debt", "Vay dài hạn", "money", 0), ("st_debt_share", "Tỷ trọng vay ngắn hạn", "pct", 1),
+    ("avg_rate", "Lãi suất vay bình quân", "pct", 1), ("icr", "Khả năng trả lãi (EBIT ÷ lãi vay)", "x", 1),
+    ("cash_to_st_debt", "(Tiền + đầu tư tài chính ngắn hạn) ÷ vay ngắn hạn", "x", 1), ("net_borrowing", "Vay thuần trong kỳ (dòng tiền)", "money", 1),
+    ("fx_unrealised", "Lãi, lỗ tỷ giá chưa thực hiện (dòng tiền)", "money", 1),
+]
 PREPAID = [
     ("g", "Chi phí trả trước"), ("prepaid_st", "Chi phí trả trước ngắn hạn", "money", 1), ("prepaid_lt", "Chi phí trả trước dài hạn", "money", 1),
     ("prepaid_total", "Tổng chi phí trả trước", "money", 0), ("prepaid_to_assets", "Chi phí trả trước ÷ tổng tài sản", "pct", 1),
@@ -214,14 +221,29 @@ def _prepaid(f: dict, pbt: Decimal | None) -> dict:
             "prepaid_to_pbt": _ratio(total, pbt, _Q2) if total is not None and pbt is not None and pbt > 0 else None}
 
 
+def _debt(f: dict, flows: dict[str, Decimal | None], before: dict | None) -> dict:
+    """Borrowings at a period's end; `flows` the interest and EBIT of the period (four quarters in the quarterly view), `before` the period a
+    year before for the average borrowings."""
+    st, lt = _d(f.get("st_debt")), _d(f.get("lt_debt"))
+    debt, cash_like = _sum(st, lt), _sum(_d(f.get("cash")), _d(f.get("st_investments")))
+    debt_before = _sum(_d((before or {}).get("st_debt")), _d((before or {}).get("lt_debt"))) if before else None
+    interest, ebit = flows.get("interest"), flows.get("ebit")
+    average = None if debt is None or debt_before is None else (debt + debt_before) / 2
+    return {"st_debt_share": _ratio(st, debt) if st is not None and debt is not None and debt > 0 else None,
+            "avg_rate": _ratio(interest, average) if interest is not None and interest > 0 and average is not None and average > 0 else None,
+            "icr": _ratio(ebit, interest, _Q2) if ebit is not None and interest is not None and interest > 0 else None,
+            "cash_to_st_debt": _ratio(cash_like, st, _Q2) if cash_like is not None and st is not None and st > 0 else None,
+            "net_borrowing": _sum(_d(f.get("borrow_in")), _d(f.get("borrow_out")))}
+
+
 def _fixed_years(years: dict) -> dict[str, dict]:
     return {y: _fixed(f, {k: _d(f.get(k)) for k in ("capex", "depreciation", "revenue")}, years.get(str(int(y) - 1))) | _prepaid(f, _d(f.get("pbt")))
-            for y, f in years.items()}
+            | _debt(f, {k: _derived(f).get(k) for k in ("interest", "ebit")}, years.get(str(int(y) - 1))) for y, f in years.items()}
 
 
 def _fixed_quarters(quarters: dict) -> dict[str, dict]:
     return {p: _fixed(f, _four(quarters, p, ("capex", "depreciation", "revenue")), quarters.get(_prior(p))) | _prepaid(f, _four(quarters, p, ("pbt",))["pbt"])
-            for p, f in quarters.items()}
+            | _debt(f, _four(quarters, p, ("interest", "ebit")), quarters.get(_prior(p))) for p, f in quarters.items()}
 
 
 def _merge(*parts: dict[str, dict]) -> dict[str, dict]:
@@ -333,7 +355,7 @@ def _ins_checks(periods: dict) -> list[dict]:
 
 
 CAP_GAP = Decimal("0.10")
-FIXED_LINES_SINCE = 10  # the statements' LINES_VERSION that brought the fixed-asset (8), prepaid-expense (9) and goodwill (10) lines
+FIXED_LINES_SINCE = 11  # the statements' LINES_VERSION that brought the fixed-asset (8), prepaid-expense (9), goodwill (10) and borrowing (11) lines
 
 
 def _invested(f: dict) -> Decimal | None:
@@ -489,11 +511,11 @@ def statement_table(record: dict, *, closes, vnstock: dict | None, kind: str | N
                 "pe_context": pe_context(record.get("quarters", {}))}
     quarters, years = record.get("quarters", {}), record.get("years", {})
     year_part = _part(years, sorted(years), extra=_merge(_valuation(years, record.get("year_end_close", {})), _fixed_years(years)),
-                      spec=P_AND_L + FIXED + PREPAID + SCALE)
+                      spec=P_AND_L + FIXED + PREPAID + DEBT + SCALE)
     quarter_part = _part(quarters, sorted(quarters), extra=_merge(_quarter_valuation(quarters, record.get("quarter_end_close", {})),
-                                                                  _fixed_quarters(quarters)), spec=P_AND_L + FIXED + PREPAID + SCALE)
+                                                                  _fixed_quarters(quarters)), spec=P_AND_L + FIXED + PREPAID + DEBT + SCALE)
     for row in quarter_part["rows"]:  # these two ratios run over the four quarters to each quarter
-        if row["key"] in ("capex_to_depreciation", "ppe_turnover", "prepaid_to_pbt"):
+        if row["key"] in ("capex_to_depreciation", "ppe_turnover", "prepaid_to_pbt", "avg_rate", "icr"):
             row["label"] = f"{row['label']} (4 quý)"
     for row in year_part["rows"] + quarter_part["rows"]:  # money lines of the valuation block arrive as Decimals
         if row["kind"] == "money":

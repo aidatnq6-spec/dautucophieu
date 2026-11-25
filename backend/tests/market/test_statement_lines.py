@@ -42,3 +42,10 @@ def test_goodwill_and_its_amortisation_are_kept_owner_25_11_2026():
     names = {(m, c): n for (m, c), n in LINES.items()}
     assert names[(1, 12690)] == "goodwill" and names[(3, 31111)] == "goodwill_amort"
     assert LINES_VERSION >= 10
+
+
+def test_borrowing_cash_flows_and_unrealised_exchange_differences_are_kept_owner_25_11_2026():
+    """Nợ vay (spec 25/11/2026): 33300 borrowings received, 33400 principal repaid, 31100 unrealised exchange gains and losses."""
+    names = {(m, c): n for (m, c), n in LINES.items()}
+    assert names[(3, 33300)] == "borrow_in" and names[(3, 33400)] == "borrow_out" and names[(3, 31100)] == "fx_unrealised"
+    assert LINES_VERSION >= 11

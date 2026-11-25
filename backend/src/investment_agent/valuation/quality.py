@@ -24,6 +24,7 @@ CIP_YEARS, CIP_SHARE = 3, Decimal("0.20")
 PREPAID_GAP, PREPAID_MATERIAL = Decimal("0.20"), Decimal("0.10")  # growth above revenue's, in share points; the increase against profit before tax
 GOODWILL_SHARE = Decimal("0.10")  # goodwill against parent equity (owner, 25/11/2026)
 INTEREST_COVER = Decimal(3)  # EBIT over interest expense below this (owner, 25/11/2026)
+EQUITY_OUTSIDE = Decimal("0.10")  # equity's change outside profit and shareholder cash against opening equity (owner, 25/11/2026)
 CIP_DROP, CIP_MATERIAL, CIP_COST_SHARE = Decimal("0.50"), Decimal("0.10"), Decimal("0.50")
 BN = Decimal(1_000_000_000)
 # Sector context shown with the signs, where a sign is usual for the business rather than a warning by itself.
@@ -254,7 +255,41 @@ def _signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:
     signs.append(_prepaid_sign(cur, prev, y))
     signs.append(_goodwill_sign(cur, prev, y))
     signs.append(_cover_sign(cur, prev, y))
+    signs += [_equity_outside_sign(cur, prev, y), _accumulated_loss_sign(cur, y)]
     return signs
+
+
+_FLOWS = ("profit", "issue_cash", "buyback_cash", "dividends_paid")
+
+
+def _equity_outside_sign(cur: dict, prev: dict, y: int) -> dict:
+    """Equity's change in the year that profit, shares issued or bought back and dividends paid do not explain, up or down, from a tenth of
+    opening equity: a subsidiary sold, a restatement, exchange differences; the notes on changes in equity tell which."""
+    label = "Vốn chủ thay đổi ngoài lợi nhuận"
+    if "equity" not in cur or prev.get("equity", Decimal(0)) <= 0 or any(k not in cur for k in _FLOWS):
+        return {"id": "equity_outside_profit", "label": label, "flag": None,
+                "detail": f"Thiếu vốn chủ năm {y - 1}–{y}, LNST hoặc dòng tiền với cổ đông năm {y} (có sau lần cập nhật báo cáo tới)"}
+    opening, closing = prev["equity"], cur["equity"]
+    rest = closing - opening - sum((cur[k] for k in _FLOWS), Decimal(0))
+    share = abs(rest) / opening
+    return {"id": "equity_outside_profit", "label": label, "flag": share >= EQUITY_OUTSIDE,
+            "rule": f"phần thay đổi vốn chủ không qua LNST, phát hành, mua lại cổ phiếu hay cổ tức (tăng hoặc giảm) từ {_num(EQUITY_OUTSIDE * 100, 0)}% vốn chủ "
+                    "đầu năm: thoái vốn công ty con, điều chỉnh hồi tố, chênh lệch tỷ giá…; đọc thuyết minh thay đổi vốn chủ",
+            "detail": f"Năm {y}: vốn chủ {_bn(closing)}, đầu năm {_bn(opening)}; LNST {_bn(cur['profit'])}, phát hành {_bn(cur['issue_cash'])}, "
+                      f"mua lại {_bn(cur['buyback_cash'])}, cổ tức đã trả {_bn(cur['dividends_paid'])}; phần còn lại {_bn(rest)}, bằng {_pct(share)} vốn chủ đầu năm"}
+
+
+def _accumulated_loss_sign(cur: dict, y: int) -> dict:
+    """Retained earnings below zero, or parent equity below charter capital: no cash dividend while losses remain; part of the capital lost."""
+    label = "Lỗ lũy kế, vốn chủ dưới vốn góp"
+    parent = _parent(cur)
+    if "retained" not in cur or cur.get("charter_capital", Decimal(0)) <= 0 or parent is None:
+        return {"id": "accumulated_loss", "label": label, "flag": None,
+                "detail": f"Thiếu LNST chưa phân phối, vốn góp hoặc vốn chủ năm {y} (có sau lần cập nhật báo cáo tới)"}
+    capital = cur["charter_capital"]
+    return {"id": "accumulated_loss", "label": label, "flag": cur["retained"] < 0 or parent < capital,
+            "rule": "LNST chưa phân phối âm (còn lỗ lũy kế thì chưa chia cổ tức tiền được), hoặc vốn chủ công ty mẹ dưới vốn góp (đã mất một phần vốn)",
+            "detail": f"Năm {y}: LNST chưa phân phối {_bn(cur['retained'])}; vốn chủ công ty mẹ {_bn(parent)}, bằng {_num(parent / capital, 2)} lần vốn góp {_bn(capital)}"}
 
 
 def _cover(row: dict) -> Decimal | None:

@@ -207,3 +207,11 @@ def test_the_record_carries_interest_expense_for_the_cover_sign_owner_25_11_2026
     s = statements()
     s["years"]["2025"]["interest"] = str(2526 * B)
     assert build_record("FPT", s, EVENTS, shares=None, now=NOW)["annual"]["2025"]["interest"] == str(2526 * B)
+
+
+def test_the_record_carries_the_equity_lines_of_the_two_equity_signs_owner_25_11_2026():
+    s = statements()
+    s["years"]["2025"].update({"charter_capital": str(9274 * B), "retained": str(-4467 * B), "issue_cash": "0", "buyback_cash": "0", "dividends_paid": str(-5 * B)})
+    annual = build_record("FPT", s, EVENTS, shares=None, now=NOW)["annual"]["2025"]
+    assert (annual["charter_capital"], annual["retained"], annual["issue_cash"], annual["buyback_cash"], annual["dividends_paid"]) == (
+        str(9274 * B), str(-4467 * B), "0", "0", str(-5 * B))

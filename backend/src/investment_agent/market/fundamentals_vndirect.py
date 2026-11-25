@@ -33,7 +33,10 @@ ANNUAL = {"revenue": "revenue", "gross_profit": "gross_profit", "selling": "sell
           "cip": "cip", "ppe_net": "ppe_net", "ppe_gross": "ppe_gross", "depreciation": "depreciation",
           "prepaid_st": "prepaid_st", "prepaid_lt": "prepaid_lt",  # Chi phí trả trước tăng nhanh hơn doanh thu (25/11/2026)
           "goodwill": "goodwill", "equity": "equity", "minority_equity": "minority_equity",  # Lợi thế thương mại lớn (25/11/2026)
-          "interest": "interest"}  # Khả năng trả lãi thấp (25/11/2026)
+          "interest": "interest",  # Khả năng trả lãi thấp (25/11/2026)
+          # Vốn chủ thay đổi ngoài lợi nhuận; Lỗ lũy kế, vốn chủ dưới vốn góp (25/11/2026)
+          "charter_capital": "charter_capital", "retained": "retained", "issue_cash": "issue_cash", "buyback_cash": "buyback_cash",
+          "dividends_paid": "dividends_paid"}
 COSTS = ("selling", "admin")  # VNDirect: positive; Vnstock (and Chất lượng báo cáo): negative
 BONUS, RAISE = ("STOCKDIV", "KINDDIV"), ("ISSUE",)
 

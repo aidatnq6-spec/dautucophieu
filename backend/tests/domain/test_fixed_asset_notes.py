@@ -113,3 +113,55 @@ def test_a_deal_gives_its_goodwill_by_the_lesson_s_formula_and_its_yearly_charge
         with pytest.raises(NoteError) as err:
             validate_deals(raw)
         assert err.value.code == code
+
+
+NVL_DEALS = [{"name": "Nova Final Solution", "date": "30/06/2021", "share": "99.98", "price": "5598", "net_assets": "7315", "note_goodwill": "-1670"},
+             {"name": "Greenland", "date": "29/03/2021", "share": "69.87", "price": "2859", "net_assets": "3896", "note_goodwill": "103", "nci_part": "34",
+              "years": "10"}]
+
+
+def test_a_deal_shows_the_notes_goodwill_beside_the_formula_and_uses_the_notes_owner_25_11_2026():
+    """Bài hợp nhất kinh doanh, NVL 2021: the formula gives −1.715,5 for Final Solution, the notes −1.670; Greenland 103 for the group, 34 for
+    non-controlling interests."""
+    from investment_agent.domain.fixed_asset_notes import deals_view, validate_deals
+    green, final = deals_view(validate_deals(NVL_DEALS), today=date(2026, 11, 25))
+    assert final["computed"] == "-1715.537" and final["note_goodwill"] == "-1670" and final["gap"] == "-45.537"
+    assert final["goodwill"] == "-1670" and final["kind"] == "bargain" and final["gain_year"] == "2021"
+    assert green["goodwill"] == "103" and green["nci_part"] == "34" and green["per_year"] == "10.3"
+    with pytest.raises(NoteError) as err:
+        validate_deals([{**NVL_DEALS[1], "nci_part": "-1"}])
+    assert err.value.code == "invalid_amount"
+
+
+def test_the_yearly_goodwill_movement_leaves_what_amortisation_does_not_explain_owner_25_11_2026():
+    """NVL 2021: 5.950,8 at the start + 103 (Greenland) − 821 amortised (notes) = 5.232,8 against 5.104,0 at the end: 128,8 other decreases."""
+    from investment_agent.domain.fixed_asset_notes import deals_view, goodwill_moves, validate_amort, validate_deals
+    deals = deals_view(validate_deals(NVL_DEALS), today=date(2026, 11, 25))
+    statements = {"years": {"2020": {"goodwill": str(int(5950.8 * 10) * 10**8)}, "2021": {"goodwill": str(5104 * B), "admin": str(int(1325.6 * 10) * 10**8),
+                                                                                          "pbt": str(int(5086.2 * 10) * 10**8)},
+                            "2022": {"goodwill": str(int(4544.3 * 10) * 10**8)}}}
+    amort = validate_amort({"2021": "821"})
+    assert amort == {"2021": "821"}
+    moves = {m["year"]: m for m in goodwill_moves(deals, amort, statements)}
+    m = moves["2021"]
+    assert (m["opening"], m["added"], m["amortised"], m["closing"], m["other"]) == ("5950.8", "103", "821", "5104", "128.8")
+    assert m["decline"] == "949.8" and m["to_admin"] == "0.6193" and m["to_pbt"] == "0.1614"
+    assert moves["2022"]["amortised"] is None and moves["2022"]["other"] is None and moves["2022"]["decline"] == "559.7"
+    assert "2020" not in moves  # no year before it
+    with pytest.raises(NoteError) as err:
+        validate_amort({"2021": "-5"})
+    assert err.value.code == "invalid_amount"
+
+
+def test_a_bargain_gain_from_a_tenth_of_profit_before_tax_is_a_sign_with_profit_without_it_owner_25_11_2026():
+    """NVL 2021: 1.670 of 5.086,2 tỷ = 32,8%; without it 3.416,2 tỷ."""
+    from investment_agent.domain.fixed_asset_notes import bargain_years, deals_view, validate_deals
+    deals = deals_view(validate_deals(NVL_DEALS), today=date(2026, 11, 25))
+    (y,) = bargain_years(deals, {"years": {"2021": {"pbt": str(int(5086.2 * 10) * 10**8)}}})
+    assert y == {"year": "2021", "gain": "1670", "deals": ["Nova Final Solution"], "pbt": "5086.2", "share": "0.3283", "pbt_without": "3416.2", "flag": True}
+    (small,) = bargain_years(deals, {"years": {"2021": {"pbt": str(20000 * B)}}})
+    assert small["share"] == "0.0835" and small["flag"] is False
+    (loss,) = bargain_years(deals, {"years": {"2021": {"pbt": str(-100 * B)}}})
+    assert loss["share"] is None and loss["flag"] is True  # a loss before tax with a bargain gain: always
+    (unknown,) = bargain_years(deals, {"years": {}})
+    assert unknown["pbt"] is None and unknown["flag"] is None

@@ -1,5 +1,17 @@
 import { expect, it } from "vitest";
-import { dealText, quarterInput, stateText, yearsLeftText } from "./fixed-asset-notes";
+import { bargainText, dealText, gapText, quarterInput, stateText, yearsLeftText } from "./fixed-asset-notes";
+
+it("the notes' goodwill sits beside the formula's, with the gap", () => {
+  expect(gapText({ computed: "-1715.537", note_goodwill: "-1670", gap: "-45.537" })).toBe("Công thức: −1.715,5 tỷ; thuyết minh: −1.670 tỷ (lệch −45,5 tỷ, dùng số thuyết minh)");
+  expect(gapText({ computed: "400", note_goodwill: null, gap: null })).toBe(null);
+});
+
+it("a bargain gain says it brought no cash and what profit is without it", () => {
+  expect(bargainText({ year: "2021", gain: "1670", pbt: "5086.2", share: "0.3283", pbt_without: "3416.2" }))
+    .toBe("Năm 2021: lãi mua rẻ 1.670 tỷ (không có tiền đi kèm), bằng 32,8% LNTT 5.086,2 tỷ; LNTT loại lãi mua rẻ 3.416,2 tỷ");
+  expect(bargainText({ year: "2021", gain: "1670", pbt: null, share: null, pbt_without: null }))
+    .toBe("Năm 2021: lãi mua rẻ 1.670 tỷ (không có tiền đi kèm); chưa có LNTT năm này trong báo cáo đã lưu");
+});
 
 it("a quarter is written back as the owner types it", () => {
   expect(quarterInput("2027-Q3")).toBe("Q3/2027");

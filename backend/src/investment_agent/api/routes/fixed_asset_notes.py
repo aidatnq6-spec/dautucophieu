@@ -8,8 +8,9 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Request
 from pydantic import Field
 
-from investment_agent.domain.fixed_asset_notes import (GROUPS, MAX_DEALS, MAX_PROJECTS, PREPAID_KINDS, NoteError, complete, deals_view, due_view,
-                                                         postpone, prepaid_view, validate_deals, validate_notes, validate_prepaid)
+from investment_agent.domain.fixed_asset_notes import (GROUPS, MAX_DEALS, MAX_PROJECTS, PREPAID_KINDS, NoteError, bargain_years, complete, deals_view,
+                                                         due_view, goodwill_moves, postpone, prepaid_view, validate_amort, validate_deals,
+                                                         validate_notes, validate_prepaid)
 from investment_agent.domain.models import ContractModel
 from investment_agent.market.financial_ratios import kind_of
 from investment_agent.market.sectors import load_sectors
@@ -32,6 +33,7 @@ class NotesRequest(ContractModel):
     ranges: dict
     prepaid: dict | None = None  # left out: the stored allocation is kept
     deals: list[dict] | None = Field(default=None, max_length=MAX_DEALS)  # left out: the stored deals are kept
+    goodwill_amort: dict | None = None  # year → amortised (the notes); left out: kept
     expected_version: int = Field(strict=True, ge=0)
     request_id: str = Field(pattern=_REQUEST)
 
@@ -68,7 +70,14 @@ def _view(request: Request, repo, owner, symbol: str) -> dict:
     statements = StatementStore(Path(request.app.state.data_dir) / "statements").read(symbol) or {}
     return {"symbol": symbol, "version": record.version if record else 0, "projects": due_view(projects, statements, today=_today(request)),
             "ranges": ranges, "groups": GROUPS, "prepaid": prepaid_view(_stored(record, "prepaid", {}), statements), "prepaid_kinds": PREPAID_KINDS,
-            "deals": deals_view(_stored(record, "deals", []), today=_today(request))}
+            **_deal_parts(record, statements, _today(request))}
+
+
+def _deal_parts(record, statements: dict, today) -> dict:
+    deals = deals_view(_stored(record, "deals", []), today=today)
+    amort = _stored(record, "goodwill_amort", {})
+    return {"deals": deals, "goodwill_amort": amort, "goodwill_moves": goodwill_moves(deals, amort, statements),
+            "bargains": bargain_years(deals, statements)}
 
 
 def _stored(record, key: str, empty):
@@ -93,12 +102,14 @@ def _run(request: Request, symbol: str, change):
         return unavailable()
 
 
-def _write(repo, owner, sym: str, projects: list, ranges: dict, body, prepaid: dict | None = None, deals: list | None = None) -> None:
-    """prepaid, deals None: the stored ones are kept."""
+EXTRAS = {"prepaid": {}, "deals": [], "goodwill_amort": {}}  # parts a write may leave out: the stored ones are kept
+
+
+def _write(repo, owner, sym: str, projects: list, ranges: dict, body, **extras) -> None:
+    """extras: prepaid, deals, goodwill_amort; one left out or None keeps what is stored."""
     record = read_notes(repo, owner, sym)[0]
-    prepaid = _stored(record, "prepaid", {}) if prepaid is None else prepaid
-    deals = _stored(record, "deals", []) if deals is None else deals
-    repo.write(owner, "settings", record_id(sym), {"symbol": sym, "projects": projects, "ranges": ranges, "prepaid": prepaid, "deals": deals},
+    kept = {k: _stored(record, k, empty) if extras.get(k) is None else extras[k] for k, empty in EXTRAS.items()}
+    repo.write(owner, "settings", record_id(sym), {"symbol": sym, "projects": projects, "ranges": ranges, **kept},
                expected_version=body.expected_version, request_id=body.request_id)
 
 
@@ -112,8 +123,9 @@ def put_notes(symbol: str, request: Request, body: NotesRequest):
     def change(repo, owner, sym):
         _, stored, _ = read_notes(repo, owner, sym)
         projects, ranges = validate_notes(body.projects, body.ranges, stored=stored)
-        _write(repo, owner, sym, projects, ranges, body, None if body.prepaid is None else validate_prepaid(body.prepaid),
-               None if body.deals is None else validate_deals(body.deals))
+        _write(repo, owner, sym, projects, ranges, body, prepaid=None if body.prepaid is None else validate_prepaid(body.prepaid),
+               deals=None if body.deals is None else validate_deals(body.deals),
+               goodwill_amort=None if body.goodwill_amort is None else validate_amort(body.goodwill_amort))
     return _run(request, symbol, change)
 
 

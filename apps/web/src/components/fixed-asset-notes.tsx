@@ -10,10 +10,14 @@ type Project = { id: string; name: string; due: string; read_period: string | nu
 type Ranges = { period: string | null; groups: Record<string, { from: number; to: number }> };
 type Prepaid = { year: string; items: Record<string, string>; total: string; summed: boolean; prepaid_lt: string | null; years_left: string | null; to_pbt: string | null };
 type Deal = { id: string; name: string; date: string; share: string; price: string; net_assets: string; years: number | null; source_url: string | null; note: string;
-  goodwill: string; kind: "goodwill" | "bargain" | "none"; per_year: string | null; ends: string | null; charging: boolean; gain_year: string | null };
+  goodwill: string; kind: "goodwill" | "bargain" | "none"; per_year: string | null; ends: string | null; charging: boolean; gain_year: string | null;
+  computed: string; note_goodwill: string | null; gap: string | null; nci_part: string | null };
+type Move = { year: string; opening: string; added: string; amortised: string | null; closing: string; decline: string; other: string | null; to_admin: string | null; to_pbt: string | null };
+type Bargain = { year: string; gain: string; deals: string[]; pbt: string | null; share: string | null; pbt_without: string | null; flag: boolean | null };
 type Data = { symbol: string; version: number; projects: Project[]; ranges: Ranges; groups: Record<string, string>; prepaid: Prepaid[]; prepaid_kinds: Record<string, string>;
-  deals: Deal[] };
-type DealDraft = { id?: string; name: string; date: string; share: string; price: string; net_assets: string; years: string; source_url: string; note: string };
+  deals: Deal[]; goodwill_amort: Record<string, string>; goodwill_moves: Move[]; bargains: Bargain[] };
+type DealDraft = { id?: string; name: string; date: string; share: string; price: string; net_assets: string; years: string; source_url: string; note: string;
+  note_goodwill: string; nci_part: string };
 type Draft = { id?: string; name: string; due: string; read_period: string; cip_value: string; budget: string; source_url: string; note: string };
 
 const requestId = () => `fan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -50,8 +54,25 @@ export function dealText(d: Pick<Deal, "kind" | "goodwill" | "per_year" | "ends"
     : `Lợi thế thương mại ${num(d.goodwill)} tỷ; ghi số năm phân bổ để thấy mức trừ vào lợi nhuận mỗi năm`;
 }
 
+const signed = (v: string) => (Number(v) < 0 ? `−${num(v.replace("-", ""))}` : num(v));
+const pct = (v: string) => `${(Number(v) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1, minimumFractionDigits: 1 })}%`;
+
+/** The formula's goodwill beside the notes', when the owner wrote the notes' figure. */
+export function gapText(d: Pick<Deal, "computed" | "note_goodwill" | "gap">): string | null {
+  return d.note_goodwill === null || d.gap === null ? null
+    : `Công thức: ${signed(d.computed)} tỷ; thuyết minh: ${signed(d.note_goodwill)} tỷ (lệch ${signed(d.gap)} tỷ, dùng số thuyết minh)`;
+}
+
+/** A year's bargain gains: no cash came with them; profit before tax with and without them. */
+export function bargainText(b: Pick<Bargain, "year" | "gain" | "pbt" | "share" | "pbt_without">): string {
+  const head = `Năm ${b.year}: lãi mua rẻ ${num(b.gain)} tỷ (không có tiền đi kèm)`;
+  if (b.pbt === null) return `${head}; chưa có LNTT năm này trong báo cáo đã lưu`;
+  const weight = b.share === null ? `; doanh nghiệp lỗ trước thuế ${signed(b.pbt)} tỷ` : `, bằng ${pct(b.share)} LNTT ${num(b.pbt)} tỷ`;
+  return `${head}${weight}; LNTT loại lãi mua rẻ ${signed(b.pbt_without ?? "0")} tỷ`;
+}
+
 const dealRaw = (d: DealDraft | Deal) => ({ ...(d.id ? { id: d.id } : {}), name: d.name, date: d.date, share: d.share, price: d.price, net_assets: d.net_assets,
-  years: d.years === null ? "" : String(d.years), source_url: d.source_url || null, note: d.note });
+  years: d.years === null ? "" : String(d.years), source_url: d.source_url || null, note: d.note, note_goodwill: d.note_goodwill ?? "", nci_part: d.nci_part ?? "" });
 
 const fig = (f: Figures) => (f ? `${periodInput(f.period)}: XDCB ${bn(f.cip)}, nguyên giá ${bn(f.ppe_gross)}` : null);
 
@@ -104,6 +125,13 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
   const saveDeals = (deals: ReturnType<typeof dealRaw>[]) => send(base, "PUT", { projects: others(), ranges: keptRanges(), deals });
   const charging = (data?.deals ?? []).filter((d) => d.charging && d.per_year).reduce((s, d) => s + Number(d.per_year), 0);
   const savePrepaid = (prepaid: Record<string, Record<string, string>>) => send(base, "PUT", { projects: others(), ranges: keptRanges(), prepaid });
+  function amortise(year: string, current: string | null) {
+    const value = window.prompt(`Phân bổ lợi thế thương mại năm ${year} theo thuyết minh (tỷ đồng; để trống để xóa):`, current ?? "");
+    if (value === null || !data) return;
+    const next = { ...data.goodwill_amort };
+    if (value.trim()) next[year] = value.trim(); else delete next[year];
+    void send(base, "PUT", { projects: others(), ranges: keptRanges(), goodwill_amort: next });
+  }
   function later(p: Project) {
     const to = window.prompt(`Quý hoàn thành mới cho ${p.name} (dạng Q2/2027):`);
     if (!to) return;
@@ -217,7 +245,9 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
             <td className="num" data-label="Tỷ lệ mua">{num(d.share)}%</td>
             <td className="num" data-label="Giá mua">{num(d.price)}</td>
             <td className="num" data-label="Tài sản thuần hợp lý">{num(d.net_assets)}</td>
-            <td data-label="Lợi thế thương mại" className={d.kind === "bargain" ? "negative" : ""}>{dealText(d)}</td>
+            <td data-label="Lợi thế thương mại" className={d.kind === "bargain" ? "negative" : ""}>{dealText(d)}
+              {gapText(d) && <div className="caption">{gapText(d)}</div>}
+              {d.nci_part && <div className="caption">Phần của cổ đông không kiểm soát: {num(d.nci_part)} tỷ</div>}</td>
             <td className="actions">
               <button type="button" className="btn" aria-label={`Sửa thương vụ ${d.name}`} onClick={() => setDeal({ ...dealRaw(d), date: day(d.date), source_url: d.source_url ?? "" })}>
                 <Pencil size={14} aria-hidden="true" />Sửa</button>
@@ -227,7 +257,8 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
         </table>
         {charging > 0 && <p className="caption" data-testid="fan-charging">Các thương vụ đang phân bổ trừ vào lợi nhuận khoảng {num(String(charging))} tỷ mỗi năm (theo số năm bạn ghi).</p>}
       </> : data && <p className="muted">Chưa ghi thương vụ nào. Lấy từ thuyết minh hợp nhất kinh doanh (mua công ty con) của báo cáo tài chính.</p>}
-      {data && !deal && <button type="button" className="btn" onClick={() => setDeal({ name: "", date: "", share: "", price: "", net_assets: "", years: "", source_url: "", note: "" })}>
+      {data && !deal && <button type="button" className="btn" onClick={() => setDeal({ name: "", date: "", share: "", price: "", net_assets: "", years: "", source_url: "", note: "",
+        note_goodwill: "", nci_part: "" })}>
         <Plus size={15} aria-hidden="true" />Thêm thương vụ</button>}
       {data && deal && <form className="pp-form" aria-label="Thương vụ mua bán" onSubmit={(e) => { e.preventDefault(); void saveDeals([...otherDeals(deal.id), dealRaw(deal)]); }}>
         <label className="field">Công ty được mua<input value={deal.name} maxLength={120} required onChange={(e) => setDeal({ ...deal, name: e.target.value })} /></label>
@@ -237,12 +268,44 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
         <label className="field">Giá trị hợp lý tài sản thuần của công ty được mua (tỷ đồng, cả công ty)<input inputMode="decimal" value={deal.net_assets} required
           onChange={(e) => setDeal({ ...deal, net_assets: e.target.value })} /></label>
         <label className="field">Số năm phân bổ (tối đa 10)<input inputMode="numeric" value={deal.years} onChange={(e) => setDeal({ ...deal, years: e.target.value })} /></label>
+        <label className="field">Lợi thế thương mại theo thuyết minh (tỷ đồng, âm nếu mua rẻ; tùy chọn)<input inputMode="decimal" value={deal.note_goodwill}
+          onChange={(e) => setDeal({ ...deal, note_goodwill: e.target.value })} /></label>
+        <label className="field">Phần của cổ đông không kiểm soát (tỷ đồng, tùy chọn)<input inputMode="decimal" value={deal.nci_part}
+          onChange={(e) => setDeal({ ...deal, nci_part: e.target.value })} /></label>
         <label className="field">Link tài liệu nguồn<input type="url" value={deal.source_url} onChange={(e) => setDeal({ ...deal, source_url: e.target.value })} placeholder="https://…" /></label>
         <label className="field">Ghi chú<input value={deal.note} maxLength={500} onChange={(e) => setDeal({ ...deal, note: e.target.value })} /></label>
         <div className="row"><button className="btn primary" type="submit">Lưu thương vụ</button><button className="btn" type="button" onClick={() => setDeal(null)}>Hủy</button></div>
       </form>}
       <p className="caption">Lợi thế thương mại = giá mua − tỷ lệ mua × giá trị hợp lý tài sản thuần của công ty được mua. Dương: ghi thành tài sản, phân bổ đều vào chi phí trong số năm
-        bạn ghi (VAS tối đa 10 năm). Âm: giao dịch mua rẻ, ghi ngay vào lợi nhuận năm mua, là lợi nhuận một lần. Số do bạn nhập từ thuyết minh; phần mềm chỉ tính theo công thức.</p>
+        bạn ghi (VAS tối đa 10 năm). Âm: giao dịch mua rẻ, ghi ngay vào lợi nhuận năm mua, là lợi nhuận một lần. Số do bạn nhập từ thuyết minh; phần mềm chỉ tính theo công thức.
+        Ghi số thuyết minh thì phần mềm dùng số đó và hiện phần lệch so với công thức.</p>
+      {data && data.bargains.length > 0 && <>
+        <h3>Lợi nhuận có lãi mua rẻ</h3>
+        <ul className="quality-list">{data.bargains.map((b) => <li key={b.year} data-testid="fan-bargain">
+          {b.flag && <><span className="pill warn">cần xem kỹ</span> </>}{bargainText(b)}
+          <div className="caption">Từ: {b.deals.join(", ")}</div></li>)}</ul>
+        <p className="caption">Cần xem kỹ khi lãi mua rẻ trong năm từ 10% LNTT, hoặc doanh nghiệp lỗ trước thuế. Lãi mua rẻ là thu nhập không có tiền (sinh ra từ đánh giá lại tài sản
+          bên bị mua), không lặp lại nếu không có thương vụ mới; bóc ra khi so lợi nhuận và so với dòng tiền kinh doanh.</p>
+      </>}
+      {data && data.goodwill_moves.length > 0 && <>
+        <h3>Biến động lợi thế thương mại</h3>
+        <table className="fv-table" aria-label={`Biến động lợi thế thương mại ${symbol}`}>
+          <thead><tr><th>Năm</th><th className="num">Đầu năm</th><th className="num">Tăng (thương vụ bạn ghi)</th><th className="num">Phân bổ (thuyết minh)</th>
+            <th className="num">Cuối năm</th><th className="num">Giảm khác</th><th className="num">Phân bổ ÷ chi phí quản lý</th><th className="num">Phân bổ ÷ LNTT</th><th></th></tr></thead>
+          <tbody>{data.goodwill_moves.map((m) => <tr key={m.year} data-testid="fan-move">
+            <td data-label="Năm">{m.year}</td><td className="num" data-label="Đầu năm">{num(m.opening)}</td><td className="num" data-label="Tăng">{num(m.added)}</td>
+            <td className="num" data-label="Phân bổ">{m.amortised === null ? "chưa ghi" : num(m.amortised)}</td><td className="num" data-label="Cuối năm">{num(m.closing)}</td>
+            <td className="num" data-label="Giảm khác">{m.other === null ? <span className="caption">giảm {signed(m.decline)}</span> : signed(m.other)}</td>
+            <td className="num" data-label="Phân bổ ÷ chi phí quản lý">{m.to_admin === null ? "—" : pct(m.to_admin)}</td>
+            <td className="num" data-label="Phân bổ ÷ LNTT">{m.to_pbt === null ? "—" : pct(m.to_pbt)}</td>
+            <td className="actions"><button type="button" className="btn" aria-label={`Ghi phân bổ ${m.year}`} onClick={() => amortise(m.year, m.amortised)}>
+              <Pencil size={14} aria-hidden="true" />Ghi phân bổ</button></td>
+          </tr>)}</tbody>
+        </table>
+        <p className="caption">Đầu năm, cuối năm: báo cáo VNDirect đã lưu (tỷ đồng). Tăng: lợi thế thương mại dương của các thương vụ bạn ghi trong năm. Phân bổ: số bạn ghi từ thuyết
+          minh, vì dòng phân bổ của VNDirect thường để trống. Giảm khác = đầu năm + tăng − phân bổ − cuối năm: thoái vốn, xóa sổ hay thương vụ chưa ghi, báo cáo không tách được.
+          Chưa ghi phân bổ thì hiện tổng mức giảm. Phân bổ nằm trong chi phí quản lý doanh nghiệp.</p>
+      </>}
       <p className="caption">Bạn tự đọc thuyết minh báo cáo tài chính và nhập; VNDirect không có nội dung thuyết minh. XDCB và nguyên giá ở cột &quot;Số của cả công ty&quot; là số dư
         của cả doanh nghiệp từ báo cáo đã lưu, báo cáo không tách theo dự án, nên phần mềm không tự kết luận dự án đã xong. Khi báo cáo của quý hoàn thành dự kiến về, Việc cần
         xem có một dòng nhắc (không gửi Telegram) đến khi bạn bấm Đã hoàn thành hoặc Lùi hạn. Khung khấu hao chỉ để đọc lại. Không phải khuyến nghị.</p>

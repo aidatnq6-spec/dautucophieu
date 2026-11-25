@@ -8,7 +8,8 @@ type Project = { id: string; name: string; due: string; read_period: string | nu
   note: string; status: "open" | "done"; done_on: string | null; postpones: { from: string; to: string; on: string; reason: string }[];
   state: "upcoming" | "waiting_report" | "due" | "done"; at_read: Figures; at_due: Figures; latest: Figures };
 type Ranges = { period: string | null; groups: Record<string, { from: number; to: number }> };
-type Data = { symbol: string; version: number; projects: Project[]; ranges: Ranges; groups: Record<string, string> };
+type Prepaid = { year: string; items: Record<string, string>; total: string; summed: boolean; prepaid_lt: string | null; years_left: string | null; to_pbt: string | null };
+type Data = { symbol: string; version: number; projects: Project[]; ranges: Ranges; groups: Record<string, string>; prepaid: Prepaid[]; prepaid_kinds: Record<string, string> };
 type Draft = { id?: string; name: string; due: string; read_period: string; cip_value: string; budget: string; source_url: string; note: string };
 
 const requestId = () => `fan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -28,6 +29,11 @@ export function stateText(p: Pick<Project, "state" | "due" | "done_on"> & { post
     : p.state === "due" ? "Đến hạn: xác nhận đã hoàn thành hoặc lùi hạn"
       : p.state === "waiting_report" ? `Chờ báo cáo ${quarterInput(p.due)}` : `Đang làm, dự kiến xong ${quarterInput(p.due)}`;
   return p.postpones.length ? `${base} · đã lùi ${p.postpones.length} lần` : base;
+}
+
+/** Long-term prepaid expenses over the year's allocation, true only at that pace. */
+export function yearsLeftText(r: Pick<Prepaid, "year" | "years_left">): string {
+  return r.years_left === null ? "—" : `≈ ${Number(r.years_left).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} năm nếu giữ nhịp phân bổ năm ${r.year}`;
 }
 
 const fig = (f: Figures) => (f ? `${periodInput(f.period)}: XDCB ${bn(f.cip)}, nguyên giá ${bn(f.ppe_gross)}` : null);
@@ -51,6 +57,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
   const [ranges, setRanges] = useState<Record<string, { from: string; to: string }> | null>(null);
   const [rangePeriod, setRangePeriod] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [allocation, setAllocation] = useState<{ old?: string; year: string; values: Record<string, string> } | null>(null);
   const base = `stock/${encodeURIComponent(symbol)}/fixed-asset-notes`;
   useEffect(() => {
     api<Data>(base).then(setData, (e) => {
@@ -64,6 +71,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
       setData(await api<Data>(path, { method, body: { ...body, expected_version: data.version, request_id: requestId() } }));
       setDraft(null);
       setRanges(null);
+      setAllocation(null);
       setMessage(null);
     } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); }
   }
@@ -71,6 +79,9 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
   const keptRanges = () => rangesRaw(data?.ranges.groups ?? {}, data?.ranges.period ?? null);
   const others = (id?: string) => (data?.projects ?? []).filter((p) => p.id !== id).map((p) => toRaw(fromProject(p)));
   const saveProjects = (projects: ReturnType<typeof toRaw>[]) => send(base, "PUT", { projects, ranges: keptRanges() });
+  const keptPrepaid = (skip?: string) => Object.fromEntries((data?.prepaid ?? []).filter((r) => r.year !== skip)
+    .map((r) => [r.year, { ...r.items, ...(r.summed ? {} : { total: r.total }) }]));
+  const savePrepaid = (prepaid: Record<string, Record<string, string>>) => send(base, "PUT", { projects: others(), ranges: keptRanges(), prepaid });
   function later(p: Project) {
     const to = window.prompt(`Quý hoàn thành mới cho ${p.name} (dạng Q2/2027):`);
     if (!to) return;
@@ -139,6 +150,39 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
         <label className="field">Kỳ báo cáo đã đọc<input value={rangePeriod} placeholder="2025" onChange={(e) => setRangePeriod(e.target.value)} /></label>
         <div className="row"><button className="btn primary" type="submit">Lưu khung khấu hao</button><button className="btn" type="button" onClick={() => setRanges(null)}>Hủy</button></div>
       </form>}
+      <h3>Chi phí trả trước: phân bổ trong năm</h3>
+      {data && data.prepaid.length > 0 ? <table className="fv-table" aria-label={`Phân bổ chi phí trả trước ${symbol}`}>
+        <thead><tr><th>Năm</th>{Object.entries(data.prepaid_kinds).map(([k, label]) => <th key={k} className="num">{label}</th>)}<th className="num">Tổng phân bổ (tỷ)</th>
+          <th className="num">CPTT dài hạn cuối năm</th><th>Số năm phân bổ còn lại</th><th className="num">Phân bổ ÷ LNTT</th><th></th></tr></thead>
+        <tbody>{data.prepaid.map((r) => <tr key={r.year} data-testid="fan-prepaid">
+          <td data-label="Năm">{r.year}</td>
+          {Object.keys(data.prepaid_kinds).map((k) => <td key={k} className="num" data-label={data.prepaid_kinds[k]}>{ty(r.items[k] ?? null)}</td>)}
+          <td className="num" data-label="Tổng phân bổ">{ty(r.total)}{r.summed && <div className="caption">cộng các loại đã nhập</div>}</td>
+          <td className="num" data-label="CPTT dài hạn cuối năm">{r.prepaid_lt === null ? "chưa có" : bn(r.prepaid_lt)}</td>
+          <td data-label="Số năm phân bổ còn lại">{yearsLeftText(r)}</td>
+          <td className="num" data-label="Phân bổ ÷ LNTT">{r.to_pbt === null ? "—" : `${(Number(r.to_pbt) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`}</td>
+          <td className="actions">
+            <button type="button" className="btn" aria-label={`Sửa phân bổ ${r.year}`} onClick={() => setAllocation({ old: r.year, year: r.year,
+              values: { ...r.items, ...(r.summed ? {} : { total: r.total }) } })}><Pencil size={14} aria-hidden="true" />Sửa</button>
+            <button type="button" className="btn" aria-label={`Xóa phân bổ ${r.year}`} onClick={() => { if (window.confirm(`Xóa phân bổ năm ${r.year}?`)) void savePrepaid(keptPrepaid(r.year)); }}>
+              <Trash2 size={14} aria-hidden="true" />Xóa</button></td>
+        </tr>)}</tbody>
+      </table> : data && <p className="muted">Chưa ghi số phân bổ. Lấy từ thuyết minh chi phí trả trước (phần &quot;phân bổ trong năm&quot;).</p>}
+      {data && !allocation && <button type="button" className="btn" onClick={() => setAllocation({ year: String(new Date().getFullYear() - 1), values: {} })}>
+        <Plus size={15} aria-hidden="true" />Thêm năm phân bổ</button>}
+      {data && allocation && <form className="pp-form" aria-label="Phân bổ chi phí trả trước" onSubmit={(e) => {
+        e.preventDefault();
+        const values = Object.fromEntries(Object.entries(allocation.values).filter(([, v]) => v.trim()));
+        void savePrepaid({ ...keptPrepaid(allocation.old), [allocation.year.trim()]: values });
+      }}>
+        <label className="field">Năm<input inputMode="numeric" maxLength={4} value={allocation.year} required onChange={(e) => setAllocation({ ...allocation, year: e.target.value })} /></label>
+        {[...Object.entries(data.prepaid_kinds), ["total", "Tổng phân bổ (nếu thuyết minh ghi)"]].map(([k, label]) =>
+          <label key={k} className="field">{label} (tỷ đồng)<input inputMode="decimal" value={allocation.values[k] ?? ""}
+            onChange={(e) => setAllocation({ ...allocation, values: { ...allocation.values, [k]: e.target.value } })} /></label>)}
+        <div className="row"><button className="btn primary" type="submit">Lưu phân bổ</button><button className="btn" type="button" onClick={() => setAllocation(null)}>Hủy</button></div>
+      </form>}
+      <p className="caption">Số năm phân bổ còn lại = chi phí trả trước dài hạn cuối năm (báo cáo đã lưu) ÷ tổng phân bổ năm đó, chỉ đúng nếu doanh nghiệp giữ nhịp phân bổ
+        như năm đó. Phần phân bổ là chi phí ghi vào lợi nhuận mà không tốn thêm tiền (tiền đã chi từ trước). Không ghi tổng thì phần mềm cộng các loại bạn đã nhập.</p>
       <p className="caption">Bạn tự đọc thuyết minh báo cáo tài chính và nhập; VNDirect không có nội dung thuyết minh. XDCB và nguyên giá ở cột &quot;Số của cả công ty&quot; là số dư
         của cả doanh nghiệp từ báo cáo đã lưu, báo cáo không tách theo dự án, nên phần mềm không tự kết luận dự án đã xong. Khi báo cáo của quý hoàn thành dự kiến về, Việc cần
         xem có một dòng nhắc (không gửi Telegram) đến khi bạn bấm Đã hoàn thành hoặc Lùi hạn. Khung khấu hao chỉ để đọc lại. Không phải khuyến nghị.</p>

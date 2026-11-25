@@ -6,6 +6,7 @@ progress and cost of tangible assets are shown beside it, for the owner to judge
 import re
 import uuid
 from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
 
 from investment_agent.domain.property_projects import ProjectError, _amount
 
@@ -136,4 +137,48 @@ def due_view(projects: list[dict], statements: dict, *, today: date) -> list[dic
         at_due = _figures(statements, p["due"]) if "cip" in (quarters.get(p["due"]) or {}) else None
         state = "done" if p["status"] == "done" else "due" if at_due else "waiting_report" if today >= _quarter_end(p["due"]) else "upcoming"
         out.append({**p, "state": state, "at_read": _figures(statements, p["read_period"]), "at_due": at_due, "latest": _figures(statements, latest)})
+    return out
+
+
+# Chi phí trả trước: phân bổ trong năm (25/11/2026). The notes give each year's allocation by kind; VNDirect does not. The years left are
+# the year-end long-term prepaid expenses over that year's allocation, at that pace, from the owner's figure and the stored balance.
+PREPAID_KINDS = {"tools": "Công cụ dụng cụ", "overhaul": "Sửa chữa lớn", "land": "Tiền thuê đất, đền bù", "preop": "Chi phí trước hoạt động",
+                 "other": "Khác"}
+MAX_PREPAID_YEARS = 15
+
+
+def validate_prepaid(raw: dict) -> dict[str, dict[str, str]]:
+    """year → {kind: tỷ đồng, and "total" when the notes give it}."""
+    if len(raw) > MAX_PREPAID_YEARS:
+        raise NoteError("too_many", f"Tối đa {MAX_PREPAID_YEARS} năm.")
+    out = {}
+    for year, items in raw.items():
+        if not _YEAR.fullmatch(str(year)):
+            raise NoteError("invalid_year", "Năm dạng 2021.")
+        kept = {}
+        for kind, value in (items or {}).items():
+            if kind != "total" and kind not in PREPAID_KINDS:
+                raise NoteError("invalid_kind", "Loại chi phí trả trước không có trong danh sách.")
+            if (amount := _money(value)) is not None:
+                kept[kind] = amount
+        if not kept:
+            raise NoteError("empty_year", f"Năm {year}: nhập ít nhất một số.")
+        out[str(year)] = {k: kept[k] for k in [*PREPAID_KINDS, "total"] if k in kept}
+    return dict(sorted(out.items()))
+
+
+def prepaid_view(prepaid: dict[str, dict[str, str]], statements: dict) -> list[dict]:
+    """Each year with its total (as written, or the kinds added up), the stored long-term prepaid expenses at that year's end, the years
+    left at that pace and the allocation against that year's profit before tax (none when a figure is missing or not positive)."""
+    out = []
+    for year, items in prepaid.items():
+        kinds = {k: v for k, v in items.items() if k != "total"}
+        summed = "total" not in items
+        total = Decimal(items["total"]) if not summed else sum((Decimal(v) for v in kinds.values()), Decimal(0))
+        row = (statements.get("years") or {}).get(year) or {}
+        lt, pbt = row.get("prepaid_lt"), row.get("pbt")
+        per_year = total * 10**9
+        out.append({"year": year, "items": kinds, "total": format(total.normalize(), "f"), "summed": summed, "prepaid_lt": lt,
+                    "years_left": str((Decimal(lt) / per_year).quantize(Decimal("0.1"), ROUND_HALF_UP)) if lt is not None and per_year > 0 else None,
+                    "to_pbt": str((per_year / Decimal(pbt)).quantize(Decimal("0.0001"), ROUND_HALF_UP)) if pbt is not None and Decimal(pbt) > 0 else None})
     return out

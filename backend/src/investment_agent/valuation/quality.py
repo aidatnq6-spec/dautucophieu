@@ -23,6 +23,7 @@ OTHER_RECEIVABLES_SHARE, OTHER_RECEIVABLES_FLOOR = Decimal("0.10"), Decimal("0.0
 CIP_YEARS, CIP_SHARE = 3, Decimal("0.20")
 PREPAID_GAP, PREPAID_MATERIAL = Decimal("0.20"), Decimal("0.10")  # growth above revenue's, in share points; the increase against profit before tax
 GOODWILL_SHARE = Decimal("0.10")  # goodwill against parent equity (owner, 25/11/2026)
+INTEREST_COVER = Decimal(3)  # EBIT over interest expense below this (owner, 25/11/2026)
 CIP_DROP, CIP_MATERIAL, CIP_COST_SHARE = Decimal("0.50"), Decimal("0.10"), Decimal("0.50")
 BN = Decimal(1_000_000_000)
 # Sector context shown with the signs, where a sign is usual for the business rather than a warning by itself.
@@ -252,7 +253,28 @@ def _signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:
     signs += _cip_signs(a, y)
     signs.append(_prepaid_sign(cur, prev, y))
     signs.append(_goodwill_sign(cur, prev, y))
+    signs.append(_cover_sign(cur, prev, y))
     return signs
+
+
+def _cover(row: dict) -> Decimal | None:
+    return (row["pbt"] + row["interest"]) / row["interest"] if "pbt" in row and row.get("interest", Decimal(0)) > 0 else None
+
+
+def _cover_sign(cur: dict, prev: dict, y: int) -> dict:
+    """EBIT (profit before tax + interest) below three times interest expense, or not positive: a fall in profit soon leaves the interest unpaid."""
+    label = "Khả năng trả lãi thấp"
+    if "pbt" not in cur or "interest" not in cur:
+        return {"id": "low_interest_cover", "label": label, "flag": None,
+                "detail": f"Thiếu lợi nhuận trước thuế hoặc chi phí lãi vay năm {y} (có sau lần cập nhật báo cáo tới)"}
+    if cur["interest"] <= 0:
+        return {"id": "low_interest_cover", "label": label, "flag": None, "detail": f"Năm {y}: không có chi phí lãi vay"}
+    ebit, cover, before = cur["pbt"] + cur["interest"], _cover(cur), _cover(prev)
+    then = f"; năm {y - 1}: {_num(before, 1)} lần" if before is not None else ""
+    return {"id": "low_interest_cover", "label": label, "flag": ebit <= 0 or cover < INTEREST_COVER,
+            "rule": f"EBIT (lợi nhuận trước thuế + lãi vay) dưới {_num(INTEREST_COVER, 0)} lần chi phí lãi vay, hoặc không dương: lợi nhuận giảm một ít "
+                    "là khó trả lãi; đọc thuyết minh vay (kỳ hạn, lãi suất, nợ đến hạn)",
+            "detail": f"Năm {y}: EBIT {_bn(ebit)} (LNTT {_bn(cur['pbt'])} + lãi vay {_bn(cur['interest'])}) bằng {_num(cover, 1)} lần lãi vay{then}"}
 
 
 def _parent(row: dict) -> Decimal | None:

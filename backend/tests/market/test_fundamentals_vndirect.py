@@ -201,3 +201,9 @@ def test_the_record_carries_goodwill_and_equity_for_the_goodwill_sign_owner_25_1
     s["years"]["2025"].update({"goodwill": str(5104 * B), "minority_equity": str(6000 * B)})
     annual = build_record("FPT", s, EVENTS, shares=None, now=NOW)["annual"]["2025"]
     assert (annual["goodwill"], annual["equity"], annual["minority_equity"]) == (str(5104 * B), str(40000 * B), str(6000 * B))
+
+
+def test_the_record_carries_interest_expense_for_the_cover_sign_owner_25_11_2026():
+    s = statements()
+    s["years"]["2025"]["interest"] = str(2526 * B)
+    assert build_record("FPT", s, EVENTS, shares=None, now=NOW)["annual"]["2025"]["interest"] == str(2526 * B)

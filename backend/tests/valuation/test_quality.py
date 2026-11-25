@@ -23,8 +23,8 @@ def test_all_nine_criteria_pass_for_a_company_improving_on_every_line():
     assert [c["passed"] for c in f["criteria"]] == [True] * 9
     assert f["criteria"][0]["detail"] == "ROA 9,0% (lợi nhuận 9 tỷ / tài sản đầu kỳ 100 tỷ)"
     assert f["criteria"][6]["detail"] == "Không có đợt huy động vốn bằng cổ phiếu năm 2025 (cổ phiếu thưởng, cổ tức bằng cổ phiếu không tính)"
-    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None, None, None, None, None, None, None]  # financial income and its cash,
-    # other receivables, prepayments, construction in progress, prepaid expenses, goodwill, interest: not kept
+    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None, None, None, None, None, None, None, None, None]  # financial income and its cash,
+    # other receivables, prepayments, construction in progress, prepaid expenses, goodwill, interest, equity: not kept
 
 
 def test_a_capital_raise_and_worse_lines_fail_and_the_signs_show_their_numbers():
@@ -380,3 +380,32 @@ def test_interest_cover_below_three_times_is_a_sign_owner_25_11_2026():
     nothing = sign(report_quality(interest_years(30, 0, 14, 0), "x"), "low_interest_cover")
     assert nothing["flag"] is None and "không có chi phí lãi vay" in nothing["detail"]
     assert sign(report_quality(STRONG, "x"), "low_interest_cover")["flag"] is None
+
+
+def equity_years(eq0, eq1, profit1, issue=0, buyback=0, div=0, retained=10, capital=100, minority=0):
+    out = {y: dict(r) for y, r in STRONG["annual"].items()}
+    out["2024"].update(equity=str(eq0 * BN))
+    out["2025"].update(equity=str(eq1 * BN), profit=str(profit1 * BN), issue_cash=str(issue * BN), buyback_cash=str(buyback * BN),
+                       dividends_paid=str(div * BN), retained=str(retained * BN), charter_capital=str(capital * BN), minority_equity=str(minority * BN))
+    return {**STRONG, "annual": out}
+
+
+def test_equity_changing_outside_profit_and_shareholder_cash_by_a_tenth_is_a_sign_owner_25_11_2026():
+    """HAG 2021 shape: equity 10.028 → 4.673 with little profit; the rest came from a disposal and a restatement."""
+    s = sign(report_quality(equity_years(1000, 450, 20, issue=10, buyback=-2, div=-5), "Nông nghiệp"), "equity_outside_profit")
+    assert s["label"] == "Vốn chủ thay đổi ngoài lợi nhuận" and s["flag"] is True and "10%" in s["rule"]
+    assert s["detail"] == ("Năm 2025: vốn chủ 450 tỷ, đầu năm 1.000 tỷ; LNST 20 tỷ, phát hành 10 tỷ, mua lại −2 tỷ, cổ tức đã trả −5 tỷ; "
+                           "phần còn lại −573 tỷ, bằng 57,3% vốn chủ đầu năm")
+    assert sign(report_quality(equity_years(1000, 1080, 100, div=-10), "x"), "equity_outside_profit")["flag"] is False  # −10, 1%
+    assert sign(report_quality(equity_years(1000, 1250, 100), "x"), "equity_outside_profit")["flag"] is True  # +150, 15%: up counts too
+    assert sign(report_quality(STRONG, "x"), "equity_outside_profit")["flag"] is None
+
+
+def test_accumulated_losses_or_parent_equity_below_capital_is_a_sign_owner_25_11_2026():
+    s = sign(report_quality(equity_years(1000, 450, 20, retained=-447, capital=927, minority=18), "Nông nghiệp"), "accumulated_loss")
+    assert s["label"] == "Lỗ lũy kế, vốn chủ dưới vốn góp" and s["flag"] is True
+    assert s["detail"] == "Năm 2025: LNST chưa phân phối −447 tỷ; vốn chủ công ty mẹ 432 tỷ, bằng 0,47 lần vốn góp 927 tỷ"
+    assert sign(report_quality(equity_years(1000, 1080, 100, retained=-5, capital=900), "x"), "accumulated_loss")["flag"] is True  # losses alone
+    assert sign(report_quality(equity_years(1000, 800, 100, retained=50, capital=900), "x"), "accumulated_loss")["flag"] is True  # below capital alone
+    assert sign(report_quality(equity_years(1000, 1080, 100, retained=200, capital=900), "x"), "accumulated_loss")["flag"] is False
+    assert sign(report_quality(STRONG, "x"), "accumulated_loss")["flag"] is None

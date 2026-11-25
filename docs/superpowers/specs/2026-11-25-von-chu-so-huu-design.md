@@ -20,3 +20,12 @@ phát triển; LNST chưa phân phối; lợi ích cổ đông không kiểm so�
 **lợi ích cổ đông không kiểm soát ÷ vốn chủ** (%); **thay đổi vốn chủ ngoài lợi nhuận** = vốn chủ cuối kỳ − vốn chủ kỳ trước (năm: năm trước;
 quý: quý liền trước) − LNST hợp nhất − tiền phát hành − tiền mua lại + cổ tức đã trả (dòng tiền âm), tức thoái vốn công ty con, điều chỉnh hồi tố,
 chênh lệch tỷ giá, trích quỹ… (thiếu một phần thì để trống). Ghi chú "Chưa đồng bộ" cho bản ghi trước phiên bản 12.
+
+## Hai dấu hiệu ở Chất lượng báo cáo (bổ sung 25/11/2026, chủ sở hữu duyệt bước 2 và chọn ngưỡng)
+Bản ghi cơ bản lấy thêm theo năm: vốn góp, LNST chưa phân phối, tiền phát hành, tiền mua lại cổ phiếu, cổ tức đã trả. Sau "Khả năng trả lãi thấp".
+- **Vốn chủ thay đổi ngoài lợi nhuận**: |vốn chủ cuối năm − đầu năm − LNST − tiền phát hành − tiền mua lại − cổ tức đã trả| từ **10%** vốn chủ đầu năm.
+  HAG 2021: −5.482 tỷ, 55% (thoái vốn HNG, điều chỉnh hồi tố); HPG 2021: 1,4%. Đọc thuyết minh thay đổi vốn chủ. Thiếu một phần hoặc vốn chủ đầu
+  năm không dương: không đánh giá được.
+- **Lỗ lũy kế, vốn chủ dưới vốn góp**: LNST chưa phân phối âm, **hoặc** vốn chủ công ty mẹ dưới vốn góp. Còn lỗ lũy kế thì chưa chia cổ tức tiền
+  được; dưới vốn góp là đã mất một phần vốn. HAG 2021: −4.467 tỷ, 0,48 lần vốn góp.
+- Hiện 0/42 mã theo dõi bật cả hai. Chỉ hiện trên trang.

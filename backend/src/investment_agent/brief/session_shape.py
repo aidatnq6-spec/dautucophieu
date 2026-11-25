@@ -6,13 +6,16 @@ The daily bars are KBS's (vnstock), whose high and low may include the reference
 """
 
 import json
+import os
 from datetime import date
+from pathlib import Path
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Callable
 
 BASE = 20
 _Q2, _Q4 = Decimal("0.01"), Decimal("0.0001")
 HOSE_VALUE = "https://api.hsx.vn/mk/api/v1/market/foreign-trading-value-report?fromDate={start}&toDate={end}"
+MIN_SESSIONS = 15  # of the 20 before, with a figure, for an average (fix 25/11/2026)
 
 
 def _s(value: Decimal, q: Decimal) -> str:
@@ -88,21 +91,60 @@ def _hose_value_bn(raw: str) -> Decimal | None:
     return Decimal(str(rows["Mua"]["market_value"]).replace(",", "").strip()) / 1000
 
 
-def hose_liquidity(hose: dict, *, earlier: list[date], hose_get: Callable[[str], str]) -> dict:
-    """HOSE's published value (with put-through deals) against the previous session and the 20 before: two calls, the second one for
-    the whole 20-session range, whose total HOSE sums (checked 06/11/2026 against the daily figures)."""
+def _read_cache(path: Path | None) -> dict:
+    if path is None or not Path(path).is_file():
+        return {}
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def _write_cache(path: Path | None, cache: dict) -> None:
+    if path is None:
+        return
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(dict(sorted(cache.items())), ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def hose_liquidity(hose: dict, *, earlier: list[date], hose_get: Callable[[str], str], cache_path: Path | None = None,
+                   today: date | None = None, pause: Callable[[], None] = lambda: None) -> dict:
+    """HOSE's published value (with put-through deals) against the previous session that has a figure and the average of the 20 sessions
+    before that have one. Each session is asked on its own and kept in `cache_path` (fix 25/11/2026: HOSE has no figure for 24/11/2026,
+    and a range's total over 19 days was divided by 20); a session without a figure is asked again at most once a day. Fewer than
+    MIN_SESSIONS of the 20 with a figure: no average, named, never filled."""
     if hose.get("status") != "ok":
         return _missing(hose.get("reason") or "HOSE chưa công bố")
     if len(earlier) < BASE:
         return _missing(f"Lịch giao dịch chưa đủ {BASE} phiên trước")
-    window = earlier[-BASE:]
+    window, cache, checked = earlier[-BASE:], _read_cache(cache_path), (today or date.today()).isoformat()
+    values: dict[date, Decimal | None] = {}
     try:
-        previous = _hose_value_bn(hose_get(HOSE_VALUE.format(start=window[-1].isoformat(), end=window[-1].isoformat())))
-        total = _hose_value_bn(hose_get(HOSE_VALUE.format(start=window[0].isoformat(), end=window[-1].isoformat())))
+        for d in window:
+            kept = cache.get(d.isoformat())
+            if kept and (kept.get("value_bn") is not None or kept.get("checked") == checked):
+                values[d] = Decimal(kept["value_bn"]) if kept.get("value_bn") is not None else None
+                continue
+            pause()  # between days asked: the first run asks up to 20
+            got = _hose_value_bn(hose_get(HOSE_VALUE.format(start=d.isoformat(), end=d.isoformat())))
+            values[d] = got
+            cache[d.isoformat()] = {"value_bn": None if got is None else format(got.normalize(), "f"), "checked": checked}
     except (ValueError, KeyError, TypeError, InvalidOperation):
+        _write_cache(cache_path, cache)
         return _missing("HOSE đổi định dạng")
-    if not previous or not total:
+    _write_cache(cache_path, cache)
+    with_figure = [d for d in window if values.get(d)]
+    if not with_figure:
         return _missing("HOSE chưa có số các phiên trước")
-    today, avg = Decimal(hose["total_value_bn"]), total / BASE
-    return {"status": "ok", "today_bn": _s(today, _Q2), "previous_bn": _s(previous, _Q2), "change_pct": _s(today / previous - 1, _Q4),
-            "avg20_bn": _s(avg, _Q2), "ratio20": _s(today / avg, _Q2)}
+    if len(with_figure) < MIN_SESSIONS:
+        return _missing(f"HOSE chỉ có số {len(with_figure)}/{BASE} phiên trước")
+    previous_day = with_figure[-1]
+    previous, avg = values[previous_day], sum((values[d] for d in with_figure), Decimal(0)) / len(with_figure)
+    today_value = Decimal(hose["total_value_bn"])
+    return {"status": "ok", "today_bn": _s(today_value, _Q2), "previous_bn": _s(previous, _Q2), "previous_session": previous_day.isoformat(),
+            "previous_skipped": previous_day != window[-1],
+            "change_pct": _s(today_value / previous - 1, _Q4), "avg20_bn": _s(avg, _Q2), "avg_sessions": len(with_figure),
+            "ratio20": _s(today_value / avg, _Q2)}

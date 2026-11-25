@@ -144,7 +144,9 @@ def build_snapshot(*, session_date: date, previous_session: date | None, now: da
     except Exception:
         sections["shocks"] = _missing("Không tính được cú sốc của VN-Index")
     try:
-        sections["hose_liquidity"] = hose_liquidity(sections["hose"], earlier=list(earlier), hose_get=hose_get)
+        sections["hose_liquidity"] = hose_liquidity(sections["hose"], earlier=list(earlier), hose_get=hose_get,
+                                                    cache_path=store.root / "hose-values.json", today=now.date(),
+                                                    pause=lambda: __import__("time").sleep(0.5))
     except Exception:
         sections["hose_liquidity"] = _missing("Không kết nối được HOSE")
     items, failures = [], 0

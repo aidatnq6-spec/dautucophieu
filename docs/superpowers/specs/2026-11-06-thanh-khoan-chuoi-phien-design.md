@@ -19,6 +19,13 @@ giữ được" mà không có số. Thêm vào ảnh chụp phiên (`data/brief
 - Nguồn: API thống kê của HOSE (như mục HOSE hiện có; robots.txt của api.hsx.vn trả 404). Giá trị gồm cả giao dịch thỏa thuận.
 - Phiên này so với phiên trước (%) và với trung bình 20 phiên trước đó (lần). Trung bình = tổng HOSE trả cho khoảng 20 phiên ÷ 20; đã kiểm
   tra tổng của khoảng ngày đúng bằng cộng từng ngày (04–06/11/2026: 52.949,47 tỷ). Thêm 2 lần gọi mỗi lượt.
+- **Sửa 25/11/2026 (chủ sở hữu duyệt):** HOSE không có số của phiên 24/11/2026 (hỏi riêng ngày đó vẫn trả rỗng; 23/11 và 25/11 có số), nên tổng
+  khoảng 20 phiên chỉ gồm 19 ngày mà vẫn chia 20 (trung bình thấp đi khoảng 5%), và phiên 25/11 báo "HOSE chưa có số các phiên trước". Nay hỏi
+  **từng phiên một**, lưu `data/brief/hose-values.json` (số ngày đã qua không hỏi lại; ngày chưa có số hỏi lại tối đa mỗi ngày một lần), nghỉ 0,5 giây
+  giữa các lần gọi (lần đầu tối đa 20 lần, sau đó 1–2 lần mỗi lượt). Trung bình = cộng các phiên có số ÷ **số phiên có số**; phiên trước = **phiên gần
+  nhất có số** trong 20 phiên. Dưới 15/20 phiên có số: không tính trung bình, ghi "HOSE chỉ có số n/20 phiên trước". Trang và tin ghi "so với phiên
+  dd/mm" khi phiên đem so không phải phiên liền trước, và "trung bình n phiên có số" khi n khác 20. Đối chiếu 25/11/2026: 16.787,93 tỷ, so với 23/11
+  (12.797,94) +31,18%, trung bình 19 phiên 15.425,01 tỷ: 1,09 lần.
 - HOSE thường công bố muộn: chưa có thì ghi "HOSE chưa công bố" (tin 15:30 thường chưa có; trang có sau lượt 20:00).
 
 ## Ngành

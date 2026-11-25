@@ -18,7 +18,8 @@ type Streak = { direction: "up" | "down" | "flat" | null; sessions: number; at_l
 type Volume = { status: "ok"; today: number; previous: number; change_pct: string | null; avg20: number; ratio20: string | null } | Missing;
 type IndexSession = { status: "ok"; range: { high: string; low: string; close: string; from_high: string; from_low: string }; streak: Streak;
   volume: Volume } | Missing;
-type HoseLiquidity = { status: "ok"; today_bn: string; previous_bn: string; change_pct: string; avg20_bn: string; ratio20: string } | Missing;
+type HoseLiquidity = { status: "ok"; today_bn: string; previous_bn: string; change_pct: string; avg20_bn: string; ratio20: string; avg_sessions?: number;
+  previous_session?: string; previous_skipped?: boolean } | Missing;
 export type MarketSection = { session_date: string; updated_at: string; indices: { status: string; rows: IndexRow[] } | Missing; board: Board;
   hose: Hose; proprietary: Missing; tickers: Ticker[]; news: News; index_session?: IndexSession; hose_liquidity?: HoseLiquidity;
   recovery?: Recovery; signal_lines?: string[]; asia_line?: string | null; us_line?: string | null; shock_line?: string | null; recent_signals?: SignalRow[]; impact?: Impact; heatmap?: HeatMap };
@@ -56,9 +57,12 @@ export function recoveryHead(r: { met: number; known: number; total: number }): 
 }
 
 /** A figure against the previous session and the 20 before it. */
-export function baseText(f: { change_pct: string | null; ratio20: string | null }): string {
-  return [f.change_pct !== null ? `${pct(f.change_pct)} so với phiên trước` : null,
-    f.ratio20 !== null ? `bằng ${num(f.ratio20)} lần trung bình 20 phiên` : null].filter(Boolean).join(" · ");
+export function baseText(f: { change_pct: string | null; ratio20: string | null; avg_sessions?: number; previous_session?: string; previous_skipped?: boolean }): string {
+  // HOSE's value (fix 25/11/2026): the previous session with a figure and the sessions with one, named when they differ
+  const previous = f.previous_skipped && f.previous_session ? `phiên ${f.previous_session.slice(8, 10)}/${f.previous_session.slice(5, 7)}` : "phiên trước";
+  const n = f.avg_sessions ?? 20;
+  return [f.change_pct !== null ? `${pct(f.change_pct)} so với ${previous}` : null,
+    f.ratio20 !== null ? `bằng ${num(f.ratio20)} lần trung bình ${n} phiên${n !== 20 ? " có số" : ""}` : null].filter(Boolean).join(" · ");
 }
 
 function Gap({ what, section }: { what: string; section: { reason?: string } }) {
@@ -119,7 +123,8 @@ export function BriefMarket({ market, session }: { market: MarketSection | null;
         <p>Giá trị khớp lệnh HOSE <strong>{num(board.value_matched_bn)} tỷ đồng</strong> ({num(board.volume_matched, 0)} cp)
           {hose.status === "ok" && <> · HOSE công bố tổng (gồm thỏa thuận) {num(hose.total_value_bn)} tỷ đồng</>}</p>
         {hose.status === "ok" && liquidity?.status === "ok" && <p data-testid="hose-liquidity">Giá trị HOSE công bố: {baseText(liquidity)}{" "}
-          <span className="caption">(phiên trước {num(liquidity.previous_bn)} tỷ, trung bình 20 phiên {num(liquidity.avg20_bn)} tỷ)</span></p>}
+          <span className="caption">({liquidity.previous_skipped ? "phiên gần nhất có số" : "phiên trước"} {num(liquidity.previous_bn)} tỷ, trung bình {liquidity.avg_sessions ?? 20}
+          phiên {num(liquidity.avg20_bn)} tỷ)</span></p>}
         {hose.status === "ok" && liquidity && liquidity.status !== "ok" && <p className="muted">So với nền: chưa có số liệu ({liquidity.reason}).</p>}
         <p><span className="positive">{board.breadth.up} tăng</span> · <span className="negative">{board.breadth.down} giảm</span> ·{" "}
           {board.breadth.flat} đứng giá · {board.breadth.no_trade} không giao dịch</p>

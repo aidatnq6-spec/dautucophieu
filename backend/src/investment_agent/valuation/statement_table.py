@@ -55,11 +55,13 @@ P_AND_L = [
 FIXED = [
     ("g", "Tài sản cố định"), ("ppe_net", "TSCĐ hữu hình (còn lại)", "money", 0), ("ppe_gross", "Nguyên giá TSCĐ hữu hình", "money", 1),
     ("ppe_depreciation", "Hao mòn lũy kế TSCĐ hữu hình", "money", 1), ("intangible_net", "TSCĐ vô hình (còn lại)", "money", 0),
-    ("property_net", "BĐS đầu tư (còn lại)", "money", 0), ("cip", "Chi phí XDCB dở dang", "money", 0),
+    ("property_net", "BĐS đầu tư (còn lại)", "money", 0), ("goodwill", "Lợi thế thương mại", "money", 0),
+    ("goodwill_to_equity", "Lợi thế thương mại ÷ vốn chủ công ty mẹ", "pct", 1), ("goodwill_amort", "Phân bổ lợi thế thương mại (dòng tiền)", "money", 1),
+    ("cip", "Chi phí XDCB dở dang", "money", 0),
     ("ppe_wear", "Mức hao mòn TSCĐ hữu hình", "pct", 1), ("cip_to_ppe", "XDCB ÷ TSCĐ hữu hình", "pct", 1),
     ("capex_to_depreciation", "Capex ÷ khấu hao", "x", 1), ("ppe_turnover", "Vòng quay TSCĐ hữu hình", "x", 1),
 ]
-FIXED_RATIOS = ("ppe_wear", "cip_to_ppe", "capex_to_depreciation", "ppe_turnover", "prepaid_to_assets", "prepaid_to_pbt")
+FIXED_RATIOS = ("ppe_wear", "cip_to_ppe", "capex_to_depreciation", "ppe_turnover", "prepaid_to_assets", "prepaid_to_pbt", "goodwill_to_equity")
 PREPAID = [
     ("g", "Chi phí trả trước"), ("prepaid_st", "Chi phí trả trước ngắn hạn", "money", 1), ("prepaid_lt", "Chi phí trả trước dài hạn", "money", 1),
     ("prepaid_total", "Tổng chi phí trả trước", "money", 0), ("prepaid_to_assets", "Chi phí trả trước ÷ tổng tài sản", "pct", 1),
@@ -71,7 +73,7 @@ FIXED_BALANCES = (("ppe_net", "ppe_gross", "ppe_depreciation", "TSCĐ hữu hìn
 SCALE = [
     ("g", "Quy mô và định giá"), ("market_cap", "Vốn hoá", "money", 0), ("debt", "Nợ vay", "money", 1),
     ("cash_like", "Tiền và đầu tư tài chính ngắn hạn", "money", 1), ("net_debt", "Nợ ròng", "money", 0), ("ev", "EV", "money", 0),
-    ("pe", "P/E", "x", 0), ("pb", "P/B", "x", 0), ("ev_ebitda", "EV/EBITDA", "x", 0), ("ev_revenue", "EV/Doanh thu", "x", 0),
+    ("pe", "P/E", "x", 0), ("pb", "P/B", "x", 0), ("pb_ex_goodwill", "P/B loại lợi thế thương mại", "x", 0), ("ev_ebitda", "EV/EBITDA", "x", 0), ("ev_revenue", "EV/Doanh thu", "x", 0),
     ("fcff_yield", "Lợi suất FCFF", "pct", 0), ("roe", "ROE", "pct", 0), ("debt_to_equity", "Vay / vốn chủ", "x", 0),
 ]
 _FIN_HEAD = [("g", "Quy mô và định giá"), ("market_cap", "Vốn hoá", "money", 0), ("parent_equity", "Vốn chủ công ty mẹ", "money", 0),
@@ -149,7 +151,7 @@ def _part(periods: dict, keys: list[str], extra: dict[str, dict] | None = None, 
             return _ratio(cur.get("gross_profit"), cur.get("revenue"))
         if key in ("net_margin", "ebit_margin", "ebitda_margin"):
             return _ratio(cur.get({"net_margin": "npat_parent", "ebit_margin": "ebit", "ebitda_margin": "ebitda"}[key]), cur.get("revenue"))
-        if key in ("pe", "pb", "ev_ebitda", "ev_revenue", "debt_to_equity"):
+        if key in ("pe", "pb", "pb_ex_goodwill", "ev_ebitda", "ev_revenue", "debt_to_equity"):
             return cur.get(key)
         if key in ("fcff_yield", "roe") or key in FIXED_RATIOS:
             return cur.get(key)
@@ -175,7 +177,9 @@ def _block(f: dict, close: Decimal | None, flows: dict[str, Decimal | None], par
     net = None if debt is None or cash_like is None else debt - cash_like
     ev = None if cap is None or net is None else cap + net + _minority(f)
     parent, npat, equity = _parent_equity(f), flows.get("npat_parent"), _d(f.get("equity"))
-    return {"market_cap": cap, "debt": debt, "cash_like": cash_like, "net_debt": net, "ev": ev,
+    goodwill = _d(f.get("goodwill"))
+    return {"market_cap": cap,
+            "pb_ex_goodwill": _ratio(cap, parent - goodwill, _Q2, positive=True) if parent is not None and goodwill is not None else None, "debt": debt, "cash_like": cash_like, "net_debt": net, "ev": ev,
             "debt_to_equity": _ratio(debt, equity, _Q2) if equity is not None and equity > 0 and debt is not None else None,
             "pe": _ratio(cap, npat, _Q2, positive=True), "pb": _ratio(cap, parent, _Q2, positive=True),
             "ev_ebitda": _ratio(ev, flows.get("ebitda"), _Q2, positive=True), "ev_revenue": _ratio(ev, flows.get("revenue"), _Q2, positive=True),
@@ -203,7 +207,9 @@ def _fixed(f: dict, flows: dict[str, Decimal | None], before: dict | None) -> di
 def _prepaid(f: dict, pbt: Decimal | None) -> dict:
     """Prepaid expenses at a period's end against total assets and the profit before tax of `pbt` (the period's, or four quarters')."""
     total, assets = _sum(_d(f.get("prepaid_st")), _d(f.get("prepaid_lt"))), _d(f.get("total_assets"))
-    return {"prepaid_total": total,
+    goodwill, parent = _d(f.get("goodwill")), _parent_equity(f)
+    return {"goodwill_to_equity": _ratio(goodwill, parent) if goodwill is not None and parent is not None and parent > 0 else None,
+            "prepaid_total": total,
             "prepaid_to_assets": _ratio(total, assets) if total is not None and assets is not None and assets > 0 else None,
             "prepaid_to_pbt": _ratio(total, pbt, _Q2) if total is not None and pbt is not None and pbt > 0 else None}
 
@@ -327,7 +333,7 @@ def _ins_checks(periods: dict) -> list[dict]:
 
 
 CAP_GAP = Decimal("0.10")
-FIXED_LINES_SINCE = 9  # the statements' LINES_VERSION that brought the fixed-asset (8) and prepaid-expense (9) lines
+FIXED_LINES_SINCE = 10  # the statements' LINES_VERSION that brought the fixed-asset (8), prepaid-expense (9) and goodwill (10) lines
 
 
 def _invested(f: dict) -> Decimal | None:

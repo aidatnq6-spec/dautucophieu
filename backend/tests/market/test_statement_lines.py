@@ -35,3 +35,10 @@ def test_prepaid_expense_lines_are_kept_owner_25_11_2026():
     names = {(m, c): n for (m, c), n in LINES.items()}
     assert names[(1, 11510)] == "prepaid_st" and names[(1, 12610)] == "prepaid_lt" and names[(3, 31160)] == "prepaid_change"
     assert LINES_VERSION >= 9
+
+
+def test_goodwill_and_its_amortisation_are_kept_owner_25_11_2026():
+    """Lợi thế thương mại (spec 25/11/2026): NVL 2021 12690 5.104,0 tỷ; 31111 the amortisation added back in operating cash flow."""
+    names = {(m, c): n for (m, c), n in LINES.items()}
+    assert names[(1, 12690)] == "goodwill" and names[(3, 31111)] == "goodwill_amort"
+    assert LINES_VERSION >= 10

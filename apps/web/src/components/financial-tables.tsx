@@ -71,7 +71,7 @@ export function lastN<T>(periods: T[], n: number): number[] {
 /** Notes under the fixed-asset group: lines not synced yet, and periods with a finance lease (no line of its own). */
 export function fixedNotes(d: { fixed_assets_pending?: boolean; finance_lease?: string[] }): string[] {
   const out: string[] = [];
-  if (d.fixed_assets_pending) out.push("Chưa đồng bộ dòng tài sản cố định và chi phí trả trước: hai nhóm này để trống đến lượt 20:00 lấy lại lịch sử của mã này.");
+  if (d.fixed_assets_pending) out.push("Chưa đồng bộ dòng tài sản cố định, chi phí trả trước và lợi thế thương mại: các dòng này để trống đến lượt 20:00 lấy lại lịch sử của mã này.");
   if (d.finance_lease?.length) out.push(`Có TSCĐ thuê tài chính (không có dòng riêng) ở ${d.finance_lease.map(periodLabel).join(", ")}.`);
   return out;
 }
@@ -243,6 +243,8 @@ export function FinancialTables({ symbol }: { symbol: string }) {
         không có số phát sinh tăng, giảm của thuyết minh, nên phần mềm không tính số kết chuyển.
         Chi phí trả trước: chi phí đã trả tiền nhưng ghi thành tài sản, phân bổ dần vào chi phí các kỳ sau (không tốn thêm tiền khi phân bổ); ÷ LNTT là LNTT
         của kỳ (quý: 4 quý). Tăng, giảm chi phí trả trước lấy từ lưu chuyển tiền tệ, chỉ phần vận hành, nên có thể khác chênh lệch số dư. VNDirect không có số phân bổ trong năm.
+        Lợi thế thương mại: phần trả cao hơn tài sản thuần khi mua công ty, phân bổ dần tối đa 10 năm; dòng phân bổ của VNDirect thường để trống. P/B loại lợi thế
+        thương mại = vốn hoá ÷ (vốn chủ công ty mẹ − lợi thế thương mại); không trừ TSCĐ vô hình vì ở Việt Nam phần lớn là quyền sử dụng đất.
       </p>}
     </div>
   );

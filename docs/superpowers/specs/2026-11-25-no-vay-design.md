@@ -27,3 +27,14 @@ Nhóm **Nợ vay**, sau Chi phí trả trước, trước Quy mô và định gi
 - ICR = (LNTT + chi phí lãi vay) ÷ chi phí lãi vay năm gần nhất; bật khi **dưới 3 lần**, hoặc EBIT không dương. Hiện ICR hai năm.
 - Không có lãi vay (0 hoặc thiếu dòng): không đánh giá được, ghi lý do. Thử 40 mã có lãi vay, năm gần nhất: 4 mã bật.
 - Chỉ hiện trên trang.
+
+## Các khoản vay nhập tay (bổ sung 25/11/2026, chủ sở hữu duyệt bước 3)
+- Khối Thuyết minh TSCĐ (nhập tay), khóa `loans` (tối đa 30) và `debt_notes`. Mỗi khoản: bên cho vay (bắt buộc), loại tiền (VND, USD, EUR, JPY, CNY,
+  khác), kỳ hạn (ngắn, dài hạn), dư nợ (tỷ đồng quy đổi theo thuyết minh, bắt buộc), lãi suất từ–đến (%/năm, 0–100), lãi suất cơ sở thả nổi và biên
+  độ, năm đáo hạn, tài sản đảm bảo, ghi chú. `debt_notes`: kỳ báo cáo đã đọc, nợ dài hạn đến hạn trả trong 12 tháng (HPG 2021: 6.200), mức đồng Việt
+  Nam mất giá giả định (trên 0 đến 100%).
+- Phần mềm cộng theo loại tiền, kỳ hạn, năm đáo hạn ("chưa ghi năm" riêng); lãi suất theo loại tiền là **khoảng** thấp nhất–cao nhất và danh sách
+  lãi suất thả nổi (không lấy trung bình); đối chiếu tổng với vay ngắn + dài hạn của VNDirect ở kỳ đã đọc (tỷ lệ phần bạn đã ghi); **kịch bản tỷ
+  giá** = dư nợ ngoại tệ (khác VND) × mức mất giá bạn giả định, so với LNTT kỳ đó, ghi rõ "kịch bản, không phải dự báo".
+- HPG 2021 (bài): VND ngắn hạn 12.998 (2,4–6,5%), USD ngắn hạn 6.357 (1,2–2,3%), HSBC 503 đến 2024; USD dài hạn Libor + 2,05%.
+- Ghi phần khác không gửi `loans`, `debt_notes` thì giữ nguyên.

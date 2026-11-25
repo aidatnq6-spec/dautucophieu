@@ -1,5 +1,18 @@
 import { expect, it } from "vitest";
-import { bargainText, dealText, gapText, quarterInput, stateText, yearsLeftText } from "./fixed-asset-notes";
+import { bargainText, coverText, dealText, fxText, gapText, quarterInput, stateText, yearsLeftText } from "./fixed-asset-notes";
+
+it("the loans written are checked against the borrowings on the balance sheet", () => {
+  expect(coverText({ period: "2021", total: "20858", reported: "57212.5", covered: "0.3646" }))
+    .toBe("Các khoản bạn ghi: 20.858 tỷ, bằng 36,5% vay ngắn hạn + dài hạn trên bảng cân đối 2021 (57.212,5 tỷ)");
+  expect(coverText({ period: null, total: "503", reported: null, covered: null })).toBe("Các khoản bạn ghi: 503 tỷ; ghi kỳ báo cáo đã đọc để đối chiếu với bảng cân đối");
+});
+
+it("the exchange scenario is the owner's own fall of the dong, not a forecast", () => {
+  expect(fxText({ foreign: "7357", fx_shock: "5", fx_loss: "367.85", fx_to_pbt: "0.0099" }))
+    .toBe("Kịch bản (không phải dự báo): đồng Việt Nam mất giá 5% thì dư nợ ngoại tệ 7.357 tỷ tăng thêm khoảng 367,9 tỷ, bằng 1,0% LNTT kỳ đã đọc");
+  expect(fxText({ foreign: "0", fx_shock: "5", fx_loss: "0", fx_to_pbt: null })).toBe("Không có dư nợ ngoại tệ trong các khoản bạn ghi");
+  expect(fxText({ foreign: "7357", fx_shock: null, fx_loss: null, fx_to_pbt: null })).toBe("Ghi mức mất giá giả định để xem kịch bản tỷ giá");
+});
 
 it("the notes' goodwill sits beside the formula's, with the gap", () => {
   expect(gapText({ computed: "-1715.537", note_goodwill: "-1670", gap: "-45.537" })).toBe("Công thức: −1.715,5 tỷ; thuyết minh: −1.670 tỷ (lệch −45,5 tỷ, dùng số thuyết minh)");

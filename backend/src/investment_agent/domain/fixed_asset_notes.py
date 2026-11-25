@@ -328,3 +328,118 @@ def bargain_years(deals: list[dict], statements: dict) -> list[dict]:
                     "pbt_without": None if pbt is None else _text(pbt - gain),
                     "flag": None if pbt is None else (pbt <= 0 or gain >= BARGAIN_SHARE * pbt)})
     return out
+
+
+# Các khoản vay (25/11/2026), from the notes on borrowings, which VNDirect does not carry: lender, currency, term, balance (tỷ đồng as
+# converted in the notes), rate range or a floating base with its margin, maturity year, collateral. Rates are shown as ranges, never
+# averaged into one figure; the exchange scenario is the owner's own fall of the đồng, not a forecast.
+MAX_LOANS = 30
+CURRENCIES = ("VND", "USD", "EUR", "JPY", "CNY", "khác")
+TERMS = {"short": "Ngắn hạn", "long": "Dài hạn"}
+
+
+def _rate(raw) -> Decimal | None:
+    text = str(raw or "").strip().replace("%", "").replace(",", ".")
+    if not text:
+        return None
+    try:
+        value = Decimal(text)
+    except InvalidOperation:
+        raise NoteError("invalid_rate", "Lãi suất là số phần trăm/năm, ví dụ 6,5.") from None
+    if not value.is_finite() or not 0 <= value <= 100:
+        raise NoteError("invalid_rate", "Lãi suất từ 0 đến 100%/năm.")
+    return value
+
+
+def _pct_text(v: Decimal) -> str:
+    return format(v.normalize(), "f")
+
+
+def validate_loans(raw: list) -> list[dict]:
+    if len(raw) > MAX_LOANS:
+        raise NoteError("too_many", f"Tối đa {MAX_LOANS} khoản vay mỗi mã.")
+    out = []
+    for loan in raw:
+        lender = str(loan.get("lender") or "").strip()
+        if not lender or len(lender) > 120:
+            raise NoteError("invalid_name", "Bên cho vay từ 1 đến 120 ký tự.")
+        currency = str(loan.get("currency") or "").strip()
+        if currency not in CURRENCIES:
+            raise NoteError("invalid_currency", "Loại tiền: " + ", ".join(CURRENCIES) + ".")
+        term = str(loan.get("term") or "").strip()
+        if term not in TERMS:
+            raise NoteError("invalid_term", "Kỳ hạn là ngắn hạn hoặc dài hạn.")
+        balance = _money(loan.get("balance"))
+        if balance is None:
+            raise NoteError("invalid_amount", "Nhập dư nợ (tỷ đồng).")
+        low, high, margin = _rate(loan.get("rate_from")), _rate(loan.get("rate_to")), _rate(loan.get("margin"))
+        if low is not None and high is not None and low > high:
+            raise NoteError("invalid_rate", "Lãi suất \"từ\" không lớn hơn \"đến\".")
+        maturity = str(loan.get("maturity") or "").strip()
+        if maturity and not _YEAR.fullmatch(maturity):
+            raise NoteError("invalid_year", "Năm đáo hạn dạng 2025.")
+        out.append({"id": str(loan.get("id") or uuid.uuid4().hex[:12])[:32], "lender": lender, "currency": currency, "term": term, "balance": balance,
+                    "rate_from": None if low is None else _pct_text(low), "rate_to": None if high is None else _pct_text(high),
+                    "base": str(loan.get("base") or "").strip()[:30] or None, "margin": None if margin is None else _pct_text(margin),
+                    "maturity": maturity or None, "collateral": str(loan.get("collateral") or "").strip()[:300],
+                    "note": str(loan.get("note") or "").strip()[:500]})
+    return out
+
+
+def validate_debt_notes(raw: dict) -> dict:
+    """The period the loans were read from, the long-term debt due within a year (the notes), and the owner's fall of the đồng (%)."""
+    out = {}
+    if (period := _period(raw.get("period"))) is not None:
+        out["period"] = period
+    if (portion := _money(raw.get("current_portion"))) is not None:
+        out["current_portion"] = portion
+    shock = str(raw.get("fx_shock") or "").strip().replace(",", ".").replace("%", "")
+    if shock:
+        try:
+            value = Decimal(shock)
+        except InvalidOperation:
+            value = Decimal(-1)
+        if not value.is_finite() or not 0 < value <= 100:
+            raise NoteError("invalid_shock", "Mức đồng Việt Nam mất giá từ trên 0 đến 100%.")
+        out["fx_shock"] = _pct_text(value)
+    return out
+
+
+def debt_view(loans: list[dict], notes: dict, statements: dict) -> dict:
+    """Totals of the owner's loans by currency, term and maturity year (tỷ đồng), each currency's rate range and floating rates, the
+    borrowings on the balance sheet at the period read and the share the loans cover, and the exchange scenario: the foreign-currency
+    balance × the owner's fall of the đồng, against that period's profit before tax."""
+    def add(bucket: dict, key: str, v: Decimal) -> None:
+        bucket[key] = bucket.get(key, Decimal(0)) + v
+    by_currency, by_term, maturities, rates = {}, {}, {}, {}
+    for loan in loans:
+        v = Decimal(loan["balance"])
+        add(by_currency, loan["currency"], v)
+        add(by_term, loan["term"], v)
+        add(maturities, loan["maturity"] or "none", v)
+        r = rates.setdefault(loan["currency"], {"from": None, "to": None, "floating": []})
+        for key, pick in (("rate_from", min), ("rate_to", max)):
+            if loan[key] is not None:
+                cur = r["from" if key == "rate_from" else "to"]
+                r["from" if key == "rate_from" else "to"] = loan[key] if cur is None else _pct_text(pick(Decimal(cur), Decimal(loan[key])))
+        if loan["base"] or loan["margin"]:
+            margin = f" + {loan['margin'].replace('.', ',')}%" if loan["margin"] else ""
+            r["floating"].append(f"{loan['base'] or 'thả nổi'}{margin}")
+    total = sum(by_currency.values(), Decimal(0))
+    period = notes.get("period")
+    row = ((statements.get("years" if period and _YEAR.fullmatch(period) else "quarters") or {}).get(period) or {}) if period else {}
+    st, lt = _bn(row, "st_debt"), _bn(row, "lt_debt")
+    reported = None if st is None or lt is None else st + lt
+    foreign = sum((v for c, v in by_currency.items() if c != "VND"), Decimal(0))
+    shock = Decimal(notes["fx_shock"]) / 100 if "fx_shock" in notes else None
+    loss = None if shock is None else foreign * shock
+    pbt = _bn(row, "pbt")
+    def text(d: dict) -> dict:
+        return {k: _text(v) for k, v in sorted(d.items())}
+    return {"period": period, "total": _text(total), "by_currency": text(by_currency), "by_term": text(by_term),
+            "maturities": dict(sorted(text(maturities).items(), key=lambda kv: (kv[0] == "none", kv[0]))), "rates": dict(sorted(rates.items())),
+            "reported": None if reported is None else _text(reported),
+            "covered": str((total / reported).quantize(Decimal("0.0001"), ROUND_HALF_UP)) if reported else None,
+            "current_portion": notes.get("current_portion"), "fx_shock": notes.get("fx_shock"), "foreign": _text(foreign),
+            "fx_loss": None if loss is None else _text(loss),
+            "fx_to_pbt": str((loss / pbt).quantize(Decimal("0.0001"), ROUND_HALF_UP)) if loss is not None and pbt is not None and pbt > 0 else None}

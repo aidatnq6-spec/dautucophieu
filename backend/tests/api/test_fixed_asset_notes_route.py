@@ -64,3 +64,12 @@ def test_the_goodwill_amortisation_is_kept_and_the_view_carries_the_movement_and
     assert saved["goodwill_moves"] == []
     kept = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "expected_version": 1, "request_id": "hn-2"}).json()
     assert kept["deals"][0]["note_goodwill"] == "-1670"
+
+
+def test_loans_and_their_notes_are_kept_and_summed_and_survive_writes_that_leave_them_out(tmp_path):
+    c, clock = client(tmp_path)
+    saved = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "loans": [{"lender": "HSBC", "currency": "USD", "term": "long", "balance": "503"}],
+                                       "debt_notes": {"period": "2021", "fx_shock": "5"}, "expected_version": 0, "request_id": "ln-1"}).json()
+    assert saved["debt"]["total"] == "503" and saved["debt"]["fx_loss"] == "25.15" and saved["loans"][0]["lender"] == "HSBC" and "USD" in saved["currencies"]
+    kept = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "expected_version": 1, "request_id": "ln-2"}).json()
+    assert kept["debt"]["total"] == "503" and kept["debt_notes"]["fx_shock"] == "5"

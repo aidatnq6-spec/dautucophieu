@@ -56,6 +56,25 @@ test("the owner writes a deal and sees its goodwill by the lesson's formula", as
   await expect(box.getByTestId("fan-charging")).toContainText("40 tỷ mỗi năm");
 });
 
+test("the owner writes a foreign-currency loan and sees the exchange scenario", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Thuyết minh TSCĐ (nhập tay)" });
+  await box.getByRole("button", { name: "Thêm khoản vay" }).click();
+  const form = box.getByRole("form", { name: "Khoản vay" });
+  await form.getByLabel("Bên cho vay").fill("Ngân hàng mẫu");
+  await form.getByLabel("Loại tiền").selectOption("USD");
+  await form.getByLabel("Kỳ hạn").selectOption("long");
+  await form.getByLabel(/Dư nợ/).fill("1000");
+  await form.getByLabel("Năm đáo hạn").fill("2027");
+  await form.getByRole("button", { name: "Lưu khoản vay" }).click();
+  await expect(box.getByTestId("fan-loan")).toContainText("Ngân hàng mẫu");
+  await box.getByRole("button", { name: "Kỳ đã đọc, nợ đến hạn, kịch bản tỷ giá" }).click();
+  await box.getByRole("form", { name: "Ghi chú nợ vay" }).getByLabel(/mất giá/).fill("5");
+  await box.getByRole("form", { name: "Ghi chú nợ vay" }).getByRole("button", { name: "Lưu" }).click();
+  await expect(box.getByTestId("fan-debt")).toContainText("mất giá 5% thì dư nợ ngoại tệ 1.000 tỷ tăng thêm khoảng 50 tỷ");
+  await expect(box.getByTestId("fan-debt")).toContainText("2027 1.000 tỷ");
+});
+
 test("a bargain purchase with the notes' figure shows the gap and a profit line without cash", async ({ page }) => {
   await page.goto("/research/FPT");
   const box = page.getByRole("region", { name: "Thuyết minh TSCĐ (nhập tay)" });

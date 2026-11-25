@@ -25,6 +25,7 @@ PREPAID_GAP, PREPAID_MATERIAL = Decimal("0.20"), Decimal("0.10")  # growth above
 GOODWILL_SHARE = Decimal("0.10")  # goodwill against parent equity (owner, 25/11/2026)
 INTEREST_COVER = Decimal(3)  # EBIT over interest expense below this (owner, 25/11/2026)
 EQUITY_OUTSIDE = Decimal("0.10")  # equity's change outside profit and shareholder cash against opening equity (owner, 25/11/2026)
+MARGIN_SWING = Decimal("0.10")  # the latest gross margin away from the four years before's average, in points (owner, 25/11/2026)
 CIP_DROP, CIP_MATERIAL, CIP_COST_SHARE = Decimal("0.50"), Decimal("0.10"), Decimal("0.50")
 BN = Decimal(1_000_000_000)
 # Sector context shown with the signs, where a sign is usual for the business rather than a warning by itself.
@@ -255,8 +256,30 @@ def _signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:
     signs.append(_prepaid_sign(cur, prev, y))
     signs.append(_goodwill_sign(cur, prev, y))
     signs.append(_cover_sign(cur, prev, y))
-    signs += [_equity_outside_sign(cur, prev, y), _accumulated_loss_sign(cur, y)]
+    signs += [_equity_outside_sign(cur, prev, y), _accumulated_loss_sign(cur, y), _margin_swing_sign(a, y)]
     return signs
+
+
+def _gross_margin(row: dict) -> Decimal | None:
+    return row["gross_profit"] / row["revenue"] if "gross_profit" in row and row.get("revenue", Decimal(0)) > 0 else None
+
+
+def _margin_swing_sign(a: dict[int, dict[str, Decimal]], y: int) -> dict:
+    """The latest gross margin from ten points above or below the average of the four years before: raw material prices, a change of
+    business mix, a restatement of the cost of sales; the notes on cost of sales tell which."""
+    label = "Biên gộp lệch mạnh"
+    years = list(range(y - 4, y))
+    margins = {yr: _gross_margin(a.get(yr, {})) for yr in [*years, y]}
+    if any(v is None for v in margins.values()):
+        return {"id": "gross_margin_swing", "label": label, "flag": None,
+                "detail": f"Cần doanh thu thuần và lãi gộp {y - 4}–{y} (có sau lần cập nhật báo cáo tới)"}
+    average = sum(margins[yr] for yr in years) / 4
+    gap = margins[y] - average
+    return {"id": "gross_margin_swing", "label": label, "flag": abs(gap) >= MARGIN_SWING,
+            "rule": f"biên gộp năm gần nhất cao hơn hoặc thấp hơn trung bình 4 năm liền trước từ {_num(MARGIN_SWING * 100, 0)} điểm %: giá nguyên liệu, "
+                    "cơ cấu mảng kinh doanh đổi, hay điều chỉnh hồi tố giá vốn; đọc thuyết minh giá vốn",
+            "detail": f"Năm {y}: biên gộp {_pct(margins[y])} (lãi gộp {_bn(a[y]['gross_profit'])} / doanh thu {_bn(a[y]['revenue'])}); trung bình {y - 4}–{y - 1}: "
+                      f"{_pct(average)} ({' · '.join(_pct(margins[yr]) for yr in years)}); lệch {'+' if gap >= 0 else ''}{_num(gap * 100, 1)} điểm"}
 
 
 _FLOWS = ("profit", "issue_cash", "buyback_cash", "dividends_paid")

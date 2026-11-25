@@ -23,8 +23,8 @@ def test_all_nine_criteria_pass_for_a_company_improving_on_every_line():
     assert [c["passed"] for c in f["criteria"]] == [True] * 9
     assert f["criteria"][0]["detail"] == "ROA 9,0% (lợi nhuận 9 tỷ / tài sản đầu kỳ 100 tỷ)"
     assert f["criteria"][6]["detail"] == "Không có đợt huy động vốn bằng cổ phiếu năm 2025 (cổ phiếu thưởng, cổ tức bằng cổ phiếu không tính)"
-    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None, None, None, None, None, None, None, None, None]  # financial income and its cash,
-    # other receivables, prepayments, construction in progress, prepaid expenses, goodwill, interest, equity: not kept
+    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None, None, None, None, None, None, None, None, None, None]  # financial income and its cash,
+    # other receivables, prepayments, construction in progress, prepaid expenses, goodwill, interest, equity; three years: no margin swing
 
 
 def test_a_capital_raise_and_worse_lines_fail_and_the_signs_show_their_numbers():
@@ -409,3 +409,23 @@ def test_accumulated_losses_or_parent_equity_below_capital_is_a_sign_owner_25_11
     assert sign(report_quality(equity_years(1000, 800, 100, retained=50, capital=900), "x"), "accumulated_loss")["flag"] is True  # below capital alone
     assert sign(report_quality(equity_years(1000, 1080, 100, retained=200, capital=900), "x"), "accumulated_loss")["flag"] is False
     assert sign(report_quality(STRONG, "x"), "accumulated_loss")["flag"] is None
+
+
+def margin_years(margins: dict):
+    """Years of revenue 1.000 tỷ and the gross profit of each margin (%)."""
+    out = {}
+    for y, m in margins.items():
+        out[y] = dict(STRONG["annual"].get(y, STRONG["annual"]["2023"]))
+        out[y].update(revenue=str(1000 * BN), gross_profit=str(m * 10 * BN))
+    return {**STRONG, "annual": out}
+
+
+def test_a_gross_margin_ten_points_away_from_the_four_years_before_is_a_sign_owner_25_11_2026():
+    """HAG 2019 shape: 11% after 35,8% and 44,1%."""
+    s = sign(report_quality(margin_years({"2021": 30, "2022": 40, "2023": 36, "2024": 44, "2025": 11}), "Nông nghiệp"), "gross_margin_swing")
+    assert s["label"] == "Biên gộp lệch mạnh" and s["flag"] is True and "10 điểm %" in s["rule"]
+    assert s["detail"] == ("Năm 2025: biên gộp 11,0% (lãi gộp 110 tỷ / doanh thu 1.000 tỷ); trung bình 2021–2024: 37,5% "
+                           "(30,0% · 40,0% · 36,0% · 44,0%); lệch −26,5 điểm")
+    assert sign(report_quality(margin_years({"2021": 30, "2022": 40, "2023": 36, "2024": 44, "2025": 48}), "x"), "gross_margin_swing")["flag"] is True  # up too
+    assert sign(report_quality(margin_years({"2021": 30, "2022": 40, "2023": 36, "2024": 44, "2025": 30}), "x"), "gross_margin_swing")["flag"] is False  # −7,5
+    assert sign(report_quality(STRONG, "x"), "gross_margin_swing")["flag"] is None  # three years only

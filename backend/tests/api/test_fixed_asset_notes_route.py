@@ -32,3 +32,14 @@ def test_notes_are_kept_per_company_and_change_their_due_quarter_only_by_postpon
     assert stale.status_code == 409
     assert call(c, clock, "GET", "/internal/stock/VCB/fixed-asset-notes").status_code == 404
     assert call(c, clock, "GET", "/internal/stock/FPT/fixed-asset-notes").status_code == 404
+
+
+def test_the_prepaid_allocation_is_kept_beside_the_projects_and_survives_a_postponement(tmp_path):
+    c, clock = client(tmp_path)
+    saved = call(c, clock, "PUT", URL, {"projects": [{"name": "Dung Quất 2", "due": "Q3/2025"}], "ranges": {}, "prepaid": {"2021": {"total": "425"}},
+                                       "expected_version": 0, "request_id": "pp-1"}).json()
+    assert saved["prepaid"][0]["year"] == "2021" and saved["prepaid"][0]["total"] == "425" and saved["prepaid_kinds"]["overhaul"] == "Sửa chữa lớn"
+    later = call(c, clock, "POST", f"{URL}/postpone", {"id": saved["projects"][0]["id"], "to": "Q1/2026", "expected_version": 1, "request_id": "pp-2"}).json()
+    assert later["prepaid"][0]["total"] == "425"
+    kept = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "expected_version": 2, "request_id": "pp-3"}).json()  # an older page sends none
+    assert kept["prepaid"][0]["total"] == "425"

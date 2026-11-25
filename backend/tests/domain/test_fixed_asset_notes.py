@@ -69,3 +69,20 @@ def test_an_open_project_is_due_once_its_quarter_s_report_is_stored_with_the_com
     assert b["state"] == "waiting_report" and b["at_due"] is None and b["at_read"] is None  # Q1/2026 over, its report not stored yet
     assert due_view(projects, {"years": statements["years"]}, today=date(2025, 8, 1))[0]["state"] == "upcoming"  # Q3/2025 not over
     assert due_view(complete(projects, a["id"], today=date(2026, 4, 21)), statements, today=date(2026, 4, 21))[0]["state"] == "done"
+
+
+def test_the_yearly_allocation_of_prepaid_expenses_gives_the_years_left_at_that_pace_owner_25_11_2026():
+    """HPG 2021: 425 tỷ allocated (109 tools, 139 overhauls among them) against 3.171 tỷ long-term prepaid: about 7,5 years at that pace."""
+    from investment_agent.domain.fixed_asset_notes import prepaid_view, validate_prepaid
+    kept = validate_prepaid({"2021": {"tools": "109", "overhaul": "139", "total": "425"}, "2022": {"tools": "100", "land": "50"}})
+    assert kept == {"2021": {"tools": "109", "overhaul": "139", "total": "425"}, "2022": {"tools": "100", "land": "50"}}
+    statements = {"years": {"2021": {"prepaid_lt": str(3171 * B), "pbt": str(37057 * B)}, "2022": {"prepaid_lt": str(3929 * B)}}}
+    a, b = prepaid_view(kept, statements)
+    assert a == {"year": "2021", "items": {"tools": "109", "overhaul": "139"}, "total": "425", "summed": False, "prepaid_lt": str(3171 * B),
+                 "years_left": "7.5", "to_pbt": "0.0115"}
+    assert b["total"] == "150" and b["summed"] is True and b["years_left"] == "26.2" and b["to_pbt"] is None  # no profit line that year
+    for raw, code in (({"20x1": {"tools": "1"}}, "invalid_year"), ({"2021": {"ships": "1"}}, "invalid_kind"), ({"2021": {"tools": "-1"}}, "invalid_amount"),
+                      ({"2021": {}}, "empty_year")):
+        with pytest.raises(NoteError) as err:
+            validate_prepaid(raw)
+        assert err.value.code == code

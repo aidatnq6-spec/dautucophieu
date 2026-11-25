@@ -8,7 +8,8 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Request
 from pydantic import Field
 
-from investment_agent.domain.fixed_asset_notes import GROUPS, MAX_PROJECTS, NoteError, complete, due_view, postpone, validate_notes
+from investment_agent.domain.fixed_asset_notes import (GROUPS, MAX_PROJECTS, PREPAID_KINDS, NoteError, complete, due_view, postpone, prepaid_view,
+                                                         validate_notes, validate_prepaid)
 from investment_agent.domain.models import ContractModel
 from investment_agent.market.financial_ratios import kind_of
 from investment_agent.market.sectors import load_sectors
@@ -29,6 +30,7 @@ NOT_A_COMPANY = "Chỉ ghi thuyết minh TSCĐ cho doanh nghiệp (không phải
 class NotesRequest(ContractModel):
     projects: list[dict] = Field(max_length=MAX_PROJECTS)
     ranges: dict
+    prepaid: dict | None = None  # left out: the stored allocation is kept
     expected_version: int = Field(strict=True, ge=0)
     request_id: str = Field(pattern=_REQUEST)
 
@@ -64,7 +66,11 @@ def _view(request: Request, repo, owner, symbol: str) -> dict:
     record, projects, ranges = read_notes(repo, owner, symbol)
     statements = StatementStore(Path(request.app.state.data_dir) / "statements").read(symbol) or {}
     return {"symbol": symbol, "version": record.version if record else 0, "projects": due_view(projects, statements, today=_today(request)),
-            "ranges": ranges, "groups": GROUPS}
+            "ranges": ranges, "groups": GROUPS, "prepaid": prepaid_view(_prepaid(record), statements), "prepaid_kinds": PREPAID_KINDS}
+
+
+def _prepaid(record) -> dict:
+    return (record.payload if record else {}).get("prepaid", {})
 
 
 def _run(request: Request, symbol: str, change):
@@ -85,9 +91,12 @@ def _run(request: Request, symbol: str, change):
         return unavailable()
 
 
-def _write(repo, owner, sym: str, projects: list, ranges: dict, body) -> None:
-    repo.write(owner, "settings", record_id(sym), {"symbol": sym, "projects": projects, "ranges": ranges}, expected_version=body.expected_version,
-               request_id=body.request_id)
+def _write(repo, owner, sym: str, projects: list, ranges: dict, body, prepaid: dict | None = None) -> None:
+    """prepaid None: the stored allocation is kept."""
+    if prepaid is None:
+        prepaid = _prepaid(read_notes(repo, owner, sym)[0])
+    repo.write(owner, "settings", record_id(sym), {"symbol": sym, "projects": projects, "ranges": ranges, "prepaid": prepaid},
+               expected_version=body.expected_version, request_id=body.request_id)
 
 
 @router.get("/stock/{symbol}/fixed-asset-notes")
@@ -100,7 +109,7 @@ def put_notes(symbol: str, request: Request, body: NotesRequest):
     def change(repo, owner, sym):
         _, stored, _ = read_notes(repo, owner, sym)
         projects, ranges = validate_notes(body.projects, body.ranges, stored=stored)
-        _write(repo, owner, sym, projects, ranges, body)
+        _write(repo, owner, sym, projects, ranges, body, None if body.prepaid is None else validate_prepaid(body.prepaid))
     return _run(request, symbol, change)
 
 

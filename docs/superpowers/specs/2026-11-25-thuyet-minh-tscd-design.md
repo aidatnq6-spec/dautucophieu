@@ -43,3 +43,11 @@ là số của cả công ty; báo cáo không tách theo dự án".
 ## Không làm
 - Điều kiện "Dự án trễ hạn" trong Luận điểm (để sau, chủ sở hữu quyết sau khi dùng).
 - Ngân hàng, chứng khoán, bảo hiểm.
+
+## Chi phí trả trước: phân bổ trong năm (bổ sung 25/11/2026, chủ sở hữu duyệt bước 3 của đề xuất chi phí trả trước)
+- Cùng bản ghi, khóa `prepaid`: mỗi năm (tối đa 15) số phân bổ theo loại của thuyết minh, tỷ đồng: công cụ dụng cụ, sửa chữa lớn, tiền thuê
+  đất và đền bù, chi phí trước hoạt động, khác; và tổng phân bổ nếu thuyết minh ghi. Năm không có số nào thì không lưu được.
+- Tổng = số thuyết minh ghi; không ghi thì cộng các loại đã nhập (ghi rõ "cộng các loại đã nhập"). HPG 2021: công cụ 109, sửa chữa lớn 139, tổng 425.
+- **Số năm phân bổ còn lại** = chi phí trả trước dài hạn cuối năm đó (báo cáo đã lưu, dòng 12610) ÷ tổng phân bổ năm đó, một chữ số thập phân,
+  ghi "nếu giữ nhịp phân bổ năm đó" (HPG 2021: 3.171 ÷ 425 ≈ 7,5). **Phân bổ ÷ LNTT** năm đó. Thiếu số dư, LNTT hoặc LNTT không dương: để trống.
+- Lùi hạn, hoàn thành dự án và lưu bảng dự án từ trang cũ (không gửi `prepaid`) giữ nguyên số phân bổ đã lưu.

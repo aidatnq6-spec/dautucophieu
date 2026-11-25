@@ -25,3 +25,17 @@ test("a bank's page has no fixed-asset notes", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.getByRole("region", { name: "Thuyết minh TSCĐ (nhập tay)" })).toHaveCount(0);
 });
+
+test("the owner writes a year's prepaid allocation from the notes", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const box = page.getByRole("region", { name: "Thuyết minh TSCĐ (nhập tay)" });
+  await box.getByRole("button", { name: "Thêm năm phân bổ" }).click();
+  const form = box.getByRole("form", { name: "Phân bổ chi phí trả trước" });
+  await form.getByLabel("Năm").fill("2021");
+  await form.getByLabel("Công cụ dụng cụ (tỷ đồng)").fill("109");
+  await form.getByLabel("Sửa chữa lớn (tỷ đồng)").fill("139");
+  await form.getByRole("button", { name: "Lưu phân bổ" }).click();
+  const row = box.getByTestId("fan-prepaid");
+  await expect(row).toContainText("248");
+  await expect(row).toContainText("cộng các loại đã nhập");
+});

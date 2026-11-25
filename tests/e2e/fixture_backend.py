@@ -98,6 +98,11 @@ if __name__ == "__main__":
         "years_created": {}, "year_end_close": {"2024": {"date": "2024-12-31", "close": "11"}, "2025": {"date": "2025-12-31", "close": "12"}},
         "quarters_conflicts": [], "years_conflicts": []})
     SeriesStore(os.path.join(data, "trend-sources")).upsert("FPT-1d", [(datetime(y, 12, 31), "12") for y in range(2020, 2026)])
+    # Thuyet minh tu dong: synthetic Vietcap-style notes for FPT (đồng).
+    from investment_agent.market.company_notes import CompanyNoteStore
+    CompanyNoteStore(os.path.join(data, "company-notes")).save({"symbol": "FPT", "fetched_at": "2026-11-25T13:00:00+00:00", "source": "vietcap:iq", "quarters": {},
+        "years": {"2025": {"st_loans_contract": str(300 * 10**9), "lt_due": str(50 * 10**9), "bonds": "0", "fin_interest": str(20 * 10**9),
+                           "fin_disposals": str(5 * 10**9), "ppe_cost_open": str(900 * 10**9), "ppe_cost_add": str(120 * 10**9)}}})
     # Quy mo va dinh gia of a bank: VCB's own layout, apart from the general statements; 1 tỷ parent profit a quarter, 100 tỷ equity.
     StatementStore(os.path.join(data, "statements-financial")).save({
         "symbol": "VCB", "kind": "bank", "fetched_at": "2026-11-07T00:00:00+00:00", "source": "vndirect:finfo",

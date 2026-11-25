@@ -433,7 +433,9 @@ def _cip_signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:
     cur, prev = a.get(y, {}), a.get(y - 1, {})
     if all(k in cur for k in ("cip", "ppe_gross")) and all(k in prev for k in ("cip", "ppe_gross")) and prev.get("ppe_net", Decimal(0)) > 0:
         before, now, base = prev["cip"], cur["cip"], prev["ppe_net"]
-        fall, rise = before - now, cur["ppe_gross"] - prev["ppe_gross"]
+        # the year's additions from the notes when there (Thuyết minh tự động): the year-end change is netted down by disposals
+        from_notes = "ppe_cost_add" in cur
+        fall, rise = before - now, cur["ppe_cost_add"] if from_notes else cur["ppe_gross"] - prev["ppe_gross"]
         material = before >= CIP_MATERIAL * base
         dep = (f"; khấu hao {y - 1}: {_bn(prev['depreciation'])}, {y}: {_bn(cur['depreciation'])}"
                if "depreciation" in cur and "depreciation" in prev else "")
@@ -444,7 +446,8 @@ def _cip_signs(a: dict[int, dict[str, Decimal]], y: int) -> list[dict]:
                             f"hữu hình còn lại, và nguyên giá TSCĐ hữu hình tăng ít nhất {_num(CIP_COST_SHARE * 100, 0)}% phần giảm đó: dự án đã đưa vào "
                             "dùng, khấu hao các kỳ sau sẽ tăng",
                     "detail": f"Năm {y}: XDCB dở dang {_bn(now)}, năm {y - 1}: {_bn(before)} ({change}, bằng {_pct(before / base)} TSCĐ hữu hình "
-                              f"còn lại năm {y - 1}); nguyên giá TSCĐ hữu hình {'tăng' if rise >= 0 else 'giảm'} {_bn(abs(rise))}{dep}"})
+                              f"còn lại năm {y - 1}); " + (f"nguyên giá TSCĐ hữu hình tăng trong năm {_bn(rise)} (thuyết minh)" if from_notes
+                              else f"nguyên giá TSCĐ hữu hình {'tăng' if rise >= 0 else 'giảm'} {_bn(abs(rise))}") + dep})
     else:
         out.append({"id": "cip_transfer", "label": label, "flag": None,
                     "detail": f"Thiếu XDCB dở dang, nguyên giá hoặc TSCĐ hữu hình năm {y - 1}–{y} (có sau lần cập nhật báo cáo tới)"})

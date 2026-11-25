@@ -56,7 +56,8 @@ def _ratio(percent) -> str | None:
     return _num(Decimal(d) / 100) if d is not None else None
 
 
-def build_record(symbol: str, statements: dict, events: list[dict], *, shares: str | None, now: datetime) -> dict:
+def build_record(symbol: str, statements: dict, events: list[dict], *, shares: str | None, now: datetime, notes: dict | None = None) -> dict:
+    """notes: the company's Vietcap notes (Thuyết minh tự động); the year's additions to tangible fixed assets join that year."""
     years, quarters, annual = {}, {}, {}
     for y, row in (statements.get("years") or {}).items():
         years[y] = {k: row[src] for k, src in (("npat", "npat_parent"), ("eps", "eps"), ("equity", "equity")) if row.get(src) is not None}
@@ -65,6 +66,9 @@ def build_record(symbol: str, statements: dict, events: list[dict], *, shares: s
             v = _num(row.get(src))
             if v is not None:
                 annual[y][name] = _num(-Decimal(v)) if src in COSTS else v
+        added = ((notes or {}).get("years") or {}).get(y, {}).get("ppe_cost_add")
+        if added is not None:
+            annual[y]["ppe_cost_add"] = added
     for q, row in (statements.get("quarters") or {}).items():
         quarters[q] = {k: row[src] for k, src in (("npat", "npat_parent"), ("equity", "equity")) if row.get(src) is not None}
     dividends, issues, share_issues = [], [], []
@@ -108,7 +112,9 @@ class VndirectFundamentals:
             hose = outstanding(symbol, get=self.hose_get) if self.hose_get else outstanding(symbol)
         except Exception:  # noqa: BLE001 - HOSE failing leaves the held count as it is
             hose = None
-        return {**build_record(symbol, statements, events, shares=shares, now=now), "shares_hose": hose}
+        from .company_notes import CompanyNoteStore
+        notes = CompanyNoteStore(self.data_dir / "company-notes").read(symbol) if kind_of(sector) is None else None
+        return {**build_record(symbol, statements, events, shares=shares, now=now, notes=notes), "shares_hose": hose}
 
     def fetch_closes(self, symbol: str, start: date, end: date, *, interval: str, index: bool):
         from .providers.vnstock_adapter import VnstockProvider

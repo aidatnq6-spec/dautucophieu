@@ -461,3 +461,12 @@ def test_convertible_bonds_or_options_are_a_dilution_sign_owner_25_11_2026():
     assert s["detail"] == "Năm 2025: trái phiếu chuyển đổi 500 tỷ; quyền chọn chuyển đổi trái phiếu 20 tỷ"
     assert sign(report_quality(with_(convertible_bonds=0, conversion_option=0), "x"), "dilution_risk")["flag"] is False
     assert sign(report_quality(STRONG, "x"), "dilution_risk")["flag"] is None
+
+
+def test_construction_moved_into_fixed_assets_uses_the_year_s_additions_when_the_notes_have_them_owner_25_11_2026():
+    """Disposals net the year-end cost down: 63.656 → 10.721 XDCB, cost +20.000 net, but 60.000 added in the year (notes)."""
+    base = cip_years({"2024": 63656, "2025": 10721}, {"2024": 67244, "2025": 70000}, {"2024": 108147, "2025": 128147})
+    assert sign(report_quality(base, "x"), "cip_transfer")["flag"] is False  # +20.000 is under half of the 52.935 fall
+    with_notes = {**base, "annual": {**base["annual"], "2025": {**base["annual"]["2025"], "ppe_cost_add": str(60000 * BN)}}}
+    s = sign(report_quality(with_notes, "x"), "cip_transfer")
+    assert s["flag"] is True and "nguyên giá TSCĐ hữu hình tăng trong năm 60.000 tỷ (thuyết minh)" in s["detail"]

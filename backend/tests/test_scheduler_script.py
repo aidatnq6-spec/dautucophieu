@@ -220,3 +220,8 @@ def test_the_stock_reminders_go_out_as_one_step_after_the_data_they_read():
         assert next(i for i, l in enumerate(ls) if f"investment_agent.jobs.step {before}" in l) < step, before
     for old in ("buy-plan-check", "insider-alerts", "drawdown-check", "thesis-check"):
         assert not any(f"investment_agent.jobs.step {old}" in l for l in ls), old
+
+def test_company_notes_follow_the_bank_notes_owner_25_11_2026():
+    """Both ask Vietcap; the company notes wait 10 s before their first call, after the bank notes."""
+    ls = lines()
+    assert next(i for i, l in enumerate(ls) if "jobs.step bank-notes-sync" in l) < next(i for i, l in enumerate(ls) if "jobs.step company-notes-sync" in l)

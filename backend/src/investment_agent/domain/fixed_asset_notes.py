@@ -634,3 +634,42 @@ def dilution_view(dilution: list[dict], statements: dict) -> dict:
     eps = lambda n: str((npat / n).quantize(Decimal(1), ROUND_HALF_UP))  # noqa: E731
     return {"quarter": latest, "shares": _text(shares), "extra": str(extra), "share": _share(Decimal(extra), shares),
             "npat_ttm": _text(npat / 10**9), "eps": eps(shares), "eps_diluted": eps(shares + extra)}
+
+
+# Thuyết minh tự động (25/11/2026): the company's Vietcap notes (market/company_notes.py) shown beside the owner's entries, read only.
+AUTO_LOANS = ("st_loans_contract", "lt_due", "lt_bank", "lt_other", "bonds", "finance_lease")
+AUTO_FIN_INCOME = ("fin_interest", "fin_bond_interest", "fin_dividends", "fin_disposals", "fin_fx_sale", "fin_fx_realised", "fin_fx_unrealised", "fin_other")
+AUTO_FIN_EXPENSE = ("exp_interest", "exp_disposals", "exp_fx_realised", "exp_fx_unrealised", "exp_provision", "exp_other")
+AUTO_PPE = ("ppe_cost_open", "ppe_cost_add", "ppe_cost_out")
+AUTO_LABELS = {
+    "st_loans_contract": "Vay ngắn hạn (theo hợp đồng)", "lt_due": "Vay dài hạn đến hạn trả", "lt_bank": "Vay dài hạn ngân hàng",
+    "lt_other": "Vay dài hạn đối tượng khác", "bonds": "Trái phiếu phát hành", "finance_lease": "Thuê tài chính",
+    "fin_interest": "Lãi tiền gửi, cho vay", "fin_bond_interest": "Lãi trái phiếu, kỳ phiếu", "fin_dividends": "Cổ tức, lợi nhuận được chia",
+    "fin_disposals": "Lãi thanh lý đầu tư", "fin_fx_sale": "Lãi bán ngoại tệ", "fin_fx_realised": "Lãi tỷ giá đã thực hiện",
+    "fin_fx_unrealised": "Lãi tỷ giá chưa thực hiện", "fin_other": "Doanh thu tài chính khác",
+    "exp_interest": "Lãi tiền vay", "exp_disposals": "Lỗ thanh lý đầu tư", "exp_fx_realised": "Lỗ tỷ giá đã thực hiện",
+    "exp_fx_unrealised": "Lỗ tỷ giá chưa thực hiện", "exp_provision": "Dự phòng giảm giá đầu tư", "exp_other": "Chi phí tài chính khác",
+    "ppe_cost_open": "Nguyên giá TSCĐ hữu hình đầu năm", "ppe_cost_add": "Tăng trong năm (mua mới, kết chuyển XDCB)", "ppe_cost_out": "Giảm trong năm",
+}
+AUTO_YEARS = 5
+
+
+def auto_view(record: dict | None, statements: dict, *, debt_notes: dict) -> dict | None:
+    """The five latest years of the notes in tỷ đồng: borrowings by kind and their total, the long-term debt due beside the owner's figure for
+    that period, financial income and costs by kind, the part hard to repeat (gains on disposals + unrealised exchange gains; Vietcap does not
+    split interest from related parties) against the stored profit before tax, and the tangible fixed assets' movement. None without notes."""
+    if not record:
+        return None
+    stored = statements.get("years") or {}
+    out = []
+    for year in sorted(record.get("years") or {}, reverse=True)[:AUTO_YEARS]:
+        row = record["years"][year]
+        pick = lambda keys: {k: _text(Decimal(row[k]) / 10**9) for k in keys if k in row}  # noqa: E731
+        loans = pick(AUTO_LOANS)
+        hard = sum((Decimal(row[k]) for k in ("fin_disposals", "fin_fx_unrealised") if k in row), Decimal(0)) / 10**9
+        pbt = _bn(stored.get(year) or {}, "pbt")
+        out.append({"year": year, "loans": loans, "loans_total": _text(sum((Decimal(v) for v in loans.values()), Decimal(0))) if loans else None,
+                    "manual_current_portion": debt_notes.get("current_portion") if debt_notes.get("period") == year else None,
+                    "fin_income": pick(AUTO_FIN_INCOME), "fin_expense": pick(AUTO_FIN_EXPENSE), "hard_to_repeat": _text(hard),
+                    "pbt": None if pbt is None else _text(pbt), "share": _share(hard, pbt) if pbt is not None and pbt > 0 else None, "ppe": pick(AUTO_PPE)})
+    return {"fetched_at": record.get("fetched_at"), "source": record.get("source"), "years": out}

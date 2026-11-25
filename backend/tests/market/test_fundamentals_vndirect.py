@@ -229,3 +229,11 @@ def test_the_record_carries_convertible_bonds_for_the_dilution_sign_owner_25_11_
     s["years"]["2025"].update({"convertible_bonds": str(500 * B), "conversion_option": "0"})
     annual = build_record("FPT", s, EVENTS, shares=None, now=NOW)["annual"]["2025"]
     assert (annual["convertible_bonds"], annual["conversion_option"]) == (str(500 * B), "0")
+
+
+def test_the_record_takes_the_year_s_additions_to_fixed_assets_from_the_company_notes_owner_25_11_2026():
+    """Thuyết minh tự động: Vietcap's 'tăng trong kỳ' of tangible fixed assets joins the year where the notes have it."""
+    notes = {"years": {"2025": {"ppe_cost_add": str(9767 * B)}, "2019": {"ppe_cost_add": "1"}}}
+    annual = build_record("FPT", statements(), EVENTS, shares=None, now=NOW, notes=notes)["annual"]
+    assert annual["2025"]["ppe_cost_add"] == str(9767 * B) and "2019" not in annual  # only years the statements have
+    assert "ppe_cost_add" not in build_record("FPT", statements(), EVENTS, shares=None, now=NOW)["annual"]["2025"]

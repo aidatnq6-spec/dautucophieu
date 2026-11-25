@@ -1,5 +1,13 @@
 import { expect, it } from "vitest";
-import { bargainText, coverText, dealText, dilutionText, finText, fxText, gapText, incentiveState, interestText, quarterInput, segmentCheckText, stateText, yearsLeftText } from "./fixed-asset-notes";
+import { autoTable, bargainText, coverText, dealText, dilutionText, finText, fxText, gapText, incentiveState, interestText, quarterInput, segmentCheckText, stateText, yearsLeftText } from "./fixed-asset-notes";
+
+it("the automatic notes become a table with the lines as rows and the years as columns, empty lines left out", () => {
+  const year = (y: string, loans: Record<string, string>) => ({ year: y, loans, loans_total: null, manual_current_portion: null, fin_income: {}, fin_expense: {},
+    hard_to_repeat: "0", pbt: null, share: null, ppe: {} });
+  const auto = { fetched_at: "2026-11-25T13:00:00+00:00", source: "vietcap:iq", years: [year("2021", { lt_due: "6200.6", bonds: "0" }), year("2020", { lt_due: "5000" })] };
+  expect(autoTable(auto, "loans", ["st_loans_contract", "lt_due", "bonds"], { lt_due: "Vay dài hạn đến hạn trả", bonds: "Trái phiếu phát hành" })).toEqual({
+    years: ["2021", "2020"], rows: [{ key: "lt_due", label: "Vay dài hạn đến hạn trả", values: ["6200.6", "5000"] }, { key: "bonds", label: "Trái phiếu phát hành", values: ["0", null] }] });
+});
 
 it("shares that may be issued give EPS before and after dilution", () => {
   expect(dilutionText({ quarter: "2026-Q1", shares: "100000000", extra: "20000000", share: "0.2000", npat_ttm: "100", eps: "1000", eps_diluted: "833" }))

@@ -18,7 +18,18 @@ type Data = { symbol: string; version: number; projects: Project[]; ranges: Rang
   deals: Deal[]; goodwill_amort: Record<string, string>; goodwill_moves: Move[]; bargains: Bargain[];
   loans: Loan[]; debt_notes: { period?: string; current_portion?: string; fx_shock?: string }; debt: Debt; currencies: string[]; terms: Record<string, string>;
   segments: SegmentPeriod[]; fin_income_notes: FinYear[]; fin_kinds: Record<string, string>; tax_incentives: Incentive[]; incentive_kinds: Record<string, string>;
-  dilution: { source: string; shares: string }[]; dilution_view: DilutionView };
+  dilution: { source: string; shares: string }[]; dilution_view: DilutionView; auto: Auto | null; auto_labels: Record<string, string> };
+type AutoYear = { year: string; loans: Record<string, string>; loans_total: string | null; manual_current_portion: string | null; fin_income: Record<string, string>;
+  fin_expense: Record<string, string>; hard_to_repeat: string; pbt: string | null; share: string | null; ppe: Record<string, string> };
+type Auto = { fetched_at: string | null; source: string | null; years: AutoYear[] };
+type AutoPart = "loans" | "fin_income" | "fin_expense" | "ppe";
+const AUTO_KEYS: Record<AutoPart, string[]> = {
+  loans: ["st_loans_contract", "lt_due", "lt_bank", "lt_other", "bonds", "finance_lease"],
+  fin_income: ["fin_interest", "fin_bond_interest", "fin_dividends", "fin_disposals", "fin_fx_sale", "fin_fx_realised", "fin_fx_unrealised", "fin_other"],
+  fin_expense: ["exp_interest", "exp_disposals", "exp_fx_realised", "exp_fx_unrealised", "exp_provision", "exp_other"],
+  ppe: ["ppe_cost_open", "ppe_cost_add", "ppe_cost_out"] };
+const AUTO_TITLES: Record<AutoPart, string> = { loans: "Vay theo loại", fin_income: "Doanh thu tài chính theo loại", fin_expense: "Chi phí tài chính theo loại",
+  ppe: "Biến động TSCĐ hữu hình" };
 type DilutionView = { quarter: string | null; shares: string | null; extra: string; share: string | null; npat_ttm: string | null; eps: string | null; eps_diluted: string | null };
 type Incentive = { id: string; entity: string; kind: string; rate: string | null; until: string; source_url: string | null; note: string; state: "active" | "ending" | "ended" };
 type IncentiveDraft = { id?: string; entity: string; kind: string; rate: string; until: string; source_url: string; note: string };
@@ -110,6 +121,14 @@ const rateText = (l: Pick<Loan, "rate_from" | "rate_to" | "base" | "margin">) =>
   const floating = l.base || l.margin ? `${l.base ?? "thả nổi"}${l.margin ? ` + ${num(l.margin)}%` : ""}` : "";
   return [fixed, floating].filter(Boolean).join("; ") || "—";
 };
+
+/** One part of the automatic notes as a table: the lines as rows (those with a figure in some year), the years as columns. */
+export function autoTable(auto: Auto, part: AutoPart, keys: string[], labels: Record<string, string>) {
+  const years = auto.years.map((y) => y.year);
+  const rows = keys.map((key) => ({ key, label: labels[key] ?? key, values: auto.years.map((y) => y[part][key] ?? null) }))
+    .filter((r) => r.values.some((v) => v !== null));
+  return { years, rows };
+}
 
 /** EPS on the latest four quarters before and after the shares that may be issued. */
 export function dilutionText(v: DilutionView): string {
@@ -249,6 +268,26 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
     <section className="surface" aria-label="Thuyết minh TSCĐ (nhập tay)">
       <h2>Thuyết minh TSCĐ (nhập tay)</h2>
       {message && <p className="errors" role="alert">{message}</p>}
+      <h3>Tự động từ thuyết minh (Vietcap)</h3>
+      {data && data.auto && data.auto.years.length > 0 ? <div data-testid="fan-auto">
+        {(Object.keys(AUTO_KEYS) as AutoPart[]).map((part) => {
+          const t = autoTable(data.auto as Auto, part, AUTO_KEYS[part], data.auto_labels);
+          return t.rows.length > 0 && <table key={part} className="fv-table fan-wide" aria-label={`${AUTO_TITLES[part]} ${symbol}`}>
+            <caption>{AUTO_TITLES[part]} (tỷ đồng)</caption>
+            <thead><tr><th>Mục</th>{t.years.map((y) => <th key={y} className="num">{y}</th>)}</tr></thead>
+            <tbody>{t.rows.map((r) => <tr key={r.key}><td>{r.label}</td>{r.values.map((v, i) => <td key={t.years[i]} className="num" data-label={t.years[i]}>{v === null ? "—" : signed(v)}</td>)}</tr>)}
+              {part === "loans" && <tr><td><strong>Tổng vay</strong></td>{data.auto!.years.map((y) => <td key={y.year} className="num">{y.loans_total === null ? "—" : num(y.loans_total)}</td>)}</tr>}</tbody>
+          </table>;
+        })}
+        <ul className="quality-list">
+          {data.auto.years.filter((y) => y.manual_current_portion !== null).map((y) => <li key={y.year}>Năm {y.year}: vay dài hạn đến hạn trả theo Vietcap {y.loans.lt_due ? num(y.loans.lt_due) : "chưa có"} tỷ,
+            bạn ghi {num(y.manual_current_portion!)} tỷ</li>)}
+          {data.auto.years.filter((y) => y.pbt !== null && Number(y.hard_to_repeat) > 0).map((y) => <li key={`h${y.year}`}>Năm {y.year}: lãi thanh lý đầu tư + lãi tỷ giá chưa
+            thực hiện {num(y.hard_to_repeat)} tỷ{y.share === null ? ` (doanh nghiệp lỗ trước thuế ${signed(y.pbt!)} tỷ)` : `, bằng ${pct(y.share)} LNTT ${num(y.pbt!)} tỷ`}</li>)}
+        </ul>
+        <p className="caption">Đọc từ thuyết minh báo cáo tài chính trên API công khai của Vietcap{data.auto.fetched_at ? `, ngày ${new Date(data.auto.fetched_at).toLocaleDateString("vi-VN")}` : ""}; làm
+          mới hằng tuần. Vietcap gộp lãi tiền gửi và cho vay (không tách bên liên quan); &quot;tăng trong năm&quot; của TSCĐ gồm cả mua mới và kết chuyển XDCB. Phần nhập tay bên dưới giữ nguyên.</p>
+      </div> : data && <p className="muted">Chưa có thuyết minh tự động cho mã này (lượt 20:00 lấy dần, mỗi lượt tối đa 15 mã).</p>}
       <h3>Dự án XDCB</h3>
       {data && data.projects.length > 0 ? <table className="fv-table" aria-label={`Dự án XDCB ${symbol}`}>
         <thead><tr><th>Dự án</th><th>Tình trạng</th><th className="num">XDCB bạn ghi (tỷ)</th><th className="num">Tổng vốn dự kiến (tỷ)</th><th>Số của cả công ty</th><th></th></tr></thead>

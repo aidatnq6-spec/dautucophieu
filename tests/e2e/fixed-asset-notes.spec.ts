@@ -56,6 +56,14 @@ test("the owner writes a deal and sees its goodwill by the lesson's formula", as
   await expect(box.getByTestId("fan-charging")).toContainText("40 tỷ mỗi năm");
 });
 
+test("the automatic notes show borrowings and fixed-asset movements read from Vietcap", async ({ page }) => {
+  await page.goto("/research/FPT");
+  const auto = page.getByRole("region", { name: "Thuyết minh TSCĐ (nhập tay)" }).getByTestId("fan-auto");
+  await expect(auto.getByRole("table", { name: "Vay theo loại FPT" })).toContainText("Vay dài hạn đến hạn trả");
+  await expect(auto.getByRole("table", { name: "Vay theo loại FPT" })).toContainText("350");  // 300 + 50
+  await expect(auto.getByRole("table", { name: "Biến động TSCĐ hữu hình FPT" })).toContainText("120");
+});
+
 test("the owner writes shares that may be issued", async ({ page }) => {
   await page.goto("/research/FPT");
   const box = page.getByRole("region", { name: "Thuyết minh TSCĐ (nhập tay)" });

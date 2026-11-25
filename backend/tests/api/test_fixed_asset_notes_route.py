@@ -108,3 +108,13 @@ def test_dilution_is_kept_and_survives_writes_that_leave_it_out(tmp_path):
     assert saved["dilution"][0]["shares"] == "1000000" and saved["dilution_view"]["extra"] == "1000000" and saved["dilution_view"]["eps"] is None
     kept = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "expected_version": 1, "request_id": "dl2-2"}).json()
     assert kept["dilution"][0]["source"] == "ESOP"
+
+
+def test_the_view_carries_the_automatic_notes_when_they_are_stored(tmp_path):
+    from investment_agent.market.company_notes import CompanyNoteStore
+    c, clock = client(tmp_path)
+    assert call(c, clock, "GET", URL).json()["auto"] is None
+    CompanyNoteStore(tmp_path / "company-notes").save({"symbol": "HPG", "fetched_at": "2026-11-25T13:00:00+00:00", "source": "vietcap:iq",
+                                                       "years": {"2021": {"lt_due": "6200600000000"}}, "quarters": {}})
+    got = call(c, clock, "GET", URL).json()
+    assert got["auto"]["years"][0]["loans"] == {"lt_due": "6200.6"} and got["auto_labels"]["lt_due"] == "Vay dài hạn đến hạn trả"

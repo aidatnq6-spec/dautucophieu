@@ -21,3 +21,9 @@ Nhóm **Nợ vay**, sau Chi phí trả trước, trước Quy mô và định gi
 - **Vay thuần trong kỳ (dòng tiền)** = tiền vay nhận được + tiền trả nợ gốc (số của kỳ).
 - **Lãi, lỗ tỷ giá chưa thực hiện (dòng tiền)**: tham khảo.
 - Thiếu thành phần, lãi vay bằng 0 hoặc mẫu số không dương: để trống. Ghi chú "Chưa đồng bộ" cho bản ghi trước phiên bản 11.
+
+## Dấu hiệu "Khả năng trả lãi thấp" (bổ sung 25/11/2026, chủ sở hữu duyệt bước 2, ngưỡng dưới 3 lần)
+- Chất lượng báo cáo, sau "Lợi thế thương mại lớn". Bản ghi cơ bản lấy thêm chi phí lãi vay theo năm.
+- ICR = (LNTT + chi phí lãi vay) ÷ chi phí lãi vay năm gần nhất; bật khi **dưới 3 lần**, hoặc EBIT không dương. Hiện ICR hai năm.
+- Không có lãi vay (0 hoặc thiếu dòng): không đánh giá được, ghi lý do. Thử 40 mã có lãi vay, năm gần nhất: 4 mã bật.
+- Chỉ hiện trên trang.

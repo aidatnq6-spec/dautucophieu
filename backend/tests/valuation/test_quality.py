@@ -23,8 +23,8 @@ def test_all_nine_criteria_pass_for_a_company_improving_on_every_line():
     assert [c["passed"] for c in f["criteria"]] == [True] * 9
     assert f["criteria"][0]["detail"] == "ROA 9,0% (lợi nhuận 9 tỷ / tài sản đầu kỳ 100 tỷ)"
     assert f["criteria"][6]["detail"] == "Không có đợt huy động vốn bằng cổ phiếu năm 2025 (cổ phiếu thưởng, cổ tức bằng cổ phiếu không tính)"
-    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None, None, None, None, None, None]  # financial income and its cash,
-    # other receivables, prepayments, construction in progress, prepaid expenses, goodwill: not kept
+    assert [s["flag"] for s in q["signs"]] == [False, False, False, None, None, None, None, None, None, None, None, None]  # financial income and its cash,
+    # other receivables, prepayments, construction in progress, prepaid expenses, goodwill, interest: not kept
 
 
 def test_a_capital_raise_and_worse_lines_fail_and_the_signs_show_their_numbers():
@@ -362,3 +362,21 @@ def test_goodwill_from_a_tenth_of_parent_equity_is_a_sign_owner_25_11_2026():
     assert sign(report_quality(goodwill_years(0, 0), "x"), "goodwill_large")["flag"] is False
     assert sign(report_quality(goodwill_years(0, 50, equity1=10, minority1=20), "x"), "goodwill_large")["flag"] is None  # parent equity not positive
     assert sign(report_quality(STRONG, "x"), "goodwill_large")["flag"] is None
+
+
+def interest_years(pbt0, int0, pbt1, int1):
+    out = {y: dict(r) for y, r in STRONG["annual"].items()}
+    out["2024"].update(pbt=str(pbt0 * BN), interest=str(int0 * BN))
+    out["2025"].update(pbt=str(pbt1 * BN), interest=str(int1 * BN))
+    return {**STRONG, "annual": out}
+
+
+def test_interest_cover_below_three_times_is_a_sign_owner_25_11_2026():
+    s = sign(report_quality(interest_years(30, 10, 13, 7), "Tài nguyên Cơ bản"), "low_interest_cover")
+    assert s["label"] == "Khả năng trả lãi thấp" and s["flag"] is True and "3 lần" in s["rule"]
+    assert s["detail"] == "Năm 2025: EBIT 20 tỷ (LNTT 13 tỷ + lãi vay 7 tỷ) bằng 2,9 lần lãi vay; năm 2024: 4,0 lần"
+    assert sign(report_quality(interest_years(30, 10, 14.1, 7), "x"), "low_interest_cover")["flag"] is False  # 3,01
+    assert sign(report_quality(interest_years(30, 10, -10, 7), "x"), "low_interest_cover")["flag"] is True  # EBIT −3
+    nothing = sign(report_quality(interest_years(30, 0, 14, 0), "x"), "low_interest_cover")
+    assert nothing["flag"] is None and "không có chi phí lãi vay" in nothing["detail"]
+    assert sign(report_quality(STRONG, "x"), "low_interest_cover")["flag"] is None

@@ -281,7 +281,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
         <div className="row"><button className="btn primary" type="submit">Lưu khung khấu hao</button><button className="btn" type="button" onClick={() => setRanges(null)}>Hủy</button></div>
       </form>}
       <h3>Chi phí trả trước: phân bổ trong năm</h3>
-      {data && data.prepaid.length > 0 ? <table className="fv-table" aria-label={`Phân bổ chi phí trả trước ${symbol}`}>
+      {data && data.prepaid.length > 0 ? <table className="fv-table fan-wide" aria-label={`Phân bổ chi phí trả trước ${symbol}`}>
         <thead><tr><th>Năm</th>{Object.entries(data.prepaid_kinds).map(([k, label]) => <th key={k} className="num">{label}</th>)}<th className="num">Tổng phân bổ (tỷ)</th>
           <th className="num">CPTT dài hạn cuối năm</th><th>Số năm phân bổ còn lại</th><th className="num">Phân bổ ÷ LNTT</th><th></th></tr></thead>
         <tbody>{data.prepaid.map((r) => <tr key={r.year} data-testid="fan-prepaid">
@@ -315,7 +315,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
         như năm đó. Phần phân bổ là chi phí ghi vào lợi nhuận mà không tốn thêm tiền (tiền đã chi từ trước). Không ghi tổng thì phần mềm cộng các loại bạn đã nhập.</p>
       <h3>Thương vụ mua bán, sáp nhập</h3>
       {data && data.deals.length > 0 ? <>
-        <table className="fv-table" aria-label={`Thương vụ mua bán ${symbol}`}>
+        <table className="fv-table fan-wide" aria-label={`Thương vụ mua bán ${symbol}`}>
           <thead><tr><th>Công ty được mua</th><th>Ngày mua</th><th className="num">Tỷ lệ mua</th><th className="num">Giá mua (tỷ)</th><th className="num">Tài sản thuần hợp lý (tỷ)</th>
             <th>Lợi thế thương mại</th><th></th></tr></thead>
           <tbody>{data.deals.map((d) => <tr key={d.id} data-testid="fan-deal">
@@ -361,7 +361,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
         Ghi số thuyết minh thì phần mềm dùng số đó và hiện phần lệch so với công thức.</p>
       <h3>Các khoản vay</h3>
       {data && data.loans.length > 0 ? <>
-        <table className="fv-table" aria-label={`Các khoản vay ${symbol}`}>
+        <table className="fv-table fan-wide" aria-label={`Các khoản vay ${symbol}`}>
           <thead><tr><th>Bên cho vay</th><th>Loại tiền</th><th>Kỳ hạn</th><th className="num">Dư nợ (tỷ)</th><th>Lãi suất</th><th>Đáo hạn</th><th>Tài sản đảm bảo</th><th></th></tr></thead>
           <tbody>{data.loans.map((l) => <tr key={l.id} data-testid="fan-loan">
             <td data-label="Bên cho vay">{l.lender}{l.note && <div className="caption">{l.note}</div>}</td>
@@ -456,7 +456,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
         với doanh thu thuần, giá vốn của báo cáo đã lưu; thuyết minh thường ghi doanh thu trước giảm trừ nên tổng có thể lệch phần giảm trừ.</p>
       <h3>Doanh thu tài chính theo loại, lãi vay vốn hóa</h3>
       {data && data.fin_income_notes.length > 0 ? <>
-        <table className="fv-table" aria-label={`Doanh thu tài chính theo loại ${symbol}`}>
+        <table className="fv-table fan-wide" aria-label={`Doanh thu tài chính theo loại ${symbol}`}>
           <thead><tr><th>Năm</th>{Object.entries(data.fin_kinds).map(([k, label]) => <th key={k} className="num">{label}</th>)}<th className="num">Tổng bạn ghi</th>
             <th className="num">Báo cáo</th><th></th></tr></thead>
           <tbody>{data.fin_income_notes.map((f) => <tr key={f.year} data-testid="fan-fin">
@@ -498,7 +498,7 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
       </>}
       {data && data.goodwill_moves.length > 0 && <>
         <h3>Biến động lợi thế thương mại</h3>
-        <table className="fv-table" aria-label={`Biến động lợi thế thương mại ${symbol}`}>
+        <table className="fv-table fan-wide" aria-label={`Biến động lợi thế thương mại ${symbol}`}>
           <thead><tr><th>Năm</th><th className="num">Đầu năm</th><th className="num">Tăng (thương vụ bạn ghi)</th><th className="num">Phân bổ (thuyết minh)</th>
             <th className="num">Cuối năm</th><th className="num">Giảm khác</th><th className="num">Phân bổ ÷ chi phí quản lý</th><th className="num">Phân bổ ÷ LNTT</th><th></th></tr></thead>
           <tbody>{data.goodwill_moves.map((m) => <tr key={m.year} data-testid="fan-move">

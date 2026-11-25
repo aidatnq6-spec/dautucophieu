@@ -109,6 +109,8 @@ legend{font-weight:600;padding:0 6px}
 .fv-table th,.fv-table td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
 /* Text columns may wrap so that the row fits its frame; figures and buttons stay on one line. */
 .fv-table td:not(.num){white-space:normal}.fv-table .btn{white-space:nowrap}
+/* Thuyết minh nhập tay: tables with many columns let their headings wrap so the row fits the page on a wide screen too. */
+.fan-wide th{white-space:normal;vertical-align:bottom}
 .fv-detail td{white-space:normal}.fv-detail ul{margin:6px 0;padding-left:18px}.fv-detail li{margin:4px 0}
 .fv-detail ul.quality-list,ul.quality-list{list-style:none;padding-left:0;margin:6px 0}.quality-list li{margin:4px 0;overflow-wrap:anywhere}.quality-list svg{vertical-align:-2px}
 .fv-search{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin:12px 0}.fv-search .field{flex:1 1 180px;min-width:0}.fv-search p{margin:0 0 8px}

@@ -91,3 +91,12 @@ def test_financial_income_by_kind_is_kept_and_survives_writes_that_leave_it_out(
     assert saved["fin_income_notes"][0]["hard_to_repeat"] == "709" and saved["fin_kinds"]["capitalised_interest"] == "Lãi vay đã vốn hóa trong năm"
     kept = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "expected_version": 1, "request_id": "fi-2"}).json()
     assert kept["fin_income_notes"][0]["year"] == "2021"
+
+
+def test_tax_incentives_are_kept_with_their_state_and_survive_writes_that_leave_them_out(tmp_path):
+    c, clock = client(tmp_path)
+    saved = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "tax_incentives": [{"entity": "Dự án A", "kind": "exempt", "until": "2099"}],
+                                       "expected_version": 0, "request_id": "ti-1"}).json()
+    assert saved["tax_incentives"][0]["state"] == "active" and saved["incentive_kinds"]["half"] == "giảm 50% thuế"
+    kept = call(c, clock, "PUT", URL, {"projects": [], "ranges": {}, "expected_version": 1, "request_id": "ti-2"}).json()
+    assert kept["tax_incentives"][0]["entity"] == "Dự án A"

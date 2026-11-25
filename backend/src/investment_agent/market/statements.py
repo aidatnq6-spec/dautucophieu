@@ -34,9 +34,10 @@ PRICE_URL = "https://api-finfo.vndirect.com.vn/v4/stock_prices?sort=date&q=code:
 FIRST_START, REFRESH_DAYS, MAX_AGE_DAYS, PACE_SECONDS = "2010-01-01", 730, 7, 1.0
 # Raised when LINES gains lines: a non-financial ticker kept with an older version is due and takes its whole history once, so the new
 # lines reach back as far as the old ones. 2: customer advances and inventory.
-LINES_VERSION = 7  # 3: current assets, receivables, current and long-term liabilities, EPS; 4: the parts of receivables; 5: interest received;
+LINES_VERSION = 8  # 3: current assets, receivables, current and long-term liabilities, EPS; 4: the parts of receivables; 5: interest received;
 # 6: inventory at cost and its provision (Khối Tồn kho, 22/11/2026); 7: no new line, the whole history read once for the update days of
 # years before the 2-year refresh (Dự phòng chốt khi kiểm toán, review 23/11/2026)
+# 8: fixed assets, investment property and construction in progress (Tài sản cố định, 25/11/2026)
 FIN_LINES_VERSION = 3  # banks, securities firms and insurers: 2: basic EPS (23001 in each of their layouts); 3: the bank's loans, loan
 # reserve, accrued interest, interest income and provision expense (Chất lượng tài sản ngân hàng, 23/11/2026; the others re-read once too)
 # (model, item code) → line. Model 1 balance sheet, 2 income statement, 3 cash flow (indirect); the general layout (TT200).
@@ -63,6 +64,11 @@ LINES = {
     # Tiền thu lãi cho vay, cổ tức và lợi nhuận được chia (investing cash flow), against financial income for Lợi nhuận giấy; checked
     # in v4/financial_models (modelType 3) on 16/11/2026
     (3, 32700): "interest_received",
+    # Tài sản cố định (25/11/2026; names from v4/financial_models, checked 25/11/2026): tangible, finance-lease, intangible fixed assets and
+    # investment property (net, at cost, accumulated depreciation negative); construction in progress, 12460 from 2015 and 12300 before
+    (1, 12210): "ppe_net", (1, 12220): "ppe_gross", (1, 12230): "ppe_depreciation", (1, 12240): "ppe_lease_net",
+    (1, 12270): "intangible_net", (1, 12280): "intangible_gross", (1, 12290): "intangible_amortisation",
+    (1, 12400): "property_net", (1, 12410): "property_gross", (1, 12420): "property_depreciation", (1, 12460): "cip", (1, 12300): "cip_old",
     (3, 22230): "depreciation", (3, 32000): "cfo", (3, 32100): "capex", (3, 33000): "cfi", (3, 34000): "cff", (3, 33600): "dividends_paid",
 }
 # Banks (TT49 layout: models 101 balance sheet, 102 income statement) and securities firms (TT334: 89, 90): only what their scale
@@ -147,6 +153,15 @@ def parse_statements(text: str, *, symbol: str, kind: str, lines: dict | None = 
         old = figures.pop("associates_old", None)
         if old is not None and "associates" not in figures:
             figures["associates"] = old
+    for period, figures in periods.items():  # construction in progress: the layout with a figure; two different figures are a conflict
+        old_cip, cip = figures.pop("cip_old", None), figures.get("cip")
+        if old_cip is None or Decimal(old_cip) == 0:
+            continue
+        if cip is None or Decimal(cip) == 0:
+            figures["cip"] = old_cip
+        elif Decimal(cip) != Decimal(old_cip):
+            del figures["cip"]
+            conflicts.append({"period": period, "line": "cip", "values": sorted([cip, old_cip], key=Decimal)})
     return {"periods": dict(sorted(periods.items())), "created": dict(sorted(created.items())), "conflicts": conflicts, "zeros": zeros,
             "modified": dict(sorted(modified.items()))}
 

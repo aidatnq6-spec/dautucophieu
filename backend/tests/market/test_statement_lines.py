@@ -17,3 +17,14 @@ def test_inventory_at_cost_and_its_provision_are_kept_owner_22_11_2026():
     names = {(m, c): n for (m, c), n in LINES.items()}
     assert names[(1, 11410)] == "inventory_gross" and names[(1, 11490)] == "inventory_provision" and names[(1, 11400)] == "inventory"
     assert LINES_VERSION >= 6  # 7 (review 23/11/2026) reads the history again for the update days
+
+
+def test_fixed_asset_investment_property_and_construction_lines_are_kept_owner_25_11_2026():
+    """Tài sản cố định (spec 25/11/2026): names from v4/financial_models; HPG 2021: 12210 68.744,1, 12460 8.289,3, 12270 536,7 tỷ."""
+    names = {(m, c): n for (m, c), n in LINES.items()}
+    assert names[(1, 12210)] == "ppe_net" and names[(1, 12220)] == "ppe_gross" and names[(1, 12230)] == "ppe_depreciation"
+    assert names[(1, 12240)] == "ppe_lease_net"
+    assert names[(1, 12270)] == "intangible_net" and names[(1, 12280)] == "intangible_gross" and names[(1, 12290)] == "intangible_amortisation"
+    assert names[(1, 12400)] == "property_net" and names[(1, 12410)] == "property_gross" and names[(1, 12420)] == "property_depreciation"
+    assert names[(1, 12460)] == "cip" and names[(1, 12300)] == "cip_old"
+    assert LINES_VERSION >= 8

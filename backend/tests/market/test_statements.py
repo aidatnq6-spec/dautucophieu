@@ -345,3 +345,16 @@ def test_a_closed_years_figure_changed_by_the_source_is_logged_not_just_overwrit
     assert out == {"HAG": "ok"} and store.read("HAG")["years"]["2024"]["npat_parent"] == "80000000000"
     assert {(r["kind"], r["period"], r["old"], r["new"], r["seen_on"]) for r in read_revisions(tmp_path, "HAG")} == {
         ("years", "2024", "100000000000", "80000000000", "2026-11-07"), ("quarters", "2024-Q4", "100000000000", "80000000000", "2026-11-07")}
+
+
+def test_construction_in_progress_takes_the_layout_that_has_a_figure_and_two_figures_are_a_conflict():
+    """XDCB dở dang: 12460 from 2015, 12300 before; the one that is not 0 is kept, both non-zero and different is a conflict."""
+    out = parse_statements(text(row(12460, 0, "2013-12-31", model=1, kind="ANNUAL"), row(12300, 5e11, "2013-12-31", model=1, kind="ANNUAL"),
+                                row(12460, 8.2893e12, "2021-12-31", model=1, kind="ANNUAL"), row(12300, 0, "2021-12-31", model=1, kind="ANNUAL"),
+                                row(12460, 0, "2022-12-31", model=1, kind="ANNUAL"), row(12300, 0, "2022-12-31", model=1, kind="ANNUAL"),
+                                row(12460, 3e11, "2014-12-31", model=1, kind="ANNUAL"), row(12300, 4e11, "2014-12-31", model=1, kind="ANNUAL")),
+                           symbol="HPG", kind="ANNUAL")
+    p = out["periods"]
+    assert p["2013"] == {"cip": "500000000000"} and p["2021"] == {"cip": "8289300000000"} and p["2022"] == {"cip": "0"}
+    assert "2014" not in p or "cip" not in p["2014"]
+    assert {"period": "2014", "line": "cip", "values": ["300000000000", "400000000000"]} in out["conflicts"]

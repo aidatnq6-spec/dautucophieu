@@ -264,3 +264,44 @@ def test_the_table_gives_four_quarter_parent_profit_at_each_of_the_latest_quarte
     t = statement_table(RECORD, closes=CLOSES, vnstock=None)
     assert t["ttm_parent"]["2025-Q4"] == "170000000000" and t["ttm_parent"]["2025-Q3"] == str(int((24 + 41 + 42 + 43) * B))
 
+
+
+def fixed(ppe_net, ppe_gross, cip, **more):
+    """Balance sheet lines of fixed assets in tỷ đồng (accumulated depreciation negative, as VNDirect gives it)."""
+    return {"ppe_net": ppe_net, "ppe_gross": ppe_gross, "ppe_depreciation": ppe_net - ppe_gross, "intangible_net": 5, "intangible_gross": 8,
+            "intangible_amortisation": -3, "property_net": 7, "property_gross": 9, "property_depreciation": -2, "cip": cip, **more}
+
+
+def test_the_fixed_assets_group_gives_balances_wear_pipeline_reinvestment_and_turnover_owner_25_11_2026():
+    years = {"2024": q(1000, 84, **fixed(400, 600, 100)), "2025": q(2000, 164, **fixed(600, 1000, 150), capex=-120, depreciation=80)}
+    quarters = {p: q(100, 10, **fixed(400, 600, 100)) for p in ("2024-Q4", "2025-Q1", "2025-Q2", "2025-Q3")}
+    quarters["2025-Q4"] = q(100, 10, **fixed(600, 1000, 150))
+    t = statement_table({**RECORD, "years": years, "quarters": quarters, "lines_version": 8}, closes=CLOSES, vnstock=None)
+    keys = [r["key"] for r in t["years"]["rows"]]
+    assert keys.index("fcff") < keys.index("ppe_net") < keys.index("market_cap")  # after Dòng tiền, before Quy mô và định giá
+    r, i = rows(t, "years"), t["years"]["periods"].index("2025")
+    assert r["ppe_net"][i] == "600000000000" and r["ppe_gross"][i] == "1000000000000" and r["ppe_depreciation"][i] == "-400000000000"
+    assert r["intangible_net"][i] == "5000000000" and r["property_net"][i] == "7000000000" and r["cip"][i] == "150000000000"
+    assert r["ppe_wear"][i] == "0.4000"  # 400 / 1000
+    assert r["cip_to_ppe"][i] == "0.2500"  # 150 / 600
+    assert r["capex_to_depreciation"][i] == "1.50"  # 120 / 80
+    assert r["ppe_turnover"][i] == "4.00"  # 2000 / average(600, 400)
+    assert r["ppe_turnover"][t["years"]["periods"].index("2024")] is None  # no year before to average with
+    rq, j = rows(t, "quarters"), t["quarters"]["periods"].index("2025-Q4")
+    assert {r["key"]: r["label"] for r in t["quarters"]["rows"]}["capex_to_depreciation"] == "Capex ÷ khấu hao (4 quý)"
+    assert rq["capex_to_depreciation"][j] == "1.50"  # four quarters: 4 × 30 / (4 × 20)
+    assert rq["ppe_turnover"][j] == "0.80"  # 400 of four quarters / average(600, 400 a year before)
+    assert rq["capex_to_depreciation"][0] is None  # 2024-Q4 has no four quarters to it
+    assert t["fixed_assets_pending"] is False and t["finance_lease"] == []
+
+
+def test_fixed_asset_ratios_stay_blank_without_their_parts_and_balances_that_do_not_add_up_are_checks():
+    years = {"2024": q(1000, 84, ppe_net=0, ppe_gross=0, cip=10, depreciation=0),
+             "2025": q(2000, 164, ppe_net=600, ppe_gross=1000, ppe_depreciation=-300, ppe_lease_net=12)}
+    t = statement_table({**RECORD, "years": years, "quarters": {}}, closes=CLOSES, vnstock=None)
+    r = rows(t, "years")
+    assert r["ppe_wear"][0] is None and r["cip_to_ppe"][0] is None and r["capex_to_depreciation"][0] is None  # nothing to divide by
+    assert r["ppe_turnover"][1] == "6.67"  # 2000 / average(600, 0): the average is positive
+    assert any(c["period"] == "2025" and c["check"] == "ppe_net" for c in t["checks"])  # 600 ≠ 1000 − 300
+    assert t["finance_lease"] == ["2025"]
+    assert t["fixed_assets_pending"] is True  # a record kept before the lines came

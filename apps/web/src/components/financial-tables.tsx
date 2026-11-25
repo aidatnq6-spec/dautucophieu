@@ -12,7 +12,7 @@ type Conflict = { period: string; line: string; values: string[] };
 type Summary = { period: string; close_date: string | null; market_cap: string | null; npat_ttm: string | null; ebitda_ttm: string | null;
   ev: string | null; pe: string | null; pb: string | null; ev_ebitda: string | null; roe: string | null; roic?: string | null; quarters: string[] };
 type Tables = { symbol: string; kind?: "bank" | "securities" | "insurance" | null; reason: string | null; source?: string; fetched_at?: string; quarters: Part; years: Part; summary: Summary | null;
-  checks: Check[]; conflicts: Conflict[];
+  checks: Check[]; conflicts: Conflict[]; fixed_assets_pending?: boolean; finance_lease?: string[];
   valuation_check?: { shares_from_vndirect?: boolean; date: string | null; ours_date: string | null; flagged: number; rows: { key: string; label: string; note?: string | null; ours: string | null; theirs: string | null; diff: string | null; off: boolean }[] } | null };
 
 type Kind = "bank" | "securities" | "insurance";
@@ -68,6 +68,14 @@ export function lastN<T>(periods: T[], n: number): number[] {
 }
 
 /** One line per period, newest first: every check that failed there with its two figures in tỷ đồng. */
+/** Notes under the fixed-asset group: lines not synced yet, and periods with a finance lease (no line of its own). */
+export function fixedNotes(d: { fixed_assets_pending?: boolean; finance_lease?: string[] }): string[] {
+  const out: string[] = [];
+  if (d.fixed_assets_pending) out.push("Chưa đồng bộ dòng tài sản cố định: nhóm Tài sản cố định để trống đến lượt 20:00 lấy lại lịch sử của mã này.");
+  if (d.finance_lease?.length) out.push(`Có TSCĐ thuê tài chính (không có dòng riêng) ở ${d.finance_lease.map(periodLabel).join(", ")}.`);
+  return out;
+}
+
 export function checkLines(checks: Check[]): string[] {
   const by = new Map<string, Check[]>();
   for (const c of checks) by.set(c.period, [...(by.get(c.period) ?? []), c]);
@@ -183,6 +191,7 @@ export function FinancialTables({ symbol }: { symbol: string }) {
           <Table part={part} cols={cols} caption={`${view === "quarters" ? `${cols.length} quý, cũ bên trái` : `${cols.length} năm`} · bấm tên dòng để vẽ (tối đa 2 dòng)`}
             extra={extra} picked={picked} onPick={(key) => setPicked((p) => toggleRow(p, key))} />
         </>}
+      {!financial && fixedNotes(data).map((n) => <p key={n} className="caption" data-testid="fixed-notes">{n}</p>)}
       {!financial && view === "quarters" && forecast && <ForecastForm key={`${forecast.quarter}-${forecast.version}`} symbol={symbol} data={forecast} onSaved={setForecast} />}
       {data.valuation_check && <details className="mc-table" aria-label="Đối chiếu định giá">
         <summary>Đối chiếu định giá với VNDirect: {data.valuation_check.flagged ? `${data.valuation_check.flagged} chỉ tiêu lệch hơn 10%` : "không lệch quá 10%"}</summary>
@@ -226,7 +235,12 @@ export function FinancialTables({ symbol }: { symbol: string }) {
         phiếu cuối quý, còn P/E, EV/EBITDA, EV/doanh thu, lợi suất FCFF và ROE của quý tính trên 4 quý tới quý đó (thiếu một quý thì để trống); vốn hoá ở thẻ 4 quý theo giá gần nhất × số cổ phiếu hiện tại; nợ ròng = nợ vay
         ngắn + dài hạn − tiền − đầu tư tài chính ngắn hạn; EV = vốn hoá + nợ ròng + lợi ích cổ đông không kiểm soát; P/B trên vốn chủ của công ty mẹ;
         ROE = LNST công ty mẹ ÷ vốn chủ bình quân đầu và cuối kỳ. Thiếu một thành phần thì để trống, không ước lượng. Kiểm tra chéo: lãi gộp với doanh thu
-        − giá vốn, tổng 4 quý với cả năm, LNST với nguồn Vnstock; dòng tiền quý những năm cũ thường lệch số cả năm đã kiểm toán.
+        − giá vốn, tổng 4 quý với cả năm, LNST với nguồn Vnstock, giá trị còn lại với nguyên giá + hao mòn lũy kế; dòng tiền quý những năm cũ thường lệch số cả năm đã kiểm toán.
+        Tài sản cố định: số dư cuối kỳ (không cộng 4 quý). Mức hao mòn = hao mòn lũy kế ÷ nguyên giá TSCĐ hữu hình: tài sản đã cũ đến đâu.
+        XDCB ÷ TSCĐ hữu hình = chi phí xây dựng cơ bản dở dang ÷ TSCĐ hữu hình còn lại: phần tài sản sắp hình thành; khi dự án xong, XDCB kết
+        chuyển sang nguyên giá và khấu hao sẽ tăng. Capex ÷ khấu hao lớn hơn 1: đang đầu tư nhiều hơn phần hao mòn. Vòng quay TSCĐ hữu hình =
+        doanh thu thuần ÷ TSCĐ hữu hình còn lại bình quân đầu và cuối kỳ. Quý: hai tỷ lệ sau tính trên 4 quý tới quý đó. VNDirect chỉ có số dư,
+        không có số phát sinh tăng, giảm của thuyết minh, nên phần mềm không tính số kết chuyển.
       </p>}
     </div>
   );

@@ -18,6 +18,7 @@ from investment_agent.services.earnings_season import review_lines
 from investment_agent.services.accumulation import due_lines
 from investment_agent.services.deposit_book import book_quotes
 from investment_agent.services.equity_budget import budget_view
+from investment_agent.services.fixed_asset_notes import KIND as CIP_KIND, due_lines as cip_lines
 from investment_agent.services.giveback import attention_lines as giveback_lines
 from investment_agent.services.insurance_alerts import due_items as payment_items
 from investment_agent.services.loan_alerts import promo_lines, read_property_book
@@ -30,6 +31,12 @@ from investment_agent.services.theses import read_theses
 NEW_QUARTER_DAYS = 7
 EARLY_EXIT_DAYS = 30  # an early exit stays in Việc cần xem for a month after the thesis closed
 _ORDER = {"high": 0, "low": 1}
+NOT_IN_BRIEF = {CIP_KIND}  # the owner chose no Telegram for these (Thuyết minh TSCĐ, 25/11/2026)
+
+
+def weekly_todo(items: list[dict]) -> list[str]:
+    """The texts of Việc cần xem that go into the weekly note."""
+    return [i["text"] for i in items if i.get("kind") not in NOT_IN_BRIEF]
 
 
 def _pct(ratio: str) -> str:
@@ -70,6 +77,8 @@ def attention_items(repo, owner, data_dir: Path, *, now: datetime) -> list[dict]
     gold = gold_rebalance_line(budget_view(repo, owner, quotes=book_quotes(data_dir))[0].get("pyramid"))  # the layers Tháp tài sản shows
     items += [{"level": "low", "kind": "gold_rebalance", "symbol": None, "text": gold, "href": "/profile?tab=tai-san"}] if gold else []
     items += [{"level": "high", "kind": "thesis_review", "symbol": s, "text": line, "href": "/earnings#ra-soat"} for s, line in review_lines(repo, owner, data_dir)]
+    items += [{"level": "low", "kind": CIP_KIND, "symbol": s, "text": line, "href": f"/research/{s}"}
+              for s, line in cip_lines(repo, owner, data_dir, today=now.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date())]
     since = (now.date() - timedelta(days=NEW_QUARTER_DAYS)).isoformat()
     store = FundamentalsStore(data_dir / "fundamentals")
     for symbol in load_watchlist(data_dir).symbols:

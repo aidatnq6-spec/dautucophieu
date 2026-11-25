@@ -88,3 +88,21 @@ def test_a_holding_past_both_giveback_thresholds_and_a_covered_goal_need_a_decis
     SeriesStore(data / "trend-sources").upsert("KDH-1d", [(datetime(2026, 11, 7), "42")])
     items = [i for i in attention_items(repo, OWNER, data, now=NOW) if i["kind"] in ("giveback", "goal")]
     assert kinds(items) == [("high", "goal", None)] and "Mua xe" in items[0]["text"]
+
+
+def test_a_project_due_this_quarter_is_listed_with_the_company_s_figures_and_left_out_of_the_weekly_note(tmp_path):
+    """Thuyết minh TSCĐ (25/11/2026): due once its quarter's report is stored; a low line until the owner confirms or postpones; not on Telegram."""
+    from investment_agent.domain.fixed_asset_notes import validate_notes
+    from investment_agent.market.statements import StatementStore
+    from investment_agent.services.attention import weekly_todo
+    repo, data = setup(tmp_path)
+    projects, ranges = validate_notes([{"name": "Dung Quất 2", "due": "Q3/2026", "read_period": "2025"}], {}, stored=[])
+    repo.write(OWNER, "settings", "fixed_asset_notes_HPG", {"symbol": "HPG", "projects": projects, "ranges": ranges}, expected_version=0, request_id="n1")
+    B = 10**9
+    StatementStore(data / "statements").save({"symbol": "HPG", "fetched_at": "x", "source": "t", "years": {"2025": {"cip": str(10721 * B), "ppe_gross": str(182309 * B)}},
+                                              "quarters": {"2026-Q3": {"cip": str(16113 * B)}}})
+    items = [i for i in attention_items(repo, OWNER, data, now=NOW) if i["kind"] == "cip_project"]
+    assert [(i["level"], i["symbol"], i["href"]) for i in items] == [("low", "HPG", "/research/HPG")]
+    assert items[0]["text"] == ("HPG: dự án Dung Quất 2 đến quý hoàn thành dự kiến Q3/26. XDCB dở dang cuối Q3/26: 16.113 tỷ (kỳ đã đọc 2025: 10.721 tỷ); "
+                                "nguyên giá TSCĐ hữu hình: chưa có (182.309 tỷ). Xác nhận đã hoàn thành hoặc lùi hạn.")
+    assert weekly_todo(items + [{"kind": "thesis", "text": "x"}]) == ["x"]

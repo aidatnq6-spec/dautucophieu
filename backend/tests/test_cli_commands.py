@@ -27,3 +27,19 @@ def test_the_combined_commands_remain(command, called, monkeypatch):
     argv = ["investment_agent", command, "--data-dir", "data"] + (["--calendar", "c.json"] if command == "portfolio-alerts" else [])
     monkeypatch.setattr(sys, "argv", argv)
     assert cli.main() == 0 and len(seen) == 1
+
+
+def test_a_command_run_by_hand_prints_vietnamese_whatever_the_console_code_page(tmp_path):
+    """Run by hand through a pipe, Windows gives cp1252, which has no Vietnamese letters: `industries` wrote its file, then failed printing
+    "Bất động sản" and exited 1. The command surface writes UTF-8 instead; the scheduler already asks for it (jobs.step)."""
+    import io
+    from investment_agent.cli import _utf8_output
+    raw = io.BytesIO()
+    stream = io.TextIOWrapper(raw, encoding="cp1252")
+    _utf8_output(stream)
+    stream.write("Bất động sản")
+    stream.flush()
+    assert raw.getvalue().decode("utf-8") == "Bất động sản"
+    already = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+    _utf8_output(already)  # left as it is
+    assert already.encoding == "utf-8"

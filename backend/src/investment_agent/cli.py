@@ -11,7 +11,17 @@ from investment_agent.market.coverage import audit_case, audit_universe, load_fi
 FIXTURES = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "market" / "coverage_cases.json"
 
 
+def _utf8_output(stream) -> None:
+    """Write Vietnamese whatever the console code page: run by hand through a pipe, Windows gives cp1252 and printing a sector name
+    failed after the work was done (25/11/2026). The scheduler already asks for UTF-8 (jobs.step), so its output does not change."""
+    if (getattr(stream, "encoding", None) or "").lower().replace("-", "") != "utf8" and hasattr(stream, "reconfigure"):
+        stream.reconfigure(encoding="utf-8")
+
+
 def main() -> int:
+    import sys
+    _utf8_output(sys.stdout)
+    _utf8_output(sys.stderr)
     parser = argparse.ArgumentParser(prog="investment_agent")
     commands = parser.add_subparsers(dest="command", required=True)
     audit = commands.add_parser("data-audit")

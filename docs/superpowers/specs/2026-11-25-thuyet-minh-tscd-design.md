@@ -1,6 +1,6 @@
 # Thuyết minh TSCĐ nhập tay: dự án XDCB và khung khấu hao (25/11/2026)
 
-**Chờ chủ sở hữu duyệt.** Chủ sở hữu chọn ngày 25/11/2026: nhập cho **mọi mã theo dõi** (không gắn Luận điểm); đến quý hoàn thành dự kiến thì
+Chủ sở hữu duyệt ngày 25/11/2026, nguyên văn; đã chọn: nhập cho **mọi mã theo dõi** (không gắn Luận điểm); đến quý hoàn thành dự kiến thì
 **một dòng ở Việc cần xem**, không gửi Telegram; **chưa** thêm điều kiện "Dự án trễ hạn" vào Luận điểm. Phần sau của
 [Tài sản cố định](2026-11-25-tai-san-co-dinh-design.md) và [Hai dấu hiệu XDCB](2026-11-25-tin-hieu-xdcb-design.md): VNDirect không có nội dung
 thuyết minh (tên dự án, tiến độ, thời gian khấu hao), nên chủ sở hữu tự ghi khi đọc báo cáo, như "Dự án và điểm rơi lợi nhuận" của mã bất động sản.

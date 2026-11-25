@@ -16,6 +16,7 @@ import { CompanyPeople } from "./company-people";
 import { FundsHoldingStock } from "./funds-view";
 import { InsiderDeals } from "./insider-deals";
 import { FinancialTables } from "./financial-tables";
+import { FixedAssetNotes } from "./fixed-asset-notes";
 import { EarlyLights } from "./early-lights";
 import { PeerCompare } from "./peer-compare";
 import { AnnualPlans } from "./annual-plans";
@@ -93,6 +94,8 @@ export function StockProfile({ symbol }: { symbol: string }) {
         <AnnualPlans symbol={p.symbol} />
         <FinancialTables symbol={p.symbol} />
       </section>}
+
+      {p.watched && <FixedAssetNotes symbol={p.symbol} />}
 
       {p.watched && <BalanceWatch symbol={p.symbol} />}
       {p.watched && <RelatedReceivables symbol={p.symbol} />}

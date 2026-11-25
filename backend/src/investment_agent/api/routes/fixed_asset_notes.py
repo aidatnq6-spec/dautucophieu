@@ -8,9 +8,10 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Request
 from pydantic import Field
 
-from investment_agent.domain.fixed_asset_notes import (GROUPS, MAX_DEALS, MAX_PROJECTS, PREPAID_KINDS, NoteError, bargain_years, complete, deals_view,
-                                                         due_view, goodwill_moves, postpone, prepaid_view, validate_amort, validate_deals,
-                                                         validate_notes, validate_prepaid)
+from investment_agent.domain.fixed_asset_notes import (CURRENCIES, GROUPS, MAX_DEALS, MAX_LOANS, MAX_PROJECTS, PREPAID_KINDS, TERMS, NoteError,
+                                                         bargain_years, complete, deals_view, debt_view, due_view, goodwill_moves, postpone, prepaid_view,
+                                                         validate_amort, validate_deals, validate_debt_notes, validate_loans, validate_notes,
+                                                         validate_prepaid)
 from investment_agent.domain.models import ContractModel
 from investment_agent.market.financial_ratios import kind_of
 from investment_agent.market.sectors import load_sectors
@@ -34,6 +35,8 @@ class NotesRequest(ContractModel):
     prepaid: dict | None = None  # left out: the stored allocation is kept
     deals: list[dict] | None = Field(default=None, max_length=MAX_DEALS)  # left out: the stored deals are kept
     goodwill_amort: dict | None = None  # year → amortised (the notes); left out: kept
+    loans: list[dict] | None = Field(default=None, max_length=MAX_LOANS)  # Các khoản vay; left out: kept
+    debt_notes: dict | None = None  # period read, long-term debt due within a year, the owner's fall of the đồng; left out: kept
     expected_version: int = Field(strict=True, ge=0)
     request_id: str = Field(pattern=_REQUEST)
 
@@ -70,7 +73,8 @@ def _view(request: Request, repo, owner, symbol: str) -> dict:
     statements = StatementStore(Path(request.app.state.data_dir) / "statements").read(symbol) or {}
     return {"symbol": symbol, "version": record.version if record else 0, "projects": due_view(projects, statements, today=_today(request)),
             "ranges": ranges, "groups": GROUPS, "prepaid": prepaid_view(_stored(record, "prepaid", {}), statements), "prepaid_kinds": PREPAID_KINDS,
-            **_deal_parts(record, statements, _today(request))}
+            **_deal_parts(record, statements, _today(request)), "loans": _stored(record, "loans", []), "debt_notes": _stored(record, "debt_notes", {}),
+            "debt": debt_view(_stored(record, "loans", []), _stored(record, "debt_notes", {}), statements), "currencies": list(CURRENCIES), "terms": TERMS}
 
 
 def _deal_parts(record, statements: dict, today) -> dict:
@@ -102,7 +106,7 @@ def _run(request: Request, symbol: str, change):
         return unavailable()
 
 
-EXTRAS = {"prepaid": {}, "deals": [], "goodwill_amort": {}}  # parts a write may leave out: the stored ones are kept
+EXTRAS = {"prepaid": {}, "deals": [], "goodwill_amort": {}, "loans": [], "debt_notes": {}}  # parts a write may leave out: the stored ones are kept
 
 
 def _write(repo, owner, sym: str, projects: list, ranges: dict, body, **extras) -> None:
@@ -125,7 +129,9 @@ def put_notes(symbol: str, request: Request, body: NotesRequest):
         projects, ranges = validate_notes(body.projects, body.ranges, stored=stored)
         _write(repo, owner, sym, projects, ranges, body, prepaid=None if body.prepaid is None else validate_prepaid(body.prepaid),
                deals=None if body.deals is None else validate_deals(body.deals),
-               goodwill_amort=None if body.goodwill_amort is None else validate_amort(body.goodwill_amort))
+               goodwill_amort=None if body.goodwill_amort is None else validate_amort(body.goodwill_amort),
+               loans=None if body.loans is None else validate_loans(body.loans),
+               debt_notes=None if body.debt_notes is None else validate_debt_notes(body.debt_notes))
     return _run(request, symbol, change)
 
 

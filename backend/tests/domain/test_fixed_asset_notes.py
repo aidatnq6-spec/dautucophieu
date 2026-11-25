@@ -165,3 +165,42 @@ def test_a_bargain_gain_from_a_tenth_of_profit_before_tax_is_a_sign_with_profit_
     assert loss["share"] is None and loss["flag"] is True  # a loss before tax with a bargain gain: always
     (unknown,) = bargain_years(deals, {"years": {}})
     assert unknown["pbt"] is None and unknown["flag"] is None
+
+
+HPG_LOANS = [{"lender": "Các ngân hàng (ngắn hạn, VND)", "currency": "VND", "term": "short", "balance": "12998", "rate_from": "2,4", "rate_to": "6,5"},
+             {"lender": "Các ngân hàng (ngắn hạn, USD)", "currency": "USD", "term": "short", "balance": "6357", "rate_from": "1,2", "rate_to": "2,3"},
+             {"lender": "HSBC", "currency": "VND", "term": "long", "balance": "503", "maturity": "2024", "collateral": "Máy móc dây chuyền Thép Hải Dương"},
+             {"lender": "Ngân hàng X", "currency": "USD", "term": "long", "balance": "1000", "maturity": "2025", "base": "Libor", "margin": "2,05"}]
+
+
+def test_loans_from_the_notes_give_currency_mix_maturities_rates_and_a_check_against_the_balance_sheet_owner_25_11_2026():
+    """Bài nợ vay, HPG 2021 (thuyết minh 24): VND 12.998 at 2,4–6,5%, USD 6.357 at 1,2–2,3%; HSBC 503 due 2024; 6.200 long-term due within a year."""
+    from investment_agent.domain.fixed_asset_notes import debt_view, validate_debt_notes, validate_loans
+    loans = validate_loans(HPG_LOANS)
+    assert loans[0]["rate_from"] == "2.4" and loans[2]["maturity"] == "2024" and loans[3]["margin"] == "2.05" and loans[3]["base"] == "Libor"
+    notes = validate_debt_notes({"period": "2021", "current_portion": "6200", "fx_shock": "5"})
+    assert notes == {"period": "2021", "current_portion": "6200", "fx_shock": "5"}
+    statements = {"years": {"2021": {"st_debt": str(int(43747.6 * 10) * 10**8), "lt_debt": str(int(13464.9 * 10) * 10**8), "pbt": str(37057 * B)}}}
+    v = debt_view(loans, notes, statements)
+    assert v["total"] == "20858" and v["by_currency"] == {"USD": "7357", "VND": "13501"} and v["by_term"] == {"long": "1503", "short": "19355"}
+    assert v["rates"] == {"USD": {"from": "1.2", "to": "2.3", "floating": ["Libor + 2,05%"]}, "VND": {"from": "2.4", "to": "6.5", "floating": []}}
+    assert v["maturities"] == {"2024": "503", "2025": "1000", "none": "19355"}
+    assert v["reported"] == "57212.5" and v["covered"] == "0.3646"  # what the owner wrote against the balance sheet's borrowings
+    assert v["foreign"] == "7357" and v["fx_loss"] == "367.85" and v["fx_to_pbt"] == "0.0099"  # 7.357 × 5%, against 37.057
+    assert v["current_portion"] == "6200"
+    for raw, code in (([{**HPG_LOANS[0], "lender": ""}], "invalid_name"), ([{**HPG_LOANS[0], "currency": "BTC"}], "invalid_currency"),
+                      ([{**HPG_LOANS[0], "term": "mid"}], "invalid_term"), ([{**HPG_LOANS[0], "balance": ""}], "invalid_amount"),
+                      ([{**HPG_LOANS[0], "rate_from": "7", "rate_to": "6"}], "invalid_rate"), ([{**HPG_LOANS[0], "rate_to": "120"}], "invalid_rate"),
+                      ([{**HPG_LOANS[2], "maturity": "20x4"}], "invalid_year")):
+        with pytest.raises(NoteError) as err:
+            validate_loans(raw)
+        assert err.value.code == code
+    with pytest.raises(NoteError) as err:
+        validate_debt_notes({"period": "2021", "fx_shock": "250"})
+    assert err.value.code == "invalid_shock"
+
+
+def test_without_a_period_or_a_shock_the_check_and_scenario_stay_blank():
+    from investment_agent.domain.fixed_asset_notes import debt_view, validate_debt_notes, validate_loans
+    v = debt_view(validate_loans(HPG_LOANS[:1]), validate_debt_notes({}), {"years": {}})
+    assert v["reported"] is None and v["covered"] is None and v["fx_loss"] is None and v["foreign"] == "0"

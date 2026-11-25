@@ -15,7 +15,15 @@ type Deal = { id: string; name: string; date: string; share: string; price: stri
 type Move = { year: string; opening: string; added: string; amortised: string | null; closing: string; decline: string; other: string | null; to_admin: string | null; to_pbt: string | null };
 type Bargain = { year: string; gain: string; deals: string[]; pbt: string | null; share: string | null; pbt_without: string | null; flag: boolean | null };
 type Data = { symbol: string; version: number; projects: Project[]; ranges: Ranges; groups: Record<string, string>; prepaid: Prepaid[]; prepaid_kinds: Record<string, string>;
-  deals: Deal[]; goodwill_amort: Record<string, string>; goodwill_moves: Move[]; bargains: Bargain[] };
+  deals: Deal[]; goodwill_amort: Record<string, string>; goodwill_moves: Move[]; bargains: Bargain[];
+  loans: Loan[]; debt_notes: { period?: string; current_portion?: string; fx_shock?: string }; debt: Debt; currencies: string[]; terms: Record<string, string> };
+type Loan = { id: string; lender: string; currency: string; term: "short" | "long"; balance: string; rate_from: string | null; rate_to: string | null; base: string | null;
+  margin: string | null; maturity: string | null; collateral: string; note: string };
+type Debt = { period: string | null; total: string; by_currency: Record<string, string>; by_term: Record<string, string>; maturities: Record<string, string>;
+  rates: Record<string, { from: string | null; to: string | null; floating: string[] }>; reported: string | null; covered: string | null;
+  current_portion: string | null; fx_shock: string | null; foreign: string; fx_loss: string | null; fx_to_pbt: string | null };
+type LoanDraft = { id?: string; lender: string; currency: string; term: string; balance: string; rate_from: string; rate_to: string; base: string; margin: string;
+  maturity: string; collateral: string; note: string };
 type DealDraft = { id?: string; name: string; date: string; share: string; price: string; net_assets: string; years: string; source_url: string; note: string;
   note_goodwill: string; nci_part: string };
 type Draft = { id?: string; name: string; due: string; read_period: string; cip_value: string; budget: string; source_url: string; note: string };
@@ -71,6 +79,33 @@ export function bargainText(b: Pick<Bargain, "year" | "gain" | "pbt" | "share" |
   return `${head}${weight}; LNTT loại lãi mua rẻ ${signed(b.pbt_without ?? "0")} tỷ`;
 }
 
+/** The owner's loans against the borrowings on the balance sheet at the period read. */
+export function coverText(d: Pick<Debt, "period" | "total" | "reported" | "covered">): string {
+  const head = `Các khoản bạn ghi: ${num(d.total)} tỷ`;
+  return d.reported === null || d.covered === null || d.period === null ? `${head}; ghi kỳ báo cáo đã đọc để đối chiếu với bảng cân đối`
+    : `${head}, bằng ${pct(d.covered)} vay ngắn hạn + dài hạn trên bảng cân đối ${periodInput(d.period)} (${num(d.reported)} tỷ)`;
+}
+
+/** The exchange scenario: the foreign-currency balance × the owner's fall of the đồng. */
+export function fxText(d: Pick<Debt, "foreign" | "fx_shock" | "fx_loss" | "fx_to_pbt">): string {
+  if (Number(d.foreign) === 0) return "Không có dư nợ ngoại tệ trong các khoản bạn ghi";
+  if (d.fx_shock === null || d.fx_loss === null) return "Ghi mức mất giá giả định để xem kịch bản tỷ giá";
+  return `Kịch bản (không phải dự báo): đồng Việt Nam mất giá ${num(d.fx_shock)}% thì dư nợ ngoại tệ ${num(d.foreign)} tỷ tăng thêm khoảng ${num(d.fx_loss)} tỷ`
+    + (d.fx_to_pbt === null ? "" : `, bằng ${pct(d.fx_to_pbt)} LNTT kỳ đã đọc`);
+}
+
+const rateText = (l: Pick<Loan, "rate_from" | "rate_to" | "base" | "margin">) => {
+  const fixed = l.rate_from && l.rate_to ? (l.rate_from === l.rate_to ? `${num(l.rate_from)}%` : `${num(l.rate_from)}–${num(l.rate_to)}%`)
+    : l.rate_from ? `từ ${num(l.rate_from)}%` : l.rate_to ? `đến ${num(l.rate_to)}%` : "";
+  const floating = l.base || l.margin ? `${l.base ?? "thả nổi"}${l.margin ? ` + ${num(l.margin)}%` : ""}` : "";
+  return [fixed, floating].filter(Boolean).join("; ") || "—";
+};
+
+const loanRaw = (l: LoanDraft | Loan) => ({ ...(l.id ? { id: l.id } : {}), lender: l.lender, currency: l.currency, term: l.term, balance: l.balance,
+  rate_from: l.rate_from ?? "", rate_to: l.rate_to ?? "", base: l.base ?? "", margin: l.margin ?? "", maturity: l.maturity ?? "", collateral: l.collateral, note: l.note });
+const loanDraft = (l: Loan): LoanDraft => ({ id: l.id, lender: l.lender, currency: l.currency, term: l.term, balance: l.balance, rate_from: l.rate_from ?? "",
+  rate_to: l.rate_to ?? "", base: l.base ?? "", margin: l.margin ?? "", maturity: l.maturity ?? "", collateral: l.collateral, note: l.note });
+
 const dealRaw = (d: DealDraft | Deal) => ({ ...(d.id ? { id: d.id } : {}), name: d.name, date: d.date, share: d.share, price: d.price, net_assets: d.net_assets,
   years: d.years === null ? "" : String(d.years), source_url: d.source_url || null, note: d.note, note_goodwill: d.note_goodwill ?? "", nci_part: d.nci_part ?? "" });
 
@@ -97,6 +132,8 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [allocation, setAllocation] = useState<{ old?: string; year: string; values: Record<string, string> } | null>(null);
   const [deal, setDeal] = useState<DealDraft | null>(null);
+  const [loan, setLoan] = useState<LoanDraft | null>(null);
+  const [debtNotes, setDebtNotes] = useState<{ period: string; current_portion: string; fx_shock: string } | null>(null);
   const base = `stock/${encodeURIComponent(symbol)}/fixed-asset-notes`;
   useEffect(() => {
     api<Data>(base).then(setData, (e) => {
@@ -112,6 +149,8 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
       setRanges(null);
       setAllocation(null);
       setDeal(null);
+      setLoan(null);
+      setDebtNotes(null);
       setMessage(null);
     } catch (e) { setMessage(e instanceof ApiError ? e.failure.message : "Lỗi lưu."); }
   }
@@ -125,6 +164,8 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
   const saveDeals = (deals: ReturnType<typeof dealRaw>[]) => send(base, "PUT", { projects: others(), ranges: keptRanges(), deals });
   const charging = (data?.deals ?? []).filter((d) => d.charging && d.per_year).reduce((s, d) => s + Number(d.per_year), 0);
   const savePrepaid = (prepaid: Record<string, Record<string, string>>) => send(base, "PUT", { projects: others(), ranges: keptRanges(), prepaid });
+  const otherLoans = (id?: string) => (data?.loans ?? []).filter((l) => l.id !== id).map(loanRaw);
+  const saveLoans = (loans: ReturnType<typeof loanRaw>[]) => send(base, "PUT", { projects: others(), ranges: keptRanges(), loans });
   function amortise(year: string, current: string | null) {
     const value = window.prompt(`Phân bổ lợi thế thương mại năm ${year} theo thuyết minh (tỷ đồng; để trống để xóa):`, current ?? "");
     if (value === null || !data) return;
@@ -279,6 +320,62 @@ export function FixedAssetNotes({ symbol }: { symbol: string }) {
       <p className="caption">Lợi thế thương mại = giá mua − tỷ lệ mua × giá trị hợp lý tài sản thuần của công ty được mua. Dương: ghi thành tài sản, phân bổ đều vào chi phí trong số năm
         bạn ghi (VAS tối đa 10 năm). Âm: giao dịch mua rẻ, ghi ngay vào lợi nhuận năm mua, là lợi nhuận một lần. Số do bạn nhập từ thuyết minh; phần mềm chỉ tính theo công thức.
         Ghi số thuyết minh thì phần mềm dùng số đó và hiện phần lệch so với công thức.</p>
+      <h3>Các khoản vay</h3>
+      {data && data.loans.length > 0 ? <>
+        <table className="fv-table" aria-label={`Các khoản vay ${symbol}`}>
+          <thead><tr><th>Bên cho vay</th><th>Loại tiền</th><th>Kỳ hạn</th><th className="num">Dư nợ (tỷ)</th><th>Lãi suất</th><th>Đáo hạn</th><th>Tài sản đảm bảo</th><th></th></tr></thead>
+          <tbody>{data.loans.map((l) => <tr key={l.id} data-testid="fan-loan">
+            <td data-label="Bên cho vay">{l.lender}{l.note && <div className="caption">{l.note}</div>}</td>
+            <td data-label="Loại tiền">{l.currency}</td><td data-label="Kỳ hạn">{data.terms[l.term]}</td>
+            <td className="num" data-label="Dư nợ">{num(l.balance)}</td><td data-label="Lãi suất">{rateText(l)}</td>
+            <td data-label="Đáo hạn">{l.maturity ?? "—"}</td><td data-label="Tài sản đảm bảo">{l.collateral || "—"}</td>
+            <td className="actions">
+              <button type="button" className="btn" aria-label={`Sửa khoản vay ${l.lender}`} onClick={() => setLoan(loanDraft(l))}><Pencil size={14} aria-hidden="true" />Sửa</button>
+              <button type="button" className="btn" aria-label={`Xóa khoản vay ${l.lender}`} onClick={() => { if (window.confirm(`Xóa khoản vay ${l.lender}?`)) void saveLoans(otherLoans(l.id)); }}>
+                <Trash2 size={14} aria-hidden="true" />Xóa</button></td>
+          </tr>)}</tbody>
+        </table>
+        <ul className="quality-list" data-testid="fan-debt">
+          <li>{coverText(data.debt)}</li>
+          <li>Theo loại tiền: {Object.entries(data.debt.by_currency).map(([c, v]) => `${c} ${num(v)} tỷ`).join(" · ")}; theo kỳ hạn: {Object.entries(data.debt.by_term)
+            .map(([t, v]) => `${data.terms[t] ?? t} ${num(v)} tỷ`).join(" · ")}</li>
+          <li>Lãi suất theo loại tiền: {Object.entries(data.debt.rates).map(([c, r]) => `${c} ${r.from && r.to ? `${num(r.from)}–${num(r.to)}%` : "chưa ghi"}${r.floating.length
+            ? `, thả nổi ${r.floating.join(", ")}` : ""}`).join(" · ")}</li>
+          <li>Đáo hạn: {Object.entries(data.debt.maturities).map(([y, v]) => `${y === "none" ? "chưa ghi năm" : y} ${num(v)} tỷ`).join(" · ")}
+            {data.debt.current_portion && ` · nợ dài hạn đến hạn trả trong 12 tháng ${num(data.debt.current_portion)} tỷ`}</li>
+          <li>{fxText(data.debt)}</li>
+        </ul>
+      </> : data && <p className="muted">Chưa ghi khoản vay nào. Lấy từ thuyết minh vay ngắn hạn, dài hạn của báo cáo tài chính.</p>}
+      {data && !loan && <button type="button" className="btn" onClick={() => setLoan({ lender: "", currency: "VND", term: "short", balance: "", rate_from: "", rate_to: "", base: "",
+        margin: "", maturity: "", collateral: "", note: "" })}><Plus size={15} aria-hidden="true" />Thêm khoản vay</button>}
+      {data && !debtNotes && <button type="button" className="btn" onClick={() => setDebtNotes({ period: periodInput(data.debt_notes.period ?? null),
+        current_portion: data.debt_notes.current_portion ?? "", fx_shock: data.debt_notes.fx_shock ?? "" })}><Pencil size={14} aria-hidden="true" />Kỳ đã đọc, nợ đến hạn, kịch bản tỷ giá</button>}
+      {data && loan && <form className="pp-form" aria-label="Khoản vay" onSubmit={(e) => { e.preventDefault(); void saveLoans([...otherLoans(loan.id), loanRaw(loan)]); }}>
+        <label className="field">Bên cho vay<input value={loan.lender} maxLength={120} required onChange={(e) => setLoan({ ...loan, lender: e.target.value })} /></label>
+        <label className="field">Loại tiền<select value={loan.currency} onChange={(e) => setLoan({ ...loan, currency: e.target.value })}>
+          {data.currencies.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
+        <label className="field">Kỳ hạn<select value={loan.term} onChange={(e) => setLoan({ ...loan, term: e.target.value })}>
+          {Object.entries(data.terms).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+        <label className="field">Dư nợ (tỷ đồng, quy đổi theo thuyết minh)<input inputMode="decimal" value={loan.balance} required onChange={(e) => setLoan({ ...loan, balance: e.target.value })} /></label>
+        <label className="field">Lãi suất từ (%/năm)<input inputMode="decimal" value={loan.rate_from} onChange={(e) => setLoan({ ...loan, rate_from: e.target.value })} /></label>
+        <label className="field">Lãi suất đến (%/năm)<input inputMode="decimal" value={loan.rate_to} onChange={(e) => setLoan({ ...loan, rate_to: e.target.value })} /></label>
+        <label className="field">Lãi suất cơ sở nếu thả nổi<input value={loan.base} maxLength={30} placeholder="Libor, SOFR…" onChange={(e) => setLoan({ ...loan, base: e.target.value })} /></label>
+        <label className="field">Biên độ (%/năm)<input inputMode="decimal" value={loan.margin} onChange={(e) => setLoan({ ...loan, margin: e.target.value })} /></label>
+        <label className="field">Năm đáo hạn<input inputMode="numeric" maxLength={4} value={loan.maturity} onChange={(e) => setLoan({ ...loan, maturity: e.target.value })} /></label>
+        <label className="field">Tài sản đảm bảo<input value={loan.collateral} maxLength={300} onChange={(e) => setLoan({ ...loan, collateral: e.target.value })} /></label>
+        <label className="field">Ghi chú<input value={loan.note} maxLength={500} onChange={(e) => setLoan({ ...loan, note: e.target.value })} /></label>
+        <div className="row"><button className="btn primary" type="submit">Lưu khoản vay</button><button className="btn" type="button" onClick={() => setLoan(null)}>Hủy</button></div>
+      </form>}
+      {data && debtNotes && <form className="pp-form" aria-label="Ghi chú nợ vay" onSubmit={(e) => {
+        e.preventDefault(); void send(base, "PUT", { projects: others(), ranges: keptRanges(), debt_notes: debtNotes }); }}>
+        <label className="field">Kỳ báo cáo đã đọc<input value={debtNotes.period} placeholder="2021 hoặc Q2/2026" onChange={(e) => setDebtNotes({ ...debtNotes, period: e.target.value })} /></label>
+        <label className="field">Nợ dài hạn đến hạn trả trong 12 tháng (tỷ đồng)<input inputMode="decimal" value={debtNotes.current_portion}
+          onChange={(e) => setDebtNotes({ ...debtNotes, current_portion: e.target.value })} /></label>
+        <label className="field">Giả định đồng Việt Nam mất giá (%)<input inputMode="decimal" value={debtNotes.fx_shock} onChange={(e) => setDebtNotes({ ...debtNotes, fx_shock: e.target.value })} /></label>
+        <div className="row"><button className="btn primary" type="submit">Lưu</button><button className="btn" type="button" onClick={() => setDebtNotes(null)}>Hủy</button></div>
+      </form>}
+      <p className="caption">Ghi các khoản vay từ thuyết minh (ngân hàng, loại tiền, kỳ hạn, lãi suất, đáo hạn, tài sản đảm bảo); VNDirect chỉ có tổng vay ngắn hạn và dài hạn. Lãi suất hiện
+        theo khoảng, không lấy trung bình. Kịch bản tỷ giá là mức mất giá bạn tự giả định, không phải dự báo; lỗ tỷ giá thực tế còn tùy cách doanh nghiệp phòng ngừa.</p>
       {data && data.bargains.length > 0 && <>
         <h3>Lợi nhuận có lãi mua rẻ</h3>
         <ul className="quality-list">{data.bargains.map((b) => <li key={b.year} data-testid="fan-bargain">

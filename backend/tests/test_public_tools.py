@@ -277,3 +277,32 @@ def test_ratios_of_a_general_company_come_from_vndirects_own_set(data):
     out = data.chi_so_tai_chinh("BBB", so_ky=1)
     assert out["loai"] == "general" and out["ten_chi_so"] == {"ROAE_TR_AVG4Q": "ROAE"} and out["ky"] == {"2026-09-30": {"ROAE_TR_AVG4Q": "0.08"}}
     assert "0,08 là 8%" in out["luu_y"] and out["lay_luc"] == "t"
+
+
+def test_an_insider_notice_without_volume_points_to_its_document(data):
+    write(data.root / "insider" / "BBB.json", {"symbol": "BBB", "fetched_at": "t", "source": "vndirect:finfo", "deals": [
+        {"date": "2026-11-11", "kind": None, "shares": None, "source": "HOSE", "title": "Báo cáo thay đổi sở hữu", "url": "https://dstock.vndirect.com.vn/x",
+         "doc_url": "https://www.hsx.vn/vi/tin-tuc/x/1"},
+        {"date": "2026-10-14", "kind": "Mua", "shares": 10000, "source": "HOSE", "title": "Báo cáo kết quả", "url": "https://dstock.vndirect.com.vn/y"},
+        {"date": "2026-10-01", "kind": None, "shares": None, "source": "HOSE", "title": "Cũ", "url": "https://dstock.vndirect.com.vn/z"}]})
+    deals = data.giao_dich_noi_bo("BBB")["deals"]
+    assert deals[0]["van_ban"] == "https://www.hsx.vn/vi/tin-tuc/x/1" and deals[0]["thieu_so_luong"] is True
+    assert "van_ban" not in deals[1] and deals[2]["van_ban"] == "https://dstock.vndirect.com.vn/z"
+    assert "không có chiều mua bán và số lượng" in data.giao_dich_noi_bo("BBB")["luu_y"]
+
+
+def test_an_eps_that_moved_far_more_than_profit_is_flagged_above_three_times(data):
+    write(data.root / "fundamentals" / "EEE.json", {"symbol": "EEE", "years": {
+        "2022": {"npat": "1100", "eps": "1440"}, "2023": {"npat": "715", "eps": "840"}, "2024": {"npat": "810", "eps": "80"},
+        "2025": {"npat": "1045", "eps": "870"}, "2021": {"npat": "-5", "eps": "-10"}}})
+    flag = data.eps_co_tuc("EEE")["canh_bao_eps"]
+    assert flag["nguong"] == "3" and [r["nam"] for r in flag["nam"]] == ["2024", "2025"]  # 2024 fell tenfold; 2025 rose back
+    first = flag["nam"][0]
+    assert first == {"nam": "2024", "eps": "80", "eps_nam_truoc": "840", "npat": "810", "npat_nam_truoc": "715", "lech": "0.084"}
+    assert "giữ nguyên" in flag["y_nghia"]
+
+
+def test_daily_prices_name_the_hose_sessions_the_store_lacks(data, tmp_path):
+    out = data.gia_ngay("VNINDEX", tu_ngay="2026-11-02", den_ngay="2026-11-06")
+    assert out["phien_thieu"] == ["2026-11-05", "2026-11-06"]  # the fixture stops on 04/11; 05 and 06/11 are HOSE sessions
+    assert out["lich_kiem"].startswith("config/trading-calendar-hose-2026.json")

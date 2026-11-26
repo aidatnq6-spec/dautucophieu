@@ -14,6 +14,7 @@ from investment_agent.market.company_people import PeopleStore, company_people
 from investment_agent.market.erp import ErpStore
 from investment_agent.market.financial_ratios import DISPLAY, FinancialRatioStore, kind_of
 from investment_agent.market.general_ratios import GENERAL_DISPLAY, GeneralRatioStore
+from investment_agent.market.report_flags import eps_jumps, outside_sales_flag
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.insider_deals import InsiderStore, insider_deals
 from investment_agent.market.index_valuation import INDICES, series_key
@@ -163,7 +164,15 @@ def statements(symbol: str, request: Request):
     if table is None:
         return {**empty, "reason": "Chưa có số liệu VNDirect cho mã này (đồng bộ lúc 20:00, mỗi lượt vài mã)"}
     theirs = ValuationCheckStore(data_dir / "valuation-check").read(symbol)
-    return {**table, "kind": kind, "reason": None, "valuation_check": compare_valuation(table.get("current") or {}, theirs, ttm=table.get("ttm_parent"))}
+    return {**table, "kind": kind, "reason": None, "valuation_check": compare_valuation(table.get("current") or {}, theirs, ttm=table.get("ttm_parent")),
+            "flags": _report_flags(data_dir, symbol) if kind is None else None}
+
+
+def _report_flags(data_dir: Path, symbol: str) -> dict:
+    """Lợi nhuận ngoài bán hàng and EPS lệch, as the public-data MCP tools give them (owner, 26/11/2026)."""
+    record = StatementStore(data_dir / "statements").read(symbol) or {}
+    fundamentals = FundamentalsStore(data_dir / "fundamentals").read(symbol) or {}
+    return {"outside_sales": outside_sales_flag(record.get("quarters") or {}), "eps": eps_jumps(fundamentals.get("years") or {})}
 
 
 def _table_of(data_dir: Path, symbol: str, kind: str | None) -> dict | None:

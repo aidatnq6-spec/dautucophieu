@@ -498,3 +498,20 @@ def test_a_general_company_gets_twelve_of_vndirects_ratios_and_one_without_them_
     assert by["DSO_TR_AVG5Q"]["format"] == "days" and by["DSO_TR_AVG5Q"]["values"] == [None, "61.4"]  # a quarter the source lacks stays blank
     assert by["DEBT_TO_EQUITY_AQ"]["format"] == "times" and body["fetched_at"] == "2026-11-26T13:00:00+00:00"
     assert call(c, clock, "GET", "/internal/fairvalue/ratios/HPG").status_code == 404
+
+
+def test_statements_of_a_general_company_carry_the_outside_sales_and_eps_flags(tmp_path):
+    from investment_agent.market.fundamentals import FundamentalsStore
+    from investment_agent.market.statements import StatementStore
+    (tmp_path / "market-symbols.txt").write_text("KKK\n", encoding="utf-8")
+    (tmp_path / "industries.json").write_text(json.dumps({"as_of": "x", "source": "t", "level": 2, "sectors": {"KKK": "Bất động sản"}}), encoding="utf-8")
+    quarters = {q: {"pbt": "100", "fin_income": "60", "other_profit": "0", "revenue": "10"} for q in ("2025-Q4", "2026-Q1", "2026-Q2", "2026-Q3")}
+    StatementStore(tmp_path / "statements").save({"symbol": "KKK", "fetched_at": "2026-11-25T00:00:00+00:00", "source": "vndirect:finfo",
+                                                   "lines_version": 14, "quarters": quarters, "years": {}})
+    FundamentalsStore(tmp_path / "fundamentals").save({"symbol": "KKK", "fetched_at": "x", "source": "vndirect",
+                                                       "years": {"2023": {"npat": "715", "eps": "840"}, "2024": {"npat": "810", "eps": "80"}}})
+    c, clock = _app(tmp_path)
+    body = call(c, clock, "GET", "/internal/fairvalue/statements/KKK").json()
+    assert body["flags"]["outside_sales"]["quy_gan_nhat"] == {"ty_le": "0.6", "vuot_nguong": True, "ky": "2026-Q3"}
+    assert body["flags"]["outside_sales"]["bon_quy"]["vuot_nguong"] is True
+    assert [r["nam"] for r in body["flags"]["eps"]] == ["2024"]

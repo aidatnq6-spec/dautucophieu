@@ -15,6 +15,7 @@ from typing import Callable
 URL = "https://api-finfo.vndirect.com.vn/v4/insider_trans?q=tagCodes:{symbol}&size=100&sort=newsDate:desc"
 MAX_AGE = timedelta(days=1)
 LINK = "https://dstock.vndirect.com.vn/"
+NEWS_URL = "https://api-finfo.vndirect.com.vn/v4/news?q=newsId:{ids}&size={size}"
 EXCHANGES = ("https://www.hsx.vn/", "https://hsx.vn/", "https://www.hnx.vn/", "https://hnx.vn/")
 KINDS = {"Mua", "Bán", "Đăng kí mua", "Đăng kí bán"}
 _SYMBOL = re.compile(r"^[A-Z0-9]{1,10}$")
@@ -49,7 +50,21 @@ def _shares(value) -> int | None:
     return int(d) if d.is_finite() and d > 0 and d == d.to_integral_value() else None
 
 
-def _deals(symbol: str, payload: dict) -> list[dict]:
+def _doc_links(payload: dict, get: Callable[[str], str]) -> dict[str, str]:
+    """newsId → the exchange's notice, for the notices that give no kind or volume: insider_trans has no such link, v4/news has it.
+    One call for all of them; a failing lookup leaves them without links."""
+    ids = [str(r["newsId"]) for r in payload.get("data") or [] if r.get("newsId") is not None
+           and (r.get("transType") not in KINDS or _shares(r.get("numberOfShares")) is None)]
+    if not ids:
+        return {}
+    try:
+        rows = json.loads(get(NEWS_URL.format(ids=",".join(ids), size=len(ids)))).get("data") or []
+    except Exception:
+        return {}
+    return {str(r.get("newsId")): str(r.get("newsUrl") or "") for r in rows}
+
+
+def _deals(symbol: str, payload: dict, links: dict[str, str] | None = None) -> list[dict]:
     out = []
     for r in payload.get("data") or []:
         if symbol not in str(r.get("tagCodes") or "").upper().replace(" ", "").split(","):
@@ -61,7 +76,7 @@ def _deals(symbol: str, payload: dict) -> list[dict]:
         title = str(r.get("newsTitle") or "").strip()
         title = title[len(symbol) + 1:].strip() if title.upper().startswith(symbol + ":") else title
         url = str(r.get("dstockUrl") or "")
-        doc = str(r.get("newsUrl") or "")  # the exchange's own notice, whose attached document holds the volumes VNDirect leaves out
+        doc = (links or {}).get(str(r.get("newsId")), "")  # the exchange's own notice, whose attached document holds the volumes
         out.append({"date": date, "kind": kind, "shares": _shares(r.get("numberOfShares")) if kind else None,
                     "source": r.get("newsSource"), "title": title, "url": url if url.startswith(LINK) else None,
                     "doc_url": doc if doc.startswith(EXCHANGES) else None})
@@ -91,7 +106,8 @@ def insider_deals(store: InsiderStore, symbol: str, *, get: Callable[[str], str]
     if saved and now - datetime.fromisoformat(saved["fetched_at"]) < MAX_AGE:
         return {**saved, "year": _year(saved["deals"], now), "stale": False, "reason": None}
     try:
-        deals = _deals(symbol, json.loads(get(URL.format(symbol=symbol))))
+        payload = json.loads(get(URL.format(symbol=symbol)))
+        deals = _deals(symbol, payload, _doc_links(payload, get))
     except Exception:
         if saved:
             return {**saved, "year": _year(saved["deals"], now), "stale": True, "reason": None}

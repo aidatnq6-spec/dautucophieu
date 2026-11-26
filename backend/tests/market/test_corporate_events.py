@@ -75,3 +75,11 @@ def test_a_failed_send_is_retried_next_run(tmp_path):
     now = datetime(2026, 10, 29, 15, 40, tzinfo=ZoneInfo("Asia/Ho_Chi_Minh"))
     assert events_run(tmp_path, fetch=lambda s: RAW, notify=lambda due: False, now=now, pace=0)["reminded"] == 0
     assert events_run(tmp_path, fetch=lambda s: RAW, notify=lambda due: True, now=now, pace=0)["reminded"] == 2
+
+
+def test_stored_english_twins_are_left_out_when_read(tmp_path):
+    store = EventStore(tmp_path)
+    store.save("KDH", [{"id": "KDH-1.VN", "kind": "issue"}, {"id": "KDH-1.EN_GB", "kind": "issue"}, {"id": "KDH-2", "kind": "meeting"}],
+               fetched_at="2026-11-26T08:00:00+07:00")
+    assert [e["id"] for e in store.read("KDH")["events"]] == ["KDH-1.VN", "KDH-2"]
+    assert [e["id"] for e in store.events(["KDH"])] == ["KDH-1.VN", "KDH-2"]

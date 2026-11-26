@@ -83,7 +83,10 @@ class EventStore:
             data = json.loads((self.root / f"{symbol.upper()}.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return None
-        return data if isinstance(data, dict) else None
+        if not isinstance(data, dict):
+            return None
+        # files saved before 26/11/2026 hold VNDirect's English twin of each event as well
+        return {**data, "events": [e for e in data.get("events") or [] if not (isinstance(e, dict) and str(e.get("id") or "").endswith("EN_GB"))]}
 
     def events(self, symbols: list[str]) -> list[dict]:
         return [e for s in symbols for e in ((self.read(s) or {}).get("events") or [])]

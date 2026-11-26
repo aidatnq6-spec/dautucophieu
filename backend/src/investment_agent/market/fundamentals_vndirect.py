@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Callable
 
 from .financial_ratios import kind_of
-from .providers.vndirect_data import BASE, default_get, events as vndirect_events
+from .providers.vndirect_data import BASE, default_get, events as vndirect_events, is_english_twin
 from .sectors import load_sectors
 from .statements import StatementStore
 
@@ -74,7 +74,7 @@ def build_record(symbol: str, statements: dict, events: list[dict], *, shares: s
     dividends, issues, share_issues = [], [], []
     for e in events:
         day, kind = (e.get("effectiveDate") or "")[:10], e.get("type")
-        if not day:
+        if not day or is_english_twin(e):
             continue
         if kind == "DIVIDEND" and _num(e.get("dividend")):
             dividends.append({"date": day, "cash": _num(e["dividend"])})

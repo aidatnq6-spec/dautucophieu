@@ -237,3 +237,11 @@ def test_the_record_takes_the_year_s_additions_to_fixed_assets_from_the_company_
     annual = build_record("FPT", statements(), EVENTS, shares=None, now=NOW, notes=notes)["annual"]
     assert annual["2025"]["ppe_cost_add"] == str(9767 * B) and "2019" not in annual  # only years the statements have
     assert "ppe_cost_add" not in build_record("FPT", statements(), EVENTS, shares=None, now=NOW)["annual"]["2025"]
+
+
+def test_an_english_twin_of_an_event_is_not_counted_again():
+    twins = EVENTS + [{"id": "1.EN_GB", "code": "FPT", "type": "DIVIDEND", "dividend": 1000.0, "effectiveDate": "2026-05-28"},
+                      {"id": "2.EN_GB", "code": "FPT", "type": "STOCKDIV", "ratio": 15.0, "effectiveDate": "2026-05-25"}]
+    rec = build_record("FPT", statements(), twins, shares=None, now=NOW)
+    assert rec["dividends"] == [{"date": "2026-05-28", "cash": "1000"}]
+    assert rec["issues"] == [{"date": "2025-06-10", "ratio": "0.1"}, {"date": "2026-05-25", "ratio": "0.15"}]

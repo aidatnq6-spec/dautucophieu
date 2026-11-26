@@ -119,9 +119,14 @@ def index_levels(index: str, get: Callable[[str], str] = default_get, *, today: 
 
 
 def events(symbol: str, get: Callable[[str], str] = default_get, *, today: date | None = None, years: int = 2) -> list[dict]:
-    """The ticker's events disclosed in the last `years` years (raw VNDirect rows; corporate_events.normalise reads them)."""
+    """The ticker's events disclosed in the last `years` years (raw VNDirect rows; corporate_events.normalise reads them). VNDirect sends
+    each event twice, "<n>.VN" and its English twin "<n>.EN_GB"; only the Vietnamese one is kept, or sums count it twice."""
     since = ((today or date.today()) - timedelta(days=365 * years)).isoformat()
-    return _data(get, EVENTS_URL.format(symbol=symbol.upper(), since=since))
+    return [r for r in _data(get, EVENTS_URL.format(symbol=symbol.upper(), since=since)) if not is_english_twin(r)]
+
+
+def is_english_twin(event: dict) -> bool:
+    return str(event.get("id") or "").endswith("EN_GB")
 
 SHAREHOLDERS_URL = BASE + "shareholders?q=code:{symbol}&size=500"
 FOREIGN_ROOM_URL = BASE + "foreigns?q=code:{symbol}&size=1&sort=tradingDate:desc"

@@ -55,7 +55,7 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
 
     @tool
     def chi_so_tai_chinh(ma: str, so_ky: int = 8) -> dict:
-        """Chỉ số tài chính theo quý của một mã (nguồn VNDirect)."""
+        """Chỉ số tài chính theo quý (nguồn VNDirect), CHỈ cho ngân hàng, công ty chứng khoán, bảo hiểm; doanh nghiệp thường không có."""
         return data.chi_so_tai_chinh(ma, so_ky)
 
     @tool

@@ -13,7 +13,7 @@ Mã là phần người dùng gõ sau lệnh, viết hoa. Không có mã thì h�
 1. `thong_tin_ma`: niêm yết HOSE, ngành ICB, VN30/VN100.
 2. `gia_ngay` với so_phien 20.
 3. `bao_cao_tai_chinh` với ky "quy", so_ky 8 (đủ để so cùng kỳ năm trước); thêm ky "nam", so_ky 3.
-4. `chi_so_tai_chinh` với so_ky 4.
+4. `chi_so_tai_chinh` với so_ky 4 (chỉ ngân hàng, chứng khoán, bảo hiểm có số).
 5. `eps_co_tuc` với so_ky 8.
 6. `su_kien_doanh_nghiep`, `co_dong_ban_lanh_dao`, `giao_dich_noi_bo`.
 7. `dinh_gia_ma`: vốn hoá, P/E, P/B do VNDirect công bố.
@@ -37,5 +37,7 @@ Mã là phần người dùng gõ sau lệnh, viết hoa. Không có mã thì h�
 - Không đoán số: không nội suy, không ước lượng, không lấp chỗ trống bằng kiến thức có sẵn hay nguồn ngoài.
 - Lợi nhuận cho EPS, P/E là npat_parent (LNST công ty mẹ). equity là vốn chủ GỒM cổ đông không kiểm soát: vốn chủ công ty mẹ = equity − minority_equity cùng kỳ. Xem pham_vi và ten_dong mà công cụ trả về.
 - Chỉ nói một kỳ "không có trong kho" khi công cụ trả `thieu` cho đúng kỳ đó; kỳ chỉ nằm ngoài số kỳ đã xin thì gọi lại với so_ky lớn hơn.
+- Cổ tức cổ đông nhận lấy từ dividends của `eps_co_tuc`; dòng dividends_paid của BCTC có thể gồm tiền trả cho cổ đông không kiểm soát.
+- Điều gì chỉ là suy đoán thì ghi "Suy luận:" ở đầu câu.
 - Không khuyến nghị mua bán, không đặt giá mục tiêu.
 - Không hỏi, nhắc hay suy đoán danh mục, giá vốn, danh sách theo dõi của người dùng.

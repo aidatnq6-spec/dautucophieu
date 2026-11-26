@@ -25,6 +25,9 @@ SCOPE = {"npat": "LNST của cả doanh nghiệp, gồm phần của cổ đông
          "npat_parent": "LNST thuộc cổ đông công ty mẹ; dùng dòng này cho EPS và P/E",
          "equity": "Vốn chủ sở hữu GỒM lợi ích cổ đông không kiểm soát (minority_equity); vốn chủ của công ty mẹ = equity − minority_equity",
          "minority_equity": "Lợi ích cổ đông không kiểm soát, một phần của equity",
+         "dividends_paid": "Tiền cổ tức, lợi nhuận đã trả cho chủ sở hữu trong kỳ trên báo cáo lưu chuyển tiền tệ hợp nhất (số âm); có thể gồm "
+                           "phần công ty con trả cho cổ đông không kiểm soát, nên không phải cổ tức cổ đông công ty nhận. Cổ tức theo từng đợt "
+                           "cho cổ đông công ty: eps_co_tuc (dividends)",
          "don_vi": "đồng; eps là đồng/cổ phiếu; chi phí, dòng tiền chi ra và dự phòng giữ dấu như VNDirect"}
 FUNDAMENTAL_NOTES = {"npat": "LNST thuộc cổ đông công ty mẹ (dòng npat_parent của BCTC)",
                      "eps": "Lãi cơ bản trên cổ phiếu do VNDirect công bố, đồng/cổ phiếu",
@@ -188,6 +191,10 @@ class PublicData:
     def chi_so_tai_chinh(self, ma, so_ky=8) -> dict:
         record, missing = self._per_symbol("financial-ratios", ma, "chỉ số tài chính")
         if missing:
+            symbol = self._symbol(ma)
+            if symbol and (self.root / "statements" / f"{symbol}.json").is_file():
+                return _missing(f"Chỉ số tài chính trong kho chỉ có cho ngân hàng, công ty chứng khoán và bảo hiểm; {symbol} là doanh nghiệp "
+                                "thường. Tự tính từ bao_cao_tai_chinh và ghi rõ công thức.")
             return missing
         return {"ma": record.get("symbol"), "loai": record.get("kind"), "nguon": record.get("source"), "lay_luc": record.get("fetched_at"),
                 "ky": _newest(record.get("quarters"), _count(so_ky, 8, 80))}

@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timezone
 
 from investment_agent.market.insider_deals import InsiderStore, insider_deals
-from investment_agent.market.insider_docs import (DocStore, fill_from_docs, news_id, parse_report, read_notice,
+from investment_agent.market.insider_docs import (READER, DocStore, fill_from_docs, news_id, parse_report, read_notice,
                                                   sync_insider_docs)
 
 NOW = datetime(2026, 11, 26, 13, tzinfo=timezone.utc)
@@ -112,6 +112,52 @@ def test_a_group_report_gives_the_groups_net_change():
     assert parse_report(GROUP.format(traded="3.381.090", after="22.889.351"), "Báo cáo") == {"reason": "cộng trừ không khớp"}
 
 
+# The long form (Phụ lục XV) as OCR gives it: labels broken across lines, the covered-warrant lines left empty, the English half
+# with commas.
+LONG = """*: mục này chỉ dành cho trường hợp sau khi đăng ký giao dịch, đối tượng đăng ký không
+còn là người nội bộ
+5. Số lượng, tỷ lệ cổ phiếu/chứng chỉ quỹ/chứng quyền có bảo đảm nắm giữ trước khi {thuc}
+hiện giao dịch/ number, ownership percentage oƒ shares/fund certificates/covered warrants
+held before the transaction: {before} cổ phần, chiếm tỷ lệ 2,86% vốn điều lệ/ 14,644,221
+shares, accounting for 2.86% oƒ charter capital
+Số lượng, tỷ lệ chứng khoán cơ sở (nếu tại mục 3) nắm giữ trước khi thực hiện chứng
+quyền có bảo đảm (đối với chứng quyền có bảo đảm)/number oƒ underlying securities:
+7. Số lượng cổ phiếu/chứng chỉ quỹ/chứng quyền có bảo đảm đã giao dịch (mua /bán/
+cho/được cho/tặng/được tặng/thừa kế/chuyển nhượng/nhận chuyển nhượng/hoán đổi)/number
+oƒ shares/fund certificates/covered warrants being traded (purchase/sell/present)-
+- Loại giao dịch đã thực hiện/type oƒ transaction executed: Bán/Sell
+- Số lượng cổ phiếu/chứng chỉ quỹ/chứng quyền có bảo đảm đã giao dịch/ number oƒ
+shares/fund certificates/covered warrants traded: {traded} cổ phần/ 2,940,000 shares
+8. Giá trị đã giao dịch (tính theo mệnh giá)/the value oƒ executed transaction: 29.400.000.000 đồng
+9, Số lượng, tỷ lệ cổ phiếu/chứng chỉ quỹ/chứng quyền có bảo đảm nắm giữ sau khi thực
+hiện giao dịch của người thực hiện giao dịch/number, ownership percentage oƒ shares/fund
+certificates/covered warrants after the transaction held by the person executing the transaction:
+{after} cổ phần, chiếm tỷ lệ 2,29% vốn điều lệ/ 11,704,221 shares, accounting for
+10. Số lượng, tỷ lệ chứng khoán cơ sở dự kiến nắm giữ sau khi thực hiện chứng quyền có bảo
+đảm/number of underlying securities held after trading the covered warrants:
+11. Phương thức giao dịch/ method oƒ transaction: Khớp lệnh
+"""
+
+
+def test_the_long_form_with_labels_broken_across_lines_is_read():
+    text = LONG.format(thuc="thực", before="14.644.221", traded="2.940.000", after="11.704.221")
+    assert parse_report(text, "BC giao dịch cp (Phụ lục XV)") == {
+        "kind": "Bán", "shares": 2940000, "before": 14644221, "after": 11704221, "rong": False}
+    # OCR reads "thực hiện" as "thực biện", and prints thousands with commas
+    misread = LONG.format(thuc="thực", before="564,696", traded="350,000", after="214,696").replace("thực\nhiện", "thực\nbiện")
+    assert parse_report(misread, "Báo cáo kết quả")["shares"] == 350000
+    # a percentage with a comma is never a share count
+    assert "kind" not in parse_report(LONG.format(thuc="thực", before="564,696%", traded="350,000", after="214,696"), "Báo cáo")
+    assert parse_report(LONG.format(thuc="thực", before="14.644.221", traded="2.940.000", after="11.704.231"), "Báo cáo") == {
+        "reason": "cộng trừ không khớp"}
+    # The executor's own "after" left blank: the next line's total with related persons is not taken in its place
+    blank = (LONG.format(thuc="thực", before="564.696", traded="350.000", after="")
+             .replace(" cổ phần, chiếm tỷ lệ 2,29% vốn điều lệ/ 11,704,221 shares, accounting for", "")
+             .replace("10. Số lượng, tỷ lệ chứng khoán", "Số lượng, tỷ lệ cổ phiếu nắm giữ sau khi thực hiện giao dịch của người thực hiện "
+                      "giao dịch và người có liên quan: 214.696 cổ phiếu\n10. Số lượng, tỷ lệ chứng khoán"))
+    assert parse_report(blank, "Báo cáo") == {"reason": "thiếu số trước, đã giao dịch hoặc sau"}
+
+
 def test_news_id_only_from_hose_notice_links():
     assert news_id("https://www.hsx.vn/vi/tin-tuc/kdh-bao-cao-ket-qua/2502523") == "2502523"
     assert news_id("https://hnx.vn/vi-vn/tin/1234567") is None
@@ -191,7 +237,7 @@ def test_sync_reads_reports_of_watched_tickers_newest_first_once_and_retries_fai
         _deal("2026-08-01", "Báo cáo kết quả cũ", DOC.format(106))]})
     store.save("ACB", {"symbol": "ACB", "fetched_at": NOW.isoformat(), "deals": [_deal("2026-11-20", "Báo cáo kết quả", DOC.format(201))]})
     docs = DocStore(tmp_path)
-    docs.save("106", {"news_id": "106", "result": None, "reason": "cộng trừ không khớp"})
+    docs.save("106", {"news_id": "106", "result": None, "reason": "cộng trừ không khớp", "reader": READER})
     asked = []
 
     def read(nid, title, **kw):
@@ -205,6 +251,26 @@ def test_sync_reads_reports_of_watched_tickers_newest_first_once_and_retries_fai
     assert out == {"read": 1, "accepted": 1, "rejected": 0, "errors": 1, "left": 0}
     assert docs.read("102")["result"]["shares"] == 1000 and docs.read("101") is None  # a failed fetch is tried again next time
     assert sync_insider_docs(tmp_path, ["KDH"], read=read, limit=0) == {"read": 0, "accepted": 0, "rejected": 0, "errors": 0, "left": 1}
+
+
+def test_a_better_reader_reads_again_once_what_an_older_one_could_not_take(tmp_path):
+    InsiderStore(tmp_path).save("KDH", {"symbol": "KDH", "fetched_at": NOW.isoformat(), "deals": [
+        _deal("2026-11-05", "Báo cáo kết quả A", DOC.format(301)), _deal("2026-11-04", "Báo cáo kết quả B", DOC.format(302)),
+        _deal("2026-11-03", "Báo cáo kết quả C", DOC.format(303))]})
+    docs = DocStore(tmp_path)
+    docs.save("301", {"news_id": "301", "result": None, "reason": "thiếu số trước, đã giao dịch hoặc sau"})  # an older reader's
+    docs.save("302", {"news_id": "302", "result": {"kind": "Mua", "shares": 5, "files": 1, "rong": False, "before": 1, "after": 6},
+                      "reason": None})  # taken: kept as it is
+    docs.save("303", {"news_id": "303", "result": None, "reason": "cộng trừ không khớp", "reader": READER})
+    asked = []
+
+    def read(nid, title, **kw):
+        asked.append(nid)
+        return {"news_id": nid, "result": None, "reason": "thiếu số trước, đã giao dịch hoặc sau", "reader": READER}
+    assert sync_insider_docs(tmp_path, ["KDH"], read=read)["read"] == 1
+    assert asked == ["301"] and sync_insider_docs(tmp_path, ["KDH"], read=read)["read"] == 0
+    assert read_notice("9", "t", get_json=lambda u: {"data": {"list": []}}, get_bytes=None, pdf_text=None, sleep=None,
+                       now=NOW)["reader"] == READER
 
 
 def test_readings_fill_only_what_vndirect_lacks_and_esop_is_tallied_apart(tmp_path):

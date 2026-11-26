@@ -21,15 +21,22 @@ LIMIT = 30
 MAX_FILES = 8
 MAX_BYTES = 15 * 1024 * 1024
 PAUSE = 1.0
+# The reader's version: a notice an older reader could not take is read again once by a newer one (2: labels broken across
+# lines, the long form, commas in counts; 26/11/2026). Taken readings are kept.
+READER = 2
 _NEWS = re.compile(r"^https://(?:www\.)?hsx\.vn/.+/(\d{1,12})$")
 _ID = re.compile(r"^\d{1,12}$")
-# A share count as printed in Vietnamese ("20.623.635"), or a bare 0; percentages ("1,84") and item numbers never match.
-_COUNT = re.compile(r"(?<![\d.,])(\d{1,3}(?:\.\d{3})+|0)(?![\d.,]*\d)")
+# A share count as printed in Vietnamese ("20.623.635"), with commas as some reports print it ("564,696"), or a bare 0;
+# percentages ("1,84", "564,696%") and item numbers never match.
+_COUNT = re.compile(r"(?<![\d.,])(\d{1,3}(?:\.\d{3})+|\d{1,3}(?:,\d{3})+|0)(?![\d.,]*\d)(?!\s*%)")
 # Where an item ends: the next line opening with an item number ("6.", "| 7.") or a bullet ("- ").
 _ITEM_END = re.compile(r"\n[|\s]*(?:\d{1,2}(?:\.\s|\s)|-\s)")  # "21.273.635" opening a line is a figure, not item 21
-_BEFORE = re.compile(r"nam giu truoc khi thuc hien giao dich")
-_AFTER = re.compile(r"nam giu sau khi thuc hien giao dich")
-_TRADED_INSIDER = re.compile(r"so luong co phieu da giao dich")
+# Labels may break across lines (the long form, Phụ lục XV) and OCR may misread "hien" ("bien"); "... thuc hien chung quyen"
+# (covered warrants) is another item.
+_BEFORE = re.compile(r"nam\s+giu\s+truoc\s+khi\s+thuc\s+\w+\s+giao\s+dich")
+_AFTER = re.compile(r"nam\s+giu\s+sau\s+khi\s+thuc\s+\w+\s+giao\s+dich")
+# "Số lượng cổ phiếu đã giao dịch", or in the long form "Số lượng cổ phiếu/chứng chỉ quỹ/chứng quyền có bảo đảm đã giao dịch"
+_TRADED_INSIDER = re.compile(r"so\s+luong\s+co\s+phie+u(?:/chung\s+chi\s+quy/chung\s+quyen\s+co\s+bao\s+dam)?\s+da\s+giao\s+dich")
 _TRADED_GROUP = re.compile(r"so luong co phieu da mua/ban")
 _TRADED_STATED = re.compile(r"so luong co phieu da (mua|ban)\b(?!/)")  # an organisation's report: "Số lượng cổ phiếu đã Mua: 141.000"
 _KIND = re.compile(r"loai giao dich da thuc hien[^:\n]*:\s*\W*(mua|ban|duoc cho|cho)\b")
@@ -47,14 +54,24 @@ def _plain(text: str) -> str:
     return "\n".join(re.sub(r"[ \t]+", " ", line) for line in text.splitlines())
 
 
+_NEXT_LABEL = re.compile(r"so\s+luong")
+_RELATED = re.compile(r"^[^:]{0,200}nguoi\s+co\s+lien\s+quan")
+
+
 def _count(text: str, label: re.Pattern) -> tuple[int | None, re.Match | None]:
-    """The first share count inside the item a label opens, with that label; each place the label appears is tried in turn."""
+    """The first share count inside the item a label opens, with that label; each place the label appears is tried in turn,
+    except the totals with related persons. The item stops at the next "Số lượng ..." label, so a figure left blank is not
+    taken from the line below."""
     for m in label.finditer(text):
         rest = text[m.end():]
+        if _RELATED.match(rest):
+            continue
         end = _ITEM_END.search(rest)
-        found = _COUNT.search(rest[:end.start() if end else 400][:400])
+        part = rest[:end.start() if end else 400][:400]
+        part = part[:nxt.start()] if (nxt := _NEXT_LABEL.search(part)) else part
+        found = _COUNT.search(part)
         if found:
-            return int(found.group(1).replace(".", "")), m
+            return int(re.sub(r"[.,]", "", found.group(1))), m
     return None, None
 
 
@@ -66,7 +83,7 @@ def _group_total(text: str) -> tuple[int, int, int] | None:
     label's line or the next two; anything but exactly three counts is not taken."""
     for m in _TOTAL.finditer(text):
         lines = text[m.end():].split("\n")[:3]
-        counts = [int(c.replace(".", "")) for c in _COUNT.findall("\n".join(lines))]
+        counts = [int(re.sub(r"[.,]", "", c)) for c in _COUNT.findall("\n".join(lines))]
         if len(counts) == 3:
             return counts[0], counts[1], counts[2]
     return None
@@ -123,7 +140,7 @@ def read_notice(nid: str, title: str, *, get_json: Callable[[str], dict], get_by
                 pdf_text: Callable[[bytes], list[str]], sleep: Callable[[float], None], now: datetime) -> dict:
     """One notice's reading; a failing call raises, so nothing is stored and the notice is tried again on the next run."""
     def done(result=None, reason=None):
-        return {"news_id": nid, "title": title, "read_at": now.isoformat(), "result": result, "reason": reason}
+        return {"news_id": nid, "title": title, "read_at": now.isoformat(), "result": result, "reason": reason, "reader": READER}
     files = [f for f in (get_json(MEDIA.format(id=nid)).get("data") or {}).get("list") or []
              if str(f.get("fileType") or "").lower() == ".pdf" and str(f.get("filePath") or "").startswith("~/")]
     if not files:
@@ -193,6 +210,10 @@ def fill_from_docs(deals: list[dict], docs: DocStore) -> list[dict]:
     return out
 
 
+def _due(rec: dict | None) -> bool:
+    return rec is None or (not rec.get("result") and rec.get("reader", 1) < READER)
+
+
 def sync_insider_docs(data_dir: Path, symbols: list[str], *, read: Callable[..., dict], limit: int = LIMIT) -> dict:
     """Reads the newest unread HOSE result reports lacking a volume among the stored notices of the given tickers."""
     from .insider_deals import InsiderStore
@@ -207,7 +228,7 @@ def sync_insider_docs(data_dir: Path, symbols: list[str], *, read: Callable[...,
         for d in record.get("deals") or []:
             nid = news_id(d.get("doc_url"))
             if (nid and nid not in seen and _lacking(d) and _plain(d.get("title") or "").startswith("bao cao")
-                    and docs.read(nid) is None):
+                    and _due(docs.read(nid))):
                 seen.add(nid)
                 due.append((d.get("date") or "", nid, d.get("title") or ""))
     due.sort(reverse=True)

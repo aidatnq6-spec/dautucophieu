@@ -9,7 +9,7 @@ company or event files, since that list follows what the app tracks.
 import json
 import os
 import re
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from investment_agent.market.prices import PriceStore
@@ -48,6 +48,11 @@ class PublicData:
     def _json(self, *parts: str):
         path = self.root.joinpath(*parts)
         return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+
+    def _written_at(self, *parts: str) -> str | None:
+        """When the file was last written, for files that keep no fetch time of their own; a write time, not a source's publish time."""
+        path = self.root.joinpath(*parts)
+        return datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).isoformat() if path.is_file() else None
 
     @staticmethod
     def _symbol(value) -> str | None:
@@ -104,7 +109,8 @@ class PublicData:
         series = self._json("index-valuation", f"{index}-{ratio}-1d.json")
         if not series:
             return _missing(f"Chưa có {ratio.upper()} của {index} trong kho.")
-        return {"chi_so": index, "ty_le": ratio, "nguon": "VNDirect", "diem": series.get("points", [])[-_count(so_diem, 60, 1000):]}
+        return {"chi_so": index, "ty_le": ratio, "nguon": "VNDirect", "tep_cap_nhat_luc": self._written_at("index-valuation", f"{index}-{ratio}-1d.json"),
+                "diem": series.get("points", [])[-_count(so_diem, 60, 1000):]}
 
     # Báo cáo tài chính
     def bao_cao_tai_chinh(self, ma, ky="quy", so_ky=8) -> dict:
@@ -175,11 +181,12 @@ class PublicData:
         if not history:
             return _missing("Chưa có lịch sử giá vàng trong kho.")
         if not loai:
-            return {"nguon": "Phú Quý", "loai": sorted(history)}
+            return {"nguon": "Phú Quý", "tep_cap_nhat_luc": self._written_at("gold-price-history.json"), "loai": sorted(history)}
         if loai not in history:
             return _missing("Không có loại vàng này; gọi không kèm loai để xem danh sách.")
         points = sorted(history[loai].items())[-_count(so_ngay, 30, 1000):]
-        return {"loai": loai, "gia": "mua", "don_vi": "đồng/chỉ", "nguon": "Phú Quý", "diem": [list(p) for p in points]}
+        return {"loai": loai, "gia": "mua", "don_vi": "đồng/chỉ", "nguon": "Phú Quý", "tep_cap_nhat_luc": self._written_at("gold-price-history.json"),
+                "diem": [list(p) for p in points]}
 
     # Quỹ mở (Fmarket, toàn thị trường). fund-scores.json is the app's own scoring and stays out.
     def quy_mo(self, ma=None, so_ngay=30) -> dict:
@@ -204,4 +211,4 @@ class PublicData:
         record = self._json("omo.json")
         if not record:
             return _missing("Chưa có số OMO trong kho.")
-        return {"sessions": sorted(record.get("sessions", []), key=lambda s: s.get("date", ""))[-_count(so_phien, 5, 60):]}
+        return {"tep_cap_nhat_luc": self._written_at("omo.json"), "sessions": sorted(record.get("sessions", []), key=lambda s: s.get("date", ""))[-_count(so_phien, 5, 60):]}

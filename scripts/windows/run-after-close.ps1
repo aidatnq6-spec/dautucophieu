@@ -138,6 +138,10 @@ if ((Get-Date).Hour -ge 20) {
     # first and weekly, every other non-financial HOSE company every two weeks (after the bank notes: 10 s before each call, at most 40 a run).
     $cn = & $python -W ignore -m investment_agent.jobs.step company-notes-sync --data-dir $data 2>$null
     "$(Get-Date -Format o) company-notes-sync exit=$LASTEXITCODE $cn" | Add-Content -LiteralPath $log -Encoding UTF8
+    # So luong tu van ban HOSE: volumes VNDirect lacks, read on this machine (OCR) from the PDFs attached to watched tickers' HOSE
+    # result reports, kept only when before +/- traded = after; each notice once, at most 30 a night, 1 s between calls.
+    $idoc = & $python -W ignore -m investment_agent.jobs.step --timeout 900 insider-docs-sync --data-dir $data --limit 30 2>$null
+    "$(Get-Date -Format o) insider-docs-sync exit=$LASTEXITCODE $idoc" | Add-Content -LiteralPath $log -Encoding UTF8
     # Ke hoach nam: the current year's business plan of each watched ticker from CafeF (one public call each, weekly per ticker).
     $ps = & $python -W ignore -m investment_agent.jobs.step plans-sync --data-dir $data 2>$null
     "$(Get-Date -Format o) plans-sync exit=$LASTEXITCODE $ps" | Add-Content -LiteralPath $log -Encoding UTF8

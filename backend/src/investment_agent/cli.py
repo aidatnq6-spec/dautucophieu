@@ -110,6 +110,9 @@ def main() -> int:
     bns.add_argument("--force", action="store_true", help="refresh every watched bank now, however recent its record")
     cns = commands.add_parser("company-notes-sync", help="notes of non-financial HOSE companies, watched first and weekly, the rest every two weeks (Vietcap, 10 s apart, 40 a run) into data/company-notes")
     cns.add_argument("--data-dir", type=Path, required=True)
+    ids = commands.add_parser("insider-docs-sync", help="volumes of watched tickers' HOSE insider reports that VNDirect lacks, read on this machine from the attached PDFs and kept only when before ± traded = after (30 a run) into data/insider-docs")
+    ids.add_argument("--data-dir", type=Path, required=True)
+    ids.add_argument("--limit", type=int, default=30)
     vcs = commands.add_parser("valuation-check-sync", help="VNDirect's market value, P/E and P/B of each watched ticker, to compare with Bảng số tài chính")
     vcs.add_argument("--data-dir", type=Path, required=True)
     ivs = commands.add_parser("index-valuation-sync", help="fetch daily P/E and P/B of VNINDEX and VN30 (VNDirect) into data/index-valuation")
@@ -243,6 +246,8 @@ def main() -> int:
         return bank_notes_sync(args.data_dir, force=args.force)
     if args.command == "company-notes-sync":
         return company_notes_sync(args.data_dir)
+    if args.command == "insider-docs-sync":
+        return insider_docs_sync(args.data_dir, limit=args.limit)
     if args.command == "industries":
         return industries(_symbols(args.symbols), args.output)
     if args.command == "backup":
@@ -824,6 +829,49 @@ def company_notes_sync(data_dir: Path, get=None, sleep=None) -> int:
     counts = {state: sum(1 for v in results.values() if v == state) for state in ("ok", "fresh", "later", "skipped")}
     print(json.dumps({"status": "ok" if not failed else "partial", **counts, "errors": failed}))
     return 0 if not failed else 1
+
+
+def insider_docs_sync(data_dir: Path, *, limit: int = 30, read=None, now=None) -> int:
+    """Số lượng từ văn bản HOSE (26/11/2026): exit 0 when every notice due was read (taken or not), 1 when a fetch failed or the
+    machine has no Tesseract with Vietnamese (nothing is stored then, so the notice is tried again)."""
+    import time
+    from datetime import datetime, timezone
+
+    from investment_agent.market.insider_docs import read_notice, sync_insider_docs
+    from investment_agent.market.watchlist import load_watchlist
+    if read is None:
+        import httpx
+
+        from investment_agent.insights.ocr import default_reader, with_ocr
+        from investment_agent.insights.pdf import extract_pages
+        ocr = default_reader()
+        if ocr is None:
+            print(json.dumps({"status": "error", "reason": "Tesseract with Vietnamese (vie) is not installed"}))
+            return 1
+        headers = {"User-Agent": "investment-agent/0.1 (personal use)"}
+
+        def get_json(url):
+            response = httpx.get(url, timeout=60, follow_redirects=False, headers=headers)
+            response.raise_for_status()
+            return response.json()
+
+        def get_bytes(url):
+            response = httpx.get(url, timeout=120, follow_redirects=False, headers=headers)
+            response.raise_for_status()
+            return response.content
+
+        def pdf_text(data):
+            pages, _, notes = with_ocr(data, extract_pages(data), read=ocr)
+            if notes and not any(p.strip() for p in pages):
+                raise RuntimeError(notes[0])  # OCR ran out of time or failed: try again next run
+            return pages
+
+        def read(nid, title):
+            return read_notice(nid, title, get_json=get_json, get_bytes=get_bytes, pdf_text=pdf_text, sleep=time.sleep,
+                               now=now or datetime.now(timezone.utc))
+    out = sync_insider_docs(data_dir, list(load_watchlist(data_dir).symbols), read=read, limit=limit)
+    print(json.dumps({"status": "ok" if not out["errors"] else "partial", **out}))
+    return 0 if not out["errors"] else 1
 
 
 def general_ratios_sync(data_dir: Path, *, limit: int = 60, symbols: list[str] | None = None, get=None, now=None) -> int:

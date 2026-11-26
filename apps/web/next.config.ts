@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 import { contentSecurityPolicy } from "./src/lib/csp";
 
 const nextConfig: NextConfig = {
+  // verify.ps1 builds into .next-verify, so the running app's .next is never replaced under it (26/11/2026)
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,  // do not name the framework in every answer
   async headers() {
     return [{

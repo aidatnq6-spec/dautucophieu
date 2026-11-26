@@ -6,6 +6,7 @@
 node_modules/
 .npm-cache/
 .next/
+.next-verify/
 *.tsbuildinfo
 __pycache__/
 *.py[cod]

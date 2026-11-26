@@ -159,7 +159,7 @@ def test_server_exposes_exactly_the_approved_read_only_tools(data):
     assert sorted(t.name for t in tools) == sorted([
         "thong_tin_ma", "gia_ngay", "dinh_gia_chi_so", "bao_cao_tai_chinh", "chi_so_tai_chinh", "eps_co_tuc", "su_kien_doanh_nghiep",
         "co_dong_ban_lanh_dao", "giao_dich_noi_bo", "danh_sach_vi_mo", "chi_bao_vi_mo", "chi_so_chau_a", "gia_vang", "omo",
-        "quy_mo", "gia_vang_lich_su", "dinh_gia_ma", "lich_su_gia", "so_sanh_nganh"])
+        "quy_mo", "gia_vang_lich_su", "dinh_gia_ma", "lich_su_gia", "so_sanh_nganh", "thuyet_minh"])
     assert all(t.annotations and t.annotations.read_only_hint for t in tools)
     assert "Ngân hàng" in result.content[0].text
 
@@ -208,7 +208,8 @@ def test_fundamentals_say_profit_is_the_parents_and_equity_includes_minorities(d
 def test_published_valuation_of_one_ticker(data):
     write(data.root / "valuation-check" / "BBB.json", {"fetched_at": "2026-11-25T13:04:50+00:00", "date": "2026-11-23", "market_cap": "191",
                                                         "pe": "11.26", "pb": "1.02", "shares": "1245", "profit_quarter": "2026-Q3", "ours": "never shown"})
-    assert data.dinh_gia_ma("bbb") == {"ma": "BBB", "nguon": "VNDirect", "ngay": "2026-11-23", "lay_luc": "2026-11-25T13:04:50+00:00",
+    published = data.dinh_gia_ma("bbb")
+    assert {k: published[k] for k in ("ma", "nguon", "ngay", "lay_luc", "von_hoa", "pe", "pb", "so_co_phieu", "quy_loi_nhuan")} == {"ma": "BBB", "nguon": "VNDirect", "ngay": "2026-11-23", "lay_luc": "2026-11-25T13:04:50+00:00",
                                        "von_hoa": "191", "pe": "11.26", "pb": "1.02", "so_co_phieu": "1245", "quy_loi_nhuan": "2026-Q3"}
     assert data.dinh_gia_ma("ZZZ") == {"thieu": True, "ly_do": "Chưa có định giá VNDirect công bố của ZZZ trong kho."}
 
@@ -357,3 +358,28 @@ def test_general_ratios_warn_that_per_share_figures_use_vndirects_quarter_end_sh
                                                                "names": {}, "quarters": {"2026-09-30": {"BVPS_AQ": "16737"}}})
     note = data.chi_so_tai_chinh("BBB")["luu_y"]
     assert "số cổ phiếu cuối quý" in note and "đợt thưởng" in note
+
+
+def test_notes_split_financial_income_borrowings_and_inventory_with_the_pages_own_labels(data):
+    write(data.root / "company-notes" / "BBB.json", {"symbol": "BBB", "fetched_at": "2026-11-25T14:06:24+00:00", "source": "vietcap:iq", "fields_version": 2,
+        "quarters": {"2026-Q1": {"fin_interest": "7100000000"},
+                     "2026-Q2": {"fin_interest": "9800000000", "fin_other": "896300000000", "fin_disposals": "0", "exp_interest": "19300000000",
+                                 "bonds": "1000", "inv_property": "5000", "ppe_dep_add": "1"}},
+        "years": {"2025": {"lt_bank": "3000"}}})
+    out = data.thuyet_minh("bbb", so_ky=1)
+    assert out["nguon"] == "vietcap:iq" and out["lay_luc"] == "2026-11-25T14:06:24+00:00" and out["don_vi"] == "đồng"
+    q2 = out["ky"]["2026-Q2"]
+    assert q2["doanh_thu_tai_chinh"] == {"fin_interest": "9800000000", "fin_disposals": "0", "fin_other": "896300000000"}
+    assert q2["chi_phi_tai_chinh"] == {"exp_interest": "19300000000"} and q2["no_vay"] == {"bonds": "1000"} and q2["ton_kho"] == {"inv_property": "5000"}
+    assert out["ten_dong"]["fin_other"] == "Doanh thu tài chính khác" and out["ten_dong"]["fin_disposals"] == "Lãi thanh lý đầu tư"
+    assert "ppe_dep_add" not in json.dumps(out["ky"])  # only the named lines
+    assert list(data.thuyet_minh("BBB", ky="nam")["ky"]) == ["2025"]
+    assert data.thuyet_minh("ZZZ") == {"thieu": True, "ly_do": "Chưa có thuyết minh BCTC của ZZZ trong kho."}
+
+
+def test_a_published_valuation_says_which_price_it_rests_on_and_how_far_the_latest_close_has_moved(data):
+    write(data.root / "valuation-check" / "VNINDEX.json", {"fetched_at": "t", "date": "2026-11-02", "market_cap": "2000000", "pe": "10", "pb": "1",
+                                                            "shares": "1000", "profit_quarter": "2026-Q3"})
+    out = data.dinh_gia_ma("VNINDEX")
+    assert out["gia_ngay_dinh_gia"] == "2000" and out["gia_moi_nhat"] == {"ngay": "2026-11-04", "gia": "1002"}
+    assert out["lech_gia"] == "-0.499" and "5%" in out["luu_y"]  # (1002 − 2000) ÷ 2000

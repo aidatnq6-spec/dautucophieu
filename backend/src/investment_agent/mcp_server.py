@@ -42,7 +42,8 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
 
     @tool
     def bao_cao_tai_chinh(ma: str, ky: str = "quy", so_ky: int = 8) -> dict:
-        """Các dòng BCTC (kết quả kinh doanh, cân đối kế toán, lưu chuyển tiền tệ) theo kỳ quy hoặc nam, đơn vị đồng, các kỳ mới nhất."""
+        """Các dòng BCTC (kết quả kinh doanh, cân đối kế toán, lưu chuyển tiền tệ) theo kỳ quy hoặc nam, đơn vị đồng, các kỳ mới nhất;
+        ten_dong là tên VNDirect của từng dòng, pham_vi nói dòng nào gồm cổ đông không kiểm soát."""
         return data.bao_cao_tai_chinh(ma, ky, so_ky)
 
     @tool
@@ -52,8 +53,13 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
 
     @tool
     def eps_co_tuc(ma: str, so_ky: int = 8) -> dict:
-        """EPS, lợi nhuận, vốn chủ theo năm và quý; cổ tức, phát hành, số cổ phiếu lưu hành."""
+        """EPS, LNST công ty mẹ, vốn chủ (gồm thiểu số) theo năm và quý; lợi ích thiểu số cùng kỳ; cổ tức, phát hành, số cổ phiếu lưu hành."""
         return data.eps_co_tuc(ma, so_ky)
+
+    @tool
+    def dinh_gia_ma(ma: str) -> dict:
+        """Vốn hoá, P/E, P/B và số cổ phiếu do VNDirect công bố cho một mã, kèm ngày và quý lợi nhuận dùng để tính. Dùng số này thay vì tự tính."""
+        return data.dinh_gia_ma(ma)
 
     @tool
     def su_kien_doanh_nghiep(ma: str) -> dict:

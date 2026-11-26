@@ -18,6 +18,19 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 _SYMBOL = re.compile(r"^[A-Z0-9]{3,10}$")
 _SERIES = re.compile(r"^[a-z][a-z0-9_]{0,63}$")  # _status, _gaps… are run bookkeeping, not series
 INDEXES = ("VNINDEX", "VN30")
+LINE_NAMES = REPO_ROOT / "config" / "statement-line-names.json"  # each stored line's own name in VNDirect's financial_models
+# What the stored lines cover (statements.py: equity includes non-controlling interests in every layout)
+SCOPE = {"npat": "LNST của cả doanh nghiệp, gồm phần của cổ đông không kiểm soát",
+         "npat_parent": "LNST thuộc cổ đông công ty mẹ; dùng dòng này cho EPS và P/E",
+         "equity": "Vốn chủ sở hữu GỒM lợi ích cổ đông không kiểm soát (minority_equity); vốn chủ của công ty mẹ = equity − minority_equity",
+         "minority_equity": "Lợi ích cổ đông không kiểm soát, một phần của equity",
+         "don_vi": "đồng; eps là đồng/cổ phiếu; chi phí, dòng tiền chi ra và dự phòng giữ dấu như VNDirect"}
+FUNDAMENTAL_NOTES = {"npat": "LNST thuộc cổ đông công ty mẹ (dòng npat_parent của BCTC)",
+                     "eps": "Lãi cơ bản trên cổ phiếu do VNDirect công bố, đồng/cổ phiếu",
+                     "equity": "Vốn chủ sở hữu GỒM lợi ích cổ đông không kiểm soát; trừ loi_ich_thieu_so cùng kỳ để ra vốn chủ của công ty mẹ",
+                     "annual": "Các dòng năm của BCTC, đồng; selling và admin mang dấu âm"}
+VALUATION_FIELDS = (("ngay", "date"), ("lay_luc", "fetched_at"), ("von_hoa", "market_cap"), ("pe", "pe"), ("pb", "pb"),
+                    ("so_co_phieu", "shares"), ("quy_loi_nhuan", "profit_quarter"))
 RATIOS = ("pe", "pb")
 
 
@@ -122,9 +135,11 @@ class PublicData:
         record = self._json("statements-financial", f"{symbol}.json") or self._json("statements", f"{symbol}.json")
         if record is None:
             return _missing(f"Chưa có BCTC của {symbol} trong kho.")
-        periods = record.get("quarters" if ky == "quy" else "years")
+        kept = _newest(record.get("quarters" if ky == "quy" else "years"), _count(so_ky, 8, 80))
+        names = (json.loads(LINE_NAMES.read_text(encoding="utf-8")) if LINE_NAMES.is_file() else {}).get(record.get("kind") or "general") or {}
+        lines = {line for row in kept.values() for line in row}
         return {"ma": symbol, "loai": record.get("kind"), "nguon": record.get("source"), "lay_luc": record.get("fetched_at"),
-                "don_vi": "đồng", "ky": _newest(periods, _count(so_ky, 8, 80))}
+                "don_vi": "đồng", "pham_vi": SCOPE, "ten_dong": {k: names[k] for k in sorted(lines) if k in names}, "ky": kept}
 
     def chi_so_tai_chinh(self, ma, so_ky=8) -> dict:
         record, missing = self._per_symbol("financial-ratios", ma, "chỉ số tài chính")
@@ -138,7 +153,18 @@ class PublicData:
         if missing:
             return missing
         n = _count(so_ky, 8, 80)
-        return {**record, **{k: _newest(record.get(k), n) for k in ("years", "quarters", "annual") if k in record}}
+        out = {**record, **{k: _newest(record.get(k), n) for k in ("years", "quarters", "annual") if k in record}}
+        statements = self._json("statements-financial", f"{record.get('symbol')}.json") or self._json("statements", f"{record.get('symbol')}.json") or {}
+        minority = {kind: {p: (statements.get(kind) or {}).get(p, {}).get("minority_equity") for p in out.get(kind) or {}
+                           if (statements.get(kind) or {}).get(p, {}).get("minority_equity") is not None}
+                    for kind in ("years", "quarters")}
+        return {**out, "chu_thich": FUNDAMENTAL_NOTES, "loi_ich_thieu_so": minority}
+
+    def dinh_gia_ma(self, ma) -> dict:
+        record, missing = self._per_symbol("valuation-check", ma, "định giá VNDirect công bố")
+        if missing:
+            return missing
+        return {"ma": self._symbol(ma), "nguon": "VNDirect", **{name: record.get(src) for name, src in VALUATION_FIELDS}}
 
     # Doanh nghiệp
     def su_kien_doanh_nghiep(self, ma) -> dict:

@@ -13,13 +13,14 @@ Các mã là những từ người dùng gõ sau lệnh, viết hoa, từ 2 đ�
 Với từng mã:
 1. `thong_tin_ma`.
 2. `gia_ngay` với so_phien 60.
-3. `bao_cao_tai_chinh` với ky "nam", so_ky 3; thêm ky "quy", so_ky 4.
+3. `bao_cao_tai_chinh` với ky "nam", so_ky 3; thêm ky "quy", so_ky 8.
 4. `eps_co_tuc` với so_ky 4.
 5. `chi_so_tai_chinh` với so_ky 4.
+6. `dinh_gia_ma`.
 
 ## Trình bày
 
-1. **Một bảng chung**, mỗi mã một cột: ngành, nhóm chỉ số, giá đóng phiên mới nhất (kèm ngày), thay đổi 60 phiên, doanh thu và lợi nhuận 3 năm, EPS gần nhất, cổ tức gần nhất, số cổ phiếu lưu hành.
+1. **Một bảng chung**, mỗi mã một cột: ngành, nhóm chỉ số, giá đóng phiên mới nhất (kèm ngày), thay đổi 60 phiên, doanh thu và lợi nhuận 3 năm, EPS gần nhất, cổ tức gần nhất, số cổ phiếu lưu hành, vốn hoá, P/E, P/B do VNDirect công bố (kèm ngày).
 2. **Chỉ số tài chính**: chỉ đặt cạnh nhau những chỉ số mà mọi mã đều có. Ngân hàng, chứng khoán, bảo hiểm có bộ chỉ số khác doanh nghiệp thường; khác loại thì tách bảng và nói rõ là không so trực tiếp được.
 3. **Khác biệt chính**: 3 đến 5 gạch đầu dòng, chỉ nêu điều số trong bảng cho thấy.
 4. **Thiếu**: mục nào trả `thieu` thì ghi mã, mục và lý do nguyên văn; ô thiếu trong bảng để "thiếu", không để trống.
@@ -27,6 +28,8 @@ Với từng mã:
 
 ## Quy tắc
 
+- Lợi nhuận cho EPS, P/E là npat_parent (LNST công ty mẹ). equity là vốn chủ GỒM cổ đông không kiểm soát: vốn chủ công ty mẹ = equity − minority_equity cùng kỳ. Xem pham_vi và ten_dong mà công cụ trả về.
+- Chỉ nói một kỳ "không có trong kho" khi công cụ trả `thieu` cho đúng kỳ đó; kỳ chỉ nằm ngoài số kỳ đã xin thì gọi lại với so_ky lớn hơn.
 - Không đoán số, không nội suy, không lấy số từ kiến thức có sẵn hay nguồn ngoài.
 - Mọi phép tính (thay đổi %, đổi đơn vị sang tỷ đồng) chỉ dùng số trong kho và ghi rõ kỳ dùng để tính.
 - Không xếp hạng "nên mua mã nào", không khuyến nghị mua bán, không đặt giá mục tiêu.

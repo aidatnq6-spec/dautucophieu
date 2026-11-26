@@ -41,6 +41,7 @@ Chủ sở hữu duyệt ngày 26/11/2026: nối Claude (Claude Code và Claude 
 - `gia_ngay` trả `phien_thieu`: phiên lịch HOSE (`config/trading-calendar-hose-*.json`) có mà kho không có, trong khoảng được hỏi (không có ngày cuối thì đến phiên mới nhất trong kho); không nêu lý do.
 - `eps_co_tuc` trả `canh_bao_eps` (chủ sở hữu duyệt 26/11/2026): năm EPS đổi khác LNST công ty mẹ hơn 3 lần theo chiều nào cũng vậy, so năm trước, cả hai dương; số giữ nguyên.
 - `giao_dich_noi_bo`: báo cáo nguồn không có chiều và số lượng được đánh dấu `thieu_so_luong` kèm `van_ban` (tin HOSE/HNX, có văn bản đính kèm; nếu chưa có thì trang VNDirect); không đọc văn bản (chủ sở hữu chọn cách A, 26/11/2026).
+- `dinh_gia_lich_su` (chủ sở hữu chọn tự tính, 26/11/2026; số trung bình của VNDirect là trung bình cộng P/E từng ngày, KDH 1 năm ra 1.825,9 lần): P/E, P/B của chính mã ở mỗi giá đóng cửa trong `index-history/` (cuối tháng từ 2018) theo cùng cách P/E VN-Index trước 2018: quý công bố sau 45 ngày, LNST công ty mẹ 4 quý, vốn chủ công ty mẹ, số cổ phiếu nhân thêm các đợt thưởng có ngày không hưởng quyền sau cuối quý; trả trung vị, tứ phân vị, thấp, cao trong 3 và 5 năm, số tháng bỏ vì thiếu quý hay lỗ, và vị trí hiện tại.
 - Thiếu thì trả `{"thieu": true, "ly_do": "…"}`, ví dụ "chưa có tệp" hoặc "mã không hợp lệ".
 - Mã chứng khoán chỉ gồm chữ in hoa và số, 3–10 ký tự. Tên chỉ báo vĩ mô phải nằm trong danh sách đang có.
 

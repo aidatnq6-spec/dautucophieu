@@ -15,6 +15,7 @@ from pathlib import Path
 from investment_agent.market.price_history import read_index_sessions
 from investment_agent.market.company_notes import NOTE_GROUPS, NOTE_LABELS
 from investment_agent.market.prices import PriceStore
+from investment_agent.market.valuation_history import own_history
 from investment_agent.market.sector_compare import compare_sector
 from investment_agent.market.report_flags import EPS_JUMP, eps_jumps, outside_sales_flag
 
@@ -210,6 +211,10 @@ class PublicData:
     def so_sanh_nganh(self, ma) -> dict:
         symbol = self._symbol(ma)
         return compare_sector(self.root, symbol) if symbol else _missing("Mã không hợp lệ.")
+
+    def dinh_gia_lich_su(self, ma) -> dict:
+        symbol = self._symbol(ma)
+        return own_history(self.root, symbol) if symbol else _missing("Mã không hợp lệ.")
 
     def dinh_gia_chi_so(self, chi_so="VNINDEX", ty_le="pe", so_diem=60) -> dict:
         index, ratio = str(chi_so or "").upper(), str(ty_le or "").lower()

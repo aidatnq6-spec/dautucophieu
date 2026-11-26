@@ -83,6 +83,12 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
         return data.thuyet_minh(ma, ky, so_ky)
 
     @tool
+    def dinh_gia_lich_su(ma: str) -> dict:
+        """P/E và P/B của chính mã ở mỗi cuối tháng (tự tính từ báo cáo và giá VNDirect): trung vị, tứ phân vị, thấp, cao trong 3 và 5 năm,
+        và vị trí hiện tại; để biết P/E hôm nay cao hay thấp so với quá khứ của mã."""
+        return data.dinh_gia_lich_su(ma)
+
+    @tool
     def su_kien_doanh_nghiep(ma: str) -> dict:
         """Sự kiện doanh nghiệp: cổ tức, phát hành, đại hội cổ đông, ngày chốt quyền."""
         return data.su_kien_doanh_nghiep(ma)

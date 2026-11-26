@@ -25,7 +25,7 @@ Mã là phần người dùng gõ sau lệnh, viết hoa. Không có mã thì h�
 2. **Giá**: phiên mới nhất trong kho, giá đóng, cao/thấp 20 phiên. Thay đổi % chỉ tính từ hai giá trong kho và ghi rõ hai phiên dùng để tính.
    Giá 3 năm (cuối tháng): nêu cao, thấp kèm tháng. Giá đã điều chỉnh thì được tính % thay đổi 1 và 3 năm (ghi hai tháng dùng để tính); giá chưa điều chỉnh mà có đợt thưởng hay phát hành ở giữa thì không tính % qua đợt đó và ghi rõ lý do.
 3. **Kết quả kinh doanh**: 4 quý gần nhất kèm cùng kỳ năm trước, và 3 năm gần nhất với các dòng có trong kho (doanh thu, lợi nhuận, dòng tiền…). Số gốc là đồng; đổi sang tỷ đồng khi trình bày và ghi đơn vị.
-4. **Định giá**: vốn hoá, P/E, P/B từ `dinh_gia_ma` kèm ngày. Thiếu thì ghi thiếu; nếu tự tính thì ghi rõ là tự tính và công thức.
+4. **Định giá**: vốn hoá, P/E, P/B từ `dinh_gia_ma` kèm ngày. Nếu canh_bao_loi_nhuan_ngoai_ban_hang của `bao_cao_tai_chinh` vượt ngưỡng thì nêu tỷ lệ, kỳ và nói P/E dựa nhiều vào lợi nhuận không từ bán hàng. Thiếu thì ghi thiếu; nếu tự tính thì ghi rõ là tự tính và công thức.
 5. **EPS, cổ tức, số cổ phiếu lưu hành**; nếu có shares_check thì nêu hai nguồn đang lệch.
 6. **Sự kiện**: sắp tới trước, rồi gần đây nhất.
 7. **Cổ đông lớn** (tối đa 5) và **giao dịch nội bộ** gần nhất.

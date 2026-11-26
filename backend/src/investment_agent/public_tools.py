@@ -10,6 +10,7 @@ import json
 import os
 import re
 from datetime import date, datetime, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from investment_agent.market.prices import PriceStore
@@ -19,6 +20,29 @@ _SYMBOL = re.compile(r"^[A-Z0-9]{3,10}$")
 _SERIES = re.compile(r"^[a-z][a-z0-9_]{0,63}$")  # _status, _gaps… are run bookkeeping, not series
 INDEXES = ("VNINDEX", "VN30")
 MAX_DAILY = 800  # daily adjusted closes per answer
+OUTSIDE_SALES = Decimal("0.3")  # owner, 26/11/2026: flag when financial income and other profit are above 30% of profit before tax
+
+
+def _dec(value) -> Decimal | None:
+    try:
+        d = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+    return d if d.is_finite() else None
+
+
+def _outside_share(rows: list[dict], keys: list[str], *, need: int) -> dict:
+    """(financial income + other profit) ÷ profit before tax over the given quarters, summed; associates are left out (owner, 26/11/2026)."""
+    if len(keys) < need:
+        return {"ky": keys, "ty_le": None, "vuot_nguong": None, "ly_do": f"Chưa đủ {need} quý"}
+    parts = [(_dec(r.get("pbt")), _dec(r.get("fin_income")), _dec(r.get("other_profit"))) for r in rows]
+    if any(v is None for p in parts for v in p):
+        return {"ky": keys, "ty_le": None, "vuot_nguong": None, "ly_do": "Thiếu dòng LNTT, doanh thu tài chính hoặc lợi nhuận khác"}
+    pbt = sum(p[0] for p in parts)
+    if pbt <= 0:
+        return {"ky": keys, "ty_le": None, "vuot_nguong": None, "ly_do": "LNTT không dương"}
+    share = sum(p[1] + p[2] for p in parts) / pbt
+    return {"ky": keys, "ty_le": format(share.quantize(Decimal("0.0001")).normalize(), "f"), "vuot_nguong": share > OUTSIDE_SALES}
 LINE_NAMES = REPO_ROOT / "config" / "statement-line-names.json"  # each stored line's own name in VNDirect's financial_models
 # What the stored lines cover (statements.py: equity includes non-controlling interests in every layout)
 SCOPE = {"npat": "LNST của cả doanh nghiệp, gồm phần của cổ đông không kiểm soát",
@@ -185,8 +209,19 @@ class PublicData:
         kept = _newest(record.get("quarters" if ky == "quy" else "years"), _count(so_ky, 8, 80))
         names = (json.loads(LINE_NAMES.read_text(encoding="utf-8")) if LINE_NAMES.is_file() else {}).get(record.get("kind") or "general") or {}
         lines = {line for row in kept.values() for line in row}
-        return {"ma": symbol, "loai": record.get("kind"), "nguon": record.get("source"), "lay_luc": record.get("fetched_at"),
-                "don_vi": "đồng", "pham_vi": SCOPE, "ten_dong": {k: names[k] for k in sorted(lines) if k in names}, "ky": kept}
+        out = {"ma": symbol, "loai": record.get("kind"), "nguon": record.get("source"), "lay_luc": record.get("fetched_at"),
+               "don_vi": "đồng", "pham_vi": SCOPE, "ten_dong": {k: names[k] for k in sorted(lines) if k in names}, "ky": kept}
+        quarters = record.get("quarters") or {}
+        if ky == "quy" and record.get("kind") is None and quarters:
+            keys = sorted(quarters)
+            latest = _outside_share([quarters[keys[-1]]], [keys[-1]], need=1)
+            latest = {k: v for k, v in latest.items() if k != "ky"} | {"ky": keys[-1]}
+            out["canh_bao_loi_nhuan_ngoai_ban_hang"] = {
+                "nguong": format(OUTSIDE_SALES, "f"), "cong_thuc": "(fin_income + other_profit) / pbt",
+                "y_nghia": "Phần LNTT đến từ doanh thu tài chính và lợi nhuận khác, không từ bán hàng; vượt ngưỡng thì P/E dựa nhiều vào khoản này. "
+                           "Lãi tiền gửi đều đặn cũng nằm trong doanh thu tài chính, nên vượt ngưỡng không có nghĩa là khoản một lần.",
+                "quy_gan_nhat": latest, "bon_quy": _outside_share([quarters[k] for k in keys[-4:]], keys[-4:], need=4)}
+        return out
 
     def chi_so_tai_chinh(self, ma, so_ky=8) -> dict:
         record, missing = self._per_symbol("financial-ratios", ma, "chỉ số tài chính")

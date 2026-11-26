@@ -42,6 +42,7 @@ Chủ sở hữu duyệt ngày 26/11/2026: nối Claude (Claude Code và Claude 
 |---|---|
 | `/dautu-ma <MÃ>` | Hồ sơ, giá 20 phiên, BCTC 4 quý và 3 năm, chỉ số, EPS, cổ tức, sự kiện, cổ đông, giao dịch nội bộ, mục thiếu, nguồn |
 | `/dautu-sosanh <MÃ1> <MÃ2> …` | 2–4 mã cạnh nhau: ngành, giá, KQKD 3 năm, EPS, cổ tức, chỉ số chung; không xếp hạng nên mua mã nào |
+| `/dautu-quy <QUỸ1> <QUỸ2> …` | 2–4 quỹ mở cạnh nhau: NAV, phí, lợi nhuận Fmarket công bố, NAV đầu–cuối trong kho, danh mục công bố và cổ phiếu cùng nắm; không xếp hạng, không dùng điểm quỹ của ứng dụng |
 | `/dautu-thitruong` | VN-Index, P/E và P/B của VN-Index và VN30, châu Á, vàng, OMO |
 | `/dautu-vimo [chủ đề]` | Chỉ báo vĩ mô theo chủ đề hoặc bộ mặc định, kèm trạng thái cập nhật |
 

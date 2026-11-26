@@ -1,7 +1,7 @@
 ---
 name: dautu-vimo
-description: Tóm tắt chỉ báo vĩ mô từ dữ liệu công khai trên máy — lạm phát, PMI, lãi suất, tỷ giá, lợi suất trái phiếu, hàng hóa, chỉ số Mỹ. Dùng khi người dùng gõ /dautu-vimo [chủ đề hoặc mã chỉ báo] hoặc hỏi vĩ mô đang thế nào.
-argument-hint: [chủ đề như "lãi suất", "tỷ giá", "hàng hóa", hoặc mã chỉ báo]
+description: "Tóm tắt chỉ báo vĩ mô từ dữ liệu công khai trên máy — lạm phát, PMI, lãi suất, tỷ giá, lợi suất trái phiếu, hàng hóa, chỉ số Mỹ. Dùng khi người dùng gõ /dautu-vimo [chủ đề hoặc mã chỉ báo] hoặc hỏi vĩ mô đang thế nào."
+argument-hint: "[chủ đề như \"lãi suất\", \"tỷ giá\", \"hàng hóa\", hoặc mã chỉ báo]"
 ---
 
 # Vĩ mô: $ARGUMENTS

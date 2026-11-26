@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { cell, checkLines, epsNote, fixedNotes, lastN, outsideSalesNote, periodLabel, withRatios } from "./financial-tables";
+import { cell, checkLines, epsNote, fixedNotes, lastN, outsideSalesNote, periodLabel, sectorColumn, withRatios } from "./financial-tables";
 
 it("money is shown in tỷ đồng, growth with its sign, margins and returns as percentages, multiples with an x", () => {
   expect(cell("62214200000000", "money", "revenue")).toBe("62.214");
@@ -92,4 +92,11 @@ it("profit mostly outside sales and an EPS far from profit are said in words, on
   expect(epsNote([{ nam: "2017" }, { nam: "2024" }, { nam: "2025" }])).toBe("EPS lệch hẳn LNST công ty mẹ năm 2017, 2024, 2025 (hơn 3 lần so năm trước): "
     + "có thể là lỗi nguồn hoặc phát hành nhiều cổ phiếu; số giữ nguyên như VNDirect.");
   expect(epsNote([])).toBeNull();
+});
+
+it("the sector column carries the medians of VNDirect's rows for the ticker's own quarter, and nothing without a sector", () => {
+  const col = sectorColumn({ name: "Bất động sản", quarter: "2026-09-30", peers: 58, medians: { ROAE_TR_AVG4Q: "0.0466", DSO_TR_AVG5Q: null }, counts: {} });
+  expect(col).toEqual({ label: "Trung vị ngành Q3/26", values: { ROAE_TR_AVG4Q: "0.0466", DSO_TR_AVG5Q: null } });
+  expect(sectorColumn(null)).toBeNull();
+  expect(sectorColumn(undefined)).toBeNull();
 });

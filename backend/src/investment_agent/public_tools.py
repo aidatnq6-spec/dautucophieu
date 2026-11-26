@@ -115,6 +115,26 @@ class PublicData:
         return {"ma": symbol, "don_vi": last.currency, "co_so_gia": last.price_basis, "nguon": last.source_id,
                 "lay_luc": last.observed_at.isoformat(), "phien_moi_nhat_trong_kho": max(view).isoformat(), "phien": rows}
 
+    def lich_su_gia(self, ma, tu_ngay=None, den_ngay=None) -> dict:
+        """Long closes kept for VN-Index P/E before 2018 (index_history.py): VNDirect's unadjusted close, daily 2013–2017 and the month's
+        last close from 2018. The ticker's share events in the range come along, since an unadjusted series jumps at each of them."""
+        record, missing = self._per_symbol("index-history", ma, "lịch sử giá dài hạn")
+        if missing:
+            return missing
+        try:
+            start = (date.fromisoformat(tu_ngay) if tu_ngay else date.min).isoformat()
+            end = (date.fromisoformat(den_ngay) if den_ngay else date.max).isoformat()
+        except (TypeError, ValueError):
+            return _missing("Ngày phải theo dạng YYYY-MM-DD.")
+        closes = [list(c) for c in record.get("closes") or [] if start <= str(c[0]) <= end]
+        issues = ((self._json("fundamentals", f"{self._symbol(ma)}.json") or {}).get("share_issues") or [])
+        return {"ma": self._symbol(ma), "nguon": record.get("source"), "lay_luc": record.get("fetched_at"), "don_vi": "nghìn đồng",
+                "dieu_chinh": False, "mat_do": "Từng phiên 2013–2017; từ 2018 chỉ giá đóng cửa cuối tháng (phiên cuối của tháng, và phiên mới nhất khi lấy)",
+                "luu_y": "Giá chưa điều chỉnh: mỗi đợt thưởng, cổ tức bằng cổ phiếu, phát hành thêm làm giá gãy xuống; không tính lợi nhuận qua "
+                         "các mốc trong su_kien_co_phieu như thể giá liền mạch. Giá ngày đã điều chỉnh gần đây: gia_ngay.",
+                "ngay_cuoi": (record.get("closes") or [[None]])[-1][0], "diem": closes,
+                "su_kien_co_phieu": [i for i in issues if start <= str(i.get("date")) <= end]}
+
     def dinh_gia_chi_so(self, chi_so="VNINDEX", ty_le="pe", so_diem=60) -> dict:
         index, ratio = str(chi_so or "").upper(), str(ty_le or "").lower()
         if index not in INDEXES or ratio not in RATIOS:

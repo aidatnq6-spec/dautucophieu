@@ -10,7 +10,8 @@ import json
 import os
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, time as time_of_day, timedelta
+from zoneinfo import ZoneInfo
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Callable
@@ -23,6 +24,8 @@ SOURCE = "vndirect:finfo"
 INDEX_SESSIONS_URL = ("https://api-finfo.vndirect.com.vn/v4/vnmarket_prices?sort=date&q=code:VNINDEX~date:gte:2013-01-01&size=9999"
                       "&fields=code,date,close")
 STALE = timedelta(days=7)
+VN = ZoneInfo("Asia/Ho_Chi_Minh")
+CLOSED_AT = time_of_day(15, 0)  # HOSE's closing auction ends 14:45; before 15:00 the day's figure is the price of the moment, not a close
 _SYMBOL = re.compile(r"^[A-Z0-9]{1,10}$")
 
 
@@ -107,6 +110,9 @@ def sync_price_history(data_dir: Path, *, get: Callable[[str], str], now: dateti
             sleep(pace)
         try:
             closes = parse_closes(get(URL.format(symbol=symbol)), symbol=symbol)
+            local = now.astimezone(VN)
+            if local.time() < CLOSED_AT:  # a run during the session keeps no price of the day still trading (owner, 26/11/2026)
+                closes = [c for c in closes if c[0] != local.date().isoformat()]
         except Exception as exc:  # noqa: BLE001 - one ticker failing must not stop the run; it is reported
             failed[symbol] = type(exc).__name__
             continue

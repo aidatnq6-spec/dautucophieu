@@ -350,3 +350,10 @@ def test_a_ticker_set_against_its_icb_sector_on_the_same_quarter(data):
     assert len(out["chi_so"]) == 16 and "không gắn nhãn tốt hay xấu" in out["luu_y"].lower()
     assert data.so_sanh_nganh("BNK")["thieu"] is True and "Ngân hàng" in data.so_sanh_nganh("BNK")["ly_do"]
     assert data.so_sanh_nganh("ZZZ")["thieu"] is True
+
+
+def test_general_ratios_warn_that_per_share_figures_use_vndirects_quarter_end_share_count(data):
+    write(data.root / "financial-ratios-general" / "BBB.json", {"symbol": "BBB", "kind": "general", "fetched_at": "t", "source": "vndirect:finfo",
+                                                               "names": {}, "quarters": {"2026-09-30": {"BVPS_AQ": "16737"}}})
+    note = data.chi_so_tai_chinh("BBB")["luu_y"]
+    assert "số cổ phiếu cuối quý" in note and "đợt thưởng" in note

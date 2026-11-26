@@ -16,6 +16,7 @@ from investment_agent.market.financial_ratios import DISPLAY, FinancialRatioStor
 from investment_agent.market.general_ratios import GENERAL_DISPLAY, GeneralRatioStore
 from investment_agent.market.report_flags import eps_jumps, outside_sales_flag
 from investment_agent.market.sector_compare import compare_sector
+from investment_agent.market.valuation_history import own_history
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.insider_deals import InsiderStore, insider_deals
 from investment_agent.market.index_valuation import INDICES, series_key
@@ -166,7 +167,24 @@ def statements(symbol: str, request: Request):
         return {**empty, "reason": "Chưa có số liệu VNDirect cho mã này (đồng bộ lúc 20:00, mỗi lượt vài mã)"}
     theirs = ValuationCheckStore(data_dir / "valuation-check").read(symbol)
     return {**table, "kind": kind, "reason": None, "valuation_check": compare_valuation(table.get("current") or {}, theirs, ttm=table.get("ttm_parent")),
-            "flags": _report_flags(data_dir, symbol) if kind is None else None}
+            "flags": _report_flags(data_dir, symbol) if kind is None else None, "own_history": _own_history(data_dir, symbol)}
+
+
+def _own_history(data_dir: Path, symbol: str) -> dict | None:
+    """P/E and P/B against the ticker's own past, as dinh_gia_lich_su works them out (owner, 26/11/2026); None without enough history."""
+    out = own_history(data_dir, symbol)
+    if out.get("thieu"):
+        return None
+    windows = out["cua_so"]
+
+    def one(kind: str) -> dict | None:
+        three, five = windows["3_nam"][kind], windows["5_nam"][kind]
+        if three.get("trung_vi") is None and five.get("trung_vi") is None:
+            return None
+        return {"now": out["hien_tai"][kind], "median_3y": three.get("trung_vi"), "median_5y": five.get("trung_vi"),
+                "lower_3y": three.get("thang_thap_hon_hien_tai")}
+    pe, pb = one("pe"), one("pb")
+    return {"date": out["ngay_cuoi"], "pe": pe, "pb": pb} if pe or pb else None
 
 
 def _sector_medians(data_dir: Path, symbol: str) -> dict | None:

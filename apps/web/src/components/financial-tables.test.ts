@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { cell, checkLines, epsNote, fixedNotes, lastN, outsideSalesNote, periodLabel, sectorColumn, withRatios } from "./financial-tables";
+import { cell, checkLines, epsNote, fixedNotes, historyCards, lastN, outsideSalesNote, periodLabel, sectorColumn, withRatios } from "./financial-tables";
 
 it("money is shown in tỷ đồng, growth with its sign, margins and returns as percentages, multiples with an x", () => {
   expect(cell("62214200000000", "money", "revenue")).toBe("62.214");
@@ -99,4 +99,14 @@ it("the sector column carries the medians of VNDirect's rows for the ticker's ow
   expect(col).toEqual({ label: "Trung vị ngành Q3/26", values: { ROAE_TR_AVG4Q: "0.0466", DSO_TR_AVG5Q: null } });
   expect(sectorColumn(null)).toBeNull();
   expect(sectorColumn(undefined)).toBeNull();
+});
+
+it("P/E and P/B are set against the ticker's own 3- and 5-year medians, only where a median exists", () => {
+  const cards = historyCards({ date: "2026-11-06", pe: { now: "10.98", median_3y: "37.02", median_5y: "28.23", lower_3y: "2/37" },
+    pb: { now: "0.99", median_3y: "1.79", median_5y: null, lower_3y: "1/37" } });
+  expect(cards).toEqual([
+    { title: "P/E so với lịch sử (06/11/2026)", value: "11,0x · 3 năm 37,0x · 5 năm 28,2x", sub: "2/37 tháng trong 3 năm thấp hơn" },
+    { title: "P/B so với lịch sử (06/11/2026)", value: "0,99x · 3 năm 1,79x · 5 năm —", sub: "1/37 tháng trong 3 năm thấp hơn" }]);
+  expect(historyCards(null)).toEqual([]);
+  expect(historyCards({ date: "2026-11-06", pe: null, pb: null })).toEqual([]);
 });

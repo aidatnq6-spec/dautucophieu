@@ -532,3 +532,20 @@ def test_a_general_companys_ratios_carry_its_sector_medians_for_the_same_quarter
     assert sector["name"] == "Bất động sản" and sector["quarter"] == "2026-09-30" and sector["peers"] == 3
     assert sector["medians"]["ROAE_TR_AVG4Q"] == "0.1" and sector["counts"]["ROAE_TR_AVG4Q"] == 3
     assert sector["medians"]["DSO_TR_AVG5Q"] is None and set(sector["medians"]) == {m["code"] for m in body["metrics"]}
+
+
+def test_statements_carry_the_tickers_own_pe_and_pb_history(tmp_path):
+    from investment_agent.market.statements import StatementStore
+    (tmp_path / "market-symbols.txt").write_text("KKK\n", encoding="utf-8")
+    (tmp_path / "industries.json").write_text(json.dumps({"as_of": "x", "source": "t", "level": 2, "sectors": {"KKK": "Bất động sản"}}), encoding="utf-8")
+    StatementStore(tmp_path / "statements").save({"symbol": "KKK", "fetched_at": "x", "source": "vndirect:finfo", "lines_version": 14,
+                                                   "quarters": {"2026-Q2": {"revenue": "10"}}, "years": {}})
+    q = {k: {"npat_parent": "25", "equity_parent": "1000", "shares": "10"} for k in ("2025-Q2", "2025-Q3", "2025-Q4", "2026-Q1", "2026-Q2")}
+    (tmp_path / "index-history").mkdir()
+    (tmp_path / "index-history" / "KKK.json").write_text(json.dumps({"symbol": "KKK", "fetched_at": "x", "source": "vndirect:finfo", "quarters": q,
+        "closes": [["2026-06-30", "0.1"], ["2026-07-31", "0.2"], ["2026-08-31", "0.3"]]}), encoding="utf-8")
+    c, clock = _app(tmp_path)
+    own = call(c, clock, "GET", "/internal/fairvalue/statements/KKK").json()["own_history"]
+    assert own["date"] == "2026-08-31"
+    assert own["pe"] == {"now": "30", "median_3y": "20", "median_5y": "20", "lower_3y": "2/3"}
+    assert own["pb"] == {"now": "3", "median_3y": "2", "median_5y": "2", "lower_3y": "2/3"}

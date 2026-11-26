@@ -1,7 +1,7 @@
 ---
 name: dautu-thitruong
-description: Bảng nhanh thị trường từ dữ liệu công khai trên máy — VN-Index, P/E và P/B của VN-Index và VN30, chỉ số châu Á, giá vàng, OMO. Dùng khi người dùng gõ /dautu-thitruong hoặc hỏi thị trường hôm nay thế nào.
-argument-hint: (không cần)
+description: "Bảng nhanh thị trường từ dữ liệu công khai trên máy — VN-Index, P/E và P/B của VN-Index và VN30, chỉ số châu Á, giá vàng, OMO. Dùng khi người dùng gõ /dautu-thitruong hoặc hỏi thị trường hôm nay thế nào."
+argument-hint: "(không cần)"
 ---
 
 # Bảng nhanh thị trường

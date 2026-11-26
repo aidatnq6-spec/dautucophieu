@@ -1,7 +1,7 @@
 ---
 name: dautu-ma
-description: Tóm tắt một mã cổ phiếu HOSE từ dữ liệu công khai trên máy — hồ sơ, giá, kết quả kinh doanh, EPS, cổ tức, sự kiện, cổ đông, giao dịch nội bộ. Dùng khi người dùng gõ /dautu-ma <MÃ> hoặc nhờ tóm tắt nhanh một mã.
-argument-hint: <MÃ> (ví dụ FPT)
+description: "Tóm tắt một mã cổ phiếu HOSE từ dữ liệu công khai trên máy — hồ sơ, giá, kết quả kinh doanh, EPS, cổ tức, sự kiện, cổ đông, giao dịch nội bộ. Dùng khi người dùng gõ /dautu-ma <MÃ> hoặc nhờ tóm tắt nhanh một mã."
+argument-hint: "<MÃ> (ví dụ FPT)"
 ---
 
 # Tóm tắt một mã: $ARGUMENTS

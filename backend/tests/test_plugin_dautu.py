@@ -37,9 +37,31 @@ def test_manifest_names_no_email_and_bundles_the_public_data_server():
 def test_each_command_names_only_tools_the_server_has(tmp_path):
     tools = server_tools(tmp_path)
     skills = sorted((PLUGIN / "skills").glob("*/SKILL.md"))
-    assert [s.parent.name for s in skills] == ["dautu-ma", "dautu-sosanh", "dautu-thitruong", "dautu-vimo"]
+    assert [s.parent.name for s in skills] == ["dautu-ma", "dautu-quy", "dautu-sosanh", "dautu-thitruong", "dautu-vimo"]
     for skill in skills:
         text = skill.read_text(encoding="utf-8")
         assert text.startswith("---\n") and f"name: {skill.parent.name}\n" in text
         named = set(re.findall(r"`([a-z_]+)`", text))
         assert named and named <= tools | {"thieu"}, (skill.parent.name, named - tools)
+
+
+def test_frontmatter_text_values_are_quoted_so_yaml_reads_them_as_strings():
+    # An unquoted value holding ": " fails to parse and the skill loads with no name or description; one opening with "[" reads as a list.
+    for skill in sorted((PLUGIN / "skills").glob("*/SKILL.md")):
+        head = skill.read_text(encoding="utf-8").split("---\n")[1]
+        fields = dict(line.split(": ", 1) for line in head.strip().splitlines())
+        assert set(fields) == {"name", "description", "argument-hint"}, skill.parent.name
+        for key in ("description", "argument-hint"):
+            value = fields[key]
+            assert value.startswith('"') and value.endswith('"') and '"' not in value[1:-1].replace('\\"', ""), (skill.parent.name, key)
+
+
+def test_chat_project_instructions_name_every_server_tool_and_nothing_else(tmp_path):
+    # docs/claude-project-instructions.md is pasted into the Claude Desktop Chat project; a new tool must be added there too.
+    text = (REPO / "docs" / "claude-project-instructions.md").read_text(encoding="utf-8")
+    block = text.split("```text\n", 1)[1].split("\n```", 1)[0]
+    tools = server_tools(tmp_path)
+    named = set(re.findall(r"\b([a-z]+(?:_[a-z]+)+)\b", block)) - {"lay_luc", "fetched_at", "as_of", "ly_do"}
+    named |= {t for t in tools if re.search(rf"\b{t}\b", block)}  # single-word tools such as omo
+    assert named == tools, named ^ tools
+    assert "dautucophieu-cong-khai" in block and "thieu" in block

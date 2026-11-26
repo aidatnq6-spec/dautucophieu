@@ -1,7 +1,7 @@
 ---
 name: dautu-sosanh
-description: So sánh hai đến bốn mã cổ phiếu HOSE cạnh nhau từ dữ liệu công khai trên máy: ngành, giá, kết quả kinh doanh, EPS, cổ tức, chỉ số tài chính. Dùng khi người dùng gõ /dautu-sosanh <MÃ1> <MÃ2> … hoặc nhờ so sánh vài mã.
-argument-hint: <MÃ1> <MÃ2> [MÃ3] [MÃ4] (ví dụ FPT CMG)
+description: "So sánh hai đến bốn mã cổ phiếu HOSE cạnh nhau từ dữ liệu công khai trên máy: ngành, giá, kết quả kinh doanh, EPS, cổ tức, chỉ số tài chính. Dùng khi người dùng gõ /dautu-sosanh <MÃ1> <MÃ2> … hoặc nhờ so sánh vài mã."
+argument-hint: "<MÃ1> <MÃ2> [MÃ3] [MÃ4] (ví dụ FPT CMG)"
 ---
 
 # So sánh: $ARGUMENTS

@@ -242,3 +242,15 @@ def test_long_prices_prefer_vndirects_adjusted_series_month_end_by_default(data)
     daily = data.lich_su_gia("BBB", tu_ngay="2024-10-16", den_ngay="2024-10-17", mat_do="ngay")
     assert daily["diem"] == [["2024-10-16", "27.349"], ["2024-10-17", "27.563"]] and daily["mat_do"].startswith("Từng phiên")
     assert data.lich_su_gia("BBB", mat_do="tuan")["thieu"] is True
+
+
+def test_dividends_paid_in_the_cash_flow_is_told_apart_from_the_dividends_shareholders_received(data):
+    note = data.bao_cao_tai_chinh("BBB")["pham_vi"]["dividends_paid"]
+    assert "cổ đông không kiểm soát" in note and "eps_co_tuc" in note
+
+
+def test_ratios_say_they_exist_only_for_banks_securities_firms_and_insurers(data):
+    # BBB has general statements, so it is a company of the general layout: say why, not just "missing"
+    assert data.chi_so_tai_chinh("BBB") == {"thieu": True, "ly_do": "Chỉ số tài chính trong kho chỉ có cho ngân hàng, công ty chứng khoán "
+                                            "và bảo hiểm; BBB là doanh nghiệp thường. Tự tính từ bao_cao_tai_chinh và ghi rõ công thức."}
+    assert data.chi_so_tai_chinh("ZZZ") == {"thieu": True, "ly_do": "Chưa có chỉ số tài chính của ZZZ trong kho."}

@@ -113,3 +113,12 @@ def test_shares_outstanding_of_many_tickers_come_in_batches():
     got = outstanding_shares([f"A{i:03d}" for i in range(250)] + ["ZZZ"], get=get)
     assert len(seen) == 2 and "ratioCode:OUTSTANDING_SHARES" in seen[0]
     assert len(got) == 250 and got["A000"] == Decimal(1000) and "ZZZ" not in got
+
+
+def test_events_keep_one_copy_of_each_event_not_the_english_twin():
+    # VNDirect sends every event twice, "<n>.VN" and "<n>.EN_GB"; summing both doubled dividends and bonus ratios (26/11/2026).
+    from investment_agent.market.providers.vndirect_data import events
+    rows = [{"id": "116624.VN", "code": "KDH", "type": "STOCKDIV", "ratio": 10.0, "effectiveDate": "2024-10-17"},
+            {"id": "116624.EN_GB", "code": "KDH", "type": "STOCKDIV", "ratio": 10.0, "effectiveDate": "2024-10-17"},
+            {"id": "a9", "code": "KDH", "type": "DIVIDEND", "dividend": 500.0, "effectiveDate": "2023-06-01"}]
+    assert [r["id"] for r in events("KDH", get=lambda url: json.dumps({"data": rows}), today=date(2026, 11, 26))] == ["116624.VN", "a9"]

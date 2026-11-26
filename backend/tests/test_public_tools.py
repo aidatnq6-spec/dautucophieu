@@ -159,7 +159,7 @@ def test_server_exposes_exactly_the_approved_read_only_tools(data):
     assert sorted(t.name for t in tools) == sorted([
         "thong_tin_ma", "gia_ngay", "dinh_gia_chi_so", "bao_cao_tai_chinh", "chi_so_tai_chinh", "eps_co_tuc", "su_kien_doanh_nghiep",
         "co_dong_ban_lanh_dao", "giao_dich_noi_bo", "danh_sach_vi_mo", "chi_bao_vi_mo", "chi_so_chau_a", "gia_vang", "omo",
-        "quy_mo", "gia_vang_lich_su", "dinh_gia_ma", "lich_su_gia"])
+        "quy_mo", "gia_vang_lich_su", "dinh_gia_ma", "lich_su_gia", "so_sanh_nganh"])
     assert all(t.annotations and t.annotations.read_only_hint for t in tools)
     assert "Ngân hàng" in result.content[0].text
 
@@ -328,6 +328,28 @@ def test_daily_long_prices_name_the_vnindex_days_the_ticker_lacks(data):
     out = data.lich_su_gia("BBB", mat_do="ngay")
     assert out["phien_thieu"] == ["2015-03-03", "2015-03-04"] and "phiên VN-Index" in out["lich_kiem"]
     assert "phien_thieu" not in data.lich_su_gia("BBB")  # month-ends are a choice of days, not sessions
+
+
+def test_a_ticker_set_against_its_icb_sector_on_the_same_quarter(data):
+    write(data.root / "hose-listing.json", {"at": "t", "listing": {"symbols": ["KKK", "PPA", "PPB", "PPC", "PPD", "BNK"],
+                                                                  "icb_codes": {"KKK": "8600", "PPA": "8600", "PPB": "8600", "PPC": "8600", "PPD": "8600", "BNK": "8300"},
+                                                                  "icb_names": {"8600": "Bất động sản", "8300": "Ngân hàng"}}})
+    for sym, roe, q in (("KKK", "0.08", "2026-09-30"), ("PPA", "0.05", "2026-09-30"), ("PPB", "0.10", "2026-09-30"), ("PPC", "0.20", "2026-09-30"),
+                        ("PPD", "0.30", "2026-06-30")):  # PPD has not reported Q3 yet: counted apart, its Q2 is not used
+        write(data.root / "financial-ratios-general" / f"{sym}.json", {"symbol": sym, "kind": "general", "fetched_at": "t", "source": "vndirect:finfo",
+                                                                      "names": {"ROAE_TR_AVG4Q": "ROAE"},
+                                                                      "quarters": {q: {"ROAE_TR_AVG4Q": roe, **({"DSO_TR_AVG5Q": "40"} if sym == "KKK" else {})}}})
+    out = data.so_sanh_nganh("kkk")
+    assert out["nganh"] == "Bất động sản" and out["quy"] == "2026-09-30" and out["so_doanh_nghiep_nganh"] == 4
+    assert out["chua_co_quy_nay"] == 1 and out["nguon"] == "vndirect:finfo"
+    roe = next(c for c in out["chi_so"] if c["ma_chi_so"] == "ROAE_TR_AVG4Q")
+    assert roe == {"ma_chi_so": "ROAE_TR_AVG4Q", "ten": "ROAE", "gia_tri": "0.08", "trung_vi": "0.1", "phan_vi_25": "0.075", "phan_vi_75": "0.15",
+                   "so_doanh_nghiep": 3, "thu_hang": "3/4 (cao xuống thấp)"}
+    dso = next(c for c in out["chi_so"] if c["ma_chi_so"] == "DSO_TR_AVG5Q")
+    assert dso["gia_tri"] == "40" and dso["trung_vi"] is None and dso["ly_do"] == "Dưới 3 doanh nghiệp cùng ngành có số quý này"
+    assert len(out["chi_so"]) == 16 and "không gắn nhãn tốt hay xấu" in out["luu_y"].lower()
+    assert data.so_sanh_nganh("BNK")["thieu"] is True and "Ngân hàng" in data.so_sanh_nganh("BNK")["ly_do"]
+    assert data.so_sanh_nganh("ZZZ")["thieu"] is True
 
 
 def test_general_ratios_warn_that_per_share_figures_use_vndirects_quarter_end_share_count(data):

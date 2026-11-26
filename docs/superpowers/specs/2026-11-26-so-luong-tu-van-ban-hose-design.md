@@ -12,12 +12,12 @@ Chủ sở hữu duyệt ngày 26/11/2026 (cách B). Nhiều báo cáo giao dị
 
 - Chỉ báo cáo đã thực hiện: tiêu đề bắt đầu bằng "Báo cáo" (kết quả giao dịch, thay đổi sở hữu của cổ đông lớn). "Thông báo giao dịch" là đăng ký, tức ý định, không đọc.
 - Chỉ báo cáo mà VNDirect thiếu chiều hoặc số lượng, của các mã đang theo dõi, đã có trong `data/insider/<MÃ>.json`.
-- Mỗi tin một tệp `data/insider-docs/<mã tin>.json`, đọc một lần (văn bản đã công bố không đổi). Lỗi tải thì lần sau đọc lại; đọc được mà không nhận số thì giữ kết quả, không đọc lại.
+- Mỗi tin một tệp `data/insider-docs/<mã tin>.json`, đọc một lần (văn bản đã công bố không đổi). Lỗi tải thì lần sau đọc lại; đọc được mà không nhận số thì giữ kết quả, không đọc lại, trừ khi bộ đọc có phiên bản mới (`reader` trong tệp): tin bộ đọc cũ không nhận được thì được đọc lại một lần; tin đã nhận số giữ nguyên.
 
 ## Khi nào nhận số (chủ sở hữu chọn: chỉ khi cộng trừ khớp)
 
 - Mỗi tệp PDF phải có đủ ba số: nắm giữ trước giao dịch, số đã giao dịch, nắm giữ sau giao dịch (của người hay nhóm thực hiện giao dịch, không phải tổng gồm người có liên quan), và trước ± đã giao dịch = sau, đúng từng cổ phiếu.
-- Số đã giao dịch nằm ở "Số lượng cổ phiếu đã giao dịch" (người nội bộ), "Số lượng cổ phiếu đã Mua/đã Bán" (tổ chức) hoặc "Số lượng cổ phiếu đã mua/bán" (nhóm cổ đông lớn). Số là số in kiểu Việt Nam có dấu chấm ngăn nghìn, hoặc 0.
+- Số đã giao dịch nằm ở "Số lượng cổ phiếu đã giao dịch" (người nội bộ), "Số lượng cổ phiếu đã Mua/đã Bán" (tổ chức) hoặc "Số lượng cổ phiếu đã mua/bán" (nhóm cổ đông lớn). Số là số in kiểu Việt Nam có dấu chấm ngăn nghìn (hoặc dấu phẩy ngăn nghìn như một số văn bản in), hoặc 0; số có dấu % là tỷ lệ, không phải số cổ phiếu. Mẫu đầy đủ (Phụ lục XV, bổ sung 26/11/2026 sau lượt đọc đầu tiên): nhãn có thể ngắt xuống dòng, nhãn số đã giao dịch có thêm "/chứng chỉ quỹ/chứng quyền có bảo đảm"; số tìm trong mục của nhãn, dừng ở nhãn "Số lượng…" kế tiếp, và không lấy dòng tổng gồm người có liên quan khi dòng của người thực hiện giao dịch để trống.
 - Chiều: lấy loại đã nêu ("Loại giao dịch đã thực hiện" hay "đã Mua/đã Bán") và chiều đó phải khớp với trước → sau; không đọc được dòng loại thì lấy chiều từ trước → sau (phép cộng trừ vẫn phải khớp). Báo cáo cổ đông lớn lấy chiều từ trước → sau.
 - Cho tặng (bổ sung 26/11/2026 sau khi đọc thử văn bản KDH): loại "Cho/tặng", "Được cho/tặng" hoặc phương thức "do cho/tặng" ghi `Cho tặng` hay `Nhận tặng`; không cộng vào mua bán, chỉ đếm số báo cáo (`gift_reports`), nên điều kiện luận điểm "người nội bộ bán" không tính.
 - Bảng của nhóm nhà đầu tư nước ngoài (bổ sung 26/11/2026): khi văn bản không có các mục trước, sau theo mẫu, đọc dòng "Tổng cả nhóm" trên dòng đó hoặc hai dòng sau; phải có đúng ba số (trước, sau, đã giao dịch, số giảm trong ngoặc) và cộng trừ khớp; ghi `rong`.

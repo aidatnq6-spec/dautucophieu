@@ -1,7 +1,9 @@
 """Giao dịch nội bộ và cổ đông lớn of a watched ticker: the notices HOSE publishes (insiders, their related persons, major
 shareholders), as listed by VNDirect's public API v4/insider_trans (robots.txt allows all user agents, use=reference). Read when
 the ticker page opens and kept in data/insider/<MÃ>.json for a day. Kind and volume are the source's; a notice without them stays
-without them, and the original notice is one link away. Public disclosures; never sent to a model.
+without them, and the original notice is one link away; what the HOSE document itself shows, read and checked by
+insider_docs, fills them when it adds up (kept apart in data/insider-docs, never written over VNDirect's record). Public
+disclosures; never sent to a model.
 """
 
 import json
@@ -11,6 +13,8 @@ from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Callable
+
+from .insider_docs import DocStore, fill_from_docs
 
 URL = "https://api-finfo.vndirect.com.vn/v4/insider_trans?q=tagCodes:{symbol}&size=100&sort=newsDate:desc"
 MAX_AGE = timedelta(days=1)
@@ -84,9 +88,11 @@ def _deals(symbol: str, payload: dict, links: dict[str, str] | None = None) -> l
 
 
 def _year(deals: list[dict], now: datetime) -> dict:
-    """Done trades over the last 12 months (registrations are intentions); results without kind or volume counted apart."""
+    """Done trades over the last 12 months (registrations are intentions); ESOP shares bought from the company, gifts between
+    people and results without kind or volume counted apart."""
     since = (now.date() - timedelta(days=365)).isoformat()
-    tally = {"since": since, "bought": 0, "buy_reports": 0, "sold": 0, "sell_reports": 0, "without_volume": 0}
+    tally = {"since": since, "bought": 0, "buy_reports": 0, "sold": 0, "sell_reports": 0, "esop": 0, "esop_reports": 0,
+             "gift_reports": 0, "without_volume": 0}
     for d in deals:
         if d["date"] < since or (d["kind"] or "").startswith("Đăng kí"):
             continue
@@ -95,24 +101,34 @@ def _year(deals: list[dict], now: datetime) -> dict:
         elif d["kind"] == "Mua":
             tally["bought"] += d["shares"]
             tally["buy_reports"] += 1
-        else:
+        elif d["kind"] == "Bán":
             tally["sold"] += d["shares"]
             tally["sell_reports"] += 1
+        elif d["kind"] == "ESOP":
+            tally["esop"] += d["shares"]
+            tally["esop_reports"] += 1
+        else:  # Cho tặng, Nhận tặng
+            tally["gift_reports"] += 1
     return tally
+
+
+def _view(store: InsiderStore, record: dict, now: datetime, stale: bool) -> dict:
+    deals = fill_from_docs(record["deals"], DocStore(store.root.parent))
+    return {**record, "deals": deals, "year": _year(deals, now), "stale": stale, "reason": None}
 
 
 def insider_deals(store: InsiderStore, symbol: str, *, get: Callable[[str], str], now: datetime) -> dict:
     saved = store.read(symbol)
     if saved and now - datetime.fromisoformat(saved["fetched_at"]) < MAX_AGE:
-        return {**saved, "year": _year(saved["deals"], now), "stale": False, "reason": None}
+        return _view(store, saved, now, False)
     try:
         payload = json.loads(get(URL.format(symbol=symbol)))
         deals = _deals(symbol, payload, _doc_links(payload, get))
     except Exception:
         if saved:
-            return {**saved, "year": _year(saved["deals"], now), "stale": True, "reason": None}
+            return _view(store, saved, now, True)
         return {"symbol": symbol, "deals": [], "year": None, "fetched_at": None, "stale": False,
                 "reason": "Không đọc được thông báo giao dịch (nguồn VNDirect lỗi)"}
     record = {"symbol": symbol, "deals": deals, "fetched_at": now.isoformat(), "source": "vndirect:finfo"}
     store.save(symbol, record)
-    return {**record, "year": _year(deals, now), "stale": False, "reason": None}
+    return _view(store, record, now, False)

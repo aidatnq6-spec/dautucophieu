@@ -292,6 +292,19 @@ def test_an_insider_notice_without_volume_points_to_its_document(data):
     assert "không có chiều mua bán và số lượng" in data.giao_dich_noi_bo("BBB")["luu_y"]
 
 
+def test_an_insider_notice_read_from_its_hose_document_carries_the_figures(data):
+    write(data.root / "insider" / "BBB.json", {"symbol": "BBB", "fetched_at": "t", "source": "vndirect:finfo", "deals": [
+        {"date": "2026-11-11", "kind": None, "shares": None, "source": "HOSE", "title": "Báo cáo kết quả ESOP", "url": None,
+         "doc_url": "https://www.hsx.vn/vi/tin-tuc/x/77"}]})
+    write(data.root / "insider-docs" / "77.json", {"news_id": "77", "read_at": "r", "reason": None,
+                                                   "result": {"kind": "ESOP", "shares": 650000, "files": 1, "rong": False, "before": 1, "after": 650001}})
+    out = data.giao_dich_noi_bo("BBB")
+    deal = out["deals"][0]
+    assert (deal["kind"], deal["shares"]) == ("ESOP", 650000) and "thieu_so_luong" not in deal
+    assert deal["tu_van_ban"] == {"truoc": 1, "sau": 650001, "so_tep": 1, "rong": False, "doc_luc": "r"}
+    assert "tu_van_ban" in out["luu_y"] and "ESOP" in out["luu_y"]
+
+
 def test_an_eps_that_moved_far_more_than_profit_is_flagged_above_three_times(data):
     write(data.root / "fundamentals" / "EEE.json", {"symbol": "EEE", "years": {
         "2022": {"npat": "1100", "eps": "1440"}, "2023": {"npat": "715", "eps": "840"}, "2024": {"npat": "810", "eps": "80"},

@@ -14,6 +14,7 @@ from pathlib import Path
 
 from investment_agent.market.price_history import read_index_sessions
 from investment_agent.market.company_notes import NOTE_GROUPS, NOTE_LABELS
+from investment_agent.market.insider_docs import DocStore, fill_from_docs
 from investment_agent.market.prices import PriceStore
 from investment_agent.market.valuation_history import own_history
 from investment_agent.market.sector_compare import compare_sector
@@ -349,13 +350,16 @@ class PublicData:
         if missing:
             return missing
         deals = []
-        for d in record.get("deals") or []:
+        for d in fill_from_docs(record.get("deals") or [], DocStore(self.root)):
             if d.get("kind") is None or d.get("shares") is None:
                 d = {**d, "thieu_so_luong": True, "van_ban": d.get("doc_url") or d.get("url")}
             deals.append(d)
         return {**record, "deals": deals,
                 "luu_y": "Báo cáo có thieu_so_luong: nguồn VNDirect không có chiều mua bán và số lượng; số lượng nằm trong văn bản công bố ở van_ban. "
-                         "Không suy ra chiều hay số lượng từ tiêu đề."}
+                         "Không suy ra chiều hay số lượng từ tiêu đề. Báo cáo có tu_van_ban: loại và số lượng đọc từ văn bản HOSE đính kèm (nhận dạng "
+                         "chữ trên máy), chỉ nhận khi số nắm giữ trước ± số đã giao dịch = số sau; rong=true là số ròng của cả nhóm cổ đông lớn; "
+                         "loại ESOP là cổ phiếu mua trực tiếp từ công ty, Cho tặng và Nhận tặng là chuyển cổ phiếu giữa các cá nhân; cả ba không phải "
+                         "mua bán trên thị trường."}
 
     # Vĩ mô và thế giới
     def _series_names(self) -> list[str]:

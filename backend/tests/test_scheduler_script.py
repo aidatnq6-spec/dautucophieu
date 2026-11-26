@@ -238,3 +238,10 @@ def test_general_company_ratios_are_refreshed_in_the_evening_slot():
     ls = lines()
     evening = next(i for i, l in enumerate(ls) if "(Get-Date).Hour -ge 20" in l)
     assert next(i for i, l in enumerate(ls) if "jobs.step general-ratios-sync --data-dir $data --limit 60" in l) > evening
+
+
+def test_insider_volumes_are_read_from_hose_documents_in_the_evening_slot_owner_26_11_2026():
+    ls = lines()
+    evening = next(i for i, l in enumerate(ls) if "(Get-Date).Hour -ge 20" in l)
+    # OCR of 30 scanned notices takes a few minutes, so the step gets 15
+    assert next(i for i, l in enumerate(ls) if "jobs.step --timeout 900 insider-docs-sync --data-dir $data --limit 30" in l) > evening

@@ -37,7 +37,7 @@ def test_notices_are_read_once_a_day_with_a_twelve_month_tally_that_counts_what_
     assert [d["date"] for d in view["deals"]] == ["2026-06-18", "2026-03-02", "2026-02-12", "2026-01-30", "2025-12-15", "2024-07-02"]
     assert view["deals"][1]["url"] is None  # only links to the VNDirect notice page
     # Done trades in the last 12 months; registrations are intentions, not trades; a result without kind or volume is counted apart.
-    assert view["year"] == {"since": "2025-10-31", "bought": 15746005, "buy_reports": 2, "sold": 2219000, "sell_reports": 1, "esop": 0, "esop_reports": 0, "gift_reports": 0, "merged_reports": 0, "without_volume": 1}
+    assert view["year"] == {"since": "2025-10-31", "bought": 15746005, "buy_reports": 2, "sold": 2219000, "sell_reports": 1, "esop": 0, "esop_reports": 0, "gift_reports": 0, "transfer_reports": 0, "merged_reports": 0, "without_volume": 1}
     insider_deals(InsiderStore(tmp_path), "ACB", get=get, now=datetime(2026, 10, 31, 20, tzinfo=timezone.utc))
     assert len(urls) == 2 and "/v4/news" in urls[1]  # the notice list and one news lookup; the second read of the day asks nothing
 

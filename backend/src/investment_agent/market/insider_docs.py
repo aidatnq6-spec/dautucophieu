@@ -21,9 +21,10 @@ LIMIT = 30
 MAX_FILES = 8
 MAX_BYTES = 15 * 1024 * 1024
 PAUSE = 1.0
-# The reader's version: a notice an older reader could not take is read again once by a newer one (2: labels broken across
-# lines, the long form, commas in counts; 26/11/2026). Taken readings are kept.
-READER = 2
+# The reader's version: every notice an older reader read is read again once by a newer one (2: labels broken across lines, the
+# long form, commas in counts; 3: negotiated transfers apart, so a transfer an older reader took for a purchase is corrected;
+# 26/11/2026). A failed fetch keeps the older reading.
+READER = 3
 _NEWS = re.compile(r"^https://(?:www\.)?hsx\.vn/.+/(\d{1,12})$")
 _ID = re.compile(r"^\d{1,12}$")
 # A share count as printed in Vietnamese ("20.623.635"), with commas as some reports print it ("564,696"), or a bare 0;
@@ -39,11 +40,13 @@ _AFTER = re.compile(r"nam\s+giu\s+sau\s+khi\s+thuc\s+\w+\s+giao\s+dich")
 _TRADED_INSIDER = re.compile(r"so\s+luong\s+co\s+phie+u(?:/chung\s+chi\s+quy/chung\s+quyen\s+co\s+bao\s+dam)?\s+da\s+giao\s+dich")
 _TRADED_GROUP = re.compile(r"so luong co phieu da mua/ban")
 _TRADED_STATED = re.compile(r"so luong co phieu da (mua|ban)\b(?!/)")  # an organisation's report: "Số lượng cổ phiếu đã Mua: 141.000"
-_KIND = re.compile(r"loai giao dich da thuc hien[^:\n]*:\s*\W*(mua|ban|duoc cho|cho)\b")
+_KIND = re.compile(r"loai giao dich da thuc hien[^:\n]*:\s*\W*(nhan chuyen nhuong|chuyen nhuong|mua|ban|duoc cho|cho)\b")
 _ESOP_METHOD = "mua truc tiep tu to chuc phat hanh"
 _GIFT_METHOD = re.compile(r"phuong thuc giao dich[^\n]*cho/tang")  # "... do cho/tặng", "... do được cho/tặng"
-# What the stated kind means: (holding goes up, kind when it is a gift)
-_STATED = {"mua": (True, None), "ban": (False, None), "duoc cho": (True, "Nhận tặng"), "cho": (False, "Cho tặng")}
+# What the stated kind means: (holding goes up, kind when it is not a trade on the exchange): a gift, or a transfer agreed between
+# two parties and settled through VSDC (owner, 26/11/2026)
+_STATED = {"mua": (True, None), "ban": (False, None), "duoc cho": (True, "Nhận tặng"), "cho": (False, "Cho tặng"),
+           "nhan chuyen nhuong": (True, "Nhận chuyển nhượng"), "chuyen nhuong": (False, "Chuyển nhượng")}
 MISSING = "thiếu số trước, đã giao dịch hoặc sau"
 
 
@@ -119,8 +122,10 @@ def parse_report(text: str, title: str) -> dict:
     if stated and (after > before) != _STATED[stated][0]:
         return {"reason": "chiều không khớp"}
     kind = "Mua" if after > before else "Bán"  # the stated kind when there is one; the figures when its line is unreadable
-    if (stated and _STATED[stated][1]) or (not stated and _GIFT_METHOD.search(plain)):
-        kind = "Nhận tặng" if after > before else "Cho tặng"  # a transfer between people, not a trade on the market
+    if stated and _STATED[stated][1]:
+        kind = _STATED[stated][1]  # a gift or a negotiated transfer, not a trade on the market
+    elif not stated and _GIFT_METHOD.search(plain):
+        kind = "Nhận tặng" if after > before else "Cho tặng"
     rong = False
     if group:
         cut = _AFTER.search(plain, label.end())
@@ -211,7 +216,7 @@ def fill_from_docs(deals: list[dict], docs: DocStore) -> list[dict]:
 
 
 def _due(rec: dict | None) -> bool:
-    return rec is None or (not rec.get("result") and rec.get("reader", 1) < READER)
+    return rec is None or rec.get("reader", 1) < READER
 
 
 def sync_insider_docs(data_dir: Path, symbols: list[str], *, read: Callable[..., dict], limit: int = LIMIT) -> dict:

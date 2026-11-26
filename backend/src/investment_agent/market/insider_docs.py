@@ -23,8 +23,9 @@ MAX_BYTES = 15 * 1024 * 1024
 PAUSE = 1.0
 # The reader's version: every notice an older reader read is read again once by a newer one (2: labels broken across lines, the
 # long form, commas in counts; 3: negotiated transfers apart, so a transfer an older reader took for a purchase is corrected;
-# 26/11/2026). A failed fetch keeps the older reading.
-READER = 3
+# 4: "g1u", gifts stated as "tặng", the traded line without "đã", total rows without separators; 26/11/2026). A failed fetch
+# keeps the older reading.
+READER = 4
 _NEWS = re.compile(r"^https://(?:www\.)?hsx\.vn/.+/(\d{1,12})$")
 _ID = re.compile(r"^\d{1,12}$")
 # A share count as printed in Vietnamese ("20.623.635"), with commas as some reports print it ("564,696"), or a bare 0;
@@ -32,20 +33,22 @@ _ID = re.compile(r"^\d{1,12}$")
 _COUNT = re.compile(r"(?<![\d.,])(\d{1,3}(?:\.\d{3})+|\d{1,3}(?:,\d{3})+|0)(?![\d.,]*\d)(?!\s*%)")
 # Where an item ends: the next line opening with an item number ("6.", "| 7.") or a bullet ("- ").
 _ITEM_END = re.compile(r"\n[|\s]*(?:\d{1,2}(?:\.\s|\s)|-\s)")  # "21.273.635" opening a line is a figure, not item 21
-# Labels may break across lines (the long form, Phụ lục XV) and OCR may misread "hien" ("bien"); "... thuc hien chung quyen"
-# (covered warrants) is another item.
-_BEFORE = re.compile(r"nam\s+giu\s+truoc\s+khi\s+thuc\s+\w+\s+giao\s+dich")
-_AFTER = re.compile(r"nam\s+giu\s+sau\s+khi\s+thuc\s+\w+\s+giao\s+dich")
-# "Số lượng cổ phiếu đã giao dịch", or in the long form "Số lượng cổ phiếu/chứng chỉ quỹ/chứng quyền có bảo đảm đã giao dịch"
-_TRADED_INSIDER = re.compile(r"so\s+luong\s+co\s+phie+u(?:/chung\s+chi\s+quy/chung\s+quyen\s+co\s+bao\s+dam)?\s+da\s+giao\s+dich")
+# Labels may break across lines (the long form, Phụ lục XV) and OCR may misread "hien" ("bien") or "giu" ("g1u"); "... thuc hien
+# chung quyen" (covered warrants) is another item.
+_BEFORE = re.compile(r"nam\s+g[i1l]u\s+truoc\s+khi\s+thuc\s+\w+\s+giao\s+dich")
+_AFTER = re.compile(r"nam\s+g[i1l]u\s+sau\s+khi\s+thuc\s+\w+\s+giao\s+dich")
+# "Số lượng cổ phiếu đã giao dịch" (some reports leave out "đã"), or in the long form "Số lượng cổ phiếu/chứng chỉ quỹ/chứng quyền
+# có bảo đảm đã giao dịch"
+_TRADED_INSIDER = re.compile(r"so\s+luong\s+co\s+phie+u(?:/chung\s+chi\s+quy/chung\s+quyen\s+co\s+bao\s+dam)?\s+(?:da\s+)?giao\s+dich")
 _TRADED_GROUP = re.compile(r"so luong co phieu da mua/ban")
 _TRADED_STATED = re.compile(r"so luong co phieu da (mua|ban)\b(?!/)")  # an organisation's report: "Số lượng cổ phiếu đã Mua: 141.000"
-_KIND = re.compile(r"loai giao dich da thuc hien[^:\n]*:\s*\W*(nhan chuyen nhuong|chuyen nhuong|mua|ban|duoc cho|cho)\b")
+_KIND = re.compile(r"loai giao dich da thuc hien[^:\n]*:\s*\W*(nhan chuyen nhuong|chuyen nhuong|mua|ban|duoc cho|duoc tang|cho|tang)\b")
 _ESOP_METHOD = "mua truc tiep tu to chuc phat hanh"
 _GIFT_METHOD = re.compile(r"phuong thuc giao dich[^\n]*cho/tang")  # "... do cho/tặng", "... do được cho/tặng"
 # What the stated kind means: (holding goes up, kind when it is not a trade on the exchange): a gift, or a transfer agreed between
 # two parties and settled through VSDC (owner, 26/11/2026)
 _STATED = {"mua": (True, None), "ban": (False, None), "duoc cho": (True, "Nhận tặng"), "cho": (False, "Cho tặng"),
+           "duoc tang": (True, "Nhận tặng"), "tang": (False, "Cho tặng"),
            "nhan chuyen nhuong": (True, "Nhận chuyển nhượng"), "chuyen nhuong": (False, "Chuyển nhượng")}
 MISSING = "thiếu số trước, đã giao dịch hoặc sau"
 
@@ -79,14 +82,16 @@ def _count(text: str, label: re.Pattern) -> tuple[int | None, re.Match | None]:
 
 
 _TOTAL = re.compile(r"tong ca nhom")
+# In a total row, also a count printed without separators ("30818296", "-5460500"), as a text layer may give it.
+_TABLE_COUNT = re.compile(r"(?<![\d.,])(\d{1,3}(?:\.\d{3})+|\d{1,3}(?:,\d{3})+|\d{4,}|0)(?![\d.,]*\d)(?!\s*%)")
 
 
 def _group_total(text: str) -> tuple[int, int, int] | None:
-    """A foreign investor group's table: the total row's three counts, before, after and traded (a decrease in brackets), on the
-    label's line or the next two; anything but exactly three counts is not taken."""
+    """A foreign investor group's table: the total row's three counts, before, after and traded (a decrease in brackets or with
+    a minus sign), on the label's line or the next two; anything but exactly three counts is not taken."""
     for m in _TOTAL.finditer(text):
         lines = text[m.end():].split("\n")[:3]
-        counts = [int(re.sub(r"[.,]", "", c)) for c in _COUNT.findall("\n".join(lines))]
+        counts = [int(re.sub(r"[.,]", "", c)) for c in _TABLE_COUNT.findall("\n".join(lines))]
         if len(counts) == 3:
             return counts[0], counts[1], counts[2]
     return None
@@ -215,6 +220,13 @@ def fill_from_docs(deals: list[dict], docs: DocStore) -> list[dict]:
     return out
 
 
+def _reportable(title: str) -> bool:
+    """A result report of a share trade: not rights to buy shares ("quyền mua cổ phiếu") nor the company buying back its own
+    shares ("mua lại cổ phiếu quỹ / ESOP"), which never add up as an insider's trade (26/11/2026)."""
+    plain = _plain(title)
+    return plain.startswith("bao cao") and "quyen mua" not in plain and "mua lai co phieu" not in plain
+
+
 def _due(rec: dict | None) -> bool:
     return rec is None or rec.get("reader", 1) < READER
 
@@ -232,8 +244,7 @@ def sync_insider_docs(data_dir: Path, symbols: list[str], *, read: Callable[...,
             continue
         for d in record.get("deals") or []:
             nid = news_id(d.get("doc_url"))
-            if (nid and nid not in seen and _lacking(d) and _plain(d.get("title") or "").startswith("bao cao")
-                    and _due(docs.read(nid))):
+            if (nid and nid not in seen and _lacking(d) and _reportable(d.get("title") or "") and _due(docs.read(nid))):
                 seen.add(nid)
                 due.append((d.get("date") or "", nid, d.get("title") or ""))
     due.sort(reverse=True)

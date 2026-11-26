@@ -348,3 +348,38 @@ def test_a_foreign_groups_table_is_read_from_its_total_row():
     # an empty total row
     assert parse_report("Tổng cả nhóm đâu tư nước ngoài có liên quan/\nTotal group oƒ affliated foreign investors\nGhi chú/Notes:\n", "Báo cáo") == {
         "reason": "thiếu số trước, đã giao dịch hoặc sau"}
+
+
+def test_a_total_row_printed_without_thousands_separators_is_read():
+    # As some foreign groups print it (a text layer, not a scan): plain integers, a decrease with a minus sign
+    row = "Tổng cả nhóm nhà đầu tư nước ngoài có liên quan/total\ngroup of affiliated foreign investors 30818296 6.02% 25357796 4.95% -5460500\n"
+    assert parse_report(row, "Báo cáo về sở hữu") == {"kind": "Bán", "shares": 5460500, "before": 30818296, "after": 25357796, "rong": True}
+    assert parse_report(row.replace("-5460500", "-5460501"), "Báo cáo") == {"reason": "cộng trừ không khớp"}
+
+
+def test_ocr_misreading_giu_and_gifts_stated_as_tang_are_read():
+    # "nắm giữ" read as "nam g1u"
+    misread = insider().replace("nắm giữ trước", "nam g1u trước").replace("nắm giữ sau khi thực hiện giao dịch của người thực hiện giao dịch/",
+                                                                         "nam g1u sau khi thực hiện giao dịch của người thực hiện giao dịch/")
+    assert parse_report(misread, "Báo cáo")["shares"] == 650000
+    # "Được tặng" / "Tặng" as the kind, and the traded line without "đã"
+    received = (insider(kind="Được tặng", before="30.000", traded="80.000", after="110.000").replace("Được tặng/Purchase", "được tặng/ be donated")
+                .replace("- Số lượng cổ phiếu đã giao dịch/Xz?ber", "- Số lượng cổ phiếu giao dịch/Xz?ber"))
+    assert parse_report(received, "Báo cáo") == {"kind": "Nhận tặng", "shares": 80000, "before": 30000, "after": 110000, "rong": False}
+    given = insider(kind="Tặng", before="153.425.288", traded="50.000", after="153.375.288").replace("Tặng/Purchase", "tặng/donate")
+    assert parse_report(given, "Báo cáo")["kind"] == "Cho tặng"
+
+
+def test_rights_and_treasury_share_reports_are_not_read(tmp_path):
+    InsiderStore(tmp_path).save("KDH", {"symbol": "KDH", "fetched_at": NOW.isoformat(), "deals": [
+        _deal("2026-11-05", "Báo cáo kết quả giao dịch quyền mua cổ phiếu của người nội bộ A", DOC.format(401)),
+        _deal("2026-11-04", "Báo cáo kết quả giao dịch mua lại cổ phiếu quỹ", DOC.format(402)),
+        _deal("2026-11-03", "Báo cáo kết quả giao dịch mua lại cổ phiếu ESOP", DOC.format(403)),
+        _deal("2026-11-02", "Báo cáo kết quả giao dịch cổ phiếu của người nội bộ B", DOC.format(404))]})
+    asked = []
+
+    def read(nid, title, **kw):
+        asked.append(nid)
+        return {"news_id": nid, "result": None, "reason": "x", "reader": READER}
+    sync_insider_docs(tmp_path, ["KDH"], read=read)
+    assert asked == ["404"]  # rights to buy shares and the company buying back its own shares are not insider share trades

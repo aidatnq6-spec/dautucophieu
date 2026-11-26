@@ -70,6 +70,13 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
         return data.dinh_gia_ma(ma)
 
     @tool
+    def so_sanh_nganh(ma: str) -> dict:
+        """Đặt một mã cạnh các doanh nghiệp cùng ngành ICB cấp 2 trên HOSE ở quý mới nhất: 16 chỉ số VNDirect (ROAE, ROIC, biên, nợ vay,
+        khả năng trả lãi, thanh toán, dòng tiền, số ngày phải thu và tồn kho, tăng trưởng, trả cổ tức), mỗi chỉ số có trung vị, tứ phân vị
+        và thứ hạng; không cho ngân hàng, bảo hiểm, chứng khoán."""
+        return data.so_sanh_nganh(ma)
+
+    @tool
     def su_kien_doanh_nghiep(ma: str) -> dict:
         """Sự kiện doanh nghiệp: cổ tức, phát hành, đại hội cổ đông, ngày chốt quyền."""
         return data.su_kien_doanh_nghiep(ma)

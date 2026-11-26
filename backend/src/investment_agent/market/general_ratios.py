@@ -23,6 +23,13 @@ CODES = ("ROAE_TR_AVG4Q", "ROAA_TR_AVG4Q", "ROIC_TR_AVG4Q", "GROSS_MARGIN_QR", "
          "CURRENT_RATIO_AQ", "QUICK_RATIO_AQ", "DEBT_TO_EQUITY_AQ", "EQUITY_TO_ASSET_AQ", "NET_CASH_TO_EQUITY_AQ", "DEBT_EBITDA",
          "INTEREST_COVERAGE_TR", "CFO_TO_SALES_TR", "DSO_TR_AVG5Q", "DIO_TR_AVG5Q", "DPO_TR_AVG5Q", "CASH_CONVERSION_CYCLE_TR_AVG5Q",
          "EPS_TR", "BVPS_AQ", "NET_SALES_TR_GRYOY", "NET_PROFIT_TR_GRYOY", "EPS_TR_GR3YR", "DIVIDEND_PAYOUT_TR")
+# Shown in Bảng số tài chính of a general company (owner, 26/11/2026; docs/superpowers/specs/2026-11-26-chi-so-doanh-nghiep-thuong-trang-ma-design.md)
+GENERAL_DISPLAY = (("ROAE_TR_AVG4Q", "ROAE", "pct1"), ("ROAA_TR_AVG4Q", "ROAA", "pct2"), ("ROIC_TR_AVG4Q", "ROIC", "pct1"),
+                   ("GROSS_MARGIN_TR", "Biên lợi nhuận gộp 4 quý", "pct1"), ("NET_MARGIN_TR", "Biên lợi nhuận ròng 4 quý", "pct1"),
+                   ("CFO_TO_SALES_TR", "Dòng tiền kinh doanh / doanh thu 4 quý", "pct1"), ("DEBT_TO_EQUITY_AQ", "Nợ vay / vốn chủ", "times"),
+                   ("CURRENT_RATIO_AQ", "Thanh toán hiện thời", "times"), ("INTEREST_COVERAGE_TR", "Khả năng trả lãi vay 4 quý", "times"),
+                   ("DSO_TR_AVG5Q", "Số ngày phải thu", "days"), ("DIO_TR_AVG5Q", "Số ngày tồn kho", "days"),
+                   ("CASH_CONVERSION_CYCLE_TR_AVG5Q", "Chu kỳ vận động vốn", "days"))
 URL = "https://api-finfo.vndirect.com.vn/v4/ratios?q=code:{symbol}~ratioCode:{codes}~reportDate:gte:{start}&sort=reportDate:desc&size=2000"
 SOURCE = "vndirect:finfo"
 STALE = timedelta(days=7)

@@ -13,6 +13,7 @@ from investment_agent.market.beta import BetaStore
 from investment_agent.market.company_people import PeopleStore, company_people
 from investment_agent.market.erp import ErpStore
 from investment_agent.market.financial_ratios import DISPLAY, FinancialRatioStore, kind_of
+from investment_agent.market.general_ratios import GENERAL_DISPLAY, GeneralRatioStore
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.insider_deals import InsiderStore, insider_deals
 from investment_agent.market.index_valuation import INDICES, series_key
@@ -414,7 +415,15 @@ def sector_ratios(symbol: str, request: Request):
         return unavailable()
     record = FinancialRatioStore(data_dir / "financial-ratios").read(sym) if sym else None
     if not record or record.get("kind") not in DISPLAY:
-        return error(404, "not_a_financial", "Chỉ có cho ngân hàng, chứng khoán, bảo hiểm trong danh sách theo dõi.")
+        general = GeneralRatioStore(data_dir).read(sym) if sym else None
+        if not general or not general.get("quarters"):
+            return error(404, "not_a_financial", "Chưa có chỉ số tài chính VNDirect cho mã này.")
+        quarters = sorted(general["quarters"])  # Chỉ số tài chính (VNDirect) of a general company (owner, 26/11/2026)
+        return {"symbol": sym, "kind": "general", "fetched_at": general.get("fetched_at"),
+                "quarters": [{"date": q, "label": f"Q{(int(q[5:7]) + 2) // 3}/{q[:4]}"} for q in quarters],
+                "metrics": [{"code": code, "label": label, "format": fmt, "values": [general["quarters"][q].get(code) for q in quarters]}
+                            for code, label, fmt in GENERAL_DISPLAY],
+                "notes": [], "notes_fetched_at": None}
     data = {q: dict(v) for q, v in record["quarters"].items()}
     rows, notes, notes_fetched_at = list(DISPLAY[record["kind"]]), [], None
     if record["kind"] == "bank":

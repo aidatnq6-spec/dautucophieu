@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { cell, periodLabel } from "./financial-tables";
 
-type Kind = "money" | "pct" | "x" | "vnd";
+type Kind = "money" | "pct" | "x" | "vnd" | "days";  // days: VNDirect's DSO, DIO and cash cycle (Chỉ số tài chính (VNDirect))
 type Row = { key: string | null; label: string; kind: "group" | Kind; indent: number; values: (string | null)[] };
 
 /** Click a row: add it, click again: remove it; at most two rows, a new one replaces the one picked earliest. */
@@ -88,8 +88,8 @@ export function linePath(values: (number | null)[], x: (i: number) => number, y:
   return d;
 }
 
-const UNIT: Record<Kind, string> = { money: "tỷ đồng", pct: "%", x: "lần", vnd: "đồng/cổ phiếu" };
-const tick = (v: number, kind: Kind) => `${v.toLocaleString("vi-VN", { maximumFractionDigits: kind === "money" || kind === "vnd" ? 0 : 1 })}${kind === "pct" ? "%" : kind === "x" ? "x" : ""}`;
+const UNIT: Record<Kind, string> = { money: "tỷ đồng", pct: "%", x: "lần", vnd: "đồng/cổ phiếu", days: "ngày" };
+const tick = (v: number, kind: Kind) => `${v.toLocaleString("vi-VN", { maximumFractionDigits: kind === "money" || kind === "vnd" || kind === "days" ? 0 : 1 })}${kind === "pct" ? "%" : kind === "x" ? "x" : kind === "days" ? " ngày" : ""}`;
 
 /** A small trend in the row's last cell, over the periods shown: bars around zero for money, a broken line for ratios. */
 export function Spark({ row, cols }: { row: Row; cols: number[] }) {

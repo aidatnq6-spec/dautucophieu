@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { cell, checkLines, fixedNotes, lastN, periodLabel } from "./financial-tables";
+import { cell, checkLines, fixedNotes, lastN, periodLabel, withRatios } from "./financial-tables";
 
 it("money is shown in tỷ đồng, growth with its sign, margins and returns as percentages, multiples with an x", () => {
   expect(cell("62214200000000", "money", "revenue")).toBe("62.214");
@@ -68,4 +68,15 @@ it("the fixed-asset group says when a ticker has not taken its lines yet and whe
   expect(fixedNotes({ fixed_assets_pending: true, finance_lease: [] })).toEqual(["Chưa đồng bộ dòng tài sản cố định, chi phí trả trước, lợi thế thương mại, nợ vay, vốn chủ sở hữu, thuế TNDN và trái phiếu chuyển đổi: các dòng này để trống đến lượt 20:00 lấy lại lịch sử của mã này."]);
   expect(fixedNotes({ fixed_assets_pending: false, finance_lease: ["2024", "2025-Q1"] })).toEqual(["Có TSCĐ thuê tài chính (không có dòng riêng) ở 2024, Q1/25."]);
   expect(fixedNotes({})).toEqual([]);
+});
+
+it("VNDirect's ratios of a general company read in days, times and percentages, as the first group of the quarters", () => {
+  expect(cell("61.4", "days", "DSO_TR_AVG5Q")).toBe("61 ngày");
+  expect(cell("-1", "days", "DSO_TR_AVG5Q")).toBe("-1 ngày");
+  const part = withRatios({ periods: ["2026-Q2", "2026-Q3"], rows: [{ key: "revenue", label: "Doanh thu", kind: "money", indent: 0, values: ["1", "2"] }] },
+    { kind: "general", quarters: [{ date: "2026-09-30", label: "Q3/2026" }],
+      metrics: [{ code: "ROAE_TR_AVG4Q", label: "ROAE", format: "pct1", values: ["0.28"] }, { code: "DSO_TR_AVG5Q", label: "Số ngày phải thu", format: "days", values: ["61.4"] }] });
+  expect(part.rows[0].label).toBe("Chỉ số tài chính (VNDirect)");
+  expect(part.rows.map((r) => r.kind)).toEqual(["group", "pct", "days", "money"]);
+  expect(part.rows[1].values).toEqual([null, "0.28"]);
 });

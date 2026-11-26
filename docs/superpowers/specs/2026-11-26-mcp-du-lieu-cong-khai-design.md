@@ -15,6 +15,7 @@ Chủ sở hữu duyệt ngày 26/11/2026: nối Claude (Claude Code và Claude 
 |---|---|---|
 | Giá và chỉ số | `thong_tin_ma`: có niêm yết HOSE không, ngành ICB, thuộc VN30/VN100 | `hose-listing.json`, `industries.json`, `index-groups.json` |
 | | `gia_ngay`: giá ngày của một mã hoặc `VNINDEX` | `prices/` |
+| | `lich_su_gia`: giá đóng cửa dài hạn từ 2013, chưa điều chỉnh, từng phiên đến 2017 rồi giá cuối tháng; kèm các đợt thưởng, cổ tức cổ phiếu, phát hành trong khoảng | `index-history/`, `fundamentals/` |
 | | `dinh_gia_chi_so`: P/E, P/B của VN-Index, VN30 | `index-valuation/` |
 | | `dinh_gia_ma`: vốn hoá, P/E, P/B, số cổ phiếu VNDirect công bố cho một mã, kèm ngày và quý lợi nhuận | `valuation-check/` (chỉ các trường của VNDirect) |
 | Báo cáo tài chính | `bao_cao_tai_chinh`: các dòng BCTC theo quý hoặc năm, kèm `ten_dong` (tên VNDirect của từng dòng, `config/statement-line-names.json`) và `pham_vi` | `statements/`, `statements-financial/` |

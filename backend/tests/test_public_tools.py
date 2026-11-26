@@ -159,7 +159,7 @@ def test_server_exposes_exactly_the_approved_read_only_tools(data):
     assert sorted(t.name for t in tools) == sorted([
         "thong_tin_ma", "gia_ngay", "dinh_gia_chi_so", "bao_cao_tai_chinh", "chi_so_tai_chinh", "eps_co_tuc", "su_kien_doanh_nghiep",
         "co_dong_ban_lanh_dao", "giao_dich_noi_bo", "danh_sach_vi_mo", "chi_bao_vi_mo", "chi_so_chau_a", "gia_vang", "omo",
-        "quy_mo", "gia_vang_lich_su", "dinh_gia_ma"])
+        "quy_mo", "gia_vang_lich_su", "dinh_gia_ma", "lich_su_gia"])
     assert all(t.annotations and t.annotations.read_only_hint for t in tools)
     assert "Ngân hàng" in result.content[0].text
 
@@ -211,3 +211,20 @@ def test_published_valuation_of_one_ticker(data):
     assert data.dinh_gia_ma("bbb") == {"ma": "BBB", "nguon": "VNDirect", "ngay": "2026-11-23", "lay_luc": "2026-11-25T13:04:50+00:00",
                                        "von_hoa": "191", "pe": "11.26", "pb": "1.02", "so_co_phieu": "1245", "quy_loi_nhuan": "2026-Q3"}
     assert data.dinh_gia_ma("ZZZ") == {"thieu": True, "ly_do": "Chưa có định giá VNDirect công bố của ZZZ trong kho."}
+
+
+def test_long_price_history_is_unadjusted_closes_with_the_share_events_that_break_it(data):
+    write(data.root / "index-history" / "BBB.json", {"symbol": "BBB", "fetched_at": "2026-11-07T08:11:50+00:00", "source": "vndirect:finfo",
+                                                     "closes": [["2016-12-30", "20.5"], ["2017-01-03", "21"], ["2024-09-30", "30"],
+                                                                ["2024-10-31", "28"], ["2026-11-06", "15.1"]]})
+    write(data.root / "fundamentals" / "BBB.json", {"symbol": "BBB", "share_issues": [{"date": "2016-07-01", "kind": "bonus", "ratio": "0.1"},
+                                                                                       {"date": "2024-10-17", "kind": "bonus", "ratio": "0.1"},
+                                                                                       {"date": "2025-01-05", "kind": "raise", "ratio": "0.2"}]})
+    out = data.lich_su_gia("bbb", tu_ngay="2017-01-01")
+    assert out["diem"] == [["2017-01-03", "21"], ["2024-09-30", "30"], ["2024-10-31", "28"], ["2026-11-06", "15.1"]]
+    assert out["don_vi"] == "nghìn đồng" and out["dieu_chinh"] is False and out["nguon"] == "vndirect:finfo"
+    assert out["ngay_cuoi"] == "2026-11-06" and out["lay_luc"] == "2026-11-07T08:11:50+00:00"
+    assert "cuối tháng" in out["mat_do"] and "chưa điều chỉnh" in out["luu_y"]
+    assert out["su_kien_co_phieu"] == [{"date": "2024-10-17", "kind": "bonus", "ratio": "0.1"}, {"date": "2025-01-05", "kind": "raise", "ratio": "0.2"}]
+    assert data.lich_su_gia("BBB", tu_ngay="ngày mai")["thieu"] is True
+    assert data.lich_su_gia("ZZZ") == {"thieu": True, "ly_do": "Chưa có lịch sử giá dài hạn của ZZZ trong kho."}

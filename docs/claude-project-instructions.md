@@ -30,6 +30,7 @@ LUÔN GHI NGUỒN
 CHỌN CÔNG CỤ
 - Hồ sơ mã (ngành, VN30/VN100): thong_tin_ma
 - Giá ngày một mã hoặc VNINDEX: gia_ngay
+- Giá dài hạn từ 2013 (chưa điều chỉnh, từ 2018 giá cuối tháng): lich_su_gia. Không tính lợi nhuận qua các đợt trong su_kien_co_phieu như thể giá liền mạch.
 - P/E, P/B của VNINDEX, VN30: dinh_gia_chi_so
 - BCTC theo quý/năm: bao_cao_tai_chinh
 - Chỉ số tài chính: chi_so_tai_chinh

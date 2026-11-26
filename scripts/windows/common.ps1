@@ -15,6 +15,15 @@ function Import-LocalEnv {
     }
 }
 
+# update-app.ps1 writes the commit it built and restarted into .next\deployed-commit. Any other build (verify.ps1, a manual one)
+# replaces .next and so drops the marker, and a merge made on this machine moves HEAD past it: either way the running app is not
+# HEAD's code and must be rebuilt and restarted (26/11/2026).
+function Test-WebDeployed([string]$webDir, [string]$head) {
+    $marker = Join-Path $webDir '.next\deployed-commit'
+    if (-not (Test-Path -LiteralPath $marker)) { return $false }
+    return (Get-Content -LiteralPath $marker -TotalCount 1).Trim() -eq $head
+}
+
 function Get-RepoPython {
     $python = Join-Path $script:RepoRoot '.venv\Scripts\python.exe'
     if (-not (Test-Path -LiteralPath $python)) { throw "Thiếu môi trường Python tại $python (chạy scripts\windows\doctor.ps1)." }

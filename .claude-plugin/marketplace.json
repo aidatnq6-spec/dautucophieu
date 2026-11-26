@@ -1,0 +1,12 @@
+{
+  "name": "dautucophieu",
+  "owner": {"name": "aidatnq6"},
+  "description": "Plugin cá nhân của ứng dụng dautucophieu, cài từ chính repo này.",
+  "plugins": [
+    {
+      "name": "dautucophieu",
+      "source": "./plugins/dautucophieu",
+      "description": "Dữ liệu công khai HOSE trên máy cho Claude: MCP chỉ đọc và lệnh tắt /dautu-ma, /dautu-thitruong, /dautu-vimo."
+    }
+  ]
+}

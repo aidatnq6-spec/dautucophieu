@@ -121,6 +121,9 @@ if ((Get-Date).Hour -ge 20) {
     # Nhac dau hieu phai thu moi: one Telegram note when a held ticker shows a receivable sign it did not show before.
     $ra = & $python -W ignore -m investment_agent.jobs.step receivable-alerts --data-dir $data 2>$null
     "$(Get-Date -Format o) receivable-alerts exit=$LASTEXITCODE $ra" | Add-Content -LiteralPath $log -Encoding UTF8
+    # Gia dai han da dieu chinh: VNDirect's adjusted daily closes since 2013 for 60 HOSE tickers a night (every listed one within a week).
+    $ph = & $python -W ignore -m investment_agent.jobs.step price-history-sync --data-dir $data --limit 60 2>$null
+    "$(Get-Date -Format o) price-history-sync exit=$LASTEXITCODE $ph" | Add-Content -LiteralPath $log -Encoding UTF8
     # Doi chieu dinh gia: VNDirect's market value, P/E and P/B of watched tickers (one public call each).
     $vc = & $python -W ignore -m investment_agent.jobs.step valuation-check-sync --data-dir $data 2>$null
     "$(Get-Date -Format o) valuation-check-sync exit=$LASTEXITCODE $vc" | Add-Content -LiteralPath $log -Encoding UTF8

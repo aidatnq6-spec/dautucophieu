@@ -225,3 +225,10 @@ def test_company_notes_follow_the_bank_notes_owner_25_11_2026():
     """Both ask Vietcap; the company notes wait 10 s before their first call, after the bank notes."""
     ls = lines()
     assert next(i for i, l in enumerate(ls) if "jobs.step bank-notes-sync" in l) < next(i for i, l in enumerate(ls) if "jobs.step company-notes-sync" in l)
+
+
+def test_adjusted_long_prices_are_refreshed_in_the_evening_slot():
+    ls = lines()
+    evening = next(i for i, l in enumerate(ls) if "(Get-Date).Hour -ge 20" in l)
+    step = next(i for i, l in enumerate(ls) if "jobs.step price-history-sync --data-dir $data --limit 60" in l)
+    assert step > evening

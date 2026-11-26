@@ -18,6 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 _SYMBOL = re.compile(r"^[A-Z0-9]{3,10}$")
 _SERIES = re.compile(r"^[a-z][a-z0-9_]{0,63}$")  # _status, _gaps… are run bookkeeping, not series
 INDEXES = ("VNINDEX", "VN30")
+MAX_DAILY = 800  # daily adjusted closes per answer
 LINE_NAMES = REPO_ROOT / "config" / "statement-line-names.json"  # each stored line's own name in VNDirect's financial_models
 # What the stored lines cover (statements.py: equity includes non-controlling interests in every layout)
 SCOPE = {"npat": "LNST của cả doanh nghiệp, gồm phần của cổ đông không kiểm soát",
@@ -115,25 +116,48 @@ class PublicData:
         return {"ma": symbol, "don_vi": last.currency, "co_so_gia": last.price_basis, "nguon": last.source_id,
                 "lay_luc": last.observed_at.isoformat(), "phien_moi_nhat_trong_kho": max(view).isoformat(), "phien": rows}
 
-    def lich_su_gia(self, ma, tu_ngay=None, den_ngay=None) -> dict:
-        """Long closes kept for VN-Index P/E before 2018 (index_history.py): VNDirect's unadjusted close, daily 2013–2017 and the month's
-        last close from 2018. The ticker's share events in the range come along, since an unadjusted series jumps at each of them."""
-        record, missing = self._per_symbol("index-history", ma, "lịch sử giá dài hạn")
-        if missing:
-            return missing
+    def lich_su_gia(self, ma, tu_ngay=None, den_ngay=None, mat_do="thang") -> dict:
+        """VNDirect's adjusted daily closes since 2013 (price_history.py) when stored, each month's last close by default; otherwise the
+        long closes kept for VN-Index P/E before 2018 (index_history.py): unadjusted, daily 2013–2017 and the month's last close from 2018.
+        The ticker's share events in the range come along either way."""
+        if mat_do not in ("thang", "ngay"):
+            return _missing("mat_do phải là thang hoặc ngay.")
+        symbol = self._symbol(ma)
+        if symbol is None:
+            return _missing("Mã không hợp lệ.")
         try:
             start = (date.fromisoformat(tu_ngay) if tu_ngay else date.min).isoformat()
             end = (date.fromisoformat(den_ngay) if den_ngay else date.max).isoformat()
         except (TypeError, ValueError):
             return _missing("Ngày phải theo dạng YYYY-MM-DD.")
+        issues = [i for i in ((self._json("fundamentals", f"{symbol}.json") or {}).get("share_issues") or []) if start <= str(i.get("date")) <= end]
+        adjusted = self._json("price-history", f"{symbol}.json")
+        if adjusted and adjusted.get("closes"):
+            rows = [list(c) for c in adjusted["closes"] if start <= str(c[0]) <= end]
+            if mat_do == "thang":
+                last = {}
+                for c in rows:
+                    last[c[0][:7]] = c
+                rows = [last[m] for m in sorted(last)]
+            else:
+                rows = rows[-MAX_DAILY:]
+            return {"ma": symbol, "nguon": adjusted.get("source"), "lay_luc": adjusted.get("fetched_at"), "don_vi": "nghìn đồng",
+                    "dieu_chinh": True,
+                    "mat_do": "Cuối tháng: phiên cuối của mỗi tháng trong khoảng" if mat_do == "thang"
+                    else f"Từng phiên, tối đa {MAX_DAILY} phiên gần nhất trong khoảng",
+                    "luu_y": "Giá đã điều chỉnh của VNDirect (adClose): VNDirect tính lại cả chuỗi sau mỗi đợt thưởng hay cổ tức cổ phiếu, "
+                             "nên so được giá qua các năm; số có thể khác giá khớp lệnh thực tế ngày đó.",
+                    "ngay_cuoi": adjusted["closes"][-1][0], "diem": rows, "su_kien_co_phieu": issues}
+        record, missing = self._per_symbol("index-history", ma, "lịch sử giá dài hạn")
+        if missing:
+            return missing
         closes = [list(c) for c in record.get("closes") or [] if start <= str(c[0]) <= end]
-        issues = ((self._json("fundamentals", f"{self._symbol(ma)}.json") or {}).get("share_issues") or [])
         return {"ma": self._symbol(ma), "nguon": record.get("source"), "lay_luc": record.get("fetched_at"), "don_vi": "nghìn đồng",
                 "dieu_chinh": False, "mat_do": "Từng phiên 2013–2017; từ 2018 chỉ giá đóng cửa cuối tháng (phiên cuối của tháng, và phiên mới nhất khi lấy)",
                 "luu_y": "Giá chưa điều chỉnh: mỗi đợt thưởng, cổ tức bằng cổ phiếu, phát hành thêm làm giá gãy xuống; không tính lợi nhuận qua "
                          "các mốc trong su_kien_co_phieu như thể giá liền mạch. Giá ngày đã điều chỉnh gần đây: gia_ngay.",
                 "ngay_cuoi": (record.get("closes") or [[None]])[-1][0], "diem": closes,
-                "su_kien_co_phieu": [i for i in issues if start <= str(i.get("date")) <= end]}
+                "su_kien_co_phieu": issues}
 
     def dinh_gia_chi_so(self, chi_so="VNINDEX", ty_le="pe", so_diem=60) -> dict:
         index, ratio = str(chi_so or "").upper(), str(ty_le or "").lower()

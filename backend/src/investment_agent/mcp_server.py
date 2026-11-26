@@ -36,10 +36,11 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
         return data.gia_ngay(ma, tu_ngay, den_ngay, so_phien)
 
     @tool
-    def lich_su_gia(ma: str, tu_ngay: str | None = None, den_ngay: str | None = None) -> dict:
-        """Giá đóng cửa dài hạn từ 2013 của một mã (nghìn đồng, CHƯA điều chỉnh; từng phiên đến 2017, từ 2018 giá cuối tháng), kèm các đợt
-        thưởng, cổ tức cổ phiếu, phát hành thêm trong khoảng để biết chỗ giá gãy."""
-        return data.lich_su_gia(ma, tu_ngay, den_ngay)
+    def lich_su_gia(ma: str, tu_ngay: str | None = None, den_ngay: str | None = None, mat_do: str = "thang") -> dict:
+        """Giá đóng cửa dài hạn từ 2013 của một mã, nghìn đồng: giá ĐÃ điều chỉnh của VNDirect khi kho có (dieu_chinh=true; mat_do "thang"
+        lấy phiên cuối mỗi tháng, "ngay" từng phiên, tối đa 800); nếu không, giá chưa điều chỉnh (dieu_chinh=false). Kèm các đợt thưởng,
+        cổ tức cổ phiếu, phát hành thêm trong khoảng."""
+        return data.lich_su_gia(ma, tu_ngay, den_ngay, mat_do)
 
     @tool
     def dinh_gia_chi_so(chi_so: str = "VNINDEX", ty_le: str = "pe", so_diem: int = 60) -> dict:

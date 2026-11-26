@@ -17,13 +17,13 @@ Mã là phần người dùng gõ sau lệnh, viết hoa. Không có mã thì h�
 5. `eps_co_tuc` với so_ky 8.
 6. `su_kien_doanh_nghiep`, `co_dong_ban_lanh_dao`, `giao_dich_noi_bo`.
 7. `dinh_gia_ma`: vốn hoá, P/E, P/B do VNDirect công bố.
-8. `lich_su_gia` từ 3 năm trước: giá cuối tháng chưa điều chỉnh, kèm các đợt thưởng hay phát hành.
+8. `lich_su_gia` từ 3 năm trước: giá cuối tháng, đã điều chỉnh khi kho có (dieu_chinh), kèm các đợt thưởng hay phát hành.
 
 ## Trình bày (tiếng Việt, gọn, bảng khi có nhiều số)
 
 1. **Hồ sơ**: ngành, nhóm chỉ số.
 2. **Giá**: phiên mới nhất trong kho, giá đóng, cao/thấp 20 phiên. Thay đổi % chỉ tính từ hai giá trong kho và ghi rõ hai phiên dùng để tính.
-   Giá 3 năm (cuối tháng, chưa điều chỉnh): nêu cao, thấp kèm tháng; có đợt thưởng hay phát hành ở giữa thì không tính % thay đổi qua đợt đó mà ghi rõ lý do.
+   Giá 3 năm (cuối tháng): nêu cao, thấp kèm tháng. Giá đã điều chỉnh thì được tính % thay đổi 1 và 3 năm (ghi hai tháng dùng để tính); giá chưa điều chỉnh mà có đợt thưởng hay phát hành ở giữa thì không tính % qua đợt đó và ghi rõ lý do.
 3. **Kết quả kinh doanh**: 4 quý gần nhất kèm cùng kỳ năm trước, và 3 năm gần nhất với các dòng có trong kho (doanh thu, lợi nhuận, dòng tiền…). Số gốc là đồng; đổi sang tỷ đồng khi trình bày và ghi đơn vị.
 4. **Định giá**: vốn hoá, P/E, P/B từ `dinh_gia_ma` kèm ngày. Thiếu thì ghi thiếu; nếu tự tính thì ghi rõ là tự tính và công thức.
 5. **EPS, cổ tức, số cổ phiếu lưu hành**; nếu có shares_check thì nêu hai nguồn đang lệch.

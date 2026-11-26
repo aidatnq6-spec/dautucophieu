@@ -228,3 +228,17 @@ def test_long_price_history_is_unadjusted_closes_with_the_share_events_that_brea
     assert out["su_kien_co_phieu"] == [{"date": "2024-10-17", "kind": "bonus", "ratio": "0.1"}, {"date": "2025-01-05", "kind": "raise", "ratio": "0.2"}]
     assert data.lich_su_gia("BBB", tu_ngay="ngày mai")["thieu"] is True
     assert data.lich_su_gia("ZZZ") == {"thieu": True, "ly_do": "Chưa có lịch sử giá dài hạn của ZZZ trong kho."}
+
+
+def test_long_prices_prefer_vndirects_adjusted_series_month_end_by_default(data):
+    write(data.root / "price-history" / "BBB.json", {"symbol": "BBB", "fetched_at": "2026-11-26T13:00:00+00:00", "source": "vndirect:finfo",
+                                                     "adjusted": True, "unit": "nghìn đồng",
+                                                     "closes": [["2024-09-27", "27.1"], ["2024-09-30", "27.3"], ["2024-10-16", "27.349"],
+                                                                ["2024-10-17", "27.563"], ["2024-10-31", "26.9"], ["2024-11-05", "26.5"]]})
+    out = data.lich_su_gia("BBB", tu_ngay="2024-09-28")
+    assert out["dieu_chinh"] is True and out["nguon"] == "vndirect:finfo" and out["lay_luc"] == "2026-11-26T13:00:00+00:00"
+    assert out["diem"] == [["2024-09-30", "27.3"], ["2024-10-31", "26.9"], ["2024-11-05", "26.5"]]  # each month's last close in range
+    assert out["ngay_cuoi"] == "2024-11-05" and "điều chỉnh" in out["luu_y"]
+    daily = data.lich_su_gia("BBB", tu_ngay="2024-10-16", den_ngay="2024-10-17", mat_do="ngay")
+    assert daily["diem"] == [["2024-10-16", "27.349"], ["2024-10-17", "27.563"]] and daily["mat_do"].startswith("Từng phiên")
+    assert data.lich_su_gia("BBB", mat_do="tuan")["thieu"] is True

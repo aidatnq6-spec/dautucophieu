@@ -15,7 +15,7 @@ Chủ sở hữu duyệt ngày 26/11/2026: nối Claude (Claude Code và Claude 
 |---|---|---|
 | Giá và chỉ số | `thong_tin_ma`: có niêm yết HOSE không, ngành ICB, thuộc VN30/VN100 | `hose-listing.json`, `industries.json`, `index-groups.json` |
 | | `gia_ngay`: giá ngày của một mã hoặc `VNINDEX` | `prices/` |
-| | `lich_su_gia`: giá đóng cửa dài hạn từ 2013, chưa điều chỉnh, từng phiên đến 2017 rồi giá cuối tháng; kèm các đợt thưởng, cổ tức cổ phiếu, phát hành trong khoảng | `index-history/`, `fundamentals/` |
+| | `lich_su_gia`: giá đóng cửa dài hạn từ 2013: giá ĐÃ điều chỉnh của VNDirect (adClose) khi `price-history/` có mã đó, cuối tháng hoặc từng phiên (tối đa 800); nếu chưa có thì giá chưa điều chỉnh của `index-history/`; kèm các đợt thưởng, cổ tức cổ phiếu, phát hành trong khoảng | `price-history/`, `index-history/`, `fundamentals/` |
 | | `dinh_gia_chi_so`: P/E, P/B của VN-Index, VN30 | `index-valuation/` |
 | | `dinh_gia_ma`: vốn hoá, P/E, P/B, số cổ phiếu VNDirect công bố cho một mã, kèm ngày và quý lợi nhuận | `valuation-check/` (chỉ các trường của VNDirect) |
 | Báo cáo tài chính | `bao_cao_tai_chinh`: các dòng BCTC theo quý hoặc năm, kèm `ten_dong` (tên VNDirect của từng dòng, `config/statement-line-names.json`) và `pham_vi` | `statements/`, `statements-financial/` |
@@ -24,6 +24,11 @@ Chủ sở hữu duyệt ngày 26/11/2026: nối Claude (Claude Code và Claude 
 | | `eps_co_tuc`: EPS, lợi nhuận, vốn chủ, cổ tức, phát hành, số cổ phiếu lưu hành | `fundamentals/` |
 | Doanh nghiệp | `su_kien_doanh_nghiep`, `co_dong_ban_lanh_dao`, `giao_dich_noi_bo` | `events/`, `company/`, `insider/` |
 | Vĩ mô và thế giới | `danh_sach_vi_mo`, `chi_bao_vi_mo`, `chi_so_chau_a`, `gia_vang`, `gia_vang_lich_su` (giá mua theo ngày), `omo` | `macro/`, `gold-price.json`, `gold-price-history.json`, `omo.json` |
+
+## Giá dài hạn đã điều chỉnh (26/11/2026)
+
+- `price-history-sync` lưu `adClose` từng phiên từ 02/01/2013 của mọi mã trong danh sách HOSE (không chỉ mã theo dõi), mỗi mã một lần gọi, tải lại cả chuỗi vì VNDirect tính lại giá điều chỉnh sau mỗi đợt thưởng.
+- Lịch 20:00: 60 mã mỗi tối, mã chưa có trước rồi mã cũ hơn 7 ngày; cả danh sách được làm mới trong khoảng một tuần. Trả về rỗng thì giữ dữ liệu cũ.
 
 ## Quy tắc trả lời
 

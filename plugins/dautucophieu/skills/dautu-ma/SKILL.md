@@ -13,7 +13,7 @@ Mã là phần người dùng gõ sau lệnh, viết hoa. Không có mã thì h�
 1. `thong_tin_ma`: niêm yết HOSE, ngành ICB, VN30/VN100.
 2. `gia_ngay` với so_phien 20.
 3. `bao_cao_tai_chinh` với ky "quy", so_ky 8 (đủ để so cùng kỳ năm trước); thêm ky "nam", so_ky 3.
-4. `chi_so_tai_chinh` với so_ky 4 (chỉ ngân hàng, chứng khoán, bảo hiểm có số).
+4. `chi_so_tai_chinh` với so_ky 4: ROAE, ROIC, biên lợi nhuận, nợ vay/vốn chủ, khả năng trả lãi… theo tên ở ten_chi_so.
 5. `eps_co_tuc` với so_ky 8.
 6. `su_kien_doanh_nghiep`, `co_dong_ban_lanh_dao`, `giao_dich_noi_bo`.
 7. `dinh_gia_ma`: vốn hoá, P/E, P/B do VNDirect công bố.

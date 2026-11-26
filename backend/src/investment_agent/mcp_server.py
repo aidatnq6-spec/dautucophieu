@@ -55,7 +55,8 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
 
     @tool
     def chi_so_tai_chinh(ma: str, so_ky: int = 8) -> dict:
-        """Chỉ số tài chính theo quý (nguồn VNDirect), CHỈ cho ngân hàng, công ty chứng khoán, bảo hiểm; doanh nghiệp thường không có."""
+        """Chỉ số tài chính theo quý do VNDirect tính: bộ ngành cho ngân hàng, chứng khoán, bảo hiểm; với doanh nghiệp thường là ROAE, ROIC,
+        các biên lợi nhuận, nợ vay/vốn chủ, khả năng trả lãi, số ngày phải thu, tồn kho, phải trả… kèm ten_chi_so là tên VNDirect."""
         return data.chi_so_tai_chinh(ma, so_ky)
 
     @tool

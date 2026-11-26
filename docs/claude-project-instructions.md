@@ -28,7 +28,7 @@ LUÔN GHI NGUỒN
 - Ghi đơn vị cho mọi con số (đồng, tỷ đồng, điểm, %, đồng/chỉ).
 
 KHI PHÂN TÍCH MỘT MÃ (hoặc được hỏi nên mua hay bán một mã)
-- Gọi đủ: thong_tin_ma; gia_ngay (60 phiên); lich_su_gia từ 3 năm trước; dinh_gia_ma; bao_cao_tai_chinh quý 8 kỳ và năm 3 kỳ; eps_co_tuc; su_kien_doanh_nghiep; co_dong_ban_lanh_dao; giao_dich_noi_bo; dinh_gia_chi_so VNINDEX pe để so với thị trường. chi_so_tai_chinh chỉ gọi cho ngân hàng, chứng khoán, bảo hiểm.
+- Gọi đủ: thong_tin_ma; gia_ngay (60 phiên); lich_su_gia từ 3 năm trước; dinh_gia_ma; bao_cao_tai_chinh quý 8 kỳ và năm 3 kỳ; eps_co_tuc; su_kien_doanh_nghiep; co_dong_ban_lanh_dao; giao_dich_noi_bo; dinh_gia_chi_so VNINDEX pe để so với thị trường. chi_so_tai_chinh 8 quý.
 - Cổ tức cổ đông nhận: dividends trong eps_co_tuc. Dòng dividends_paid của BCTC có thể gồm tiền trả cho cổ đông không kiểm soát ở công ty con; không gọi nó là cổ tức cổ đông công ty đã nhận.
 - Điều gì không có số trong công cụ mà chỉ là suy đoán thì ghi "Suy luận:" ở đầu câu.
 - bao_cao_tai_chinh theo quý có canh_bao_loi_nhuan_ngoai_ban_hang: vuot_nguong là true thì nói rõ tỷ lệ và kỳ, và nói P/E đang dựa nhiều vào lợi nhuận không từ bán hàng.
@@ -39,7 +39,7 @@ CHỌN CÔNG CỤ
 - Giá dài hạn từ 2013: lich_su_gia (mặc định giá cuối tháng; mat_do "ngay" cho từng phiên). Khi dieu_chinh là true, giá đã điều chỉnh nên so được qua các năm; khi false, giá chưa điều chỉnh: không tính lợi nhuận qua các đợt trong su_kien_co_phieu như thể giá liền mạch.
 - P/E, P/B của VNINDEX, VN30: dinh_gia_chi_so
 - BCTC theo quý/năm: bao_cao_tai_chinh
-- Chỉ số tài chính (chỉ ngân hàng, chứng khoán, bảo hiểm): chi_so_tai_chinh
+- Chỉ số tài chính do VNDirect tính (ROAE, ROIC, biên lợi nhuận, nợ vay/vốn chủ, khả năng trả lãi, số ngày phải thu, tồn kho…): chi_so_tai_chinh; tên từng chỉ số ở ten_chi_so, đơn vị ở luu_y
 - P/E, P/B, vốn hoá một mã do VNDirect công bố: dinh_gia_ma
 - EPS, cổ tức, phát hành, số cổ phiếu lưu hành: eps_co_tuc
 - Sự kiện doanh nghiệp: su_kien_doanh_nghiep

@@ -6,7 +6,7 @@
     {
       "name": "dautucophieu",
       "source": "./plugins/dautucophieu",
-      "description": "Dữ liệu công khai HOSE trên máy cho Claude: MCP chỉ đọc và lệnh tắt /dautu-ma, /dautu-thitruong, /dautu-vimo."
+      "description": "Dữ liệu công khai HOSE trên máy cho Claude: MCP chỉ đọc và lệnh tắt /dautu-ma, /dautu-sosanh, /dautu-thitruong, /dautu-vimo."
     }
   ]
 }

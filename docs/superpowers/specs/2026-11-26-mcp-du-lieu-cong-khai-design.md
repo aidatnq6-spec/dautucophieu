@@ -17,10 +17,11 @@ Chủ sở hữu duyệt ngày 26/11/2026: nối Claude (Claude Code và Claude 
 | | `gia_ngay`: giá ngày của một mã hoặc `VNINDEX` | `prices/` |
 | | `dinh_gia_chi_so`: P/E, P/B của VN-Index, VN30 | `index-valuation/` |
 | Báo cáo tài chính | `bao_cao_tai_chinh`: các dòng BCTC theo quý hoặc năm | `statements/`, `statements-financial/` |
+| Quỹ mở | `quy_mo`: danh sách quỹ và NAV; một quỹ: hồ sơ, lịch sử NAV, danh mục công bố. Không trả điểm quỹ do ứng dụng tự chấm (`fund-scores.json`) | `fund-nav.json`, `fund-nav-history.json`, `fund-holdings.json` (Fmarket) |
 | | `chi_so_tai_chinh`: chỉ số theo quý | `financial-ratios/` |
 | | `eps_co_tuc`: EPS, lợi nhuận, vốn chủ, cổ tức, phát hành, số cổ phiếu lưu hành | `fundamentals/` |
 | Doanh nghiệp | `su_kien_doanh_nghiep`, `co_dong_ban_lanh_dao`, `giao_dich_noi_bo` | `events/`, `company/`, `insider/` |
-| Vĩ mô và thế giới | `danh_sach_vi_mo`, `chi_bao_vi_mo`, `chi_so_chau_a`, `gia_vang`, `omo` | `macro/`, `gold-price.json`, `omo.json` |
+| Vĩ mô và thế giới | `danh_sach_vi_mo`, `chi_bao_vi_mo`, `chi_so_chau_a`, `gia_vang`, `gia_vang_lich_su` (giá mua theo ngày), `omo` | `macro/`, `gold-price.json`, `gold-price-history.json`, `omo.json` |
 
 ## Quy tắc trả lời
 
@@ -40,6 +41,7 @@ Chủ sở hữu duyệt ngày 26/11/2026: nối Claude (Claude Code và Claude 
 | Lệnh | Việc |
 |---|---|
 | `/dautu-ma <MÃ>` | Hồ sơ, giá 20 phiên, BCTC 4 quý và 3 năm, chỉ số, EPS, cổ tức, sự kiện, cổ đông, giao dịch nội bộ, mục thiếu, nguồn |
+| `/dautu-sosanh <MÃ1> <MÃ2> …` | 2–4 mã cạnh nhau: ngành, giá, KQKD 3 năm, EPS, cổ tức, chỉ số chung; không xếp hạng nên mua mã nào |
 | `/dautu-thitruong` | VN-Index, P/E và P/B của VN-Index và VN30, châu Á, vàng, OMO |
 | `/dautu-vimo [chủ đề]` | Chỉ báo vĩ mô theo chủ đề hoặc bộ mặc định, kèm trạng thái cập nhật |
 

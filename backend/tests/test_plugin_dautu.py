@@ -37,7 +37,7 @@ def test_manifest_names_no_email_and_bundles_the_public_data_server():
 def test_each_command_names_only_tools_the_server_has(tmp_path):
     tools = server_tools(tmp_path)
     skills = sorted((PLUGIN / "skills").glob("*/SKILL.md"))
-    assert [s.parent.name for s in skills] == ["dautu-ma", "dautu-thitruong", "dautu-vimo"]
+    assert [s.parent.name for s in skills] == ["dautu-ma", "dautu-sosanh", "dautu-thitruong", "dautu-vimo"]
     for skill in skills:
         text = skill.read_text(encoding="utf-8")
         assert text.startswith("---\n") and f"name: {skill.parent.name}\n" in text

@@ -254,3 +254,20 @@ def test_ratios_say_they_exist_only_for_banks_securities_firms_and_insurers(data
     assert data.chi_so_tai_chinh("BBB") == {"thieu": True, "ly_do": "Chỉ số tài chính trong kho chỉ có cho ngân hàng, công ty chứng khoán "
                                             "và bảo hiểm; BBB là doanh nghiệp thường. Tự tính từ bao_cao_tai_chinh và ghi rõ công thức."}
     assert data.chi_so_tai_chinh("ZZZ") == {"thieu": True, "ly_do": "Chưa có chỉ số tài chính của ZZZ trong kho."}
+
+
+def test_a_quarter_whose_profit_comes_mostly_from_outside_sales_is_flagged_above_thirty_percent(data):
+    quarters = {"2025-Q4": {"pbt": "100", "fin_income": "5", "other_profit": "0"}, "2026-Q1": {"pbt": "100", "fin_income": "5", "other_profit": "5"},
+                "2026-Q2": {"pbt": "1000", "fin_income": "900", "other_profit": "0"}, "2026-Q3": {"pbt": "100", "fin_income": "20", "other_profit": "5"}}
+    write(data.root / "statements" / "KKK.json", {"symbol": "KKK", "fetched_at": "x", "source": "vndirect:finfo", "quarters": quarters, "years": {}})
+    flag = data.bao_cao_tai_chinh("KKK", so_ky=1)["canh_bao_loi_nhuan_ngoai_ban_hang"]
+    assert flag["nguong"] == "0.3" and flag["cong_thuc"] == "(fin_income + other_profit) / pbt"
+    assert flag["quy_gan_nhat"] == {"ky": "2026-Q3", "ty_le": "0.25", "vuot_nguong": False}
+    assert flag["bon_quy"] == {"ky": ["2025-Q4", "2026-Q1", "2026-Q2", "2026-Q3"], "ty_le": "0.7231", "vuot_nguong": True}  # (5+10+900+25) / 1300
+    write(data.root / "statements" / "LLL.json", {"symbol": "LLL", "fetched_at": "x", "source": "vndirect:finfo",
+                                                  "quarters": {"2026-Q3": {"pbt": "-5", "fin_income": "3", "other_profit": "0"}}, "years": {}})
+    loss = data.bao_cao_tai_chinh("LLL")["canh_bao_loi_nhuan_ngoai_ban_hang"]
+    assert loss["quy_gan_nhat"] == {"ky": "2026-Q3", "ty_le": None, "vuot_nguong": None, "ly_do": "LNTT không dương"}
+    assert loss["bon_quy"] == {"ky": ["2026-Q3"], "ty_le": None, "vuot_nguong": None, "ly_do": "Chưa đủ 4 quý"}
+    assert "canh_bao_loi_nhuan_ngoai_ban_hang" not in data.bao_cao_tai_chinh("KKK", ky="nam")
+    assert "canh_bao_loi_nhuan_ngoai_ban_hang" not in data.bao_cao_tai_chinh("AAA")  # banks: their income is financial by nature

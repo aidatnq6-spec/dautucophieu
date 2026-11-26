@@ -36,6 +36,7 @@ Chủ sở hữu duyệt ngày 26/11/2026: nối Claude (Claude Code và Claude 
 - Tệp không lưu thời điểm lấy (P/E và P/B chỉ số, lịch sử giá vàng, OMO) thì trả `tep_cap_nhat_luc`: giờ ghi tệp gần nhất (UTC), là lúc ứng dụng ghi chứ không phải lúc nguồn công bố.
 - Phạm vi (26/11/2026): `npat` của dữ liệu cơ bản là LNST công ty mẹ; `equity` ở mọi nơi gồm lợi ích cổ đông không kiểm soát, nên `eps_co_tuc` trả thêm `loi_ich_thieu_so` cùng kỳ và `chu_thich`.
 - `dividends_paid` (lưu chuyển tiền tệ hợp nhất) có thể gồm tiền trả cho cổ đông không kiểm soát; `pham_vi` nói rõ, cổ tức cổ đông nhận lấy từ `eps_co_tuc`. `chi_so_tai_chinh` của doanh nghiệp thường trả lý do: kho chỉ có chỉ số cho ngân hàng, chứng khoán, bảo hiểm.
+- Lợi nhuận phần lớn không đến từ bán hàng (chủ sở hữu duyệt 26/11/2026): `bao_cao_tai_chinh` theo quý của doanh nghiệp thường trả `canh_bao_loi_nhuan_ngoai_ban_hang` = (doanh thu tài chính + lợi nhuận khác) ÷ LNTT cho quý gần nhất và tổng 4 quý, cờ khi trên 30%; không tính công ty liên kết; LNTT không dương thì không tính và ghi lý do. Ngày duyệt: 19/42 doanh nghiệp thường vượt ngưỡng.
 - Thiếu thì trả `{"thieu": true, "ly_do": "…"}`, ví dụ "chưa có tệp" hoặc "mã không hợp lệ".
 - Mã chứng khoán chỉ gồm chữ in hoa và số, 3–10 ký tự. Tên chỉ báo vĩ mô phải nằm trong danh sách đang có.
 

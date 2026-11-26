@@ -159,7 +159,7 @@ def test_server_exposes_exactly_the_approved_read_only_tools(data):
     assert sorted(t.name for t in tools) == sorted([
         "thong_tin_ma", "gia_ngay", "dinh_gia_chi_so", "bao_cao_tai_chinh", "chi_so_tai_chinh", "eps_co_tuc", "su_kien_doanh_nghiep",
         "co_dong_ban_lanh_dao", "giao_dich_noi_bo", "danh_sach_vi_mo", "chi_bao_vi_mo", "chi_so_chau_a", "gia_vang", "omo",
-        "quy_mo", "gia_vang_lich_su", "dinh_gia_ma", "lich_su_gia", "so_sanh_nganh", "thuyet_minh"])
+        "quy_mo", "gia_vang_lich_su", "dinh_gia_ma", "lich_su_gia", "so_sanh_nganh", "thuyet_minh", "dinh_gia_lich_su"])
     assert all(t.annotations and t.annotations.read_only_hint for t in tools)
     assert "Ngân hàng" in result.content[0].text
 
@@ -385,6 +385,27 @@ def test_a_published_valuation_says_which_price_it_rests_on_and_how_far_the_late
     assert out["lech_gia"] == "-0.499" and "5%" in out["luu_y"]  # (1002 − 2000) ÷ 2000
 
 
+def test_a_tickers_own_pe_and_pb_history_by_month_end_with_medians_robust_to_tiny_profits(data):
+    # 4 quarters' parent profit 100, parent equity 1000, 10 shares: P/E = 100 × close, P/B = 10 × close (close in thousand đồng)
+    q = {k: {"npat_parent": "25", "equity_parent": "1000", "shares": "10"} for k in ("2025-Q1", "2025-Q2", "2025-Q3", "2025-Q4", "2026-Q1")}
+    q["2026-Q2"] = {"npat_parent": "-200", "equity_parent": "1000", "shares": "10"}  # four quarters to Q2/2026 lose money
+    write(data.root / "index-history" / "BBB.json", {"symbol": "BBB", "fetched_at": "2026-11-07T08:11:50+00:00", "source": "vndirect:finfo", "quarters": q,
+                                                     "closes": [["2025-05-30", "0.5"],   # Q1/2025 is out (15/05) but Q2–Q4/2024 are missing
+                                                                ["2026-06-30", "0.1"], ["2026-07-31", "0.2"], ["2026-08-31", "0.3"]]})
+    # a 10% bonus issue on 15/07/2026, after both quarters those months rest on: the close has fallen with it, so the shares must rise with it
+    write(data.root / "fundamentals" / "BBB.json", {"symbol": "BBB", "share_issues": [{"date": "2026-07-15", "kind": "bonus", "ratio": "0.1"},
+                                                                                      {"date": "2026-07-20", "kind": "raise", "ratio": "0.2"}]})
+    out = data.dinh_gia_lich_su("bbb")
+    pe, pb = out["cua_so"]["3_nam"]["pe"], out["cua_so"]["3_nam"]["pb"]
+    assert pe["so_thang"] == 2 and pe["trung_vi"] == "16" and pe["bo_qua_lo"] == 1 and pe["bo_qua_thieu"] == 1  # 10 and 0.2 × 1000 × 11 ÷ 100 = 22
+    assert (pe["thap_nhat"], pe["cao_nhat"]) == ("10", "22")
+    assert pb["so_thang"] == 3 and pb["trung_vi"] == "2.2" and pb["bo_qua_thieu"] == 1
+    assert out["hien_tai"] == {"ngay": "2026-08-31", "pe": None, "pb": "3.3"} and pb["thang_thap_hon_hien_tai"] == "2/3"
+    assert "thưởng" in out["cong_thuc"]
+    assert out["ngay_cuoi"] == "2026-08-31" and "45 ngày" in out["cong_thuc"] and "tự tính" in out["nguon"]
+    assert data.dinh_gia_lich_su("ZZZ")["thieu"] is True
+
+
 def test_every_time_the_tools_give_is_in_vietnam_time():
     from investment_agent.public_tools import vn_times
     out = vn_times({"lay_luc": "2026-11-26T08:30:05.123456+00:00", "fetched_at": "2026-11-25T13:04:50+00:00", "ngay": "2026-11-23",
@@ -410,3 +431,9 @@ def test_fewer_daily_sessions_than_asked_point_to_the_long_daily_series(data):
     out = data.gia_ngay("VNINDEX", so_phien=60)
     assert len(out["phien"]) == 3 and "2026-11-02" in out["luu_y"] and "lich_su_gia" in out["luu_y"]
     assert "luu_y" not in data.gia_ngay("VNINDEX", so_phien=2)
+
+
+def test_every_tool_answer_goes_through_vietnam_time():
+    import re as _re
+    source = (SRC / "mcp_server.py").read_text(encoding="utf-8")
+    assert not _re.findall(r"^\s+return data\.", source, flags=_re.M)  # a new tool must wrap its answer in vn_times too

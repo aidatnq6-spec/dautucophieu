@@ -16,7 +16,7 @@ Mã là phần người dùng gõ sau lệnh, viết hoa. Không có mã thì h�
 4. `chi_so_tai_chinh` với so_ky 4: ROAE, ROIC, biên lợi nhuận, nợ vay/vốn chủ, khả năng trả lãi… theo tên ở ten_chi_so.
 5. `eps_co_tuc` với so_ky 8.
 6. `su_kien_doanh_nghiep`, `co_dong_ban_lanh_dao`, `giao_dich_noi_bo`.
-7. `dinh_gia_ma`: vốn hoá, P/E, P/B do VNDirect công bố; `so_sanh_nganh`: vị trí của mã trong ngành ICB.
+7. `dinh_gia_ma`: vốn hoá, P/E, P/B do VNDirect công bố; `so_sanh_nganh`: vị trí của mã trong ngành ICB; `dinh_gia_lich_su`: P/E, P/B so với 3 và 5 năm của chính mã.
 9. `thuyet_minh` 4 quý: khoản nào làm doanh thu, chi phí tài chính hay nợ vay đổi lớn.
 8. `lich_su_gia` từ 3 năm trước: giá cuối tháng, đã điều chỉnh khi kho có (dieu_chinh), kèm các đợt thưởng hay phát hành.
 

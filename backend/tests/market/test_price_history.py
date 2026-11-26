@@ -79,3 +79,15 @@ def test_vnindex_sessions_since_2013_are_kept_as_a_list_of_days(tmp_path):
     assert read_index_sessions(tmp_path) == {"source": "vndirect:finfo", "fetched_at": NOW.isoformat(), "dates": ["2013-01-02", "2013-01-03"]}
     assert sync_index_sessions(tmp_path, get=lambda url: json.dumps({"data": []}), now=NOW) == {"status": "empty", "sessions": 0}
     assert read_index_sessions(tmp_path)["dates"] == ["2013-01-02", "2013-01-03"]  # an empty answer keeps what was stored
+
+
+def test_a_run_before_the_close_keeps_no_price_of_the_session_still_trading(tmp_path):
+    # 26/11/2026 13:46 in Hà Nội: VNDirect already lists 26/11 at the price of the moment, which is no close (owner, 26/11/2026)
+    _listing(tmp_path, [])
+    midday = datetime(2026, 11, 26, 6, 46, tzinfo=timezone.utc)
+    get = lambda url: rows("KDH", [("2026-11-25", 14.95), ("2026-11-26", 14.3)])  # noqa: E731
+    sync_price_history(tmp_path, get=get, now=midday, symbols=["KDH"], sleep=lambda s: None)
+    assert PriceHistoryStore(tmp_path).read("KDH")["closes"] == [["2026-11-25", "14.95"]]
+    evening = datetime(2026, 11, 26, 13, 0, tzinfo=timezone.utc)  # 20:00 in Hà Nội: the session is closed
+    sync_price_history(tmp_path, get=get, now=evening, symbols=["KDH"], sleep=lambda s: None)
+    assert PriceHistoryStore(tmp_path).read("KDH")["closes"][-1] == ["2026-11-26", "14.3"]

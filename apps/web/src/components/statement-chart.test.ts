@@ -25,6 +25,7 @@ it("a growth row is named after the line it measures", () => {
 it("money plots in tỷ đồng, ratios in percent, multiples as they are; a missing value stays missing", () => {
   expect(plotValue("4058000000000", "money")).toBe(4058);
   expect(plotValue("0.186", "pct")).toBeCloseTo(18.6);
+  expect(plotValue("61.4", "days")).toBe(61.4);  // days are plotted as they are
   expect(plotValue("13.14", "x")).toBe(13.14);
   expect(plotValue("400000000", "money")).toBe(0);  // what the table shows: under half a tỷ is 0, so the spark draws no bar
   expect(plotValue("-2600000000", "money")).toBe(-3);

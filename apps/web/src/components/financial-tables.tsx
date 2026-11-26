@@ -52,6 +52,20 @@ export function epsNote(years: { nam: string }[] | null | undefined): string | n
     + "có thể là lỗi nguồn hoặc phát hành nhiều cổ phiếu; số giữ nguyên như VNDirect.";
 }
 
+// P/E, P/B so với lịch sử (26/11/2026): the ticker's own month-end P/E and P/B, worked out as dinh_gia_lich_su does
+type OwnOne = { now: string | null; median_3y: string | null; median_5y: string | null; lower_3y: string | null } | null;
+export type OwnHistory = { date: string; pe: OwnOne; pb: OwnOne } | null;
+
+export function historyCards(h: OwnHistory | undefined): { title: string; value: string; sub: string | null }[] {
+  if (!h) return [];
+  const day = h.date.split("-").reverse().join("/");
+  const fmt = (v: string | null, places: number) => (v === null ? "—" : `${Number(v).toLocaleString("vi-VN", { minimumFractionDigits: places, maximumFractionDigits: places })}x`);
+  return ([["P/E", h.pe, 1], ["P/B", h.pb, 2]] as const).flatMap(([name, o, places]) => !o || (o.median_3y === null && o.median_5y === null) ? [] : [{
+    title: `${name} so với lịch sử (${day})`,
+    value: `${fmt(o.now, places)} · 3 năm ${fmt(o.median_3y, places)} · 5 năm ${fmt(o.median_5y, places)}`,
+    sub: o.lower_3y ? `${o.lower_3y} tháng trong 3 năm thấp hơn` : null }]);
+}
+
 export type PeContext = { quarter: string; year_ago: string; ttm: string; ttm_year_ago: string; change: string | null; kind: "earnings_drop" | "earnings_spike" | "loss" | null };
 const quarterText = (p: string) => `Q${p.slice(-1)}/${p.slice(0, 4)}`;
 const share = (v: string) => `${(Math.abs(Number(v)) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 0 })}%`;
@@ -200,6 +214,7 @@ export function FinancialTables({ symbol }: { symbol: string }) {
   const note = peNote(pe), calm = peCalm(pe);
   const flags = (data as { flags?: { outside_sales: OutsideSales; eps: { nam: string }[] } | null }).flags ?? null;
   const outside = outsideSalesNote(flags?.outside_sales ?? null), epsWarn = epsNote(flags?.eps);
+  const own = historyCards((data as { own_history?: OwnHistory }).own_history ?? null);
   const extra = view === "quarters" && forecast?.quarter && Object.keys(forecast.values).length ? { label: `${periodLabel(forecast.quarter)}F`, values: forecast.values } : null;
   return (
     <div className="ft">
@@ -215,6 +230,8 @@ export function FinancialTables({ symbol }: { symbol: string }) {
           <span className="caption">ROIC vận hành 4 quý</span><strong>{cell(s.roic ?? null, "pct", null)}</strong></div>
         <div><span className="caption">P/E · P/B · EV/EBITDA {s.close_date ? `(giá ${s.close_date.split("-").reverse().join("/")})` : ""}</span>
           <strong>{cell(s.pe, "x", null)} · {cell(s.pb, "x", null)} · {cell(s.ev_ebitda, "x", null)}</strong></div>
+        {own.map((o) => <div key={o.title} title="Tự tính mỗi cuối tháng: vốn hóa (giá chưa điều chỉnh × số cổ phiếu của quý đã công bố, cộng các đợt thưởng sau quý) ÷ LNST công ty mẹ 4 quý hoặc vốn chủ công ty mẹ; trung vị, không dùng trung bình">
+          <span className="caption">{o.title}</span><strong>{o.value}</strong>{o.sub && <span className="caption">{o.sub}</span>}</div>)}
       </div>}
       <div className="pb-head">
         <span className="pb-toggle" role="radiogroup" aria-label="Kỳ">{(["quarters", "years"] as const).map((v) =>

@@ -26,6 +26,7 @@ Chủ sở hữu duyệt ngày 26/11/2026: nối Claude (Claude Code và Claude 
 ## Quy tắc trả lời
 
 - Số giữ nguyên chuỗi như trong kho, kèm nguồn và thời điểm lấy. Không nội suy, không tính thêm.
+- Tệp không lưu thời điểm lấy (P/E và P/B chỉ số, lịch sử giá vàng, OMO) thì trả `tep_cap_nhat_luc`: giờ ghi tệp gần nhất (UTC), là lúc ứng dụng ghi chứ không phải lúc nguồn công bố.
 - Thiếu thì trả `{"thieu": true, "ly_do": "…"}`, ví dụ "chưa có tệp" hoặc "mã không hợp lệ".
 - Mã chứng khoán chỉ gồm chữ in hoa và số, 3–10 ký tự. Tên chỉ báo vĩ mô phải nằm trong danh sách đang có.
 

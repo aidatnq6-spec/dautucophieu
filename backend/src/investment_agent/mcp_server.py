@@ -37,7 +37,7 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
 
     @tool
     def dinh_gia_chi_so(chi_so: str = "VNINDEX", ty_le: str = "pe", so_diem: int = 60) -> dict:
-        """P/E hoặc P/B theo ngày của VNINDEX hoặc VN30 (nguồn VNDirect)."""
+        """P/E hoặc P/B theo ngày của VNINDEX hoặc VN30 (nguồn VNDirect); tep_cap_nhat_luc là giờ ứng dụng ghi tệp (UTC)."""
         return data.dinh_gia_chi_so(chi_so, ty_le, so_diem)
 
     @tool

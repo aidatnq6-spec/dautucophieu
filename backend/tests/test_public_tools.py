@@ -138,9 +138,9 @@ def test_open_funds_list_and_one_fund_without_the_apps_own_scores(data):
 
 
 def test_gold_history_lists_kinds_then_reads_buy_prices(data):
-    assert data.gia_vang_lich_su() == {"nguon": "Phú Quý", "loai": ["Nhẫn", "Vàng miếng SJC"]}
+    assert data.gia_vang_lich_su()["loai"] == ["Nhẫn", "Vàng miếng SJC"]
     out = data.gia_vang_lich_su("Vàng miếng SJC", so_ngay=2)
-    assert out == {"loai": "Vàng miếng SJC", "gia": "mua", "don_vi": "đồng/chỉ", "nguon": "Phú Quý",
+    assert {k: v for k, v in out.items() if k != "tep_cap_nhat_luc"} == {"loai": "Vàng miếng SJC", "gia": "mua", "don_vi": "đồng/chỉ", "nguon": "Phú Quý",
                    "diem": [["2026-11-13", "103"], ["2026-11-14", "104"]]}
     assert data.gia_vang_lich_su("Bạc")["thieu"] is True
 
@@ -172,3 +172,15 @@ def test_server_code_never_imports_personal_data(module):
     project = [m for m in names if m.startswith("investment_agent")]
     assert project and all(m.startswith(("investment_agent.market", "investment_agent.public_tools")) for m in project), project
     assert not any(m.startswith(("investment_agent.market.watchlist", "firebase", "google")) for m in names)
+
+
+def test_files_without_a_fetch_time_report_when_the_file_was_last_written(data):
+    # P/E-P/B series, gold history and OMO keep no fetch time inside the file; the file's own write time is the only honest stamp.
+    import os
+    stamp = datetime(2026, 11, 25, 13, 0, tzinfo=timezone.utc)
+    for name in ("index-valuation/VNINDEX-pe-1d.json", "gold-price-history.json", "omo.json"):
+        os.utime(data.root / name, (stamp.timestamp(), stamp.timestamp()))
+    assert data.dinh_gia_chi_so("VNINDEX", "pe")["tep_cap_nhat_luc"] == "2026-11-25T13:00:00+00:00"
+    assert data.gia_vang_lich_su("Nhẫn")["tep_cap_nhat_luc"] == "2026-11-25T13:00:00+00:00"
+    assert data.gia_vang_lich_su()["tep_cap_nhat_luc"] == "2026-11-25T13:00:00+00:00"
+    assert data.omo()["tep_cap_nhat_luc"] == "2026-11-25T13:00:00+00:00"

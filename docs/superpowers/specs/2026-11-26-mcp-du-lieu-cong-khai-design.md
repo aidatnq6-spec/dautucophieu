@@ -30,6 +30,17 @@ Chủ sở hữu duyệt ngày 26/11/2026: nối Claude (Claude Code và Claude 
 
 ## Đăng ký
 
-- Claude Code: `.mcp.json` ở gốc repo (phạm vi dự án).
-- Claude Desktop: thêm cùng lệnh vào `%APPDATA%\Claude\claude_desktop_config.json`.
+- Plugin `dautucophieu` (`plugins/dautucophieu/`, marketplace cục bộ ở `.claude-plugin/marketplace.json`) mang MCP server và là nơi đăng ký duy nhất; cài ở phạm vi User nên dùng được ở mọi thư mục, cả Claude Code lẫn tab Code của Claude Desktop.
+- Cài: `claude plugin marketplace add D:/GitHub/dautucophieu` rồi `claude plugin install dautucophieu@dautucophieu --scope user`.
+- Server không nhận biến môi trường nào, nên không có khóa hay token của ứng dụng.
 - Không dùng connector từ xa của claude.ai, vì phải đưa ứng dụng ra internet.
+
+## Lệnh tắt (chủ sở hữu duyệt 26/11/2026)
+
+| Lệnh | Việc |
+|---|---|
+| `/dautu-ma <MÃ>` | Hồ sơ, giá 20 phiên, BCTC 4 quý và 3 năm, chỉ số, EPS, cổ tức, sự kiện, cổ đông, giao dịch nội bộ, mục thiếu, nguồn |
+| `/dautu-thitruong` | VN-Index, P/E và P/B của VN-Index và VN30, châu Á, vàng, OMO |
+| `/dautu-vimo [chủ đề]` | Chỉ báo vĩ mô theo chủ đề hoặc bộ mặc định, kèm trạng thái cập nhật |
+
+Lệnh nào cũng: không đoán hay nội suy số, chỉ tính thay đổi từ hai số trong kho và ghi rõ hai kỳ dùng để tính, không khuyến nghị mua bán, không nhắc danh mục hay giá vốn.

@@ -159,7 +159,7 @@ def test_server_exposes_exactly_the_approved_read_only_tools(data):
     assert sorted(t.name for t in tools) == sorted([
         "thong_tin_ma", "gia_ngay", "dinh_gia_chi_so", "bao_cao_tai_chinh", "chi_so_tai_chinh", "eps_co_tuc", "su_kien_doanh_nghiep",
         "co_dong_ban_lanh_dao", "giao_dich_noi_bo", "danh_sach_vi_mo", "chi_bao_vi_mo", "chi_so_chau_a", "gia_vang", "omo",
-        "quy_mo", "gia_vang_lich_su"])
+        "quy_mo", "gia_vang_lich_su", "dinh_gia_ma"])
     assert all(t.annotations and t.annotations.read_only_hint for t in tools)
     assert "Ngân hàng" in result.content[0].text
 
@@ -184,3 +184,30 @@ def test_files_without_a_fetch_time_report_when_the_file_was_last_written(data):
     assert data.gia_vang_lich_su("Nhẫn")["tep_cap_nhat_luc"] == "2026-11-25T13:00:00+00:00"
     assert data.gia_vang_lich_su()["tep_cap_nhat_luc"] == "2026-11-25T13:00:00+00:00"
     assert data.omo()["tep_cap_nhat_luc"] == "2026-11-25T13:00:00+00:00"
+
+
+def test_statements_name_each_line_as_vndirect_does_and_say_what_equity_covers(data):
+    write(data.root / "statements" / "CCC.json", {"symbol": "CCC", "fetched_at": "x", "source": "vndirect:finfo",
+                                                  "quarters": {"2026-Q3": {"npat": "10", "npat_parent": "9", "equity": "100", "minority_equity": "7"}}, "years": {}})
+    out = data.bao_cao_tai_chinh("CCC")
+    assert out["ten_dong"] == {"npat": "Lợi nhuận sau thuế thu nhập doanh nghiệp", "npat_parent": "Lợi nhuận sau thuế của Công ty mẹ",
+                               "equity": "Vốn chủ sở hữu", "minority_equity": "Lợi ích cổ đông không kiểm soát"}
+    assert "không kiểm soát" in out["pham_vi"]["equity"] and "công ty mẹ" in out["pham_vi"]["npat_parent"]
+    bank = data.bao_cao_tai_chinh("AAA")  # the financial layout names its own lines
+    assert bank["ten_dong"] == {} and bank["loai"] == "bank"  # "loans" is not a stored bank line; nothing is named by guess
+
+
+def test_fundamentals_say_profit_is_the_parents_and_equity_includes_minorities(data):
+    write(data.root / "statements" / "BBB.json", {"symbol": "BBB", "fetched_at": "x", "source": "vndirect:finfo",
+                                                  "quarters": {"2026-Q3": {"minority_equity": "5"}}, "years": {"2025": {"minority_equity": "4"}}})
+    out = data.eps_co_tuc("BBB", so_ky=1)
+    assert "công ty mẹ" in out["chu_thich"]["npat"] and "không kiểm soát" in out["chu_thich"]["equity"]
+    assert out["loi_ich_thieu_so"] == {"years": {"2025": "4"}, "quarters": {"2026-Q3": "5"}}
+
+
+def test_published_valuation_of_one_ticker(data):
+    write(data.root / "valuation-check" / "BBB.json", {"fetched_at": "2026-11-25T13:04:50+00:00", "date": "2026-11-23", "market_cap": "191",
+                                                        "pe": "11.26", "pb": "1.02", "shares": "1245", "profit_quarter": "2026-Q3", "ours": "never shown"})
+    assert data.dinh_gia_ma("bbb") == {"ma": "BBB", "nguon": "VNDirect", "ngay": "2026-11-23", "lay_luc": "2026-11-25T13:04:50+00:00",
+                                       "von_hoa": "191", "pe": "11.26", "pb": "1.02", "so_co_phieu": "1245", "quy_loi_nhuan": "2026-Q3"}
+    assert data.dinh_gia_ma("ZZZ") == {"thieu": True, "ly_do": "Chưa có định giá VNDirect công bố của ZZZ trong kho."}

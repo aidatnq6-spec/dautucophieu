@@ -12,24 +12,28 @@ Mã là phần người dùng gõ sau lệnh, viết hoa. Không có mã thì h�
 
 1. `thong_tin_ma`: niêm yết HOSE, ngành ICB, VN30/VN100.
 2. `gia_ngay` với so_phien 20.
-3. `bao_cao_tai_chinh` với ky "quy", so_ky 4; thêm ky "nam", so_ky 3.
+3. `bao_cao_tai_chinh` với ky "quy", so_ky 8 (đủ để so cùng kỳ năm trước); thêm ky "nam", so_ky 3.
 4. `chi_so_tai_chinh` với so_ky 4.
 5. `eps_co_tuc` với so_ky 8.
 6. `su_kien_doanh_nghiep`, `co_dong_ban_lanh_dao`, `giao_dich_noi_bo`.
+7. `dinh_gia_ma`: vốn hoá, P/E, P/B do VNDirect công bố.
 
 ## Trình bày (tiếng Việt, gọn, bảng khi có nhiều số)
 
 1. **Hồ sơ**: ngành, nhóm chỉ số.
 2. **Giá**: phiên mới nhất trong kho, giá đóng, cao/thấp 20 phiên. Thay đổi % chỉ tính từ hai giá trong kho và ghi rõ hai phiên dùng để tính.
-3. **Kết quả kinh doanh**: 4 quý và 3 năm gần nhất với các dòng có trong kho (doanh thu, lợi nhuận, dòng tiền…). Số gốc là đồng; đổi sang tỷ đồng khi trình bày và ghi đơn vị.
-4. **EPS, cổ tức, số cổ phiếu lưu hành**; nếu có shares_check thì nêu hai nguồn đang lệch.
-5. **Sự kiện**: sắp tới trước, rồi gần đây nhất.
-6. **Cổ đông lớn** (tối đa 5) và **giao dịch nội bộ** gần nhất.
-7. **Thiếu**: mỗi công cụ trả `thieu` thì ghi tên mục và lý do nguyên văn.
-8. **Nguồn**: nguồn và thời điểm lấy của từng nhóm số.
+3. **Kết quả kinh doanh**: 4 quý gần nhất kèm cùng kỳ năm trước, và 3 năm gần nhất với các dòng có trong kho (doanh thu, lợi nhuận, dòng tiền…). Số gốc là đồng; đổi sang tỷ đồng khi trình bày và ghi đơn vị.
+4. **Định giá**: vốn hoá, P/E, P/B từ `dinh_gia_ma` kèm ngày. Thiếu thì ghi thiếu; nếu tự tính thì ghi rõ là tự tính và công thức.
+5. **EPS, cổ tức, số cổ phiếu lưu hành**; nếu có shares_check thì nêu hai nguồn đang lệch.
+6. **Sự kiện**: sắp tới trước, rồi gần đây nhất.
+7. **Cổ đông lớn** (tối đa 5) và **giao dịch nội bộ** gần nhất.
+8. **Thiếu**: mỗi công cụ trả `thieu` thì ghi tên mục và lý do nguyên văn.
+9. **Nguồn**: nguồn và thời điểm lấy của từng nhóm số.
 
 ## Quy tắc
 
 - Không đoán số: không nội suy, không ước lượng, không lấp chỗ trống bằng kiến thức có sẵn hay nguồn ngoài.
+- Lợi nhuận cho EPS, P/E là npat_parent (LNST công ty mẹ). equity là vốn chủ GỒM cổ đông không kiểm soát: vốn chủ công ty mẹ = equity − minority_equity cùng kỳ. Xem pham_vi và ten_dong mà công cụ trả về.
+- Chỉ nói một kỳ "không có trong kho" khi công cụ trả `thieu` cho đúng kỳ đó; kỳ chỉ nằm ngoài số kỳ đã xin thì gọi lại với so_ky lớn hơn.
 - Không khuyến nghị mua bán, không đặt giá mục tiêu.
 - Không hỏi, nhắc hay suy đoán danh mục, giá vốn, danh sách theo dõi của người dùng.

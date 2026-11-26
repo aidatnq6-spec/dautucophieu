@@ -61,7 +61,7 @@ def test_chat_project_instructions_name_every_server_tool_and_nothing_else(tmp_p
     text = (REPO / "docs" / "claude-project-instructions.md").read_text(encoding="utf-8")
     block = text.split("```text\n", 1)[1].split("\n```", 1)[0]
     tools = server_tools(tmp_path)
-    named = set(re.findall(r"\b([a-z]+(?:_[a-z]+)+)\b", block)) - {"lay_luc", "fetched_at", "as_of", "ly_do", "tep_cap_nhat_luc", "so_ky", "npat_parent", "minority_equity", "pham_vi", "su_kien_co_phieu", "mat_do", "dieu_chinh", "dividends_paid", "canh_bao_loi_nhuan_ngoai_ban_hang", "vuot_nguong", "ten_chi_so", "luu_y", "phien_thieu", "canh_bao_eps", "thieu_so_luong", "van_ban", "lich_kiem"}
+    named = set(re.findall(r"\b([a-z]+(?:_[a-z]+)+)\b", block)) - {"lay_luc", "fetched_at", "as_of", "ly_do", "tep_cap_nhat_luc", "so_ky", "npat_parent", "minority_equity", "pham_vi", "su_kien_co_phieu", "mat_do", "dieu_chinh", "dividends_paid", "canh_bao_loi_nhuan_ngoai_ban_hang", "vuot_nguong", "ten_chi_so", "luu_y", "phien_thieu", "canh_bao_eps", "thieu_so_luong", "van_ban", "lich_kiem", "lech_gia"}
     named |= {t for t in tools if re.search(rf"\b{t}\b", block)}  # single-word tools such as omo
     assert named == tools, named ^ tools
     assert "dautucophieu-cong-khai" in block and "thieu" in block

@@ -66,7 +66,7 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
 
     @tool
     def dinh_gia_ma(ma: str) -> dict:
-        """Vốn hoá, P/E, P/B và số cổ phiếu do VNDirect công bố cho một mã, kèm ngày và quý lợi nhuận dùng để tính. Dùng số này thay vì tự tính."""
+        """Vốn hoá, P/E, P/B và số cổ phiếu do VNDirect công bố cho một mã, kèm ngày, quý lợi nhuận, giá ứng với số đó và độ lệch so với giá mới nhất."""
         return data.dinh_gia_ma(ma)
 
     @tool
@@ -75,6 +75,12 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
         khả năng trả lãi, thanh toán, dòng tiền, số ngày phải thu và tồn kho, tăng trưởng, trả cổ tức), mỗi chỉ số có trung vị, tứ phân vị
         và thứ hạng; không cho ngân hàng, bảo hiểm, chứng khoán."""
         return data.so_sanh_nganh(ma)
+
+    @tool
+    def thuyet_minh(ma: str, ky: str = "quy", so_ky: int = 4) -> dict:
+        """Thuyết minh BCTC (Vietcap): doanh thu và chi phí tài chính theo khoản (lãi tiền gửi, cổ tức, thanh lý đầu tư, tỷ giá, khác),
+        nợ vay theo loại, tồn kho theo loại, tài sản cố định, chi phí theo yếu tố; ky "quy" hoặc "nam"."""
+        return data.thuyet_minh(ma, ky, so_ky)
 
     @tool
     def su_kien_doanh_nghiep(ma: str) -> dict:

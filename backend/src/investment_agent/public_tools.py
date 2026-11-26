@@ -13,6 +13,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from investment_agent.market.price_history import read_index_sessions
+from investment_agent.market.company_notes import NOTE_GROUPS, NOTE_LABELS
 from investment_agent.market.prices import PriceStore
 from investment_agent.market.report_flags import EPS_JUMP, eps_jumps, outside_sales_flag
 
@@ -337,7 +338,35 @@ class PublicData:
         record, missing = self._per_symbol("valuation-check", ma, "định giá VNDirect công bố")
         if missing:
             return missing
-        return {"ma": self._symbol(ma), "nguon": "VNDirect", **{name: record.get(src) for name, src in VALUATION_FIELDS}}
+        symbol = self._symbol(ma)
+        out = {"ma": symbol, "nguon": "VNDirect", **{name: record.get(src) for name, src in VALUATION_FIELDS}}
+        # Which price the published figures rest on, and how far the latest stored close has moved since (owner, 26/11/2026)
+        from decimal import Decimal, InvalidOperation
+        try:
+            then = Decimal(str(record["market_cap"])) / Decimal(str(record["shares"]))
+        except (KeyError, InvalidOperation, ZeroDivisionError, TypeError):
+            then = None
+        view = PriceStore(self.root).latest(symbol)
+        latest = view[max(view)][0] if view else None
+        out["gia_ngay_dinh_gia"] = format(then.quantize(Decimal("0.01")).normalize(), "f") if then else None
+        out["gia_moi_nhat"] = {"ngay": latest.session_date.isoformat(), "gia": format(latest.close.normalize(), "f")} if latest else None
+        out["lech_gia"] = format(((latest.close - then) / then).quantize(Decimal("0.001")).normalize(), "f") if then and latest else None
+        out["luu_y"] = ("gia_ngay_dinh_gia = von_hoa ÷ so_co_phieu, giá VNDirect dùng cho P/E, P/B ở ngày đó (đồng). Nếu lech_gia so với giá mới nhất "
+                        "trong kho quá 5% thì nói rõ; muốn quy P/E, P/B về giá mới nhất thì nhân với gia_moi_nhat ÷ gia_ngay_dinh_gia và ghi là tự tính.")
+        return out
+
+    def thuyet_minh(self, ma, ky="quy", so_ky=4) -> dict:
+        record, missing = self._per_symbol("company-notes", ma, "thuyết minh BCTC")
+        if missing:
+            return missing
+        if ky not in ("quy", "nam"):
+            return _missing("Kỳ phải là quy hoặc nam.")
+        periods = _newest(record.get("quarters" if ky == "quy" else "years"), _count(so_ky, 4, 40))
+        ky_out = {p: {g: {k: row[k] for k in keys if k in row} for g, keys in NOTE_GROUPS.items() if any(k in row for k in keys)}
+                  for p, row in periods.items()}
+        return {"ma": self._symbol(ma), "nguon": record.get("source"), "lay_luc": record.get("fetched_at"), "don_vi": "đồng",
+                "ten_dong": NOTE_LABELS, "ky": ky_out,
+                "luu_y": "Thuyết minh BCTC từ API công khai của Vietcap, giữ nguyên số. Dòng không có trong kỳ là nguồn không ghi, không phải 0."}
 
     # Doanh nghiệp
     def su_kien_doanh_nghiep(self, ma) -> dict:

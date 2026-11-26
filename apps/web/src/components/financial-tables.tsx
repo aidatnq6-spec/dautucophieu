@@ -27,6 +27,29 @@ const TWO = new Set(["BAD_LOANS_RATIO_AQ", "GROUP2_RATIO", "CAR", "OVERDUE_LOANS
 const TITLE: Record<Kind, string> = { bank: "ngân hàng", securities: "công ty chứng khoán", insurance: "bảo hiểm" };
 const COUNTS = [8, 12, 20, 0] as const;
 
+// Cảnh báo báo cáo (26/11/2026, docs/superpowers/specs/2026-11-26-canh-bao-bang-so-tai-chinh-design.md), worked out as the MCP tools do
+type Share = { ky: string | string[]; ty_le: string | null; vuot_nguong: boolean | null };
+export type OutsideSales = { nguong: string; quy_gan_nhat: Share; bon_quy: Share } | null;
+const pct1 = (v: string) => `${(Number(v) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`;
+const qText = (k: string) => `Q${k.slice(-1)}/${k.slice(0, 4)}`;
+
+export function outsideSalesNote(f: OutsideSales): string | null {
+  if (!f) return null;
+  const parts: string[] = [];
+  const q = f.quy_gan_nhat, y = f.bon_quy;
+  if (q.vuot_nguong && q.ty_le) parts.push(`${pct1(q.ty_le)} LNTT ${qText(String(q.ky))}`);
+  if (y.vuot_nguong && y.ty_le && Array.isArray(y.ky)) parts.push(`${pct1(y.ty_le)} LNTT 4 quý đến ${qText(y.ky[y.ky.length - 1])}`);
+  if (!parts.length) return null;
+  return `Lợi nhuận ngoài bán hàng: doanh thu tài chính và lợi nhuận khác bằng ${parts.join(", ")} (ngưỡng ${pct1(f.nguong)}). `
+    + "Lãi tiền gửi đều đặn cũng nằm trong doanh thu tài chính, nên đây không hẳn là khoản một lần.";
+}
+
+export function epsNote(years: { nam: string }[] | null | undefined): string | null {
+  if (!years || !years.length) return null;
+  return `EPS lệch hẳn LNST công ty mẹ năm ${years.map((y) => y.nam).join(", ")} (hơn 3 lần so năm trước): `
+    + "có thể là lỗi nguồn hoặc phát hành nhiều cổ phiếu; số giữ nguyên như VNDirect.";
+}
+
 export type PeContext = { quarter: string; year_ago: string; ttm: string; ttm_year_ago: string; change: string | null; kind: "earnings_drop" | "earnings_spike" | "loss" | null };
 const quarterText = (p: string) => `Q${p.slice(-1)}/${p.slice(0, 4)}`;
 const share = (v: string) => `${(Math.abs(Number(v)) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 0 })}%`;
@@ -166,11 +189,15 @@ export function FinancialTables({ symbol }: { symbol: string }) {
   const s = data.summary;
   const pe = (data as { pe_context?: PeContext | null }).pe_context ?? null;
   const note = peNote(pe), calm = peCalm(pe);
+  const flags = (data as { flags?: { outside_sales: OutsideSales; eps: { nam: string }[] } | null }).flags ?? null;
+  const outside = outsideSalesNote(flags?.outside_sales ?? null), epsWarn = epsNote(flags?.eps);
   const extra = view === "quarters" && forecast?.quarter && Object.keys(forecast.values).length ? { label: `${periodLabel(forecast.quarter)}F`, values: forecast.values } : null;
   return (
     <div className="ft">
       {note && <p className="notice" data-testid="pe-context">{note}</p>}
       {calm && <p className="caption" data-testid="pe-context">{calm}</p>}
+      {outside && <p className="notice" data-testid="report-flags">{outside}</p>}
+      {epsWarn && <p className="notice" data-testid="report-flags">{epsWarn}</p>}
       {s && <div className="pb-cards" aria-label="Bốn quý gần nhất">
         <div><span className="caption">LNST công ty mẹ 4 quý ({s.quarters.map(periodLabel).join(", ")})</span><strong>{ty(s.npat_ttm)}</strong></div>
         <div><span className="caption">EBITDA 4 quý</span><strong>{ty(s.ebitda_ttm)}</strong></div>

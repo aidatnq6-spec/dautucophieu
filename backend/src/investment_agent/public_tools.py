@@ -10,10 +10,10 @@ import json
 import os
 import re
 from datetime import date, datetime, timezone
-from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from investment_agent.market.prices import PriceStore
+from investment_agent.market.report_flags import EPS_JUMP, eps_jumps, outside_sales_flag
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 _SYMBOL = re.compile(r"^[A-Z0-9]{3,10}$")
@@ -23,37 +23,6 @@ MAX_DAILY = 800  # daily adjusted closes per answer
 GENERAL_RATIO_NOTE = ("Số do VNDirect tự tính, giữ nguyên. Tỷ lệ, biên và tăng trưởng ở dạng thập phân (0,08 là 8%); DSO, DIO, DPO và chu kỳ "
                       "vận động vốn là số ngày; EPS_TR, BVPS_AQ là đồng; các hệ số thanh toán và DEBT_EBITDA là số lần. Quý có doanh thu rất "
                       "nhỏ làm số ngày và biên lệch rất xa: nói rõ khi gặp, không bỏ đi.")
-OUTSIDE_SALES = Decimal("0.3")  # owner, 26/11/2026: flag when financial income and other profit are above 30% of profit before tax
-
-
-def _dec(value) -> Decimal | None:
-    try:
-        d = Decimal(str(value))
-    except (InvalidOperation, TypeError, ValueError):
-        return None
-    return d if d.is_finite() else None
-
-
-EPS_JUMP = Decimal("3")  # owner, 26/11/2026: 1 of 75 stored tickers flagged that day (KDH 2024, 80 đồng)
-
-
-def _eps_jumps(years: dict) -> list[dict]:
-    """Years whose EPS moved more than EPS_JUMP times further than parent profit did, against the year before; both must be positive."""
-    out = []
-    for y in sorted(years):
-        prev = years.get(str(int(y) - 1)) if y.isdigit() else None
-        if not prev:
-            continue
-        e, ep, n, npv = (_dec(years[y].get("eps")), _dec(prev.get("eps")), _dec(years[y].get("npat")), _dec(prev.get("npat")))
-        if None in (e, ep, n, npv) or min(e, ep, n, npv) <= 0:
-            continue
-        gap = (e / ep) / (n / npv)
-        if gap > EPS_JUMP or gap < 1 / EPS_JUMP:
-            out.append({"nam": y, "eps": years[y]["eps"], "eps_nam_truoc": prev["eps"], "npat": years[y]["npat"], "npat_nam_truoc": prev["npat"],
-                        "lech": format(gap.quantize(Decimal("0.001")).normalize(), "f")})
-    return out
-
-
 def _sessions(start: date, end: date) -> tuple[set[date], str | None]:
     """HOSE sessions between start and end from the official calendar files in config/ (the years that exist); the files read, named."""
     from investment_agent.market.calendar import TradingCalendar
@@ -71,18 +40,6 @@ def _sessions(start: date, end: date) -> tuple[set[date], str | None]:
     return found, "; ".join(named) or None
 
 
-def _outside_share(rows: list[dict], keys: list[str], *, need: int) -> dict:
-    """(financial income + other profit) ÷ profit before tax over the given quarters, summed; associates are left out (owner, 26/11/2026)."""
-    if len(keys) < need:
-        return {"ky": keys, "ty_le": None, "vuot_nguong": None, "ly_do": f"Chưa đủ {need} quý"}
-    parts = [(_dec(r.get("pbt")), _dec(r.get("fin_income")), _dec(r.get("other_profit"))) for r in rows]
-    if any(v is None for p in parts for v in p):
-        return {"ky": keys, "ty_le": None, "vuot_nguong": None, "ly_do": "Thiếu dòng LNTT, doanh thu tài chính hoặc lợi nhuận khác"}
-    pbt = sum(p[0] for p in parts)
-    if pbt <= 0:
-        return {"ky": keys, "ty_le": None, "vuot_nguong": None, "ly_do": "LNTT không dương"}
-    share = sum(p[1] + p[2] for p in parts) / pbt
-    return {"ky": keys, "ty_le": format(share.quantize(Decimal("0.0001")).normalize(), "f"), "vuot_nguong": share > OUTSIDE_SALES}
 LINE_NAMES = REPO_ROOT / "config" / "statement-line-names.json"  # each stored line's own name in VNDirect's financial_models
 # What the stored lines cover (statements.py: equity includes non-controlling interests in every layout)
 SCOPE = {"npat": "LNST của cả doanh nghiệp, gồm phần của cổ đông không kiểm soát",
@@ -257,14 +214,7 @@ class PublicData:
                "don_vi": "đồng", "pham_vi": SCOPE, "ten_dong": {k: names[k] for k in sorted(lines) if k in names}, "ky": kept}
         quarters = record.get("quarters") or {}
         if ky == "quy" and record.get("kind") is None and quarters:
-            keys = sorted(quarters)
-            latest = _outside_share([quarters[keys[-1]]], [keys[-1]], need=1)
-            latest = {k: v for k, v in latest.items() if k != "ky"} | {"ky": keys[-1]}
-            out["canh_bao_loi_nhuan_ngoai_ban_hang"] = {
-                "nguong": format(OUTSIDE_SALES, "f"), "cong_thuc": "(fin_income + other_profit) / pbt",
-                "y_nghia": "Phần LNTT đến từ doanh thu tài chính và lợi nhuận khác, không từ bán hàng; vượt ngưỡng thì P/E dựa nhiều vào khoản này. "
-                           "Lãi tiền gửi đều đặn cũng nằm trong doanh thu tài chính, nên vượt ngưỡng không có nghĩa là khoản một lần.",
-                "quy_gan_nhat": latest, "bon_quy": _outside_share([quarters[k] for k in keys[-4:]], keys[-4:], need=4)}
+            out["canh_bao_loi_nhuan_ngoai_ban_hang"] = outside_sales_flag(quarters)
         return out
 
     def chi_so_tai_chinh(self, ma, so_ky=8) -> dict:
@@ -284,7 +234,7 @@ class PublicData:
         if missing:
             return missing
         n = _count(so_ky, 8, 80)
-        eps_flags = _eps_jumps(record.get("years") or {})
+        eps_flags = eps_jumps(record.get("years") or {})
         out = {**record, **{k: _newest(record.get(k), n) for k in ("years", "quarters", "annual") if k in record}}
         statements = self._json("statements-financial", f"{record.get('symbol')}.json") or self._json("statements", f"{record.get('symbol')}.json") or {}
         minority = {kind: {p: (statements.get(kind) or {}).get(p, {}).get("minority_equity") for p in out.get(kind) or {}

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { cell, checkLines, fixedNotes, lastN, periodLabel, withRatios } from "./financial-tables";
+import { cell, checkLines, epsNote, fixedNotes, lastN, outsideSalesNote, periodLabel, withRatios } from "./financial-tables";
 
 it("money is shown in tỷ đồng, growth with its sign, margins and returns as percentages, multiples with an x", () => {
   expect(cell("62214200000000", "money", "revenue")).toBe("62.214");
@@ -79,4 +79,17 @@ it("VNDirect's ratios of a general company read in days, times and percentages, 
   expect(part.rows[0].label).toBe("Chỉ số tài chính (VNDirect)");
   expect(part.rows.map((r) => r.kind)).toEqual(["group", "pct", "days", "money"]);
   expect(part.rows[1].values).toEqual([null, "0.28"]);
+});
+
+it("profit mostly outside sales and an EPS far from profit are said in words, only past the owner's thresholds", () => {
+  const flag = (q: string | null, qv: boolean | null, f: string | null, fv: boolean | null) => ({ nguong: "0.3",
+    quy_gan_nhat: { ky: "2026-Q3", ty_le: q, vuot_nguong: qv }, bon_quy: { ky: ["2025-Q4", "2026-Q1", "2026-Q2", "2026-Q3"], ty_le: f, vuot_nguong: fv } });
+  expect(outsideSalesNote(flag("0.686", true, "0.5736", true))).toBe("Lợi nhuận ngoài bán hàng: doanh thu tài chính và lợi nhuận khác bằng 68,6% LNTT Q3/2026, "
+    + "57,4% LNTT 4 quý đến Q3/2026 (ngưỡng 30%). Lãi tiền gửi đều đặn cũng nằm trong doanh thu tài chính, nên đây không hẳn là khoản một lần.");
+  expect(outsideSalesNote(flag("0.25", false, "0.41", true))).toContain("bằng 41% LNTT 4 quý đến Q3/2026 (ngưỡng 30%)");
+  expect(outsideSalesNote(flag("0.25", false, null, null))).toBeNull();
+  expect(outsideSalesNote(null)).toBeNull();
+  expect(epsNote([{ nam: "2017" }, { nam: "2024" }, { nam: "2025" }])).toBe("EPS lệch hẳn LNST công ty mẹ năm 2017, 2024, 2025 (hơn 3 lần so năm trước): "
+    + "có thể là lỗi nguồn hoặc phát hành nhiều cổ phiếu; số giữ nguyên như VNDirect.");
+  expect(epsNote([])).toBeNull();
 });

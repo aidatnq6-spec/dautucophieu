@@ -77,6 +77,29 @@ def default_data_dir() -> Path:
     return Path(os.environ.get("INVESTMENT_DATA_DIR") or REPO_ROOT / "data").resolve()
 
 
+TIME_KEYS = frozenset({"lay_luc", "fetched_at", "tep_cap_nhat_luc", "danh_muc_lay_luc", "recorded_at", "read_at", "as_of", "at", "first_seen"})
+VN_TZ = timezone(timedelta(hours=7))
+
+
+def vn_times(value):
+    """Every time a tool gives, in Vietnam time (owner, 26/11/2026): the stores keep UTC or +07:00 as each source wrote them."""
+    if isinstance(value, dict):
+        out = {}
+        for k, v in value.items():
+            if k in TIME_KEYS and isinstance(v, str) and "T" in v:
+                try:
+                    when = datetime.fromisoformat(v)
+                except ValueError:
+                    when = None
+                out[k] = when.astimezone(VN_TZ).isoformat(timespec="seconds") if when and when.tzinfo else v
+            else:
+                out[k] = vn_times(v)
+        return out
+    if isinstance(value, list):
+        return [vn_times(v) for v in value]
+    return value
+
+
 def _missing(reason: str) -> dict:
     return {"thieu": True, "ly_do": reason}
 
@@ -156,7 +179,10 @@ class PublicData:
                 for d, b in ((d, view[d][0]) for d in days)]
         return {"ma": symbol, "don_vi": last.currency, "co_so_gia": last.price_basis, "nguon": last.source_id,
                 "lay_luc": last.observed_at.isoformat(), "phien_moi_nhat_trong_kho": max(view).isoformat(), "phien": rows,
-                "phien_thieu": absent, "lich_kiem": calendars or "Chưa có lịch HOSE trong config cho khoảng này; không kiểm phiên thiếu."}
+                "phien_thieu": absent, "lich_kiem": calendars or "Chưa có lịch HOSE trong config cho khoảng này; không kiểm phiên thiếu.",
+                **({"luu_y": f"Kho giá ngày chỉ có từ {min(view).isoformat()}, nên trả {len(rows)} phiên thay vì {_count(so_phien, 60, 500)}. "
+                             "Phiên xa hơn: lich_su_gia với mat_do \"ngay\" (giá đóng cửa đã điều chỉnh từ 2013)."}
+                   if start is None and len(rows) < _count(so_phien, 60, 500) else {})}
 
     def lich_su_gia(self, ma, tu_ngay=None, den_ngay=None, mat_do="thang") -> dict:
         """VNDirect's adjusted daily closes since 2013 (price_history.py) when stored, each month's last close by default; otherwise the

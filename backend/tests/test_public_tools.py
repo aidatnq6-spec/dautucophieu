@@ -306,3 +306,25 @@ def test_daily_prices_name_the_hose_sessions_the_store_lacks(data, tmp_path):
     out = data.gia_ngay("VNINDEX", tu_ngay="2026-11-02", den_ngay="2026-11-06")
     assert out["phien_thieu"] == ["2026-11-05", "2026-11-06"]  # the fixture stops on 04/11; 05 and 06/11 are HOSE sessions
     assert out["lich_kiem"].startswith("config/trading-calendar-hose-2026.json")
+
+
+def test_sessions_before_the_official_calendar_are_checked_against_vnindex_days(data):
+    from datetime import date as d
+    from investment_agent.market.prices import PriceStore, ingest
+    from investment_agent.market.calendar import TradingCalendar
+    cal = TradingCalendar(version="t", source="synthetic", holidays=frozenset(), first=d(2025, 12, 1), last=d(2025, 12, 31))
+    ingest(PriceStore(data.root), cal, [bar("BBB", day, 1000) for day in ("2025-12-29", "2025-12-31")], revision_id="r1")
+    write(data.root / "index-sessions" / "VNINDEX.json", {"source": "vndirect:finfo", "fetched_at": "t", "dates": ["2025-12-29", "2025-12-30", "2025-12-31"]})
+    out = data.gia_ngay("BBB", tu_ngay="2025-12-29", den_ngay="2025-12-31")
+    assert out["phien_thieu"] == ["2025-12-30"]
+    assert "phiên VN-Index của VNDirect" in out["lich_kiem"] and "không phải lịch chính thức" in out["lich_kiem"]
+
+
+def test_daily_long_prices_name_the_vnindex_days_the_ticker_lacks(data):
+    write(data.root / "price-history" / "BBB.json", {"symbol": "BBB", "fetched_at": "t", "source": "vndirect:finfo", "adjusted": True,
+                                                     "closes": [["2015-03-02", "10"], ["2015-03-05", "11"]]})
+    write(data.root / "index-sessions" / "VNINDEX.json", {"source": "vndirect:finfo", "fetched_at": "t",
+                                                          "dates": ["2015-03-02", "2015-03-03", "2015-03-04", "2015-03-05"]})
+    out = data.lich_su_gia("BBB", mat_do="ngay")
+    assert out["phien_thieu"] == ["2015-03-03", "2015-03-04"] and "phiên VN-Index" in out["lich_kiem"]
+    assert "phien_thieu" not in data.lich_su_gia("BBB")  # month-ends are a choice of days, not sessions

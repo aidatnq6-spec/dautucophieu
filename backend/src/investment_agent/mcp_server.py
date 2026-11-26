@@ -81,7 +81,7 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
 
     @tool
     def giao_dich_noi_bo(ma: str) -> dict:
-        """Giao dịch của người nội bộ và người liên quan đã công bố."""
+        """Giao dịch của người nội bộ và người liên quan đã công bố; báo cáo nguồn không có số lượng được đánh dấu thieu_so_luong kèm van_ban."""
         return data.giao_dich_noi_bo(ma)
 
     @tool

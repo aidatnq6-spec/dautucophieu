@@ -34,6 +34,43 @@ def _dec(value) -> Decimal | None:
     return d if d.is_finite() else None
 
 
+EPS_JUMP = Decimal("3")  # owner, 26/11/2026: 1 of 75 stored tickers flagged that day (KDH 2024, 80 đồng)
+
+
+def _eps_jumps(years: dict) -> list[dict]:
+    """Years whose EPS moved more than EPS_JUMP times further than parent profit did, against the year before; both must be positive."""
+    out = []
+    for y in sorted(years):
+        prev = years.get(str(int(y) - 1)) if y.isdigit() else None
+        if not prev:
+            continue
+        e, ep, n, npv = (_dec(years[y].get("eps")), _dec(prev.get("eps")), _dec(years[y].get("npat")), _dec(prev.get("npat")))
+        if None in (e, ep, n, npv) or min(e, ep, n, npv) <= 0:
+            continue
+        gap = (e / ep) / (n / npv)
+        if gap > EPS_JUMP or gap < 1 / EPS_JUMP:
+            out.append({"nam": y, "eps": years[y]["eps"], "eps_nam_truoc": prev["eps"], "npat": years[y]["npat"], "npat_nam_truoc": prev["npat"],
+                        "lech": format(gap.quantize(Decimal("0.001")).normalize(), "f")})
+    return out
+
+
+def _sessions(start: date, end: date) -> tuple[set[date], str | None]:
+    """HOSE sessions between start and end from the official calendar files in config/ (the years that exist); the files read, named."""
+    from investment_agent.market.calendar import TradingCalendar
+    found, named = set(), []
+    for path in sorted((REPO_ROOT / "config").glob("trading-calendar-hose-*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        first, last = date.fromisoformat(data["first"]), date.fromisoformat(data["last"])
+        lo, hi = max(start, first), min(end, last)
+        if lo > hi:
+            continue
+        cal = TradingCalendar(version=data["version"], source=data["source"], first=first, last=last,
+                              holidays=frozenset(date.fromisoformat(d) for d in data["holidays"]))
+        found |= set(cal.sessions(lo, hi))
+        named.append(f"config/{path.name} ({data['first']}–{data['last']})")
+    return found, "; ".join(named) or None
+
+
 def _outside_share(rows: list[dict], keys: list[str], *, need: int) -> dict:
     """(financial income + other profit) ÷ profit before tax over the given quarters, summed; associates are left out (owner, 26/11/2026)."""
     if len(keys) < need:
@@ -141,10 +178,14 @@ class PublicData:
         if not days:
             return _missing(f"Không có phiên nào của {symbol} trong khoảng ngày này.")
         last = view[days[-1]][0]
+        window_start, window_end = start or days[0], end or days[-1]
+        sessions, calendars = _sessions(window_start, window_end)
+        absent = sorted(d.isoformat() for d in sessions if d not in view)
         rows = [{"ngay": d.isoformat(), "mo": str(b.open), "cao": str(b.high), "thap": str(b.low), "dong": str(b.close), "khoi_luong": b.volume}
                 for d, b in ((d, view[d][0]) for d in days)]
         return {"ma": symbol, "don_vi": last.currency, "co_so_gia": last.price_basis, "nguon": last.source_id,
-                "lay_luc": last.observed_at.isoformat(), "phien_moi_nhat_trong_kho": max(view).isoformat(), "phien": rows}
+                "lay_luc": last.observed_at.isoformat(), "phien_moi_nhat_trong_kho": max(view).isoformat(), "phien": rows,
+                "phien_thieu": absent, "lich_kiem": calendars or "Chưa có lịch HOSE trong config cho khoảng này; không kiểm phiên thiếu."}
 
     def lich_su_gia(self, ma, tu_ngay=None, den_ngay=None, mat_do="thang") -> dict:
         """VNDirect's adjusted daily closes since 2013 (price_history.py) when stored, each month's last close by default; otherwise the
@@ -243,12 +284,17 @@ class PublicData:
         if missing:
             return missing
         n = _count(so_ky, 8, 80)
+        eps_flags = _eps_jumps(record.get("years") or {})
         out = {**record, **{k: _newest(record.get(k), n) for k in ("years", "quarters", "annual") if k in record}}
         statements = self._json("statements-financial", f"{record.get('symbol')}.json") or self._json("statements", f"{record.get('symbol')}.json") or {}
         minority = {kind: {p: (statements.get(kind) or {}).get(p, {}).get("minority_equity") for p in out.get(kind) or {}
                            if (statements.get(kind) or {}).get(p, {}).get("minority_equity") is not None}
                     for kind in ("years", "quarters")}
-        return {**out, "chu_thich": FUNDAMENTAL_NOTES, "loi_ich_thieu_so": minority}
+        return {**out, "chu_thich": FUNDAMENTAL_NOTES, "loi_ich_thieu_so": minority,
+                "canh_bao_eps": {"nguong": format(EPS_JUMP, "f"), "cong_thuc": "(eps / eps_nam_truoc) / (npat / npat_nam_truoc)",
+                                 "y_nghia": "EPS năm đổi khác hẳn LNST công ty mẹ (hơn 3 lần theo chiều nào cũng vậy): có thể là lỗi của nguồn hoặc "
+                                            "phát hành nhiều cổ phiếu. Số giữ nguyên như nguồn; nói rõ năm bị gắn cờ, không tự sửa.",
+                                 "nam": eps_flags}}
 
     def dinh_gia_ma(self, ma) -> dict:
         record, missing = self._per_symbol("valuation-check", ma, "định giá VNDirect công bố")
@@ -267,7 +313,16 @@ class PublicData:
 
     def giao_dich_noi_bo(self, ma) -> dict:
         record, missing = self._per_symbol("insider", ma, "giao dịch nội bộ")
-        return missing or record
+        if missing:
+            return missing
+        deals = []
+        for d in record.get("deals") or []:
+            if d.get("kind") is None or d.get("shares") is None:
+                d = {**d, "thieu_so_luong": True, "van_ban": d.get("doc_url") or d.get("url")}
+            deals.append(d)
+        return {**record, "deals": deals,
+                "luu_y": "Báo cáo có thieu_so_luong: nguồn VNDirect không có chiều mua bán và số lượng; số lượng nằm trong văn bản công bố ở van_ban. "
+                         "Không suy ra chiều hay số lượng từ tiêu đề."}
 
     # Vĩ mô và thế giới
     def _series_names(self) -> list[str]:

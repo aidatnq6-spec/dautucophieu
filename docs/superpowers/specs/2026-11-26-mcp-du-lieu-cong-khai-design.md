@@ -37,6 +37,9 @@ Chủ sở hữu duyệt ngày 26/11/2026: nối Claude (Claude Code và Claude 
 - Phạm vi (26/11/2026): `npat` của dữ liệu cơ bản là LNST công ty mẹ; `equity` ở mọi nơi gồm lợi ích cổ đông không kiểm soát, nên `eps_co_tuc` trả thêm `loi_ich_thieu_so` cùng kỳ và `chu_thich`.
 - `dividends_paid` (lưu chuyển tiền tệ hợp nhất) có thể gồm tiền trả cho cổ đông không kiểm soát; `pham_vi` nói rõ, cổ tức cổ đông nhận lấy từ `eps_co_tuc`. Chỉ số của doanh nghiệp thường nằm riêng ở `financial-ratios-general/` để trang mã và điểm sức khỏe không đổi.
 - Lợi nhuận phần lớn không đến từ bán hàng (chủ sở hữu duyệt 26/11/2026): `bao_cao_tai_chinh` theo quý của doanh nghiệp thường trả `canh_bao_loi_nhuan_ngoai_ban_hang` = (doanh thu tài chính + lợi nhuận khác) ÷ LNTT cho quý gần nhất và tổng 4 quý, cờ khi trên 30%; không tính công ty liên kết; LNTT không dương thì không tính và ghi lý do. Ngày duyệt: 19/42 doanh nghiệp thường vượt ngưỡng.
+- `gia_ngay` trả `phien_thieu`: phiên lịch HOSE (`config/trading-calendar-hose-*.json`) có mà kho không có, trong khoảng được hỏi (không có ngày cuối thì đến phiên mới nhất trong kho); không nêu lý do.
+- `eps_co_tuc` trả `canh_bao_eps` (chủ sở hữu duyệt 26/11/2026): năm EPS đổi khác LNST công ty mẹ hơn 3 lần theo chiều nào cũng vậy, so năm trước, cả hai dương; số giữ nguyên.
+- `giao_dich_noi_bo`: báo cáo nguồn không có chiều và số lượng được đánh dấu `thieu_so_luong` kèm `van_ban` (tin HOSE/HNX, có văn bản đính kèm; nếu chưa có thì trang VNDirect); không đọc văn bản (chủ sở hữu chọn cách A, 26/11/2026).
 - Thiếu thì trả `{"thieu": true, "ly_do": "…"}`, ví dụ "chưa có tệp" hoặc "mã không hợp lệ".
 - Mã chứng khoán chỉ gồm chữ in hoa và số, 3–10 ký tự. Tên chỉ báo vĩ mô phải nằm trong danh sách đang có.
 

@@ -33,7 +33,7 @@ def test_notices_are_read_once_a_day_with_a_twelve_month_tally_that_counts_what_
     first = view["deals"][0]
     assert first == {"date": "2026-06-18", "kind": "Mua", "shares": 15746000, "source": "HOSE",
                      "title": "Báo cáo về thay đổi sở hữu của cổ đông lớn Nguyễn Thiên Hương Jenny và NCLQ",
-                     "url": "https://dstock.vndirect.com.vn/tin-tuc/tin-tu-so/1"}
+                     "url": "https://dstock.vndirect.com.vn/tin-tuc/tin-tu-so/1", "doc_url": None}
     assert [d["date"] for d in view["deals"]] == ["2026-06-18", "2026-03-02", "2026-02-12", "2026-01-30", "2025-12-15", "2024-07-02"]
     assert view["deals"][1]["url"] is None  # only links to the VNDirect notice page
     # Done trades in the last 12 months; registrations are intentions, not trades; a result without kind or volume is counted apart.
@@ -52,3 +52,11 @@ def test_a_failing_source_shows_the_saved_copy_or_a_reason(tmp_path):
     assert later["stale"] is True and later["deals"]
     empty = insider_deals(InsiderStore(tmp_path / "e"), "FPT", get=broken, now=NOW)
     assert empty["deals"] == [] and empty["reason"] == "Không đọc được thông báo giao dịch (nguồn VNDirect lỗi)"
+
+
+def test_the_exchange_notice_holding_the_document_is_kept_when_the_source_has_no_volume(tmp_path):
+    rows = [{**_row("2026-11-11", None, None, "KDH: Báo cáo về thay đổi sở hữu của nhóm cổ đông lớn Longwoods", code="KDH"),
+             "newsUrl": "https://www.hsx.vn/vi/tin-tuc/kdh-bao-cao/2515247"},
+            {**_row("2026-11-10", None, None, "KDH: other", code="KDH"), "newsUrl": "javascript:alert(1)"}]
+    deals = insider_deals(InsiderStore(tmp_path), "KDH", get=lambda url: json.dumps({"data": rows}), now=NOW)["deals"]
+    assert [d["doc_url"] for d in deals] == ["https://www.hsx.vn/vi/tin-tuc/kdh-bao-cao/2515247", None]

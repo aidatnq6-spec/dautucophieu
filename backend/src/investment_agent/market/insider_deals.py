@@ -15,6 +15,7 @@ from typing import Callable
 URL = "https://api-finfo.vndirect.com.vn/v4/insider_trans?q=tagCodes:{symbol}&size=100&sort=newsDate:desc"
 MAX_AGE = timedelta(days=1)
 LINK = "https://dstock.vndirect.com.vn/"
+EXCHANGES = ("https://www.hsx.vn/", "https://hsx.vn/", "https://www.hnx.vn/", "https://hnx.vn/")
 KINDS = {"Mua", "Bán", "Đăng kí mua", "Đăng kí bán"}
 _SYMBOL = re.compile(r"^[A-Z0-9]{1,10}$")
 
@@ -60,8 +61,10 @@ def _deals(symbol: str, payload: dict) -> list[dict]:
         title = str(r.get("newsTitle") or "").strip()
         title = title[len(symbol) + 1:].strip() if title.upper().startswith(symbol + ":") else title
         url = str(r.get("dstockUrl") or "")
+        doc = str(r.get("newsUrl") or "")  # the exchange's own notice, whose attached document holds the volumes VNDirect leaves out
         out.append({"date": date, "kind": kind, "shares": _shares(r.get("numberOfShares")) if kind else None,
-                    "source": r.get("newsSource"), "title": title, "url": url if url.startswith(LINK) else None})
+                    "source": r.get("newsSource"), "title": title, "url": url if url.startswith(LINK) else None,
+                    "doc_url": doc if doc.startswith(EXCHANGES) else None})
     return sorted(out, key=lambda d: d["date"], reverse=True)
 
 

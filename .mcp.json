@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "dautucophieu-cong-khai": {
+      "command": "D:/GitHub/dautucophieu/.venv/Scripts/python.exe",
+      "args": ["-m", "investment_agent.mcp_server"]
+    }
+  }
+}

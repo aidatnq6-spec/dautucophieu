@@ -249,10 +249,7 @@ def test_dividends_paid_in_the_cash_flow_is_told_apart_from_the_dividends_shareh
     assert "cổ đông không kiểm soát" in note and "eps_co_tuc" in note
 
 
-def test_ratios_say_they_exist_only_for_banks_securities_firms_and_insurers(data):
-    # BBB has general statements, so it is a company of the general layout: say why, not just "missing"
-    assert data.chi_so_tai_chinh("BBB") == {"thieu": True, "ly_do": "Chỉ số tài chính trong kho chỉ có cho ngân hàng, công ty chứng khoán "
-                                            "và bảo hiểm; BBB là doanh nghiệp thường. Tự tính từ bao_cao_tai_chinh và ghi rõ công thức."}
+def test_ratios_missing_for_a_ticker_say_so(data):
     assert data.chi_so_tai_chinh("ZZZ") == {"thieu": True, "ly_do": "Chưa có chỉ số tài chính của ZZZ trong kho."}
 
 
@@ -271,3 +268,12 @@ def test_a_quarter_whose_profit_comes_mostly_from_outside_sales_is_flagged_above
     assert loss["bon_quy"] == {"ky": ["2026-Q3"], "ty_le": None, "vuot_nguong": None, "ly_do": "Chưa đủ 4 quý"}
     assert "canh_bao_loi_nhuan_ngoai_ban_hang" not in data.bao_cao_tai_chinh("KKK", ky="nam")
     assert "canh_bao_loi_nhuan_ngoai_ban_hang" not in data.bao_cao_tai_chinh("AAA")  # banks: their income is financial by nature
+
+
+def test_ratios_of_a_general_company_come_from_vndirects_own_set(data):
+    write(data.root / "financial-ratios-general" / "BBB.json", {"symbol": "BBB", "kind": "general", "fetched_at": "t", "source": "vndirect:finfo",
+                                                               "names": {"ROAE_TR_AVG4Q": "ROAE"},
+                                                               "quarters": {"2026-06-30": {"ROAE_TR_AVG4Q": "0.09"}, "2026-09-30": {"ROAE_TR_AVG4Q": "0.08"}}})
+    out = data.chi_so_tai_chinh("BBB", so_ky=1)
+    assert out["loai"] == "general" and out["ten_chi_so"] == {"ROAE_TR_AVG4Q": "ROAE"} and out["ky"] == {"2026-09-30": {"ROAE_TR_AVG4Q": "0.08"}}
+    assert "0,08 là 8%" in out["luu_y"] and out["lay_luc"] == "t"

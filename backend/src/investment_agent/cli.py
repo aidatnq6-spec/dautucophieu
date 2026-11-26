@@ -114,6 +114,10 @@ def main() -> int:
     vcs.add_argument("--data-dir", type=Path, required=True)
     ivs = commands.add_parser("index-valuation-sync", help="fetch daily P/E and P/B of VNINDEX and VN30 (VNDirect) into data/index-valuation")
     ivs.add_argument("--data-dir", type=Path, required=True)
+    gr = commands.add_parser("general-ratios-sync", help="VNDirect's quarterly ratios of HOSE tickers outside banks, securities and insurance into data/financial-ratios-general")
+    gr.add_argument("--data-dir", type=Path, required=True)
+    gr.add_argument("--limit", type=int, default=60, help="tickers per run: never fetched first, then those older than a week")
+    gr.add_argument("--symbols", help="comma-separated tickers to fetch now, however recent")
     phist = commands.add_parser("price-history-sync", help="VNDirect's adjusted daily closes since 2013 of HOSE tickers into data/price-history")
     phist.add_argument("--data-dir", type=Path, required=True)
     phist.add_argument("--limit", type=int, default=60, help="tickers per run: never fetched first, then those older than a week")
@@ -181,6 +185,8 @@ def main() -> int:
         return macro_sync(args.data_dir)
     if args.command == "index-valuation-sync":
         return index_valuation_sync(args.data_dir)
+    if args.command == "general-ratios-sync":
+        return general_ratios_sync(args.data_dir, limit=args.limit, symbols=args.symbols.split(",") if args.symbols else None)
     if args.command == "price-history-sync":
         return price_history_sync(args.data_dir, limit=args.limit, symbols=args.symbols.split(",") if args.symbols else None)
     if args.command == "beta-sync":
@@ -813,6 +819,22 @@ def company_notes_sync(data_dir: Path, get=None, sleep=None) -> int:
     counts = {state: sum(1 for v in results.values() if v == state) for state in ("ok", "fresh", "later", "skipped")}
     print(json.dumps({"status": "ok" if not failed else "partial", **counts, "errors": failed}))
     return 0 if not failed else 1
+
+
+def general_ratios_sync(data_dir: Path, *, limit: int = 60, symbols: list[str] | None = None, get=None, now=None) -> int:
+    """Exit 0 when every ticker asked for came back or was empty, 1 when some failed (each is reported)."""
+    from datetime import datetime, timezone
+    from investment_agent.market.general_ratios import sync_general_ratios
+    if get is None:
+        import httpx
+
+        def get(url):
+            response = httpx.get(url, timeout=60, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+            response.raise_for_status()
+            return response.text
+    out = sync_general_ratios(data_dir, get=get, now=now or datetime.now(timezone.utc), symbols=symbols, limit=limit)
+    print(json.dumps(out))
+    return 0 if out["status"] == "ok" else 1
 
 
 def price_history_sync(data_dir: Path, *, limit: int = 60, symbols: list[str] | None = None, get=None, now=None) -> int:

@@ -20,6 +20,9 @@ _SYMBOL = re.compile(r"^[A-Z0-9]{3,10}$")
 _SERIES = re.compile(r"^[a-z][a-z0-9_]{0,63}$")  # _status, _gaps… are run bookkeeping, not series
 INDEXES = ("VNINDEX", "VN30")
 MAX_DAILY = 800  # daily adjusted closes per answer
+GENERAL_RATIO_NOTE = ("Số do VNDirect tự tính, giữ nguyên. Tỷ lệ, biên và tăng trưởng ở dạng thập phân (0,08 là 8%); DSO, DIO, DPO và chu kỳ "
+                      "vận động vốn là số ngày; EPS_TR, BVPS_AQ là đồng; các hệ số thanh toán và DEBT_EBITDA là số lần. Quý có doanh thu rất "
+                      "nhỏ làm số ngày và biên lệch rất xa: nói rõ khi gặp, không bỏ đi.")
 OUTSIDE_SALES = Decimal("0.3")  # owner, 26/11/2026: flag when financial income and other profit are above 30% of profit before tax
 
 
@@ -226,11 +229,12 @@ class PublicData:
     def chi_so_tai_chinh(self, ma, so_ky=8) -> dict:
         record, missing = self._per_symbol("financial-ratios", ma, "chỉ số tài chính")
         if missing:
-            symbol = self._symbol(ma)
-            if symbol and (self.root / "statements" / f"{symbol}.json").is_file():
-                return _missing(f"Chỉ số tài chính trong kho chỉ có cho ngân hàng, công ty chứng khoán và bảo hiểm; {symbol} là doanh nghiệp "
-                                "thường. Tự tính từ bao_cao_tai_chinh và ghi rõ công thức.")
-            return missing
+            general, _ = self._per_symbol("financial-ratios-general", ma, "chỉ số tài chính")
+            if general is None:
+                return missing
+            return {"ma": general.get("symbol"), "loai": "general", "nguon": general.get("source"), "lay_luc": general.get("fetched_at"),
+                    "ten_chi_so": general.get("names") or {}, "luu_y": GENERAL_RATIO_NOTE,
+                    "ky": _newest(general.get("quarters"), _count(so_ky, 8, 80))}
         return {"ma": record.get("symbol"), "loai": record.get("kind"), "nguon": record.get("source"), "lay_luc": record.get("fetched_at"),
                 "ky": _newest(record.get("quarters"), _count(so_ky, 8, 80))}
 

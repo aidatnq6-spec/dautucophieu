@@ -232,3 +232,9 @@ def test_adjusted_long_prices_are_refreshed_in_the_evening_slot():
     evening = next(i for i, l in enumerate(ls) if "(Get-Date).Hour -ge 20" in l)
     step = next(i for i, l in enumerate(ls) if "jobs.step price-history-sync --data-dir $data --limit 60" in l)
     assert step > evening
+
+
+def test_general_company_ratios_are_refreshed_in_the_evening_slot():
+    ls = lines()
+    evening = next(i for i, l in enumerate(ls) if "(Get-Date).Hour -ge 20" in l)
+    assert next(i for i, l in enumerate(ls) if "jobs.step general-ratios-sync --data-dir $data --limit 60" in l) > evening

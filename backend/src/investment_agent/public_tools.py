@@ -23,7 +23,8 @@ INDEXES = ("VNINDEX", "VN30")
 MAX_DAILY = 800  # daily adjusted closes per answer
 GENERAL_RATIO_NOTE = ("Số do VNDirect tự tính, giữ nguyên. Tỷ lệ, biên và tăng trưởng ở dạng thập phân (0,08 là 8%); DSO, DIO, DPO và chu kỳ "
                       "vận động vốn là số ngày; EPS_TR, BVPS_AQ là đồng; các hệ số thanh toán và DEBT_EBITDA là số lần. Quý có doanh thu rất "
-                      "nhỏ làm số ngày và biên lệch rất xa: nói rõ khi gặp, không bỏ đi.")
+                      "nhỏ làm số ngày và biên lệch rất xa: nói rõ khi gặp, không bỏ đi. EPS_TR, BVPS_AQ và các chỉ số trên mỗi cổ phiếu dùng số cổ phiếu cuối quý "
+                      "của VNDirect: có đợt thưởng hay phát hành sau quý đó thì không so trực tiếp với giá hiện tại mà nói rõ hai số cổ phiếu.")
 def _sessions(start: date, end: date, data_dir: Path) -> tuple[set[date], str | None]:
     """HOSE sessions between start and end from the official calendar files in config/ (the years that exist); before the first of them,
     the days VN-Index traded at VNDirect (owner, 26/11/2026), said to be no official calendar. What was read, named."""

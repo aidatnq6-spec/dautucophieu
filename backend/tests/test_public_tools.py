@@ -328,3 +328,10 @@ def test_daily_long_prices_name_the_vnindex_days_the_ticker_lacks(data):
     out = data.lich_su_gia("BBB", mat_do="ngay")
     assert out["phien_thieu"] == ["2015-03-03", "2015-03-04"] and "phiên VN-Index" in out["lich_kiem"]
     assert "phien_thieu" not in data.lich_su_gia("BBB")  # month-ends are a choice of days, not sessions
+
+
+def test_general_ratios_warn_that_per_share_figures_use_vndirects_quarter_end_share_count(data):
+    write(data.root / "financial-ratios-general" / "BBB.json", {"symbol": "BBB", "kind": "general", "fetched_at": "t", "source": "vndirect:finfo",
+                                                               "names": {}, "quarters": {"2026-09-30": {"BVPS_AQ": "16737"}}})
+    note = data.chi_so_tai_chinh("BBB")["luu_y"]
+    assert "số cổ phiếu cuối quý" in note and "đợt thưởng" in note

@@ -92,13 +92,21 @@ def _year(deals: list[dict], now: datetime) -> dict:
     people and results without kind or volume counted apart."""
     since = (now.date() - timedelta(days=365)).isoformat()
     tally = {"since": since, "bought": 0, "buy_reports": 0, "sold": 0, "sell_reports": 0, "esop": 0, "esop_reports": 0,
-             "gift_reports": 0, "without_volume": 0}
+             "gift_reports": 0, "merged_reports": 0, "without_volume": 0}
+    seen = set()
     for d in deals:
         if d["date"] < since or (d["kind"] or "").startswith("Đăng kí"):
             continue
         if d["kind"] is None or d["shares"] is None:
             tally["without_volume"] += 1
-        elif d["kind"] == "Mua":
+            continue
+        # One trade in a major shareholder's own report and in its group's report (owner, 26/11/2026): same day, kind and shares count once
+        key = (d["date"], d["kind"], d["shares"])
+        if key in seen:
+            tally["merged_reports"] += 1
+            continue
+        seen.add(key)
+        if d["kind"] == "Mua":
             tally["bought"] += d["shares"]
             tally["buy_reports"] += 1
         elif d["kind"] == "Bán":

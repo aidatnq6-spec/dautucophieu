@@ -230,7 +230,7 @@ def test_readings_fill_only_what_vndirect_lacks_and_esop_is_tallied_apart(tmp_pa
     store.save("KDH", {"symbol": "KDH", "fetched_at": NOW.isoformat(), "deals": deals, "source": "vndirect:finfo"})
     view = insider_deals(store, "KDH", get=None, now=NOW)
     assert view["year"] == {"since": "2025-11-26", "bought": 7, "buy_reports": 1, "sold": 3000, "sell_reports": 1,
-                            "esop": 650000, "esop_reports": 1, "gift_reports": 0, "without_volume": 2}
+                            "esop": 650000, "esop_reports": 1, "gift_reports": 0, "merged_reports": 0, "without_volume": 2}
     assert json.loads((tmp_path / "insider" / "KDH.json").read_text(encoding="utf-8"))["deals"] == deals  # stored as VNDirect gave it
 
 
@@ -244,3 +244,26 @@ def test_gifts_are_counted_apart_from_buying_and_selling(tmp_path):
                        "deals": [_deal("2026-11-20", "Cho", DOC.format(301)), _deal("2026-11-20", "Nhận", DOC.format(302))]})
     year = insider_deals(store, "KDH", get=None, now=NOW)["year"]
     assert (year["bought"], year["sold"], year["gift_reports"], year["without_volume"]) == (0, 0, 2, 0)
+
+
+# A foreign investor group's report: a table per member, then the group's total row (before, after, traded).
+TABLE = """5. Thông tin chỉ tiết về tình hình giao dịch chứng khoán của các thành viên trong nhóm
+2| Longwoods
+gw cu 22.000.000 | 1,7666 | 23.000.000. | 1,8469 | 1.000.000
+Tổng cả nhóm nhà đầu tư nước ngoài có liên quan/Total
+. „ ố . S {before} | 7,9739 | {after} | 8,0542 | {traded}
+group of affiliated foreign Investors
+6. Ngày thay đổi tỷ lệ sở hữu của cả nhóm
+"""
+
+
+def test_a_foreign_groups_table_is_read_from_its_total_row():
+    assert parse_report(TABLE.format(before="99.298.874", after="100.298.874", traded="1.000.000"), "Báo cáo về sở hữu của nhóm NĐTNN") == {
+        "kind": "Mua", "shares": 1000000, "before": 99298874, "after": 100298874, "rong": True}
+    # a decrease is printed in brackets; the total on the same line as its label, percentages with a dot
+    one_line = "Tổng cả nhóm đầu tư nước ngoài có liên quan/ 62.902.841 5,0512% | 62.192.841 4.9942% (710.000)\nTotal group\n"
+    assert parse_report(one_line, "Báo cáo")["kind"] == "Bán" and parse_report(one_line, "Báo cáo")["shares"] == 710000
+    assert parse_report(TABLE.format(before="99.298.874", after="100.298.874", traded="1.000.001"), "Báo cáo") == {"reason": "cộng trừ không khớp"}
+    # an empty total row
+    assert parse_report("Tổng cả nhóm đâu tư nước ngoài có liên quan/\nTotal group oƒ affliated foreign investors\nGhi chú/Notes:\n", "Báo cáo") == {
+        "reason": "thiếu số trước, đã giao dịch hoặc sau"}

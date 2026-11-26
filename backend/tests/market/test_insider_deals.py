@@ -37,7 +37,7 @@ def test_notices_are_read_once_a_day_with_a_twelve_month_tally_that_counts_what_
     assert [d["date"] for d in view["deals"]] == ["2026-06-18", "2026-03-02", "2026-02-12", "2026-01-30", "2025-12-15", "2024-07-02"]
     assert view["deals"][1]["url"] is None  # only links to the VNDirect notice page
     # Done trades in the last 12 months; registrations are intentions, not trades; a result without kind or volume is counted apart.
-    assert view["year"] == {"since": "2025-10-31", "bought": 15746005, "buy_reports": 2, "sold": 2219000, "sell_reports": 1, "esop": 0, "esop_reports": 0, "gift_reports": 0, "without_volume": 1}
+    assert view["year"] == {"since": "2025-10-31", "bought": 15746005, "buy_reports": 2, "sold": 2219000, "sell_reports": 1, "esop": 0, "esop_reports": 0, "gift_reports": 0, "merged_reports": 0, "without_volume": 1}
     insider_deals(InsiderStore(tmp_path), "ACB", get=get, now=datetime(2026, 10, 31, 20, tzinfo=timezone.utc))
     assert len(urls) == 2 and "/v4/news" in urls[1]  # the notice list and one news lookup; the second read of the day asks nothing
 
@@ -79,3 +79,17 @@ def test_a_failing_news_lookup_keeps_the_notices_without_links(tmp_path):
         return json.dumps({"data": rows})
     deals = insider_deals(InsiderStore(tmp_path), "KDH", get=get, now=NOW)["deals"]
     assert len(deals) == 1 and deals[0]["doc_url"] is None
+
+
+def test_one_trade_in_two_reports_counts_once_in_the_twelve_months_owner_26_11_2026(tmp_path):
+    # A major shareholder's own report and its foreign group's report: same day, same kind, same shares
+    store = InsiderStore(tmp_path)
+    deal = {"source": "HOSE", "url": None, "doc_url": None}
+    store.save("KDH", {"symbol": "KDH", "fetched_at": NOW.isoformat(), "source": "vndirect:finfo", "deals": [
+        {**deal, "date": "2026-10-09", "kind": "Mua", "shares": 12500000, "title": "Cổ đông lớn"},
+        {**deal, "date": "2026-10-09", "kind": "Mua", "shares": 12500000, "title": "Nhóm NĐTNN"},
+        {**deal, "date": "2026-10-09", "kind": "Mua", "shares": 100, "title": "Khác số"},
+        {**deal, "date": "2026-10-10", "kind": "Mua", "shares": 100, "title": "Khác ngày"}]})
+    year = insider_deals(store, "KDH", get=None, now=NOW)["year"]
+    assert (year["bought"], year["buy_reports"], year["merged_reports"]) == (12500200, 3, 1)
+    assert len(insider_deals(store, "KDH", get=None, now=NOW)["deals"]) == 4  # the table still lists every report

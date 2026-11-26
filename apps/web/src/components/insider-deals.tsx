@@ -6,14 +6,15 @@ import { formatVnd } from "../lib/format";
 type FromDoc = { truoc: number | null; sau: number | null; so_tep: number; rong: boolean; doc_luc: string | null };
 type Deal = { date: string; kind: string | null; shares: number | null; source: string | null; title: string; url: string | null;
   doc_url?: string | null; tu_van_ban?: FromDoc };
-type Year = { since: string; bought: number; buy_reports: number; sold: number; sell_reports: number; esop?: number; esop_reports?: number; gift_reports?: number; merged_reports?: number;
+type Year = { since: string; bought: number; buy_reports: number; sold: number; sell_reports: number; esop?: number; esop_reports?: number; gift_reports?: number; transfer_reports?: number; merged_reports?: number;
   without_volume: number };
 type View = { symbol: string; deals: Deal[]; year: Year | null; fetched_at: string | null; stale: boolean; reason: string | null };
 
 const day = (iso: string | null) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
 const shares = (q: number) => formatVnd(String(q), { unit: false });
 const KIND: Record<string, [string, string]> = { "Mua": ["Mua", "good"], "Bán": ["Bán", "bad"], "Đăng kí mua": ["Đăng ký mua", ""],
-  "Đăng kí bán": ["Đăng ký bán", ""], "ESOP": ["ESOP", ""], "Cho tặng": ["Cho tặng", ""], "Nhận tặng": ["Nhận tặng", ""] };
+  "Đăng kí bán": ["Đăng ký bán", ""], "ESOP": ["ESOP", ""], "Cho tặng": ["Cho tặng", ""], "Nhận tặng": ["Nhận tặng", ""],
+  "Chuyển nhượng": ["Chuyển nhượng", ""], "Nhận chuyển nhượng": ["Nhận chuyển nhượng", ""] };
 const FIRST = 15;
 const fromDocTitle = (f: FromDoc) => [
   "Đọc từ văn bản HOSE" + (f.so_tep > 1 ? ` (${f.so_tep} tệp, cộng lại)` : ""),
@@ -43,6 +44,7 @@ export function InsiderDeals({ symbol }: { symbol: string }) {
           đã bán <strong>{shares(y.sold)}</strong> cổ phiếu ({y.sell_reports} báo cáo)
           {(y.esop_reports ?? 0) > 0 && <>; nhận ESOP <strong>{shares(y.esop ?? 0)}</strong> cổ phiếu ({y.esop_reports} báo cáo, không tính vào mua)</>}
           {(y.gift_reports ?? 0) > 0 && <>; {y.gift_reports} báo cáo cho tặng giữa các cá nhân (không tính vào mua bán)</>}
+          {(y.transfer_reports ?? 0) > 0 && <>; {y.transfer_reports} báo cáo chuyển nhượng thỏa thuận qua VSDC (không tính vào mua bán)</>}
           {(y.merged_reports ?? 0) > 0 && <>; {y.merged_reports} báo cáo trùng giao dịch đã có (cùng ngày, cùng loại, cùng số) chỉ tính một lần</>}
           {y.without_volume > 0 && <>; {y.without_volume} báo cáo kết quả không ghi loại hoặc khối lượng, xem thông báo gốc</>}.</p>}
         <table className="fv-table" aria-label={`Giao dịch nội bộ ${symbol}`}>

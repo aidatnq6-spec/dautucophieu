@@ -358,8 +358,9 @@ class PublicData:
                 "luu_y": "Báo cáo có thieu_so_luong: nguồn VNDirect không có chiều mua bán và số lượng; số lượng nằm trong văn bản công bố ở van_ban. "
                          "Không suy ra chiều hay số lượng từ tiêu đề. Báo cáo có tu_van_ban: loại và số lượng đọc từ văn bản HOSE đính kèm (nhận dạng "
                          "chữ trên máy), chỉ nhận khi số nắm giữ trước ± số đã giao dịch = số sau; rong=true là số ròng của cả nhóm cổ đông lớn; "
-                         "loại ESOP là cổ phiếu mua trực tiếp từ công ty, Cho tặng và Nhận tặng là chuyển cổ phiếu giữa các cá nhân; cả ba không phải "
-                         "mua bán trên thị trường."}
+                         "loại ESOP là cổ phiếu mua trực tiếp từ công ty, Cho tặng và Nhận tặng là chuyển cổ phiếu giữa các cá nhân, "
+                         "Chuyển nhượng và Nhận chuyển nhượng là chuyển nhượng thỏa thuận giữa hai bên qua VSDC; các loại này không phải "
+                         "mua bán khớp lệnh trên thị trường và không cộng vào số mua, bán 12 tháng."}
 
     # Vĩ mô và thế giới
     def _series_names(self) -> list[str]:

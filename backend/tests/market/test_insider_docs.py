@@ -98,6 +98,18 @@ def test_gifts_are_their_own_kinds_and_a_report_of_nothing_traded_says_so():
         "reason": "không giao dịch cổ phiếu nào"}
 
 
+def test_negotiated_transfers_are_their_own_kinds():
+    # A transfer agreed between two parties and settled through VSDC (owner, 26/11/2026): not a trade on the exchange
+    received = insider(kind="Nhận chuyển nhượng", before="6.485.439", traded="198.391", after="6.683.830").replace(
+        "Nhận chuyển nhượng/Purchase", "nhận chuyển nhượng/to be transferred")
+    assert parse_report(received, "Báo cáo kết quả")["kind"] == "Nhận chuyển nhượng"
+    given = insider(kind="Chuyển nhượng", before="6.683.830", traded="198.391", after="6.485.439").replace(
+        "Chuyển nhượng/Purchase", "chuyển nhượng/transfer")
+    assert parse_report(given, "Báo cáo kết quả")["kind"] == "Chuyển nhượng"
+    # the stated kind and the figures disagree: nothing is taken
+    assert parse_report(received.replace("6.683.830", "6.287.048"), "Báo cáo") == {"reason": "chiều không khớp"}
+
+
 def test_esop_is_its_own_kind():
     via_title = parse_report(insider(), "Báo cáo kết quả giao dịch cổ phiếu ESOP của Người nội bộ A")
     via_method = parse_report(insider(method="Mua trực tiếp từ tổ chức phát hành/Pzrchase directiy ƒrom the iSsuer"), "Báo cáo kết quả")
@@ -245,7 +257,8 @@ def test_sync_reads_reports_of_watched_tickers_newest_first_once_and_retries_fai
         if nid == "101":
             raise OSError("timeout")
         return {"news_id": nid, "title": title, "result": {"kind": "Mua", "shares": 1000, "files": 1, "rong": False,
-                                                           "before": 1000, "after": 2000}, "reason": None, "read_at": NOW.isoformat()}
+                                                           "before": 1000, "after": 2000}, "reason": None, "read_at": NOW.isoformat(),
+                "reader": READER}
     out = sync_insider_docs(tmp_path, ["KDH"], read=read, limit=30)
     assert asked == ["102", "101"]  # ACB is not watched; 103 is an intention, 104 has VNDirect's figures, 105 is HNX, 106 was read
     assert out == {"read": 1, "accepted": 1, "rejected": 0, "errors": 1, "left": 0}
@@ -253,22 +266,22 @@ def test_sync_reads_reports_of_watched_tickers_newest_first_once_and_retries_fai
     assert sync_insider_docs(tmp_path, ["KDH"], read=read, limit=0) == {"read": 0, "accepted": 0, "rejected": 0, "errors": 0, "left": 1}
 
 
-def test_a_better_reader_reads_again_once_what_an_older_one_could_not_take(tmp_path):
+def test_a_newer_reader_reads_every_older_reading_again_once(tmp_path):
     InsiderStore(tmp_path).save("KDH", {"symbol": "KDH", "fetched_at": NOW.isoformat(), "deals": [
         _deal("2026-11-05", "Báo cáo kết quả A", DOC.format(301)), _deal("2026-11-04", "Báo cáo kết quả B", DOC.format(302)),
         _deal("2026-11-03", "Báo cáo kết quả C", DOC.format(303))]})
     docs = DocStore(tmp_path)
     docs.save("301", {"news_id": "301", "result": None, "reason": "thiếu số trước, đã giao dịch hoặc sau"})  # an older reader's
     docs.save("302", {"news_id": "302", "result": {"kind": "Mua", "shares": 5, "files": 1, "rong": False, "before": 1, "after": 6},
-                      "reason": None})  # taken: kept as it is
+                      "reason": None})  # taken, but an older reader may have taken a transfer for a purchase
     docs.save("303", {"news_id": "303", "result": None, "reason": "cộng trừ không khớp", "reader": READER})
     asked = []
 
     def read(nid, title, **kw):
         asked.append(nid)
         return {"news_id": nid, "result": None, "reason": "thiếu số trước, đã giao dịch hoặc sau", "reader": READER}
-    assert sync_insider_docs(tmp_path, ["KDH"], read=read)["read"] == 1
-    assert asked == ["301"] and sync_insider_docs(tmp_path, ["KDH"], read=read)["read"] == 0
+    assert sync_insider_docs(tmp_path, ["KDH"], read=read)["read"] == 2
+    assert asked == ["301", "302"] and sync_insider_docs(tmp_path, ["KDH"], read=read)["read"] == 0
     assert read_notice("9", "t", get_json=lambda u: {"data": {"list": []}}, get_bytes=None, pdf_text=None, sleep=None,
                        now=NOW)["reader"] == READER
 
@@ -296,20 +309,22 @@ def test_readings_fill_only_what_vndirect_lacks_and_esop_is_tallied_apart(tmp_pa
     store.save("KDH", {"symbol": "KDH", "fetched_at": NOW.isoformat(), "deals": deals, "source": "vndirect:finfo"})
     view = insider_deals(store, "KDH", get=None, now=NOW)
     assert view["year"] == {"since": "2025-11-26", "bought": 7, "buy_reports": 1, "sold": 3000, "sell_reports": 1,
-                            "esop": 650000, "esop_reports": 1, "gift_reports": 0, "merged_reports": 0, "without_volume": 2}
+                            "esop": 650000, "esop_reports": 1, "gift_reports": 0, "transfer_reports": 0, "merged_reports": 0,
+                            "without_volume": 2}
     assert json.loads((tmp_path / "insider" / "KDH.json").read_text(encoding="utf-8"))["deals"] == deals  # stored as VNDirect gave it
 
 
 def test_gifts_are_counted_apart_from_buying_and_selling(tmp_path):
     docs = DocStore(tmp_path)
-    for nid, kind in (("301", "Cho tặng"), ("302", "Nhận tặng")):
+    for nid, kind in (("301", "Cho tặng"), ("302", "Nhận tặng"), ("303", "Nhận chuyển nhượng"), ("304", "Chuyển nhượng")):
         docs.save(nid, {"news_id": nid, "read_at": "r", "reason": None,
                         "result": {"kind": kind, "shares": 17700000, "files": 1, "rong": False, "before": 1, "after": 2}})
     store = InsiderStore(tmp_path)
     store.save("KDH", {"symbol": "KDH", "fetched_at": NOW.isoformat(), "source": "vndirect:finfo",
-                       "deals": [_deal("2026-11-20", "Cho", DOC.format(301)), _deal("2026-11-20", "Nhận", DOC.format(302))]})
+                       "deals": [_deal("2026-11-20", "Cho", DOC.format(301)), _deal("2026-11-20", "Nhận", DOC.format(302)),
+                                 _deal("2026-11-21", "Nhận CN", DOC.format(303)), _deal("2026-11-21", "CN", DOC.format(304))]})
     year = insider_deals(store, "KDH", get=None, now=NOW)["year"]
-    assert (year["bought"], year["sold"], year["gift_reports"], year["without_volume"]) == (0, 0, 2, 0)
+    assert (year["bought"], year["sold"], year["gift_reports"], year["transfer_reports"], year["without_volume"]) == (0, 0, 2, 2, 0)
 
 
 # A foreign investor group's report: a table per member, then the group's total row (before, after, traded).

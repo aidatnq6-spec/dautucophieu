@@ -12,7 +12,7 @@ Chủ sở hữu duyệt ngày 26/11/2026 (cách B). Nhiều báo cáo giao dị
 
 - Chỉ báo cáo đã thực hiện: tiêu đề bắt đầu bằng "Báo cáo" (kết quả giao dịch, thay đổi sở hữu của cổ đông lớn). "Thông báo giao dịch" là đăng ký, tức ý định, không đọc.
 - Chỉ báo cáo mà VNDirect thiếu chiều hoặc số lượng, của các mã đang theo dõi, đã có trong `data/insider/<MÃ>.json`.
-- Mỗi tin một tệp `data/insider-docs/<mã tin>.json`, đọc một lần (văn bản đã công bố không đổi). Lỗi tải thì lần sau đọc lại; đọc được mà không nhận số thì giữ kết quả, không đọc lại, trừ khi bộ đọc có phiên bản mới (`reader` trong tệp): tin bộ đọc cũ không nhận được thì được đọc lại một lần; tin đã nhận số giữ nguyên.
+- Mỗi tin một tệp `data/insider-docs/<mã tin>.json`, đọc một lần (văn bản đã công bố không đổi). Lỗi tải thì lần sau đọc lại; đọc được mà không nhận số thì giữ kết quả, không đọc lại, trừ khi bộ đọc có phiên bản mới (`reader` trong tệp): mọi tin bộ đọc cũ đã đọc được đọc lại một lần, kể cả tin đã nhận số (phiên bản 3 tách chuyển nhượng, nên một tin bộ đọc cũ ghi là mua được sửa); lỗi tải thì giữ kết quả cũ.
 
 ## Khi nào nhận số (chủ sở hữu chọn: chỉ khi cộng trừ khớp)
 
@@ -20,6 +20,7 @@ Chủ sở hữu duyệt ngày 26/11/2026 (cách B). Nhiều báo cáo giao dị
 - Số đã giao dịch nằm ở "Số lượng cổ phiếu đã giao dịch" (người nội bộ), "Số lượng cổ phiếu đã Mua/đã Bán" (tổ chức) hoặc "Số lượng cổ phiếu đã mua/bán" (nhóm cổ đông lớn). Số là số in kiểu Việt Nam có dấu chấm ngăn nghìn (hoặc dấu phẩy ngăn nghìn như một số văn bản in), hoặc 0; số có dấu % là tỷ lệ, không phải số cổ phiếu. Mẫu đầy đủ (Phụ lục XV, bổ sung 26/11/2026 sau lượt đọc đầu tiên): nhãn có thể ngắt xuống dòng, nhãn số đã giao dịch có thêm "/chứng chỉ quỹ/chứng quyền có bảo đảm"; số tìm trong mục của nhãn, dừng ở nhãn "Số lượng…" kế tiếp, và không lấy dòng tổng gồm người có liên quan khi dòng của người thực hiện giao dịch để trống.
 - Chiều: lấy loại đã nêu ("Loại giao dịch đã thực hiện" hay "đã Mua/đã Bán") và chiều đó phải khớp với trước → sau; không đọc được dòng loại thì lấy chiều từ trước → sau (phép cộng trừ vẫn phải khớp). Báo cáo cổ đông lớn lấy chiều từ trước → sau.
 - Cho tặng (bổ sung 26/11/2026 sau khi đọc thử văn bản KDH): loại "Cho/tặng", "Được cho/tặng" hoặc phương thức "do cho/tặng" ghi `Cho tặng` hay `Nhận tặng`; không cộng vào mua bán, chỉ đếm số báo cáo (`gift_reports`), nên điều kiện luận điểm "người nội bộ bán" không tính.
+- Chuyển nhượng thỏa thuận (chủ sở hữu chọn 26/11/2026): loại đã thực hiện "Nhận chuyển nhượng" hoặc "Chuyển nhượng" (thỏa thuận giữa hai bên, chuyển quyền sở hữu qua VSDC) ghi `Nhận chuyển nhượng` hay `Chuyển nhượng`, chiều vẫn phải khớp với trước → sau; như cho tặng, không cộng vào mua bán, chỉ đếm số báo cáo (`transfer_reports`).
 - Bảng của nhóm nhà đầu tư nước ngoài (bổ sung 26/11/2026): khi văn bản không có các mục trước, sau theo mẫu, đọc dòng "Tổng cả nhóm" trên dòng đó hoặc hai dòng sau; phải có đúng ba số (trước, sau, đã giao dịch, số giảm trong ngoặc) và cộng trừ khớp; ghi `rong`.
 - Đã giao dịch 0 cổ phiếu (đăng ký mà không mua bán): để thiếu, lý do "không giao dịch cổ phiếu nào".
 - Nhóm cổ đông lớn vừa mua vừa bán trong một văn bản (chủ sở hữu chọn): ghi số ròng của cả nhóm, kiểm trên tổng nhóm, đánh dấu `rong`.
@@ -30,7 +31,7 @@ Chủ sở hữu duyệt ngày 26/11/2026 (cách B). Nhiều báo cáo giao dị
 ## Dùng ở đâu
 
 - `insider_deals` điền `kind` và `shares` cho báo cáo VNDirect thiếu, từ các văn bản đã nhận, kèm `tu_van_ban` = {trước, sau, số tệp, ròng hay không, lúc đọc}; số VNDirect có sẵn không bao giờ bị thay. Trang mã, cảnh báo giao dịch nội bộ (nhận diện theo ngày và tiêu đề nên không gửi lại tin cũ), điều kiện luận điểm "Người nội bộ hoặc cổ đông lớn bán", bản tin tuần và `giao_dich_noi_bo` cùng thấy số đó.
-- Tổng 12 tháng thêm `esop`, `esop_reports` và `gift_reports`. Báo cáo cùng ngày, cùng loại và đúng cùng số cổ phiếu chỉ tính một lần (một giao dịch có trong cả báo cáo cổ đông lớn và báo cáo nhóm; chủ sở hữu chọn 26/11/2026), đếm ở `merged_reports`; bảng vẫn hiện đủ từng báo cáo.
+- Tổng 12 tháng thêm `esop`, `esop_reports`, `gift_reports` và `transfer_reports`. Báo cáo cùng ngày, cùng loại và đúng cùng số cổ phiếu chỉ tính một lần (một giao dịch có trong cả báo cáo cổ đông lớn và báo cáo nhóm; chủ sở hữu chọn 26/11/2026), đếm ở `merged_reports`; bảng vẫn hiện đủ từng báo cáo.
 - Trang mã: loại "ESOP", số đọc từ văn bản có ghi chú "đọc từ văn bản HOSE, đã kiểm trước ± giao dịch = sau".
 - `giao_dich_noi_bo`: báo cáo còn thiếu vẫn có `thieu_so_luong` và `van_ban`; báo cáo đã điền có `tu_van_ban`.
 

@@ -89,10 +89,10 @@ def _deals(symbol: str, payload: dict, links: dict[str, str] | None = None) -> l
 
 def _year(deals: list[dict], now: datetime) -> dict:
     """Done trades over the last 12 months (registrations are intentions); ESOP shares bought from the company, gifts between
-    people and results without kind or volume counted apart."""
+    people, negotiated transfers and results without kind or volume counted apart."""
     since = (now.date() - timedelta(days=365)).isoformat()
     tally = {"since": since, "bought": 0, "buy_reports": 0, "sold": 0, "sell_reports": 0, "esop": 0, "esop_reports": 0,
-             "gift_reports": 0, "merged_reports": 0, "without_volume": 0}
+             "gift_reports": 0, "transfer_reports": 0, "merged_reports": 0, "without_volume": 0}
     seen = set()
     for d in deals:
         if d["date"] < since or (d["kind"] or "").startswith("Đăng kí"):
@@ -115,6 +115,8 @@ def _year(deals: list[dict], now: datetime) -> dict:
         elif d["kind"] == "ESOP":
             tally["esop"] += d["shares"]
             tally["esop_reports"] += 1
+        elif d["kind"] in ("Nhận chuyển nhượng", "Chuyển nhượng"):  # agreed between two parties, settled through VSDC
+            tally["transfer_reports"] += 1
         else:  # Cho tặng, Nhận tặng
             tally["gift_reports"] += 1
     return tally

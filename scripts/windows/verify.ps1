@@ -4,6 +4,8 @@
 . (Join-Path $PSScriptRoot 'common.ps1')
 $python = Get-RepoPython
 $web = Join-Path $script:RepoRoot 'apps\web'
+# The last verify build's route types would otherwise reach tsc (a page removed since would fail the typecheck).
+Remove-Item -LiteralPath (Join-Path $web '.next-verify') -Recurse -Force -ErrorAction SilentlyContinue
 $checks = [ordered]@{
     'backend pytest'  = { & $python -m pytest (Join-Path $script:RepoRoot 'backend\tests') -q -p no:warnings }
     'dependency audit' = {
@@ -16,7 +18,8 @@ $checks = [ordered]@{
     'web typecheck'   = { npm.cmd --prefix $web run typecheck }
     'web lint'        = { npm.cmd --prefix $web run lint }
     'web unit tests'  = { npm.cmd --prefix $web run test -- --run }
-    'web build'       = { npm.cmd --prefix $web run build }
+    # Into its own folder: rebuilding .next under the running app broke its pages (26/11/2026).
+    'web build'       = { $env:NEXT_DIST_DIR = '.next-verify'; try { npm.cmd --prefix $web run build } finally { Remove-Item Env:NEXT_DIST_DIR } }
     'browser e2e'     = { npm.cmd --prefix $web run test:e2e -- --reporter=line }
 }
 $failed = @()
@@ -44,6 +47,10 @@ try {
         }
         $failed += $name
     }
-} finally { Pop-Location }
+} finally {
+    # The build and the browser tests' dev server rewrite next-env.d.ts; it is never committed, so it is put back.
+    git -C $script:RepoRoot checkout --quiet -- apps/web/next-env.d.ts 2>$null
+    Pop-Location
+}
 if ($failed) { Write-Host "Không đạt: $($failed -join ', ')"; exit 1 }
 Write-Host 'Tất cả kiểm tra tự động đã đạt (dữ liệu tổng hợp; kiểm chứng live chưa chạy).'

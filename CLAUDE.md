@@ -13,7 +13,7 @@
 - Test backend: `.venv/Scripts/python.exe -m pytest backend/tests -q -p no:warnings`
 - Kiểm tra toàn bộ (bắt buộc đạt trước khi mở PR): `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows\verify.ps1`
 - Web: `npm.cmd --prefix apps/web run <dev|typecheck|lint|test|build>`; CLI backend: `python -m investment_agent.cli <lệnh>`.
-- Sau `verify.ps1`, bước build sửa `apps/web/next-env.d.ts`: khôi phục bằng `git checkout -- apps/web/next-env.d.ts`, không commit.
+- `verify.ps1` dựng web vào `apps/web/.next-verify` (không đụng `.next` của ứng dụng đang chạy) và tự khôi phục `next-env.d.ts`; một lệnh build tay vẫn sửa tệp đó: khôi phục bằng `git checkout -- apps/web/next-env.d.ts`, không commit. Sau khi merge vào main, chạy `scripts\windows\update-app.ps1` để dựng lại và khởi động lại ứng dụng.
 
 ## Quy trình
 - Nhánh `feat/…`, `fix/…`, `chore/…`, `docs/…` tạo từ `origin/main`; mỗi việc một PR, chủ sở hữu tự merge.

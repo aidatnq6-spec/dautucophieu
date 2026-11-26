@@ -1,0 +1,106 @@
+"""MCP dữ liệu công khai: `python -m investment_agent.mcp_server` serves public market data to Claude over stdio, read-only.
+
+Only investment_agent.public_tools is wired in; no personal record is reachable from here (a test checks the imports).
+"""
+
+from pathlib import Path
+
+from mcp.server.mcpserver import MCPServer
+from mcp.types import ToolAnnotations
+
+from investment_agent.public_tools import PublicData, default_data_dir
+
+INSTRUCTIONS = (
+    "Dữ liệu thị trường công khai của sàn HOSE từ kho trên máy (VNDirect, HOSE, nguồn vĩ mô công khai). Số giữ nguyên như trong kho, "
+    "kèm nguồn và thời điểm lấy. Khi công cụ trả thieu=true thì nói rõ là thiếu và lý do, không ước lượng hay nội suy. "
+    "Không có danh mục, giao dịch hay định giá cá nhân ở đây."
+)
+READ_ONLY = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
+
+
+def build_server(data_dir: Path | str | None = None) -> MCPServer:
+    data = PublicData(data_dir or default_data_dir())
+    server = MCPServer(name="dautucophieu-cong-khai", title="Dữ liệu công khai HOSE", instructions=INSTRUCTIONS)
+
+    def tool(fn):
+        return server.tool(annotations=READ_ONLY)(fn)
+
+    @tool
+    def thong_tin_ma(ma: str) -> dict:
+        """Mã có niêm yết HOSE không, ngành ICB và thuộc VN30/VN100 không."""
+        return data.thong_tin_ma(ma)
+
+    @tool
+    def gia_ngay(ma: str, tu_ngay: str | None = None, den_ngay: str | None = None, so_phien: int = 60) -> dict:
+        """Giá ngày (mở, cao, thấp, đóng, khối lượng) của một mã hoặc VNINDEX; ngày dạng YYYY-MM-DD; tối đa 500 phiên mới nhất."""
+        return data.gia_ngay(ma, tu_ngay, den_ngay, so_phien)
+
+    @tool
+    def dinh_gia_chi_so(chi_so: str = "VNINDEX", ty_le: str = "pe", so_diem: int = 60) -> dict:
+        """P/E hoặc P/B theo ngày của VNINDEX hoặc VN30 (nguồn VNDirect)."""
+        return data.dinh_gia_chi_so(chi_so, ty_le, so_diem)
+
+    @tool
+    def bao_cao_tai_chinh(ma: str, ky: str = "quy", so_ky: int = 8) -> dict:
+        """Các dòng BCTC (kết quả kinh doanh, cân đối kế toán, lưu chuyển tiền tệ) theo kỳ quy hoặc nam, đơn vị đồng, các kỳ mới nhất."""
+        return data.bao_cao_tai_chinh(ma, ky, so_ky)
+
+    @tool
+    def chi_so_tai_chinh(ma: str, so_ky: int = 8) -> dict:
+        """Chỉ số tài chính theo quý của một mã (nguồn VNDirect)."""
+        return data.chi_so_tai_chinh(ma, so_ky)
+
+    @tool
+    def eps_co_tuc(ma: str, so_ky: int = 8) -> dict:
+        """EPS, lợi nhuận, vốn chủ theo năm và quý; cổ tức, phát hành, số cổ phiếu lưu hành."""
+        return data.eps_co_tuc(ma, so_ky)
+
+    @tool
+    def su_kien_doanh_nghiep(ma: str) -> dict:
+        """Sự kiện doanh nghiệp: cổ tức, phát hành, đại hội cổ đông, ngày chốt quyền."""
+        return data.su_kien_doanh_nghiep(ma)
+
+    @tool
+    def co_dong_ban_lanh_dao(ma: str) -> dict:
+        """Cổ đông lớn và ban lãnh đạo đang nắm cổ phiếu."""
+        return data.co_dong_ban_lanh_dao(ma)
+
+    @tool
+    def giao_dich_noi_bo(ma: str) -> dict:
+        """Giao dịch của người nội bộ và người liên quan đã công bố."""
+        return data.giao_dich_noi_bo(ma)
+
+    @tool
+    def danh_sach_vi_mo() -> dict:
+        """Danh sách mã chỉ báo vĩ mô đang có (CPI, PMI, lãi suất, tỷ giá, hàng hóa, chỉ số Mỹ…) kèm trạng thái cập nhật."""
+        return data.danh_sach_vi_mo()
+
+    @tool
+    def chi_bao_vi_mo(ma: str, so_diem: int = 24) -> dict:
+        """Các quan sát mới nhất của một chỉ báo vĩ mô; lấy mã từ danh_sach_vi_mo."""
+        return data.chi_bao_vi_mo(ma, so_diem)
+
+    @tool
+    def chi_so_chau_a() -> dict:
+        """Các chỉ số chứng khoán châu Á mới nhất."""
+        return data.chi_so_chau_a()
+
+    @tool
+    def gia_vang() -> dict:
+        """Giá vàng trong nước mới nhất (mua, bán)."""
+        return data.gia_vang()
+
+    @tool
+    def omo(so_phien: int = 5) -> dict:
+        """Kết quả nghiệp vụ thị trường mở (OMO) của Ngân hàng Nhà nước, các phiên mới nhất."""
+        return data.omo(so_phien)
+
+    return server
+
+
+def main() -> None:
+    build_server().run()
+
+
+if __name__ == "__main__":
+    main()

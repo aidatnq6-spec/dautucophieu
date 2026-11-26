@@ -14,6 +14,7 @@ from pathlib import Path
 
 from investment_agent.market.price_history import read_index_sessions
 from investment_agent.market.prices import PriceStore
+from investment_agent.market.sector_compare import compare_sector
 from investment_agent.market.report_flags import EPS_JUMP, eps_jumps, outside_sales_flag
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -21,15 +22,6 @@ _SYMBOL = re.compile(r"^[A-Z0-9]{3,10}$")
 _SERIES = re.compile(r"^[a-z][a-z0-9_]{0,63}$")  # _status, _gaps… are run bookkeeping, not series
 INDEXES = ("VNINDEX", "VN30")
 MAX_DAILY = 800  # daily adjusted closes per answer
-# So sánh ngành (owner, 26/11/2026; docs/superpowers/specs/2026-11-26-so-sanh-nganh-design.md): the sixteen ratios, in this order
-SECTOR_CODES = ("ROAE_TR_AVG4Q", "ROIC_TR_AVG4Q", "GROSS_MARGIN_TR", "NET_MARGIN_TR", "DEBT_TO_EQUITY_AQ", "INTEREST_COVERAGE_TR",
-                "CURRENT_RATIO_AQ", "DEBT_EBITDA", "CFO_TO_SALES_TR", "DSO_TR_AVG5Q", "DIO_TR_AVG5Q", "CASH_CONVERSION_CYCLE_TR_AVG5Q",
-                "NET_SALES_TR_GRYOY", "NET_PROFIT_TR_GRYOY", "EPS_TR_GR3YR", "DIVIDEND_PAYOUT_TR")
-MIN_PEERS = 3
-
-
-def _plain(d) -> str:
-    return format(d.normalize(), "f")
 GENERAL_RATIO_NOTE = ("Số do VNDirect tự tính, giữ nguyên. Tỷ lệ, biên và tăng trưởng ở dạng thập phân (0,08 là 8%); DSO, DIO, DPO và chu kỳ "
                       "vận động vốn là số ngày; EPS_TR, BVPS_AQ là đồng; các hệ số thanh toán và DEBT_EBITDA là số lần. Quý có doanh thu rất "
                       "nhỏ làm số ngày và biên lệch rất xa: nói rõ khi gặp, không bỏ đi. EPS_TR, BVPS_AQ và các chỉ số trên mỗi cổ phiếu dùng số cổ phiếu cuối quý "
@@ -215,64 +207,8 @@ class PublicData:
                 "su_kien_co_phieu": issues}
 
     def so_sanh_nganh(self, ma) -> dict:
-        from decimal import Decimal, InvalidOperation
-        from statistics import median, quantiles
-        from investment_agent.market.financial_ratios import kind_of
         symbol = self._symbol(ma)
-        if symbol is None:
-            return _missing("Mã không hợp lệ.")
-        listing = (self._json("hose-listing.json") or {}).get("listing") or {}
-        codes, names = listing.get("icb_codes") or {}, listing.get("icb_names") or {}
-        code = codes.get(symbol)
-        if code is None:
-            return _missing(f"Chưa có ngành ICB của {symbol} trong danh sách HOSE.")
-        sector = names.get(code, code)
-        if kind_of(sector) is not None:
-            return _missing(f"{sector} có bộ chỉ số riêng (ngân hàng, bảo hiểm, chứng khoán); so sánh ngành chỉ dành cho doanh nghiệp thường.")
-        own = self._json("financial-ratios-general", f"{symbol}.json")
-        if not own or not own.get("quarters"):
-            return _missing(f"Chưa có chỉ số tài chính VNDirect của {symbol} trong kho.")
-        quarter = max(q for q, v in own["quarters"].items() if any(c in v for c in SECTOR_CODES))
-        mine = own["quarters"][quarter]
-        peers = sorted(s for s, c in codes.items() if c == code and s != symbol)
-        rows, no_file, no_quarter = {}, 0, 0
-        for s in peers:
-            rec = self._json("financial-ratios-general", f"{s}.json") if _SYMBOL.fullmatch(s) else None
-            if not rec:
-                no_file += 1
-            elif quarter not in (rec.get("quarters") or {}):
-                no_quarter += 1
-            else:
-                rows[s] = rec["quarters"][quarter]
-
-        def num(v):
-            try:
-                d = Decimal(str(v))
-            except (InvalidOperation, TypeError, ValueError):
-                return None
-            return d if d.is_finite() else None
-
-        out = []
-        for c in SECTOR_CODES:
-            label = (own.get("names") or {}).get(c, c)
-            value = num(mine.get(c))
-            others = [v for v in (num(r.get(c)) for r in rows.values()) if v is not None]
-            item = {"ma_chi_so": c, "ten": label, "gia_tri": mine.get(c)}
-            if value is None:
-                out.append({**item, "trung_vi": None, "so_doanh_nghiep": len(others), "ly_do": f"{symbol} chưa có số quý này"})
-                continue
-            if len(others) < MIN_PEERS:
-                out.append({**item, "trung_vi": None, "so_doanh_nghiep": len(others), "ly_do": f"Dưới {MIN_PEERS} doanh nghiệp cùng ngành có số quý này"})
-                continue
-            q1, _, q3 = quantiles(others, n=4, method="inclusive")
-            rank = 1 + sum(1 for v in others if v > value)
-            out.append({**item, "trung_vi": _plain(median(others)), "phan_vi_25": _plain(q1), "phan_vi_75": _plain(q3),
-                        "so_doanh_nghiep": len(others), "thu_hang": f"{rank}/{len(others) + 1} (cao xuống thấp)"})
-        return {"ma": symbol, "nganh": sector, "ma_nganh": code, "quy": quarter, "nguon": own.get("source"), "lay_luc": own.get("fetched_at"),
-                "so_doanh_nghiep_nganh": len(peers), "chua_co_quy_nay": no_quarter, "chua_co_chi_so": no_file, "chi_so": out,
-                "luu_y": "So với các doanh nghiệp cùng ngành ICB cấp 2 trên HOSE có số ở đúng quý này; trung vị và tứ phân vị là phép tính thống kê "
-                         "trên số VNDirect, không gồm mã đang xem. Không gắn nhãn tốt hay xấu: cao hơn không phải lúc nào cũng tốt (nợ vay, số "
-                         "ngày phải thu, tồn kho). Tỷ lệ ở dạng thập phân (0,08 là 8%); số ngày là ngày; hệ số là lần."}
+        return compare_sector(self.root, symbol) if symbol else _missing("Mã không hợp lệ.")
 
     def dinh_gia_chi_so(self, chi_so="VNINDEX", ty_le="pe", so_diem=60) -> dict:
         index, ratio = str(chi_so or "").upper(), str(ty_le or "").lower()

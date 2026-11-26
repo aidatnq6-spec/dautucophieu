@@ -15,6 +15,7 @@ from investment_agent.market.erp import ErpStore
 from investment_agent.market.financial_ratios import DISPLAY, FinancialRatioStore, kind_of
 from investment_agent.market.general_ratios import GENERAL_DISPLAY, GeneralRatioStore
 from investment_agent.market.report_flags import eps_jumps, outside_sales_flag
+from investment_agent.market.sector_compare import compare_sector
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.insider_deals import InsiderStore, insider_deals
 from investment_agent.market.index_valuation import INDICES, series_key
@@ -166,6 +167,15 @@ def statements(symbol: str, request: Request):
     theirs = ValuationCheckStore(data_dir / "valuation-check").read(symbol)
     return {**table, "kind": kind, "reason": None, "valuation_check": compare_valuation(table.get("current") or {}, theirs, ttm=table.get("ttm_parent")),
             "flags": _report_flags(data_dir, symbol) if kind is None else None}
+
+
+def _sector_medians(data_dir: Path, symbol: str) -> dict | None:
+    """Trung vị ngành of the twelve rows, as so_sanh_nganh works them out (owner, 26/11/2026); None when the ticker has no sector to compare."""
+    out = compare_sector(data_dir, symbol, tuple(code for code, _, _ in GENERAL_DISPLAY))
+    if out.get("thieu"):
+        return None
+    return {"name": out["nganh"], "quarter": out["quy"], "peers": out["so_doanh_nghiep_nganh"] - out["chua_co_quy_nay"] - out["chua_co_chi_so"],
+            "medians": {c["ma_chi_so"]: c["trung_vi"] for c in out["chi_so"]}, "counts": {c["ma_chi_so"]: c["so_doanh_nghiep"] for c in out["chi_so"]}}
 
 
 def _report_flags(data_dir: Path, symbol: str) -> dict:
@@ -432,7 +442,7 @@ def sector_ratios(symbol: str, request: Request):
                 "quarters": [{"date": q, "label": f"Q{(int(q[5:7]) + 2) // 3}/{q[:4]}"} for q in quarters],
                 "metrics": [{"code": code, "label": label, "format": fmt, "values": [general["quarters"][q].get(code) for q in quarters]}
                             for code, label, fmt in GENERAL_DISPLAY],
-                "notes": [], "notes_fetched_at": None}
+                "notes": [], "notes_fetched_at": None, "sector": _sector_medians(data_dir, sym)}
     data = {q: dict(v) for q, v in record["quarters"].items()}
     rows, notes, notes_fetched_at = list(DISPLAY[record["kind"]]), [], None
     if record["kind"] == "bank":

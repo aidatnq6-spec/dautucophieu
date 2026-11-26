@@ -18,6 +18,10 @@ from typing import Callable
 URL = ("https://api-finfo.vndirect.com.vn/v4/stock_prices?sort=date&q=code:{symbol}~date:gte:" + "2013-01-01"
        + "&size=9999&fields=code,date,adClose")
 SOURCE = "vndirect:finfo"
+# Days VN-Index traded since 2013, for the sessions a ticker's store lacks before the official calendar files begin (owner, 26/11/2026):
+# not an official calendar, and a day the whole source lacks is missing here too.
+INDEX_SESSIONS_URL = ("https://api-finfo.vndirect.com.vn/v4/vnmarket_prices?sort=date&q=code:VNINDEX~date:gte:2013-01-01&size=9999"
+                      "&fields=code,date,close")
 STALE = timedelta(days=7)
 _SYMBOL = re.compile(r"^[A-Z0-9]{1,10}$")
 
@@ -41,6 +45,24 @@ class PriceHistoryStore:
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
         os.replace(tmp, path)
+
+
+def read_index_sessions(data_dir: Path) -> dict | None:
+    path = Path(data_dir) / "index-sessions" / "VNINDEX.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+
+
+def sync_index_sessions(data_dir: Path, *, get: Callable[[str], str], now: datetime) -> dict:
+    rows = json.loads(get(INDEX_SESSIONS_URL)).get("data") or []
+    dates = sorted({str(r["date"])[:10] for r in rows if r.get("code") == "VNINDEX" and r.get("close") is not None and r.get("date")})
+    if not dates:
+        return {"status": "empty", "sessions": 0}
+    path = Path(data_dir) / "index-sessions" / "VNINDEX.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps({"source": SOURCE, "fetched_at": now.isoformat(), "dates": dates}), encoding="utf-8")
+    os.replace(tmp, path)
+    return {"status": "ok", "sessions": len(dates)}
 
 
 def parse_closes(text: str, *, symbol: str) -> list[list[str]]:

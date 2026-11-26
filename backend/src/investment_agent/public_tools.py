@@ -9,10 +9,11 @@ company or event files, since that list follows what the app tracks.
 import json
 import os
 import re
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+from investment_agent.market.price_history import read_index_sessions
 from investment_agent.market.prices import PriceStore
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -54,8 +55,9 @@ def _eps_jumps(years: dict) -> list[dict]:
     return out
 
 
-def _sessions(start: date, end: date) -> tuple[set[date], str | None]:
-    """HOSE sessions between start and end from the official calendar files in config/ (the years that exist); the files read, named."""
+def _sessions(start: date, end: date, data_dir: Path) -> tuple[set[date], str | None]:
+    """HOSE sessions between start and end from the official calendar files in config/ (the years that exist); before the first of them,
+    the days VN-Index traded at VNDirect (owner, 26/11/2026), said to be no official calendar. What was read, named."""
     from investment_agent.market.calendar import TradingCalendar
     found, named = set(), []
     for path in sorted((REPO_ROOT / "config").glob("trading-calendar-hose-*.json")):
@@ -68,6 +70,15 @@ def _sessions(start: date, end: date) -> tuple[set[date], str | None]:
                               holidays=frozenset(date.fromisoformat(d) for d in data["holidays"]))
         found |= set(cal.sessions(lo, hi))
         named.append(f"config/{path.name} ({data['first']}–{data['last']})")
+    official_from = min((date.fromisoformat(json.loads(p.read_text(encoding="utf-8"))["first"])
+                         for p in (REPO_ROOT / "config").glob("trading-calendar-hose-*.json")), default=None)
+    before = end if official_from is None else min(end, official_from - timedelta(days=1))
+    if start <= before:
+        index = read_index_sessions(data_dir)
+        if index and index.get("dates"):
+            days = {date.fromisoformat(d) for d in index["dates"] if start.isoformat() <= d <= before.isoformat()}
+            found |= days
+            named.append(f"phiên VN-Index của VNDirect đến {before.isoformat()} (không phải lịch chính thức; ngày cả nguồn thiếu không bắt được)")
     return found, "; ".join(named) or None
 
 
@@ -179,7 +190,7 @@ class PublicData:
             return _missing(f"Không có phiên nào của {symbol} trong khoảng ngày này.")
         last = view[days[-1]][0]
         window_start, window_end = start or days[0], end or days[-1]
-        sessions, calendars = _sessions(window_start, window_end)
+        sessions, calendars = _sessions(window_start, window_end, self.root)
         absent = sorted(d.isoformat() for d in sessions if d not in view)
         rows = [{"ngay": d.isoformat(), "mo": str(b.open), "cao": str(b.high), "thap": str(b.low), "dong": str(b.close), "khoi_luong": b.volume}
                 for d, b in ((d, view[d][0]) for d in days)]
@@ -212,13 +223,19 @@ class PublicData:
                 rows = [last[m] for m in sorted(last)]
             else:
                 rows = rows[-MAX_DAILY:]
-            return {"ma": symbol, "nguon": adjusted.get("source"), "lay_luc": adjusted.get("fetched_at"), "don_vi": "nghìn đồng",
+            out = {"ma": symbol, "nguon": adjusted.get("source"), "lay_luc": adjusted.get("fetched_at"), "don_vi": "nghìn đồng",
                     "dieu_chinh": True,
                     "mat_do": "Cuối tháng: phiên cuối của mỗi tháng trong khoảng" if mat_do == "thang"
                     else f"Từng phiên, tối đa {MAX_DAILY} phiên gần nhất trong khoảng",
                     "luu_y": "Giá đã điều chỉnh của VNDirect (adClose): VNDirect tính lại cả chuỗi sau mỗi đợt thưởng hay cổ tức cổ phiếu, "
                              "nên so được giá qua các năm; số có thể khác giá khớp lệnh thực tế ngày đó.",
                     "ngay_cuoi": adjusted["closes"][-1][0], "diem": rows, "su_kien_co_phieu": issues}
+            if mat_do == "ngay" and rows:
+                have = {r[0] for r in rows}
+                sessions, calendars = _sessions(date.fromisoformat(rows[0][0]), date.fromisoformat(rows[-1][0]), self.root)
+                out["phien_thieu"] = sorted(d.isoformat() for d in sessions if d.isoformat() not in have)
+                out["lich_kiem"] = calendars or "Chưa có lịch hay phiên VN-Index cho khoảng này; không kiểm phiên thiếu."
+            return out
         record, missing = self._per_symbol("index-history", ma, "lịch sử giá dài hạn")
         if missing:
             return missing

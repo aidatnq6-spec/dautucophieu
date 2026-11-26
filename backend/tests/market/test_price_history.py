@@ -64,3 +64,18 @@ def test_the_store_refuses_a_bad_ticker(tmp_path):
     import pytest
     with pytest.raises(ValueError):
         PriceHistoryStore(tmp_path).read("../x")
+
+
+def test_vnindex_sessions_since_2013_are_kept_as_a_list_of_days(tmp_path):
+    from investment_agent.market.price_history import INDEX_SESSIONS_URL, read_index_sessions, sync_index_sessions
+    asked = []
+
+    def get(url):
+        asked.append(url)
+        return json.dumps({"data": [{"code": "VNINDEX", "date": "2013-01-03", "close": 1}, {"code": "VNINDEX", "date": "2013-01-02", "close": 1},
+                                    {"code": "VN30", "date": "2013-01-04", "close": 1}, {"code": "VNINDEX", "date": "2013-01-07", "close": None}]})
+    assert sync_index_sessions(tmp_path, get=get, now=NOW) == {"status": "ok", "sessions": 2}
+    assert asked == [INDEX_SESSIONS_URL] and "code:VNINDEX" in asked[0] and "date:gte:2013-01-01" in asked[0]
+    assert read_index_sessions(tmp_path) == {"source": "vndirect:finfo", "fetched_at": NOW.isoformat(), "dates": ["2013-01-02", "2013-01-03"]}
+    assert sync_index_sessions(tmp_path, get=lambda url: json.dumps({"data": []}), now=NOW) == {"status": "empty", "sessions": 0}
+    assert read_index_sessions(tmp_path)["dates"] == ["2013-01-02", "2013-01-03"]  # an empty answer keeps what was stored

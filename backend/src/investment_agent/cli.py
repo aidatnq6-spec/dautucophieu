@@ -840,7 +840,7 @@ def general_ratios_sync(data_dir: Path, *, limit: int = 60, symbols: list[str] |
 def price_history_sync(data_dir: Path, *, limit: int = 60, symbols: list[str] | None = None, get=None, now=None) -> int:
     """Exit 0 when every ticker asked for came back or was empty, 1 when some failed (each is reported)."""
     from datetime import datetime, timezone
-    from investment_agent.market.price_history import sync_price_history
+    from investment_agent.market.price_history import sync_index_sessions, sync_price_history
     if get is None:
         import httpx
 
@@ -848,7 +848,12 @@ def price_history_sync(data_dir: Path, *, limit: int = 60, symbols: list[str] | 
             response = httpx.get(url, timeout=60, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
             response.raise_for_status()
             return response.text
-    out = sync_price_history(data_dir, get=get, now=now or datetime.now(timezone.utc), symbols=symbols, limit=limit)
+    now = now or datetime.now(timezone.utc)
+    out = sync_price_history(data_dir, get=get, now=now, symbols=symbols, limit=limit)
+    try:
+        out["index_sessions"] = sync_index_sessions(data_dir, get=get, now=now)["status"]  # one call: VN-Index days for phien_thieu
+    except Exception as exc:  # noqa: BLE001 - reported; the price run still counts
+        out["index_sessions"] = f"error:{type(exc).__name__}"
     print(json.dumps(out))
     return 0 if out["status"] == "ok" else 1
 

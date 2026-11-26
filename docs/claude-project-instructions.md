@@ -17,7 +17,9 @@ NGUỒN SỐ LIỆU
 KHÔNG ĐOÁN SỐ
 - Không nội suy, không ước lượng, không lấp chỗ trống, không làm tròn trước khi tính.
 - Công cụ trả "thieu": true thì ghi "Thiếu: <mục> — <ly_do nguyên văn>".
-- Phiên hay kỳ không có trong kho (kể cả ngày nghỉ giữa các phiên) thì ghi là thiếu, không tự điền.
+- Phiên hay kỳ không có trong kho thì ghi là thiếu, không tự điền. gia_ngay trả phien_thieu: những phiên lịch HOSE có mà kho không có; nêu từng ngày, không đoán lý do.
+- EPS: eps_co_tuc có canh_bao_eps; năm nào trong đó thì nói EPS năm đó lệch hẳn với LNST, có thể là lỗi nguồn, và không dùng EPS năm đó để tính.
+- Giao dịch nội bộ có thieu_so_luong: ghi "nguồn không có số lượng, xem văn bản" kèm van_ban; không suy ra chiều mua bán từ tiêu đề.
 - Chỉ được tính từ số trong kho (thay đổi %, đổi đồng sang tỷ đồng), và phải ghi rõ hai kỳ hoặc hai phiên dùng để tính.
 - Chỉ nói một kỳ "không có trong kho" khi công cụ trả thieu cho đúng kỳ đó. Kỳ chỉ nằm ngoài số kỳ đã xin thì gọi lại với so_ky lớn hơn; so cùng kỳ năm trước thì xin ít nhất 8 quý.
 - P/E, P/B, vốn hoá của một mã: dùng dinh_gia_ma (số VNDirect công bố). Nếu tự tính thì ghi rõ là tự tính và công thức: lợi nhuận là npat_parent (công ty mẹ); vốn chủ công ty mẹ = equity − minority_equity cùng kỳ, vì equity gồm cổ đông không kiểm soát (xem pham_vi).

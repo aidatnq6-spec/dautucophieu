@@ -5,7 +5,7 @@ import { ApiError, api } from "../lib/api";
 import { type Forecast, ForecastForm } from "./quarter-forecast";
 import { Spark, StatementChart, seriesName, toggleRow } from "./statement-chart";
 
-type Row = { key: string | null; label: string; kind: "group" | "money" | "pct" | "x" | "vnd"; indent: number; values: (string | null)[] };
+type Row = { key: string | null; label: string; kind: "group" | "money" | "pct" | "x" | "vnd" | "days"; indent: number; values: (string | null)[] };
 type Part = { periods: string[]; rows: Row[] };
 type Check = { period: string; check: string; label: string; a: string | null; b: string | null };
 type Conflict = { period: string; line: string; values: string[] };
@@ -16,9 +16,10 @@ type Tables = { symbol: string; kind?: "bank" | "securities" | "insurance" | nul
   valuation_check?: { shares_from_vndirect?: boolean; date: string | null; ours_date: string | null; flagged: number; rows: { key: string; label: string; note?: string | null; ours: string | null; theirs: string | null; diff: string | null; off: boolean }[] } | null };
 
 type Kind = "bank" | "securities" | "insurance";
-type Ratios = { kind: Kind; quarters: { date: string; label: string }[];
-  metrics: { code: string; label: string; format: "pct0" | "pct1" | "pct2" | "times"; values: (string | null)[] }[];
-  notes?: string[]; notes_fetched_at?: string | null };  // a bank's group-2 share and CASA: quarters left blank or entered differently
+// "general": VNDirect's ratios of a company outside banks, securities and insurance (Chỉ số tài chính (VNDirect), 26/11/2026)
+type Ratios = { kind: Kind | "general"; quarters: { date: string; label: string }[];
+  metrics: { code: string; label: string; format: "pct0" | "pct1" | "pct2" | "times" | "days"; values: (string | null)[] }[];
+  fetched_at?: string | null; notes?: string[]; notes_fetched_at?: string | null };  // a bank's group-2 share and CASA: quarters left blank or entered differently
 
 const SIGNED = new Set(["revenue_yoy", "gross_profit_yoy", "npat_parent_yoy", "ebitda_yoy", "fcff_yield"]);
 // VNDirect's ratios read to two places (NPL 1,66%, not 1,7%), as their own table showed them.
@@ -51,6 +52,7 @@ export function cell(v: string | null, kind: Row["kind"], key: string | null): s
   const n = Number(v);
   if (kind === "money") return (Math.round(n / 1e9) || 0).toLocaleString("vi-VN");  // || 0: a small loss rounds to 0, not -0
   if (kind === "vnd") return `${Math.round(n).toLocaleString("vi-VN")} đ`;
+  if (kind === "days") return `${Math.round(n).toLocaleString("vi-VN")} ngày`;
   const places = key && TWO.has(key) ? 2 : 1;
   if (kind === "x") return `${n.toLocaleString("vi-VN", { minimumFractionDigits: places, maximumFractionDigits: places })}x`;
   const pct = (n * 100).toLocaleString("vi-VN", { minimumFractionDigits: places, maximumFractionDigits: places });
@@ -121,8 +123,10 @@ export function withRatios(part: Part, ratios: Ratios): Part {
   const own = ratios.quarters.map((q) => `${q.date.slice(0, 4)}-Q${Math.floor((Number(q.date.slice(5, 7)) - 1) / 3) + 1}`);
   const periods = [...new Set([...part.periods, ...own])].sort();
   const at = (from: string[], values: (string | null)[]) => periods.map((p) => { const i = from.indexOf(p); return i < 0 ? null : values[i] ?? null; });
-  const ratioRows: Row[] = [{ key: null, label: `Chỉ số ${TITLE[ratios.kind]}`, kind: "group", indent: 0, values: [] },
-    ...ratios.metrics.map((m) => ({ key: m.code, label: m.label, kind: m.format === "times" ? "x" as const : "pct" as const, indent: 0, values: at(own, m.values) }))];
+  const title = ratios.kind === "general" ? "Chỉ số tài chính (VNDirect)" : `Chỉ số ${TITLE[ratios.kind]}`;
+  const rowKind = (f: Ratios["metrics"][number]["format"]) => (f === "times" ? "x" as const : f === "days" ? "days" as const : "pct" as const);
+  const ratioRows: Row[] = [{ key: null, label: title, kind: "group", indent: 0, values: [] },
+    ...ratios.metrics.map((m) => ({ key: m.code, label: m.label, kind: rowKind(m.format), indent: 0, values: at(own, m.values) }))];
   return { periods, rows: [...ratioRows, ...part.rows.map((r) => (r.kind === "group" ? r : { ...r, values: at(part.periods, r.values) }))] };
 }
 
@@ -147,6 +151,8 @@ export function FinancialTables({ symbol }: { symbol: string }) {
         api<Ratios>(`fairvalue/ratios/${sym}`).then(setRatios, (e) => setRatioError(e instanceof ApiError ? e.failure.message : "Lỗi tải."));
       } else {
         api<Forecast>(`quarter-forecast/${sym}`).then(setForecast, () => setForecast(null));
+        // Chỉ số tài chính (VNDirect): shown when the ticker's ratios are stored; none is no error, the table stays as it was
+        api<Ratios>(`fairvalue/ratios/${sym}`).then(setRatios, () => setRatios(null));
       }
       setData(d);
     }, (e) => setError(e instanceof ApiError ? e.failure.message : "Lỗi tải."));
@@ -228,6 +234,10 @@ export function FinancialTables({ symbol }: { symbol: string }) {
           : "Danh mục đầu tư = tiền + đầu tư tài chính ngắn hạn + dài hạn, trên vốn chủ sở hữu (cả phần không kiểm soát). Kết quả kinh doanh bảo hiểm = lợi nhuận thuần từ hoạt động kinh doanh bảo hiểm; với bảo hiểm nhân thọ thường âm vì khoản tăng dự phòng toán học ghi vào chi phí và được bù bằng lãi đầu tư, không có nghĩa là lỗ. Chỉ hiện ở kỳ mà kết quả bảo hiểm, lợi nhuận hoạt động tài chính và các khoản khác cộng ra đúng LNTT (từ giữa 2014; mẫu báo cáo cũ không cộng ra được, để trống và ghi ở Kiểm tra chéo). Không tính P/EV: giá trị nội tại không có trong báo cáo tài chính. Tỷ lệ kết hợp là số của VNDirect ở nhóm chỉ số."} Không
         tính nợ ròng, EV, EBITDA, FCFF: với ngân hàng, công ty chứng khoán và bảo hiểm, đi vay hay giữ tiền của khách là hoạt động kinh doanh. Thiếu một thành phần thì để trống, không ước lượng.
       </p> : <p className="caption wrap">
+        {ratios?.kind === "general" && <>Chỉ số tài chính (VNDirect): tỷ lệ VNDirect tính sẵn từ dữ liệu công khai{ratios.fetched_at ? `, đọc ${new Date(ratios.fetched_at).toLocaleDateString("vi-VN")}` : ""},
+          chỉ có theo quý; ROAE, ROAA, ROIC, biên lợi nhuận, dòng tiền / doanh thu và khả năng trả lãi trên 4–5 quý gần nhất, các hệ số khác tại cuối quý;
+          quý doanh thu rất nhỏ làm số ngày và biên lệch xa, giữ nguyên như nguồn; có thể lệch ROE 4 quý và ROIC vận hành ở trên vì ứng dụng tự tính từ
+          báo cáo tài chính; ô — là quý nguồn chưa có số. </>}
         Nguồn: báo cáo tài chính trên API công khai của VNDirect{data.fetched_at ? `, đọc ${new Date(data.fetched_at).toLocaleDateString("vi-VN")}` : ""}; số từng quý (không lũy kế),
         chi phí ghi số âm. LN HĐKD lõi = lãi gộp − chi phí bán hàng − quản lý. EBIT = LNTT + lãi vay; EBITDA = EBIT + khấu hao. FCFF = lưu chuyển tiền
         HĐKD + lãi vay × (1 − thuế ÷ LNTT) + capex; không tính khi LNTT ≤ 0. Vốn hoá năm = giá đóng cửa thực (chưa điều chỉnh) phiên cuối năm × số cổ

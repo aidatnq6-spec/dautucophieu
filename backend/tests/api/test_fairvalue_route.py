@@ -479,3 +479,22 @@ def test_the_weekly_series_takes_vndirect_quarters_when_the_ticker_has_them(tmp_
     assert call(client, clock, "GET", "/internal/fairvalue/milestones/FPT/15").json()["source"] == "vndirect"
     monthly = call(client, clock, "GET", "/internal/fairvalue/history/FPT").json()
     assert monthly["source"] == "vndirect" and (monthly["pe"]["points"][0]["basis"], monthly["pe"]["points"][0]["year"]) == ("4 quý", "2025-Q1")
+
+
+def test_a_general_company_gets_twelve_of_vndirects_ratios_and_one_without_them_still_404s(tmp_path):
+    from investment_agent.market.general_ratios import GeneralRatioStore
+    (tmp_path / "market-symbols.txt").write_text("FPT\nHPG\n", encoding="utf-8")
+    (tmp_path / "industries.json").write_text(json.dumps({"as_of": "2026-10-25", "source": "t", "level": 2,
+                                                         "sectors": {"FPT": "Công nghệ Thông tin", "HPG": "Tài nguyên Cơ bản"}}), encoding="utf-8")
+    GeneralRatioStore(tmp_path).save("FPT", {"symbol": "FPT", "kind": "general", "fetched_at": "2026-11-26T13:00:00+00:00", "source": "vndirect:finfo",
+                                             "names": {}, "quarters": {"2026-09-30": {"ROAE_TR_AVG4Q": "0.28", "DSO_TR_AVG5Q": "61.4"},
+                                                                       "2026-06-30": {"ROAE_TR_AVG4Q": "0.27"}}})
+    c, clock = _app(tmp_path)
+    body = call(c, clock, "GET", "/internal/fairvalue/ratios/FPT").json()
+    assert body["kind"] == "general" and [q["label"] for q in body["quarters"]] == ["Q2/2026", "Q3/2026"]
+    by = {m["code"]: m for m in body["metrics"]}
+    assert len(body["metrics"]) == 12 and list(by)[:3] == ["ROAE_TR_AVG4Q", "ROAA_TR_AVG4Q", "ROIC_TR_AVG4Q"]
+    assert by["ROAE_TR_AVG4Q"] == {"code": "ROAE_TR_AVG4Q", "label": "ROAE", "format": "pct1", "values": ["0.27", "0.28"]}
+    assert by["DSO_TR_AVG5Q"]["format"] == "days" and by["DSO_TR_AVG5Q"]["values"] == [None, "61.4"]  # a quarter the source lacks stays blank
+    assert by["DEBT_TO_EQUITY_AQ"]["format"] == "times" and body["fetched_at"] == "2026-11-26T13:00:00+00:00"
+    assert call(c, clock, "GET", "/internal/fairvalue/ratios/HPG").status_code == 404

@@ -54,6 +54,13 @@ def data(tmp_path):
     write(tmp_path / "index-valuation" / "VNINDEX-pe-1d.json", {"key": "VNINDEX-pe-1d", "points": [["2026-11-2" + str(i), str(10 + i)] for i in range(5)]})
     write(tmp_path / "gold-price.json", {"source": "Phú Quý", "unit": "chỉ", "as_of": "x", "kinds": {"SJC": {"buy": "1", "sell": "2"}}})
     write(tmp_path / "omo.json", {"sessions": [{"date": f"2026-11-1{i}", "rows": [], "total": str(i)} for i in range(4)]})
+    write(tmp_path / "fund-nav.json", {"fetched_at": "t", "source": "Fmarket", "url": "u",
+                                       "funds": {"QA": {"date": "2026-11-25", "name": "Quỹ A", "nav": "10"}, "QB": {"date": "2026-11-24", "name": "Quỹ B", "nav": "20"}},
+                                       "profiles": {"QA": {"fee": "1", "kind": "STOCK", "manager": "M", "returns": {"m1": "2"}}}})
+    write(tmp_path / "fund-nav-history.json", {"QA": {f"2026-11-1{i}": str(9 + i) for i in range(4)}})
+    write(tmp_path / "fund-holdings.json", {"fetched_at": "t", "source": "Fmarket", "funds": {"QA": {"as_of": "2026-10", "stocks": [{"symbol": "AAA", "percent": "6"}]}}})
+    write(tmp_path / "fund-scores.json", {"2026-11": {"QA": {"score": "9"}}})
+    write(tmp_path / "gold-price-history.json", {"Vàng miếng SJC": {f"2026-11-1{i}": str(100 + i) for i in range(5)}, "Nhẫn": {"2026-11-14": "90"}})
     store = PriceStore(tmp_path)
     ingest(store, CAL, [bar("VNINDEX", d, 1000 + i) for i, d in enumerate(("2026-11-02", "2026-11-03", "2026-11-04"))], revision_id="r1")
     return PublicData(tmp_path)
@@ -116,6 +123,28 @@ def test_index_valuation(data):
     assert data.dinh_gia_chi_so("HNX", "pe")["thieu"] is True
 
 
+def test_open_funds_list_and_one_fund_without_the_apps_own_scores(data):
+    listing = data.quy_mo()
+    assert listing["nguon"] == "Fmarket" and listing["lay_luc"] == "t"
+    assert listing["quy"] == [{"ma": "QA", "ten": "Quỹ A", "loai": "STOCK", "nav": "10", "ngay": "2026-11-25"},
+                              {"ma": "QB", "ten": "Quỹ B", "loai": None, "nav": "20", "ngay": "2026-11-24"}]
+    one = data.quy_mo("qa", so_ngay=2)
+    assert one["nav"] == {"date": "2026-11-25", "name": "Quỹ A", "nav": "10"} and one["ho_so"]["manager"] == "M"
+    assert one["lich_su_nav"] == {"2026-11-12": "11", "2026-11-13": "12"}
+    assert one["danh_muc_cong_bo"] == {"as_of": "2026-10", "stocks": [{"symbol": "AAA", "percent": "6"}]}
+    assert "score" not in json.dumps(one) and "score" not in json.dumps(listing)
+    assert data.quy_mo("QB")["danh_muc_cong_bo"] is None and data.quy_mo("QB")["lich_su_nav"] == {}
+    assert data.quy_mo("ZZ")["thieu"] is True and data.quy_mo("../x")["thieu"] is True
+
+
+def test_gold_history_lists_kinds_then_reads_buy_prices(data):
+    assert data.gia_vang_lich_su() == {"nguon": "Phú Quý", "loai": ["Nhẫn", "Vàng miếng SJC"]}
+    out = data.gia_vang_lich_su("Vàng miếng SJC", so_ngay=2)
+    assert out == {"loai": "Vàng miếng SJC", "gia": "mua", "don_vi": "đồng/chỉ", "nguon": "Phú Quý",
+                   "diem": [["2026-11-13", "103"], ["2026-11-14", "104"]]}
+    assert data.gia_vang_lich_su("Bạc")["thieu"] is True
+
+
 def test_server_exposes_exactly_the_approved_read_only_tools(data):
     from mcp import Client
     from investment_agent.mcp_server import build_server
@@ -129,7 +158,8 @@ def test_server_exposes_exactly_the_approved_read_only_tools(data):
     tools, result = anyio.run(run)
     assert sorted(t.name for t in tools) == sorted([
         "thong_tin_ma", "gia_ngay", "dinh_gia_chi_so", "bao_cao_tai_chinh", "chi_so_tai_chinh", "eps_co_tuc", "su_kien_doanh_nghiep",
-        "co_dong_ban_lanh_dao", "giao_dich_noi_bo", "danh_sach_vi_mo", "chi_bao_vi_mo", "chi_so_chau_a", "gia_vang", "omo"])
+        "co_dong_ban_lanh_dao", "giao_dich_noi_bo", "danh_sach_vi_mo", "chi_bao_vi_mo", "chi_so_chau_a", "gia_vang", "omo",
+        "quy_mo", "gia_vang_lich_su"])
     assert all(t.annotations and t.annotations.read_only_hint for t in tools)
     assert "Ngân hàng" in result.content[0].text
 

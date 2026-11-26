@@ -91,6 +91,17 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
         return data.gia_vang()
 
     @tool
+    def gia_vang_lich_su(loai: str | None = None, so_ngay: int = 30) -> dict:
+        """Lịch sử giá mua vàng trong nước theo ngày (đồng/chỉ, Phú Quý); không kèm loai thì trả danh sách loại vàng."""
+        return data.gia_vang_lich_su(loai, so_ngay)
+
+    @tool
+    def quy_mo(ma: str | None = None, so_ngay: int = 30) -> dict:
+        """Quỹ mở trên Fmarket: không kèm ma thì trả danh sách quỹ và NAV mới nhất; có ma thì NAV, hồ sơ (phí, loại, công ty quản lý,
+        lợi nhuận công bố), lịch sử NAV và danh mục quỹ đã công bố."""
+        return data.quy_mo(ma, so_ngay)
+
+    @tool
     def omo(so_phien: int = 5) -> dict:
         """Kết quả nghiệp vụ thị trường mở (OMO) của Ngân hàng Nhà nước, các phiên mới nhất."""
         return data.omo(so_phien)

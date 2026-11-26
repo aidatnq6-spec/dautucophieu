@@ -170,6 +170,36 @@ class PublicData:
     def gia_vang(self) -> dict:
         return self._json("gold-price.json") or _missing("Chưa có giá vàng trong kho.")
 
+    def gia_vang_lich_su(self, loai=None, so_ngay=30) -> dict:
+        history = self._json("gold-price-history.json")
+        if not history:
+            return _missing("Chưa có lịch sử giá vàng trong kho.")
+        if not loai:
+            return {"nguon": "Phú Quý", "loai": sorted(history)}
+        if loai not in history:
+            return _missing("Không có loại vàng này; gọi không kèm loai để xem danh sách.")
+        points = sorted(history[loai].items())[-_count(so_ngay, 30, 1000):]
+        return {"loai": loai, "gia": "mua", "don_vi": "đồng/chỉ", "nguon": "Phú Quý", "diem": [list(p) for p in points]}
+
+    # Quỹ mở (Fmarket, toàn thị trường). fund-scores.json is the app's own scoring and stays out.
+    def quy_mo(self, ma=None, so_ngay=30) -> dict:
+        navs = self._json("fund-nav.json")
+        if not navs:
+            return _missing("Chưa có NAV quỹ mở trong kho.")
+        funds, profiles = navs.get("funds") or {}, navs.get("profiles") or {}
+        if not ma:
+            return {"nguon": navs.get("source"), "lay_luc": navs.get("fetched_at"),
+                    "quy": [{"ma": code, "ten": f.get("name"), "loai": (profiles.get(code) or {}).get("kind"), "nav": f.get("nav"), "ngay": f.get("date")}
+                            for code, f in sorted(funds.items())]}
+        code = str(ma).strip().upper()
+        if code not in funds:
+            return _missing("Không có quỹ này; gọi không kèm ma để xem danh sách.")
+        history = (self._json("fund-nav-history.json") or {}).get(code) or {}
+        holdings = self._json("fund-holdings.json") or {}
+        return {"ma": code, "nguon": navs.get("source"), "lay_luc": navs.get("fetched_at"), "nav": funds[code], "ho_so": profiles.get(code),
+                "lich_su_nav": _newest(history, _count(so_ngay, 30, 1000)),
+                "danh_muc_cong_bo": (holdings.get("funds") or {}).get(code), "danh_muc_lay_luc": holdings.get("fetched_at")}
+
     def omo(self, so_phien=5) -> dict:
         record = self._json("omo.json")
         if not record:

@@ -404,3 +404,36 @@ def test_a_tickers_own_pe_and_pb_history_by_month_end_with_medians_robust_to_tin
     assert "thưởng" in out["cong_thuc"]
     assert out["ngay_cuoi"] == "2026-08-31" and "45 ngày" in out["cong_thuc"] and "tự tính" in out["nguon"]
     assert data.dinh_gia_lich_su("ZZZ")["thieu"] is True
+
+
+def test_every_time_the_tools_give_is_in_vietnam_time():
+    from investment_agent.public_tools import vn_times
+    out = vn_times({"lay_luc": "2026-11-26T08:30:05.123456+00:00", "fetched_at": "2026-11-25T13:04:50+00:00", "ngay": "2026-11-23",
+                    "x": {"tep_cap_nhat_luc": "2026-11-26T01:31:00+00:00", "nested": [{"recorded_at": "2026-11-26T00:52:02+00:00"}]},
+                    "fetched_at_bad": "not a time", "as_of": "2026-11-25T18:27:00+07:00", "lay_luc2": None})
+    assert out["lay_luc"] == "2026-11-26T15:30:05+07:00" and out["fetched_at"] == "2026-11-25T20:04:50+07:00"
+    assert out["x"]["tep_cap_nhat_luc"] == "2026-11-26T08:31:00+07:00" and out["x"]["nested"][0]["recorded_at"] == "2026-11-26T07:52:02+07:00"
+    assert out["ngay"] == "2026-11-23" and out["fetched_at_bad"] == "not a time" and out["as_of"] == "2026-11-25T18:27:00+07:00"
+
+
+def test_the_server_answers_in_vietnam_time(data):
+    from mcp import Client
+    from investment_agent.mcp_server import build_server
+
+    async def run():
+        async with Client(build_server(data.root)) as client:
+            return await client.call_tool("gia_ngay", {"ma": "VNINDEX"})
+    text = anyio.run(run).content[0].text
+    assert '"lay_luc": "2026-10-24T17:00:00+07:00"' in text  # OBSERVED is 10:00 UTC
+
+
+def test_fewer_daily_sessions_than_asked_point_to_the_long_daily_series(data):
+    out = data.gia_ngay("VNINDEX", so_phien=60)
+    assert len(out["phien"]) == 3 and "2026-11-02" in out["luu_y"] and "lich_su_gia" in out["luu_y"]
+    assert "luu_y" not in data.gia_ngay("VNINDEX", so_phien=2)
+
+
+def test_every_tool_answer_goes_through_vietnam_time():
+    import re as _re
+    source = (SRC / "mcp_server.py").read_text(encoding="utf-8")
+    assert not _re.findall(r"^\s+return data\.", source, flags=_re.M)  # a new tool must wrap its answer in vn_times too

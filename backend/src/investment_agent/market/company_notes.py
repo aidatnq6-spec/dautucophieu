@@ -23,7 +23,8 @@ URL = "https://iq.vietcap.com.vn/api/iq-insight-service/v1/company/{symbol}/fina
 SOURCE = "vietcap:iq"
 DELAY_SECONDS = 10
 MAX_AGE = timedelta(days=7)
-LIMIT = 15
+LIMIT = 40  # owner, 26/11/2026: every non-financial HOSE company; 40 calls 10 s apart stay inside a step's 10 minutes
+OTHERS_MAX_AGE = timedelta(days=14)  # the companies not watched: every two weeks
 # Vietcap's NOTE fields (financial-statement/metrics, checked 25/11/2026) → names
 FIELDS = {
     "st_loans_contract": "noc66", "lt_due": "noc67", "lt_bank": "noc94", "lt_other": "noc95", "bonds": "noc96", "finance_lease": "noc97",
@@ -118,18 +119,21 @@ def parse_company_notes(text: str, *, symbol: str) -> dict:
 
 
 def sync_company_notes(store: CompanyNoteStore, sectors: dict[str, str | None], *, get: Callable[[str], str],
-                       sleep: Callable[[float], None] = time.sleep, now: datetime | None = None, limit: int = LIMIT) -> dict[str, str]:
-    """Refresh the non-financial watched companies a week old or missing, the oldest first, at most `limit`; ok, fresh, later, skipped, error."""
+                       sleep: Callable[[float], None] = time.sleep, now: datetime | None = None, limit: int = LIMIT,
+                       others: dict[str, str | None] | None = None) -> dict[str, str]:
+    """Refresh the non-financial watched companies a week old or missing, the oldest first; then the other non-financial HOSE companies
+    (`others`) two weeks old or missing (owner, 26/11/2026); at most `limit` in all. ok, fresh, later, skipped, error."""
     now = now or datetime.now(timezone.utc)
     results, due = {}, []
-    for symbol in sorted(s for s, sector in sectors.items() if kind_of(sector) is None):
-        old = store.read(symbol)
-        if old and old.get("fields_version", 1) >= FIELDS_VERSION and now - datetime.fromisoformat(old["fetched_at"]) < MAX_AGE:
-            results[symbol] = "fresh"
-        else:
-            due.append((old["fetched_at"] if old else "", symbol))
+    for rank, group, max_age in ((0, sectors, MAX_AGE), (1, {s: v for s, v in (others or {}).items() if s not in sectors}, OTHERS_MAX_AGE)):
+        for symbol in sorted(s for s, sector in group.items() if kind_of(sector) is None):
+            old = store.read(symbol)
+            if old and old.get("fields_version", 1) >= FIELDS_VERSION and now - datetime.fromisoformat(old["fetched_at"]) < max_age:
+                results[symbol] = "fresh"
+            else:
+                due.append((rank, old["fetched_at"] if old else "", symbol))
     refused = False
-    for i, (_, symbol) in enumerate(sorted(due)):
+    for i, (_, _, symbol) in enumerate(sorted(due)):
         if i >= limit:
             results[symbol] = "later"
             continue

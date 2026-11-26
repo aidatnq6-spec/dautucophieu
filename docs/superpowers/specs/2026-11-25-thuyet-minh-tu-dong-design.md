@@ -42,3 +42,9 @@ Phần chi tiết ghi rõ số nào được dùng.
   hàng bất động sản).
 - Số phiên bản bộ mục (`fields_version`, nay 2): bản ghi lấy với bộ mục cũ hơn được lấy lại ở lượt sau, không chờ hết tuần.
 - Mục tự động có thêm hai bảng và một dòng: nguyên liệu, vật liệu và nhân công so với tổng chi phí theo yếu tố (năm gần nhất có số).
+
+## Mở rộng toàn HOSE (chủ sở hữu duyệt 26/11/2026)
+
+- Ngoài các mã đang theo dõi (ưu tiên trước, làm mới hằng tuần như cũ), tải cả mọi mã HOSE ngoài ngân hàng, bảo hiểm, chứng khoán theo ngành ICB cấp 2 trong `hose-listing.json`, làm mới mỗi 14 ngày.
+- Mỗi lượt 20:00 tối đa 40 công ty (vẫn chờ 10 giây trước mỗi lần gọi; khoảng 8 phút, trong giới hạn 10 phút của một bước). Lần đầu phủ hết trong khoảng 9 tối.
+- Dùng cho công cụ MCP `thuyet_minh`; trang Thuyết minh TSCĐ vẫn chỉ hiện mã đang theo dõi.

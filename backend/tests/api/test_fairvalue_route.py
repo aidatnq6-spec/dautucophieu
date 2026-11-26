@@ -515,3 +515,20 @@ def test_statements_of_a_general_company_carry_the_outside_sales_and_eps_flags(t
     assert body["flags"]["outside_sales"]["quy_gan_nhat"] == {"ty_le": "0.6", "vuot_nguong": True, "ky": "2026-Q3"}
     assert body["flags"]["outside_sales"]["bon_quy"]["vuot_nguong"] is True
     assert [r["nam"] for r in body["flags"]["eps"]] == ["2024"]
+
+
+def test_a_general_companys_ratios_carry_its_sector_medians_for_the_same_quarter(tmp_path):
+    from investment_agent.market.general_ratios import GeneralRatioStore
+    (tmp_path / "market-symbols.txt").write_text("KKK\n", encoding="utf-8")
+    (tmp_path / "industries.json").write_text(json.dumps({"as_of": "x", "source": "t", "level": 2, "sectors": {"KKK": "Bất động sản"}}), encoding="utf-8")
+    (tmp_path / "hose-listing.json").write_text(json.dumps({"at": "t", "listing": {"symbols": ["KKK", "PPA", "PPB", "PPC"],
+        "icb_codes": {"KKK": "8600", "PPA": "8600", "PPB": "8600", "PPC": "8600"}, "icb_names": {"8600": "Bất động sản"}}}), encoding="utf-8")
+    for sym, roe in (("KKK", "0.08"), ("PPA", "0.05"), ("PPB", "0.10"), ("PPC", "0.20")):
+        GeneralRatioStore(tmp_path).save(sym, {"symbol": sym, "kind": "general", "fetched_at": "2026-11-26T13:00:00+00:00", "source": "vndirect:finfo",
+                                               "names": {}, "quarters": {"2026-09-30": {"ROAE_TR_AVG4Q": roe}}})
+    c, clock = _app(tmp_path)
+    body = call(c, clock, "GET", "/internal/fairvalue/ratios/KKK").json()
+    sector = body["sector"]
+    assert sector["name"] == "Bất động sản" and sector["quarter"] == "2026-09-30" and sector["peers"] == 3
+    assert sector["medians"]["ROAE_TR_AVG4Q"] == "0.1" and sector["counts"]["ROAE_TR_AVG4Q"] == 3
+    assert sector["medians"]["DSO_TR_AVG5Q"] is None and set(sector["medians"]) == {m["code"] for m in body["metrics"]}

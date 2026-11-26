@@ -19,7 +19,9 @@ type Kind = "bank" | "securities" | "insurance";
 // "general": VNDirect's ratios of a company outside banks, securities and insurance (Chỉ số tài chính (VNDirect), 26/11/2026)
 type Ratios = { kind: Kind | "general"; quarters: { date: string; label: string }[];
   metrics: { code: string; label: string; format: "pct0" | "pct1" | "pct2" | "times" | "days"; values: (string | null)[] }[];
-  fetched_at?: string | null; notes?: string[]; notes_fetched_at?: string | null };  // a bank's group-2 share and CASA: quarters left blank or entered differently
+  fetched_at?: string | null; notes?: string[]; notes_fetched_at?: string | null; sector?: Sector | null };
+// Trung vị ngành (26/11/2026): peers of the same ICB level-2 sector on HOSE with figures for the ticker's own latest quarter
+export type Sector = { name: string; quarter: string; peers: number; medians: Record<string, string | null>; counts: Record<string, number> };  // a bank's group-2 share and CASA: quarters left blank or entered differently
 
 const SIGNED = new Set(["revenue_yoy", "gross_profit_yoy", "npat_parent_yoy", "ebitda_yoy", "fcff_yield"]);
 // VNDirect's ratios read to two places (NPL 1,66%, not 1,7%), as their own table showed them.
@@ -113,16 +115,22 @@ const ty = (v: string | null) => (v === null ? "—" : `${cell(v, "money", null)
 
 type Extra = { label: string; values: Record<string, string | null> } | null;  // the owner's forecast column, shown after the last quarter
 
-function Table({ part, cols, caption, extra = null, picked, onPick }: { part: Part; cols: number[]; caption: string; extra?: Extra; picked: string[];
+export function sectorColumn(s: Sector | null | undefined): Extra {
+  if (!s) return null;
+  const q = `${s.quarter.slice(0, 4)}-Q${Math.floor((Number(s.quarter.slice(5, 7)) - 1) / 3) + 1}`;
+  return { label: `Trung vị ngành ${periodLabel(q)}`, values: s.medians };
+}
+
+function Table({ part, cols, caption, extra = null, sector = null, picked, onPick }: { part: Part; cols: number[]; caption: string; extra?: Extra; sector?: Extra; picked: string[];
   onPick: (key: string) => void }) {
   return (
     <div className="pb-scroll">
       <table className="pb-table ft-table">
         <caption className="caption">{caption}</caption>
         <thead><tr><th>Tỷ đồng</th>{cols.map((i) => <th key={part.periods[i]} className="num">{periodLabel(part.periods[i])}</th>)}
-          {extra && <th className="num ft-forecast">{extra.label}</th>}<th>Xu hướng</th></tr></thead>
+          {extra && <th className="num ft-forecast">{extra.label}</th>}{sector && <th className="num">{sector.label}</th>}<th>Xu hướng</th></tr></thead>
         <tbody>{part.rows.map((r, k) => r.kind === "group"
-          ? <tr key={`g${k}`} className="ft-group"><th colSpan={cols.length + 2 + (extra ? 1 : 0)}>{r.label}</th></tr>
+          ? <tr key={`g${k}`} className="ft-group"><th colSpan={cols.length + 2 + (extra ? 1 : 0) + (sector ? 1 : 0)}>{r.label}</th></tr>
           : <tr key={r.key ?? k} className={r.key && picked.includes(r.key) ? "ft-picked" : undefined}><td className={r.indent ? "ft-indent" : undefined}>
             {r.key ? <>
               {/* The label is a mouse shortcut; the icon button is the keyboard and screen-reader way to the same toggle. */}
@@ -132,6 +140,7 @@ function Table({ part, cols, caption, extra = null, picked, onPick }: { part: Pa
             </> : r.label}</td>
             {cols.map((i) => <td key={part.periods[i]} className={`num ${tone(r.values[i], r.key)}`}>{cell(r.values[i], r.kind, r.key)}</td>)}
             {extra && <td className={`num ft-forecast ${tone(extra.values[r.key ?? ""] ?? null, r.key)}`}>{cell(extra.values[r.key ?? ""] ?? null, r.kind, r.key)}</td>}
+            {sector && <td className="num">{r.key && r.key in sector.values ? cell(sector.values[r.key] ?? null, r.kind, r.key) : ""}</td>}
             <td className="ft-spark"><Spark row={r} cols={cols} /></td></tr>)}</tbody>
       </table>
     </div>
@@ -222,7 +231,7 @@ export function FinancialTables({ symbol }: { symbol: string }) {
           <StatementChart rows={part.rows} periods={part.periods} cols={cols} keys={picked} forecast={extra} checks={data.checks}
             onRemove={(key) => setPicked((p) => p.filter((k) => k !== key))} />
           <Table part={part} cols={cols} caption={`${view === "quarters" ? `${cols.length} quý, cũ bên trái` : `${cols.length} năm`} · bấm tên dòng để vẽ (tối đa 2 dòng)`}
-            extra={extra} picked={picked} onPick={(key) => setPicked((p) => toggleRow(p, key))} />
+            extra={extra} sector={view === "quarters" && ratios?.kind === "general" ? sectorColumn(ratios.sector) : null} picked={picked} onPick={(key) => setPicked((p) => toggleRow(p, key))} />
         </>}
       {!financial && fixedNotes(data).map((n) => <p key={n} className="caption" data-testid="fixed-notes">{n}</p>)}
       {!financial && view === "quarters" && forecast && <ForecastForm key={`${forecast.quarter}-${forecast.version}`} symbol={symbol} data={forecast} onSaved={setForecast} />}
@@ -265,6 +274,9 @@ export function FinancialTables({ symbol }: { symbol: string }) {
           chỉ có theo quý; ROAE, ROAA, ROIC, biên lợi nhuận, dòng tiền / doanh thu và khả năng trả lãi trên 4–5 quý gần nhất, các hệ số khác tại cuối quý;
           quý doanh thu rất nhỏ làm số ngày và biên lệch xa, giữ nguyên như nguồn; có thể lệch ROE 4 quý và ROIC vận hành ở trên vì ứng dụng tự tính từ
           báo cáo tài chính; ô — là quý nguồn chưa có số. </>}
+        {ratios?.kind === "general" && ratios.sector && <>Trung vị ngành: trung vị của {ratios.sector.peers} doanh nghiệp cùng ngành
+          {" "}{ratios.sector.name} (ICB cấp 2, HOSE) có số ở quý {periodLabel(`${ratios.sector.quarter.slice(0, 4)}-Q${Math.floor((Number(ratios.sector.quarter.slice(5, 7)) - 1) / 3) + 1}`)},
+          không gồm mã này; cần ít nhất 3 doanh nghiệp, không thì để —; cao hơn hay thấp hơn trung vị không có nghĩa là tốt hay xấu. </>}
         Nguồn: báo cáo tài chính trên API công khai của VNDirect{data.fetched_at ? `, đọc ${new Date(data.fetched_at).toLocaleDateString("vi-VN")}` : ""}; số từng quý (không lũy kế),
         chi phí ghi số âm. LN HĐKD lõi = lãi gộp − chi phí bán hàng − quản lý. EBIT = LNTT + lãi vay; EBITDA = EBIT + khấu hao. FCFF = lưu chuyển tiền
         HĐKD + lãi vay × (1 − thuế ÷ LNTT) + capex; không tính khi LNTT ≤ 0. Vốn hoá năm = giá đóng cửa thực (chưa điều chỉnh) phiên cuối năm × số cổ

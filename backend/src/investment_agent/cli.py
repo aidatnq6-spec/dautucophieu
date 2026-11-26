@@ -108,7 +108,7 @@ def main() -> int:
     bns = commands.add_parser("bank-notes-sync", help="loans by group and deposits by kind of watched banks (Vietcap notes, 10 s apart, weekly) into data/bank-notes")
     bns.add_argument("--data-dir", type=Path, required=True)
     bns.add_argument("--force", action="store_true", help="refresh every watched bank now, however recent its record")
-    cns = commands.add_parser("company-notes-sync", help="notes of watched non-financial companies (Vietcap, 10 s apart, weekly, 15 a run) into data/company-notes")
+    cns = commands.add_parser("company-notes-sync", help="notes of non-financial HOSE companies, watched first and weekly, the rest every two weeks (Vietcap, 10 s apart, 40 a run) into data/company-notes")
     cns.add_argument("--data-dir", type=Path, required=True)
     vcs = commands.add_parser("valuation-check-sync", help="VNDirect's market value, P/E and P/B of each watched ticker, to compare with Bảng số tài chính")
     vcs.add_argument("--data-dir", type=Path, required=True)
@@ -814,7 +814,12 @@ def company_notes_sync(data_dir: Path, get=None, sleep=None) -> int:
             return response.text
     sectors = load_sectors(data_dir)[0]
     watched = {s: sectors.get(s) for s in load_watchlist(data_dir).symbols}
-    results = sync_company_notes(CompanyNoteStore(data_dir / "company-notes"), watched, get=get, sleep=sleep or time.sleep)
+    # every other HOSE company, sectored by the listing's ICB level-2 names (owner, 26/11/2026)
+    listing_path = data_dir / "hose-listing.json"
+    listing = (json.loads(listing_path.read_text(encoding="utf-8")).get("listing") or {}) if listing_path.is_file() else {}
+    icb, names = listing.get("icb_codes") or {}, listing.get("icb_names") or {}
+    others = {s: names.get(icb[s], icb[s]) for s in listing.get("symbols") or [] if s in icb and s not in watched}
+    results = sync_company_notes(CompanyNoteStore(data_dir / "company-notes"), watched, get=get, sleep=sleep or time.sleep, others=others)
     failed = {k: v for k, v in results.items() if v.startswith("error")}
     counts = {state: sum(1 for v in results.values() if v == state) for state in ("ok", "fresh", "later", "skipped")}
     print(json.dumps({"status": "ok" if not failed else "partial", **counts, "errors": failed}))

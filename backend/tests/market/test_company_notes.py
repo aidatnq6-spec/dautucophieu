@@ -48,9 +48,9 @@ def test_the_sync_waits_ten_seconds_before_every_call_takes_the_oldest_fifteen_a
     assert sleeps == [10] and len(calls) == 1  # waits even before the first call (Vietcap was just called by bank-notes-sync)
     later = sync_company_notes(store, {"DDD": "Thép"}, get=get, sleep=sleeps.append, now=NOW)
     assert later == {"DDD": "ok"} and store.read("DDD")["years"]["2021"]["lt_due"] == "6200600000000"
-    many = {f"T{i:02d}": "Thép" for i in range(20)}
+    many = {f"T{i:02d}": "Thép" for i in range(50)}
     done = sync_company_notes(CompanyNoteStore(tmp_path / "m"), many, get=get, sleep=lambda s: None, now=NOW)
-    assert sum(1 for v in done.values() if v == "ok") == 15 and sum(1 for v in done.values() if v == "later") == 5  # at most 15 a run
+    assert sum(1 for v in done.values() if v == "ok") == 40 and sum(1 for v in done.values() if v == "later") == 10  # at most 40 a run (owner, 26/11/2026)
 
 
 def test_costs_by_element_and_inventory_by_kind_are_kept_and_an_older_set_of_lines_is_read_again_owner_25_11_2026(tmp_path):
@@ -66,3 +66,20 @@ def test_costs_by_element_and_inventory_by_kind_are_kept_and_an_older_set_of_lin
     got = sync_company_notes(store, {"HPG": "Thép"}, get=lambda url: body(), sleep=lambda s: None, now=NOW)
     assert got == {"HPG": "ok"} and store.read("HPG")["fields_version"] == FIELDS_VERSION >= 2
     assert sync_company_notes(store, {"HPG": "Thép"}, get=lambda url: body(), sleep=lambda s: None, now=NOW) == {"HPG": "fresh"}
+
+
+def test_every_other_non_financial_hose_company_follows_the_watched_ones_and_waits_two_weeks(tmp_path):
+    # Thuyết minh toàn HOSE (owner, 26/11/2026): watched companies first and weekly; the rest after them, every 14 days
+    store = CompanyNoteStore(tmp_path)
+    store.save({"symbol": "OLD", "fetched_at": (NOW - timedelta(days=10)).isoformat(), "source": "vietcap:iq", "fields_version": 2, "years": {}, "quarters": {}})
+    store.save({"symbol": "STL", "fetched_at": (NOW - timedelta(days=15)).isoformat(), "source": "vietcap:iq", "fields_version": 2, "years": {}, "quarters": {}})
+    calls = []
+
+    def get(url):
+        symbol = url.split("/company/")[1].split("/")[0]
+        calls.append(symbol)
+        return body(symbol=symbol)
+    results = sync_company_notes(store, {"WAT": "Thép"}, others={"OLD": "Thép", "STL": "Thép", "NEW": "Bán lẻ", "BNK": "Ngân hàng"},
+                                 get=get, sleep=lambda s: None, now=NOW, limit=2)
+    assert calls == ["WAT", "NEW"]  # the watched one first; then the never-asked one; banks are never asked
+    assert results == {"WAT": "ok", "NEW": "ok", "OLD": "fresh", "STL": "later"}  # 10 days is fresh for the others, 15 is not

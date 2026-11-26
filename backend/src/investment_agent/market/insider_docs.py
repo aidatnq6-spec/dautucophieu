@@ -58,10 +58,31 @@ def _count(text: str, label: re.Pattern) -> tuple[int | None, re.Match | None]:
     return None, None
 
 
+_TOTAL = re.compile(r"tong ca nhom")
+
+
+def _group_total(text: str) -> tuple[int, int, int] | None:
+    """A foreign investor group's table: the total row's three counts, before, after and traded (a decrease in brackets), on the
+    label's line or the next two; anything but exactly three counts is not taken."""
+    for m in _TOTAL.finditer(text):
+        lines = text[m.end():].split("\n")[:3]
+        counts = [int(c.replace(".", "")) for c in _COUNT.findall("\n".join(lines))]
+        if len(counts) == 3:
+            return counts[0], counts[1], counts[2]
+    return None
+
+
 def parse_report(text: str, title: str) -> dict:
     """{kind, shares, before, after, rong} when the report's figures add up, else {reason}."""
     plain = _plain(text)
     before, after = _count(plain, _BEFORE)[0], _count(plain, _AFTER)[0]
+    if before is None and after is None and (total := _group_total(plain)):
+        before, after, traded = total
+        if traded == 0:
+            return {"reason": "không giao dịch cổ phiếu nào"}
+        if abs(after - before) != traded:
+            return {"reason": "cộng trừ không khớp"}
+        return {"kind": "Mua" if after > before else "Bán", "shares": traded, "before": before, "after": after, "rong": True}
     stated = _KIND.search(plain)
     stated = stated.group(1) if stated else None
     traded, label = _count(plain, _TRADED_INSIDER)

@@ -159,7 +159,7 @@ def test_server_exposes_exactly_the_approved_read_only_tools(data):
     assert sorted(t.name for t in tools) == sorted([
         "thong_tin_ma", "gia_ngay", "dinh_gia_chi_so", "bao_cao_tai_chinh", "chi_so_tai_chinh", "eps_co_tuc", "su_kien_doanh_nghiep",
         "co_dong_ban_lanh_dao", "giao_dich_noi_bo", "danh_sach_vi_mo", "chi_bao_vi_mo", "chi_so_chau_a", "gia_vang", "omo",
-        "quy_mo", "gia_vang_lich_su", "dinh_gia_ma", "lich_su_gia", "so_sanh_nganh", "thuyet_minh", "dinh_gia_lich_su", "tu_doanh"])
+        "quy_mo", "gia_vang_lich_su", "dinh_gia_ma", "lich_su_gia", "so_sanh_nganh", "thuyet_minh", "dinh_gia_lich_su", "tu_doanh", "khoi_ngoai"])
     assert all(t.annotations and t.annotations.read_only_hint for t in tools)
     assert "Ngân hàng" in result.content[0].text
 
@@ -553,3 +553,37 @@ def test_tu_doanh_tells_sessions_never_asked_from_sessions_vndirect_left_empty_a
     wide = data.tu_doanh(so_phien=250, now=TU_DOANH_NOW)  # only 2026 has a calendar here: the window says what it holds
     assert wide["khoang"]["so_phien_hoi"] == 250 and wide["khoang"]["so_phien"] < 250 and wide["khoang"]["tu"] >= "2026-01-01"
     assert "không khớp" in out["luu_y"]
+
+
+def _foreign(data, day, stocks):
+    write(data.root / "foreign" / f"{day}.json", {"date": day, "source": "vndirect:finfo", "fetched_at": f"{day}T13:00:00+00:00",
+        "index": {"buy_volume": "0", "sell_volume": "0", "buy_value": "999", "sell_value": "0"},  # VNDirect's VNINDEX row: not the total
+        "stocks": {c: {"buy_volume": "10", "sell_volume": "4", "buy_value": str(b), "sell_value": str(s)} for c, b, s in stocks}})
+
+
+def test_khoi_ngoai_totals_are_the_sum_of_the_stocks_with_the_same_window_as_tu_doanh(data):
+    _foreign(data, "2026-11-19", [("FPT", 5, 1), ("SSI", 1, 4)])
+    write(data.root / "foreign" / "2026-11-20.json", {"date": "2026-11-20", "thieu": True, "ly_do": "VNDirect trả mọi mã bằng 0 cho phiên này"})
+    _foreign(data, "2026-11-23", [("FPT", 3, 0), ("HPG", 0, 2)])
+    out = data.khoi_ngoai(so_phien=3, now=TU_DOANH_NOW)
+    assert out["khoang"]["phien_thieu"] == ["2026-11-20"] and out["khoang"]["cham_phien"] == 4 and out["khoang"]["so_phien"] == 3
+    assert out["toan_san"] == {"mua_gt": "9", "ban_gt": "7", "rong_gt": "2", "mua_kl": "40", "ban_kl": "16", "rong_kl": "24"}
+    assert [x["ma"] for x in out["mua_rong_manh"]] == ["FPT"] and [x["ma"] for x in out["ban_rong_manh"]] == ["SSI", "HPG"]
+    assert "phien_khong_khop" not in out and out["nguon"].startswith("VNDirect (foreigns")
+    one = data.khoi_ngoai(so_phien=3, ma="HPG", now=TU_DOANH_NOW)
+    assert [r.get("khong_giao_dich") or r.get("thieu") or r["rong_gt"] for r in one["phien"]] == [True, True, "-2"]
+
+
+def test_khoi_ngoai_with_an_empty_store_says_so(data):
+    assert data.khoi_ngoai(now=TU_DOANH_NOW)["thieu"] is True
+
+
+def test_a_ticker_vndirect_left_empty_is_named_and_never_read_as_no_trading(data):
+    _foreign(data, "2026-11-19", [("FPT", 5, 1)])
+    rec = json.loads((data.root / "foreign" / "2026-11-19.json").read_text(encoding="utf-8"))
+    rec["bo_qua"] = ["HPG"]  # VNDirect served HPG with an empty figure that session
+    write(data.root / "foreign" / "2026-11-19.json", rec)
+    out = data.khoi_ngoai(so_phien=1, now=TU_DOANH_NOW)
+    assert out["phien_bo_qua"] == [{"ngay": "2026-11-19", "ma": ["HPG"]}]
+    one = data.khoi_ngoai(so_phien=1, ma="HPG", now=TU_DOANH_NOW)
+    assert one["phien"] == [{"ngay": "2026-11-19", "thieu": True}]

@@ -1,6 +1,6 @@
 ---
 name: dautu-thitruong
-description: "Bảng nhanh thị trường từ dữ liệu công khai trên máy — VN-Index, P/E và P/B của VN-Index và VN30, chỉ số châu Á, giá vàng, OMO, tự doanh. Dùng khi người dùng gõ /dautu-thitruong hoặc hỏi thị trường hôm nay thế nào."
+description: "Bảng nhanh thị trường từ dữ liệu công khai trên máy — VN-Index, P/E và P/B của VN-Index và VN30, chỉ số châu Á, giá vàng, OMO, tự doanh, khối ngoại. Dùng khi người dùng gõ /dautu-thitruong hoặc hỏi thị trường hôm nay thế nào."
 argument-hint: "(không cần)"
 ---
 
@@ -11,7 +11,7 @@ argument-hint: "(không cần)"
 1. `gia_ngay` với ma "VNINDEX", so_phien 20.
 2. `dinh_gia_chi_so`: VNINDEX pe, VNINDEX pb, VN30 pe, VN30 pb, mỗi chuỗi so_diem 20.
 3. `chi_so_chau_a`, `gia_vang`, `omo` với so_phien 5.
-4. `tu_doanh` với so_phien 60.
+4. `tu_doanh` và `khoi_ngoai`, mỗi công cụ so_phien 60.
 
 ## Trình bày
 
@@ -20,7 +20,7 @@ argument-hint: "(không cần)"
 3. **Châu Á**: tên, giá, % thay đổi như trong kho.
 4. **Vàng**: giá mua/bán từng loại, đơn vị và thời điểm.
 5. **OMO**: các phiên gần nhất, khối lượng và lãi suất.
-6. **Tự doanh 60 phiên**: tổng mua, bán, ròng toàn sàn (tỷ đồng), 5 mã mua ròng và 5 mã bán ròng mạnh nhất; ghi phiên đầu, phiên cuối, số phiên thiếu và số phiên VNDirect đăng chậm.
+6. **Tự doanh và khối ngoại 60 phiên**: với mỗi bên, tổng mua, bán, ròng toàn sàn (tỷ đồng), 5 mã mua ròng và 5 mã bán ròng mạnh nhất; ghi phiên đầu, phiên cuối, số phiên thiếu và số phiên chậm.
 7. **Thiếu**: mục nào trả `thieu` thì ghi lý do nguyên văn; phiên trống giữa các ngày thì nói là thiếu, không lấp.
 8. **Nguồn** và thời điểm lấy.
 

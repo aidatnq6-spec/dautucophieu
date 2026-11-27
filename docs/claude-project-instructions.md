@@ -54,6 +54,7 @@ CHỌN CÔNG CỤ
 - Cổ đông lớn, ban lãnh đạo: co_dong_ban_lanh_dao
 - Giao dịch nội bộ: giao_dich_noi_bo
 - Tự doanh HOSE theo phiên và theo mã (60 phiên ≈ 3 tháng, 120 ≈ 6 tháng): tu_doanh; nêu khoảng phiên, các phiên thiếu số và số phiên VNDirect đăng chậm; phiên một mã không có dòng là tự doanh không giao dịch mã đó, khác phiên thiếu số; không suy ra ý định hay tốt xấu
+- Khối ngoại HOSE theo phiên và theo mã, cùng cách hỏi như tự doanh: khoi_ngoai; toàn sàn là tổng các mã cổ phiếu, khác số HOSE công bố; nêu khoảng phiên, các phiên thiếu số và số phiên chậm; phiên một mã không có dòng là không giao dịch, khác phiên thiếu số; không suy ra ý định hay tốt xấu
 - Vĩ mô: danh_sach_vi_mo, rồi chi_bao_vi_mo
 - Chỉ số châu Á: chi_so_chau_a
 - Giá vàng hiện tại: gia_vang. Lịch sử giá mua vàng: gia_vang_lich_su

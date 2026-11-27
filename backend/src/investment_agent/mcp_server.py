@@ -98,6 +98,13 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
         return vn_times(data.tu_doanh(so_phien, ma))
 
     @tool
+    def khoi_ngoai(so_phien: int = 60, ma: str | None = None) -> dict:
+        """Khối ngoại (nhà đầu tư nước ngoài) trên HOSE theo số VNDirect công bố, như tu_doanh: so_phien phiên gần nhất có số (60 ≈ 3 tháng,
+        120 ≈ 6 tháng, tối đa 250). Toàn sàn là tổng các mã cổ phiếu. Không có ma: 10 mã mua ròng, 10 mã bán ròng mạnh nhất theo giá trị.
+        Có ma: từng phiên của mã đó và tổng. Luôn có khoảng phiên, phiên VNDirect thiếu số, phiên kho chưa tải và số phiên chậm."""
+        return vn_times(data.khoi_ngoai(so_phien, ma))
+
+    @tool
     def su_kien_doanh_nghiep(ma: str) -> dict:
         """Sự kiện doanh nghiệp: cổ tức, phát hành, đại hội cổ đông, ngày chốt quyền."""
         return vn_times(data.su_kien_doanh_nghiep(ma))

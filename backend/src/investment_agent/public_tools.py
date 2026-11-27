@@ -293,13 +293,14 @@ class PublicData:
         head = {"nguon": nguon, "lay_luc": max((r.get("fetched_at") or "" for r in present), default=None),
                 "don_vi": "đồng (giá trị), cổ phiếu (khối lượng)", "khoang": span, "lich_kiem": calendars,
                 "luu_y": "Số VNDirect công bố theo phiên, giữ nguyên; phiên thiếu không được thay bằng phiên khác. phien_thieu: VNDirect không có "
-                         "số; chua_hoi: kho chưa tải phiên đó (ngoài khoảng lưu hoặc lượt tải lỗi). VNDirect đăng chậm vài phiên (cham_phien). "
+                         "số; chua_hoi: kho chưa tải phiên đó (ngoài khoảng lưu hoặc lượt tải lỗi); phien_bo_qua: mã VNDirect để trống số ở phiên đó, "
+                         "không có trong tổng hay danh sách, nêu rõ khi dùng. VNDirect đăng chậm vài phiên (cham_phien). "
                          + total_note + "so_phien là số phiên thật của khoảng, có thể ít hơn so_phien_hoi khi lịch không đủ. Mua, bán ròng không nói lên "
                          "ý định hay tốt xấu."}
         if symbol:
             rows, mine = [], []
             for d, r in zip(window, kept):
-                if not r or r.get("thieu"):
+                if not r or r.get("thieu") or symbol in (r.get("bo_qua") or []):  # VNDirect left its figure empty: missing, not no trading
                     rows.append({"ngay": d.isoformat(), "thieu": True})
                 elif symbol in r["stocks"]:
                     mine.append(r["stocks"][symbol])
@@ -314,6 +315,7 @@ class PublicData:
         totals = [{"ma": sym, **flow(rows), "so_phien": len(rows)} for sym, rows in by_symbol.items()]
         buys = sorted((t for t in totals if Decimal(t["rong_gt"]) > 0), key=lambda t: (-Decimal(t["rong_gt"]), t["ma"]))[:10]
         sells = sorted((t for t in totals if Decimal(t["rong_gt"]) < 0), key=lambda t: (Decimal(t["rong_gt"]), t["ma"]))[:10]
+        head["phien_bo_qua"] = [{"ngay": r["date"], "ma": r["bo_qua"]} for r in present if r.get("bo_qua")]  # left out of every sum
         if not by_index:
             return {**head, "toan_san": flow([f for r in present for f in r["stocks"].values()]), "mua_rong_manh": buys, "ban_rong_manh": sells}
         return {**head, "toan_san": flow([r["index"] for r in present]), "mua_rong_manh": buys, "ban_rong_manh": sells,

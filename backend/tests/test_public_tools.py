@@ -576,3 +576,14 @@ def test_khoi_ngoai_totals_are_the_sum_of_the_stocks_with_the_same_window_as_tu_
 
 def test_khoi_ngoai_with_an_empty_store_says_so(data):
     assert data.khoi_ngoai(now=TU_DOANH_NOW)["thieu"] is True
+
+
+def test_a_ticker_vndirect_left_empty_is_named_and_never_read_as_no_trading(data):
+    _foreign(data, "2026-11-19", [("FPT", 5, 1)])
+    rec = json.loads((data.root / "foreign" / "2026-11-19.json").read_text(encoding="utf-8"))
+    rec["bo_qua"] = ["HPG"]  # VNDirect served HPG with an empty figure that session
+    write(data.root / "foreign" / "2026-11-19.json", rec)
+    out = data.khoi_ngoai(so_phien=1, now=TU_DOANH_NOW)
+    assert out["phien_bo_qua"] == [{"ngay": "2026-11-19", "ma": ["HPG"]}]
+    one = data.khoi_ngoai(so_phien=1, ma="HPG", now=TU_DOANH_NOW)
+    assert one["phien"] == [{"ngay": "2026-11-19", "thieu": True}]

@@ -24,7 +24,7 @@ Khi xem một ngân hàng, thấy ngay mỗi chỉ số của nó đứng ở đ
 
 ## Thiết kế
 
-1. **Tải:** `financial-ratios-sync` tải như cũ cho mọi mã tài chính đang theo dõi, và thêm mọi mã HOSE thuộc ngành "Ngân hàng" trong `hose-listing.json` (một lượt gọi mỗi mã, như hiện nay). Mã lỗi được báo, mã khác vẫn tải.
+1. **Tải:** `financial-ratios-sync` tải như cũ cho mọi mã tài chính đang theo dõi, và thêm mọi mã HOSE thuộc ngành "Ngân hàng" trong `hose-listing.json` (một lượt gọi mỗi mã, như hiện nay). Mã lỗi được báo, mã khác vẫn tải. Từ 27/11/2026 chỉ mã đang theo dõi tải lỗi mới làm bước này báo lỗi (và vào Tình trạng hệ thống); mã khác lỗi chỉ được ghi (`unwatched_failed`). Độ mới của "Chỉ số ngành" tính theo tệp cũ nhất của các mã tài chính đang theo dõi.
 2. **Tính:** `compare_sector` nhận ngân hàng: đọc `data/financial-ratios/`, so với các ngân hàng có số ở đúng quý mới nhất của mã đang xem, không gồm mã đó; tối thiểu 3 ngân hàng như cũ. Tên chỉ số lấy từ nhãn trên bảng. Chứng khoán và bảo hiểm vẫn trả `thieu` với lý do.
 3. **Trang:** Bảng số tài chính của ngân hàng, chế độ Quý, có cột "Trung vị ngành Qx/yyyy" như doanh nghiệp thường; chú thích dưới bảng nêu số ngân hàng được so và quý.
 4. **Claude:** `so_sanh_nganh` trả 9 chỉ số cho ngân hàng (trung vị, tứ phân vị, thứ hạng); mô tả công cụ, skill `/dautu-ma` và hướng dẫn Project sửa theo (plugin lên 0.19.0).

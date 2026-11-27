@@ -92,3 +92,25 @@ def test_cli_financial_ratios_sync_adds_every_hose_investment_services_firm_but_
     assert financial_ratios_sync(tmp_path, get=_by_symbol, today=date(2026, 11, 27)) == 0
     assert json.loads(capsys.readouterr().out)["results"] == {"SSI": "ok", "VND": "ok"}
     assert FinancialRatioStore(tmp_path / "financial-ratios").read("VND")["kind"] == "securities"
+
+
+def test_cli_financial_ratios_sync_fails_only_for_a_watched_ticker(tmp_path, capsys):
+    from investment_agent.cli import financial_ratios_sync
+    _watch_ssi_fpt(tmp_path)
+    (tmp_path / "hose-listing.json").write_text(json.dumps({"at": "t", "listing": {"symbols": ["VCB", "ACB"],
+        "icb_codes": {"VCB": "8300", "ACB": "8300"}, "icb_names": {"8300": "Ngân hàng"}}}), encoding="utf-8")
+
+    def get(url):
+        if "code:VCB" in url:
+            raise OSError("down")
+        return _by_symbol(url)
+    assert financial_ratios_sync(tmp_path, get=get, today=date(2026, 11, 27)) == 0  # VCB is not watched
+    out = json.loads(capsys.readouterr().out)
+    assert out["status"] == "ok" and out["results"]["VCB"].startswith("error:") and out["unwatched_failed"] == 1
+
+    def get_ssi_down(url):
+        if "code:SSI" in url:
+            raise OSError("down")
+        return _by_symbol(url)
+    assert financial_ratios_sync(tmp_path, get=get_ssi_down, today=date(2026, 11, 27)) == 1  # SSI is watched
+    assert json.loads(capsys.readouterr().out)["status"] == "partial"

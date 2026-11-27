@@ -61,6 +61,24 @@ def _newest(folder: Path) -> datetime | None:
     return datetime.fromtimestamp(max(times), timezone.utc) if times else None
 
 
+def _oldest_watched_ratios(data_dir: Path) -> datetime | None:
+    """Chỉ số ngành: the oldest file among the watched banks, securities firms and insurers. Every HOSE bank and broker is fetched too
+    (27/11/2026), so the newest file would hide a watched ticker gone stale. None when none is watched (the newest file is used then)."""
+    from investment_agent.market.financial_ratios import kind_of
+    from investment_agent.market.sectors import load_sectors
+    from investment_agent.market.watchlist import load_watchlist
+    try:
+        sectors = load_sectors(data_dir)[0]
+        watched = [s for s in load_watchlist(data_dir).symbols if kind_of(sectors.get(s))]
+    except Exception:  # noqa: BLE001 - no watchlist or sectors: fall back to the folder's newest file
+        return None
+    if not watched:
+        return None
+    folder = data_dir / "financial-ratios"
+    times = [(folder / f"{s}.json").stat().st_mtime if (folder / f"{s}.json").is_file() else 0.0 for s in watched]
+    return datetime.fromtimestamp(min(times), timezone.utc) if min(times) else None
+
+
 def _read_tail(path: Path) -> list[str] | None:
     if not path.is_file():
         return None
@@ -229,6 +247,8 @@ def health_report(data_dir: Path, *, now: datetime, calendar=None, config_dir: P
         if s["dir"] is None:
             points = SeriesStore(data_dir / "trend-sources").read("VNINDEX-1d")
             last = points[-1][0].replace(tzinfo=timezone.utc) if points else None
+        elif s["id"] == "financial-ratios" and (oldest := _oldest_watched_ratios(data_dir)) is not None:
+            last = oldest
         else:
             last = _newest(data_dir / s["dir"])
         stale = last is None or now - last > timedelta(days=s["max_days"])

@@ -323,7 +323,7 @@ export function DepositBook({ onSaved, refresh }: { onSaved?: () => void; refres
     if (!(await put(next, view.book.count_ledger_cash, view.book.reserve))) return;
     setEditing(null);
     if (purposes && (purposeDraft !== (purposes.data.tags[id] ?? "") || newPurpose)) {
-      const { [id]: _old, ...rest } = purposes.data.tags;
+      const rest = Object.fromEntries(Object.entries(purposes.data.tags).filter(([k]) => k !== id));
       try {
         setPurposes(await api<PurposesView>("money-purposes", { method: "PUT", body: { purposes: newPurpose ? [...purposes.data.purposes, newPurpose] : purposes.data.purposes,
           tags: purposeDraft ? { ...rest, [id]: purposeDraft } : rest, expected_version: purposes.version, request_id: requestId() } }));

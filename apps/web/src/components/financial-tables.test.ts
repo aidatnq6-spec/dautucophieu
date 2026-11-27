@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { cell, checkLines, epsNote, fixedNotes, historyCards, lastN, outsideSalesNote, periodLabel, sectorColumn, withRatios } from "./financial-tables";
+import { cell, checkLines, epsNote, fixedNotes, historyCards, lastN, outsideSalesNote, periodLabel, sectorColumn, showsSector, withRatios } from "./financial-tables";
 
 it("money is shown in tỷ đồng, growth with its sign, margins and returns as percentages, multiples with an x", () => {
   expect(cell("62214200000000", "money", "revenue")).toBe("62.214");
@@ -109,4 +109,12 @@ it("P/E and P/B are set against the ticker's own 3- and 5-year medians, only whe
     { title: "P/B so với lịch sử (06/11/2026)", value: "0,99x · 3 năm 1,79x · 5 năm —", sub: "1/37 tháng trong 3 năm thấp hơn" }]);
   expect(historyCards(null)).toEqual([]);
   expect(historyCards({ date: "2026-11-06", pe: null, pb: null })).toEqual([]);
+});
+
+it("the sector median column shows for general companies and banks only", () => {
+  expect(showsSector("general")).toBe(true);
+  expect(showsSector("bank")).toBe(true);
+  expect(showsSector("securities")).toBe(false);
+  expect(showsSector("insurance")).toBe(false);
+  expect(showsSector(undefined)).toBe(false);
 });

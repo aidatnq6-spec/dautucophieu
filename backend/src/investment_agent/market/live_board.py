@@ -102,11 +102,19 @@ class ChartStore:
         return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
 
     def save(self, symbol: str, interval: str, record: dict) -> None:
+        """Atomic, through a temporary file of its own: two requests saving the same candles at once once shared one name and the
+        second rename failed (27/11/2026)."""
+        import tempfile
         self.root.mkdir(parents=True, exist_ok=True)
         path = self._path(symbol, interval)
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(record), encoding="utf-8")
-        os.replace(tmp, path)
+        fd, tmp = tempfile.mkstemp(dir=self.root, prefix=f"{path.stem}.", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(json.dumps(record))
+            os.replace(tmp, path)
+        except BaseException:
+            Path(tmp).unlink(missing_ok=True)
+            raise
 
 
 def _key(when: datetime, interval: str):
@@ -174,7 +182,10 @@ def chart(store: ChartStore, symbol: str, interval: str, *, fetch: Callable, now
             if not bars:
                 raise ValueError("no bars")
             record, stale = {"symbol": symbol, "interval": interval, "bars": bars, "fetched_at": now.isoformat(), "source": "vnstock"}, False
-            store.save(symbol, interval, record)
+            try:
+                store.save(symbol, interval, record)
+            except OSError:
+                pass  # the candles were read: shown now, saved by a later request
         except Exception:
             if not saved:
                 return {"symbol": symbol, "interval": interval, "bars": [], "macd": [], "rsi": [], "fetched_at": None, "stale": False,

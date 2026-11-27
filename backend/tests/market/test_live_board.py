@@ -105,3 +105,27 @@ def test_regrouping_a_close_line_keeps_the_last_close_and_a_reason_passes_throug
     assert regroup(line, "1M")["bars"] == [{"t": "2026-09-01", "c": "99.4"}] and regroup(line, "1M")["style"] == "line"
     missing = {**line, "bars": [], "reason": "Chưa có số"}
     assert regroup(missing, "1W") == {**missing, "interval": "1W"}
+
+
+def test_two_saves_at_once_do_not_share_a_temporary_file(tmp_path, monkeypatch):
+    # Two requests for the same candles (the chart and Đáy nhịp, two tabs, a dev double render) wrote one MWG-1D.tmp: the second
+    # rename found it gone and the page said "nguồn lỗi" though the candles had been read (e2e trend.spec, 27/11/2026)
+    import investment_agent.market.live_board as lb
+    seen = []
+    real = lb.os.replace
+    monkeypatch.setattr(lb.os, "replace", lambda src, dst: seen.append(str(src)) or real(src, dst))
+    store = ChartStore(tmp_path)
+    store.save("MWG", "1D", {"bars": []})
+    store.save("MWG", "1D", {"bars": [1]})
+    assert len(set(seen)) == 2 and store.read("MWG", "1D") == {"bars": [1]}
+    assert not list((tmp_path / "chart").glob("*.tmp*"))  # nothing left behind
+
+
+def test_candles_read_from_the_source_are_shown_even_when_saving_them_fails(tmp_path, monkeypatch):
+    store = ChartStore(tmp_path)
+
+    def cannot_save(*a):
+        raise OSError("disk full")
+    monkeypatch.setattr(store, "save", cannot_save)
+    out = chart(store, "FPT", "1D", fetch=lambda *a: _bars(5), now=NOW, index=False)
+    assert out["reason"] is None and len(out["bars"]) == 5 and out["stale"] is False

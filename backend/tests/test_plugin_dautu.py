@@ -65,3 +65,13 @@ def test_chat_project_instructions_name_every_server_tool_and_nothing_else(tmp_p
     named |= {t for t in tools if re.search(rf"\b{t}\b", block)}  # single-word tools such as omo
     assert named == tools, named ^ tools
     assert "dautucophieu-cong-khai" in block and "thieu" in block
+
+
+def test_dautu_ma_presents_the_sector_and_its_own_history_not_only_fetches_them():
+    text = (PLUGIN / "skills" / "dautu-ma" / "SKILL.md").read_text(encoding="utf-8")
+    fetch, show = text.split("## Trình bày", 1)[0], text.split("## Trình bày", 1)[1].split("## Quy tắc", 1)[0]
+    steps = [int(n) for n in re.findall(r"^(\d+)\. ", fetch.split("## Lấy dữ liệu", 1)[1], re.M)]
+    assert steps == list(range(1, len(steps) + 1))  # fetch steps numbered in order
+    for tool in ("so_sanh_nganh", "dinh_gia_lich_su"):
+        assert f"`{tool}`" in show, tool
+    assert "ngay_cuoi" in show and "thang_thap_hon_hien_tai" in show

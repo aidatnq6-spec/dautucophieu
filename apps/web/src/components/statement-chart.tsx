@@ -114,6 +114,11 @@ type Series = { key: string; name: string; kind: Kind; values: (number | null)[]
   median: { values: (number | null)[]; raw: (string | null)[] } | null };
 type Medians = Record<string, Record<string, string | null>>;  // Trung vị ngành theo quý: ratio code -> period -> median
 
+/** The chart's accessible name: the rows drawn and which of them carry the dashed sector median. */
+export function chartLabel(names: string[], withMedian: string[]): string {
+  return `Biểu đồ ${names.join(" và ")}${withMedian.length ? `, kèm trung vị ngành của ${withMedian.join(" và ")} (nét đứt)` : ""}`;
+}
+
 /** The sector median of a drawn row over the periods shown (none for the forecast column); null when the row has no median. */
 export function medianRaw(medians: Medians | undefined, key: string, periods: string[], cols: number[], forecast: boolean): (string | null)[] | null {
   const m = medians?.[key];
@@ -171,10 +176,11 @@ export function StatementChart({ rows, periods, cols, keys, forecast, checks, on
       <div className="sc-legend" aria-label="Dòng đang vẽ">
         {series.map((s, i) => <button key={s.key} type="button" className="btn sc-chip" onClick={() => onRemove(s.key)} aria-label={`Bỏ ${s.name} khỏi biểu đồ`}>
           <span className={`sc-key ${swatch(i)}${s.kind === "money" ? "" : " line"}`} aria-hidden="true" />{s.name} <span aria-hidden="true">×</span></button>)}
+        {withMedian.length > 0 && <span className="caption"><span className="sc-key sc-key-median" aria-hidden="true" />trung vị ngành</span>}
         <span className="caption">{[left, right].filter(Boolean).map((u, k) => `${k ? "phải" : "trái"}: ${UNIT[u as Kind]}`).join(" · ")}</span>
       </div>
       <div className="mc-plot" ref={box}>
-        <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} onPointerLeave={() => setAt(null)} role="img" aria-label={`Biểu đồ ${series.map((s) => s.name).join(" và ")}`}>
+        <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} onPointerLeave={() => setAt(null)} role="img" aria-label={chartLabel(series.map((s) => s.name), withMedian.map((s) => s.name))}>
           <defs><pattern id="sc-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <rect width="6" height="6" className="sc-hatch-bg" /><line x1="0" y1="0" x2="0" y2="6" className="sc-hatch-line" /></pattern></defs>
           {tl.map((t, k) => <g key={`l${k}`}><line x1={PAD.left} x2={W - PAD.right} y1={yL(t)} y2={yL(t)} className={t === 0 && left === "money" ? "sc-zero" : "mc-grid"} />
@@ -192,6 +198,8 @@ export function StatementChart({ rows, periods, cols, keys, forecast, checks, on
             const real = s.values.map((v, i) => (i === fc ? null : v));
             return <g key={s.key}>
               {s.median && <path d={linePath(s.median.values, cx, y)} className={`sc-line sc-median ${swatch(idx)}`} />}
+              {s.median?.values.map((v, i) => v === null ? null :  // hollow dots: a quarter alone between gaps still shows
+                <circle key={`m${i}`} cx={cx(i)} cy={y(v)} r={2} className={`sc-dot-median ${swatch(idx)}`} />)}
               <path d={linePath(real, cx, y)} className={`sc-line ${swatch(idx)}`} />
               {s.values.map((v, i) => v === null ? null :
                 <circle key={i} cx={cx(i)} cy={y(v)} r={i === fc ? 4 : 2.5} className={i === fc ? `sc-dot-fc ${swatch(idx)}` : `sc-dot ${swatch(idx)}`} />)}

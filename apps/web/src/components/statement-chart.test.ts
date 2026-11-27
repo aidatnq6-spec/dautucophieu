@@ -90,3 +90,9 @@ it("lines the sector median up with the periods drawn, nothing for the forecast 
   expect(medianRaw(medians, "ROAE_TR_AVG4Q", ["2026-Q1", "2026-Q2", "2026-Q3"], [1, 2], true)).toEqual(["0.10", null, null]);
   expect(medianRaw(medians, "revenue", ["2026-Q2"], [0], false)).toBeNull();
 });
+
+it("names the sector median lines in the chart's label", async () => {
+  const { chartLabel } = await import("./statement-chart");
+  expect(chartLabel(["ROAE", "Doanh thu"], ["ROAE"])).toBe("Biểu đồ ROAE và Doanh thu, kèm trung vị ngành của ROAE (nét đứt)");
+  expect(chartLabel(["Doanh thu"], [])).toBe("Biểu đồ Doanh thu");
+});

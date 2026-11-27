@@ -270,7 +270,28 @@ class PublicData:
             symbol = self._symbol(ma)
             if not symbol:
                 return _missing("Mã không hợp lệ.")
-        records = {d: store.read(d) for d in store.days()}
+        _FIG = ("buy_value", "sell_value", "buy_volume", "sell_volume")
+
+        def usable(r) -> bool:  # a damaged file (bad JSON, fields missing) is named in phien_hong, never the whole answer
+            if not isinstance(r, dict):
+                return False
+            if r.get("thieu"):
+                return True
+            rows = list((r.get("stocks") or {}).values()) + ([r.get("index")] if by_index else [])
+            try:
+                return isinstance(r.get("stocks"), dict) and all(isinstance(x, dict) and all(Decimal(str(x[k])).is_finite() for k in _FIG) for x in rows)
+            except (KeyError, TypeError, ArithmeticError):
+                return False
+        records, damaged = {}, []
+        for d in store.days():
+            try:
+                r = store.read(d)
+            except (OSError, ValueError):
+                r = None
+            if usable(r):
+                records[d] = r
+            else:
+                damaged.append(d)
         with_figures = sorted(d for d, r in records.items() if r and not r.get("thieu"))
         if not with_figures:
             return _missing(empty)
@@ -289,11 +310,13 @@ class PublicData:
         present = [r for r in kept if r and not r.get("thieu")]
         span = {"so_phien": len(window), "so_phien_hoi": n, "tu": window[0].isoformat() if window else None, "den": newest.isoformat(),
                 "phien_co_so": len(present), "phien_thieu": [d.isoformat() for d, r in zip(window, kept) if r and r.get("thieu")],
-                "chua_hoi": [d.isoformat() for d, r in zip(window, kept) if not r], "cham_phien": len(closed_after)}
+                "chua_hoi": [d.isoformat() for d, r in zip(window, kept) if not r and d.isoformat() not in damaged],
+                "phien_hong": [d for d in damaged if window and d >= window[0].isoformat()], "cham_phien": len(closed_after)}
         head = {"nguon": nguon, "lay_luc": max((r.get("fetched_at") or "" for r in present), default=None),
                 "don_vi": "đồng (giá trị), cổ phiếu (khối lượng)", "khoang": span, "lich_kiem": calendars,
                 "luu_y": "Số VNDirect công bố theo phiên, giữ nguyên; phiên thiếu không được thay bằng phiên khác. phien_thieu: VNDirect không có "
                          "số; chua_hoi: kho chưa tải phiên đó (ngoài khoảng lưu hoặc lượt tải lỗi); phien_bo_qua: mã VNDirect để trống số ở phiên đó, "
+                         "không có trong tổng hay danh sách; phien_hong: tệp trong kho của phiên đó bị hỏng, bỏ ra ngoài, "
                          "không có trong tổng hay danh sách, nêu rõ khi dùng. VNDirect đăng chậm vài phiên (cham_phien). "
                          + total_note + "so_phien là số phiên thật của khoảng, có thể ít hơn so_phien_hoi khi lịch không đủ. Mua, bán ròng không nói lên "
                          "ý định hay tốt xấu."}

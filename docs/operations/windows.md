@@ -53,7 +53,7 @@ Mỗi bước ghi một dòng `<thời điểm> <tên bước> exit=<mã>` vào 
 
 ### Lịch giao dịch
 
-Lịch tự động dùng `data\trading-calendar.json` nếu có, nếu không thì `config\trading-calendar-hose-<năm hiện tại>.json` (đã có năm 2026, xem `docs\decisions\market-rules.md`). File của năm hiện tại được đọc cùng file năm trước và năm sau, nếu có và nối liền nhau. Thiếu file năm hiện tại thì log ghi "chưa có lịch giao dịch HOSE <năm>". Định dạng khi tự lập:
+Lịch tự động dùng `data\trading-calendar.json` nếu có, nếu không thì `config\trading-calendar-hose-<năm hiện tại>.json` (đã có năm 2026, xem `docs\decisions\market-rules.md`). File của năm hiện tại được đọc cùng file năm trước và năm sau, nếu có và nối liền nhau. Thiếu file năm hiện tại thì log ghi "chưa có lịch giao dịch HOSE <năm>". Bước `calendar-watch` đọc tin mới nhất của HOSE mỗi lượt và nhắn Telegram một lần khi có thông báo về lịch nghỉ hay lịch giao dịch của năm nay (và năm sau, từ tháng 12): chưa có file lịch thì nhắc tạo, đã có thì nhắc kiểm lại, vì HOSE có thể bổ sung ngày nghỉ giữa năm (như 24/11/2026, thông báo ngày 11/11/2026). File lịch luôn sửa tay theo thông báo gốc. Định dạng khi tự lập:
 
 ```json
 {"version": "hose-2026", "source": "<đường dẫn thông báo chính thức>", "holidays": ["2026-09-02"], "first": "2026-01-02", "last": "2026-12-31"}

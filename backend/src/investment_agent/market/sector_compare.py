@@ -87,6 +87,22 @@ def sector_history(data_dir: Path, symbol: str, quarters: list[str], codes: tupl
     return out
 
 
+def sector_trend(data_dir: Path, symbol: str, n: int, codes: tuple[str, ...] | None = None) -> dict | None:
+    """so_sanh_nganh theo quý (owner, 27/11/2026): the ticker's last n quarters with figures, each ratio's own values beside the sector
+    median of the same quarter (sector_history's rule). None when there is no group or no own quarter."""
+    root = Path(data_dir)
+    found = _group(root, symbol, codes)
+    if "thieu" in found:
+        return None
+    own = ((_json(root / found["folder"] / f"{symbol}.json") or {}).get("quarters") or {})
+    quarters = sorted(q for q, v in own.items() if any(c in v for c in found["codes"]))[-n:]
+    if not quarters:
+        return None
+    medians = sector_history(root, symbol, quarters, codes)
+    return {"quy": quarters, "chi_so": {c: {"gia_tri": [own[q].get(c) for q in quarters], "trung_vi": medians.get(c, [None] * len(quarters))}
+                                        for c in found["codes"]}}
+
+
 def _group(root: Path, symbol: str, codes: tuple[str, ...] | None) -> dict:
     """The ticker's comparison group: kind, store folder, ratio codes, peer symbols, group code and name; or a reason there is none."""
     if not _SYMBOL.fullmatch(symbol or ""):

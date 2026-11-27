@@ -22,6 +22,9 @@ def healthy(tmp_path):
             f.write_text("{}", encoding="utf-8")
             os.utime(f, (NOW.timestamp() - 3600, NOW.timestamp() - 3600))
     SeriesStore(data / "trend-sources").upsert("VNINDEX-1d", [(NOW.replace(tzinfo=None) - timedelta(days=1), "1700")])
+    for folder in ("foreign", "proprietary"):  # kho theo phiên: a session of today with figures
+        (data / folder).mkdir(parents=True, exist_ok=True)
+        (data / folder / "2026-11-09.json").write_text(json.dumps({"date": "2026-11-09", "stocks": {}}), encoding="utf-8")
     (tmp_path / "logs").mkdir()
     (tmp_path / "logs" / "scheduler.log").write_text(f"﻿{stamp(2)} market-sync exit=0 {{}}\n{stamp(2)} finish exit=0 pid=1\n", encoding="utf-8")
     backup = tmp_path / "backups" / "20261109T010000Z-daily"
@@ -316,3 +319,17 @@ def test_chi_so_nganh_is_as_old_as_the_oldest_watched_financial_ticker_not_the_n
     assert row["stale"] is True
     os.utime(data / "financial-ratios" / "VCB.json", (NOW.timestamp() - 3600, NOW.timestamp() - 3600))
     assert next(s for s in report(data)["sources"] if s["id"] == "financial-ratios")["stale"] is False
+
+
+def test_foreign_and_proprietary_stores_are_late_past_five_closed_sessions_without_a_new_one(tmp_path):
+    data = healthy(tmp_path)
+    for folder, day in (("foreign", "2026-11-05"), ("proprietary", "2026-10-30")):
+        (data / folder / "2026-11-09.json").unlink()
+        (data / folder / f"{day}.json").write_text(json.dumps({"date": day, "stocks": {}}), encoding="utf-8")
+    (data / "proprietary" / "2026-11-03.json").write_text(json.dumps({"date": "2026-11-03", "thieu": True}), encoding="utf-8")  # no figures
+    rows = {s["id"]: s for s in report(data)["sources"]}
+    assert rows["foreign"]["max_sessions"] == 5 and rows["foreign"]["last"] == "2026-11-05"
+    assert rows["foreign"]["stale"] is False  # NOW is 9/11 15:00 in Vietnam: 6 and 9/11 closed since, 2 sessions
+    assert rows["proprietary"]["stale"] is True and rows["proprietary"]["last"] == "2026-10-30"  # 2–9/11: 6 sessions
+    problem = next(p for p in report(data)["problems"] if p["id"] == "source:proprietary")
+    assert problem["label"] == "Tự doanh theo phiên" and "chậm 6 phiên" in problem["detail"]

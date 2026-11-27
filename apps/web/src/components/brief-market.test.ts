@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { baseText, recoveryHead, spreadText, streakText } from "./brief-market";
+import { baseText, proprietaryHead, recoveryHead, spreadText, streakText } from "./brief-market";
 
 it("words the run of sessions, never giving a total for a run that reaches past the data", () => {
   expect(streakText({ direction: "up", sessions: 2, at_least: false, change: "41.11", pct: "0.0242" })).toBe("Tăng 2 phiên liên tiếp, +41,11 điểm (+2,42%)");
@@ -29,4 +29,9 @@ it("counts the recovery conditions met and names those without figures", () => {
 it("a base on fewer sessions or an older previous session says so (fix 25/11/2026)", () => {
   expect(baseText({ change_pct: "0.05", ratio20: "1.02", avg_sessions: 19, previous_session: "2026-11-23", previous_skipped: true }))
     .toBe("+5,00% so với phiên 23/11 · bằng 1,02 lần trung bình 19 phiên có số");
+});
+
+it("names Tự doanh's own session and how far VNDirect lags, and nothing when it is the brief's session", () => {
+  expect(proprietaryHead({ date: "2026-11-23", lag_sessions: 3 })).toBe("Tự doanh — phiên 23/11/2026 (VNDirect chậm 3 phiên)");
+  expect(proprietaryHead({ date: "2026-11-26", lag_sessions: 0 })).toBe("Tự doanh");
 });

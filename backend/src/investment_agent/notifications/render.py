@@ -5,6 +5,8 @@ applies to the rendered text, so splitting happens last, on line boundaries
 where possible, and every part carries "(i/n)".
 """
 
+from datetime import date
+
 MAX_MESSAGE = 4096
 _PREFIX_RESERVE = 12  # "(99/99)\n"
 
@@ -35,6 +37,19 @@ def _pct(value) -> str:
 
 def _missing(name: str, section: dict | None) -> str:
     return f"{name}: chưa có số liệu ({(section or {}).get('reason', 'không rõ lý do')})"
+
+
+def _proprietary_lines(section: dict | None) -> list[str]:
+    """Tự doanh (brief.proprietary): VNDirect's latest session, named with its lag when it is not the brief's own."""
+    if not section or section.get("status") != "ok":
+        return [_missing("Tự doanh", section)]
+    when = "" if not section["lag_sessions"] else         f" phiên {date.fromisoformat(section['date']):%d/%m/%Y} (VNDirect chậm {section['lag_sessions']} phiên)"
+    lines = [f"Tự doanh{when}: mua {_num(section['buy_value_bn'])} tỷ · bán {_num(section['sell_value_bn'])} tỷ"
+             f" · ròng {_num(section['net_value_bn'], sign=True)} tỷ"]
+    for key, name in (("top_sell", "bán ròng mạnh"), ("top_buy", "mua ròng mạnh")):
+        if section.get(key):
+            lines.append(f"Tự doanh {name}: " + "; ".join(f"{x['symbol']} {_num(x['net_value_bn'], sign=True)} tỷ" for x in section[key]))
+    return lines
 
 
 def _session_lines(shape: dict | None) -> list[str]:
@@ -182,7 +197,7 @@ def render_market_brief(report: dict, market: dict) -> str:
             lines.append("Mua ròng mạnh: " + "; ".join(f"{x['symbol']} {_num(x['net_value_bn'], sign=True)} tỷ" for x in f["top_buy"]))
     else:
         lines.append(_missing("Bảng giá cả sàn (giá trị, độ rộng, khối ngoại, ngành)", board))
-    lines.append(_missing("Tự doanh", market.get("proprietary")))
+    lines += _proprietary_lines(market.get("proprietary"))
     if board.get("status") == "ok" and board["sectors"]:
         lines += ["", "NGÀNH"] + [f"- {s['sector']} {_pct(s['pct'])} ({s['count']} mã)" for s in board["sectors"]]
     held = [t for t in market.get("tickers", []) if t["held"]]

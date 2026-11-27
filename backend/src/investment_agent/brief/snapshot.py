@@ -20,7 +20,6 @@ VN = ZoneInfo("Asia/Ho_Chi_Minh")
 CLOSE = time(15, 0)
 HOSE_VALUE = "https://api.hsx.vn/mk/api/v1/market/foreign-trading-value-report?fromDate={day}&toDate={day}"
 HOSE_VOLUME = "https://api.hsx.vn/mk/api/v1/market/foreign-trading-volumn-report?fromDate={day}&toDate={day}"
-NO_PROPRIETARY = {"status": "missing", "reason": "Chưa có nguồn miễn phí"}
 
 
 class BriefStore:
@@ -100,9 +99,10 @@ def _signals(sections: dict, shares, store: BriefStore, sessions_before: list[da
 
 def build_snapshot(*, session_date: date, previous_session: date | None, now: datetime, listing, board, series, hose_get, rss_get,
                    store: BriefStore, earlier: list[date] = (), index_bars=lambda: {}, shares=lambda symbols: {},
-                   vn30_weights=lambda: {}, asia=lambda: None, us=lambda: None) -> dict:
+                   vn30_weights=lambda: {}, asia=lambda: None, us=lambda: None, proprietary=None) -> dict:
     """earlier: the sessions before session_date on the trading calendar, ascending; index_bars(): VN-Index daily bars by session;
-    shares(symbols): shares outstanding by symbol, for Tín hiệu phiên (mã kéo chỉ số)."""
+    shares(symbols): shares outstanding by symbol, for Tín hiệu phiên (mã kéo chỉ số); proprietary(session_date): VNDirect's
+    Tự doanh rows (market.providers.vndirect_data.proprietary_trading)."""
     sections: dict[str, dict] = {}
     sessions_before = list(earlier)
     try:
@@ -163,7 +163,16 @@ def build_snapshot(*, session_date: date, previous_session: date | None, now: da
     else:
         since = datetime.combine(previous_session or session_date - timedelta(days=1), CLOSE, tzinfo=VN)
         sections["news"] = {"status": "ok", "items": window_items(items, since=since, until=now)}
-    sections["proprietary"] = dict(NO_PROPRIETARY)
+    if proprietary is None:
+        sections["proprietary"] = _missing("Chưa đọc nguồn tự doanh")
+    else:
+        try:  # Tự doanh (brief.proprietary): VNDirect's latest session up to this one, with its date and lag (27/11/2026)
+            from .proprietary import summarise_proprietary
+            got = proprietary(session_date)
+            sections["proprietary"] = summarise_proprietary(got["index"], got["stocks"], session_date=session_date,
+                                                            sessions=[*sessions_before, session_date])
+        except Exception:
+            sections["proprietary"] = _missing("Không kết nối được VNDirect")
     previous = store.read(session_date) or {}
     for name, section in sections.items():
         if section.get("status") != "ok" and (previous.get(name) or {}).get("status") == "ok":

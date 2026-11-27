@@ -1874,6 +1874,7 @@ def brief_snapshot_cli(data_dir: Path, calendar_path: Path, *, listing=None, boa
 
     from investment_agent.brief.snapshot import BriefStore, build_snapshot, latest_session
     from investment_agent.jobs.schedule import _previous_session
+    from investment_agent.market.providers import vndirect_data as vd
     from investment_agent.market.series import SeriesStore
 
     try:
@@ -1889,7 +1890,6 @@ def brief_snapshot_cli(data_dir: Path, calendar_path: Path, *, listing=None, boa
     if listing is None or board is None or http_get is None:
         import httpx
 
-        from investment_agent.market.providers import vndirect_data as vd
         client = httpx.Client(follow_redirects=True, timeout=httpx.Timeout(30, connect=10), headers={"User-Agent": USER_AGENT})
 
         def fetch(url: str) -> str:
@@ -1931,7 +1931,8 @@ def brief_snapshot_cli(data_dir: Path, calendar_path: Path, *, listing=None, boa
                           board=board, series=lambda index_id: series.read(f"{index_id}-1d"), hose_get=http_get, rss_get=http_get,
                           store=BriefStore(data_dir), earlier=earlier, index_bars=index_bars,
                           shares=lambda symbols: _vd_shares(symbols, http_get), vn30_weights=lambda: _vn30_weights(Path(data_dir), session),
-                          asia=lambda: _asia(Path(data_dir), now, http_get), us=lambda: _us(Path(data_dir), now))
+                          asia=lambda: _asia(Path(data_dir), now, http_get), us=lambda: _us(Path(data_dir), now),
+                          proprietary=lambda day: vd.proprietary_trading(day, http_get))
     print(json.dumps({"status": "ok", "session": session.isoformat(),
                       "sections": {k: v["status"] for k, v in snap.items() if isinstance(v, dict) and "status" in v}}, ensure_ascii=False))
     return 0

@@ -106,6 +106,12 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
         return vn_times(data.khoi_ngoai(so_phien, ma))
 
     @tool
+    def cung_chieu(so_phien: int = 20, so_ma: int = 5) -> dict:
+        """Mã mà khối ngoại và tự doanh cùng mua ròng (hoặc cùng bán ròng) trên HOSE trong so_phien phiên (1–250) mà cả hai có số theo
+        VNDirect; so_ma mã mỗi chiều (1–20), xếp theo tổng ròng hai bên; có khoảng phiên, số phiên bỏ và số phiên chậm."""
+        return vn_times(data.cung_chieu(so_phien, so_ma))
+
+    @tool
     def su_kien_doanh_nghiep(ma: str) -> dict:
         """Sự kiện doanh nghiệp: cổ tức, phát hành, đại hội cổ đông, ngày chốt quyền."""
         return vn_times(data.su_kien_doanh_nghiep(ma))

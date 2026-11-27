@@ -104,8 +104,9 @@ def recent_signals(data_dir: Path, session, n: int = RECENT) -> list[dict]:
     return [_signal_row(snap) for d in days if (snap := store.read(d))]
 
 
-def _flows(data_dir: Path, session: str) -> dict:
-    """Khối ngoại và tự doanh ròng 20 phiên (brief.flows, 27/11/2026); a failure blanks the two rows, never the brief."""
+def _flows(data_dir: Path, session: str, watched: list[str] = ()) -> dict:
+    """Khối ngoại và tự doanh ròng 20 phiên and cùng chiều (brief.flows, 27/11/2026); a failure blanks them, never the brief.
+    Watched tickers are marked here, on the owner's machine only."""
     from datetime import date, timedelta
 
     from . import flows
@@ -113,10 +114,19 @@ def _flows(data_dir: Path, session: str) -> dict:
         from investment_agent.public_tools import _sessions
         day = date.fromisoformat(session)
         sessions, _ = _sessions(day - timedelta(days=90), day, data_dir)
-        return flows.net_flows(data_dir, day, sorted(sessions))
+        out = flows.net_flows(data_dir, day, sorted(sessions))
     except Exception:
         gone = {"status": "missing", "reason": "Không đọc được số khối ngoại, tự doanh theo phiên"}
-        return {"foreign": gone, "proprietary": gone}
+        return {"foreign": gone, "proprietary": gone, "same_direction": gone}
+    try:
+        same = flows.same_direction(data_dir, day, sorted(sessions))
+        mine = set(watched)
+        for side in ("buy", "sell"):
+            for row in same.get(side, []):
+                row["watched"] = row["symbol"] in mine
+    except Exception:
+        same = {"status": "missing", "reason": "Không tính được mã cùng chiều"}
+    return {**out, "same_direction": same}
 
 
 def market_for_session(data_dir: Path | None, held: set[str]):
@@ -131,7 +141,7 @@ def market_for_session(data_dir: Path | None, held: set[str]):
             out = market_view(BriefStore(Path(data_dir)).read(session), watched=watched, held=held) if session else None
             if out is not None:
                 out["recent_signals"] = recent_signals(Path(data_dir), session)  # 5 phiên gần nhất, for runs of days
-                out["flows"] = _flows(Path(data_dir), session)
+                out["flows"] = _flows(Path(data_dir), session, watched)
             return out
         except Exception:
             return None

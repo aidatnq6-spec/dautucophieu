@@ -29,7 +29,10 @@ type HoseLiquidity = { status: "ok"; today_bn: string; previous_bn: string; chan
 export type MarketSection = { session_date: string; updated_at: string; indices: { status: string; rows: IndexRow[] } | Missing; board: Board;
   hose: Hose; proprietary: Proprietary; tickers: Ticker[]; news: News; index_session?: IndexSession; hose_liquidity?: HoseLiquidity;
   recovery?: Recovery; signal_lines?: string[]; asia_line?: string | null; us_line?: string | null; shock_line?: string | null; recent_signals?: SignalRow[]; impact?: Impact; heatmap?: HeatMap;
-  flows?: { foreign: Flow; proprietary: Flow } };
+  flows?: { foreign: Flow; proprietary: Flow; same_direction?: Same } };
+// Khối ngoại và tự doanh cùng chiều (27/11/2026): the 20 sessions both stores have, tickers both bought or both sold net
+type SameRow = { symbol: string; foreign_bn: string; proprietary_bn: string; watched?: boolean };
+type Same = { status: "ok"; from: string; to: string; lag_sessions: number; dropped: number; buy: SameRow[]; sell: SameRow[] } | Missing;
 type Check = { id: string; met: boolean | null; label: string; figure: string };
 type Recovery = { status: "ok"; met: number; known: number; total: number; checks: Check[] } | Missing;
 
@@ -93,10 +96,35 @@ export function barLabel(b: FlowBar): string {
   return b.net_bn === null ? `${day}: thiếu số` : `${day}: ${signed(b.net_bn, 1)} tỷ`;
 }
 
-function FlowRows({ flows }: { flows: { foreign: Flow; proprietary: Flow } }) {
+const dm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+
+/** The same-direction heading: the sessions compared, the lag behind the brief and the sessions dropped for missing figures. */
+export function sameHead(s: { from: string; to: string; lag_sessions: number; dropped: number }): string {
+  const notes = [s.lag_sessions ? `chậm ${s.lag_sessions} phiên` : "", s.dropped ? `bỏ ${s.dropped} phiên thiếu số` : ""].filter(Boolean).join("; ");
+  return `Cùng chiều 20 phiên (${dm(s.from)}–${dm(s.to)}${notes ? `, ${notes}` : ""})`;
+}
+
+export function sameItem(r: { symbol: string; foreign_bn: string; proprietary_bn: string }): string {
+  return `${r.symbol} (ngoại ${signed(r.foreign_bn, 1)} tỷ · tự doanh ${signed(r.proprietary_bn, 1)} tỷ)`;
+}
+
+function SameDirection({ same }: { same: Same }) {
+  if (same.status !== "ok") return <p className="caption">Cùng chiều: {same.reason}.</p>;
+  const list = (rows: SameRow[]) => rows.length ? rows.map((r, i) => <span key={r.symbol}>{i ? "; " : ""}{r.watched ? <strong>{sameItem(r)}</strong> : sameItem(r)}</span>)
+    : <span className="muted">không có mã nào</span>;
+  return <div className="bm-same">
+    <div><strong>{sameHead(same)}</strong></div>
+    <p><span className="positive">Cùng mua ròng:</span> {list(same.buy)}</p>
+    <p><span className="negative">Cùng bán ròng:</span> {list(same.sell)}</p>
+    <p className="caption">Mã mà khối ngoại và tự doanh cùng mua ròng (hoặc cùng bán ròng) trong các phiên cả hai có số, tối đa 5 mã mỗi chiều, xếp theo tổng ròng hai bên; mã in đậm là mã bạn theo dõi. Không phải khuyến nghị.</p>
+  </div>;
+}
+
+function FlowRows({ flows }: { flows: { foreign: Flow; proprietary: Flow; same_direction?: Same } }) {
   return <div className="bm-flows">
     <FlowRow label="Khối ngoại ròng" f={flows.foreign} />
     <FlowRow label="Tự doanh ròng" f={flows.proprietary} />
+    {flows.same_direction && <SameDirection same={flows.same_direction} />}
   </div>;
 }
 

@@ -12,6 +12,9 @@ type Board = { status: "ok"; value_matched_bn: string; volume_matched: number; b
 type Proprietary = { status: "ok"; source: string; date: string; lag_sessions: number; buy_volume: number; sell_volume: number;
   buy_value_bn: string; sell_value_bn: string; net_value_bn: string; top_sell: { symbol: string; net_value_bn: string }[] | null;
   top_buy: { symbol: string; net_value_bn: string }[] | null; top_reason?: string } | Missing;
+// Khối ngoại và tự doanh ròng 20 phiên (27/11/2026): each ends at its own newest session, a missing session is a null bar
+type FlowBar = { date: string; net_bn: string | null };
+type Flow = { status: "ok"; date: string; lag_sessions: number; net_bn: string; sum_bn: string; missing: number; bars: FlowBar[] } | Missing;
 type Spread = { count: number; mean_pct: string | null; median_pct: string | null };
 type Hose = { status: "ok"; total_value_bn: string; total_volume: number; foreign: Omit<Foreign, "top_sell" | "top_buy"> } | Missing;
 type Ticker = { symbol: string; price: number | null; change: number | null; pct: string | null; held: boolean; sector: string | null;
@@ -25,7 +28,8 @@ type HoseLiquidity = { status: "ok"; today_bn: string; previous_bn: string; chan
   previous_session?: string; previous_skipped?: boolean } | Missing;
 export type MarketSection = { session_date: string; updated_at: string; indices: { status: string; rows: IndexRow[] } | Missing; board: Board;
   hose: Hose; proprietary: Proprietary; tickers: Ticker[]; news: News; index_session?: IndexSession; hose_liquidity?: HoseLiquidity;
-  recovery?: Recovery; signal_lines?: string[]; asia_line?: string | null; us_line?: string | null; shock_line?: string | null; recent_signals?: SignalRow[]; impact?: Impact; heatmap?: HeatMap };
+  recovery?: Recovery; signal_lines?: string[]; asia_line?: string | null; us_line?: string | null; shock_line?: string | null; recent_signals?: SignalRow[]; impact?: Impact; heatmap?: HeatMap;
+  flows?: { foreign: Flow; proprietary: Flow } };
 type Check = { id: string; met: boolean | null; label: string; figure: string };
 type Recovery = { status: "ok"; met: number; known: number; total: number; checks: Check[] } | Missing;
 
@@ -58,6 +62,41 @@ export function proprietaryHead(p: { date: string; lag_sessions: number }): stri
   if (!p.lag_sessions) return "Tự doanh";
   const [y, m, d] = p.date.split("-");
   return `Tự doanh — phiên ${d}/${m}/${y} (VNDirect chậm ${p.lag_sessions} phiên)`;
+}
+
+/** A flow row's figure and caption: its own session (with the lag when VNDirect is late), the 20 sessions' sum, missing sessions. */
+export function flowHead(f: { date: string; lag_sessions: number; net_bn: string; sum_bn: string; missing: number }): { value: string; tone: string; sub: string } {
+  const [, m, d] = f.date.split("-");
+  return { value: `${signed(f.net_bn, 1)} tỷ`, tone: tone(f.net_bn),
+    sub: `Phiên ${d}/${m}${f.lag_sessions ? ` (chậm ${f.lag_sessions} phiên)` : ""} · 20 phiên ${signed(f.sum_bn, 0)} tỷ${f.missing ? ` (thiếu ${f.missing} phiên)` : ""}` };
+}
+
+/** Bars from a middle line, one scale for the row; a missing session is no bar (null), never a zero bar. */
+export function barHeights(bars: FlowBar[], height: number): ({ y: number; h: number; tone: string } | null)[] {
+  const mid = height / 2;
+  const top = Math.max(0, ...bars.map((b) => (b.net_bn === null ? 0 : Math.abs(Number(b.net_bn)))));
+  return bars.map((b) => {
+    if (b.net_bn === null) return null;
+    const v = Number(b.net_bn), h = top ? Math.round((Math.abs(v) / top) * mid * 100) / 100 : 0;
+    return { y: v > 0 ? mid - h : mid, h, tone: tone(v) };
+  });
+}
+
+function FlowRows({ flows }: { flows: { foreign: Flow; proprietary: Flow } }) {
+  const H = 28, W = 6;
+  return <div className="bm-flows">{([["Khối ngoại ròng", flows.foreign], ["Tự doanh ròng", flows.proprietary]] as const).map(([label, f]) => {
+    if (f.status !== "ok") return <div className="bm-flow" key={label}><div><strong>{label}</strong><div className="caption">{f.reason}</div></div></div>;
+    const head = flowHead(f);
+    return <div className="bm-flow" key={label}>
+      <div><strong>{label}</strong><div className="caption">{head.sub}</div></div>
+      <strong className={`bm-flow-value ${head.tone}`}>{head.value}</strong>
+      <svg className="bm-flow-bars" width={f.bars.length * W} height={H} role="img" aria-label={`${label} ${f.bars.length} phiên`}>
+        <line x1={0} x2={f.bars.length * W} y1={H / 2} y2={H / 2} className="bm-flow-axis" />
+        {barHeights(f.bars, H).map((b, i) => b && <rect key={f.bars[i].date} x={i * W + 1} y={b.y} width={W - 2} height={Math.max(b.h, 0.5)}
+          className={`bm-bar ${b.tone}`}><title>{`${f.bars[i].date.split("-").reverse().join("/")}: ${signed(f.bars[i].net_bn!, 1)} tỷ`}</title></rect>)}
+      </svg>
+    </div>;
+  })}</div>;
 }
 
 /** Bảng kiểm "Thị trường phục hồi": how many conditions are met, and how many have no figures (counted neither way). */
@@ -140,6 +179,7 @@ export function BriefMarket({ market, session }: { market: MarketSection | null;
           {board.breadth.flat} đứng giá · {board.breadth.no_trade} không giao dịch</p>
         {board.spread && spreadText(board.spread, vnPct) && <p data-testid="spread">Lan tỏa: {spreadText(board.spread, vnPct)}
           <span className="caption"> · mọi mã HOSE có giao dịch, cùng trọng số; VN-Index tính theo vốn hóa</span></p>}
+        {market.flows && <FlowRows flows={market.flows} />}
         <h3>Khối ngoại</h3>
         <p>Mua {num(board.foreign.buy_volume, 0)} cp / {num(board.foreign.buy_value_bn)} tỷ · Bán {num(board.foreign.sell_volume, 0)} cp /{" "}
           {num(board.foreign.sell_value_bn)} tỷ · Ròng <strong className={tone(board.foreign.net_value_bn)}>{signed(board.foreign.net_value_bn)} tỷ</strong></p>
@@ -147,7 +187,8 @@ export function BriefMarket({ market, session }: { market: MarketSection | null;
         {board.foreign.top_buy.length > 0 && <p>Mua ròng mạnh: {board.foreign.top_buy.map((x) => `${x.symbol} ${signed(x.net_value_bn)} tỷ`).join("; ")}</p>}
         {hose.status === "ok" && <p className="caption">HOSE công bố: mua {num(hose.foreign.buy_value_bn)} tỷ · bán {num(hose.foreign.sell_value_bn)} tỷ ·
           ròng {signed(hose.foreign.net_value_bn)} tỷ.</p>}
-      </> : <Gap what="Giá trị giao dịch, độ rộng, khối ngoại và ngành" section={board} />}
+      </> : <><Gap what="Giá trị giao dịch, độ rộng, khối ngoại và ngành" section={board} />
+        {market.flows && <FlowRows flows={market.flows} />}</>}
       {market.proprietary.status === "ok" ? <>
         <h3>{proprietaryHead(market.proprietary)}</h3>
         <p>Mua {num(market.proprietary.buy_volume, 0)} cp / {num(market.proprietary.buy_value_bn)} tỷ · Bán {num(market.proprietary.sell_volume, 0)} cp /{" "}

@@ -125,6 +125,9 @@ def main() -> int:
     phist.add_argument("--data-dir", type=Path, required=True)
     phist.add_argument("--limit", type=int, default=60, help="tickers per run: never fetched first, then those older than a week")
     phist.add_argument("--symbols", help="comma-separated tickers to fetch now, however recent")
+    fsync = commands.add_parser("foreign-sync", help="HOSE foreign trading by session (VNDirect) into data/foreign, about a year, for the brief")
+    fsync.add_argument("--data-dir", type=Path, required=True)
+    fsync.add_argument("--limit", type=int, default=260, help="sessions per run: newest first; a missing one asked again while among the last 20")
     prop = commands.add_parser("proprietary-sync", help="HOSE proprietary trading by session (VNDirect) into data/proprietary, about a year, for tu_doanh")
     prop.add_argument("--data-dir", type=Path, required=True)
     prop.add_argument("--limit", type=int, default=260, help="sessions per run: newest first; a missing one asked again while among the last 20")
@@ -179,6 +182,8 @@ def main() -> int:
                             send=telegram[0] if telegram else None)
     if args.command == "market-sync":
         return market_sync(_symbols(args.symbols), args.data_dir, args.calendar, args.days, index=args.index)
+    if args.command == "foreign-sync":
+        return foreign_sync(args.data_dir, limit=args.limit)
     if args.command == "proprietary-sync":
         return proprietary_sync(args.data_dir, limit=args.limit)
     if args.command == "index-history-sync":
@@ -550,12 +555,20 @@ def index_history_cli(data_dir: Path, *, get=None, now=None, sleep=None) -> int:
     return 0 if not failed else 1
 
 
-def proprietary_sync(data_dir: Path, *, limit: int = 260, get=None, now=None, sleep=None) -> int:
-    """Exit 0 when every session asked came back (with figures or posted as missing), 1 when some failed (each is reported)."""
+def foreign_sync(data_dir: Path, *, limit: int = 260, get=None, now=None, sleep=None) -> int:
+    """Khối ngoại theo phiên (market.foreign_history) into data/foreign, kept as proprietary-sync keeps tự doanh."""
+    from investment_agent.market.foreign_history import sync_foreign
+    return proprietary_sync(data_dir, limit=limit, get=get, now=now, sleep=sleep, sync=sync_foreign)
+
+
+def proprietary_sync(data_dir: Path, *, limit: int = 260, get=None, now=None, sleep=None, sync=None) -> int:
+    """Exit 0 when every session asked came back (with figures or posted as missing), 1 when some failed (each is reported).
+    sync: the store's sync function (tự doanh by default; foreign_sync passes khối ngoại's)."""
     import time
     from datetime import datetime, timedelta, timezone
     from zoneinfo import ZoneInfo
     from investment_agent.market.proprietary_history import KEEP_DAYS, sync_proprietary
+    sync_proprietary = sync or sync_proprietary
     from investment_agent.public_tools import _sessions
     if get is None:
         import httpx

@@ -35,3 +35,18 @@ it("names Tự doanh's own session and how far VNDirect lags, and nothing when i
   expect(proprietaryHead({ date: "2026-11-23", lag_sessions: 3 })).toBe("Tự doanh — phiên 23/11/2026 (VNDirect chậm 3 phiên)");
   expect(proprietaryHead({ date: "2026-11-26", lag_sessions: 0 })).toBe("Tự doanh");
 });
+
+it("words a 20-session flow row with its own session, lag, sum and missing sessions", async () => {
+  const { flowHead } = await import("./brief-market");
+  const flow = { status: "ok" as const, date: "2026-11-23", lag_sessions: 3, net_bn: "357.51", sum_bn: "230.40", missing: 2, bars: [] };
+  expect(flowHead(flow)).toEqual({ value: "+357,5 tỷ", tone: "positive", sub: "Phiên 23/11 (chậm 3 phiên) · 20 phiên +230 tỷ (thiếu 2 phiên)" });
+  expect(flowHead({ ...flow, lag_sessions: 0, net_bn: "-237.00", sum_bn: "-11825.40", missing: 0 }))
+    .toEqual({ value: "−237,0 tỷ", tone: "negative", sub: "Phiên 23/11 · 20 phiên −11.825 tỷ" });
+});
+
+it("draws the bars from a middle line on one scale, a missing session as no bar", async () => {
+  const { barHeights } = await import("./brief-market");
+  const bars = [{ date: "a", net_bn: "10.00" }, { date: "b", net_bn: "-5.00" }, { date: "c", net_bn: null }, { date: "d", net_bn: "0.00" }];
+  expect(barHeights(bars, 20)).toEqual([{ y: 0, h: 10, tone: "positive" }, { y: 10, h: 5, tone: "negative" }, null, { y: 10, h: 0, tone: "" }]);
+  expect(barHeights([{ date: "a", net_bn: "0.00" }], 20)).toEqual([{ y: 10, h: 0, tone: "" }]);  // all zero: no division by zero
+});

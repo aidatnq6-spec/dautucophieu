@@ -259,3 +259,10 @@ def test_proprietary_trading_by_session_is_kept_in_the_evening_slot():
     evening = next(i for i, l in enumerate(ls) if "(Get-Date).Hour -ge 20" in l)
     step = next(i for i, l in enumerate(ls) if "jobs.step proprietary-sync --data-dir $data --limit 260" in l)
     assert step > evening
+
+
+def test_foreign_trading_by_session_is_kept_in_the_evening_slot():
+    ls = lines()
+    evening = next(i for i, l in enumerate(ls) if "(Get-Date).Hour -ge 20" in l)
+    step = next(i for i, l in enumerate(ls) if "jobs.step foreign-sync --data-dir $data --limit 260" in l)
+    assert step > evening

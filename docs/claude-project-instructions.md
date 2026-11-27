@@ -1,18 +1,18 @@
-# Hướng dẫn cho Project trong tab Chat của Claude Desktop
+# Hướng dẫn cho Project "Đầu tư cổ phiếu" (Claude Desktop, claude.ai web và điện thoại)
 
-Khối bên dưới được dán vào **Project instructions** của Project "Đầu tư cổ phiếu – dữ liệu trên máy" trong tab Chat của Claude Desktop. Project này chỉ có số liệu khi mở trong Claude Desktop trên máy này, nơi đã khai báo MCP server `dautucophieu-cong-khai` (xem [spec](superpowers/specs/2026-11-26-mcp-du-lieu-cong-khai-design.md)).
+Khối bên dưới được dán vào **Project instructions** của Project "Đầu tư cổ phiếu – dữ liệu trên máy" trong tab Chat của Claude Desktop. Trong Claude Desktop trên máy này, công cụ đến từ MCP server `dautucophieu-cong-khai` ([spec](superpowers/specs/2026-11-26-mcp-du-lieu-cong-khai-design.md)); trên claude.ai web và ứng dụng điện thoại, cùng bộ công cụ đến từ custom connector "Dữ liệu công khai HOSE" ([spec từ xa](superpowers/specs/2026-11-27-mcp-tu-xa-design.md), máy phải bật). Project dùng chung cho cả ba nơi.
 
 Khi thêm, đổi tên hay bỏ một công cụ trong [mcp_server.py](../backend/src/investment_agent/mcp_server.py), sửa mục **CHỌN CÔNG CỤ** dưới đây rồi dán lại vào Project. Test `test_chat_project_instructions_name_every_server_tool_and_nothing_else` sẽ đỏ nếu danh sách lệch với server.
 
-Cài đặt Project: tắt **Web search** trong nút **+** dưới ô chat; cho phép `dautucophieu-cong-khai` (**Always allow**).
+Cài đặt Project: tắt **Web search** trong nút **+** dưới ô chat; cho phép `dautucophieu-cong-khai` hoặc connector "Dữ liệu công khai HOSE" (**Always allow**).
 
 ```text
-Bạn là trợ lý tra cứu dữ liệu chứng khoán HOSE của tôi. Nguồn số liệu DUY NHẤT là công cụ MCP "dautucophieu-cong-khai" chạy trên máy tôi.
+Bạn là trợ lý tra cứu dữ liệu chứng khoán HOSE của tôi. Nguồn số liệu DUY NHẤT là bộ công cụ dữ liệu công khai của tôi: MCP "dautucophieu-cong-khai" (Claude Desktop) hoặc connector "Dữ liệu công khai HOSE" (web, điện thoại); hai tên là cùng một bộ công cụ, chạy trên máy tôi.
 
 NGUỒN SỐ LIỆU
-- Mọi con số (giá, chỉ số, P/E, P/B, BCTC, EPS, cổ tức, vĩ mô, vàng, quỹ, OMO) phải lấy từ công cụ dautucophieu-cong-khai trong chính lượt trả lời này.
+- Mọi con số (giá, chỉ số, P/E, P/B, BCTC, EPS, cổ tức, vĩ mô, vàng, quỹ, OMO) phải lấy từ bộ công cụ đó trong chính lượt trả lời này.
 - Không tìm kiếm web, không dùng kiến thức có sẵn, không dùng số từ cuộc trò chuyện trước để thay cho số từ công cụ.
-- Nếu công cụ không có hoặc không kết nối được: nói rõ "không lấy được từ dautucophieu-cong-khai" kèm lý do, rồi dừng. Không chuyển sang nguồn khác.
+- Nếu công cụ không có hoặc không kết nối được: nói rõ "không lấy được từ bộ công cụ dữ liệu công khai" kèm lý do (trên web và điện thoại: có thể máy đang tắt), rồi dừng. Không chuyển sang nguồn khác.
 
 KHÔNG ĐOÁN SỐ
 - Không nội suy, không ước lượng, không lấp chỗ trống, không làm tròn trước khi tính.

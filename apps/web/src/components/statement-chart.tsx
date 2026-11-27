@@ -110,12 +110,21 @@ export function Spark({ row, cols }: { row: Row; cols: number[] }) {
   );
 }
 
-type Series = { key: string; name: string; kind: Kind; values: (number | null)[]; raw: (string | null)[] };
+type Series = { key: string; name: string; kind: Kind; values: (number | null)[]; raw: (string | null)[];
+  median: { values: (number | null)[]; raw: (string | null)[] } | null };
+type Medians = Record<string, Record<string, string | null>>;  // Trung vị ngành theo quý: ratio code -> period -> median
+
+/** The sector median of a drawn row over the periods shown (none for the forecast column); null when the row has no median. */
+export function medianRaw(medians: Medians | undefined, key: string, periods: string[], cols: number[], forecast: boolean): (string | null)[] | null {
+  const m = medians?.[key];
+  if (!m) return null;
+  return [...cols.map((i) => m[periods[i]] ?? null), ...(forecast ? [null] : [])];
+}
 
 /** The picked rows over the periods shown, bars for money and lines for ratios, one axis per unit; the owner's forecast is hatched. */
-export function StatementChart({ rows, periods, cols, keys, forecast, checks, onRemove }: {
+export function StatementChart({ rows, periods, cols, keys, forecast, checks, onRemove, medians }: {
   rows: Row[]; periods: string[]; cols: number[]; keys: string[]; forecast: { label: string; values: Record<string, string | null> } | null;
-  checks: Check[]; onRemove: (key: string) => void;
+  checks: Check[]; onRemove: (key: string) => void; medians?: Medians;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [W, setW] = useState(640);
@@ -135,11 +144,14 @@ export function StatementChart({ rows, periods, cols, keys, forecast, checks, on
     const row = rows.find((r) => r.key === key);
     if (!row || row.kind === "group") return [];
     const raw = [...cols.map((i) => row.values[i]), ...(forecast ? [forecast.values[key] ?? null] : [])];
-    return [{ key, name: seriesName(rows, key), kind: row.kind, raw, values: raw.map((v) => plotValue(v, row.kind as Kind)) }];
+    const m = medianRaw(medians, key, periods, cols, !!forecast);
+    return [{ key, name: seriesName(rows, key), kind: row.kind, raw, values: raw.map((v) => plotValue(v, row.kind as Kind)),
+      median: m && { raw: m, values: m.map((v) => plotValue(v, row.kind as Kind)) } }];
   });
   if (!series.length) return <p className="caption">Bấm tên một dòng trong bảng để vẽ biểu đồ (tối đa 2 dòng).</p>;
   const { left, right } = axes(series.map((s) => s.kind));
-  const scale = (unit: Kind | null) => unit && scaleOf(series.filter((s) => s.kind === unit).flatMap((s) => s.values), unit === "money");
+  const scale = (unit: Kind | null) => unit && scaleOf(series.filter((s) => s.kind === unit).flatMap((s) => [...s.values, ...(s.median?.values ?? [])]), unit === "money");
+  const withMedian = series.filter((s) => s.median);
   const flagged = flaggedFor(checks, series.map((s) => s.key));
   const flagAt = (i: number) => (i === fc ? undefined : flagged.get(periods[cols[i]]));
   const tl = (() => { const s = scale(left); return s ? niceTicks(s.lo, s.hi) : []; })();
@@ -179,6 +191,7 @@ export function StatementChart({ rows, periods, cols, keys, forecast, checks, on
             const y = yFor(s.kind), idx = series.indexOf(s);
             const real = s.values.map((v, i) => (i === fc ? null : v));
             return <g key={s.key}>
+              {s.median && <path d={linePath(s.median.values, cx, y)} className={`sc-line sc-median ${swatch(idx)}`} />}
               <path d={linePath(real, cx, y)} className={`sc-line ${swatch(idx)}`} />
               {s.values.map((v, i) => v === null ? null :
                 <circle key={i} cx={cx(i)} cy={y(v)} r={i === fc ? 4 : 2.5} className={i === fc ? `sc-dot-fc ${swatch(idx)}` : `sc-dot ${swatch(idx)}`} />)}
@@ -192,17 +205,21 @@ export function StatementChart({ rows, periods, cols, keys, forecast, checks, on
         </svg>
         {at !== null && <div className="mc-tip" style={{ left: `${Math.min(80, Math.max(20, (cx(at) / W) * 100))}%` }} role="status">
           <strong>{labels[at]}{at === fc ? " (dự phóng)" : ""}</strong>
-          {series.map((s) => <div key={s.key}>{s.name}: {cell(s.raw[at], s.kind, s.key)}</div>)}
+          {series.map((s) => <div key={s.key}>{s.name}: {cell(s.raw[at], s.kind, s.key)}
+            {s.median && at !== fc && <span className="caption"> · trung vị ngành {cell(s.median.raw[at], s.kind, s.key)}</span>}</div>)}
           {flagAt(at)?.map((l) => <div key={l} className="caption">* {l}</div>)}</div>}
       </div>
       <p className="caption">Ô trống trong bảng là khoảng trống trên biểu đồ, không nối qua.{forecast ? ` ${forecast.label} gạch chéo là số dự phóng của bạn, không phải số công bố.` : ""}
+        {withMedian.length ? " Đường nét đứt là trung vị ngành của từng quý (các doanh nghiệp cùng nhóm có số ở quý đó, không gồm mã này, cần ít nhất 3); quý dưới 3 doanh nghiệp để trống." : ""}
         {labels.some((_, i) => flagAt(i)) ? " * kỳ có chỗ lệch trong Kiểm tra chéo ở dòng đang vẽ hoặc số tính ra từ nó; chạm vào kỳ để xem." : ""}</p>
       <details className="mc-table">
         <summary>Xem số liệu</summary>
         <table aria-label="Số liệu biểu đồ bảng số tài chính">
-          <thead><tr><th>Kỳ</th>{series.map((s) => <th key={s.key} className="num">{s.name}</th>)}{flagged.size > 0 && <th>Kiểm tra chéo</th>}</tr></thead>
+          <thead><tr><th>Kỳ</th>{series.map((s) => <th key={s.key} className="num">{s.name}</th>)}
+            {withMedian.map((s) => <th key={`m${s.key}`} className="num">Trung vị ngành: {s.name}</th>)}{flagged.size > 0 && <th>Kiểm tra chéo</th>}</tr></thead>
           <tbody>{labels.map((l, i) => <tr key={l}><td>{l}{i === fc ? " (dự phóng)" : ""}</td>
             {series.map((s) => <td key={s.key} className="num">{cell(s.raw[i], s.kind, s.key)}</td>)}
+            {withMedian.map((s) => <td key={`m${s.key}`} className="num">{cell(s.median!.raw[i], s.kind, s.key)}</td>)}
             {flagged.size > 0 && <td>{flagAt(i)?.join("; ") ?? ""}</td>}</tr>)}</tbody>
         </table>
       </details>

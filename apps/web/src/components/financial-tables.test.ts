@@ -133,3 +133,11 @@ it("the median note names the peers and quarter, and for a bank why CASA and nh�
   expect(insurer).toContain("gồm cả bảo hiểm nhân thọ (BVH) và phi nhân thọ");
   expect(sectorNote({ kind: "bank", sector: null })).toBeNull();
 });
+
+it("turns the sector's quarterly medians into the table's periods", async () => {
+  const { sectorHistory } = await import("./financial-tables");
+  const ratios = { kind: "bank" as const, quarters: [{ date: "2026-06-30", label: "Q2/2026" }, { date: "2026-09-30", label: "Q3/2026" }], metrics: [],
+    sector: { name: "Ngân hàng", quarter: "2026-09-30", peers: 21, medians: {}, counts: {}, history: { BAD_LOANS_RATIO_AQ: [null, "0.0222"] } } };
+  expect(sectorHistory(ratios)).toEqual({ BAD_LOANS_RATIO_AQ: { "2026-Q2": null, "2026-Q3": "0.0222" } });
+  expect(sectorHistory({ ...ratios, sector: null })).toEqual({});
+});

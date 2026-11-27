@@ -21,7 +21,8 @@ type Ratios = { kind: Kind | "general"; quarters: { date: string; label: string 
   metrics: { code: string; label: string; format: "pct0" | "pct1" | "pct2" | "times" | "days"; values: (string | null)[] }[];
   fetched_at?: string | null; notes?: string[]; notes_fetched_at?: string | null; sector?: Sector | null };
 // Trung vị ngành (26/11/2026): peers of the same ICB level-2 sector on HOSE with figures for the ticker's own latest quarter
-export type Sector = { name: string; quarter: string; peers: number; medians: Record<string, string | null>; counts: Record<string, number> };  // a bank's group-2 share and CASA: quarters left blank or entered differently
+export type Sector = { name: string; quarter: string; peers: number; medians: Record<string, string | null>; counts: Record<string, number>;
+  history?: Record<string, (string | null)[]> };  // a bank's group-2 share and CASA: quarters left blank or entered differently
 
 const SIGNED = new Set(["revenue_yoy", "gross_profit_yoy", "npat_parent_yoy", "ebitda_yoy", "fcff_yield"]);
 // VNDirect's ratios read to two places (NPL 1,66%, not 1,7%), as their own table showed them.
@@ -144,6 +145,13 @@ export function sectorNote(r: { kind: Ratios["kind"]; sector?: Sector | null }):
     + " cao hơn hay thấp hơn trung vị không có nghĩa là tốt hay xấu.";
 }
 
+/** Trung vị ngành theo quý (27/11/2026): the route's medians, one per quarter of the ratios, keyed by the table's periods for the chart. */
+export function sectorHistory(r: { quarters: { date: string }[]; sector?: Sector | null }): Record<string, Record<string, string | null>> {
+  const period = (d: string) => `${d.slice(0, 4)}-Q${Math.floor((Number(d.slice(5, 7)) - 1) / 3) + 1}`;
+  return Object.fromEntries(Object.entries(r.sector?.history ?? {}).map(([code, values]) =>
+    [code, Object.fromEntries(r.quarters.map((q, i) => [period(q.date), values[i] ?? null]))]));
+}
+
 export function sectorColumn(s: Sector | null | undefined): Extra {
   if (!s) return null;
   const q = `${s.quarter.slice(0, 4)}-Q${Math.floor((Number(s.quarter.slice(5, 7)) - 1) / 3) + 1}`;
@@ -261,7 +269,8 @@ export function FinancialTables({ symbol }: { symbol: string }) {
       {part.periods.length === 0 ? <p className="muted">Chưa có kỳ nào.</p>
         : <>
           <StatementChart rows={part.rows} periods={part.periods} cols={cols} keys={picked} forecast={extra} checks={data.checks}
-            onRemove={(key) => setPicked((p) => p.filter((k) => k !== key))} />
+            onRemove={(key) => setPicked((p) => p.filter((k) => k !== key))}
+            medians={view === "quarters" && ratios && showsSector(ratios.kind) ? sectorHistory(ratios) : undefined} />
           <Table part={part} cols={cols} caption={`${view === "quarters" ? `${cols.length} quý, cũ bên trái` : `${cols.length} năm`} · bấm tên dòng để vẽ (tối đa 2 dòng)`}
             extra={extra} sector={view === "quarters" && showsSector(ratios?.kind) ? sectorColumn(ratios?.sector) : null} picked={picked} onPick={(key) => setPicked((p) => toggleRow(p, key))} />
         </>}

@@ -629,3 +629,19 @@ def test_sector_history_gives_each_quarters_median_of_the_peers_reporting_it(dat
     out = sector_history(data.root, "KKK", ["2026-06-30", "2026-09-30"], ("ROAE_TR_AVG4Q",))
     assert out == {"ROAE_TR_AVG4Q": [None, "0.08"]}  # Q2: under 3 peers, no point; never another quarter
     assert sector_history(data.root, "ZZZ", ["2026-09-30"]) == {}
+
+
+def test_so_sanh_nganh_adds_the_tickers_own_quarters_beside_the_sector_median_of_each(data):
+    write(data.root / "hose-listing.json", {"at": "t", "listing": {"symbols": ["KKK", "PPA", "PPB", "PPC"],
+        "icb_codes": {s: "8600" for s in ("KKK", "PPA", "PPB", "PPC")}, "icb_names": {"8600": "Bất động sản"}}})
+    q = {"KKK": {"2026-03-31": "0.09", "2026-06-30": "0.1", "2026-09-30": "0.2"}, "PPA": {"2026-06-30": "0.05", "2026-09-30": "0.06"},
+         "PPB": {"2026-06-30": "0.07", "2026-09-30": "0.08"}, "PPC": {"2026-06-30": "0.09", "2026-09-30": "0.10"}}
+    for sym, by_q in q.items():
+        write(data.root / "financial-ratios-general" / f"{sym}.json", {"symbol": sym, "kind": "general", "fetched_at": "t", "source": "vndirect:finfo",
+                                                                      "names": {"ROAE_TR_AVG4Q": "ROAE"},
+                                                                      "quarters": {d: {"ROAE_TR_AVG4Q": v} for d, v in by_q.items()}})
+    out = data.so_sanh_nganh("KKK", so_quy=2)
+    assert out["quy"] == "2026-09-30" and out["theo_quy"]["quy"] == ["2026-06-30", "2026-09-30"]
+    assert out["theo_quy"]["chi_so"]["ROAE_TR_AVG4Q"] == {"gia_tri": ["0.1", "0.2"], "trung_vi": ["0.07", "0.08"]}
+    assert data.so_sanh_nganh("KKK")["theo_quy"]["quy"] == ["2026-03-31", "2026-06-30", "2026-09-30"]  # default 4, only 3 exist
+    assert data.so_sanh_nganh("KKK", so_quy=99)["theo_quy"]["chi_so"]["ROAE_TR_AVG4Q"]["trung_vi"][0] is None  # Q1: no peer, clamped to 8

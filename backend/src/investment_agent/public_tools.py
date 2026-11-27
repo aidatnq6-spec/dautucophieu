@@ -17,7 +17,7 @@ from investment_agent.market.company_notes import NOTE_GROUPS, NOTE_LABELS
 from investment_agent.market.insider_docs import DocStore, fill_from_docs
 from investment_agent.market.prices import PriceStore
 from investment_agent.market.valuation_history import own_history
-from investment_agent.market.sector_compare import compare_sector
+from investment_agent.market.sector_compare import compare_sector, sector_trend
 from investment_agent.market.report_flags import EPS_JUMP, eps_jumps, outside_sales_flag
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -235,9 +235,19 @@ class PublicData:
                 "ngay_cuoi": (record.get("closes") or [[None]])[-1][0], "diem": closes,
                 "su_kien_co_phieu": issues}
 
-    def so_sanh_nganh(self, ma) -> dict:
+    def so_sanh_nganh(self, ma, so_quy=4) -> dict:
         symbol = self._symbol(ma)
-        return compare_sector(self.root, symbol) if symbol else _missing("Mã không hợp lệ.")
+        if not symbol:
+            return _missing("Mã không hợp lệ.")
+        out = compare_sector(self.root, symbol)
+        if out.get("thieu"):
+            return out
+        trend = sector_trend(self.root, symbol, _count(so_quy, 4, 8))  # theo quý (owner, 27/11/2026)
+        if trend:
+            out["theo_quy"] = trend
+            out["luu_y"] += (" theo_quy: giá trị của mã và trung vị ngành từng quý (các mã cùng nhóm có số ở đúng quý đó, không gồm mã này, "
+                             "cần ít nhất 3, không thì null); thứ hạng và tứ phân vị chỉ có ở quý mới nhất.")
+        return out
 
     def dinh_gia_lich_su(self, ma) -> dict:
         symbol = self._symbol(ma)

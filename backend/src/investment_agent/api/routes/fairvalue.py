@@ -15,7 +15,7 @@ from investment_agent.market.erp import ErpStore
 from investment_agent.market.financial_ratios import DISPLAY, FinancialRatioStore, kind_of
 from investment_agent.market.general_ratios import GENERAL_DISPLAY, GeneralRatioStore
 from investment_agent.market.report_flags import eps_jumps, outside_sales_flag
-from investment_agent.market.sector_compare import compare_sector
+from investment_agent.market.sector_compare import compare_sector, sector_history
 from investment_agent.market.valuation_history import own_history
 from investment_agent.market.fundamentals import FundamentalsStore
 from investment_agent.market.insider_deals import InsiderStore, insider_deals
@@ -187,7 +187,7 @@ def _own_history(data_dir: Path, symbol: str) -> dict | None:
     return {"date": out["ngay_cuoi"], "pe": pe, "pb": pb} if pe or pb else None
 
 
-def _sector_medians(data_dir: Path, symbol: str, rows: list[str], codes: tuple[str, ...] | None = None) -> dict | None:
+def _sector_medians(data_dir: Path, symbol: str, rows: list[str], codes: tuple[str, ...] | None = None, quarters: list[str] = ()) -> dict | None:
     """Trung vị ngành of the table's rows, as so_sanh_nganh works them out (owner, 26/11/2026; banks 27/11/2026): codes are the ratios
     compared (None: the ticker's own set), rows every code of the table, those not compared (a bank's CASA, nhóm 2) given no median.
     None when the ticker has no sector to compare; a ratio under 3 peers has no median ("—"), as the 26/11/2026 spec says."""
@@ -197,7 +197,9 @@ def _sector_medians(data_dir: Path, symbol: str, rows: list[str], codes: tuple[s
     medians = {c["ma_chi_so"]: c["trung_vi"] for c in out["chi_so"]}
     counts = {c["ma_chi_so"]: c["so_doanh_nghiep"] for c in out["chi_so"]}
     return {"name": out["nganh"], "quarter": out["quy"], "peers": out["so_doanh_nghiep_nganh"] - out["chua_co_quy_nay"] - out["chua_co_chi_so"],
-            "medians": {c: medians.get(c) for c in rows}, "counts": {c: counts.get(c, 0) for c in rows}}
+            "medians": {c: medians.get(c) for c in rows}, "counts": {c: counts.get(c, 0) for c in rows},
+            # Trung vị ngành theo quý (27/11/2026): each compared ratio's median for every quarter of the table, in the same order
+            "history": sector_history(data_dir, symbol, list(quarters), codes)}
 
 
 def _report_flags(data_dir: Path, symbol: str) -> dict:
@@ -465,7 +467,7 @@ def sector_ratios(symbol: str, request: Request):
                 "metrics": [{"code": code, "label": label, "format": fmt, "values": [general["quarters"][q].get(code) for q in quarters]}
                             for code, label, fmt in GENERAL_DISPLAY],
                 "notes": [], "notes_fetched_at": None,
-                "sector": _sector_medians(data_dir, sym, [c for c, _, _ in GENERAL_DISPLAY], tuple(c for c, _, _ in GENERAL_DISPLAY))}
+                "sector": _sector_medians(data_dir, sym, [c for c, _, _ in GENERAL_DISPLAY], tuple(c for c, _, _ in GENERAL_DISPLAY), quarters)}
     data = {q: dict(v) for q, v in record["quarters"].items()}
     rows, notes, notes_fetched_at = list(DISPLAY[record["kind"]]), [], None
     if record["kind"] == "bank":
@@ -479,7 +481,7 @@ def sector_ratios(symbol: str, request: Request):
             "quarters": [{"date": q, "label": f"Q{(int(q[5:7]) + 2) // 3}/{q[:4]}"} for q in quarters],
             "metrics": [{"code": code, "label": label, "format": fmt, "values": [data[q].get(code) for q in quarters]} for code, label, fmt in rows],
             "notes": notes, "notes_fetched_at": notes_fetched_at,
-            "sector": _sector_medians(data_dir, sym, [code for code, _, _ in rows])}
+            "sector": _sector_medians(data_dir, sym, [code for code, _, _ in rows], quarters=quarters)}
 
 
 @router.get("/fairvalue/dividends/{symbol}")

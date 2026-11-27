@@ -83,3 +83,16 @@ it("an insurer's blank insurance result is starred where its parts miss the prof
   const checks = [{ period: "2013-Q4", check: "ins_reconcile", label: "Kết quả kinh doanh bảo hiểm để trống", a: "1", b: "2" }];
   expect([...flaggedFor(checks, ["ins_result", "fin_profit"]).keys()]).toEqual(["2013-Q4"]);
 });
+
+it("lines the sector median up with the periods drawn, nothing for the forecast column", async () => {
+  const { medianRaw } = await import("./statement-chart");
+  const medians = { ROAE_TR_AVG4Q: { "2026-Q2": "0.10", "2026-Q3": null } };
+  expect(medianRaw(medians, "ROAE_TR_AVG4Q", ["2026-Q1", "2026-Q2", "2026-Q3"], [1, 2], true)).toEqual(["0.10", null, null]);
+  expect(medianRaw(medians, "revenue", ["2026-Q2"], [0], false)).toBeNull();
+});
+
+it("names the sector median lines in the chart's label", async () => {
+  const { chartLabel } = await import("./statement-chart");
+  expect(chartLabel(["ROAE", "Doanh thu"], ["ROAE"])).toBe("Biểu đồ ROAE và Doanh thu, kèm trung vị ngành của ROAE (nét đứt)");
+  expect(chartLabel(["Doanh thu"], [])).toBe("Biểu đồ Doanh thu");
+});

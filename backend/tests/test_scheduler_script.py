@@ -245,3 +245,10 @@ def test_insider_volumes_are_read_from_hose_documents_in_the_evening_slot_owner_
     evening = next(i for i, l in enumerate(ls) if "(Get-Date).Hour -ge 20" in l)
     # OCR of 30 scanned notices takes a few minutes, so the step gets 15
     assert next(i for i, l in enumerate(ls) if "jobs.step --timeout 900 insider-docs-sync --data-dir $data --limit 30" in l) > evening
+
+
+def test_long_history_for_p_e_against_its_own_past_is_refreshed_in_the_evening_slot():
+    ls = lines()
+    evening = next(i for i, l in enumerate(ls) if "(Get-Date).Hour -ge 20" in l)
+    step = next(i for i, l in enumerate(ls) if "jobs.step index-history-sync --data-dir $data --limit 60" in l)
+    assert step > evening

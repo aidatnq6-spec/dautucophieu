@@ -125,6 +125,9 @@ def main() -> int:
     phist.add_argument("--data-dir", type=Path, required=True)
     phist.add_argument("--limit", type=int, default=60, help="tickers per run: never fetched first, then those older than a week")
     phist.add_argument("--symbols", help="comma-separated tickers to fetch now, however recent")
+    ihsync = commands.add_parser("index-history-sync", help="refresh data/index-history (statements and unadjusted closes) for dinh_gia_lich_su")
+    ihsync.add_argument("--data-dir", type=Path, required=True)
+    ihsync.add_argument("--limit", type=int, default=60, help="tickers per run: never fetched first, then those older than a week")
     ihist = commands.add_parser("index-history", help="work out VN-Index P/E and P/B before VNDirect's series from today's HOSE tickers (one-off, ~15 min)")
     ihist.add_argument("--data-dir", type=Path, required=True)
     psync = commands.add_parser("plans-sync", help="business plans of watched tickers from CafeF (current year) into data/annual-plans-cafef")
@@ -173,6 +176,8 @@ def main() -> int:
                             send=telegram[0] if telegram else None)
     if args.command == "market-sync":
         return market_sync(_symbols(args.symbols), args.data_dir, args.calendar, args.days, index=args.index)
+    if args.command == "index-history-sync":
+        return index_history_sync(args.data_dir, limit=args.limit)
     if args.command == "index-history":
         return index_history_cli(args.data_dir)
     if args.command == "plans-sync":
@@ -538,6 +543,25 @@ def index_history_cli(data_dir: Path, *, get=None, now=None, sleep=None) -> int:
     print(json.dumps({"status": "ok" if not failed else "partial", "built": built, "compare": checks["VNINDEX"], "vn30": checks["VN30"]},
                      ensure_ascii=False))
     return 0 if not failed else 1
+
+
+def index_history_sync(data_dir: Path, *, limit: int = 60, get=None, now=None, sleep=None) -> int:
+    """Exit 0 when every ticker due this run came back, 1 when some failed (each is reported, its stored record kept)."""
+    import time
+    from datetime import datetime, timezone
+    from investment_agent.market.index_history import IndexHistoryStore, refresh_history
+    if get is None:
+        import httpx
+
+        def get(url):
+            response = httpx.get(url, timeout=60, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+            response.raise_for_status()
+            return response.text
+    symbols = json.loads((data_dir / "hose-listing.json").read_text(encoding="utf-8"))["listing"]["symbols"]
+    out = refresh_history(IndexHistoryStore(data_dir / "index-history"), symbols, get=get, now=now or datetime.now(timezone.utc), limit=limit,
+                          sleep=sleep or time.sleep)
+    print(json.dumps(out))
+    return 0 if out["status"] == "ok" else 1
 
 
 def plans_sync(data_dir: Path, *, get=None, now=None, sleep=None) -> int:

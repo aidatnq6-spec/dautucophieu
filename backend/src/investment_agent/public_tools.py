@@ -245,8 +245,24 @@ class PublicData:
 
     def tu_doanh(self, so_phien=60, ma=None, now: datetime | None = None) -> dict:
         """Tự doanh HOSE (market.proprietary_history) over the so_phien sessions ending at the newest stored one (owner, 27/11/2026)."""
+        from investment_agent.market.proprietary_history import ProprietaryStore
+        return self._session_flows(ProprietaryStore(self.root), so_phien, ma, now, by_index=True, nguon="VNDirect (proprietary_trading, công khai)",
+                                   empty="Chưa có số tự doanh trong kho (proprietary-sync chạy ở lượt 20:00).",
+                                   total_note="toan_san lấy từ dòng VNINDEX, danh sách mã lấy từ từng mã: ở phien_khong_khop hai số này không "
+                                              "khớp nhau, nêu rõ khi dùng. ")
+
+    def khoi_ngoai(self, so_phien=60, ma=None, now: datetime | None = None) -> dict:
+        """Khối ngoại HOSE (market.foreign_history), as tu_doanh; the market total is the sum of the stocks (owner, 27/11/2026)."""
+        from investment_agent.market.foreign_history import ForeignStore
+        return self._session_flows(ForeignStore(self.root), so_phien, ma, now, by_index=False, nguon="VNDirect (foreigns, công khai)",
+                                   empty="Chưa có số khối ngoại trong kho (foreign-sync chạy ở lượt 20:00).",
+                                   total_note="toan_san là tổng các mã cổ phiếu (như dòng Khối ngoại của bản tin), khác số HOSE công bố gồm cả "
+                                              "thỏa thuận và chứng chỉ quỹ. phien_thieu gồm cả phiên VNDirect trả mọi mã bằng 0. ")
+
+    def _session_flows(self, store, so_phien, ma, now, *, by_index: bool, nguon: str, empty: str, total_note: str) -> dict:
+        """One store of HOSE sessions (tự doanh or khối ngoại) over the so_phien sessions ending at the newest one with figures."""
         from decimal import Decimal
-        from investment_agent.market.proprietary_history import CLOSED_AT, VN, ProprietaryStore
+        from investment_agent.market.proprietary_history import CLOSED_AT, VN
         _plain = lambda d: format(d.normalize(), "f") if d else "0"  # noqa: E731
         n = _count(so_phien, 60, 250)
         symbol = None
@@ -254,11 +270,10 @@ class PublicData:
             symbol = self._symbol(ma)
             if not symbol:
                 return _missing("Mã không hợp lệ.")
-        store = ProprietaryStore(self.root)
         records = {d: store.read(d) for d in store.days()}
         with_figures = sorted(d for d, r in records.items() if r and not r.get("thieu"))
         if not with_figures:
-            return _missing("Chưa có số tự doanh trong kho (proprietary-sync chạy ở lượt 20:00).")
+            return _missing(empty)
         newest = date.fromisoformat(with_figures[-1])
         local = (now or datetime.now(timezone.utc)).astimezone(VN)
         sessions, calendars = _sessions(newest - timedelta(days=n * 2 + 30), local.date(), self.root)
@@ -275,12 +290,11 @@ class PublicData:
         span = {"so_phien": len(window), "so_phien_hoi": n, "tu": window[0].isoformat() if window else None, "den": newest.isoformat(),
                 "phien_co_so": len(present), "phien_thieu": [d.isoformat() for d, r in zip(window, kept) if r and r.get("thieu")],
                 "chua_hoi": [d.isoformat() for d, r in zip(window, kept) if not r], "cham_phien": len(closed_after)}
-        head = {"nguon": "VNDirect (proprietary_trading, công khai)", "lay_luc": max((r.get("fetched_at") or "" for r in present), default=None),
+        head = {"nguon": nguon, "lay_luc": max((r.get("fetched_at") or "" for r in present), default=None),
                 "don_vi": "đồng (giá trị), cổ phiếu (khối lượng)", "khoang": span, "lich_kiem": calendars,
                 "luu_y": "Số VNDirect công bố theo phiên, giữ nguyên; phiên thiếu không được thay bằng phiên khác. phien_thieu: VNDirect không có "
                          "số; chua_hoi: kho chưa tải phiên đó (ngoài khoảng lưu hoặc lượt tải lỗi). VNDirect đăng chậm vài phiên (cham_phien). "
-                         "toan_san lấy từ dòng VNINDEX, danh sách mã lấy từ từng mã: ở phien_khong_khop hai số này không khớp nhau, nêu rõ khi "
-                         "dùng. so_phien là số phiên thật của khoảng, có thể ít hơn so_phien_hoi khi lịch không đủ. Mua, bán ròng không nói lên "
+                         + total_note + "so_phien là số phiên thật của khoảng, có thể ít hơn so_phien_hoi khi lịch không đủ. Mua, bán ròng không nói lên "
                          "ý định hay tốt xấu."}
         if symbol:
             rows, mine = [], []
@@ -300,6 +314,8 @@ class PublicData:
         totals = [{"ma": sym, **flow(rows), "so_phien": len(rows)} for sym, rows in by_symbol.items()]
         buys = sorted((t for t in totals if Decimal(t["rong_gt"]) > 0), key=lambda t: (-Decimal(t["rong_gt"]), t["ma"]))[:10]
         sells = sorted((t for t in totals if Decimal(t["rong_gt"]) < 0), key=lambda t: (Decimal(t["rong_gt"]), t["ma"]))[:10]
+        if not by_index:
+            return {**head, "toan_san": flow([f for r in present for f in r["stocks"].values()]), "mua_rong_manh": buys, "ban_rong_manh": sells}
         return {**head, "toan_san": flow([r["index"] for r in present]), "mua_rong_manh": buys, "ban_rong_manh": sells,
                 "phien_khong_khop": [r["date"] for r in present if not r.get("khop")]}
 

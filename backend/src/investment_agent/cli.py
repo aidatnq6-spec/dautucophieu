@@ -760,7 +760,7 @@ def _macro_extras(data_dir: Path, results: dict, *, get, get_bytes, sleep) -> No
 
 
 def financial_ratios_sync(data_dir: Path, get=None, today=None) -> int:
-    """Exit 0 when every watched financial ticker updated, 1 when some failed (each is reported)."""
+    """Exit 0 when every financial ticker asked (the watched ones and every HOSE bank) updated, 1 when some failed (each is reported)."""
     from datetime import datetime
     from zoneinfo import ZoneInfo
     from investment_agent.market.financial_ratios import FinancialRatioStore, fetch_financial_ratios
@@ -775,6 +775,13 @@ def financial_ratios_sync(data_dir: Path, get=None, today=None) -> int:
             return response.text
     sectors = load_sectors(data_dir)[0]
     watched = {s: sectors.get(s) for s in load_watchlist(data_dir).symbols}
+    # Trung vị ngành cho ngân hàng (owner, 27/11/2026): every HOSE bank too, so a bank is set against the others
+    try:
+        listing = json.loads((data_dir / "hose-listing.json").read_text(encoding="utf-8"))["listing"]
+        banks = [s for s in listing["symbols"] if (listing.get("icb_names") or {}).get((listing.get("icb_codes") or {}).get(s)) == "Ngân hàng"]
+    except (OSError, ValueError, KeyError, TypeError):
+        banks = []
+    watched = {**{s: "Ngân hàng" for s in banks}, **watched}
     results = fetch_financial_ratios(FinancialRatioStore(data_dir / "financial-ratios"), watched, get=get,
                                      today=today or datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
     failed = {k: v for k, v in results.items() if v != "ok"}

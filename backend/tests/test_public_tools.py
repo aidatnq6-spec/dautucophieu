@@ -362,8 +362,28 @@ def test_a_ticker_set_against_its_icb_sector_on_the_same_quarter(data):
     dso = next(c for c in out["chi_so"] if c["ma_chi_so"] == "DSO_TR_AVG5Q")
     assert dso["gia_tri"] == "40" and dso["trung_vi"] is None and dso["ly_do"] == "Dưới 3 doanh nghiệp cùng ngành có số quý này"
     assert len(out["chi_so"]) == 16 and "không gắn nhãn tốt hay xấu" in out["luu_y"].lower()
-    assert data.so_sanh_nganh("BNK")["thieu"] is True and "Ngân hàng" in data.so_sanh_nganh("BNK")["ly_do"]
+    assert data.so_sanh_nganh("BNK")["thieu"] is True and "Chưa có chỉ số" in data.so_sanh_nganh("BNK")["ly_do"]  # a bank: its own ratios
     assert data.so_sanh_nganh("ZZZ")["thieu"] is True
+
+
+def test_a_bank_set_against_the_other_hose_banks_on_the_same_quarter(data):
+    from investment_agent.market.financial_ratios import DISPLAY
+    write(data.root / "hose-listing.json", {"at": "t", "listing": {"symbols": ["BNK", "BAA", "BBB", "BCC", "BDD", "SEC"],
+        "icb_codes": {"BNK": "8300", "BAA": "8300", "BBB": "8300", "BCC": "8300", "BDD": "8300", "SEC": "8700"},
+        "icb_names": {"8300": "Ngân hàng", "8700": "Dịch vụ tài chính"}}})
+    for sym, npl, q in (("BNK", "0.02", "2026-09-30"), ("BAA", "0.01", "2026-09-30"), ("BBB", "0.03", "2026-09-30"), ("BCC", "0.05", "2026-09-30"),
+                        ("BDD", "0.09", "2026-06-30")):  # BDD has not reported Q3 yet: counted apart, its Q2 is not used
+        write(data.root / "financial-ratios" / f"{sym}.json", {"symbol": sym, "kind": "bank", "fetched_at": "2026-11-27T01:00:00+00:00",
+                                                              "source": "vndirect:finfo", "quarters": {q: {"BAD_LOANS_RATIO_AQ": npl}}})
+    out = data.so_sanh_nganh("bnk")
+    assert out["nganh"] == "Ngân hàng" and out["quy"] == "2026-09-30" and out["so_doanh_nghiep_nganh"] == 4 and out["chua_co_quy_nay"] == 1
+    assert out["nguon"] == "vndirect:finfo"
+    npl = next(c for c in out["chi_so"] if c["ma_chi_so"] == "BAD_LOANS_RATIO_AQ")
+    assert npl == {"ma_chi_so": "BAD_LOANS_RATIO_AQ", "ten": "Tỷ lệ nợ xấu (NPL)", "gia_tri": "0.02", "trung_vi": "0.03",
+                   "phan_vi_25": "0.02", "phan_vi_75": "0.04", "so_doanh_nghiep": 3, "thu_hang": "3/4 (cao xuống thấp)"}
+    assert [c["ma_chi_so"] for c in out["chi_so"]] == [code for code, _, _ in DISPLAY["bank"]]
+    sec = data.so_sanh_nganh("SEC")
+    assert sec["thieu"] is True and "ngân hàng" in sec["ly_do"]
 
 
 def test_general_ratios_warn_that_per_share_figures_use_vndirects_quarter_end_share_count(data):

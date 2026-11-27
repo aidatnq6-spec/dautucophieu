@@ -11,12 +11,15 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from statistics import median, quantiles
 
-from .financial_ratios import kind_of
+from .financial_ratios import DISPLAY, kind_of
 
 # The sixteen ratios the owner chose, in this order
 SECTOR_CODES = ("ROAE_TR_AVG4Q", "ROIC_TR_AVG4Q", "GROSS_MARGIN_TR", "NET_MARGIN_TR", "DEBT_TO_EQUITY_AQ", "INTEREST_COVERAGE_TR",
                 "CURRENT_RATIO_AQ", "DEBT_EBITDA", "CFO_TO_SALES_TR", "DSO_TR_AVG5Q", "DIO_TR_AVG5Q", "CASH_CONVERSION_CYCLE_TR_AVG5Q",
                 "NET_SALES_TR_GRYOY", "NET_PROFIT_TR_GRYOY", "EPS_TR_GR3YR", "DIVIDEND_PAYOUT_TR")
+# Trung vị ngành cho ngân hàng (owner, 27/11/2026): a bank against the other HOSE banks on VNDirect's bank rows of Bảng số tài chính
+BANK_CODES = tuple(code for code, _, _ in DISPLAY["bank"])
+BANK_NAMES = {code: label for code, label, _ in DISPLAY["bank"]}
 MIN_PEERS = 3
 NOTE = ("So với các doanh nghiệp cùng ngành ICB cấp 2 trên HOSE có số ở đúng quý này; trung vị và tứ phân vị là phép tính thống kê "
         "trên số VNDirect, không gồm mã đang xem. Không gắn nhãn tốt hay xấu: cao hơn không phải lúc nào cũng tốt (nợ vay, số "
@@ -44,7 +47,8 @@ def _plain(d: Decimal) -> str:
     return format(d.normalize(), "f")
 
 
-def compare_sector(data_dir: Path, symbol: str, codes: tuple[str, ...] = SECTOR_CODES) -> dict:
+def compare_sector(data_dir: Path, symbol: str, codes: tuple[str, ...] | None = None) -> dict:
+    """codes: None for the ticker's own set (BANK_CODES for a bank, SECTOR_CODES for a general company)."""
     root = Path(data_dir)
     if not _SYMBOL.fullmatch(symbol or ""):
         return _missing("Mã không hợp lệ.")
@@ -54,9 +58,12 @@ def compare_sector(data_dir: Path, symbol: str, codes: tuple[str, ...] = SECTOR_
     if code is None:
         return _missing(f"Chưa có ngành ICB của {symbol} trong danh sách HOSE.")
     sector = names.get(code, code)
-    if kind_of(sector) is not None:
-        return _missing(f"{sector} có bộ chỉ số riêng (ngân hàng, bảo hiểm, chứng khoán); so sánh ngành chỉ dành cho doanh nghiệp thường.")
-    own = _json(root / "financial-ratios-general" / f"{symbol}.json")
+    kind = kind_of(sector)
+    if kind not in (None, "bank"):
+        return _missing(f"{sector} có bộ chỉ số riêng (bảo hiểm, chứng khoán); so sánh ngành có cho doanh nghiệp thường và ngân hàng.")
+    folder = "financial-ratios" if kind == "bank" else "financial-ratios-general"
+    codes = codes or (BANK_CODES if kind == "bank" else SECTOR_CODES)
+    own = _json(root / folder / f"{symbol}.json")
     quarters = [q for q, v in ((own or {}).get("quarters") or {}).items() if any(c in v for c in codes)]
     if not quarters:
         return _missing(f"Chưa có chỉ số tài chính VNDirect của {symbol} trong kho.")
@@ -65,7 +72,7 @@ def compare_sector(data_dir: Path, symbol: str, codes: tuple[str, ...] = SECTOR_
     peers = sorted(s for s, c in icb.items() if c == code and s != symbol)
     rows, no_file, no_quarter = {}, 0, 0
     for s in peers:
-        rec = _json(root / "financial-ratios-general" / f"{s}.json") if _SYMBOL.fullmatch(s) else None
+        rec = _json(root / folder / f"{s}.json") if _SYMBOL.fullmatch(s) else None
         if not rec:
             no_file += 1
         elif quarter not in (rec.get("quarters") or {}):
@@ -76,7 +83,7 @@ def compare_sector(data_dir: Path, symbol: str, codes: tuple[str, ...] = SECTOR_
     for c in codes:
         value = _num(mine.get(c))
         others = [v for v in (_num(r.get(c)) for r in rows.values()) if v is not None]
-        item = {"ma_chi_so": c, "ten": (own.get("names") or {}).get(c, c), "gia_tri": mine.get(c)}
+        item = {"ma_chi_so": c, "ten": BANK_NAMES.get(c, c) if kind == "bank" else (own.get("names") or {}).get(c, c), "gia_tri": mine.get(c)}
         if value is None:
             out.append({**item, "trung_vi": None, "so_doanh_nghiep": len(others), "ly_do": f"{symbol} chưa có số quý này"})
             continue

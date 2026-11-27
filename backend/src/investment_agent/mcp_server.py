@@ -73,7 +73,8 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
     def so_sanh_nganh(ma: str) -> dict:
         """Đặt một mã cạnh các doanh nghiệp cùng ngành ICB cấp 2 trên HOSE ở quý mới nhất: 16 chỉ số VNDirect (ROAE, ROIC, biên, nợ vay,
         khả năng trả lãi, thanh toán, dòng tiền, số ngày phải thu và tồn kho, tăng trưởng, trả cổ tức), mỗi chỉ số có trung vị, tứ phân vị
-        và thứ hạng; không cho ngân hàng, bảo hiểm, chứng khoán."""
+        và thứ hạng; ngân hàng so với các ngân hàng HOSE trên 9 chỉ số (NPL, nợ quá hạn, bao phủ nợ xấu, NIM, LDR, tăng trưởng cho vay,
+        vốn chủ/tài sản, ROAA, ROAE); không cho bảo hiểm, chứng khoán."""
         return vn_times(data.so_sanh_nganh(ma))
 
     @tool

@@ -187,13 +187,17 @@ def _own_history(data_dir: Path, symbol: str) -> dict | None:
     return {"date": out["ngay_cuoi"], "pe": pe, "pb": pb} if pe or pb else None
 
 
-def _sector_medians(data_dir: Path, symbol: str) -> dict | None:
-    """Trung vị ngành of the twelve rows, as so_sanh_nganh works them out (owner, 26/11/2026); None when the ticker has no sector to compare."""
-    out = compare_sector(data_dir, symbol, tuple(code for code, _, _ in GENERAL_DISPLAY))
+def _sector_medians(data_dir: Path, symbol: str, rows: list[str], codes: tuple[str, ...] | None = None) -> dict | None:
+    """Trung vị ngành of the table's rows, as so_sanh_nganh works them out (owner, 26/11/2026; banks 27/11/2026): codes are the ratios
+    compared (None: the ticker's own set), rows every code of the table, those not compared (a bank's CASA, nhóm 2) given no median.
+    None when the ticker has no sector to compare; a ratio under 3 peers has no median ("—"), as the 26/11/2026 spec says."""
+    out = compare_sector(data_dir, symbol, codes)
     if out.get("thieu"):
         return None
+    medians = {c["ma_chi_so"]: c["trung_vi"] for c in out["chi_so"]}
+    counts = {c["ma_chi_so"]: c["so_doanh_nghiep"] for c in out["chi_so"]}
     return {"name": out["nganh"], "quarter": out["quy"], "peers": out["so_doanh_nghiep_nganh"] - out["chua_co_quy_nay"] - out["chua_co_chi_so"],
-            "medians": {c["ma_chi_so"]: c["trung_vi"] for c in out["chi_so"]}, "counts": {c["ma_chi_so"]: c["so_doanh_nghiep"] for c in out["chi_so"]}}
+            "medians": {c: medians.get(c) for c in rows}, "counts": {c: counts.get(c, 0) for c in rows}}
 
 
 def _report_flags(data_dir: Path, symbol: str) -> dict:
@@ -460,7 +464,8 @@ def sector_ratios(symbol: str, request: Request):
                 "quarters": [{"date": q, "label": f"Q{(int(q[5:7]) + 2) // 3}/{q[:4]}"} for q in quarters],
                 "metrics": [{"code": code, "label": label, "format": fmt, "values": [general["quarters"][q].get(code) for q in quarters]}
                             for code, label, fmt in GENERAL_DISPLAY],
-                "notes": [], "notes_fetched_at": None, "sector": _sector_medians(data_dir, sym)}
+                "notes": [], "notes_fetched_at": None,
+                "sector": _sector_medians(data_dir, sym, [c for c, _, _ in GENERAL_DISPLAY], tuple(c for c, _, _ in GENERAL_DISPLAY))}
     data = {q: dict(v) for q, v in record["quarters"].items()}
     rows, notes, notes_fetched_at = list(DISPLAY[record["kind"]]), [], None
     if record["kind"] == "bank":
@@ -473,7 +478,8 @@ def sector_ratios(symbol: str, request: Request):
     return {"symbol": sym, "kind": record["kind"], "fetched_at": record.get("fetched_at"),
             "quarters": [{"date": q, "label": f"Q{(int(q[5:7]) + 2) // 3}/{q[:4]}"} for q in quarters],
             "metrics": [{"code": code, "label": label, "format": fmt, "values": [data[q].get(code) for q in quarters]} for code, label, fmt in rows],
-            "notes": notes, "notes_fetched_at": notes_fetched_at}
+            "notes": notes, "notes_fetched_at": notes_fetched_at,
+            "sector": _sector_medians(data_dir, sym, [code for code, _, _ in rows]) if record["kind"] == "bank" else None}
 
 
 @router.get("/fairvalue/dividends/{symbol}")

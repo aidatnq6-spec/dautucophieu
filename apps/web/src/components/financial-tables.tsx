@@ -129,6 +129,20 @@ const ty = (v: string | null) => (v === null ? "—" : `${cell(v, "money", null)
 
 type Extra = { label: string; values: Record<string, string | null> } | null;  // the owner's forecast column, shown after the last quarter
 
+/** Trung vị ngành: general companies (26/11/2026) and banks against the other HOSE banks (27/11/2026); securities firms and insurers have none. */
+export function showsSector(kind: Ratios["kind"] | undefined): boolean {
+  return kind === "general" || kind === "bank";
+}
+
+/** The caption line under the table for the Trung vị ngành column; null when the column is not shown. */
+export function sectorNote(r: { kind: Ratios["kind"]; sector?: Sector | null }): string | null {
+  if (!showsSector(r.kind) || !r.sector) return null;
+  const q = periodLabel(`${r.sector.quarter.slice(0, 4)}-Q${Math.floor((Number(r.sector.quarter.slice(5, 7)) - 1) / 3) + 1}`);
+  return `Trung vị ngành: trung vị của ${r.sector.peers} doanh nghiệp cùng ngành ${r.sector.name} (ICB cấp 2, HOSE) có số ở quý ${q}, không gồm mã này;`
+    + ` cần ít nhất 3 doanh nghiệp, không thì để —${r.kind === "bank" ? "; CASA và tỷ lệ nợ nhóm 2 không có trung vị (chỉ có cho ngân hàng đang theo dõi)" : ""};`
+    + " cao hơn hay thấp hơn trung vị không có nghĩa là tốt hay xấu.";
+}
+
 export function sectorColumn(s: Sector | null | undefined): Extra {
   if (!s) return null;
   const q = `${s.quarter.slice(0, 4)}-Q${Math.floor((Number(s.quarter.slice(5, 7)) - 1) / 3) + 1}`;
@@ -248,7 +262,7 @@ export function FinancialTables({ symbol }: { symbol: string }) {
           <StatementChart rows={part.rows} periods={part.periods} cols={cols} keys={picked} forecast={extra} checks={data.checks}
             onRemove={(key) => setPicked((p) => p.filter((k) => k !== key))} />
           <Table part={part} cols={cols} caption={`${view === "quarters" ? `${cols.length} quý, cũ bên trái` : `${cols.length} năm`} · bấm tên dòng để vẽ (tối đa 2 dòng)`}
-            extra={extra} sector={view === "quarters" && ratios?.kind === "general" ? sectorColumn(ratios.sector) : null} picked={picked} onPick={(key) => setPicked((p) => toggleRow(p, key))} />
+            extra={extra} sector={view === "quarters" && showsSector(ratios?.kind) ? sectorColumn(ratios?.sector) : null} picked={picked} onPick={(key) => setPicked((p) => toggleRow(p, key))} />
         </>}
       {!financial && fixedNotes(data).map((n) => <p key={n} className="caption" data-testid="fixed-notes">{n}</p>)}
       {!financial && view === "quarters" && forecast && <ForecastForm key={`${forecast.quarter}-${forecast.version}`} symbol={symbol} data={forecast} onSaved={setForecast} />}
@@ -276,6 +290,7 @@ export function FinancialTables({ symbol }: { symbol: string }) {
         <ul className="ft-checks">{ratios.notes.map((n) => <li key={n}>{n}</li>)}</ul>
       </details>}
       {financial ? <p className="caption wrap">
+        {ratios && sectorNote(ratios) && <>{sectorNote(ratios)} </>}
         Chỉ số {TITLE[data.kind as Kind]}: tỷ lệ VNDirect tính sẵn (dữ liệu công khai, từ Q4/2017; ROAA, ROAE từ Q3/2023), chỉ có theo quý; NIM, ROAA, ROAE,
         biên lợi nhuận trên 4–5 quý gần nhất, các tỷ lệ khác tại cuối quý; ô — là quý nguồn chưa có số.{data.kind === "bank" ? ` Tỷ lệ nợ nhóm 2 = nợ nhóm 2 / nợ nhóm 1–5 và CASA = (tiền gửi không kỳ hạn + ký quỹ) / tiền gửi của khách hàng: từ thuyết minh báo cáo tài chính trên API công khai của Vietcap (từ Q1/2018${ratios?.notes_fetched_at ? `, đọc ${new Date(ratios.notes_fetched_at).toLocaleDateString("vi-VN")}` : ""}), chỉ ở quý mà các nhóm nợ và các loại tiền gửi cộng ra đúng tổng; quý đã nhập ở Số liệu ngân hàng (nhập tay) dùng số nhập tay. CAR (cuối năm): tỷ lệ an toàn vốn cuối năm của Vietcap, ở cột Q4 (không nguồn miễn phí nào có CAR theo quý); năm Vietcap chưa có thì dùng số của VNDirect (trừ mức 8% giữ chỗ); hai nguồn lệch quá 0,1 điểm hoặc Vietcap trùng đúng năm trước thì ghi ở mục đối chiếu. Thiếu thì để trống, không nội suy.` : ""} Quy mô và định giá: báo cáo tài chính trên API công
         khai của VNDirect{data.fetched_at ? `, đọc ${new Date(data.fetched_at).toLocaleDateString("vi-VN")}` : ""}. Vốn hoá = giá đóng
@@ -291,9 +306,7 @@ export function FinancialTables({ symbol }: { symbol: string }) {
           chỉ có theo quý; ROAE, ROAA, ROIC, biên lợi nhuận, dòng tiền / doanh thu và khả năng trả lãi trên 4–5 quý gần nhất, các hệ số khác tại cuối quý;
           quý doanh thu rất nhỏ làm số ngày và biên lệch xa, giữ nguyên như nguồn; có thể lệch ROE 4 quý và ROIC vận hành ở trên vì ứng dụng tự tính từ
           báo cáo tài chính; ô — là quý nguồn chưa có số. </>}
-        {ratios?.kind === "general" && ratios.sector && <>Trung vị ngành: trung vị của {ratios.sector.peers} doanh nghiệp cùng ngành
-          {" "}{ratios.sector.name} (ICB cấp 2, HOSE) có số ở quý {periodLabel(`${ratios.sector.quarter.slice(0, 4)}-Q${Math.floor((Number(ratios.sector.quarter.slice(5, 7)) - 1) / 3) + 1}`)},
-          không gồm mã này; cần ít nhất 3 doanh nghiệp, không thì để —; cao hơn hay thấp hơn trung vị không có nghĩa là tốt hay xấu. </>}
+        {ratios && sectorNote(ratios) && <>{sectorNote(ratios)} </>}
         Nguồn: báo cáo tài chính trên API công khai của VNDirect{data.fetched_at ? `, đọc ${new Date(data.fetched_at).toLocaleDateString("vi-VN")}` : ""}; số từng quý (không lũy kế),
         chi phí ghi số âm. LN HĐKD lõi = lãi gộp − chi phí bán hàng − quản lý. EBIT = LNTT + lãi vay; EBITDA = EBIT + khấu hao. FCFF = lưu chuyển tiền
         HĐKD + lãi vay × (1 − thuế ÷ LNTT) + capex; không tính khi LNTT ≤ 0. Vốn hoá năm = giá đóng cửa thực (chưa điều chỉnh) phiên cuối năm × số cổ

@@ -159,7 +159,7 @@ def test_server_exposes_exactly_the_approved_read_only_tools(data):
     assert sorted(t.name for t in tools) == sorted([
         "thong_tin_ma", "gia_ngay", "dinh_gia_chi_so", "bao_cao_tai_chinh", "chi_so_tai_chinh", "eps_co_tuc", "su_kien_doanh_nghiep",
         "co_dong_ban_lanh_dao", "giao_dich_noi_bo", "danh_sach_vi_mo", "chi_bao_vi_mo", "chi_so_chau_a", "gia_vang", "omo",
-        "quy_mo", "gia_vang_lich_su", "dinh_gia_ma", "lich_su_gia", "so_sanh_nganh", "thuyet_minh", "dinh_gia_lich_su", "tu_doanh", "khoi_ngoai"])
+        "quy_mo", "gia_vang_lich_su", "dinh_gia_ma", "lich_su_gia", "so_sanh_nganh", "thuyet_minh", "dinh_gia_lich_su", "tu_doanh", "khoi_ngoai", "cung_chieu"])
     assert all(t.annotations and t.annotations.read_only_hint for t in tools)
     assert "Ngân hàng" in result.content[0].text
 
@@ -645,3 +645,20 @@ def test_so_sanh_nganh_adds_the_tickers_own_quarters_beside_the_sector_median_of
     assert out["theo_quy"]["chi_so"]["ROAE_TR_AVG4Q"] == {"gia_tri": ["0.1", "0.2"], "trung_vi": ["0.07", "0.08"]}
     assert data.so_sanh_nganh("KKK")["theo_quy"]["quy"] == ["2026-03-31", "2026-06-30", "2026-09-30"]  # default 4, only 3 exist
     assert data.so_sanh_nganh("KKK", so_quy=99)["theo_quy"]["chi_so"]["ROAE_TR_AVG4Q"]["trung_vi"][0] is None  # Q1: no peer, clamped to 8
+
+
+def test_cung_chieu_gives_the_tickers_both_bought_or_both_sold_over_the_sessions_both_stores_have(data):
+    _foreign(data, "2026-11-19", [("VPB", 5, 0), ("MCH", 0, 4), ("FPT", 3, 0)])
+    _foreign(data, "2026-11-20", [("VPB", 5, 0), ("MCH", 0, 4), ("FPT", 3, 0)])
+    _prop(data, "2026-11-19", [("VPB", 2, 0), ("MCH", 0, 1), ("FPT", 0, 1)])
+    out = data.cung_chieu(so_phien=2, now=TU_DOANH_NOW)
+    assert out["khoang"]["tu"] == "2026-11-18" and out["khoang"]["den"] == "2026-11-19" and out["khoang"]["phien_bo"] == 1
+    assert out["khoang"]["cham_phien"] == 6  # 20, 23–27/11 closed after the newest session both stores have
+    assert out["cung_mua_rong"] == [{"ma": "VPB", "ngoai_rong_gt": "5", "tu_doanh_rong_gt": "2"}]
+    assert out["cung_ban_rong"] == [{"ma": "MCH", "ngoai_rong_gt": "-4", "tu_doanh_rong_gt": "-1"}]
+    assert out["don_vi"].startswith("đồng") and "watched" not in str(out)
+
+
+def test_cung_chieu_without_a_common_session_says_so(data):
+    _foreign(data, "2026-11-19", [("VPB", 5, 0)])
+    assert data.cung_chieu(now=TU_DOANH_NOW)["thieu"] is True

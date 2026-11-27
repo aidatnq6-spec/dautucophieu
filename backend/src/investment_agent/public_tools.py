@@ -269,6 +269,28 @@ class PublicData:
                                    total_note="toan_san là tổng các mã cổ phiếu (như dòng Khối ngoại của bản tin), khác số HOSE công bố gồm cả "
                                               "thỏa thuận và chứng chỉ quỹ. phien_thieu gồm cả phiên VNDirect trả mọi mã bằng 0. ")
 
+    def cung_chieu(self, so_phien=20, so_ma=5, now: datetime | None = None) -> dict:
+        """Khối ngoại và tự doanh cùng chiều (brief.flows.same_direction_raw, owner 27/11/2026): no watched tickers marked here."""
+        from investment_agent.market.flow_compare import same_direction_raw
+        from investment_agent.market.proprietary_history import CLOSED_AT, VN
+        n, top = _count(so_phien, 20, 250), _count(so_ma, 5, 20)
+        local = (now or datetime.now(timezone.utc)).astimezone(VN)
+        sessions, calendars = _sessions(local.date() - timedelta(days=n * 2 + 60), local.date(), self.root)
+        closed = sorted(d for d in sessions if d < local.date() or local.time() >= CLOSED_AT)
+        if not closed:
+            return _missing("Chưa có lịch phiên HOSE cho khoảng này.")
+        raw = same_direction_raw(self.root, closed[-1], closed, n, top)
+        if raw["status"] != "ok":
+            return _missing(raw["reason"])
+        plain = lambda d: format(d.normalize(), "f") if d else "0"  # noqa: E731
+        rows = lambda xs: [{"ma": s, "ngoai_rong_gt": plain(f), "tu_doanh_rong_gt": plain(p)} for s, f, p in xs]  # noqa: E731
+        return {"nguon": "VNDirect (foreigns và proprietary_trading, công khai)", "don_vi": "đồng (giá trị ròng)", "lich_kiem": calendars,
+                "khoang": {"so_phien_hoi": n, "tu": raw["from"], "den": raw["to"], "phien_bo": raw["dropped"], "cham_phien": raw["lag_sessions"]},
+                "cung_mua_rong": rows(raw["buy"]), "cung_ban_rong": rows(raw["sell"]),
+                "luu_y": "Khoảng kết thúc ở phiên mới nhất cả khối ngoại và tự doanh đều có số; phiên một bên thiếu số bị bỏ ở cả hai bên "
+                         "(phien_bo). Khối ngoại ròng là tổng các mã cổ phiếu của mã đó; tự doanh ròng theo từng mã của VNDirect. Xếp theo tổng "
+                         "ròng hai bên. Cùng chiều không nói lên ý định hay tốt xấu."}
+
     def _session_flows(self, store, so_phien, ma, now, *, by_index: bool, nguon: str, empty: str, total_note: str) -> dict:
         """One store of HOSE sessions (tự doanh or khối ngoại) over the so_phien sessions ending at the newest one with figures."""
         from decimal import Decimal

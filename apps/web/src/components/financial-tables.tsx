@@ -129,9 +129,9 @@ const ty = (v: string | null) => (v === null ? "—" : `${cell(v, "money", null)
 
 type Extra = { label: string; values: Record<string, string | null> } | null;  // the owner's forecast column, shown after the last quarter
 
-/** Trung vị ngành: general companies (26/11/2026), banks and securities firms (ICB level 4 Dịch vụ đầu tư) (27/11/2026); insurers have none. */
+/** Trung vị ngành: general companies (26/11/2026), banks, securities firms (ICB level 4 Dịch vụ đầu tư) and insurers (27/11/2026). */
 export function showsSector(kind: Ratios["kind"] | undefined): boolean {
-  return kind === "general" || kind === "bank" || kind === "securities";
+  return kind === "general" || kind === "bank" || kind === "securities" || kind === "insurance";
 }
 
 /** The caption line under the table for the Trung vị ngành column; null when the column is not shown. */
@@ -139,7 +139,8 @@ export function sectorNote(r: { kind: Ratios["kind"]; sector?: Sector | null }):
   if (!showsSector(r.kind) || !r.sector) return null;
   const q = periodLabel(`${r.sector.quarter.slice(0, 4)}-Q${Math.floor((Number(r.sector.quarter.slice(5, 7)) - 1) / 3) + 1}`);
   return `Trung vị ngành: trung vị của ${r.sector.peers} doanh nghiệp cùng ngành ${r.sector.name} (ICB cấp ${r.kind === "securities" ? 4 : 2}, HOSE) có số ở quý ${q}, không gồm mã này;`
-    + ` cần ít nhất 3 doanh nghiệp, không thì để —${r.kind === "bank" ? "; CASA và tỷ lệ nợ nhóm 2 không có trung vị (chỉ có cho ngân hàng đang theo dõi)" : ""};`
+    + ` cần ít nhất 3 doanh nghiệp, không thì để —${r.kind === "bank" ? "; CASA và tỷ lệ nợ nhóm 2 không có trung vị (chỉ có cho ngân hàng đang theo dõi)" : ""}${r.kind === "insurance"
+      ? "; nhóm gồm cả bảo hiểm nhân thọ (BVH) và phi nhân thọ, tỷ lệ kết hợp và biên lợi nhuận khó so trực tiếp" : ""};`
     + " cao hơn hay thấp hơn trung vị không có nghĩa là tốt hay xấu.";
 }
 

@@ -114,3 +114,13 @@ def test_cli_financial_ratios_sync_fails_only_for_a_watched_ticker(tmp_path, cap
         return _by_symbol(url)
     assert financial_ratios_sync(tmp_path, get=get_ssi_down, today=date(2026, 11, 27)) == 1  # SSI is watched
     assert json.loads(capsys.readouterr().out)["status"] == "partial"
+
+
+def test_cli_financial_ratios_sync_adds_every_hose_insurer(tmp_path, capsys):
+    from investment_agent.cli import financial_ratios_sync
+    _watch_ssi_fpt(tmp_path)
+    (tmp_path / "hose-listing.json").write_text(json.dumps({"at": "t", "listing": {"symbols": ["BVH", "PGI"],
+        "icb_codes": {"BVH": "8500", "PGI": "8500"}, "icb_names": {"8500": "Bảo hiểm"}}}), encoding="utf-8")
+    assert financial_ratios_sync(tmp_path, get=_by_symbol, today=date(2026, 11, 27)) == 0
+    assert json.loads(capsys.readouterr().out)["results"] == {"BVH": "ok", "PGI": "ok", "SSI": "ok"}
+    assert FinancialRatioStore(tmp_path / "financial-ratios").read("BVH")["kind"] == "insurance"

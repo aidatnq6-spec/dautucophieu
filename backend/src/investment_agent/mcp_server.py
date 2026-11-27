@@ -75,7 +75,7 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
         khả năng trả lãi, thanh toán, dòng tiền, số ngày phải thu và tồn kho, tăng trưởng, trả cổ tức), mỗi chỉ số có trung vị, tứ phân vị
         và thứ hạng; ngân hàng so với các ngân hàng HOSE trên 9 chỉ số (NPL, nợ quá hạn, bao phủ nợ xấu, NIM, LDR, tăng trưởng cho vay,
         vốn chủ/tài sản, ROAA, ROAE); công ty chứng khoán so với các mã HOSE thuộc ICB cấp 4 Dịch vụ đầu tư trên 5 chỉ số (ROAA, ROAE, biên
-        lợi nhuận ròng, cho vay/vốn chủ, vốn chủ/tài sản); không cho bảo hiểm."""
+        lợi nhuận ròng, cho vay/vốn chủ, vốn chủ/tài sản); bảo hiểm so với các mã bảo hiểm HOSE (gồm cả nhân thọ) trên 5 chỉ số."""
         return vn_times(data.so_sanh_nganh(ma))
 
     @tool

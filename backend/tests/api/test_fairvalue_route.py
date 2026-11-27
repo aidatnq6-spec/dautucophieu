@@ -603,3 +603,18 @@ def test_a_securities_firms_ratios_carry_the_median_of_the_other_investment_serv
     sector = body["sector"]
     assert sector["name"] == "Dịch vụ đầu tư (chứng khoán)" and sector["peers"] == 3 and sector["medians"]["ROAE_TR_AVG4Q"] == "0.1"
     assert set(sector["medians"]) == {m["code"] for m in body["metrics"]}
+
+
+def test_an_insurers_ratios_carry_the_median_of_the_other_hose_insurers(tmp_path):
+    from investment_agent.market.financial_ratios import FinancialRatioStore
+    cr = {"BMI": "0.95", "BVH": "1.02", "MIG": "0.98", "PGI": "0.90"}
+    (tmp_path / "market-symbols.txt").write_text("BMI\n", encoding="utf-8")
+    (tmp_path / "industries.json").write_text(json.dumps({"as_of": "x", "source": "t", "level": 2, "sectors": {"BMI": "Bảo hiểm"}}), encoding="utf-8")
+    (tmp_path / "hose-listing.json").write_text(json.dumps({"at": "t", "listing": {"symbols": list(cr), "icb_codes": {s: "8500" for s in cr},
+                                                                                  "icb_names": {"8500": "Bảo hiểm"}}}), encoding="utf-8")
+    for sym, v in cr.items():
+        FinancialRatioStore(tmp_path / "financial-ratios").save({"symbol": sym, "kind": "insurance", "fetched_at": "2026-11-27T01:00:00+00:00",
+                                                                 "source": "vndirect:finfo", "quarters": {"2026-09-30": {"COMBINED_RATIO_TR": v}}})
+    c, clock = _app(tmp_path)
+    sector = call(c, clock, "GET", "/internal/fairvalue/ratios/BMI").json()["sector"]
+    assert sector["name"] == "Bảo hiểm" and sector["peers"] == 3 and sector["medians"]["COMBINED_RATIO_TR"] == "0.98"

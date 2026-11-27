@@ -115,7 +115,7 @@ it("the sector median column shows for general companies and banks only", () => 
   expect(showsSector("general")).toBe(true);
   expect(showsSector("bank")).toBe(true);
   expect(showsSector("securities")).toBe(true);  // against the other investment-services firms (27/11/2026)
-  expect(showsSector("insurance")).toBe(false);
+  expect(showsSector("insurance")).toBe(true);  // against the other HOSE insurers, life and non-life together (27/11/2026)
   expect(showsSector(undefined)).toBe(false);
 });
 
@@ -128,6 +128,8 @@ it("the median note names the peers and quarter, and for a bank why CASA and nh�
   const broker = sectorNote({ kind: "securities", sector: { ...sector, name: "Dịch vụ đầu tư (chứng khoán)", peers: 20 } })!;
   expect(broker).toContain("trung vị của 20 doanh nghiệp cùng ngành Dịch vụ đầu tư (chứng khoán) (ICB cấp 4, HOSE)");
   expect(broker).not.toContain("CASA");
-  expect(sectorNote({ kind: "insurance", sector })).toBeNull();
+  const insurer = sectorNote({ kind: "insurance", sector: { ...sector, name: "Bảo hiểm", peers: 3 } })!;
+  expect(insurer).toContain("trung vị của 3 doanh nghiệp cùng ngành Bảo hiểm (ICB cấp 2, HOSE)");
+  expect(insurer).toContain("gồm cả bảo hiểm nhân thọ (BVH) và phi nhân thọ");
   expect(sectorNote({ kind: "bank", sector: null })).toBeNull();
 });

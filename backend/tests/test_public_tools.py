@@ -599,3 +599,19 @@ def test_a_damaged_session_file_is_named_and_left_out_not_the_whole_answer(data)
     _prop(data, "2026-11-19", [("FPT", 5, 1)])
     write(data.root / "proprietary" / "2026-11-23.json", {"date": "2026-11-23", "stocks": {}, "index": None})
     assert data.tu_doanh(so_phien=3, now=TU_DOANH_NOW)["khoang"]["phien_hong"] == ["2026-11-23"]
+
+
+def test_an_insurer_set_against_the_other_hose_insurers(data):
+    from investment_agent.market.financial_ratios import DISPLAY
+    syms = ["BMI", "BVH", "MIG", "PGI", "BIC"]
+    write(data.root / "hose-listing.json", {"at": "t", "listing": {"symbols": syms, "icb_codes": {s: "8500" for s in syms},
+                                                                  "icb_names": {"8500": "Bảo hiểm"}}})
+    for sym, cr, q in (("BMI", "0.95", "2026-09-30"), ("BVH", "1.02", "2026-09-30"), ("MIG", "0.98", "2026-09-30"), ("PGI", "0.90", "2026-09-30"),
+                       ("BIC", "0.80", "2026-06-30")):  # BIC not out for Q3
+        write(data.root / "financial-ratios" / f"{sym}.json", {"symbol": sym, "kind": "insurance", "fetched_at": "t", "source": "vndirect:finfo",
+                                                              "quarters": {q: {"COMBINED_RATIO_TR": cr}}})
+    out = data.so_sanh_nganh("BMI")
+    assert out["nganh"] == "Bảo hiểm" and out["chua_co_quy_nay"] == 1 and out["so_doanh_nghiep_nganh"] == 4
+    cr = next(c for c in out["chi_so"] if c["ma_chi_so"] == "COMBINED_RATIO_TR")
+    assert cr["ten"] == "Tỷ lệ kết hợp" and cr["trung_vi"] == "0.98" and cr["thu_hang"] == "3/4 (cao xuống thấp)"
+    assert [c["ma_chi_so"] for c in out["chi_so"]] == [code for code, _, _ in DISPLAY["insurance"]]

@@ -23,7 +23,9 @@ BANK_NAMES = {code: label for code, label, _ in DISPLAY["bank"]}
 # and a securities firm against the other HOSE firms of ICB level 4 "Dịch vụ đầu tư" (owner, 27/11/2026), EVF and the like left out
 SECURITIES_CODES = tuple(code for code, _, _ in DISPLAY["securities"])
 SECURITIES_NAME = "Dịch vụ đầu tư (chứng khoán)"
-OWN = {"bank": (BANK_CODES, BANK_NAMES), "securities": (SECURITIES_CODES, {code: label for code, label, _ in DISPLAY["securities"]})}
+OWN = {"bank": (BANK_CODES, BANK_NAMES), "securities": (SECURITIES_CODES, {code: label for code, label, _ in DISPLAY["securities"]}),
+       # an insurer against the other HOSE insurers (owner, 27/11/2026), life (BVH) and non-life together: only five on HOSE
+       "insurance": (tuple(code for code, _, _ in DISPLAY["insurance"]), {code: label for code, label, _ in DISPLAY["insurance"]})}
 MIN_PEERS = 3
 NOTE = ("So với các doanh nghiệp cùng ngành ICB cấp 2 trên HOSE có số ở đúng quý này; trung vị và tứ phân vị là phép tính thống kê "
         "trên số VNDirect, không gồm mã đang xem. Không gắn nhãn tốt hay xấu: cao hơn không phải lúc nào cũng tốt (nợ vay, số "
@@ -63,8 +65,6 @@ def compare_sector(data_dir: Path, symbol: str, codes: tuple[str, ...] | None = 
         return _missing(f"Chưa có ngành ICB của {symbol} trong danh sách HOSE.")
     sector = names.get(code, code)
     kind = kind_of(sector)
-    if kind == "insurance":
-        return _missing(f"{sector} có bộ chỉ số riêng; so sánh ngành có cho doanh nghiệp thường, ngân hàng và công ty chứng khoán.")
     group = icb
     if kind == "securities":
         level4 = listing.get("icb4_codes")

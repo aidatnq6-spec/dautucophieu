@@ -818,11 +818,13 @@ def financial_ratios_sync(data_dir: Path, get=None, today=None) -> int:
     # Trung vị ngành cho ngân hàng (owner, 27/11/2026): every HOSE bank too, so a bank is set against the others
     try:
         listing = json.loads((data_dir / "hose-listing.json").read_text(encoding="utf-8"))["listing"]
-        banks = [s for s in listing["symbols"] if (listing.get("icb_names") or {}).get((listing.get("icb_codes") or {}).get(s)) == "Ngân hàng"]
+        sector_of = lambda s: (listing.get("icb_names") or {}).get((listing.get("icb_codes") or {}).get(s))  # noqa: E731
+        banks = [s for s in listing["symbols"] if sector_of(s) == "Ngân hàng"]
+        insurers = [s for s in listing["symbols"] if sector_of(s) == "Bảo hiểm"]  # every HOSE insurer too (27/11/2026)
         brokers = [s for s in listing["symbols"] if (listing.get("icb4_codes") or {}).get(s) == INVESTMENT_SERVICES]  # and securities firms
     except (OSError, ValueError, KeyError, TypeError):
-        banks, brokers = [], []
-    watched = {**{s: "Ngân hàng" for s in banks}, **{s: "Dịch vụ tài chính" for s in brokers}, **watched}
+        banks, brokers, insurers = [], [], []
+    watched = {**{s: "Ngân hàng" for s in banks}, **{s: "Dịch vụ tài chính" for s in brokers}, **{s: "Bảo hiểm" for s in insurers}, **watched}
     mine = set(load_watchlist(data_dir).symbols)
     results = fetch_financial_ratios(FinancialRatioStore(data_dir / "financial-ratios"), watched, get=get,
                                      today=today or datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())

@@ -515,7 +515,7 @@ def test_tu_doanh_sums_the_sessions_up_to_the_newest_stored_and_names_the_strong
     _prop(data, "2026-11-23", [("FPT", 3, 0), ("HPG", 0, 2), ("VNM", 2, 2)])
     out = data.tu_doanh(so_phien=3, now=TU_DOANH_NOW)
     assert out["khoang"] == {"so_phien": 3, "so_phien_hoi": 3, "tu": "2026-11-19", "den": "2026-11-23", "phien_co_so": 2,
-                             "phien_thieu": ["2026-11-20"], "chua_hoi": [], "cham_phien": 4}  # 24, 25, 26, 27/11 closed with no figures yet
+                             "phien_thieu": ["2026-11-20"], "chua_hoi": [], "phien_hong": [], "cham_phien": 4}  # 24, 25, 26, 27/11 closed with no figures yet
     assert out["toan_san"]["mua_gt"] == "11" and out["toan_san"]["ban_gt"] == "9" and out["toan_san"]["rong_gt"] == "2"
     assert [x["ma"] for x in out["mua_rong_manh"]] == ["FPT"] and out["mua_rong_manh"][0] == {
         "ma": "FPT", "mua_gt": "8", "ban_gt": "1", "rong_gt": "7", "mua_kl": "20", "ban_kl": "8", "rong_kl": "12", "so_phien": 2}
@@ -587,3 +587,15 @@ def test_a_ticker_vndirect_left_empty_is_named_and_never_read_as_no_trading(data
     assert out["phien_bo_qua"] == [{"ngay": "2026-11-19", "ma": ["HPG"]}]
     one = data.khoi_ngoai(so_phien=1, ma="HPG", now=TU_DOANH_NOW)
     assert one["phien"] == [{"ngay": "2026-11-19", "thieu": True}]
+
+
+def test_a_damaged_session_file_is_named_and_left_out_not_the_whole_answer(data):
+    _foreign(data, "2026-11-19", [("FPT", 5, 1)])
+    (data.root / "foreign" / "2026-11-20.json").write_text("{not json", encoding="utf-8")
+    write(data.root / "foreign" / "2026-11-23.json", {"date": "2026-11-23", "stocks": {"FPT": {"buy_value": "1"}}})  # fields missing
+    out = data.khoi_ngoai(so_phien=3, now=TU_DOANH_NOW)
+    assert out["khoang"]["phien_hong"] == ["2026-11-20", "2026-11-23"] and out["khoang"]["den"] == "2026-11-19"
+    assert out["toan_san"]["mua_gt"] == "5"
+    _prop(data, "2026-11-19", [("FPT", 5, 1)])
+    write(data.root / "proprietary" / "2026-11-23.json", {"date": "2026-11-23", "stocks": {}, "index": None})
+    assert data.tu_doanh(so_phien=3, now=TU_DOANH_NOW)["khoang"]["phien_hong"] == ["2026-11-23"]

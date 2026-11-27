@@ -132,7 +132,9 @@ if ((Get-Date).Hour -ge 20) {
     "$(Get-Date -Format o) foreign-sync exit=$LASTEXITCODE $fs" | Add-Content -LiteralPath $log -Encoding UTF8
     # Lich su dinh gia cua ma: statements and unadjusted closes of 60 HOSE tickers a night (all within a week), so dinh_gia_lich_su and
     # the P/E, P/B so voi lich su cards on Bang so tai chinh stay current.
-    $ih = & $python -W ignore -m investment_agent.jobs.step index-history-sync --data-dir $data --limit 60 2>$null
+    # 120 a night until 4/12/2026 so the first full refresh ends in about four nights (owner, 27/11/2026), then 60 (all within a week).
+    $ihLimit = if ((Get-Date) -lt [datetime]'2026-12-05') { 120 } else { 60 }
+    $ih = & $python -W ignore -m investment_agent.jobs.step index-history-sync --data-dir $data --limit $ihLimit 2>$null
     "$(Get-Date -Format o) index-history-sync exit=$LASTEXITCODE $ih" | Add-Content -LiteralPath $log -Encoding UTF8
     # Chi so tai chinh doanh nghiep thuong: VNDirect's quarterly ratios for 60 non-financial HOSE tickers a night (all within a week).
     $gr = & $python -W ignore -m investment_agent.jobs.step general-ratios-sync --data-dir $data --limit 60 2>$null

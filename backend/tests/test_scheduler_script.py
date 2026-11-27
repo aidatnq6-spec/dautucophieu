@@ -250,8 +250,11 @@ def test_insider_volumes_are_read_from_hose_documents_in_the_evening_slot_owner_
 def test_long_history_for_p_e_against_its_own_past_is_refreshed_in_the_evening_slot():
     ls = lines()
     evening = next(i for i, l in enumerate(ls) if "(Get-Date).Hour -ge 20" in l)
-    step = next(i for i, l in enumerate(ls) if "jobs.step index-history-sync --data-dir $data --limit 60" in l)
+    step = next(i for i, l in enumerate(ls) if "jobs.step index-history-sync --data-dir $data --limit $ihLimit" in l)
     assert step > evening
+    # 120 a night until the first full refresh is done (owner, 27/11/2026), then 60
+    limit = next(l for l in ls if "$ihLimit =" in l)
+    assert "[datetime]'2026-12-05'" in limit and "120" in limit and "60" in limit
 
 
 def test_proprietary_trading_by_session_is_kept_in_the_evening_slot():

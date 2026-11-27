@@ -586,3 +586,20 @@ def test_a_bank_without_a_listed_sector_gets_no_column(tmp_path):
     (tmp_path / "hose-listing.json").unlink()
     c, clock = _app(tmp_path)
     assert call(c, clock, "GET", "/internal/fairvalue/ratios/VCB").json()["sector"] is None
+
+
+def test_a_securities_firms_ratios_carry_the_median_of_the_other_investment_services_firms(tmp_path):
+    from investment_agent.market.financial_ratios import FinancialRatioStore
+    roe = {"SSI": "0.12", "VND": "0.08", "VCI": "0.10", "HCM": "0.20"}
+    (tmp_path / "market-symbols.txt").write_text("SSI\n", encoding="utf-8")
+    (tmp_path / "industries.json").write_text(json.dumps({"as_of": "x", "source": "t", "level": 2, "sectors": {"SSI": "Dịch vụ tài chính"}}), encoding="utf-8")
+    (tmp_path / "hose-listing.json").write_text(json.dumps({"at": "t", "listing": {"symbols": list(roe), "icb_codes": {s: "8700" for s in roe},
+        "icb_names": {"8700": "Dịch vụ tài chính"}, "icb4_codes": {s: "8777" for s in roe}}}), encoding="utf-8")
+    for sym, v in roe.items():
+        FinancialRatioStore(tmp_path / "financial-ratios").save({"symbol": sym, "kind": "securities", "fetched_at": "2026-11-27T01:00:00+00:00",
+                                                                 "source": "vndirect:finfo", "quarters": {"2026-09-30": {"ROAE_TR_AVG4Q": v}}})
+    c, clock = _app(tmp_path)
+    body = call(c, clock, "GET", "/internal/fairvalue/ratios/SSI").json()
+    sector = body["sector"]
+    assert sector["name"] == "Dịch vụ đầu tư (chứng khoán)" and sector["peers"] == 3 and sector["medians"]["ROAE_TR_AVG4Q"] == "0.1"
+    assert set(sector["medians"]) == {m["code"] for m in body["metrics"]}

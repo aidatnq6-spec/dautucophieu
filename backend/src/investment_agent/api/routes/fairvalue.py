@@ -479,7 +479,7 @@ def sector_ratios(symbol: str, request: Request):
             "quarters": [{"date": q, "label": f"Q{(int(q[5:7]) + 2) // 3}/{q[:4]}"} for q in quarters],
             "metrics": [{"code": code, "label": label, "format": fmt, "values": [data[q].get(code) for q in quarters]} for code, label, fmt in rows],
             "notes": notes, "notes_fetched_at": notes_fetched_at,
-            "sector": _sector_medians(data_dir, sym, [code for code, _, _ in rows]) if record["kind"] == "bank" else None}
+            "sector": _sector_medians(data_dir, sym, [code for code, _, _ in rows]) if record["kind"] in ("bank", "securities") else None}
 
 
 @router.get("/fairvalue/dividends/{symbol}")

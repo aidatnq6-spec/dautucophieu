@@ -57,3 +57,9 @@ it("a session VNDirect served with every stock's foreign trading at 0 shows why,
     .toBe("Chưa có số liệu (VNDirect trả mọi mã bằng 0 cho phiên này).");
   expect(foreignGap({ foreign: { net_value_bn: "1.00" } })).toBeNull();
 });
+
+it("reads each bar out as its date and net, or says the session has no figures", async () => {
+  const { barLabel } = await import("./brief-market");
+  expect(barLabel({ date: "2026-11-23", net_bn: "357.51" })).toBe("23/11/2026: +357,5 tỷ");
+  expect(barLabel({ date: "2026-11-24", net_bn: null })).toBe("24/11/2026: thiếu số");
+});

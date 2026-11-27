@@ -87,21 +87,37 @@ export function barHeights(bars: FlowBar[], height: number): ({ y: number; h: nu
   });
 }
 
+/** One bar read out: its date and net, or that the session has no figures (hover, tap and screen readers). */
+export function barLabel(b: FlowBar): string {
+  const day = b.date.split("-").reverse().join("/");
+  return b.net_bn === null ? `${day}: thiếu số` : `${day}: ${signed(b.net_bn, 1)} tỷ`;
+}
+
 function FlowRows({ flows }: { flows: { foreign: Flow; proprietary: Flow } }) {
+  return <div className="bm-flows">
+    <FlowRow label="Khối ngoại ròng" f={flows.foreign} />
+    <FlowRow label="Tự doanh ròng" f={flows.proprietary} />
+  </div>;
+}
+
+function FlowRow({ label, f }: { label: string; f: Flow }) {
+  const [picked, setPicked] = useState<number | null>(null);
   const H = 28, W = 6;
-  return <div className="bm-flows">{([["Khối ngoại ròng", flows.foreign], ["Tự doanh ròng", flows.proprietary]] as const).map(([label, f]) => {
-    if (f.status !== "ok") return <div className="bm-flow" key={label}><div><strong>{label}</strong><div className="caption">{f.reason}</div></div></div>;
-    const head = flowHead(f);
-    return <div className="bm-flow" key={label}>
-      <div><strong>{label}</strong><div className="caption">{head.sub}</div></div>
-      <strong className={`bm-flow-value ${head.tone}`}>{head.value}</strong>
-      <svg className="bm-flow-bars" width={f.bars.length * W} height={H} role="img" aria-label={`${label} ${f.bars.length} phiên`}>
-        <line x1={0} x2={f.bars.length * W} y1={H / 2} y2={H / 2} className="bm-flow-axis" />
-        {barHeights(f.bars, H).map((b, i) => b && <rect key={f.bars[i].date} x={i * W + 1} y={b.y} width={W - 2} height={Math.max(b.h, 0.5)}
-          className={`bm-bar ${b.tone}`}><title>{`${f.bars[i].date.split("-").reverse().join("/")}: ${signed(f.bars[i].net_bn!, 1)} tỷ`}</title></rect>)}
-      </svg>
-    </div>;
-  })}</div>;
+  if (f.status !== "ok") return <div className="bm-flow"><div><strong>{label}</strong><div className="caption">{f.reason}</div></div></div>;
+  const head = flowHead(f);
+  return <div className="bm-flow">
+    <div><strong>{label}</strong><div className="caption">{head.sub}</div>
+      {picked !== null && f.bars[picked] && <div className="caption" data-testid="flow-picked">{barLabel(f.bars[picked])}</div>}</div>
+    <strong className={`bm-flow-value ${head.tone}`}>{head.value}</strong>
+    <svg className="bm-flow-bars" width={f.bars.length * W} height={H} aria-hidden="true">
+      <line x1={0} x2={f.bars.length * W} y1={H / 2} y2={H / 2} className="bm-flow-axis" />
+      {barHeights(f.bars, H).map((b, i) => b && <rect key={`b${f.bars[i].date}`} x={i * W + 1} y={b.y} width={W - 2} height={Math.max(b.h, 0.5)}
+        className={`bm-bar ${b.tone}${picked === i ? " picked" : ""}`} />)}
+      {f.bars.map((bar, i) => <rect key={`t${bar.date}`} x={i * W} y={0} width={W} height={H} className="bm-bar-hit"
+        onClick={() => setPicked(picked === i ? null : i)}><title>{barLabel(bar)}</title></rect>)}
+    </svg>
+    <ul className="visually-hidden" aria-label={`${label}, ${f.bars.length} phiên`}>{f.bars.map((bar) => <li key={bar.date}>{barLabel(bar)}</li>)}</ul>
+  </div>;
 }
 
 /** Bảng kiểm "Thị trường phục hồi": how many conditions are met, and how many have no figures (counted neither way). */

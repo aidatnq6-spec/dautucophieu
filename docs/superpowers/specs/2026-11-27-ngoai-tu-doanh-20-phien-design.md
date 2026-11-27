@@ -27,7 +27,7 @@ Phiên 23/11 (chậm 3 phiên) · 20 phiên +230 tỷ
 ```
 
 - Số lớn: ròng của phiên mới nhất có số, không sau phiên của bản tin; xanh khi dương, đỏ khi âm. Dòng phụ: phiên của số (kèm số phiên chậm khi khác phiên bản tin) và tổng ròng của 20 phiên kết thúc ở phiên đó.
-- 20 cột: 20 phiên HOSE kết thúc ở phiên của số, cột lên khi mua ròng (xanh), xuống khi bán ròng (đỏ), cùng một thang cho cả 20 cột của một dòng; phiên thiếu số để trống (không vẽ 0) và tổng ghi "(thiếu n phiên)". Di chuột lên cột hiện ngày và số ròng.
+- 20 cột: 20 phiên HOSE kết thúc ở phiên của số, cột lên khi mua ròng (xanh), xuống khi bán ròng (đỏ), cùng một thang cho cả 20 cột của một dòng; phiên thiếu số để trống (không vẽ 0) và tổng ghi "(thiếu n phiên)". Di chuột lên cột hiện ngày và số ròng. Từ 27/11/2026: chạm vào cột (điện thoại) hiện ngày và số dưới dòng; mỗi cột có vùng chạm cao cả biểu đồ, kể cả phiên thiếu số ("thiếu số"); trình đọc màn hình đọc danh sách ẩn các phiên.
 - Một dòng không có số thì ghi "chưa có số" kèm lý do. Bản tin Telegram không đổi.
 
 ## Không làm

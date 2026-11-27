@@ -309,8 +309,34 @@ def _remote_issues(env, probe, tailscale) -> list[str]:
     return issues
 
 
+DISK_MIN_GB = 5  # owner, 27/11/2026: C: filled up and Tailscale, Claude Code's update and npm failed before anything said so
+
+
+def _disk_free(root: str) -> int:
+    import shutil
+    return shutil.disk_usage(root).free
+
+
+def _disk_rows(data_dir: Path, disk_free) -> tuple[list[dict], list[dict]]:
+    """C: (Windows, Tailscale, Claude Code, temporary files) and the drive holding data/: under DISK_MIN_GB free is a problem."""
+    rows, problems = [], []
+    for root in dict.fromkeys(["C:\\", Path(data_dir).anchor or "C:\\"]):
+        try:
+            free = disk_free(root) / 1024**3
+        except OSError:
+            continue  # no such drive here: nothing to say
+        letter = root[0].upper()
+        low = free < DISK_MIN_GB
+        rows.append({"id": f"disk:{letter}", "label": f"Ổ {letter}: còn trống", "last": None, "max_days": 0, "stale": low,
+                     "free_gb": f"{free:.1f}"})
+        if low:
+            problems.append({"id": f"source:disk:{letter}", "label": f"Ổ {letter}: sắp đầy",
+                             "detail": f"còn {free:.1f} GB trống (dưới {DISK_MIN_GB} GB): ứng dụng, Tailscale và Claude Code có thể lỗi khi ghi tệp".replace(".", ",", 1)})
+    return rows, problems
+
+
 def health_report(data_dir: Path, *, now: datetime, calendar=None, config_dir: Path | None = None, env=None, probe=_probe,
-                  tailscale=_tailscale) -> dict:
+                  tailscale=_tailscale, disk_free=_disk_free) -> dict:
     from investment_agent.domain.pinned import CONFIG_DIR
     data_dir = Path(data_dir)
     root = data_dir.parent
@@ -337,6 +363,9 @@ def health_report(data_dir: Path, *, now: datetime, calendar=None, config_dir: P
             detail = "chưa có phiên nào có số" if newest is None else                 f"phiên mới nhất có số {_dmy(datetime.fromisoformat(newest))}, chậm {late} phiên (quá {MAX_SESSIONS} phiên)"
             problems.append({"id": f"source:{s['id']}", "label": s["label"], "detail": detail})
     aware = now if now.tzinfo else now.replace(tzinfo=timezone.utc)  # some callers pass a naive UTC time
+    disk_sources, disk_problems = _disk_rows(data_dir, disk_free)
+    sources.extend(disk_sources)
+    problems.extend(disk_problems)
     environ = os.environ if env is None else env
     if environ.get("MCP_REMOTE_SECRET"):  # Kết nối từ xa (owner, 27/11/2026): only once it is set up
         issues = _remote_issues(environ, probe, tailscale)

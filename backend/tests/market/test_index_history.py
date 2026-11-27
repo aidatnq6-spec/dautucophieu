@@ -118,3 +118,55 @@ def test_the_index_can_be_limited_to_a_basket():
     b = record(full, [(date(2016, 3, 1), Decimal(30))])
     out = compute_index({"A": a, "B": b}, members=lambda s, d: s == "B")
     assert out[date(2016, 3, 1)] == {"pe": Decimal("750"), "pb": Decimal("150"), "tickers": 1}  # 3,000 tỷ / 4 tỷ ; / 20 tỷ
+
+
+def _served(asked):
+    def get(url):
+        symbol = url.split("code:")[1].split("~")[0]
+        asked.append(symbol)
+        if "financial_statements" in url:
+            return statements(symbol, (23000, 1e9, "2026-09-30"))
+        return json.dumps({"data": [{"code": symbol, "date": "2026-11-26", "close": 20}, {"code": symbol, "date": "2026-11-27", "close": 21}]})
+    return get
+
+
+def test_refresh_fetches_new_tickers_first_then_the_stalest_past_a_week_and_no_more_than_the_limit(tmp_path):
+    from investment_agent.market.index_history import refresh_history
+    store = IndexHistoryStore(tmp_path)
+    now = datetime(2026, 11, 27, 13, 30, tzinfo=timezone.utc)  # 20:30 in Vietnam
+    for symbol, fetched in (("OLD", "2026-11-01T00:00:00+00:00"), ("MID", "2026-11-10T00:00:00+00:00"), ("NEW", "2026-11-25T00:00:00+00:00")):
+        store.save(symbol, {"symbol": symbol, "fetched_at": fetched, "quarters": {}, "closes": [["2026-11-06", "19"]]})
+    asked = []
+    out = refresh_history(store, ["MID", "NEW", "OLD", "ADD"], get=_served(asked), now=now, limit=2, sleep=lambda s: None)
+    assert out == {"status": "ok", "due": 3, "updated": 2, "failed": {}}
+    assert asked == ["ADD", "ADD", "OLD", "OLD"]
+    assert store.read("OLD")["fetched_at"] == now.isoformat() and store.read("OLD")["closes"][-1] == ["2026-11-27", "21"]
+    assert store.read("MID")["fetched_at"] == "2026-11-10T00:00:00+00:00"  # past the limit: next night
+
+
+def test_refresh_before_the_close_keeps_no_price_of_the_session_still_trading(tmp_path):
+    from investment_agent.market.index_history import refresh_history
+    store = IndexHistoryStore(tmp_path)
+    refresh_history(store, ["AAA"], get=_served([]), now=datetime(2026, 11, 27, 3, 0, tzinfo=timezone.utc), limit=5, sleep=lambda s: None)
+    assert store.read("AAA")["closes"][-1] == ["2026-11-26", "20"]  # 10:00 in Vietnam: 27/11 is the price of the moment
+
+
+def test_a_ticker_failing_to_refresh_keeps_its_stored_record_and_is_reported(tmp_path):
+    from investment_agent.market.index_history import refresh_history
+    store = IndexHistoryStore(tmp_path)
+    kept = {"symbol": "OLD", "fetched_at": "2026-11-01T00:00:00+00:00", "quarters": {}, "closes": [["2026-11-06", "19"]]}
+    store.save("OLD", kept)
+
+    def get(url):
+        raise OSError("down")
+    out = refresh_history(store, ["OLD"], get=get, now=datetime(2026, 11, 27, 13, 30, tzinfo=timezone.utc), limit=5, sleep=lambda s: None)
+    assert out["status"] == "partial" and out["updated"] == 0 and out["failed"] == {"OLD": "error:OSError"}
+    assert store.read("OLD") == kept
+
+
+def test_cli_refresh_reads_the_hose_listing_and_prints_what_it_did(tmp_path, capsys):
+    from investment_agent.cli import index_history_sync
+    (tmp_path / "hose-listing.json").write_text(json.dumps({"listing": {"symbols": ["AAA", "BBB"]}}), encoding="utf-8")
+    code = index_history_sync(tmp_path, limit=1, get=_served([]), now=datetime(2026, 11, 27, 13, 30, tzinfo=timezone.utc), sleep=lambda s: None)
+    assert code == 0 and json.loads(capsys.readouterr().out) == {"status": "ok", "due": 2, "updated": 1, "failed": {}}
+    assert IndexHistoryStore(tmp_path / "index-history").read("AAA") is not None

@@ -14,3 +14,7 @@ Mỗi giá đóng cửa trong `index-history/` (cuối tháng từ 2018): vốn 
 
 - Hai thẻ cạnh "P/E · P/B · EV/EBITDA": "P/E so với lịch sử" và "P/B so với lịch sử", mỗi thẻ: giá trị hiện tại (tự tính, ngày cuối của chuỗi) · trung vị 3 năm · trung vị 5 năm; dòng nhỏ: "x/n tháng trong 3 năm thấp hơn".
 - Thẻ chỉ hiện khi có trung vị; chú thích dưới bảng nói số tự tính, cách tính và ngày cuối của chuỗi (có thể cũ hơn giá trên thẻ P/E hiện tại).
+
+## Làm mới (27/11/2026)
+
+`index-history/` trước chỉ được dựng một lần bằng lệnh `index-history`, nên điểm hiện tại ngày càng cũ. Lượt 20:00 nay chạy `index-history-sync --limit 60` (`market/index_history.refresh_history`): mã chưa có trước, rồi mã lấy cách đây 7 ngày trở lên, cũ nhất trước; 406 mã HOSE xong trong khoảng một tuần, hai lượt gọi VNDirect mỗi mã. Mã tải lỗi giữ bản cũ và được báo. Chạy trước 15:00 thì không giữ giá của phiên đang giao dịch. Lệnh `index-history` vẫn dùng để dựng lại chuỗi VN-Index trước 2018.

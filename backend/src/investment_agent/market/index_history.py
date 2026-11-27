@@ -20,9 +20,11 @@ import time
 from bisect import bisect_right
 from collections import defaultdict
 from datetime import date, datetime, timedelta
+from datetime import time as dtime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Callable
+from zoneinfo import ZoneInfo
 
 from investment_agent.valuation.weekly import _latest_quarter_out
 
@@ -34,6 +36,9 @@ PRICES_URL = "https://api-finfo.vndirect.com.vn/v4/stock_prices?sort=date&q=code
 ITEMS = {14000: "equity", 14110: "capital", 14240: "minority", 15000: "minority_outside", 23000: "npat_parent"}
 DAILY_BEFORE = date(2018, 1, 1)
 CARRY_DAYS, PACE_SECONDS = 30, 0.5
+REFRESH_AFTER = timedelta(days=7)
+VN = ZoneInfo("Asia/Ho_Chi_Minh")
+CLOSED_AT = dtime(15, 0)  # HOSE's closing auction ends 14:45
 PAR = Decimal(10000)
 _Q2, _Q4 = Decimal("0.01"), Decimal("0.0001")
 _SYMBOL = re.compile(r"^[A-Z0-9]{1,10}$")
@@ -73,7 +78,8 @@ def parse_quarters(text: str, *, symbol: str) -> dict[str, dict[str, Decimal]]:
     return out
 
 
-def parse_closes(text: str, *, symbol: str) -> list[tuple[date, Decimal]]:
+def parse_closes(text: str, *, symbol: str, skip: date | None = None) -> list[tuple[date, Decimal]]:
+    """skip: a day left out before the month's last close is chosen (the session still trading)."""
     days: dict[date, Decimal] = {}
     for r in json.loads(text).get("data") or []:
         try:
@@ -82,7 +88,7 @@ def parse_closes(text: str, *, symbol: str) -> list[tuple[date, Decimal]]:
             day, close = date.fromisoformat(str(r["date"])[:10]), Decimal(str(r["close"]))
         except (InvalidOperation, KeyError, TypeError, ValueError):
             continue
-        if close.is_finite() and close > 0:
+        if close.is_finite() and close > 0 and day != skip:
             days[day] = close
     month_last: dict[tuple[int, int], date] = {}
     for d in days:
@@ -113,6 +119,18 @@ class IndexHistoryStore:
         os.replace(tmp, path)
 
 
+def _fetch(symbol: str, *, get: Callable[[str], str], now: datetime, sleep: Callable[[float], None]) -> dict:
+    """One ticker's record: its statements and unadjusted closes, two calls. Before 15:00 on a session day the day's figure is the price
+    of the moment, not a close, and is not kept (as price-history-sync, owner 26/11/2026)."""
+    quarters = parse_quarters(_get_with_retry(get, STATEMENTS_URL.format(symbol=symbol), sleep), symbol=symbol)
+    local = now.astimezone(VN)
+    closes = parse_closes(_get_with_retry(get, PRICES_URL.format(symbol=symbol), sleep), symbol=symbol,
+                          skip=local.date() if local.time() < CLOSED_AT else None)
+    return {"symbol": symbol, "fetched_at": now.isoformat(), "source": "vndirect:finfo",
+            "quarters": {q: {k: format(v.normalize(), "f") for k, v in f.items()} for q, f in quarters.items()},
+            "closes": [[d.isoformat(), format(c.normalize(), "f")] for d, c in closes]}
+
+
 def build_history(store: IndexHistoryStore, symbols: list[str], *, get: Callable[[str], str], now: datetime,
                   sleep: Callable[[float], None] = time.sleep) -> dict[str, str]:
     """Fetch each ticker not stored yet (resumable); one failing is reported and the others go on."""
@@ -122,15 +140,37 @@ def build_history(store: IndexHistoryStore, symbols: list[str], *, get: Callable
         if i:
             sleep(PACE_SECONDS)
         try:
-            quarters = parse_quarters(_get_with_retry(get, STATEMENTS_URL.format(symbol=symbol), sleep), symbol=symbol)
-            closes = parse_closes(_get_with_retry(get, PRICES_URL.format(symbol=symbol), sleep), symbol=symbol)
-            store.save(symbol, {"symbol": symbol, "fetched_at": now.isoformat(), "source": "vndirect:finfo",
-                                "quarters": {q: {k: format(v.normalize(), "f") for k, v in f.items()} for q, f in quarters.items()},
-                                "closes": [[d.isoformat(), format(c.normalize(), "f")] for d, c in closes]})
+            store.save(symbol, _fetch(symbol, get=get, now=now, sleep=sleep))
             results[symbol] = "ok"
         except Exception as exc:  # one ticker never stops the others
             results[symbol] = f"error:{type(exc).__name__}"
     return results
+
+
+def refresh_history(store: IndexHistoryStore, symbols: list[str], *, get: Callable[[str], str], now: datetime, limit: int = 60,
+                    sleep: Callable[[float], None] = time.sleep) -> dict:
+    """index-history-sync (27/11/2026): keeps dinh_gia_lich_su and the Bảng số tài chính cards current. Tickers never fetched first,
+    then those fetched a week ago or more, stalest first, at most `limit` a run (406 HOSE tickers within a week at 60 a night).
+    A ticker that fails keeps its stored record and is reported."""
+    ages = []
+    for symbol in symbols:
+        if not _SYMBOL.fullmatch(str(symbol)):
+            continue
+        record = store.read(symbol)
+        when = datetime.fromisoformat(record["fetched_at"]) if record and record.get("fetched_at") else None
+        if when is None or now - when >= REFRESH_AFTER:
+            ages.append((when is not None, when.isoformat() if when else "", symbol))
+    due = [s for _, _, s in sorted(ages)]
+    updated, failed = 0, {}
+    for i, symbol in enumerate(due[:max(0, limit)]):
+        if i:
+            sleep(PACE_SECONDS)
+        try:
+            store.save(symbol, _fetch(symbol, get=get, now=now, sleep=sleep))
+            updated += 1
+        except Exception as exc:  # noqa: BLE001 - one ticker never stops the others; it is reported
+            failed[symbol] = f"error:{type(exc).__name__}"
+    return {"status": "partial" if failed else "ok", "due": len(due), "updated": updated, "failed": failed}
 
 
 def _previous(q: str) -> str:

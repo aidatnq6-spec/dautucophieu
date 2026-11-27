@@ -1,6 +1,7 @@
-"""Dò lịch giao dịch HOSE: from 1 December while next year's calendar file is missing (and in any month while this year's is), each run
-reads HOSE's latest news (api.hsx.vn, robots.txt allows) and tells over Telegram, once, a notice whose title speaks of days off or the
-trading calendar of that year, with its link. The calendar file itself is made by hand from the notice; nothing is guessed here."""
+"""Dò lịch giao dịch HOSE: each run reads HOSE's latest news (api.hsx.vn, robots.txt allows) and tells over Telegram, once, a notice whose
+title speaks of days off or the trading calendar of this year (and of next year from 1 December), with its link: to make the calendar
+file when it is missing, or to check it when it exists. Until 27/11/2026 the watch stopped once a year's file existed, and so missed
+HOSE's notice of 11/11/2026 adding 24/11/2026 (Ngày Văn hóa Việt Nam). The calendar file is edited by hand; nothing is guessed here."""
 
 import json
 import os
@@ -24,9 +25,13 @@ def default_get(url: str) -> str:
     return response.text
 
 
+def watching(today: date) -> list[int]:
+    return [today.year] + ([today.year + 1] if today.month == 12 else [])
+
+
 def looking_for(config_dir: Path, today: date) -> list[int]:
-    years = [today.year] + ([today.year + 1] if today.month == 12 else [])
-    return [y for y in years if not (Path(config_dir) / f"trading-calendar-hose-{y}.json").is_file()]
+    """The years watched whose calendar file is still missing."""
+    return [y for y in watching(today) if not (Path(config_dir) / f"trading-calendar-hose-{y}.json").is_file()]
 
 
 def _write(path: Path, data: dict) -> None:
@@ -38,13 +43,11 @@ def _write(path: Path, data: dict) -> None:
 
 def watch_calendar(data_dir: Path, config_dir: Path, *, get: Callable[[str], str] = default_get, send: Callable[[str], bool],
                    today: date) -> dict:
-    years = looking_for(config_dir, today)
-    if not years:
-        return {"status": "ok", "looking_for": [], "sent": 0}
+    years, missing = watching(today), looking_for(config_dir, today)
     try:
         items = json.loads(get(NEWS_URL))["data"]["list"] or []
     except Exception:
-        return {"status": "source_error", "looking_for": years, "sent": 0}
+        return {"status": "source_error", "watching": years, "looking_for": missing, "sent": 0}
     path = Path(data_dir).joinpath(*STATE)
     state = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {"told": []}
     sent = 0
@@ -54,10 +57,12 @@ def watch_calendar(data_dir: Path, config_dir: Path, *, get: Callable[[str], str
         if year is None or not _WORDS.search(title) or item["id"] in state["told"]:
             continue
         day = datetime.fromtimestamp(item["postedDate"], VN).strftime("%d/%m/%Y")
-        text = (f"Lịch giao dịch HOSE {year}: HOSE vừa đăng “{title}” ({day}) {LINK.format(id=item['id'])}\n"
-                f"Phần mềm chưa có tệp config/trading-calendar-hose-{year}.json: gửi thông báo này để tạo lịch theo đúng số ngày nghỉ HOSE công bố.")
+        head = f"Lịch giao dịch HOSE {year}: HOSE vừa đăng “{title}” ({day}) {LINK.format(id=item['id'])}\n"
+        text = head + (f"Phần mềm chưa có tệp config/trading-calendar-hose-{year}.json: gửi thông báo này để tạo lịch theo đúng số ngày nghỉ HOSE công bố."
+                       if year in missing else
+                       f"Kiểm lại config/trading-calendar-hose-{year}.json: thông báo này có thể thêm hoặc đổi ngày nghỉ của năm đang dùng.")
         if send(text):
             state["told"].append(item["id"])
             _write(path, state)
             sent += 1
-    return {"status": "ok", "looking_for": years, "sent": sent}
+    return {"status": "ok", "watching": years, "looking_for": missing, "sent": sent}

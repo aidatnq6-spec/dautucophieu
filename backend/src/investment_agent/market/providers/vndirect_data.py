@@ -19,6 +19,8 @@ BOARD_URL = (BASE + "stock_prices?q=floor:HOSE~date:gte:{start}~date:lte:{end}&s
 INDEX_LEVELS_URL = BASE + "vnmarket_prices?sort=date:desc&q=code:{index}~date:gte:{start}&size=10&fields=code,date,close"
 FOREIGN_URL = BASE + "foreigns?q=floor:HOSE~tradingDate:{day}&size=9999"
 EVENTS_URL = BASE + "events?q=code:{symbol}~disclosureDate:gte:{since}&size=500&sort=disclosureDate:desc"
+PROPRIETARY_INDEX_URL = BASE + "proprietary_trading?q=code:VNINDEX~date:lte:{day}&sort=date:desc&size=1"
+PROPRIETARY_STOCKS_URL = BASE + "proprietary_trading?q=type:STOCK~floor:HOSE~date:{day}&size=9999"
 BOARD_LOOKBACK_DAYS = 10
 
 
@@ -165,3 +167,12 @@ def company_people(symbol: str, get: Callable[[str], str] = default_get, *, shar
         ownership = {"foreign": ratio(total - left) if total is not None and left is not None else None,
                      "foreign_max": ratio(total) if total is not None else None, "state": None, "free_float": None}
     return {"shareholders": holders, "officers": officers, "ownership": ownership, "structure": None}
+
+
+def proprietary_trading(session_date: date, get: Callable[[str], str] = default_get) -> dict:
+    """Tự doanh (brief.proprietary): VNDirect's latest VNINDEX row up to session_date, then that day's HOSE ticker rows.
+    VNDirect posts them some sessions late, so the row's own date is what the brief shows (checked 27/11/2026)."""
+    found = _data(get, PROPRIETARY_INDEX_URL.format(day=session_date.isoformat()))
+    if not found:
+        return {"index": None, "stocks": []}
+    return {"index": found[0], "stocks": _data(get, PROPRIETARY_STOCKS_URL.format(day=str(found[0]["date"])[:10]))}

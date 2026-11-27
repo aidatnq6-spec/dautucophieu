@@ -9,6 +9,9 @@ type Foreign = { buy_volume: number; sell_volume: number; buy_value_bn: string; 
   top_sell: { symbol: string; net_value_bn: string }[]; top_buy: { symbol: string; net_value_bn: string }[] };
 type Board = { status: "ok"; value_matched_bn: string; volume_matched: number; breadth: { up: number; down: number; flat: number; no_trade: number };
   foreign: Foreign; sectors: { sector: string; pct: string; count: number }[]; spread?: Spread } | Missing;
+type Proprietary = { status: "ok"; source: string; date: string; lag_sessions: number; buy_volume: number; sell_volume: number;
+  buy_value_bn: string; sell_value_bn: string; net_value_bn: string; top_sell: { symbol: string; net_value_bn: string }[] | null;
+  top_buy: { symbol: string; net_value_bn: string }[] | null; top_reason?: string } | Missing;
 type Spread = { count: number; mean_pct: string | null; median_pct: string | null };
 type Hose = { status: "ok"; total_value_bn: string; total_volume: number; foreign: Omit<Foreign, "top_sell" | "top_buy"> } | Missing;
 type Ticker = { symbol: string; price: number | null; change: number | null; pct: string | null; held: boolean; sector: string | null;
@@ -21,7 +24,7 @@ type IndexSession = { status: "ok"; range: { high: string; low: string; close: s
 type HoseLiquidity = { status: "ok"; today_bn: string; previous_bn: string; change_pct: string; avg20_bn: string; ratio20: string; avg_sessions?: number;
   previous_session?: string; previous_skipped?: boolean } | Missing;
 export type MarketSection = { session_date: string; updated_at: string; indices: { status: string; rows: IndexRow[] } | Missing; board: Board;
-  hose: Hose; proprietary: Missing; tickers: Ticker[]; news: News; index_session?: IndexSession; hose_liquidity?: HoseLiquidity;
+  hose: Hose; proprietary: Proprietary; tickers: Ticker[]; news: News; index_session?: IndexSession; hose_liquidity?: HoseLiquidity;
   recovery?: Recovery; signal_lines?: string[]; asia_line?: string | null; us_line?: string | null; shock_line?: string | null; recent_signals?: SignalRow[]; impact?: Impact; heatmap?: HeatMap };
 type Check = { id: string; met: boolean | null; label: string; figure: string };
 type Recovery = { status: "ok"; met: number; known: number; total: number; checks: Check[] } | Missing;
@@ -48,6 +51,13 @@ export function spreadText(s: Spread, vnPct: string | null): string | null {
   const head = `Trung bình cộng các mã ${pct(s.mean_pct)}, trung vị ${pct(s.median_pct)} (${s.count} mã có giao dịch)`;
   if (vnPct === null) return head;
   return `${head}; VN-Index ${pct(vnPct)}${Number(vnPct) * Number(s.mean_pct) < 0 ? ", ngược chiều" : ""}`;
+}
+
+/** Tự doanh's heading: VNDirect posts some sessions late, so a session other than the brief's is named with its lag. */
+export function proprietaryHead(p: { date: string; lag_sessions: number }): string {
+  if (!p.lag_sessions) return "Tự doanh";
+  const [y, m, d] = p.date.split("-");
+  return `Tự doanh — phiên ${d}/${m}/${y} (VNDirect chậm ${p.lag_sessions} phiên)`;
 }
 
 /** Bảng kiểm "Thị trường phục hồi": how many conditions are met, and how many have no figures (counted neither way). */
@@ -138,8 +148,20 @@ export function BriefMarket({ market, session }: { market: MarketSection | null;
         {hose.status === "ok" && <p className="caption">HOSE công bố: mua {num(hose.foreign.buy_value_bn)} tỷ · bán {num(hose.foreign.sell_value_bn)} tỷ ·
           ròng {signed(hose.foreign.net_value_bn)} tỷ.</p>}
       </> : <Gap what="Giá trị giao dịch, độ rộng, khối ngoại và ngành" section={board} />}
-      <h3>Tự doanh</h3>
-      <p className="muted">Chưa có số liệu ({market.proprietary.reason}).</p>
+      {market.proprietary.status === "ok" ? <>
+        <h3>{proprietaryHead(market.proprietary)}</h3>
+        <p>Mua {num(market.proprietary.buy_volume, 0)} cp / {num(market.proprietary.buy_value_bn)} tỷ · Bán {num(market.proprietary.sell_volume, 0)} cp /{" "}
+          {num(market.proprietary.sell_value_bn)} tỷ · Ròng <strong className={tone(market.proprietary.net_value_bn)}>{signed(market.proprietary.net_value_bn)} tỷ</strong></p>
+        {market.proprietary.top_sell && market.proprietary.top_sell.length > 0 &&
+          <p>Bán ròng mạnh: {market.proprietary.top_sell.map((x) => `${x.symbol} ${signed(x.net_value_bn)} tỷ`).join("; ")}</p>}
+        {market.proprietary.top_buy && market.proprietary.top_buy.length > 0 &&
+          <p>Mua ròng mạnh: {market.proprietary.top_buy.map((x) => `${x.symbol} ${signed(x.net_value_bn)} tỷ`).join("; ")}</p>}
+        {market.proprietary.top_reason && <p className="caption">Không có mã mua, bán ròng mạnh: {market.proprietary.top_reason}.</p>}
+        <p className="caption">Nguồn: {market.proprietary.source}.</p>
+      </> : <>
+        <h3>Tự doanh</h3>
+        <p className="muted">Chưa có số liệu ({market.proprietary.reason}).</p>
+      </>}
       {board.status === "ok" && board.sectors.length > 0 && <>
         <h3>Ngành (toàn HOSE): {board.sectors.filter((s) => Number(s.pct) > 0).length}/{board.sectors.length} ngành tăng</h3>
         <ul className="bm-sectors">{board.sectors.map((s) => <li key={s.sector}><span>{s.sector}</span>{" "}

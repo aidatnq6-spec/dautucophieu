@@ -35,7 +35,7 @@ def test_all_sections_are_built_and_stored(tmp_path):
     assert snap["indices"]["rows"][0]["change"] == "-8.40"
     assert snap["board"]["breadth"]["down"] == 1 and snap["board"]["sectors"][0]["sector"] == "Công nghệ Thông tin"
     assert snap["hose"] == {"status": "missing", "reason": "HOSE chưa công bố"}
-    assert snap["proprietary"] == {"status": "missing", "reason": "Chưa có nguồn miễn phí"}
+    assert snap["proprietary"] == {"status": "missing", "reason": "Chưa đọc nguồn tự doanh"}
     assert snap["news"]["status"] == "ok" and snap["news"]["items"][0]["url"] == "https://cafef.vn/a.chn"
     assert len(snap["news"]["items"]) == 1  # five feeds served the same item; deduplicated
     assert BriefStore(tmp_path).read(D) == snap
@@ -136,3 +136,34 @@ def test_a_shock_of_the_session_is_stored_with_the_snapshot(tmp_path):
     assert snap["shocks"]["status"] == "ok" and [g["id"] for g in snap["shocks"]["today"]] == ["drop3", "below200"]
     plain = build_snapshot(**deps(tmp_path / "b"))
     assert plain["shocks"]["status"] == "ok" and plain["shocks"]["today"] == []
+
+
+def _prop(day, buy, sell):
+    return {"code": "VNINDEX", "type": "INDEX", "floor": "HOSE", "date": day, "buyingVol": 10.0, "sellingVol": 4.0,
+            "buyingVal": buy, "sellingVal": sell}
+
+
+def test_tu_doanh_is_vndirect_s_latest_session_with_how_far_it_lags(tmp_path):
+    asked = []
+
+    def proprietary(day):
+        asked.append(day)
+        stock = {**_prop("2026-10-22", 3e9, 1e9), "code": "FPT", "type": "STOCK"}
+        return {"index": _prop("2026-10-22", 3e9, 1e9), "stocks": [stock]}
+    snap = build_snapshot(**deps(tmp_path, proprietary=proprietary, earlier=[date(2026, 10, 21), date(2026, 10, 22), date(2026, 10, 23)]))
+    assert asked == [D]
+    p = snap["proprietary"]
+    assert p["status"] == "ok" and p["date"] == "2026-10-22" and p["lag_sessions"] == 2 and p["net_value_bn"] == "2.00"
+    assert p["top_buy"] == [{"symbol": "FPT", "net_value_bn": "2.00"}]
+
+
+def test_tu_doanh_failing_keeps_what_an_earlier_wake_up_had(tmp_path):
+    build_snapshot(**deps(tmp_path, earlier=[date(2026, 10, 23)],
+                          proprietary=lambda day: {"index": _prop("2026-10-23", 3e9, 1e9), "stocks": []}))
+
+    def boom(day):
+        raise OSError("down")
+    again = build_snapshot(**deps(tmp_path, earlier=[date(2026, 10, 23)], proprietary=boom))
+    assert again["proprietary"]["status"] == "ok" and again["proprietary"]["date"] == "2026-10-23"
+    alone = build_snapshot(**deps(tmp_path / "other", earlier=[date(2026, 10, 23)], proprietary=boom))
+    assert alone["proprietary"] == {"status": "missing", "reason": "Không kết nối được VNDirect"}

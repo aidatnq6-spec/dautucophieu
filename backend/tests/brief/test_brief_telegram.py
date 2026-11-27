@@ -14,7 +14,9 @@ MARKET = {"session_date": "2026-10-26",
                                 "top_sell": [{"symbol": "VHM", "net_value_bn": "-210.50"}], "top_buy": [{"symbol": "FPT", "net_value_bn": "45.00"}]},
                     "sectors": [{"sector": "Ngân hàng", "pct": "0.0052", "count": 27}, {"sector": "Bất động sản", "pct": "-0.0210", "count": 60}]},
           "hose": {"status": "missing", "reason": "HOSE chưa công bố"},
-          "proprietary": {"status": "missing", "reason": "Chưa có nguồn miễn phí"},
+          "proprietary": {"status": "ok", "source": "VNDirect", "date": "2026-10-21", "lag_sessions": 3, "buy_volume": 10, "sell_volume": 4,
+                          "buy_value_bn": "874.62", "sell_value_bn": "517.11", "net_value_bn": "357.51",
+                          "top_buy": [{"symbol": "FPT", "net_value_bn": "400.00"}], "top_sell": [{"symbol": "VHM", "net_value_bn": "-250.00"}]},
           "tickers": [{"symbol": "HPG", "price": 20900, "change": -300, "pct": "-0.0142", "held": True, "sector": "Tài nguyên Cơ bản"},
                       {"symbol": "FPT", "price": 56000, "change": -1000, "pct": "-0.0175", "held": False, "sector": "Công nghệ Thông tin"}],
           "news": {"status": "ok", "items": [{"title": f"Tin {i}", "url": f"https://x.vn/{i}", "source": "CafeF", "published": "x", "reason": "vĩ mô"}
@@ -26,7 +28,8 @@ def test_short_telegram_brief_follows_the_agreed_order():
     order = ["BẢN TIN SAU PHIÊN 26/10/2026", "VN-Index 1.650,12 (−8,40 điểm, −0,51%)", "VN30: chưa có số liệu (Chưa có giá chỉ số phiên này)",
              "Giá trị khớp lệnh HOSE: 13.528,79 tỷ đồng", "Độ rộng: 107 tăng · 205 giảm · 65 đứng giá · 30 không giao dịch",
              "Khối ngoại: mua 1.200,50 tỷ · bán 2.100,00 tỷ · ròng −899,50 tỷ", "Bán ròng mạnh: VHM −210,50 tỷ", "Mua ròng mạnh: FPT +45,00 tỷ",
-             "Tự doanh: chưa có số liệu (Chưa có nguồn miễn phí)", "Ngân hàng +0,52% (27 mã)", "Bất động sản −2,10% (60 mã)",
+             "Tự doanh phiên 21/10/2026 (VNDirect chậm 3 phiên): mua 874,62 tỷ · bán 517,11 tỷ · ròng +357,51 tỷ",
+             "Tự doanh bán ròng mạnh: VHM −250,00 tỷ", "Tự doanh mua ròng mạnh: FPT +400,00 tỷ", "Ngân hàng +0,52% (27 mã)", "Bất động sản −2,10% (60 mã)",
              "HPG 20.900 (−1,42%)", "Tin 0 (CafeF)", "Danh mục: Giữ phân bổ hiện tại", "PMI Việt Nam quá hạn 35 ngày",
              "Xem bản đầy đủ trong ứng dụng, mục Bản tin sau phiên."]
     positions = [text.index(s) for s in order]
@@ -156,3 +159,12 @@ def test_a_base_on_fewer_sessions_or_an_older_previous_session_says_so_fix_25_11
                                                   "previous_skipped": True}, "change_pct")
     assert line == "HOSE công bố tổng, +5,00% so với phiên 23/11, bằng 1,02 lần trung bình 19 phiên có số"
     assert _base_line("X", {"change_pct": "0.05", "ratio20": "1.02", "avg_sessions": 20}, "change_pct") == "X, +5,00% so với phiên trước, bằng 1,02 lần trung bình 20 phiên"
+
+
+def test_tu_doanh_of_the_session_itself_says_no_lag_and_a_missing_one_says_why():
+    same = {**MARKET["proprietary"], "date": "2026-10-26", "lag_sessions": 0, "top_buy": None, "top_sell": None,
+            "top_reason": "Tổng các mã không khớp dòng tổng VN-Index của VNDirect"}
+    text = render_report(REPORT, market={**MARKET, "proprietary": same})
+    assert "Tự doanh: mua 874,62 tỷ · bán 517,11 tỷ · ròng +357,51 tỷ" in text and "Tự doanh bán ròng" not in text
+    gone = render_report(REPORT, market={**MARKET, "proprietary": {"status": "missing", "reason": "VNDirect chưa có số tự doanh"}})
+    assert "Tự doanh: chưa có số liệu (VNDirect chưa có số tự doanh)" in gone

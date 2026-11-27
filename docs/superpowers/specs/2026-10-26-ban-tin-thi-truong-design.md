@@ -21,7 +21,7 @@ Chủ sở hữu đọc bản tin sau phiên để biết nhanh phiên vừa r�
 | Mã theo dõi | Giá đã lưu của 50 mã (`data/market-symbols.txt`) | |
 | Ngành, số mã tăng/giảm, khối ngoại theo mã, tổng giá trị | **Bảng giá cả sàn Vnstock** `Trading.price_board`: 407 mã cổ phiếu HOSE trong **một lần gọi** | chạy được ở gói Cộng đồng. Có giá tham chiếu, giá khớp, khối lượng và giá trị khớp lũy kế, khối ngoại mua/bán (khối lượng, giá trị) theo từng mã. Ngành lấy theo mã ICB cấp 2 của `Listing.symbols_by_exchange`. Phiên 26/10: 107 tăng, 205 giảm, 65 đứng giá, 30 không giao dịch |
 | Tổng giao dịch và khối ngoại toàn sàn (đối chiếu) | Dịch vụ thống kê HOSE `api.hsx.vn/mk/api/v1/market/...` (`foreign-trading-value-report`, `foreign-trading-volumn-report`, `summary/hompage`) | ứng dụng đã dùng nguồn này. Báo cáo khối ngoại của phiên **chưa có lúc 16:13 cùng ngày**, có lẽ đăng sáng hôm sau |
-| Tự doanh | **Chưa có nguồn miễn phí hợp lệ** | Vnstock chặn ở gói Cộng đồng; HOSE không công bố; trang của CafeF đã gỡ; Vietstock tải số bằng JavaScript và có mã chống tự động (không vượt qua). **Chủ sở hữu chọn ghi "chưa có nguồn miễn phí".** |
+| Tự doanh | **Chưa có nguồn miễn phí hợp lệ** | Vnstock chặn ở gói Cộng đồng; HOSE không công bố; trang của CafeF đã gỡ; Vietstock tải số bằng JavaScript và có mã chống tự động (không vượt qua). **Chủ sở hữu chọn ghi "chưa có nguồn miễn phí".** <br>**Cập nhật 27/11/2026:** API công khai VNDirect `v4/proprietary_trading` có tự doanh HOSE (dòng tổng `VNINDEX` và từng mã; ngày 23/11/2026 tổng 88 mã khớp đúng dòng tổng). Số đến chậm vài phiên (27/11 mới có tới phiên 23/11) và thiếu 19/319 phiên từ 13/8/2025. **Chủ sở hữu chọn hiện số của phiên gần nhất VNDirect có, kèm ngày phiên và số phiên chậm.** |
 | Tin tức | RSS **CafeF** (`thi-truong-chung-khoan.rss`, `vi-mo-dau-tu.rss`), **Vietstock** (`830/chung-khoan/co-phieu.rss`, `761/kinh-te/vi-mo.rss`), **Vneconomy** (`chung-khoan.rss`) | robots.txt cho phép. Chỉ lấy tiêu đề, link và thời gian. **Không dùng VnExpress** (robots chặn). Vnstock đã ngừng hỗ trợ tin tức |
 
 ## Bản tin mới, theo thứ tự
@@ -33,7 +33,7 @@ Chủ sở hữu đọc bản tin sau phiên để biết nhanh phiên vừa r�
 4. **Khối ngoại:**
    - mua, bán và ròng, cả khối lượng lẫn giá trị;
    - **3 mã bán ròng mạnh nhất và 3 mã mua ròng mạnh nhất** (theo giá trị).
-5. **Tự doanh:** dòng "Chưa có nguồn miễn phí".
+5. **Tự doanh** (từ 27/11/2026, `brief/proprietary.py`): phiên gần nhất VNDirect có, không sau phiên của bản tin; khác phiên của bản tin thì ghi "phiên dd/mm/yyyy (VNDirect chậm n phiên)", không bao giờ coi là số của phiên bản tin. Mua, bán, ròng (khối lượng và giá trị) lấy từ dòng `VNINDEX`; 3 mã mua ròng và 3 mã bán ròng mạnh nhất lấy từ các mã của phiên đó, chỉ khi tổng các mã khớp dòng `VNINDEX`. Không có số, hoặc số cũ hơn mọi phiên bản tin giữ (60 phiên), thì ghi thiếu kèm lý do.
 6. **Ngành:** % tăng/giảm của từng ngành ICB cấp 2 **trên toàn HOSE**, xếp từ tăng mạnh nhất đến giảm mạnh nhất.
 7. **Mã đang theo dõi:**
    - Mỗi mã có giá, ± giá và ± %.

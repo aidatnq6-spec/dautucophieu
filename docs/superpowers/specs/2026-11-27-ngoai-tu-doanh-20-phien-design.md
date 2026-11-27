@@ -11,7 +11,7 @@ Chủ sở hữu yêu cầu ngày 27/11/2026, kèm ảnh mẫu: hai dòng "Khố
 
 ## Dữ liệu
 
-- `data/foreign/<YYYY-MM-DD>.json` (`market/foreign_history.py`), cách làm giống `proprietary_history`: mỗi phiên một lượt gọi `foreigns?q=floor:HOSE~tradingDate:<ngày>`, giữ mã loại STOCK (mua, bán khối lượng và giá trị, đơn vị nguồn) và dòng `VNINDEX` nếu có; phiên không có dòng mã nào là thiếu (VNDirect phiên 24/11/2026 chỉ có dòng chỉ số). Số trống không lưu thành 0. Giữ 400 ngày; `foreign-sync --limit 260` ở lượt 20:00; phiên thiếu trong 20 phiên gần nhất hỏi lại.
+- `data/foreign/<YYYY-MM-DD>.json` (`market/foreign_history.py`), cách làm giống `proprietary_history`: mỗi phiên một lượt gọi `foreigns?q=floor:HOSE~tradingDate:<ngày>`, giữ mã loại STOCK (mua, bán khối lượng và giá trị, đơn vị nguồn) và dòng `VNINDEX` nếu có; phiên không có dòng mã nào là thiếu (VNDirect phiên 24/11/2026 chỉ có dòng chỉ số). Số trống không lưu thành 0. Giữ 400 ngày; `foreign-sync --limit 260` ở lượt 20:00; phiên thiếu trong 20 phiên gần nhất hỏi lại mỗi lượt, phiên thiếu thứ 21–60 hỏi lại mỗi tuần (27/11/2026).
 - Khối ngoại ròng của một phiên = tổng các mã cổ phiếu (như mục Khối ngoại của bản tin hiện nay: phiên 26/11/2026 là −237,0 tỷ; dòng VNINDEX của VNDirect −186,9 tỷ và số HOSE −179,4 tỷ khác vì cách tính khác).
 - Tự doanh ròng của một phiên = dòng `VNINDEX` của `data/proprietary/` (như mục Tự doanh và `tu_doanh`).
 

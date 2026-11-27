@@ -20,6 +20,8 @@ from zoneinfo import ZoneInfo
 URL = "https://api-finfo.vndirect.com.vn/v4/proprietary_trading?q=floor:HOSE~date:{day}&size=9999"
 SOURCE = "vndirect:finfo"
 RETRY_SESSIONS = 20
+# VNDirect corrects some sessions late (khối ngoại 23/11/2026 served all 0): sessions 21–60 back are asked again once a week (owner, 27/11/2026)
+WEEKLY_SESSIONS, WEEKLY_DAYS = 60, 7
 KEEP_DAYS = 400  # 250 sessions take about 365 days, and VNDirect posts some sessions late
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
 CLOSED_AT = dtime(15, 0)
@@ -108,11 +110,17 @@ def sync_sessions(store: SessionStore, *, url: str, parse: Callable[[str, date],
     """sessions: HOSE sessions of the window, any order. Newest first; one call per session (url has {day})."""
     local = now.astimezone(VN)
     newest = sorted((d for d in set(sessions) if d < local.date() or (d == local.date() and local.time() >= CLOSED_AT)), reverse=True)
-    recent = set(newest[:RETRY_SESSIONS])
+    recent, weekly = set(newest[:RETRY_SESSIONS]), set(newest[RETRY_SESSIONS:WEEKLY_SESSIONS])
+
+    def week_old(record: dict) -> bool:
+        try:
+            return now - datetime.fromisoformat(record["hoi_luc"]) >= timedelta(days=WEEKLY_DAYS)
+        except (KeyError, TypeError, ValueError):
+            return True  # never stamped: ask
     due = []
     for day in newest:
         record = store.read(day)
-        if record is None or (record.get("thieu") and day in recent):
+        if record is None or (record.get("thieu") and (day in recent or (day in weekly and week_old(record)))):
             due.append(day)
     fetched = missing = 0
     failed: dict[str, str] = {}

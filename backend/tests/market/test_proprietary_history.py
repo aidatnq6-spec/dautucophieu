@@ -57,14 +57,14 @@ def test_sync_fetches_newest_first_skips_stored_ones_and_stops_at_the_limit(tmp_
     assert asked == ["2026-11-27", "2026-11-25"] and out == {"status": "ok", "due": 4, "fetched": 2, "missing": 0, "failed": {}}
 
 
-def test_a_missing_recent_session_is_asked_again_and_an_older_one_only_once(tmp_path):
+def test_a_missing_recent_session_is_asked_again_and_an_older_one_not_within_its_week(tmp_path):
     sessions = _sessions(date(2026, 11, 27), 25)
     store = ProprietaryStore(tmp_path)
     for day in sessions:
         store.save(parse_session(page(day.isoformat(), [("FPT", 1, 0)]), day))
     recent, old = sessions[-3], sessions[0]  # recent: inside the last 20 sessions; old: the 25th back
     for day in (recent, old):
-        store.save(parse_session(json.dumps({"data": []}), day))
+        store.save({**parse_session(json.dumps({"data": []}), day), "hoi_luc": (EVENING - timedelta(days=1)).isoformat()})
     asked = []
 
     def get(url):
@@ -125,3 +125,22 @@ def test_a_missing_vndirect_figure_is_never_stored_as_zero():
 def test_the_store_keeps_four_hundred_days_so_a_250_session_window_fits():
     from investment_agent.market.proprietary_history import KEEP_DAYS
     assert KEEP_DAYS >= 400
+
+
+def test_an_older_missing_session_within_sixty_is_asked_again_once_a_week(tmp_path):
+    sessions = _sessions(date(2026, 11, 27), 70)
+    store = ProprietaryStore(tmp_path)
+    for day in sessions:
+        store.save(parse_session(page(day.isoformat(), [("FPT", 1, 0)]), day))
+    stale, fresh, too_old = sessions[-30], sessions[-40], sessions[-65]  # 30th, 40th, 65th back
+    for day, asked_at in ((stale, EVENING - timedelta(days=8)), (fresh, EVENING - timedelta(days=2)), (too_old, EVENING - timedelta(days=30))):
+        store.save({"date": day.isoformat(), "thieu": True, "hoi_luc": asked_at.isoformat()})
+    asked = []
+
+    def get(url):
+        day = url.split("date:")[1].split("&")[0]
+        asked.append(day)
+        return page(day, [("FPT", 2e9, 0)])
+    sync_proprietary(tmp_path, get=get, now=EVENING, sessions=sessions, sleep=lambda s: None)
+    assert asked == [stale.isoformat()]  # VNDirect posted it late; asked a week ago; 2 days ago is too soon; past 60 never again
+    assert store.read(stale)["khop"] is True and store.read(too_old)["thieu"] is True

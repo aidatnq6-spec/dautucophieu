@@ -487,6 +487,7 @@ def test_a_securities_firm_set_against_the_other_hose_investment_services_firms(
     roe = next(c for c in out["chi_so"] if c["ma_chi_so"] == "ROAE_TR_AVG4Q")
     assert roe["ten"] == "ROAE" and roe["trung_vi"] == "0.1" and roe["so_doanh_nghiep"] == 3 and roe["thu_hang"] == "2/4 (cao xuống thấp)"
     assert [c["ma_chi_so"] for c in out["chi_so"]] == [code for code, _, _ in DISPLAY["securities"]]
+    assert "ICB cấp 4" in out["luu_y"] and "cấp 2" not in out["luu_y"]
     evx = data.so_sanh_nganh("EVX")
     assert evx["thieu"] is True and "Dịch vụ đầu tư" in evx["ly_do"]
 

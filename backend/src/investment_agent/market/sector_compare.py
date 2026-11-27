@@ -107,4 +107,4 @@ def compare_sector(data_dir: Path, symbol: str, codes: tuple[str, ...] | None = 
         out.append({**item, "trung_vi": _plain(median(others)), "phan_vi_25": _plain(q1), "phan_vi_75": _plain(q3),
                     "so_doanh_nghiep": len(others), "thu_hang": f"{rank}/{len(others) + 1} (cao xuống thấp)"})
     return {"ma": symbol, "nganh": sector, "ma_nganh": code, "quy": quarter, "nguon": own.get("source"), "lay_luc": own.get("fetched_at"),
-            "so_doanh_nghiep_nganh": len(peers), "chua_co_quy_nay": no_quarter, "chua_co_chi_so": no_file, "chi_so": out, "luu_y": NOTE}
+            "so_doanh_nghiep_nganh": len(peers), "chua_co_quy_nay": no_quarter, "chua_co_chi_so": no_file, "chi_so": out, "luu_y": NOTE.replace("ICB cấp 2", "ICB cấp 4 (Dịch vụ đầu tư)") if kind == "securities" else NOTE}

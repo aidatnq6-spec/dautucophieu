@@ -126,3 +126,13 @@ def test_events_keep_one_copy_of_each_event_not_the_english_twin():
             {"id": "116624.EN_GB", "code": "KDH", "type": "STOCKDIV", "ratio": 10.0, "effectiveDate": "2024-10-17"},
             {"id": "a9", "code": "KDH", "type": "DIVIDEND", "dividend": 500.0, "effectiveDate": "2023-06-01"}]
     assert [r["id"] for r in events("KDH", get=lambda url: json.dumps({"data": rows}), today=date(2026, 11, 26))] == ["116624.VN", "a9"]
+
+
+def test_the_listing_keeps_its_level_two_codes_when_the_level_four_call_fails():
+    # level 4 only serves the securities firms' peers; it must never take the brief's board down (27/11/2026)
+    def get(url):
+        if "industryLevel:4" in url:
+            raise OSError("timeout")
+        return fake_get(url)
+    out = hose_listing(get=get)
+    assert out["icb_codes"] == {"FPT": "9500", "HPG": "1700"} and "icb4_codes" not in out  # absent: the next run fetches it again

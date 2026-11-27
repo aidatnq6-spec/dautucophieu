@@ -63,13 +63,17 @@ def hose_listing(get: Callable[[str], str] = default_get, *, known_names: dict[s
         for symbol in str(row.get("codeList") or "").split(","):
             if symbol.strip().upper() in wanted:
                 codes[symbol.strip().upper()] = code
-    level4 = {}
-    for row in _data(get, INDUSTRY4_URL):
-        for symbol in str(row.get("codeList") or "").split(","):
-            if symbol.strip().upper() in wanted and row.get("industryCode"):
-                level4[symbol.strip().upper()] = str(row["industryCode"])
-    return {"symbols": symbols, "icb_codes": codes, "icb_names": {**names, **{c: n for c, n in (known_names or {}).items() if c in names}},
-            "icb4_codes": level4}
+    out = {"symbols": symbols, "icb_codes": codes, "icb_names": {**names, **{c: n for c, n in (known_names or {}).items() if c in names}}}
+    try:  # level 4 only serves the securities firms' peers: a failure leaves it out (asked again next run), never the listing
+        level4 = {}
+        for row in _data(get, INDUSTRY4_URL):
+            for symbol in str(row.get("codeList") or "").split(","):
+                if symbol.strip().upper() in wanted and row.get("industryCode"):
+                    level4[symbol.strip().upper()] = str(row["industryCode"])
+        out["icb4_codes"] = level4
+    except Exception:  # noqa: BLE001 - any failure of this one call
+        pass
+    return out
 
 
 def price_board(symbols: list[str], get: Callable[[str], str] = default_get, *, today: date | None = None) -> list[dict]:

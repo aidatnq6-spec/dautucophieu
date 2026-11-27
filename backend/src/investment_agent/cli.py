@@ -810,10 +810,13 @@ def financial_ratios_sync(data_dir: Path, get=None, today=None) -> int:
     except (OSError, ValueError, KeyError, TypeError):
         banks, brokers = [], []
     watched = {**{s: "Ngân hàng" for s in banks}, **{s: "Dịch vụ tài chính" for s in brokers}, **watched}
+    mine = set(load_watchlist(data_dir).symbols)
     results = fetch_financial_ratios(FinancialRatioStore(data_dir / "financial-ratios"), watched, get=get,
                                      today=today or datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
-    failed = {k: v for k, v in results.items() if v != "ok"}
-    print(json.dumps({"status": "ok" if not failed else "partial", "results": results}))
+    # only a watched ticker failing fails the step (and Tình trạng hệ thống); the other banks and brokers are reported, not alerted
+    failed = {k: v for k, v in results.items() if v != "ok" and k in mine}
+    others = sum(1 for k, v in results.items() if v != "ok" and k not in mine)
+    print(json.dumps({"status": "ok" if not failed else "partial", "results": results, "unwatched_failed": others}))
     return 0 if not failed else 1
 
 

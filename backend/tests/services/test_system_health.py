@@ -300,3 +300,19 @@ def test_a_damaged_us_calendar_never_breaks_the_report(tmp_path):
     (data / "macro" / "us-calendar.json").write_text("{not json", encoding="utf-8")
     out = health_report(data, now=datetime(2026, 11, 22, 1, 0, tzinfo=timezone.utc))
     assert out["known"][0]["detail"].endswith("tự hết khi có số tháng 11/2026; đến 15/12/2026 vẫn chưa có thì báo lại thành sự cố.")
+
+
+def test_chi_so_nganh_is_as_old_as_the_oldest_watched_financial_ticker_not_the_newest_file(tmp_path):
+    # since every HOSE bank and broker is fetched (27/11/2026), a fresh unwatched file must not hide a watched one gone stale
+    data = healthy(tmp_path)
+    (data / "market-symbols.txt").write_text("VCB\nFPT\n", encoding="utf-8")
+    (data / "industries.json").write_text(json.dumps({"as_of": "x", "source": "t", "level": 2,
+                                                      "sectors": {"VCB": "Ngân hàng", "FPT": "Công nghệ Thông tin"}}), encoding="utf-8")
+    for name, days in (("VCB.json", 6), ("ACB.json", 0)):
+        f = data / "financial-ratios" / name
+        f.write_text("{}", encoding="utf-8")
+        os.utime(f, (NOW.timestamp() - days * 86400 - 60, NOW.timestamp() - days * 86400 - 60))
+    row = next(s for s in report(data)["sources"] if s["id"] == "financial-ratios")
+    assert row["stale"] is True
+    os.utime(data / "financial-ratios" / "VCB.json", (NOW.timestamp() - 3600, NOW.timestamp() - 3600))
+    assert next(s for s in report(data)["sources"] if s["id"] == "financial-ratios")["stale"] is False

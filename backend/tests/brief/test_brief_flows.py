@@ -90,3 +90,46 @@ def test_one_damaged_file_blanks_its_own_session_only(tmp_path):
     out = net_flows(tmp_path, date(2026, 11, 26), SESSIONS)
     assert out["foreign"]["date"] == "2026-11-25" and out["foreign"]["bars"][-1]["net_bn"] == "1.00"
     assert out["proprietary"]["net_bn"] == "1.00"
+
+
+def stocks_foreign(root, day, nets: dict):
+    write(root, "foreign", day, {"stocks": {s: {"buy_volume": "1", "sell_volume": "1", "buy_value": str(max(n, 0)), "sell_value": str(max(-n, 0))}
+                                            for s, n in nets.items()}})
+
+
+def stocks_proprietary(root, day, nets: dict):
+    write(root, "proprietary", day, {"index": {"buy_volume": "1", "sell_volume": "1", "buy_value": "1", "sell_value": "0"},
+                                     "stocks": {s: {"buy_volume": "1", "sell_volume": "1", "buy_value": str(max(n, 0)), "sell_value": str(max(-n, 0))}
+                                                for s, n in nets.items()}})
+
+
+def test_same_direction_ends_where_both_stores_have_figures_and_drops_sessions_either_lacks(tmp_path):
+    from investment_agent.brief.flows import same_direction
+    days = SESSIONS[-6:]  # 19, 20, 21(24/11?) … up to 26/11
+    for d in days:
+        stocks_foreign(tmp_path, d.isoformat(), {"VPB": 5 * B, "MCH": -4 * B, "FPT": 3 * B, "HPG": -1 * B})
+    for d in days[:-2]:  # tự doanh two sessions late
+        stocks_proprietary(tmp_path, d.isoformat(), {"VPB": 2 * B, "MCH": -1 * B, "FPT": -1 * B})
+    write(tmp_path, "proprietary", days[1].isoformat(), {"thieu": True})
+    out = same_direction(tmp_path, date(2026, 11, 26), SESSIONS, n=20)
+    assert out["status"] == "ok" and out["to"] == days[-3].isoformat() and out["lag_sessions"] == 2
+    assert out["dropped"] == 1 + (20 - 4)  # 24/11's tự doanh missing, and 16 sessions before the stores begin
+    assert out["buy"] == [{"symbol": "VPB", "foreign_bn": "15.00", "proprietary_bn": "6.00"}]
+    assert out["sell"] == [{"symbol": "MCH", "foreign_bn": "-12.00", "proprietary_bn": "-3.00"}]  # FPT opposite, HPG no tự doanh: neither
+
+
+def test_same_direction_without_a_common_session_says_so(tmp_path):
+    from investment_agent.brief.flows import same_direction
+    stocks_foreign(tmp_path, "2026-11-26", {"VPB": B})
+    assert same_direction(tmp_path, date(2026, 11, 26), SESSIONS)["status"] == "missing"
+
+
+def test_the_brief_view_carries_same_direction_with_watched_tickers_marked(tmp_path):
+    from investment_agent.brief.view import market_for_session
+    (tmp_path / "brief").mkdir()
+    (tmp_path / "brief" / "2026-11-26.json").write_text(json.dumps({"session_date": "2026-11-26", "board": {"status": "ok"}}), encoding="utf-8")
+    (tmp_path / "market-symbols.txt").write_text("VPB\n", encoding="utf-8")
+    stocks_foreign(tmp_path, "2026-11-25", {"VPB": 5 * B, "MCH": 2 * B})
+    stocks_proprietary(tmp_path, "2026-11-25", {"VPB": 1 * B, "MCH": 1 * B})
+    same = market_for_session(tmp_path, set())("2026-11-26")["flows"]["same_direction"]
+    assert [(r["symbol"], r["watched"]) for r in same["buy"]] == [("VPB", True), ("MCH", False)]

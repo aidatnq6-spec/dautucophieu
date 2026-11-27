@@ -63,3 +63,11 @@ it("reads each bar out as its date and net, or says the session has no figures",
   expect(barLabel({ date: "2026-11-23", net_bn: "357.51" })).toBe("23/11/2026: +357,5 tỷ");
   expect(barLabel({ date: "2026-11-24", net_bn: null })).toBe("24/11/2026: thiếu số");
 });
+
+it("heads the same-direction rows with their sessions, lag and dropped sessions, and words each ticker", async () => {
+  const { sameHead, sameItem } = await import("./brief-market");
+  expect(sameHead({ from: "2026-10-27", to: "2026-11-24", lag_sessions: 2, dropped: 3 }))
+    .toBe("Cùng chiều 20 phiên (27/10–24/11, chậm 2 phiên; bỏ 3 phiên thiếu số)");
+  expect(sameHead({ from: "2026-10-29", to: "2026-11-26", lag_sessions: 0, dropped: 0 })).toBe("Cùng chiều 20 phiên (29/10–26/11)");
+  expect(sameItem({ symbol: "VPB", foreign_bn: "15.00", proprietary_bn: "6.00" })).toBe("VPB (ngoại +15,0 tỷ · tự doanh +6,0 tỷ)");
+});

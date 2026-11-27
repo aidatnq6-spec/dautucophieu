@@ -22,6 +22,10 @@ def healthy(tmp_path):
             f.write_text("{}", encoding="utf-8")
             os.utime(f, (NOW.timestamp() - 3600, NOW.timestamp() - 3600))
     SeriesStore(data / "trend-sources").upsert("VNINDEX-1d", [(NOW.replace(tzinfo=None) - timedelta(days=1), "1700")])
+    (data / "index-history").mkdir(parents=True, exist_ok=True)  # lịch sử định giá: one ticker refreshed an hour ago
+    fresh = data / "index-history" / "AAA.json"
+    fresh.write_text("{}", encoding="utf-8")
+    os.utime(fresh, (NOW.timestamp() - 3600, NOW.timestamp() - 3600))
     for folder in ("foreign", "proprietary"):  # kho theo phiên: a session of today with figures
         (data / folder).mkdir(parents=True, exist_ok=True)
         (data / folder / "2026-11-09.json").write_text(json.dumps({"date": "2026-11-09", "stocks": {}}), encoding="utf-8")
@@ -333,3 +337,17 @@ def test_foreign_and_proprietary_stores_are_late_past_five_closed_sessions_witho
     assert rows["proprietary"]["stale"] is True and rows["proprietary"]["last"] == "2026-10-30"  # 2–9/11: 6 sessions
     problem = next(p for p in report(data)["problems"] if p["id"] == "source:proprietary")
     assert problem["label"] == "Tự doanh theo phiên" and "chậm 6 phiên" in problem["detail"]
+
+
+def test_valuation_history_counts_tickers_past_fourteen_days_and_alerts_only_from_5_december(tmp_path):
+    data = healthy(tmp_path)
+    for name, days in (("OLD.json", 20), ("MID.json", 15), ("NEW.json", 3)):
+        f = data / "index-history" / name
+        f.write_text("{}", encoding="utf-8")
+        os.utime(f, (NOW.timestamp() - days * 86400, NOW.timestamp() - days * 86400))
+    row = next(s for s in report(data)["sources"] if s["id"] == "index-history")
+    assert row["stale"] is True and row["max_days"] == 14 and row["over"] == 2 and row["oldest"] == "OLD"
+    assert not any(p["id"] == "source:index-history" for p in report(data)["problems"])  # 9/11: before the first full refresh
+    late = health_report(data, now=datetime(2026, 12, 5, 1, 0, tzinfo=timezone.utc))
+    problem = next(p for p in late["problems"] if p["id"] == "source:index-history")
+    assert "mã quá 14 ngày" in problem["detail"]

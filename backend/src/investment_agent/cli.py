@@ -125,6 +125,9 @@ def main() -> int:
     phist.add_argument("--data-dir", type=Path, required=True)
     phist.add_argument("--limit", type=int, default=60, help="tickers per run: never fetched first, then those older than a week")
     phist.add_argument("--symbols", help="comma-separated tickers to fetch now, however recent")
+    prop = commands.add_parser("proprietary-sync", help="HOSE proprietary trading by session (VNDirect) into data/proprietary, about a year, for tu_doanh")
+    prop.add_argument("--data-dir", type=Path, required=True)
+    prop.add_argument("--limit", type=int, default=260, help="sessions per run: newest first; a missing one asked again while among the last 20")
     ihsync = commands.add_parser("index-history-sync", help="refresh data/index-history (statements and unadjusted closes) for dinh_gia_lich_su")
     ihsync.add_argument("--data-dir", type=Path, required=True)
     ihsync.add_argument("--limit", type=int, default=60, help="tickers per run: never fetched first, then those older than a week")
@@ -176,6 +179,8 @@ def main() -> int:
                             send=telegram[0] if telegram else None)
     if args.command == "market-sync":
         return market_sync(_symbols(args.symbols), args.data_dir, args.calendar, args.days, index=args.index)
+    if args.command == "proprietary-sync":
+        return proprietary_sync(args.data_dir, limit=args.limit)
     if args.command == "index-history-sync":
         return index_history_sync(args.data_dir, limit=args.limit)
     if args.command == "index-history":
@@ -543,6 +548,28 @@ def index_history_cli(data_dir: Path, *, get=None, now=None, sleep=None) -> int:
     print(json.dumps({"status": "ok" if not failed else "partial", "built": built, "compare": checks["VNINDEX"], "vn30": checks["VN30"]},
                      ensure_ascii=False))
     return 0 if not failed else 1
+
+
+def proprietary_sync(data_dir: Path, *, limit: int = 260, get=None, now=None, sleep=None) -> int:
+    """Exit 0 when every session asked came back (with figures or posted as missing), 1 when some failed (each is reported)."""
+    import time
+    from datetime import datetime, timedelta, timezone
+    from zoneinfo import ZoneInfo
+    from investment_agent.market.proprietary_history import KEEP_DAYS, sync_proprietary
+    from investment_agent.public_tools import _sessions
+    if get is None:
+        import httpx
+
+        def get(url):
+            response = httpx.get(url, timeout=60, follow_redirects=False, headers={"User-Agent": "investment-agent/0.1 (personal use)"})
+            response.raise_for_status()
+            return response.text
+    now = now or datetime.now(timezone.utc)
+    today = now.astimezone(ZoneInfo("Asia/Ho_Chi_Minh")).date()
+    sessions, _ = _sessions(today - timedelta(days=KEEP_DAYS), today, Path(data_dir))
+    out = sync_proprietary(Path(data_dir), get=get, now=now, sessions=sorted(sessions), limit=limit, sleep=sleep or time.sleep)
+    print(json.dumps(out))
+    return 0 if out["status"] == "ok" else 1
 
 
 def index_history_sync(data_dir: Path, *, limit: int = 60, get=None, now=None, sleep=None) -> int:

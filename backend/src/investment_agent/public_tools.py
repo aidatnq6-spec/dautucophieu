@@ -243,6 +243,66 @@ class PublicData:
         symbol = self._symbol(ma)
         return own_history(self.root, symbol) if symbol else _missing("Mã không hợp lệ.")
 
+    def tu_doanh(self, so_phien=60, ma=None, now: datetime | None = None) -> dict:
+        """Tự doanh HOSE (market.proprietary_history) over the so_phien sessions ending at the newest stored one (owner, 27/11/2026)."""
+        from decimal import Decimal
+        from investment_agent.market.proprietary_history import CLOSED_AT, VN, ProprietaryStore
+        _plain = lambda d: format(d.normalize(), "f") if d else "0"  # noqa: E731
+        n = _count(so_phien, 60, 250)
+        symbol = None
+        if ma is not None:
+            symbol = self._symbol(ma)
+            if not symbol:
+                return _missing("Mã không hợp lệ.")
+        store = ProprietaryStore(self.root)
+        records = {d: store.read(d) for d in store.days()}
+        with_figures = sorted(d for d, r in records.items() if r and not r.get("thieu"))
+        if not with_figures:
+            return _missing("Chưa có số tự doanh trong kho (proprietary-sync chạy ở lượt 20:00).")
+        newest = date.fromisoformat(with_figures[-1])
+        local = (now or datetime.now(timezone.utc)).astimezone(VN)
+        sessions, calendars = _sessions(newest - timedelta(days=n * 2 + 30), local.date(), self.root)
+        window = sorted(d for d in sessions if d <= newest)[-n:]
+        closed_after = [d for d in sessions if d > newest and (d < local.date() or local.time() >= CLOSED_AT)]
+        z = Decimal(0)
+
+        def flow(rows: list[dict]) -> dict:
+            got = {k: sum((Decimal(r[k]) for r in rows), z) for k in ("buy_value", "sell_value", "buy_volume", "sell_volume")}
+            return {"mua_gt": _plain(got["buy_value"]), "ban_gt": _plain(got["sell_value"]), "rong_gt": _plain(got["buy_value"] - got["sell_value"]),
+                    "mua_kl": _plain(got["buy_volume"]), "ban_kl": _plain(got["sell_volume"]), "rong_kl": _plain(got["buy_volume"] - got["sell_volume"])}
+        kept = [records.get(d.isoformat()) for d in window]
+        present = [r for r in kept if r and not r.get("thieu")]
+        span = {"so_phien": len(window), "so_phien_hoi": n, "tu": window[0].isoformat() if window else None, "den": newest.isoformat(),
+                "phien_co_so": len(present), "phien_thieu": [d.isoformat() for d, r in zip(window, kept) if r and r.get("thieu")],
+                "chua_hoi": [d.isoformat() for d, r in zip(window, kept) if not r], "cham_phien": len(closed_after)}
+        head = {"nguon": "VNDirect (proprietary_trading, công khai)", "lay_luc": max((r.get("fetched_at") or "" for r in present), default=None),
+                "don_vi": "đồng (giá trị), cổ phiếu (khối lượng)", "khoang": span, "lich_kiem": calendars,
+                "luu_y": "Số VNDirect công bố theo phiên, giữ nguyên; phiên thiếu không được thay bằng phiên khác. phien_thieu: VNDirect không có "
+                         "số; chua_hoi: kho chưa tải phiên đó (ngoài khoảng lưu hoặc lượt tải lỗi). VNDirect đăng chậm vài phiên (cham_phien). "
+                         "toan_san lấy từ dòng VNINDEX, danh sách mã lấy từ từng mã: ở phien_khong_khop hai số này không khớp nhau, nêu rõ khi "
+                         "dùng. so_phien là số phiên thật của khoảng, có thể ít hơn so_phien_hoi khi lịch không đủ. Mua, bán ròng không nói lên "
+                         "ý định hay tốt xấu."}
+        if symbol:
+            rows, mine = [], []
+            for d, r in zip(window, kept):
+                if not r or r.get("thieu"):
+                    rows.append({"ngay": d.isoformat(), "thieu": True})
+                elif symbol in r["stocks"]:
+                    mine.append(r["stocks"][symbol])
+                    rows.append({"ngay": d.isoformat(), **flow([r["stocks"][symbol]])})
+                else:
+                    rows.append({"ngay": d.isoformat(), "khong_giao_dich": True})
+            return {"ma": symbol, **head, "phien": rows, "tong": {**flow(mine), "so_phien": len(mine)}}
+        by_symbol: dict[str, list[dict]] = {}
+        for r in present:
+            for sym, figures in r["stocks"].items():
+                by_symbol.setdefault(sym, []).append(figures)
+        totals = [{"ma": sym, **flow(rows), "so_phien": len(rows)} for sym, rows in by_symbol.items()]
+        buys = sorted((t for t in totals if Decimal(t["rong_gt"]) > 0), key=lambda t: (-Decimal(t["rong_gt"]), t["ma"]))[:10]
+        sells = sorted((t for t in totals if Decimal(t["rong_gt"]) < 0), key=lambda t: (Decimal(t["rong_gt"]), t["ma"]))[:10]
+        return {**head, "toan_san": flow([r["index"] for r in present]), "mua_rong_manh": buys, "ban_rong_manh": sells,
+                "phien_khong_khop": [r["date"] for r in present if not r.get("khop")]}
+
     def dinh_gia_chi_so(self, chi_so="VNINDEX", ty_le="pe", so_diem=60) -> dict:
         index, ratio = str(chi_so or "").upper(), str(ty_le or "").lower()
         if index not in INDEXES or ratio not in RATIOS:

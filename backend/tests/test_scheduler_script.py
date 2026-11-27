@@ -252,3 +252,10 @@ def test_long_history_for_p_e_against_its_own_past_is_refreshed_in_the_evening_s
     evening = next(i for i, l in enumerate(ls) if "(Get-Date).Hour -ge 20" in l)
     step = next(i for i, l in enumerate(ls) if "jobs.step index-history-sync --data-dir $data --limit 60" in l)
     assert step > evening
+
+
+def test_proprietary_trading_by_session_is_kept_in_the_evening_slot():
+    ls = lines()
+    evening = next(i for i, l in enumerate(ls) if "(Get-Date).Hour -ge 20" in l)
+    step = next(i for i, l in enumerate(ls) if "jobs.step proprietary-sync --data-dir $data --limit 260" in l)
+    assert step > evening

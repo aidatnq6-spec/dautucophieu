@@ -159,7 +159,7 @@ def test_server_exposes_exactly_the_approved_read_only_tools(data):
     assert sorted(t.name for t in tools) == sorted([
         "thong_tin_ma", "gia_ngay", "dinh_gia_chi_so", "bao_cao_tai_chinh", "chi_so_tai_chinh", "eps_co_tuc", "su_kien_doanh_nghiep",
         "co_dong_ban_lanh_dao", "giao_dich_noi_bo", "danh_sach_vi_mo", "chi_bao_vi_mo", "chi_so_chau_a", "gia_vang", "omo",
-        "quy_mo", "gia_vang_lich_su", "dinh_gia_ma", "lich_su_gia", "so_sanh_nganh", "thuyet_minh", "dinh_gia_lich_su"])
+        "quy_mo", "gia_vang_lich_su", "dinh_gia_ma", "lich_su_gia", "so_sanh_nganh", "thuyet_minh", "dinh_gia_lich_su", "tu_doanh"])
     assert all(t.annotations and t.annotations.read_only_hint for t in tools)
     assert "Ngân hàng" in result.content[0].text
 
@@ -497,3 +497,59 @@ def test_a_securities_firm_without_level_four_codes_in_the_listing_says_so(data)
                                                                   "icb_names": {"8700": "Dịch vụ tài chính"}}})
     out = data.so_sanh_nganh("SSA")
     assert out["thieu"] is True and "ICB cấp 4" in out["ly_do"]
+
+
+def _prop(data, day, stocks):
+    rec = {"date": day, "source": "vndirect:finfo", "fetched_at": f"{day}T13:00:00+00:00", "khop": True,
+           "index": {"buy_volume": "0", "sell_volume": "0", "buy_value": str(sum(b for _, b, _ in stocks)), "sell_value": str(sum(s for _, _, s in stocks))},
+           "stocks": {c: {"buy_volume": "10", "sell_volume": "4", "buy_value": str(b), "sell_value": str(s)} for c, b, s in stocks}}
+    write(data.root / "proprietary" / f"{day}.json", rec)
+
+
+TU_DOANH_NOW = datetime(2026, 11, 27, 13, 30, tzinfo=timezone.utc)  # Friday 20:30 in Vietnam
+
+
+def test_tu_doanh_sums_the_sessions_up_to_the_newest_stored_and_names_the_strongest_net_buys_and_sells(data):
+    _prop(data, "2026-11-19", [("FPT", 5, 1), ("SSI", 1, 4)])
+    write(data.root / "proprietary" / "2026-11-20.json", {"date": "2026-11-20", "thieu": True, "hoi_luc": "x"})
+    _prop(data, "2026-11-23", [("FPT", 3, 0), ("HPG", 0, 2), ("VNM", 2, 2)])
+    out = data.tu_doanh(so_phien=3, now=TU_DOANH_NOW)
+    assert out["khoang"] == {"so_phien": 3, "so_phien_hoi": 3, "tu": "2026-11-19", "den": "2026-11-23", "phien_co_so": 2,
+                             "phien_thieu": ["2026-11-20"], "chua_hoi": [], "cham_phien": 4}  # 24, 25, 26, 27/11 closed with no figures yet
+    assert out["toan_san"]["mua_gt"] == "11" and out["toan_san"]["ban_gt"] == "9" and out["toan_san"]["rong_gt"] == "2"
+    assert [x["ma"] for x in out["mua_rong_manh"]] == ["FPT"] and out["mua_rong_manh"][0] == {
+        "ma": "FPT", "mua_gt": "8", "ban_gt": "1", "rong_gt": "7", "mua_kl": "20", "ban_kl": "8", "rong_kl": "12", "so_phien": 2}
+    assert [x["ma"] for x in out["ban_rong_manh"]] == ["SSI", "HPG"]  # VNM nets to zero: in neither list
+    assert out["don_vi"].startswith("đồng") and out["nguon"].startswith("VNDirect") and out["phien_khong_khop"] == []
+
+
+def test_tu_doanh_of_one_ticker_tells_a_session_without_its_trades_from_a_session_without_figures(data):
+    _prop(data, "2026-11-19", [("FPT", 5, 1)])
+    write(data.root / "proprietary" / "2026-11-20.json", {"date": "2026-11-20", "thieu": True, "hoi_luc": "x"})
+    _prop(data, "2026-11-23", [("HPG", 1, 0)])
+    out = data.tu_doanh(so_phien=3, ma="fpt", now=TU_DOANH_NOW)
+    assert out["ma"] == "FPT" and out["phien"] == [
+        {"ngay": "2026-11-19", "mua_gt": "5", "ban_gt": "1", "rong_gt": "4", "mua_kl": "10", "ban_kl": "4", "rong_kl": "6"},
+        {"ngay": "2026-11-20", "thieu": True},
+        {"ngay": "2026-11-23", "khong_giao_dich": True}]
+    assert out["tong"]["rong_gt"] == "4" and out["tong"]["so_phien"] == 1
+
+
+def test_tu_doanh_clamps_the_window_and_says_when_nothing_is_stored(data):
+    assert data.tu_doanh(now=TU_DOANH_NOW)["thieu"] is True
+    _prop(data, "2026-11-23", [("FPT", 1, 0)])
+    assert data.tu_doanh(so_phien="x", now=TU_DOANH_NOW)["khoang"]["so_phien_hoi"] == 60
+    assert data.tu_doanh(so_phien=9999, now=TU_DOANH_NOW)["khoang"]["so_phien_hoi"] == 250
+    assert data.tu_doanh(so_phien=0, now=TU_DOANH_NOW)["khoang"]["so_phien_hoi"] == 1
+    assert data.tu_doanh(ma="??", now=TU_DOANH_NOW)["thieu"] is True
+
+
+def test_tu_doanh_tells_sessions_never_asked_from_sessions_vndirect_left_empty_and_gives_the_window_it_has(data):
+    _prop(data, "2026-11-23", [("FPT", 1, 0)])
+    write(data.root / "proprietary" / "2026-11-20.json", {"date": "2026-11-20", "thieu": True, "hoi_luc": "x"})  # 2026-11-19: no file
+    out = data.tu_doanh(so_phien=3, now=TU_DOANH_NOW)
+    assert out["khoang"]["phien_thieu"] == ["2026-11-20"] and out["khoang"]["chua_hoi"] == ["2026-11-19"]
+    assert out["khoang"]["so_phien"] == 3 and out["khoang"]["so_phien_hoi"] == 3
+    wide = data.tu_doanh(so_phien=250, now=TU_DOANH_NOW)  # only 2026 has a calendar here: the window says what it holds
+    assert wide["khoang"]["so_phien_hoi"] == 250 and wide["khoang"]["so_phien"] < 250 and wide["khoang"]["tu"] >= "2026-01-01"
+    assert "không khớp" in out["luu_y"]

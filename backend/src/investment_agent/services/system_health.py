@@ -274,7 +274,43 @@ def _probe(url: str) -> bool:
         return False
 
 
-def health_report(data_dir: Path, *, now: datetime, calendar=None, config_dir: Path | None = None, env=None, probe=_probe) -> dict:
+def _tailscale(*args: str) -> str:
+    import shutil
+    import subprocess
+    exe = shutil.which("tailscale") or str(Path("C:/Program Files/Tailscale/tailscale.exe"))  # Tailscale does not add itself to PATH
+    # bytes decoded as UTF-8: Tailscale's JSON carries the account's name ("anh Đạt"), which the Windows code page cannot read
+    return subprocess.run([exe, *args], capture_output=True, timeout=15, check=True).stdout.decode("utf-8", "replace")
+
+
+def _remote_issues(env, probe, tailscale) -> list[str]:
+    """Kết nối từ xa: the server on this machine, Tailscale connected, and Funnel pointing at it (27/11/2026: the Tailscale app closed
+    when the disk filled and Funnel went with it while the server still answered on 127.0.0.1). The secret never enters the report."""
+    issues = []
+    if not probe(f"http://127.0.0.1:8770/{env['MCP_REMOTE_SECRET']}/healthz"):
+        issues.append("không trả lời trên máy (tác vụ InvestmentAgent-McpRemote)")
+    host = env.get("MCP_REMOTE_HOST")
+    if host:
+        try:
+            state = json.loads(tailscale("status", "--json"))
+            connected = state.get("BackendState") == "Running" and bool((state.get("Self") or {}).get("Online"))
+        except Exception:  # noqa: BLE001 - missing or unreadable Tailscale is the finding
+            connected = False
+        if not connected:
+            issues.append("Tailscale chưa kết nối (mở ứng dụng Tailscale hoặc khởi động lại dịch vụ Tailscale)")
+        key = f"{host}:443"
+        try:
+            funnel = json.loads(tailscale("funnel", "status", "--json") or "{}")
+            handlers = (((funnel.get("Web") or {}).get(key) or {}).get("Handlers") or {}).values()
+            opened = bool((funnel.get("AllowFunnel") or {}).get(key)) and any(h.get("Proxy") == "http://127.0.0.1:8770" for h in handlers)
+        except Exception:  # noqa: BLE001
+            opened = False
+        if not opened:
+            issues.append("Funnel chưa mở tới cổng 8770 (chạy tailscale funnel --bg 8770)")
+    return issues
+
+
+def health_report(data_dir: Path, *, now: datetime, calendar=None, config_dir: Path | None = None, env=None, probe=_probe,
+                  tailscale=_tailscale) -> dict:
     from investment_agent.domain.pinned import CONFIG_DIR
     data_dir = Path(data_dir)
     root = data_dir.parent
@@ -301,13 +337,14 @@ def health_report(data_dir: Path, *, now: datetime, calendar=None, config_dir: P
             detail = "chưa có phiên nào có số" if newest is None else                 f"phiên mới nhất có số {_dmy(datetime.fromisoformat(newest))}, chậm {late} phiên (quá {MAX_SESSIONS} phiên)"
             problems.append({"id": f"source:{s['id']}", "label": s["label"], "detail": detail})
     aware = now if now.tzinfo else now.replace(tzinfo=timezone.utc)  # some callers pass a naive UTC time
-    secret = (os.environ if env is None else env).get("MCP_REMOTE_SECRET")
-    if secret:  # Kết nối từ xa (owner, 27/11/2026): only once it is set up; the secret never enters the report
-        alive = probe(f"http://127.0.0.1:8770/{secret}/healthz")
-        sources.append({"id": "mcp-remote", "label": "Kết nối từ xa", "last": aware.isoformat() if alive else None, "max_days": 0, "stale": not alive})
-        if not alive:
+    environ = os.environ if env is None else env
+    if environ.get("MCP_REMOTE_SECRET"):  # Kết nối từ xa (owner, 27/11/2026): only once it is set up
+        issues = _remote_issues(environ, probe, tailscale)
+        sources.append({"id": "mcp-remote", "label": "Kết nối từ xa", "last": None if issues else aware.isoformat(), "max_days": 0,
+                        "stale": bool(issues)})
+        if issues:
             problems.append({"id": "source:mcp-remote", "label": "Kết nối từ xa",
-                             "detail": "không trả lời trên máy (tác vụ InvestmentAgent-McpRemote); claude.ai trên web và điện thoại không gọi được dữ liệu"})
+                             "detail": "; ".join(issues) + "; claude.ai trên web và điện thoại không gọi được dữ liệu"})
     times = {p.stem: datetime.fromtimestamp(p.stat().st_mtime, timezone.utc) for p in (data_dir / "index-history").glob("*.json")}         if (data_dir / "index-history").is_dir() else {}
     over = sorted((t, s) for s, t in times.items() if aware - t > timedelta(days=HISTORY_MAX_DAYS))
     oldest = min(times.items(), key=lambda kv: kv[1]) if times else None

@@ -365,3 +365,64 @@ def test_the_remote_connector_is_checked_only_when_it_is_set_up(tmp_path):
     up = health_report(data, now=NOW, env={"MCP_REMOTE_SECRET": "s" * 40}, probe=lambda url: True)
     assert next(s for s in up["sources"] if s["id"] == "mcp-remote")["stale"] is False
     assert "s" * 40 not in str(up)  # the secret never appears in the report
+
+
+TS_HOST = "may.tail1234.ts.net"
+TS_OK = {("status", "--json"): '{"BackendState": "Running", "Self": {"Online": true}}',
+         ("funnel", "status", "--json"): '{"Web": {"may.tail1234.ts.net:443": {"Handlers": {"/": {"Proxy": "http://127.0.0.1:8770"}}}}, '
+                                          '"AllowFunnel": {"may.tail1234.ts.net:443": true}}'}
+REMOTE_ENV = {"MCP_REMOTE_SECRET": "s" * 40, "MCP_REMOTE_HOST": TS_HOST}
+
+
+def remote(data, answers, probe=lambda url: True):
+    out = health_report(data, now=NOW, env=REMOTE_ENV, probe=probe, tailscale=lambda *args: answers[args])
+    return next(s for s in out["sources"] if s["id"] == "mcp-remote"), [p for p in out["problems"] if p["id"] == "source:mcp-remote"]
+
+
+def test_the_remote_connector_also_needs_tailscale_connected_and_funnel_pointing_at_the_server(tmp_path):
+    # 27/11/2026: the Tailscale app closed when the disk filled, Funnel went with it, and the check (127.0.0.1 only) still said fine
+    data = healthy(tmp_path)
+    row, problems = remote(data, TS_OK)
+    assert row["stale"] is False and problems == []
+    row, problems = remote(data, {**TS_OK, ("status", "--json"): '{"BackendState": "NoState", "Self": {"Online": false}}'})
+    assert row["stale"] is True and "Tailscale chưa kết nối" in problems[0]["detail"]
+    _, problems = remote(data, {**TS_OK, ("funnel", "status", "--json"): "{}"})
+    assert "Funnel chưa mở tới cổng 8770" in problems[0]["detail"]
+    _, problems = remote(data, TS_OK, probe=lambda url: False)
+    assert problems[0]["detail"].startswith("không trả lời trên máy")
+
+
+def test_tailscale_missing_or_unreadable_is_said_not_crashed(tmp_path):
+    def missing(*args):
+        raise FileNotFoundError("tailscale")
+    data = healthy(tmp_path)
+    out = health_report(data, now=NOW, env=REMOTE_ENV, probe=lambda url: True, tailscale=missing)
+    problem = next(p for p in out["problems"] if p["id"] == "source:mcp-remote")
+    assert "Tailscale chưa kết nối" in problem["detail"]
+
+
+def test_tailscales_json_is_read_as_utf8_whatever_the_windows_code_page(monkeypatch):
+    # the account name "anh Đạt" broke a cp1252 decode and the check said Tailscale was down while it ran (27/11/2026)
+    import subprocess
+
+    import investment_agent.services.system_health as sh
+
+    class Done:
+        stdout = '{"BackendState": "Running", "User": {"1": {"DisplayName": "anh Đạt"}}}'.encode("utf-8")
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: Done())
+    assert "anh Đạt" in sh._tailscale("status", "--json")
+
+
+def test_the_tailscale_fallback_path_is_the_real_install_path(monkeypatch):
+    import shutil
+    import subprocess
+
+    import investment_agent.services.system_health as sh
+    seen = []
+
+    class Done:
+        stdout = b"{}"
+    monkeypatch.setattr(shutil, "which", lambda name: None)  # Tailscale does not add itself to PATH
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: seen.append(cmd[0]) or Done())
+    sh._tailscale("status", "--json")
+    assert seen == [str(Path("C:/Program Files/Tailscale/tailscale.exe"))]

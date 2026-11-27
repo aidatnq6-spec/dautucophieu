@@ -426,3 +426,24 @@ def test_the_tailscale_fallback_path_is_the_real_install_path(monkeypatch):
     monkeypatch.setattr(subprocess, "run", lambda cmd, **k: seen.append(cmd[0]) or Done())
     sh._tailscale("status", "--json")
     assert seen == [str(Path("C:/Program Files/Tailscale/tailscale.exe"))]
+
+
+def test_a_drive_under_five_gigabytes_free_is_a_problem(tmp_path):
+    # 27/11/2026: C: filled up; Tailscale, Claude Code's update and npm failed before anything said so
+    data = healthy(tmp_path)
+    out = health_report(data, now=NOW, disk_free=lambda root: (3 if root.upper().startswith("C") else 200) * 1024**3)
+    rows = {s["id"]: s for s in out["sources"] if s["id"].startswith("disk:")}
+    assert rows["disk:C"]["stale"] is True and rows["disk:C"]["label"] == "Ổ C: còn trống"
+    problem = next(p for p in out["problems"] if p["id"] == "source:disk:C")
+    assert problem["detail"] == "còn 3,0 GB trống (dưới 5 GB): ứng dụng, Tailscale và Claude Code có thể lỗi khi ghi tệp"
+    ok = health_report(data, now=NOW, disk_free=lambda root: 50 * 1024**3)
+    assert not any(p["id"].startswith("source:disk:") for p in ok["problems"])
+
+
+def test_an_unreadable_drive_is_skipped_not_crashed(tmp_path):
+    data = healthy(tmp_path)
+
+    def boom(root):
+        raise OSError("no drive")
+    out = health_report(data, now=NOW, disk_free=boom)
+    assert not any(s["id"].startswith("disk:") for s in out["sources"])

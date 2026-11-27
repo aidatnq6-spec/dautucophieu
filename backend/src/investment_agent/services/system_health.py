@@ -36,6 +36,10 @@ SOURCES = ({"id": "prices", "label": "Giá VN-Index", "dir": None, "max_days": 6
 SESSION_SOURCES = ({"id": "foreign", "label": "Khối ngoại theo phiên", "store": "foreign"},
                    {"id": "proprietary", "label": "Tự doanh theo phiên", "store": "proprietary"})
 MAX_SESSIONS = 5
+# Lịch sử định giá (owner, 27/11/2026): index-history-sync refreshes 60 tickers a night, every one within a week; a ticker past 14 days
+# is late. Shown at once, but a problem (and Telegram) only from 5/12/2026, once the first full refresh has gone round.
+HISTORY_MAX_DAYS = 14
+HISTORY_ALERT_FROM = datetime(2026, 12, 5, tzinfo=timezone(timedelta(hours=7)))
 _NAMED = re.compile(r"^(\S+) (.+?) exit=(\d+)(?:\s|$)")
 _BARE = re.compile(r"^(\S+) exit=(\d+)(?:\s|$)")
 _STAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T")
@@ -288,6 +292,16 @@ def health_report(data_dir: Path, *, now: datetime, calendar=None, config_dir: P
         if stale:
             detail = "chưa có phiên nào có số" if newest is None else                 f"phiên mới nhất có số {_dmy(datetime.fromisoformat(newest))}, chậm {late} phiên (quá {MAX_SESSIONS} phiên)"
             problems.append({"id": f"source:{s['id']}", "label": s["label"], "detail": detail})
+    aware = now if now.tzinfo else now.replace(tzinfo=timezone.utc)  # some callers pass a naive UTC time
+    times = {p.stem: datetime.fromtimestamp(p.stat().st_mtime, timezone.utc) for p in (data_dir / "index-history").glob("*.json")}         if (data_dir / "index-history").is_dir() else {}
+    over = sorted((t, s) for s, t in times.items() if aware - t > timedelta(days=HISTORY_MAX_DAYS))
+    oldest = min(times.items(), key=lambda kv: kv[1]) if times else None
+    stale = not times or bool(over)
+    sources.append({"id": "index-history", "label": "Lịch sử định giá", "last": oldest[1].isoformat() if oldest else None,
+                    "max_days": HISTORY_MAX_DAYS, "stale": stale, "over": len(over), "oldest": oldest[0] if oldest else None})
+    if stale and aware >= HISTORY_ALERT_FROM:
+        problems.append({"id": "source:index-history", "label": "Lịch sử định giá",
+                         "detail": "chưa có dữ liệu" if not times else f"{len(over)} mã quá {HISTORY_MAX_DAYS} ngày chưa làm mới, cũ nhất {oldest[0]} ({_dmy(oldest[1])})"})
     macro, known = macro_problems(data_dir, today=now.astimezone(timezone(timedelta(hours=7))).date())
     problems.extend(macro)
     lines = _read_tail(root / "logs" / "scheduler.log")

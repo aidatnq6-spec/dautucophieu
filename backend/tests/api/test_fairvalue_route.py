@@ -549,3 +549,31 @@ def test_statements_carry_the_tickers_own_pe_and_pb_history(tmp_path):
     assert own["date"] == "2026-08-31"
     assert own["pe"] == {"now": "30", "median_3y": "20", "median_5y": "20", "lower_3y": "2/3"}
     assert own["pb"] == {"now": "3", "median_3y": "2", "median_5y": "2", "lower_3y": "2/3"}
+
+
+def _banks(tmp_path, npls):
+    from investment_agent.market.financial_ratios import FinancialRatioStore
+    (tmp_path / "market-symbols.txt").write_text("VCB\n", encoding="utf-8")
+    (tmp_path / "industries.json").write_text(json.dumps({"as_of": "x", "source": "t", "level": 2, "sectors": {"VCB": "Ngân hàng"}}), encoding="utf-8")
+    (tmp_path / "hose-listing.json").write_text(json.dumps({"at": "t", "listing": {"symbols": list(npls), "icb_codes": {s: "8300" for s in npls},
+                                                                                  "icb_names": {"8300": "Ngân hàng"}}}), encoding="utf-8")
+    for sym, npl in npls.items():
+        FinancialRatioStore(tmp_path / "financial-ratios").save({"symbol": sym, "kind": "bank", "fetched_at": "2026-11-27T01:00:00+00:00",
+                                                                 "source": "vndirect:finfo", "quarters": {"2026-09-30": {"BAD_LOANS_RATIO_AQ": npl}}})
+
+
+def test_a_banks_ratios_carry_the_median_of_the_other_hose_banks(tmp_path):
+    _banks(tmp_path, {"VCB": "0.02", "ACB": "0.01", "BID": "0.03", "CTG": "0.05"})
+    c, clock = _app(tmp_path)
+    body = call(c, clock, "GET", "/internal/fairvalue/ratios/VCB").json()
+    sector = body["sector"]
+    assert sector["name"] == "Ngân hàng" and sector["quarter"] == "2026-09-30" and sector["peers"] == 3
+    assert sector["medians"]["BAD_LOANS_RATIO_AQ"] == "0.03" and sector["counts"]["BAD_LOANS_RATIO_AQ"] == 3
+    assert set(sector["medians"]) == {m["code"] for m in body["metrics"]}  # CASA, nhóm 2 included, with no median
+    assert sector["medians"]["CASA"] is None and sector["medians"]["GROUP2_RATIO"] is None
+
+
+def test_a_bank_with_too_few_others_reporting_gets_no_median(tmp_path):
+    _banks(tmp_path, {"VCB": "0.02", "ACB": "0.01"})
+    c, clock = _app(tmp_path)
+    assert call(c, clock, "GET", "/internal/fairvalue/ratios/VCB").json()["sector"] is None

@@ -50,3 +50,33 @@ def test_cli_financial_ratios_sync_reads_watchlist_and_sectors(tmp_path, capsys)
 def test_a_banks_year_end_car_is_fetched_with_its_ratios_to_check_vietcaps_but_not_shown_as_a_row():
     from investment_agent.market.financial_ratios import CODES, DISPLAY
     assert "BANK_CAR_AQ" in CODES["bank"] and "BANK_CAR_AQ" not in [code for code, _, _ in DISPLAY["bank"]]
+
+
+def _watch_ssi_fpt(root):
+    (root / "market-symbols.txt").write_text("SSI\nFPT\n", encoding="utf-8")
+    (root / "industries.json").write_text(json.dumps({"as_of": "2026-10-25", "source": "t", "level": 2,
+                                                     "sectors": {"SSI": "Dịch vụ tài chính", "FPT": "Công nghệ Thông tin"}}), encoding="utf-8")
+
+
+def _by_symbol(url):
+    symbol = url.split("code:")[1].split("~")[0]
+    return _page(symbol, [("2026-09-30", "ROAA_TR_AVG4Q", 0.01)])
+
+
+def test_cli_financial_ratios_sync_adds_every_hose_bank_to_the_watched_financials(tmp_path, capsys):
+    from investment_agent.cli import financial_ratios_sync
+    _watch_ssi_fpt(tmp_path)
+    (tmp_path / "hose-listing.json").write_text(json.dumps({"at": "t", "listing": {"symbols": ["VCB", "ACB", "FPT"],
+        "icb_codes": {"VCB": "8300", "ACB": "8300", "FPT": "9500"}, "icb_names": {"8300": "Ngân hàng", "9500": "Công nghệ Thông tin"}}}),
+        encoding="utf-8")
+    assert financial_ratios_sync(tmp_path, get=_by_symbol, today=date(2026, 11, 27)) == 0
+    assert json.loads(capsys.readouterr().out)["results"] == {"ACB": "ok", "SSI": "ok", "VCB": "ok"}
+    assert FinancialRatioStore(tmp_path / "financial-ratios").read("VCB")["kind"] == "bank"
+    assert FinancialRatioStore(tmp_path / "financial-ratios").read("SSI")["kind"] == "securities"
+
+
+def test_cli_financial_ratios_sync_without_a_listing_keeps_to_the_watched(tmp_path, capsys):
+    from investment_agent.cli import financial_ratios_sync
+    _watch_ssi_fpt(tmp_path)
+    assert financial_ratios_sync(tmp_path, get=_by_symbol, today=date(2026, 11, 27)) == 0
+    assert json.loads(capsys.readouterr().out)["results"] == {"SSI": "ok"}

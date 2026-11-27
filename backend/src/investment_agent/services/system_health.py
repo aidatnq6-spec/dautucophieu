@@ -31,6 +31,11 @@ SOURCES = ({"id": "prices", "label": "Giá VN-Index", "dir": None, "max_days": 6
            {"id": "financial-ratios", "label": "Chỉ số ngành", "dir": "financial-ratios", "max_days": 4},
            {"id": "valuation-check", "label": "Đối chiếu định giá (VNDirect)", "dir": "valuation-check", "max_days": 4},
            {"id": "bank-notes", "label": "Thuyết minh ngân hàng (Vietcap)", "dir": "bank-notes", "max_days": 10})
+# Kho theo phiên (owner, 27/11/2026): late when more than this many closed HOSE sessions have passed since the newest one with figures
+# (VNDirect posts tự doanh 3–4 sessions late), judged by sessions, not by when a file was written.
+SESSION_SOURCES = ({"id": "foreign", "label": "Khối ngoại theo phiên", "store": "foreign"},
+                   {"id": "proprietary", "label": "Tự doanh theo phiên", "store": "proprietary"})
+MAX_SESSIONS = 5
 _NAMED = re.compile(r"^(\S+) (.+?) exit=(\d+)(?:\s|$)")
 _BARE = re.compile(r"^(\S+) exit=(\d+)(?:\s|$)")
 _STAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T")
@@ -77,6 +82,26 @@ def _oldest_watched_ratios(data_dir: Path) -> datetime | None:
     folder = data_dir / "financial-ratios"
     times = [(folder / f"{s}.json").stat().st_mtime if (folder / f"{s}.json").is_file() else 0.0 for s in watched]
     return datetime.fromtimestamp(min(times), timezone.utc) if min(times) else None
+
+
+def _session_lag(data_dir: Path, folder: str, *, now: datetime) -> tuple[str | None, int]:
+    """The newest session with figures in data/<folder> and how many closed HOSE sessions have passed since it."""
+    from investment_agent.market.proprietary_history import CLOSED_AT, VN
+    from investment_agent.public_tools import _sessions
+    root, newest = data_dir / folder, None
+    for path in sorted(root.glob("*.json"), reverse=True) if root.is_dir() else []:
+        try:
+            if not json.loads(path.read_text(encoding="utf-8")).get("thieu"):
+                newest = path.stem
+                break
+        except (OSError, ValueError, AttributeError):
+            continue
+    if newest is None:
+        return None, 0
+    local = now.astimezone(VN)
+    sessions, _ = _sessions(datetime.fromisoformat(newest).date(), local.date(), data_dir)
+    closed = [d for d in sessions if d.isoformat() > newest and (d < local.date() or local.time() >= CLOSED_AT)]
+    return newest, len(closed)
 
 
 def _read_tail(path: Path) -> list[str] | None:
@@ -256,6 +281,13 @@ def health_report(data_dir: Path, *, now: datetime, calendar=None, config_dir: P
         if stale:
             problems.append({"id": f"source:{s['id']}", "label": s["label"],
                              "detail": "chưa có dữ liệu" if last is None else f"cập nhật lần cuối {_dmy(last)}, quá {s['max_days']} ngày"})
+    for s in SESSION_SOURCES:
+        newest, late = _session_lag(data_dir, s["store"], now=now)
+        stale = newest is None or late > MAX_SESSIONS
+        sources.append({"id": s["id"], "label": s["label"], "last": newest, "max_sessions": MAX_SESSIONS, "stale": stale})
+        if stale:
+            detail = "chưa có phiên nào có số" if newest is None else                 f"phiên mới nhất có số {_dmy(datetime.fromisoformat(newest))}, chậm {late} phiên (quá {MAX_SESSIONS} phiên)"
+            problems.append({"id": f"source:{s['id']}", "label": s["label"], "detail": detail})
     macro, known = macro_problems(data_dir, today=now.astimezone(timezone(timedelta(hours=7))).date())
     problems.extend(macro)
     lines = _read_tail(root / "logs" / "scheduler.log")

@@ -300,6 +300,9 @@ legend{font-weight:600;padding:0 6px}
   .trend-macd.changed,.trend-rsi.changed{animation:none}
 }
 .bm h3{font-size:15px;margin:14px 0 4px}.bm p{margin:4px 0}.bm-list{margin:4px 0;padding-left:18px}.bm-list li{margin:4px 0;overflow-wrap:anywhere}
+.bm-flows{display:grid;gap:8px;margin:8px 0}.bm-flow{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:12px}
+.bm-flow-value{font-size:1.15em;white-space:nowrap}.bm-flow-axis{stroke:var(--line,#8884);stroke-width:1}.bm-bar{fill:var(--muted,#888)}
+.bm-bar.positive{fill:var(--good)}.bm-bar.negative{fill:var(--bad)}
 .bm-sectors,.bm-tickers{list-style:none;margin:4px 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:4px 16px}
 .bm-tickers .pill{margin-left:6px}
 .brief-holdings td,.brief-holdings th{white-space:normal}

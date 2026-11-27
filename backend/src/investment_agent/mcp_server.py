@@ -94,7 +94,7 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
     def tu_doanh(so_phien: int = 60, ma: str | None = None) -> dict:
         """Tự doanh (công ty chứng khoán) trên HOSE theo số VNDirect công bố: so_phien phiên gần nhất có số (60 ≈ 3 tháng, 120 ≈ 6 tháng,
         tối đa 250). Không có ma: tổng mua, bán, ròng toàn sàn và 10 mã mua ròng, 10 mã bán ròng mạnh nhất theo giá trị. Có ma: từng phiên
-        của mã đó và tổng. Luôn có khoảng phiên, phiên thiếu và số phiên VNDirect đăng chậm."""
+        của mã đó và tổng. Luôn có khoảng phiên, phiên VNDirect thiếu số, phiên kho chưa tải và số phiên VNDirect đăng chậm."""
         return vn_times(data.tu_doanh(so_phien, ma))
 
     @tool

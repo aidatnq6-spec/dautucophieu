@@ -110,3 +110,18 @@ def test_cli_sync_prints_what_it_did(tmp_path, capsys):
                             now=EVENING, sleep=lambda s: None)
     out = json.loads(capsys.readouterr().out)
     assert code == 0 and out["fetched"] == 1 and out["due"] > 200  # a year of HOSE sessions
+
+
+def test_a_missing_vndirect_figure_is_never_stored_as_zero():
+    rows = json.loads(page("2026-11-23", [("FPT", 3e9, 1e9), ("SSI", 1e9, 2e9)]))["data"]
+    next(r for r in rows if r["code"] == "SSI")["buyingVal"] = None
+    rec = parse_session(json.dumps({"data": rows}), date(2026, 11, 23))
+    assert set(rec["stocks"]) == {"FPT"} and rec["bo_qua"] == ["SSI"] and rec["khop"] is False
+    next(r for r in rows if r["code"] == "VNINDEX")["sellingVal"] = None
+    gone = parse_session(json.dumps({"data": rows}), date(2026, 11, 23))
+    assert gone["thieu"] is True and "VNINDEX" in gone["ly_do"]
+
+
+def test_the_store_keeps_four_hundred_days_so_a_250_session_window_fits():
+    from investment_agent.market.proprietary_history import KEEP_DAYS
+    assert KEEP_DAYS >= 400

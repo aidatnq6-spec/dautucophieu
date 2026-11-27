@@ -20,19 +20,22 @@ from zoneinfo import ZoneInfo
 URL = "https://api-finfo.vndirect.com.vn/v4/proprietary_trading?q=floor:HOSE~date:{day}&size=9999"
 SOURCE = "vndirect:finfo"
 RETRY_SESSIONS = 20
-KEEP_DAYS = 370
+KEEP_DAYS = 400  # 250 sessions take about 365 days, and VNDirect posts some sessions late
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
 CLOSED_AT = dtime(15, 0)
 _DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _FIELDS = (("buy_volume", "buyingVol"), ("sell_volume", "sellingVol"), ("buy_value", "buyingVal"), ("sell_value", "sellingVal"))
 
 
-def _plain(value) -> str:
+def _plain(value) -> str | None:
+    """A figure as served, plain digits; None when VNDirect left it empty or unreadable (never stored as 0)."""
+    if value is None:
+        return None
     try:
-        d = Decimal(str(value if value is not None else 0))
+        d = Decimal(str(value))
     except InvalidOperation:
-        d = Decimal(0)
-    return format(d.normalize(), "f") if d.is_finite() else "0"
+        return None
+    return format(d.normalize(), "f") if d.is_finite() else None
 
 
 class ProprietaryStore:
@@ -70,10 +73,21 @@ def parse_session(text: str, day: date) -> dict:
     index = next((r for r in rows if r.get("code") == "VNINDEX" and r.get("type") == "INDEX"), None)
     if index is None:
         return {"date": day.isoformat(), "thieu": True}
-    stocks = {str(r["code"]).upper(): {k: _plain(r.get(src)) for k, src in _FIELDS} for r in rows if r.get("type") == "STOCK" and r.get("code")}
     total = {k: _plain(index.get(src)) for k, src in _FIELDS}
+    if None in total.values():
+        return {"date": day.isoformat(), "thieu": True, "ly_do": "Dòng VNINDEX của VNDirect thiếu số mua hoặc bán"}
+    stocks, skipped = {}, []
+    for r in rows:
+        if r.get("type") != "STOCK" or not r.get("code"):
+            continue
+        figures = {k: _plain(r.get(src)) for k, src in _FIELDS}
+        if None in figures.values():
+            skipped.append(str(r["code"]).upper())  # left out of every sum and named, never counted as 0
+        else:
+            stocks[str(r["code"]).upper()] = figures
     adds_up = all(sum((Decimal(s[k]) for s in stocks.values()), Decimal(0)) == Decimal(total[k]) for k in ("buy_value", "sell_value"))
-    return {"date": day.isoformat(), "source": SOURCE, "index": total, "stocks": stocks, "khop": bool(stocks) and adds_up}
+    out = {"date": day.isoformat(), "source": SOURCE, "index": total, "stocks": stocks, "khop": bool(stocks) and adds_up and not skipped}
+    return {**out, "bo_qua": sorted(skipped)} if skipped else out
 
 
 def sync_proprietary(data_dir: Path, *, get: Callable[[str], str], now: datetime, sessions: list[date], limit: int = 260,

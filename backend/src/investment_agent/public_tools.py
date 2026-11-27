@@ -272,12 +272,16 @@ class PublicData:
                     "mua_kl": _plain(got["buy_volume"]), "ban_kl": _plain(got["sell_volume"]), "rong_kl": _plain(got["buy_volume"] - got["sell_volume"])}
         kept = [records.get(d.isoformat()) for d in window]
         present = [r for r in kept if r and not r.get("thieu")]
-        span = {"so_phien": n, "tu": window[0].isoformat() if window else None, "den": newest.isoformat(), "phien_co_so": len(present),
-                "phien_thieu": [d.isoformat() for d, r in zip(window, kept) if not r or r.get("thieu")], "cham_phien": len(closed_after)}
+        span = {"so_phien": len(window), "so_phien_hoi": n, "tu": window[0].isoformat() if window else None, "den": newest.isoformat(),
+                "phien_co_so": len(present), "phien_thieu": [d.isoformat() for d, r in zip(window, kept) if r and r.get("thieu")],
+                "chua_hoi": [d.isoformat() for d, r in zip(window, kept) if not r], "cham_phien": len(closed_after)}
         head = {"nguon": "VNDirect (proprietary_trading, công khai)", "lay_luc": max((r.get("fetched_at") or "" for r in present), default=None),
                 "don_vi": "đồng (giá trị), cổ phiếu (khối lượng)", "khoang": span, "lich_kiem": calendars,
-                "luu_y": "Số VNDirect công bố theo phiên, giữ nguyên; phiên thiếu không được thay bằng phiên khác. VNDirect đăng chậm vài phiên "
-                         "(cham_phien). Mua, bán ròng không nói lên ý định hay tốt xấu."}
+                "luu_y": "Số VNDirect công bố theo phiên, giữ nguyên; phiên thiếu không được thay bằng phiên khác. phien_thieu: VNDirect không có "
+                         "số; chua_hoi: kho chưa tải phiên đó (ngoài khoảng lưu hoặc lượt tải lỗi). VNDirect đăng chậm vài phiên (cham_phien). "
+                         "toan_san lấy từ dòng VNINDEX, danh sách mã lấy từ từng mã: ở phien_khong_khop hai số này không khớp nhau, nêu rõ khi "
+                         "dùng. so_phien là số phiên thật của khoảng, có thể ít hơn so_phien_hoi khi lịch không đủ. Mua, bán ròng không nói lên "
+                         "ý định hay tốt xấu."}
         if symbol:
             rows, mine = [], []
             for d, r in zip(window, kept):

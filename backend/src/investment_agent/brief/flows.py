@@ -29,21 +29,20 @@ def _proprietary_net(record: dict) -> Decimal:
 
 
 def _flow(store, net, *, session_date: date, sessions: list[date], n: int, empty: str) -> dict:
-    def figures(day: date) -> dict | None:
+    def figure(day: date) -> Decimal | None:
+        """The session's net, None when it has no figures or its file cannot be read (that session only)."""
         try:
             record = store.read(day)
-        except (OSError, ValueError):
+            return net(record) if record and not record.get("thieu") else None
+        except Exception:  # noqa: BLE001 - a damaged file blanks its own session, never the row or the other row
             return None
-        return record if record and not record.get("thieu") else None
-    days = sorted(d for d in sessions if d <= session_date)
-    newest = next((d for d in reversed(days) if figures(d)), None)
+    days = sorted({d for d in sessions if d <= session_date} | {session_date})  # the brief's session counts even if the calendar lacks it
+    nets_by_day = {d: figure(d) for d in days[-(n + 60):]}
+    newest = next((d for d in reversed(days) if nets_by_day.get(d) is not None), None)
     if newest is None:
         return {"status": "missing", "reason": empty}
     window = [d for d in days if d <= newest][-n:]
-    nets = []
-    for d in window:
-        record = figures(d)
-        nets.append(net(record) if record else None)
+    nets = [nets_by_day.get(d) for d in window]
     known = [v for v in nets if v is not None]
     return {"status": "ok", "date": newest.isoformat(), "lag_sessions": sum(1 for d in days if d > newest), "net_bn": _bn(nets[-1]),
             "sum_bn": _bn(sum(known, Decimal(0))), "missing": len(nets) - len(known),

@@ -85,7 +85,7 @@ export function barHeights(bars: FlowBar[], height: number): ({ y: number; h: nu
 function FlowRows({ flows }: { flows: { foreign: Flow; proprietary: Flow } }) {
   const H = 28, W = 6;
   return <div className="bm-flows">{([["Khối ngoại ròng", flows.foreign], ["Tự doanh ròng", flows.proprietary]] as const).map(([label, f]) => {
-    if (f.status !== "ok") return <div className="bm-flow" key={label}><div><strong>{label}</strong><div className="caption">Chưa có số ({f.reason})</div></div></div>;
+    if (f.status !== "ok") return <div className="bm-flow" key={label}><div><strong>{label}</strong><div className="caption">{f.reason}</div></div></div>;
     const head = flowHead(f);
     return <div className="bm-flow" key={label}>
       <div><strong>{label}</strong><div className="caption">{head.sub}</div></div>

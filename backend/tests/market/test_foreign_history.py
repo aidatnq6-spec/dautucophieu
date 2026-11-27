@@ -59,3 +59,13 @@ def test_cli_foreign_sync_prints_what_it_did(tmp_path, capsys):
                         now=EVENING, sleep=lambda s: None)
     out = json.loads(capsys.readouterr().out)
     assert code == 0 and out["fetched"] == 1 and out["due"] > 200
+
+
+def test_a_session_whose_stocks_are_all_zero_is_missing_not_a_real_zero():
+    # VNDirect served 23/11/2026 (and 28/08/2026) with every stock at 0 while its VNINDEX row had 1,464 tỷ bought
+    zeros = json.loads(page("2026-11-23", [("FPT", 0, 0), ("HPG", 0, 0)]))
+    for r in zeros["data"]:
+        if r["type"] == "STOCK":
+            r["buyVol"] = r["sellVol"] = 0.0
+    rec = parse_foreign_session(json.dumps(zeros), date(2026, 11, 23))
+    assert rec["thieu"] is True and "bằng 0" in rec["ly_do"]

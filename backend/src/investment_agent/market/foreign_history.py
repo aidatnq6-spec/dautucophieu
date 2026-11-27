@@ -35,6 +35,8 @@ def parse_foreign_session(text: str, day: date) -> dict:
             stocks[str(r["code"]).upper()] = figures
     if not stocks:
         return {"date": day.isoformat(), "thieu": True}
+    if all(v == "0" for s in stocks.values() for v in s.values()):  # VNDirect's 23/11 and 28/08/2026: every stock 0, never a real session
+        return {"date": day.isoformat(), "thieu": True, "ly_do": "VNDirect trả mọi mã bằng 0 cho phiên này"}
     out = {"date": day.isoformat(), "source": SOURCE, "stocks": stocks}
     index = next((r for r in rows if r.get("code") == "VNINDEX" and r.get("type") == "INDEX"), None)
     if index is not None:

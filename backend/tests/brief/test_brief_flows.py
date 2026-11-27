@@ -75,3 +75,18 @@ def test_the_brief_view_carries_both_rows_and_a_broken_store_only_blanks_them(tm
     monkeypatch.setattr(flows, "net_flows", lambda *a, **k: 1 / 0)
     broken = market_for_session(tmp_path, set())("2026-11-26")
     assert broken is not None and broken["flows"]["foreign"]["status"] == "missing"
+
+
+def test_the_lag_counts_the_brief_session_even_when_the_calendar_has_not_got_it(tmp_path):
+    foreign(tmp_path, "2026-11-25", 1 * B)
+    f = net_flows(tmp_path, date(2026, 11, 26), [d for d in SESSIONS if d != date(2026, 11, 26)])["foreign"]
+    assert f["date"] == "2026-11-25" and f["lag_sessions"] == 1
+
+
+def test_one_damaged_file_blanks_its_own_session_only(tmp_path):
+    foreign(tmp_path, "2026-11-25", 1 * B)
+    write(tmp_path, "foreign", "2026-11-26", {"stocks": {"FPT": {"buy_value": None, "sell_value": "1"}}})
+    proprietary(tmp_path, "2026-11-26", 2 * B, 1 * B)
+    out = net_flows(tmp_path, date(2026, 11, 26), SESSIONS)
+    assert out["foreign"]["date"] == "2026-11-25" and out["foreign"]["bars"][-1]["net_bn"] == "1.00"
+    assert out["proprietary"]["net_bn"] == "1.00"

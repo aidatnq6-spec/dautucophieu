@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
 import { ApiError, api, requestId } from "../lib/api";
-import { formatRatio, formatVnd } from "../lib/format";
+import { formatRatio } from "../lib/format";
 
 type Row = { symbol: string; sector: string | null; held: boolean; reported: boolean; npat: string | null; yoy: string | null; qoq: string | null; ytd: string | null;
   ytd_yoy: string | null; plan_ratio: string | null; plan_label: string | null; forecast: string | null; vs_forecast: string | null; seasonal_share: string | null; review: string | null };

@@ -93,7 +93,7 @@ export function ThesisCatalysts<M extends Parts>({ model, save, busy, due, auto 
       {(list.length > 0 || auto.length > 0) && <CatalystTimeline label="Mốc và chất xúc tác" today={hanoiDate()} due={due}
         items={[...list, ...auto]} actions={(c) => c.auto ? <><span className="caption">Giữ làm mốc:</span>
           {(["+", "-", "?"] as const).map((sign) => <button key={sign} type="button" className="btn" aria-label={`Giữ mốc ${c.text} với dấu ${SIGN[sign]}`} disabled={busy}
-            onClick={() => { const { auto: _auto, ...kept } = c; void save({ ...model, catalysts: [...list, { ...kept, sign }] }); }}>{SIGN[sign]}</button>)}</> : <>
+            onClick={() => { const kept = { ...c }; delete kept.auto; void save({ ...model, catalysts: [...list, { ...kept, sign }] }); }}>{SIGN[sign]}</button>)}</> : <>
           <button type="button" className="btn" disabled={busy} onClick={() => void save({ ...model, catalysts: list.map((x) => (x.id === c.id ? { ...x, done: !x.done } : x)) })}>
             {c.done ? "Mở lại" : "Đã xảy ra"}</button>
           <button type="button" className="btn" aria-label={`Xóa mốc ${c.text}`} disabled={busy}

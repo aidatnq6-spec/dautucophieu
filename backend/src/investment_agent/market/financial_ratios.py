@@ -16,6 +16,8 @@ from typing import Callable
 from .leading import _get_with_retry
 
 KINDS = {"Ngân hàng": "bank", "Dịch vụ tài chính": "securities", "Bảo hiểm": "insurance"}
+# ICB level 4 "Dịch vụ đầu tư" (VNDirect): the HOSE securities firms, apart from other financial services such as EVF (27/11/2026)
+INVESTMENT_SERVICES = "8777"
 # Shown on the ticker page (Chỉ số ngành theo quý), in this order: code, label, format (pct1/pct2/times). The health score
 # (valuation/quality.py) uses a subset.
 DISPLAY = {

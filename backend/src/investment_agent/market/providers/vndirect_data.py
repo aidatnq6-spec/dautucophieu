@@ -14,6 +14,7 @@ from typing import Callable
 BASE = "https://api-finfo.vndirect.com.vn/v4/"
 LISTING_URL = BASE + "stocks?q=type:STOCK~floor:HOSE~status:LISTED&size=9999&fields=code,type,floor"
 INDUSTRY_URL = BASE + "industry_classification?q=industryLevel:2&size=100"
+INDUSTRY4_URL = BASE + "industry_classification?q=industryLevel:4&size=500"  # securities firms' peers (27/11/2026)
 BOARD_URL = (BASE + "stock_prices?q=floor:HOSE~date:gte:{start}~date:lte:{end}&size=9999"
              "&fields=code,date,basicPrice,close,nmVolume,nmValue,ceilingPrice,floorPrice,high,low")
 INDEX_LEVELS_URL = BASE + "vnmarket_prices?sort=date:desc&q=code:{index}~date:gte:{start}&size=10&fields=code,date,close"
@@ -62,7 +63,13 @@ def hose_listing(get: Callable[[str], str] = default_get, *, known_names: dict[s
         for symbol in str(row.get("codeList") or "").split(","):
             if symbol.strip().upper() in wanted:
                 codes[symbol.strip().upper()] = code
-    return {"symbols": symbols, "icb_codes": codes, "icb_names": {**names, **{c: n for c, n in (known_names or {}).items() if c in names}}}
+    level4 = {}
+    for row in _data(get, INDUSTRY4_URL):
+        for symbol in str(row.get("codeList") or "").split(","):
+            if symbol.strip().upper() in wanted and row.get("industryCode"):
+                level4[symbol.strip().upper()] = str(row["industryCode"])
+    return {"symbols": symbols, "icb_codes": codes, "icb_names": {**names, **{c: n for c, n in (known_names or {}).items() if c in names}},
+            "icb4_codes": level4}
 
 
 def price_board(symbols: list[str], get: Callable[[str], str] = default_get, *, today: date | None = None) -> list[dict]:

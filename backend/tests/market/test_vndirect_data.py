@@ -9,6 +9,9 @@ def fake_get(url: str) -> str:
     if "/stocks?" in url:
         return json.dumps({"data": [{"code": "FPT", "type": "STOCK", "floor": "HOSE"}, {"code": "HPG", "type": "STOCK", "floor": "HOSE"},
                                     {"code": "NEW", "type": "STOCK", "floor": "HOSE"}]})
+    if "industry_classification" in url and "industryLevel:4" in url:
+        return json.dumps({"data": [{"industryCode": "9537", "vietnameseName": "Phần mềm", "codeList": "FPT,CMG"},
+                                    {"industryCode": "1757", "vietnameseName": "Thép", "codeList": "HSG"}]})
     if "industry_classification" in url:
         return json.dumps({"data": [{"industryCode": "9500", "vietnameseName": "Công nghệ", "codeList": "FPT,CMG,ELC"},
                                     {"industryCode": "1700", "vietnameseName": "Tài nguyên", "codeList": "HPG,HSG"}]})
@@ -29,6 +32,7 @@ def test_the_hose_listing_has_symbols_level_two_codes_and_keeps_known_sector_nam
     assert out["symbols"] == ["FPT", "HPG", "NEW"]
     assert out["icb_codes"] == {"FPT": "9500", "HPG": "1700"}  # NEW has no sector yet
     assert out["icb_names"] == {"9500": "Công nghệ", "1700": "Tài nguyên Cơ bản"}
+    assert out["icb4_codes"] == {"FPT": "9537"}  # level 4 too, for the securities firms' peers (27/11/2026); HPG has none here
 
 
 def test_the_board_is_the_latest_session_in_the_units_the_brief_reads():

@@ -763,7 +763,7 @@ def financial_ratios_sync(data_dir: Path, get=None, today=None) -> int:
     """Exit 0 when every financial ticker asked (the watched ones and every HOSE bank) updated, 1 when some failed (each is reported)."""
     from datetime import datetime
     from zoneinfo import ZoneInfo
-    from investment_agent.market.financial_ratios import FinancialRatioStore, fetch_financial_ratios
+    from investment_agent.market.financial_ratios import INVESTMENT_SERVICES, FinancialRatioStore, fetch_financial_ratios
     from investment_agent.market.sectors import load_sectors
     from investment_agent.market.watchlist import load_watchlist
     if get is None:
@@ -779,9 +779,10 @@ def financial_ratios_sync(data_dir: Path, get=None, today=None) -> int:
     try:
         listing = json.loads((data_dir / "hose-listing.json").read_text(encoding="utf-8"))["listing"]
         banks = [s for s in listing["symbols"] if (listing.get("icb_names") or {}).get((listing.get("icb_codes") or {}).get(s)) == "Ngân hàng"]
+        brokers = [s for s in listing["symbols"] if (listing.get("icb4_codes") or {}).get(s) == INVESTMENT_SERVICES]  # and securities firms
     except (OSError, ValueError, KeyError, TypeError):
-        banks = []
-    watched = {**{s: "Ngân hàng" for s in banks}, **watched}
+        banks, brokers = [], []
+    watched = {**{s: "Ngân hàng" for s in banks}, **{s: "Dịch vụ tài chính" for s in brokers}, **watched}
     results = fetch_financial_ratios(FinancialRatioStore(data_dir / "financial-ratios"), watched, get=get,
                                      today=today or datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).date())
     failed = {k: v for k, v in results.items() if v != "ok"}
@@ -1943,7 +1944,7 @@ def brief_snapshot_cli(data_dir: Path, calendar_path: Path, *, listing=None, boa
     def cached_listing():
         try:
             saved = json.loads(cache.read_text(encoding="utf-8"))
-            if now - datetime.fromisoformat(saved["at"]) < timedelta(days=LISTING_MAX_AGE_DAYS) and "icb_codes" in saved["listing"]:
+            if now - datetime.fromisoformat(saved["at"]) < timedelta(days=LISTING_MAX_AGE_DAYS) and "icb4_codes" in saved["listing"]:  # level 4 since 27/11/2026
                 return saved["listing"]
         except (OSError, ValueError, KeyError, TypeError):
             pass

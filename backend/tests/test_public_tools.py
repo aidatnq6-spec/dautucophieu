@@ -383,7 +383,7 @@ def test_a_bank_set_against_the_other_hose_banks_on_the_same_quarter(data):
                    "phan_vi_25": "0.02", "phan_vi_75": "0.04", "so_doanh_nghiep": 3, "thu_hang": "3/4 (cao xuống thấp)"}
     assert [c["ma_chi_so"] for c in out["chi_so"]] == [code for code, _, _ in DISPLAY["bank"]]
     sec = data.so_sanh_nganh("SEC")
-    assert sec["thieu"] is True and "ngân hàng" in sec["ly_do"]
+    assert sec["thieu"] is True and "ICB cấp 4" in sec["ly_do"]  # securities firms compare on level 4 (27/11/2026)
 
 
 def test_general_ratios_warn_that_per_share_figures_use_vndirects_quarter_end_share_count(data):
@@ -470,3 +470,30 @@ def test_every_tool_answer_goes_through_vietnam_time():
     import re as _re
     source = (SRC / "mcp_server.py").read_text(encoding="utf-8")
     assert not _re.findall(r"^\s+return data\.", source, flags=_re.M)  # a new tool must wrap its answer in vn_times too
+
+
+def test_a_securities_firm_set_against_the_other_hose_investment_services_firms(data):
+    from investment_agent.market.financial_ratios import DISPLAY
+    syms = ["SSA", "SSB", "SSC", "SSD", "SSE", "EVX"]
+    write(data.root / "hose-listing.json", {"at": "t", "listing": {"symbols": syms, "icb_codes": {s: "8700" for s in syms},
+        "icb_names": {"8700": "Dịch vụ tài chính"}, "icb4_codes": {**{s: "8777" for s in syms[:5]}, "EVX": "8773"}}})
+    for sym, roe, q in (("SSA", "0.12", "2026-09-30"), ("SSB", "0.08", "2026-09-30"), ("SSC", "0.10", "2026-09-30"), ("SSD", "0.20", "2026-09-30"),
+                        ("SSE", "0.30", "2026-06-30"), ("EVX", "0.50", "2026-09-30")):  # SSE not out for Q3; EVX consumer finance, never a peer
+        write(data.root / "financial-ratios" / f"{sym}.json", {"symbol": sym, "kind": "securities", "fetched_at": "2026-11-27T01:00:00+00:00",
+                                                              "source": "vndirect:finfo", "quarters": {q: {"ROAE_TR_AVG4Q": roe}}})
+    out = data.so_sanh_nganh("SSA")
+    assert out["nganh"] == "Dịch vụ đầu tư (chứng khoán)" and out["ma_nganh"] == "8777" and out["quy"] == "2026-09-30"
+    assert out["so_doanh_nghiep_nganh"] == 4 and out["chua_co_quy_nay"] == 1
+    roe = next(c for c in out["chi_so"] if c["ma_chi_so"] == "ROAE_TR_AVG4Q")
+    assert roe["ten"] == "ROAE" and roe["trung_vi"] == "0.1" and roe["so_doanh_nghiep"] == 3 and roe["thu_hang"] == "2/4 (cao xuống thấp)"
+    assert [c["ma_chi_so"] for c in out["chi_so"]] == [code for code, _, _ in DISPLAY["securities"]]
+    assert "ICB cấp 4" in out["luu_y"] and "cấp 2" not in out["luu_y"]
+    evx = data.so_sanh_nganh("EVX")
+    assert evx["thieu"] is True and "Dịch vụ đầu tư" in evx["ly_do"]
+
+
+def test_a_securities_firm_without_level_four_codes_in_the_listing_says_so(data):
+    write(data.root / "hose-listing.json", {"at": "t", "listing": {"symbols": ["SSA"], "icb_codes": {"SSA": "8700"},
+                                                                  "icb_names": {"8700": "Dịch vụ tài chính"}}})
+    out = data.so_sanh_nganh("SSA")
+    assert out["thieu"] is True and "ICB cấp 4" in out["ly_do"]

@@ -9,6 +9,9 @@ def fake_get(url: str) -> str:
     if "/stocks?" in url:
         return json.dumps({"data": [{"code": "FPT", "type": "STOCK", "floor": "HOSE"}, {"code": "HPG", "type": "STOCK", "floor": "HOSE"},
                                     {"code": "NEW", "type": "STOCK", "floor": "HOSE"}]})
+    if "industry_classification" in url and "industryLevel:4" in url:
+        return json.dumps({"data": [{"industryCode": "9537", "vietnameseName": "Phần mềm", "codeList": "FPT,CMG"},
+                                    {"industryCode": "1757", "vietnameseName": "Thép", "codeList": "HSG"}]})
     if "industry_classification" in url:
         return json.dumps({"data": [{"industryCode": "9500", "vietnameseName": "Công nghệ", "codeList": "FPT,CMG,ELC"},
                                     {"industryCode": "1700", "vietnameseName": "Tài nguyên", "codeList": "HPG,HSG"}]})
@@ -29,6 +32,7 @@ def test_the_hose_listing_has_symbols_level_two_codes_and_keeps_known_sector_nam
     assert out["symbols"] == ["FPT", "HPG", "NEW"]
     assert out["icb_codes"] == {"FPT": "9500", "HPG": "1700"}  # NEW has no sector yet
     assert out["icb_names"] == {"9500": "Công nghệ", "1700": "Tài nguyên Cơ bản"}
+    assert out["icb4_codes"] == {"FPT": "9537"}  # level 4 too, for the securities firms' peers (27/11/2026); HPG has none here
 
 
 def test_the_board_is_the_latest_session_in_the_units_the_brief_reads():
@@ -122,3 +126,13 @@ def test_events_keep_one_copy_of_each_event_not_the_english_twin():
             {"id": "116624.EN_GB", "code": "KDH", "type": "STOCKDIV", "ratio": 10.0, "effectiveDate": "2024-10-17"},
             {"id": "a9", "code": "KDH", "type": "DIVIDEND", "dividend": 500.0, "effectiveDate": "2023-06-01"}]
     assert [r["id"] for r in events("KDH", get=lambda url: json.dumps({"data": rows}), today=date(2026, 11, 26))] == ["116624.VN", "a9"]
+
+
+def test_the_listing_keeps_its_level_two_codes_when_the_level_four_call_fails():
+    # level 4 only serves the securities firms' peers; it must never take the brief's board down (27/11/2026)
+    def get(url):
+        if "industryLevel:4" in url:
+            raise OSError("timeout")
+        return fake_get(url)
+    out = hose_listing(get=get)
+    assert out["icb_codes"] == {"FPT": "9500", "HPG": "1700"} and "icb4_codes" not in out  # absent: the next run fetches it again

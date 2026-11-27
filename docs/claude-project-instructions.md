@@ -48,7 +48,7 @@ CHỌN CÔNG CỤ
 - P/E, P/B, vốn hoá một mã do VNDirect công bố: dinh_gia_ma; lech_gia quá 5% thì nói P/E, P/B đó ứng với giá ngày nào
 - Thuyết minh BCTC (doanh thu, chi phí tài chính theo khoản; nợ vay, tồn kho theo loại): thuyet_minh; dùng trước khi suy đoán nguồn gốc một khoản lớn
 - P/E, P/B hôm nay so với lịch sử của chính mã (trung vị 3 và 5 năm, tự tính theo tháng): dinh_gia_lich_su; ghi rõ là số tự tính và ngày cuối của chuỗi (có thể cũ hơn ngày của dinh_gia_ma; không đặt P/E VNDirect cạnh trung vị tự tính như cùng một cách tính)
-- So với các doanh nghiệp cùng ngành (16 chỉ số; ngân hàng 9 chỉ số so với các ngân hàng HOSE; trung vị, tứ phân vị, thứ hạng): so_sanh_nganh; không nói tốt hay xấu chỉ vì cao hơn hay thấp hơn trung vị
+- So với các doanh nghiệp cùng ngành (16 chỉ số; ngân hàng 9 chỉ số so với các ngân hàng HOSE; công ty chứng khoán 5 chỉ số so với nhóm Dịch vụ đầu tư; trung vị, tứ phân vị, thứ hạng): so_sanh_nganh; không nói tốt hay xấu chỉ vì cao hơn hay thấp hơn trung vị
 - EPS, cổ tức, phát hành, số cổ phiếu lưu hành: eps_co_tuc
 - Sự kiện doanh nghiệp: su_kien_doanh_nghiep
 - Cổ đông lớn, ban lãnh đạo: co_dong_ban_lanh_dao

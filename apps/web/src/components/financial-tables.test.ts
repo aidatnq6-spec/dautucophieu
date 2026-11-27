@@ -114,7 +114,7 @@ it("P/E and P/B are set against the ticker's own 3- and 5-year medians, only whe
 it("the sector median column shows for general companies and banks only", () => {
   expect(showsSector("general")).toBe(true);
   expect(showsSector("bank")).toBe(true);
-  expect(showsSector("securities")).toBe(false);
+  expect(showsSector("securities")).toBe(true);  // against the other investment-services firms (27/11/2026)
   expect(showsSector("insurance")).toBe(false);
   expect(showsSector(undefined)).toBe(false);
 });
@@ -125,6 +125,9 @@ it("the median note names the peers and quarter, and for a bank why CASA and nh�
   expect(bank).toContain("trung vị của 21 doanh nghiệp cùng ngành Ngân hàng (ICB cấp 2, HOSE) có số ở quý Q3/26");
   expect(bank).toContain("CASA và tỷ lệ nợ nhóm 2 không có trung vị");
   expect(sectorNote({ kind: "general", sector: { ...sector, name: "Bất động sản" } })).not.toContain("CASA");
-  expect(sectorNote({ kind: "securities", sector })).toBeNull();
+  const broker = sectorNote({ kind: "securities", sector: { ...sector, name: "Dịch vụ đầu tư (chứng khoán)", peers: 20 } })!;
+  expect(broker).toContain("trung vị của 20 doanh nghiệp cùng ngành Dịch vụ đầu tư (chứng khoán) (ICB cấp 4, HOSE)");
+  expect(broker).not.toContain("CASA");
+  expect(sectorNote({ kind: "insurance", sector })).toBeNull();
   expect(sectorNote({ kind: "bank", sector: null })).toBeNull();
 });

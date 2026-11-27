@@ -80,3 +80,15 @@ def test_cli_financial_ratios_sync_without_a_listing_keeps_to_the_watched(tmp_pa
     _watch_ssi_fpt(tmp_path)
     assert financial_ratios_sync(tmp_path, get=_by_symbol, today=date(2026, 11, 27)) == 0
     assert json.loads(capsys.readouterr().out)["results"] == {"SSI": "ok"}
+
+
+def test_cli_financial_ratios_sync_adds_every_hose_investment_services_firm_but_not_other_financials(tmp_path, capsys):
+    from investment_agent.cli import financial_ratios_sync
+    _watch_ssi_fpt(tmp_path)
+    (tmp_path / "hose-listing.json").write_text(json.dumps({"at": "t", "listing": {"symbols": ["SSI", "VND", "EVF", "FPT"],
+        "icb_codes": {"SSI": "8700", "VND": "8700", "EVF": "8700", "FPT": "9500"},
+        "icb_names": {"8700": "Dịch vụ tài chính", "9500": "Công nghệ Thông tin"},
+        "icb4_codes": {"SSI": "8777", "VND": "8777", "EVF": "8773", "FPT": "9537"}}}), encoding="utf-8")
+    assert financial_ratios_sync(tmp_path, get=_by_symbol, today=date(2026, 11, 27)) == 0
+    assert json.loads(capsys.readouterr().out)["results"] == {"SSI": "ok", "VND": "ok"}
+    assert FinancialRatioStore(tmp_path / "financial-ratios").read("VND")["kind"] == "securities"

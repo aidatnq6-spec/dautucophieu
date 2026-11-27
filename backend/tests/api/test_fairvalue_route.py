@@ -573,7 +573,16 @@ def test_a_banks_ratios_carry_the_median_of_the_other_hose_banks(tmp_path):
     assert sector["medians"]["CASA"] is None and sector["medians"]["GROUP2_RATIO"] is None
 
 
-def test_a_bank_with_too_few_others_reporting_gets_no_median(tmp_path):
+def test_a_bank_with_too_few_others_reporting_gets_a_column_of_blanks(tmp_path):
+    # as the 26/11/2026 spec says for general companies: under 3 peers the median is "—", the column stays
     _banks(tmp_path, {"VCB": "0.02", "ACB": "0.01"})
+    c, clock = _app(tmp_path)
+    sector = call(c, clock, "GET", "/internal/fairvalue/ratios/VCB").json()["sector"]
+    assert sector["name"] == "Ngân hàng" and sector["peers"] == 1 and set(sector["medians"].values()) == {None}
+
+
+def test_a_bank_without_a_listed_sector_gets_no_column(tmp_path):
+    _banks(tmp_path, {"VCB": "0.02", "ACB": "0.01"})
+    (tmp_path / "hose-listing.json").unlink()
     c, clock = _app(tmp_path)
     assert call(c, clock, "GET", "/internal/fairvalue/ratios/VCB").json()["sector"] is None

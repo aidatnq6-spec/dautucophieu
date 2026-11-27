@@ -190,13 +190,11 @@ def _own_history(data_dir: Path, symbol: str) -> dict | None:
 def _sector_medians(data_dir: Path, symbol: str, rows: list[str], codes: tuple[str, ...] | None = None) -> dict | None:
     """Trung vị ngành of the table's rows, as so_sanh_nganh works them out (owner, 26/11/2026; banks 27/11/2026): codes are the ratios
     compared (None: the ticker's own set), rows every code of the table, those not compared (a bank's CASA, nhóm 2) given no median.
-    None when the ticker has no sector to compare or no ratio has enough peers."""
+    None when the ticker has no sector to compare; a ratio under 3 peers has no median ("—"), as the 26/11/2026 spec says."""
     out = compare_sector(data_dir, symbol, codes)
     if out.get("thieu"):
         return None
     medians = {c["ma_chi_so"]: c["trung_vi"] for c in out["chi_so"]}
-    if not any(v is not None for v in medians.values()):
-        return None
     counts = {c["ma_chi_so"]: c["so_doanh_nghiep"] for c in out["chi_so"]}
     return {"name": out["nganh"], "quarter": out["quy"], "peers": out["so_doanh_nghiep_nganh"] - out["chua_co_quy_nay"] - out["chua_co_chi_so"],
             "medians": {c: medians.get(c) for c in rows}, "counts": {c: counts.get(c, 0) for c in rows}}

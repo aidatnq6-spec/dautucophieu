@@ -34,6 +34,12 @@ def market_view(snapshot: dict | None, *, watched: list[str], held: set[str], ne
         news = {"status": "ok", "items": pick_news(news["items"], watched=watched, held=held, sector_names=sector_names, limit=news_limit)}
     view = {k: snapshot.get(k) for k in ("session_date", "updated_at", "indices", "hose", "proprietary")}
     view["board"] = {k: v for k, v in board.items() if k != "symbols"}
+    foreign = view["board"].get("foreign")
+    if foreign and not any(foreign.get(k) for k in ("buy_volume", "sell_volume")) \
+            and all(Decimal(str(foreign.get(k) or 0)) == 0 for k in ("buy_value_bn", "sell_value_bn")):
+        # VNDirect served 23/11/2026 with every stock's foreign trading at 0: no figures, never a real 0 (owner, 27/11/2026)
+        view["board"]["foreign"] = None
+        view["board"]["foreign_missing"] = "VNDirect trả mọi mã bằng 0 cho phiên này"
     for name in ("index_session", "hose_liquidity", "signals", "asia", "us", "shocks"):  # snapshots stored before 06/11/2026 (signals: 16/11, us and shocks: 21/11) lack them
         view[name] = snapshot.get(name) or {"status": "missing", "reason": "Ảnh chụp phiên này chưa có mục này"}
     view["recovery"] = recovery_checks(snapshot.get("index_session"), board)  # Bảng kiểm "Thị trường phục hồi"

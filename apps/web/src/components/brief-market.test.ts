@@ -50,3 +50,10 @@ it("draws the bars from a middle line on one scale, a missing session as no bar"
   expect(barHeights(bars, 20)).toEqual([{ y: 0, h: 10, tone: "positive" }, { y: 10, h: 5, tone: "negative" }, null, { y: 10, h: 0, tone: "" }]);
   expect(barHeights([{ date: "a", net_bn: "0.00" }], 20)).toEqual([{ y: 10, h: 0, tone: "" }]);  // all zero: no division by zero
 });
+
+it("a session VNDirect served with every stock's foreign trading at 0 shows why, not a zero", async () => {
+  const { foreignGap } = await import("./brief-market");
+  expect(foreignGap({ foreign: null, foreign_missing: "VNDirect trả mọi mã bằng 0 cho phiên này" }))
+    .toBe("Chưa có số liệu (VNDirect trả mọi mã bằng 0 cho phiên này).");
+  expect(foreignGap({ foreign: { net_value_bn: "1.00" } })).toBeNull();
+});

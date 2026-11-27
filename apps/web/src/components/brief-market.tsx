@@ -8,7 +8,7 @@ type IndexRow = { id: string; status: "ok"; close: string; change: string; pct: 
 type Foreign = { buy_volume: number; sell_volume: number; buy_value_bn: string; sell_value_bn: string; net_value_bn: string;
   top_sell: { symbol: string; net_value_bn: string }[]; top_buy: { symbol: string; net_value_bn: string }[] };
 type Board = { status: "ok"; value_matched_bn: string; volume_matched: number; breadth: { up: number; down: number; flat: number; no_trade: number };
-  foreign: Foreign; sectors: { sector: string; pct: string; count: number }[]; spread?: Spread } | Missing;
+  foreign: Foreign | null; foreign_missing?: string; sectors: { sector: string; pct: string; count: number }[]; spread?: Spread } | Missing;
 type Proprietary = { status: "ok"; source: string; date: string; lag_sessions: number; buy_volume: number; sell_volume: number;
   buy_value_bn: string; sell_value_bn: string; net_value_bn: string; top_sell: { symbol: string; net_value_bn: string }[] | null;
   top_buy: { symbol: string; net_value_bn: string }[] | null; top_reason?: string } | Missing;
@@ -62,6 +62,11 @@ export function proprietaryHead(p: { date: string; lag_sessions: number }): stri
   if (!p.lag_sessions) return "Tự doanh";
   const [y, m, d] = p.date.split("-");
   return `Tự doanh — phiên ${d}/${m}/${y} (VNDirect chậm ${p.lag_sessions} phiên)`;
+}
+
+/** Khối ngoại with no figures (VNDirect served every stock at 0, 27/11/2026): the reason, never a zero; null when there are figures. */
+export function foreignGap(b: { foreign: unknown; foreign_missing?: string }): string | null {
+  return b.foreign ? null : `Chưa có số liệu (${b.foreign_missing ?? "không rõ lý do"}).`;
 }
 
 /** A flow row's figure and caption: its own session (with the lag when VNDirect is late), the 20 sessions' sum, missing sessions. */
@@ -181,10 +186,12 @@ export function BriefMarket({ market, session }: { market: MarketSection | null;
           <span className="caption"> · mọi mã HOSE có giao dịch, cùng trọng số; VN-Index tính theo vốn hóa</span></p>}
         {market.flows && <FlowRows flows={market.flows} />}
         <h3>Khối ngoại</h3>
-        <p>Mua {num(board.foreign.buy_volume, 0)} cp / {num(board.foreign.buy_value_bn)} tỷ · Bán {num(board.foreign.sell_volume, 0)} cp /{" "}
-          {num(board.foreign.sell_value_bn)} tỷ · Ròng <strong className={tone(board.foreign.net_value_bn)}>{signed(board.foreign.net_value_bn)} tỷ</strong></p>
-        {board.foreign.top_sell.length > 0 && <p>Bán ròng mạnh: {board.foreign.top_sell.map((x) => `${x.symbol} ${signed(x.net_value_bn)} tỷ`).join("; ")}</p>}
-        {board.foreign.top_buy.length > 0 && <p>Mua ròng mạnh: {board.foreign.top_buy.map((x) => `${x.symbol} ${signed(x.net_value_bn)} tỷ`).join("; ")}</p>}
+        {board.foreign ? <>
+          <p>Mua {num(board.foreign.buy_volume, 0)} cp / {num(board.foreign.buy_value_bn)} tỷ · Bán {num(board.foreign.sell_volume, 0)} cp /{" "}
+            {num(board.foreign.sell_value_bn)} tỷ · Ròng <strong className={tone(board.foreign.net_value_bn)}>{signed(board.foreign.net_value_bn)} tỷ</strong></p>
+          {board.foreign.top_sell.length > 0 && <p>Bán ròng mạnh: {board.foreign.top_sell.map((x) => `${x.symbol} ${signed(x.net_value_bn)} tỷ`).join("; ")}</p>}
+          {board.foreign.top_buy.length > 0 && <p>Mua ròng mạnh: {board.foreign.top_buy.map((x) => `${x.symbol} ${signed(x.net_value_bn)} tỷ`).join("; ")}</p>}
+        </> : <p className="muted">{foreignGap(board)}</p>}
         {hose.status === "ok" && <p className="caption">HOSE công bố: mua {num(hose.foreign.buy_value_bn)} tỷ · bán {num(hose.foreign.sell_value_bn)} tỷ ·
           ròng {signed(hose.foreign.net_value_bn)} tỷ.</p>}
       </> : <><Gap what="Giá trị giao dịch, độ rộng, khối ngoại và ngành" section={board} />

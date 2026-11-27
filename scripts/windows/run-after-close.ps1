@@ -127,6 +127,9 @@ if ((Get-Date).Hour -ge 20) {
     # Tu doanh theo phien: HOSE proprietary trading of each session VNDirect has posted, about a year kept (one call a session), for tu_doanh.
     $pt = & $python -W ignore -m investment_agent.jobs.step proprietary-sync --data-dir $data --limit 260 2>$null
     "$(Get-Date -Format o) proprietary-sync exit=$LASTEXITCODE $pt" | Add-Content -LiteralPath $log -Encoding UTF8
+    # Khoi ngoai theo phien: HOSE foreign trading of each session (one call a session), about a year, for the brief's 20 sessions.
+    $fs = & $python -W ignore -m investment_agent.jobs.step foreign-sync --data-dir $data --limit 260 2>$null
+    "$(Get-Date -Format o) foreign-sync exit=$LASTEXITCODE $fs" | Add-Content -LiteralPath $log -Encoding UTF8
     # Lich su dinh gia cua ma: statements and unadjusted closes of 60 HOSE tickers a night (all within a week), so dinh_gia_lich_su and
     # the P/E, P/B so voi lich su cards on Bang so tai chinh stay current.
     $ih = & $python -W ignore -m investment_agent.jobs.step index-history-sync --data-dir $data --limit 60 2>$null

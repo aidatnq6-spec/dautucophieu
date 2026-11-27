@@ -38,9 +38,12 @@ def _plain(value) -> str | None:
     return format(d.normalize(), "f") if d.is_finite() else None
 
 
-class ProprietaryStore:
+class SessionStore:
+    """One JSON file per HOSE session under data/<folder>: tự doanh here, khối ngoại in foreign_history."""
+    folder = "proprietary"
+
     def __init__(self, data_dir: Path):
-        self.root = Path(data_dir) / "proprietary"
+        self.root = Path(data_dir) / self.folder
 
     def _path(self, day) -> Path:
         key = day.isoformat() if isinstance(day, date) else str(day)
@@ -68,6 +71,10 @@ class ProprietaryStore:
                 self._path(day).unlink(missing_ok=True)
 
 
+class ProprietaryStore(SessionStore):
+    folder = "proprietary"
+
+
 def parse_session(text: str, day: date) -> dict:
     rows = [r for r in json.loads(text).get("data") or [] if str(r.get("date"))[:10] == day.isoformat() and r.get("floor") == "HOSE"]
     index = next((r for r in rows if r.get("code") == "VNINDEX" and r.get("type") == "INDEX"), None)
@@ -92,8 +99,14 @@ def parse_session(text: str, day: date) -> dict:
 
 def sync_proprietary(data_dir: Path, *, get: Callable[[str], str], now: datetime, sessions: list[date], limit: int = 260,
                      sleep: Callable[[float], None] = time.sleep, pace: float = 0.5) -> dict:
-    """sessions: HOSE sessions of the window, any order. Newest first; one call per session."""
-    store, local = ProprietaryStore(data_dir), now.astimezone(VN)
+    return sync_sessions(ProprietaryStore(data_dir), url=URL, parse=parse_session, get=get, now=now, sessions=sessions, limit=limit,
+                         sleep=sleep, pace=pace)
+
+
+def sync_sessions(store: SessionStore, *, url: str, parse: Callable[[str, date], dict], get: Callable[[str], str], now: datetime,
+                  sessions: list[date], limit: int = 260, sleep: Callable[[float], None] = time.sleep, pace: float = 0.5) -> dict:
+    """sessions: HOSE sessions of the window, any order. Newest first; one call per session (url has {day})."""
+    local = now.astimezone(VN)
     newest = sorted((d for d in set(sessions) if d < local.date() or (d == local.date() and local.time() >= CLOSED_AT)), reverse=True)
     recent = set(newest[:RETRY_SESSIONS])
     due = []
@@ -107,7 +120,7 @@ def sync_proprietary(data_dir: Path, *, get: Callable[[str], str], now: datetime
         if i:
             sleep(pace)
         try:
-            record = parse_session(get(URL.format(day=day.isoformat())), day)
+            record = parse(get(url.format(day=day.isoformat())), day)
         except Exception as exc:  # noqa: BLE001 - one session failing never stops the others; it is reported
             failed[day.isoformat()] = f"error:{type(exc).__name__}"
             continue

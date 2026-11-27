@@ -11,12 +11,14 @@ $updateName = 'InvestmentAgent-Update'
 $updateArgument = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$(Join-Path $PSScriptRoot 'update-app.ps1')`""
 $alertsName = 'InvestmentAgent-Alerts'
 $alertsArgument = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$(Join-Path $PSScriptRoot 'run-alerts.ps1')`""
+$mcpName = 'InvestmentAgent-McpRemote'
+$mcpArgument = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$(Join-Path $PSScriptRoot 'run-mcp-remote.ps1')`""
 
 if ($Unregister) {
-    foreach ($n in $name, $updateName, $alertsName) {
+    foreach ($n in $name, $updateName, $alertsName, $mcpName) {
         if (Get-ScheduledTask -TaskName $n -ErrorAction SilentlyContinue) { Unregister-ScheduledTask -TaskName $n -Confirm:$false }
     }
-    Write-Host "Đã gỡ $name, $updateName và $alertsName (nếu có)."
+    Write-Host "Đã gỡ $name, $updateName, $alertsName và $mcpName (nếu có)."
     return
 }
 
@@ -25,6 +27,7 @@ Write-Host "Lệnh: powershell.exe $argument"
 Write-Host "Kích hoạt: hằng ngày lúc $($times -join ', ') (giờ máy, cần đặt múi giờ Asia/Ho_Chi_Minh) và khi đăng nhập (chạy bù)."
 Write-Host "Tác vụ: $updateName — 10 phút một lần và khi đăng nhập: khi main trên GitHub có bản mới thì kéo về, build và khởi động lại ứng dụng (chỉ khi thư mục đang ở main, không có thay đổi chưa commit)."
 Write-Host "Tác vụ: $alertsName — 5 phút một lần từ 09:00 đến 16:35 mỗi ngày: cảnh báo giá trong phiên (ngoài phiên lệnh tự bỏ qua) và kiểm tra bản tin sau phiên đã gửi chưa."
+Write-Host "Tác vụ: $mcpName — khi đăng nhập: chạy MCP dữ liệu công khai từ xa trên 127.0.0.1:8770 cho Tailscale Funnel (chỉ khi .env.local có MCP_REMOTE_SECRET), tự chạy lại khi dừng."
 if (-not $Register) { Write-Host 'Chưa đăng ký. Chạy lại với -Register sau khi cấu hình xong.'; return }
 
 $calendars = @('data\trading-calendar.json', "config\trading-calendar-hose-$((Get-Date).Year).json")
@@ -59,3 +62,11 @@ $alertsSettings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -Exe
 Register-ScheduledTask -TaskName $alertsName -Action $alertsAction -Trigger $alertsTrigger -Settings $alertsSettings `
     -Description 'Cảnh báo giá trong phiên qua Telegram' -Force -ErrorAction Stop | Out-Null
 Write-Host "Đã đăng ký $alertsName. Nhật ký: logs\scheduler.log (dòng price-alerts)."
+
+# MCP dữ liệu công khai từ xa (27/11/2026): one long-running process from logon, restarted every minute if it stops, never time-limited.
+$mcpAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $mcpArgument -WorkingDirectory $script:RepoRoot
+$mcpTrigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+$mcpSettings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
+Register-ScheduledTask -TaskName $mcpName -Action $mcpAction -Trigger $mcpTrigger -Settings $mcpSettings `
+    -Description 'MCP dữ liệu công khai từ xa cho claude.ai (qua Tailscale Funnel)' -Force -ErrorAction Stop | Out-Null
+Write-Host "Đã đăng ký $mcpName. Nhật ký: logs\mcp-remote.log."

@@ -351,3 +351,17 @@ def test_valuation_history_counts_tickers_past_fourteen_days_and_alerts_only_fro
     late = health_report(data, now=datetime(2026, 12, 5, 1, 0, tzinfo=timezone.utc))
     problem = next(p for p in late["problems"] if p["id"] == "source:index-history")
     assert "mã quá 14 ngày" in problem["detail"]
+
+
+def test_the_remote_connector_is_checked_only_when_it_is_set_up(tmp_path):
+    data = healthy(tmp_path)
+    assert not any(s["id"] == "mcp-remote" for s in health_report(data, now=NOW, env={})["sources"])
+    asked = []
+    down = health_report(data, now=NOW, env={"MCP_REMOTE_SECRET": "s" * 40}, probe=lambda url: asked.append(url) or False)
+    assert asked == [f"http://127.0.0.1:8770/{'s' * 40}/healthz"]
+    row = next(s for s in down["sources"] if s["id"] == "mcp-remote")
+    assert row["stale"] is True and row["label"] == "Kết nối từ xa"
+    assert next(p for p in down["problems"] if p["id"] == "source:mcp-remote")["detail"].startswith("không trả lời")
+    up = health_report(data, now=NOW, env={"MCP_REMOTE_SECRET": "s" * 40}, probe=lambda url: True)
+    assert next(s for s in up["sources"] if s["id"] == "mcp-remote")["stale"] is False
+    assert "s" * 40 not in str(up)  # the secret never appears in the report

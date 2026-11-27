@@ -27,7 +27,7 @@ export function SystemHealth() {
         <p className="caption">Lượt sau phiên xong gần nhất: {when(h.last_finish)} · Diễn tập khôi phục: {h.drill ? `${when(h.drill.at)}, ${h.drill.ok ? `đạt (${h.drill.files} tệp)` : "không đạt"}` : "chưa có"}</p>
         <div className="tablewrap"><table aria-label="Độ mới của dữ liệu">
           <thead><tr><th>Nguồn</th><th>Cập nhật lần cuối</th><th className="num">Cho phép</th><th>Trạng thái</th></tr></thead>
-          <tbody>{h.sources.map((s) => <tr key={s.id}><td>{s.label}{s.over ? <span className="caption"> · {s.over} mã quá hạn, cũ nhất {s.oldest}</span> : null}</td><td>{when(s.last)}</td><td className="num">{s.max_sessions ? `${s.max_sessions} phiên` : `${s.max_days} ngày`}</td><td className={s.stale ? "negative" : "positive"}>{s.stale ? "Quá hạn" : "Mới"}</td></tr>)}</tbody>
+          <tbody>{h.sources.map((s) => <tr key={s.id}><td>{s.label}{s.over ? <span className="caption"> · {s.over} mã quá hạn, cũ nhất {s.oldest}</span> : null}</td><td>{when(s.last)}</td><td className="num">{s.max_sessions ? `${s.max_sessions} phiên` : s.max_days ? `${s.max_days} ngày` : "—"}</td><td className={s.stale ? "negative" : "positive"}>{s.stale ? "Quá hạn" : "Mới"}</td></tr>)}</tbody>
         </table></div>
         <details className="mc-table"><summary>Các bước tự động ({h.steps.length})</summary>
           <div className="tablewrap"><table aria-label="Các bước tự động">

@@ -66,3 +66,13 @@ def test_a_new_secret_goes_into_env_local_without_being_printed(tmp_path, capsys
     assert lines[0] == "TELEGRAM_BOT_TOKEN=keep" and sum(l.startswith("MCP_REMOTE_SECRET=") for l in lines) == 1
     new = next(l for l in lines if l.startswith("MCP_REMOTE_SECRET="))[len("MCP_REMOTE_SECRET="):]
     assert new != "old" and len(new) >= 32 and new not in capsys.readouterr().out
+
+
+def test_a_windows_task_starts_the_remote_server_at_logon_and_restarts_it():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2] / "scripts" / "windows"
+    run = (root / "run-mcp-remote.ps1").read_text(encoding="utf-8-sig")
+    assert "Import-LocalEnv" in run and "investment_agent.mcp_remote" in run and "MCP_REMOTE_SECRET" in run
+    tasks = (root / "register-tasks.ps1").read_text(encoding="utf-8-sig")
+    assert "InvestmentAgent-McpRemote" in tasks and "run-mcp-remote.ps1" in tasks and "-RestartCount" in tasks
+    assert "$mcpName" in tasks.split("if ($Unregister)")[1].split("return")[0]  # unregistered with the others

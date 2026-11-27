@@ -164,13 +164,14 @@ def test_server_exposes_exactly_the_approved_read_only_tools(data):
     assert "Ngân hàng" in result.content[0].text
 
 
-@pytest.mark.parametrize("module", ["public_tools.py", "mcp_server.py"])
+@pytest.mark.parametrize("module", ["public_tools.py", "mcp_server.py", "mcp_remote.py"])
 def test_server_code_never_imports_personal_data(module):
     tree = ast.parse((SRC / module).read_text(encoding="utf-8"))
     names = [a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names]
     names += [n.module or "" for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)]
     project = [m for m in names if m.startswith("investment_agent")]
-    assert project and all(m.startswith(("investment_agent.market", "investment_agent.public_tools")) for m in project), project
+    # mcp_remote serves mcp_server over HTTP; mcp_server is itself checked here
+    assert project and all(m.startswith(("investment_agent.market", "investment_agent.public_tools", "investment_agent.mcp_server")) for m in project), project
     assert not any(m.startswith(("investment_agent.market.watchlist", "firebase", "google")) for m in names)
 
 

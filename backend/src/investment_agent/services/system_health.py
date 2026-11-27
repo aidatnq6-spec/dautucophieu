@@ -266,7 +266,15 @@ def macro_problems(data_dir: Path, *, today) -> tuple[list[dict], list[dict]]:
     return out, known
 
 
-def health_report(data_dir: Path, *, now: datetime, calendar=None, config_dir: Path | None = None) -> dict:
+def _probe(url: str) -> bool:
+    import httpx
+    try:
+        return httpx.get(url, timeout=3).text == "ok"
+    except Exception:  # noqa: BLE001 - not answering is the finding
+        return False
+
+
+def health_report(data_dir: Path, *, now: datetime, calendar=None, config_dir: Path | None = None, env=None, probe=_probe) -> dict:
     from investment_agent.domain.pinned import CONFIG_DIR
     data_dir = Path(data_dir)
     root = data_dir.parent
@@ -293,6 +301,13 @@ def health_report(data_dir: Path, *, now: datetime, calendar=None, config_dir: P
             detail = "chưa có phiên nào có số" if newest is None else                 f"phiên mới nhất có số {_dmy(datetime.fromisoformat(newest))}, chậm {late} phiên (quá {MAX_SESSIONS} phiên)"
             problems.append({"id": f"source:{s['id']}", "label": s["label"], "detail": detail})
     aware = now if now.tzinfo else now.replace(tzinfo=timezone.utc)  # some callers pass a naive UTC time
+    secret = (os.environ if env is None else env).get("MCP_REMOTE_SECRET")
+    if secret:  # Kết nối từ xa (owner, 27/11/2026): only once it is set up; the secret never enters the report
+        alive = probe(f"http://127.0.0.1:8770/{secret}/healthz")
+        sources.append({"id": "mcp-remote", "label": "Kết nối từ xa", "last": aware.isoformat() if alive else None, "max_days": 0, "stale": not alive})
+        if not alive:
+            problems.append({"id": "source:mcp-remote", "label": "Kết nối từ xa",
+                             "detail": "không trả lời trên máy (tác vụ InvestmentAgent-McpRemote); claude.ai trên web và điện thoại không gọi được dữ liệu"})
     times = {p.stem: datetime.fromtimestamp(p.stat().st_mtime, timezone.utc) for p in (data_dir / "index-history").glob("*.json")}         if (data_dir / "index-history").is_dir() else {}
     over = sorted((t, s) for s, t in times.items() if aware - t > timedelta(days=HISTORY_MAX_DAYS))
     oldest = min(times.items(), key=lambda kv: kv[1]) if times else None

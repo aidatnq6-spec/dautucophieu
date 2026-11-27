@@ -63,4 +63,7 @@ def test_2026_calendar_matches_hose_notice():
     assert not any(cal.is_session(d) for d in closed)
     assert all(cal.is_session(d) for d in (date(2026, 1, 5), date(2026, 2, 23), date(2026, 5, 4), date(2026, 9, 3)))
     holidays_on_weekdays = [d for d in cal.holidays if d.weekday() < 5]
-    assert len(holidays_on_weekdays) == 13
+    assert len(holidays_on_weekdays) == 14
+    # Ngày Văn hóa Việt Nam (Nghị quyết 28/2026/QH16), added by HOSE on 11/11/2026: no source had a session that day
+    assert not cal.is_session(date(2026, 11, 24)) and cal.is_session(date(2026, 11, 23)) and cal.is_session(date(2026, 11, 25))
+    assert cal.version == "hose-2026.3"

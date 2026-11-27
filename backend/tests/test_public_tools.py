@@ -515,7 +515,7 @@ def test_tu_doanh_sums_the_sessions_up_to_the_newest_stored_and_names_the_strong
     _prop(data, "2026-11-23", [("FPT", 3, 0), ("HPG", 0, 2), ("VNM", 2, 2)])
     out = data.tu_doanh(so_phien=3, now=TU_DOANH_NOW)
     assert out["khoang"] == {"so_phien": 3, "so_phien_hoi": 3, "tu": "2026-11-19", "den": "2026-11-23", "phien_co_so": 2,
-                             "phien_thieu": ["2026-11-20"], "chua_hoi": [], "phien_hong": [], "cham_phien": 4}  # 24, 25, 26, 27/11 closed with no figures yet
+                             "phien_thieu": ["2026-11-20"], "chua_hoi": [], "phien_hong": [], "cham_phien": 3}  # 25, 26, 27/11 closed with no figures yet (24/11: holiday)
     assert out["toan_san"]["mua_gt"] == "11" and out["toan_san"]["ban_gt"] == "9" and out["toan_san"]["rong_gt"] == "2"
     assert [x["ma"] for x in out["mua_rong_manh"]] == ["FPT"] and out["mua_rong_manh"][0] == {
         "ma": "FPT", "mua_gt": "8", "ban_gt": "1", "rong_gt": "7", "mua_kl": "20", "ban_kl": "8", "rong_kl": "12", "so_phien": 2}
@@ -566,7 +566,7 @@ def test_khoi_ngoai_totals_are_the_sum_of_the_stocks_with_the_same_window_as_tu_
     write(data.root / "foreign" / "2026-11-20.json", {"date": "2026-11-20", "thieu": True, "ly_do": "VNDirect trả mọi mã bằng 0 cho phiên này"})
     _foreign(data, "2026-11-23", [("FPT", 3, 0), ("HPG", 0, 2)])
     out = data.khoi_ngoai(so_phien=3, now=TU_DOANH_NOW)
-    assert out["khoang"]["phien_thieu"] == ["2026-11-20"] and out["khoang"]["cham_phien"] == 4 and out["khoang"]["so_phien"] == 3
+    assert out["khoang"]["phien_thieu"] == ["2026-11-20"] and out["khoang"]["cham_phien"] == 3 and out["khoang"]["so_phien"] == 3
     assert out["toan_san"] == {"mua_gt": "9", "ban_gt": "7", "rong_gt": "2", "mua_kl": "40", "ban_kl": "16", "rong_kl": "24"}
     assert [x["ma"] for x in out["mua_rong_manh"]] == ["FPT"] and [x["ma"] for x in out["ban_rong_manh"]] == ["SSI", "HPG"]
     assert "phien_khong_khop" not in out and out["nguon"].startswith("VNDirect (foreigns")
@@ -653,7 +653,7 @@ def test_cung_chieu_gives_the_tickers_both_bought_or_both_sold_over_the_sessions
     _prop(data, "2026-11-19", [("VPB", 2, 0), ("MCH", 0, 1), ("FPT", 0, 1)])
     out = data.cung_chieu(so_phien=2, now=TU_DOANH_NOW)
     assert out["khoang"]["tu"] == "2026-11-18" and out["khoang"]["den"] == "2026-11-19" and out["khoang"]["phien_bo"] == 1
-    assert out["khoang"]["cham_phien"] == 6  # 20, 23–27/11 closed after the newest session both stores have
+    assert out["khoang"]["cham_phien"] == 5  # 20, 23, 25–27/11 closed after the newest session both stores have (24/11: holiday)
     assert out["cung_mua_rong"] == [{"ma": "VPB", "ngoai_rong_gt": "5", "tu_doanh_rong_gt": "2"}]
     assert out["cung_ban_rong"] == [{"ma": "MCH", "ngoai_rong_gt": "-4", "tu_doanh_rong_gt": "-1"}]
     assert out["don_vi"].startswith("đồng") and "watched" not in str(out)

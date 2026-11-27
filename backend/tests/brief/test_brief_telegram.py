@@ -168,3 +168,10 @@ def test_tu_doanh_of_the_session_itself_says_no_lag_and_a_missing_one_says_why()
     assert "Tự doanh: mua 874,62 tỷ · bán 517,11 tỷ · ròng +357,51 tỷ" in text and "Tự doanh bán ròng" not in text
     gone = render_report(REPORT, market={**MARKET, "proprietary": {"status": "missing", "reason": "VNDirect chưa có số tự doanh"}})
     assert "Tự doanh: chưa có số liệu (VNDirect chưa có số tự doanh)" in gone
+
+
+def test_a_board_without_foreign_figures_says_so_in_the_short_brief():
+    board = {**MARKET["board"], "foreign": None, "foreign_missing": "VNDirect trả mọi mã bằng 0 cho phiên này"}
+    text = render_report(REPORT, market={**MARKET, "board": board})
+    assert "Khối ngoại: chưa có số liệu (VNDirect trả mọi mã bằng 0 cho phiên này)" in text and "Bán ròng mạnh" not in text
+    assert "Độ rộng: 107 tăng" in text  # the rest of the board stays

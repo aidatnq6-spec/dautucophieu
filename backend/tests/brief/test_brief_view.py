@@ -79,3 +79,13 @@ def test_the_shock_line_of_the_snapshot_is_shown_with_the_markets():
     assert view["shock_line"].startswith("Cú sốc hôm nay: VN-Index giảm 5 phiên liền.")
     assert view["shocks"] == shocks  # Telegram renders from this view
     assert market_view(SNAP, watched=[], held=set())["shock_line"] is None  # snapshots stored before 21/11/2026
+
+
+def test_a_session_whose_foreign_figures_are_all_zero_shows_no_figures_not_a_zero():
+    # VNDirect served 23/11/2026 with every stock's foreign trading at 0 (its VNINDEX row and HOSE had real figures)
+    zero = {"buy_volume": 0, "sell_volume": 0, "buy_value_bn": "0.00", "sell_value_bn": "0.00", "net_value_bn": "0.00", "top_sell": [], "top_buy": []}
+    snap = {"session_date": "2026-11-23", "board": {"status": "ok", "symbols": {}, "foreign": zero, "breadth": {}, "sectors": []}}
+    v = market_view(snap, watched=[], held=set())
+    assert v["board"]["foreign"] is None and "bằng 0" in v["board"]["foreign_missing"]
+    real = market_view({**snap, "board": {**snap["board"], "foreign": {**zero, "buy_value_bn": "1.00", "net_value_bn": "1.00"}}}, watched=[], held=set())
+    assert real["board"]["foreign"]["net_value_bn"] == "1.00" and "foreign_missing" not in real["board"]

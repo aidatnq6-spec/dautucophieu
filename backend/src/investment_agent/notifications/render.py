@@ -189,12 +189,14 @@ def render_market_brief(report: dict, market: dict) -> str:
             lines.append(spread)
         if (recovery := market.get("recovery") or {}).get("status") == "ok":
             lines.append(_recovery_line(recovery))
-        lines += [
-                  f"Khối ngoại: mua {_num(f['buy_value_bn'])} tỷ · bán {_num(f['sell_value_bn'])} tỷ · ròng {_num(f['net_value_bn'], sign=True)} tỷ"]
-        if f["top_sell"]:
-            lines.append("Bán ròng mạnh: " + "; ".join(f"{x['symbol']} {_num(x['net_value_bn'], sign=True)} tỷ" for x in f["top_sell"]))
-        if f["top_buy"]:
-            lines.append("Mua ròng mạnh: " + "; ".join(f"{x['symbol']} {_num(x['net_value_bn'], sign=True)} tỷ" for x in f["top_buy"]))
+        if f is None:  # VNDirect served every stock at 0 (brief.view): no figures, never a real 0
+            lines.append(_missing("Khối ngoại", {"reason": board.get("foreign_missing")}))
+        else:
+            lines.append(f"Khối ngoại: mua {_num(f['buy_value_bn'])} tỷ · bán {_num(f['sell_value_bn'])} tỷ · ròng {_num(f['net_value_bn'], sign=True)} tỷ")
+            if f["top_sell"]:
+                lines.append("Bán ròng mạnh: " + "; ".join(f"{x['symbol']} {_num(x['net_value_bn'], sign=True)} tỷ" for x in f["top_sell"]))
+            if f["top_buy"]:
+                lines.append("Mua ròng mạnh: " + "; ".join(f"{x['symbol']} {_num(x['net_value_bn'], sign=True)} tỷ" for x in f["top_buy"]))
     else:
         lines.append(_missing("Bảng giá cả sàn (giá trị, độ rộng, khối ngoại, ngành)", board))
     lines += _proprietary_lines(market.get("proprietary"))

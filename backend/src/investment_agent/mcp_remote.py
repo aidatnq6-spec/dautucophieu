@@ -58,6 +58,19 @@ def remote_app(data_dir: Path | str | None, *, secret: str, host: str, limit_per
     return app
 
 
+def configure_logging(path: Path) -> None:
+    """Warnings and errors only, UTF-8, into logs/mcp-remote.log: the SDK logs every call at INFO ("Terminating session: None"), which
+    PowerShell 5.1 wrote as UTF-16 error records when it went through stderr (27/11/2026)."""
+    import logging
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handler = logging.FileHandler(path, encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    handler.setLevel(logging.WARNING)
+    logging.getLogger().addHandler(handler)
+    for name in ("mcp", "uvicorn", "uvicorn.error", "uvicorn.access"):
+        logging.getLogger(name).setLevel(logging.WARNING)
+
+
 def _env_file() -> Path:
     return REPO_ROOT / ".env.local"
 
@@ -86,7 +99,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"https://{host}/{secret}/mcp")
         return 0
     import uvicorn
-    uvicorn.run(remote_app(os.environ.get("INVESTMENT_DATA_DIR"), secret=secret, host=host), host="127.0.0.1", port=PORT, log_level="warning")
+    configure_logging(REPO_ROOT / "logs" / "mcp-remote.log")
+    uvicorn.run(remote_app(os.environ.get("INVESTMENT_DATA_DIR"), secret=secret, host=host), host="127.0.0.1", port=PORT, log_level="warning", log_config=None)
     return 0
 
 

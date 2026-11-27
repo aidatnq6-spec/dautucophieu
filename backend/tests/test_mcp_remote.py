@@ -1,6 +1,7 @@
 """MCP dữ liệu công khai từ xa (owner, 27/11/2026): the same public tools over HTTP behind a secret path, a host check and a rate limit."""
 
 import json
+from pathlib import Path
 
 import pytest
 from starlette.testclient import TestClient
@@ -76,3 +77,24 @@ def test_a_windows_task_starts_the_remote_server_at_logon_and_restarts_it():
     tasks = (root / "register-tasks.ps1").read_text(encoding="utf-8-sig")
     assert "InvestmentAgent-McpRemote" in tasks and "run-mcp-remote.ps1" in tasks and "-RestartCount" in tasks
     assert "$mcpName" in tasks.split("if ($Unregister)")[1].split("return")[0]  # unregistered with the others
+
+
+def test_the_remote_log_is_utf8_and_keeps_warnings_not_each_call(tmp_path):
+    import logging
+    from investment_agent.mcp_remote import configure_logging
+    log = tmp_path / "logs" / "mcp-remote.log"
+    configure_logging(log)
+    try:
+        logging.getLogger("mcp.server.streamable_http").info("Terminating session: None")
+        logging.getLogger("mcp.server").warning("Lỗi thử")
+        for h in logging.getLogger().handlers:
+            h.flush()
+        text = log.read_text(encoding="utf-8")
+        assert "Terminating session" not in text and "Lỗi thử" in text
+    finally:
+        for h in list(logging.getLogger().handlers):
+            if getattr(h, "baseFilename", "") == str(log):
+                logging.getLogger().removeHandler(h)
+                h.close()
+    script = (Path(__file__).resolve().parents[2] / "scripts" / "windows" / "run-mcp-remote.ps1").read_text(encoding="utf-8-sig")
+    assert "2>> $log" not in script  # PowerShell 5.1 wrote stderr there as UTF-16 error records

@@ -9,5 +9,6 @@ $ErrorActionPreference = 'Continue'
 if (-not $env:MCP_REMOTE_SECRET) { "$(Get-Date -Format o) skip: chua co MCP_REMOTE_SECRET trong .env.local" | Add-Content -LiteralPath $log -Encoding UTF8; return }
 $python = Get-RepoPython
 "$(Get-Date -Format o) start" | Add-Content -LiteralPath $log -Encoding UTF8
-& $python -W ignore -m investment_agent.mcp_remote 2>> $log
+# The server writes its own UTF-8 log (warnings and errors); stderr is dropped, as PowerShell 5.1 turned it into UTF-16 error records.
+& $python -W ignore -m investment_agent.mcp_remote 2>$null
 "$(Get-Date -Format o) stop exit=$LASTEXITCODE" | Add-Content -LiteralPath $log -Encoding UTF8

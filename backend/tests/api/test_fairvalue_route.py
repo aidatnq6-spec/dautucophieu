@@ -618,3 +618,17 @@ def test_an_insurers_ratios_carry_the_median_of_the_other_hose_insurers(tmp_path
     c, clock = _app(tmp_path)
     sector = call(c, clock, "GET", "/internal/fairvalue/ratios/BMI").json()["sector"]
     assert sector["name"] == "Bảo hiểm" and sector["peers"] == 3 and sector["medians"]["COMBINED_RATIO_TR"] == "0.98"
+
+
+def test_a_banks_sector_carries_each_quarters_median_in_the_order_of_its_quarters(tmp_path):
+    from investment_agent.market.financial_ratios import FinancialRatioStore
+    _banks(tmp_path, {"VCB": "0.02", "ACB": "0.01", "BID": "0.03", "CTG": "0.05"})
+    store = FinancialRatioStore(tmp_path / "financial-ratios")
+    for sym in ("VCB", "ACB", "BID", "CTG"):
+        rec = store.read(sym)
+        rec["quarters"]["2026-06-30"] = {"BAD_LOANS_RATIO_AQ": "0.04"}
+        store.save(rec)
+    c, clock = _app(tmp_path)
+    body = call(c, clock, "GET", "/internal/fairvalue/ratios/VCB").json()
+    assert [q["date"] for q in body["quarters"]] == ["2026-06-30", "2026-09-30"]
+    assert body["sector"]["history"]["BAD_LOANS_RATIO_AQ"] == ["0.04", "0.03"]

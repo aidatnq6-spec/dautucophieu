@@ -615,3 +615,17 @@ def test_an_insurer_set_against_the_other_hose_insurers(data):
     cr = next(c for c in out["chi_so"] if c["ma_chi_so"] == "COMBINED_RATIO_TR")
     assert cr["ten"] == "Tỷ lệ kết hợp" and cr["trung_vi"] == "0.98" and cr["thu_hang"] == "3/4 (cao xuống thấp)"
     assert [c["ma_chi_so"] for c in out["chi_so"]] == [code for code, _, _ in DISPLAY["insurance"]]
+
+
+def test_sector_history_gives_each_quarters_median_of_the_peers_reporting_it(data):
+    from investment_agent.market.sector_compare import sector_history
+    write(data.root / "hose-listing.json", {"at": "t", "listing": {"symbols": ["KKK", "PPA", "PPB", "PPC"],
+        "icb_codes": {s: "8600" for s in ("KKK", "PPA", "PPB", "PPC")}, "icb_names": {"8600": "Bất động sản"}}})
+    q = {"KKK": {"2026-06-30": "0.1", "2026-09-30": "0.2"}, "PPA": {"2026-06-30": "0.05", "2026-09-30": "0.06"},
+         "PPB": {"2026-06-30": "0.07", "2026-09-30": "0.08"}, "PPC": {"2026-09-30": "0.10"}}  # PPC has no Q2: two peers then
+    for sym, by_q in q.items():
+        write(data.root / "financial-ratios-general" / f"{sym}.json", {"symbol": sym, "kind": "general", "fetched_at": "t", "source": "vndirect:finfo",
+                                                                      "quarters": {d: {"ROAE_TR_AVG4Q": v} for d, v in by_q.items()}})
+    out = sector_history(data.root, "KKK", ["2026-06-30", "2026-09-30"], ("ROAE_TR_AVG4Q",))
+    assert out == {"ROAE_TR_AVG4Q": [None, "0.08"]}  # Q2: under 3 peers, no point; never another quarter
+    assert sector_history(data.root, "ZZZ", ["2026-09-30"]) == {}

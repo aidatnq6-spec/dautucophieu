@@ -56,6 +56,39 @@ def _plain(d: Decimal) -> str:
 def compare_sector(data_dir: Path, symbol: str, codes: tuple[str, ...] | None = None) -> dict:
     """codes: None for the ticker's own set (BANK_CODES for a bank, SECURITIES_CODES for a securities firm, SECTOR_CODES otherwise)."""
     root = Path(data_dir)
+    found = _group(root, symbol, codes)
+    if "thieu" in found:
+        return found
+    kind, folder, codes, peers, code, sector = (found[k] for k in ("kind", "folder", "codes", "peers", "code", "sector"))
+    own = _json(root / folder / f"{symbol}.json")
+    quarters = [q for q, v in ((own or {}).get("quarters") or {}).items() if any(c in v for c in codes)]
+    if not quarters:
+        return _missing(f"Chưa có chỉ số tài chính VNDirect của {symbol} trong kho.")
+    quarter = max(quarters)
+    mine = own["quarters"][quarter]
+    return _against(root, symbol, kind, folder, codes, peers, code, sector, own, quarter, mine)
+
+
+def sector_history(data_dir: Path, symbol: str, quarters: list[str], codes: tuple[str, ...] | None = None) -> dict[str, list[str | None]]:
+    """Trung vị ngành theo quý (owner, 27/11/2026): each quarter's median of the same peers as compare_sector, each peer counted only for
+    a quarter it reported, the ticker left out, at least MIN_PEERS; None for a quarter under that. {} when there is no group to compare."""
+    root = Path(data_dir)
+    found = _group(root, symbol, codes)
+    if "thieu" in found:
+        return {}
+    records = [rec for s in found["peers"] if _SYMBOL.fullmatch(s) and (rec := _json(root / found["folder"] / f"{s}.json"))]
+    out: dict[str, list[str | None]] = {}
+    for c in found["codes"]:
+        row = []
+        for q in quarters:
+            values = [v for v in (_num(((r.get("quarters") or {}).get(q) or {}).get(c)) for r in records) if v is not None]
+            row.append(_plain(median(values)) if len(values) >= MIN_PEERS else None)
+        out[c] = row
+    return out
+
+
+def _group(root: Path, symbol: str, codes: tuple[str, ...] | None) -> dict:
+    """The ticker's comparison group: kind, store folder, ratio codes, peer symbols, group code and name; or a reason there is none."""
     if not _SYMBOL.fullmatch(symbol or ""):
         return _missing("Mã không hợp lệ.")
     listing = (_json(root / "hose-listing.json") or {}).get("listing") or {}
@@ -74,14 +107,11 @@ def compare_sector(data_dir: Path, symbol: str, codes: tuple[str, ...] | None = 
             return _missing(f"{symbol} không thuộc nhóm Dịch vụ đầu tư (ICB cấp 4, công ty chứng khoán); không có nhóm để so.")
         group, code, sector = level4, INVESTMENT_SERVICES, SECURITIES_NAME
     folder = "financial-ratios-general" if kind is None else "financial-ratios"
-    codes = codes or (OWN[kind][0] if kind else SECTOR_CODES)
-    own = _json(root / folder / f"{symbol}.json")
-    quarters = [q for q, v in ((own or {}).get("quarters") or {}).items() if any(c in v for c in codes)]
-    if not quarters:
-        return _missing(f"Chưa có chỉ số tài chính VNDirect của {symbol} trong kho.")
-    quarter = max(quarters)
-    mine = own["quarters"][quarter]
-    peers = sorted(s for s, c in group.items() if c == code and s != symbol)
+    return {"kind": kind, "folder": folder, "codes": codes or (OWN[kind][0] if kind else SECTOR_CODES), "code": code, "sector": sector,
+            "peers": sorted(s for s, c in group.items() if c == code and s != symbol)}
+
+
+def _against(root: Path, symbol: str, kind, folder: str, codes, peers: list[str], code, sector, own: dict, quarter: str, mine: dict) -> dict:
     rows, no_file, no_quarter = {}, 0, 0
     for s in peers:
         rec = _json(root / folder / f"{s}.json") if _SYMBOL.fullmatch(s) else None

@@ -81,6 +81,12 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
         return vn_times(data.so_sanh_nganh(ma, so_quy))
 
     @tool
+    def lich_giao_dich(ngay: str | None = None, den_ngay: str | None = None) -> dict:
+        """Lịch giao dịch HOSE: ngay (YYYY-MM-DD, mặc định hôm nay) có phiên không và vì sao, phiên trước và sau; có den_ngay thì số phiên
+        giữa hai ngày (tính cả hai đầu) và danh sách phiên; kèm ngày nghỉ còn lại, phạm vi, nguồn của lịch. Ngoài phạm vi lịch thì thiếu."""
+        return vn_times(data.lich_giao_dich(ngay, den_ngay))
+
+    @tool
     def chuoi_gia_tri(ma: str) -> dict:
         """Chuỗi giá trị của ngành ICB cấp 2 mà mã thuộc về (mọi chuỗi của ngành, không cho biết mã có trong chuỗi hay không): các khâu
         đầu vào – trung gian – đầu ra kèm nguồn, từng yếu tố vĩ mô (chiều 1 tháng, tốt hay xấu cho ngành, trọng số), tỷ trọng tốt/xấu,

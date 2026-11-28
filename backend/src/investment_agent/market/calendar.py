@@ -83,3 +83,64 @@ def load_calendar(path: Path):
         return cal
     return TradingCalendar(version=" + ".join(p.version for p in parts), source=" · ".join(p.source for p in parts),
                            holidays=frozenset().union(*(p.holidays for p in parts)), first=parts[0].first, last=parts[-1].last)
+
+
+def calendar_dir() -> Path:
+    """config/ of the repository, where each year's HOSE calendar lives."""
+    from investment_agent.domain.pinned import CONFIG_DIR
+    return CONFIG_DIR
+
+
+MAX_LISTED = 260  # sessions listed by lich_giao_dich, about a year
+
+
+def calendar_view(folder: Path, day: date, until: date | None = None) -> dict:
+    """Lịch giao dịch HOSE cho Claude (owner, 28/11/2026): the day's session, the sessions either side, the count between two days and the
+    weekday holidays left, from the year's file and the years it meets; nothing outside the files is inferred."""
+    def missing(year: int) -> dict:
+        return {"thieu": True, "ly_do": f"chưa có lịch giao dịch HOSE năm {year} trong kho"}
+    try:
+        cal = load_calendar(Path(folder) / f"trading-calendar-hose-{day.year}.json")
+    except CalendarMissing:
+        return missing(day.year)
+    except (OSError, ValueError, KeyError):
+        return {"thieu": True, "ly_do": f"không đọc được lịch giao dịch HOSE năm {day.year}"}
+    for d in (day, until):
+        if d is not None and not cal.first <= d <= cal.last:
+            return missing(d.year)
+
+    def step(start: date, by: int):
+        d = start + timedelta(days=by)
+        while cal.first <= d <= cal.last:
+            if cal.is_session(d):
+                return d, None
+            d += timedelta(days=by)
+        return None, f"chưa có lịch giao dịch HOSE năm {d.year} trong kho"
+    before, why_before = step(day, -1)
+    after, why_after = step(day, 1)
+    weekday = day.weekday() < 5
+    out = {"ngay": day.isoformat(), "co_phien": cal.is_session(day),
+           "ly_do": None if cal.is_session(day) else ("cuối tuần" if not weekday else "ngày nghỉ theo lịch HOSE"),
+           "phien_truoc": before.isoformat() if before else None, "phien_sau": after.isoformat() if after else None}
+    if why_before:
+        out["ly_do_phien_truoc"] = why_before
+    if why_after:
+        out["ly_do_phien_sau"] = why_after
+    if until is not None:
+        lo, hi = sorted((day, until))
+        sessions = cal.sessions(lo, hi)
+        out.update({"tu": lo.isoformat(), "den": hi.isoformat(), "so_phien": len(sessions),
+                    "cac_phien": [d.isoformat() for d in sessions] if len(sessions) <= MAX_LISTED else None})
+    checks = []
+    for y in range(cal.first.year, cal.last.year + 1):
+        try:
+            raw = json.loads((Path(folder) / f"trading-calendar-hose-{y}.json").read_text(encoding="utf-8"))
+            if raw.get("verification"):
+                checks.append(str(raw["verification"]))
+        except (OSError, ValueError):
+            continue
+    out.update({"ngay_nghi_con_lai": sorted(d.isoformat() for d in cal.holidays if d >= day and d.weekday() < 5 and d <= cal.last),
+                "pham_vi": {"tu": cal.first.isoformat(), "den": cal.last.isoformat()}, "phien_ban": cal.version, "nguon": cal.source,
+                "xac_minh": " · ".join(checks) or None,
+                "luu_y": "Theo tệp lịch HOSE trong kho; ngày nghỉ chỉ có ngày, không có tên ngày lễ; ngoài phạm vi lịch thì không suy ra."})
+    return out

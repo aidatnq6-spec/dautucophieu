@@ -160,7 +160,7 @@ def test_server_exposes_exactly_the_approved_read_only_tools(data):
         "thong_tin_ma", "gia_ngay", "dinh_gia_chi_so", "bao_cao_tai_chinh", "chi_so_tai_chinh", "eps_co_tuc", "su_kien_doanh_nghiep",
         "co_dong_ban_lanh_dao", "giao_dich_noi_bo", "danh_sach_vi_mo", "chi_bao_vi_mo", "chi_so_chau_a", "gia_vang", "omo",
         "quy_mo", "gia_vang_lich_su", "dinh_gia_ma", "lich_su_gia", "so_sanh_nganh", "thuyet_minh", "dinh_gia_lich_su", "tu_doanh", "khoi_ngoai", "cung_chieu",
-        "chuoi_gia_tri"])  # Chuỗi giá trị cho Claude (owner, 28/11/2026)
+        "chuoi_gia_tri", "lich_giao_dich"])  # Chuỗi giá trị, Lịch giao dịch HOSE cho Claude (owner, 28/11/2026)
     assert all(t.annotations and t.annotations.read_only_hint for t in tools)
     assert "Ngân hàng" in result.content[0].text
 

@@ -24,6 +24,11 @@ def test_links_are_absolute_pdf_links_with_their_labels():
         {"url": "https://cdn.example.vn/2026/07/20260729-kdh-bctc-cong-ty-me-q22026.pdf", "nhan": "BCTC Công ty Mẹ Q2.2026 (29/07/2026)"}]
 
 
+def test_a_page_the_html_parser_cannot_read_gives_the_links_found_before_it():
+    broken = '<a href="/a.pdf">BCTC Hợp nhất (29/07/2026)</a><![Ø\x15|@\x10\x7f\to0&&D'  # a site that served binary as text
+    assert [x["url"] for x in links_on_page(broken, "https://www.example.vn/")] == ["https://www.example.vn/a.pdf"]
+
+
 def test_consolidated_statements_and_resolutions_are_classified_parent_only_is_not():
     assert classify("BCTC Hợp nhất Q2.2026 + Giải trình trong TM (29/07/2026)") == "bctc"
     assert classify("Báo cáo tài chính hợp nhất soát xét 6 tháng năm 2026") == "bctc"

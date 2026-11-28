@@ -53,7 +53,10 @@ class _Links(HTMLParser):
 def links_on_page(page_html: str, page_url: str) -> list[dict]:
     """Every link to a PDF on a page, as an absolute url with its label (tags dropped, spaces collapsed)."""
     parser = _Links()
-    parser.feed(page_html)
+    try:
+        parser.feed(page_html)
+    except Exception:  # noqa: BLE001 - html.parser gives up on garbage (a site serving binary as text): keep what came before it
+        pass
     out, seen = [], set()
     for href, text in parser.found:
         url = urljoin(page_url, html.unescape(href.strip()))

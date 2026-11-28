@@ -21,6 +21,7 @@ Server chỉ có các công cụ dữ liệu thị trường công khai (như b�
 
 ## Kiểm tra và xử lý
 
+- Mỗi lần `update-app.ps1` dựng lại ứng dụng, nó chạy `restart-mcp-remote.ps1` để server từ xa nạp code mới (`logs\update.log` ghi `mcp-remote=restarted`); máy chưa đăng ký hoặc đã tắt tác vụ thì bỏ qua.
 - Tình trạng hệ thống có dòng **Kết nối từ xa**: "Quá hạn" nghĩa là server trên máy không trả lời (xem `logs\mcp-remote.log`, tác vụ `InvestmentAgent-McpRemote`).
 - Lộ địa chỉ: chạy lại `--new-secret`, khởi động lại tác vụ, lấy địa chỉ mới (bước 6) và sửa connector trên claude.ai.
 - Tắt kết nối từ xa: `tailscale funnel --bg off` (hoặc `tailscale funnel reset`), xóa `MCP_REMOTE_SECRET` khỏi `.env.local`.

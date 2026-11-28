@@ -1989,7 +1989,7 @@ def brief_snapshot_cli(data_dir: Path, calendar_path: Path, *, listing=None, boa
     def cached_listing():
         try:
             saved = json.loads(cache.read_text(encoding="utf-8"))
-            if now - datetime.fromisoformat(saved["at"]) < timedelta(days=LISTING_MAX_AGE_DAYS) and {"icb4_codes", "icb4_names"} <= saved["listing"].keys():  # level 4 since 27/11/2026, its names 28/11/2026
+            if now - datetime.fromisoformat(saved["at"]) < timedelta(days=LISTING_MAX_AGE_DAYS) and {"icb4_codes", "icb4_names", "icb3_names"} <= saved["listing"].keys():  # level 4 since 27/11/2026, its names 28/11/2026
                 return saved["listing"]
         except (OSError, ValueError, KeyError, TypeError):
             pass

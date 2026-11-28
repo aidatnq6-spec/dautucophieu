@@ -12,6 +12,9 @@ def fake_get(url: str) -> str:
     if "industry_classification" in url and "industryLevel:4" in url:
         return json.dumps({"data": [{"industryCode": "9537", "vietnameseName": "Phần mềm", "codeList": "FPT,CMG"},
                                     {"industryCode": "1757", "vietnameseName": "Thép", "codeList": "HSG"}]})
+    if "industry_classification" in url and "industryLevel:3" in url:
+        return json.dumps({"data": [{"industryCode": "9530", "vietnameseName": "Phần mềm & dịch vụ máy tính ", "codeList": "FPT,CMG"},
+                                    {"industryCode": "1750", "vietnameseName": "Kim loại công nghiệp", "codeList": "HPG,HSG"}]})
     if "industry_classification" in url:
         return json.dumps({"data": [{"industryCode": "9500", "vietnameseName": "Công nghệ", "codeList": "FPT,CMG,ELC"},
                                     {"industryCode": "1700", "vietnameseName": "Tài nguyên", "codeList": "HPG,HSG"}]})
@@ -34,6 +37,8 @@ def test_the_hose_listing_has_symbols_level_two_codes_and_keeps_known_sector_nam
     assert out["icb_names"] == {"9500": "Công nghệ", "1700": "Tài nguyên Cơ bản"}
     assert out["icb4_codes"] == {"FPT": "9537"}  # level 4 too, for the securities firms' peers (27/11/2026); HPG has none here
     assert out["icb4_names"] == {"9537": "Phần mềm", "1757": "Thép"}  # level-4 names for Trung vị ngành cấp 4 (28/11/2026)
+    assert out["icb3_codes"] == {"FPT": "9530", "HPG": "1750"}  # and level 3 from its own member lists (28/11/2026)
+    assert out["icb3_names"] == {"9530": "Phần mềm & dịch vụ máy tính", "1750": "Kim loại công nghiệp"}
 
 
 def test_the_board_is_the_latest_session_in_the_units_the_brief_reads():
@@ -137,3 +142,12 @@ def test_the_listing_keeps_its_level_two_codes_when_the_level_four_call_fails():
         return fake_get(url)
     out = hose_listing(get=get)
     assert out["icb_codes"] == {"FPT": "9500", "HPG": "1700"} and "icb4_codes" not in out  # absent: the next run fetches it again
+
+
+def test_a_failed_level_three_call_leaves_out_only_level_three():
+    def get(url):
+        if "industryLevel:3" in url:
+            raise OSError("timeout")
+        return fake_get(url)
+    out = hose_listing(get=get)
+    assert out["icb4_codes"] == {"FPT": "9537"} and "icb3_codes" not in out and "icb3_names" not in out

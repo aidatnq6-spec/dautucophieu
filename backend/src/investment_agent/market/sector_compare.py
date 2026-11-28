@@ -28,8 +28,9 @@ OWN = {"bank": (BANK_CODES, BANK_NAMES), "securities": (SECURITIES_CODES, {code:
        "insurance": (tuple(code for code, _, _ in DISPLAY["insurance"]), {code: label for code, label, _ in DISPLAY["insurance"]})}
 MIN_PEERS = 3
 # Trung vị ngành cấp 4 (owner, 28/11/2026): a general company is set against its ICB level-4 group when at least this many other
-# tickers of it have a ratios file, else its level-2 sector; chosen once per ticker, so every quarter uses the same group
-MIN_LEVEL4_PEERS = 5
+# tickers of it have a ratios file, else its level-3 group (when narrower than level 2) on the same rule, else its level-2 sector;
+# chosen once per ticker, so every quarter uses the same group
+MIN_NARROW_PEERS = 5
 NOTE = ("So với các doanh nghiệp cùng ngành ICB cấp 2 trên HOSE có số ở đúng quý này; trung vị và tứ phân vị là phép tính thống kê "
         "trên số VNDirect, không gồm mã đang xem. Không gắn nhãn tốt hay xấu: cao hơn không phải lúc nào cũng tốt (nợ vay, số "
         "ngày phải thu, tồn kho). Tỷ lệ ở dạng thập phân (0,08 là 8%); số ngày là ngày; hệ số là lần.")
@@ -127,12 +128,18 @@ def _group(root: Path, symbol: str, codes: tuple[str, ...] | None) -> dict:
         group, code, sector = level4, INVESTMENT_SERVICES, SECURITIES_NAME
     folder = "financial-ratios-general" if kind is None else "financial-ratios"
     level = 4 if kind == "securities" else 2
-    if kind is None and (c4 := (listing.get("icb4_codes") or {}).get(symbol)):
-        level4 = listing["icb4_codes"]
-        with_file = [s for s, c in level4.items() if c == c4 and s != symbol and _SYMBOL.fullmatch(s) and (root / folder / f"{s}.json").is_file()]
-        if len(with_file) >= MIN_LEVEL4_PEERS:
-            group, code, level = level4, c4, 4
-            sector = (listing.get("icb4_names") or {}).get(c4) or f"ICB {c4}"
+    if kind is None:
+        def others(codes: dict, c) -> list[str]:
+            return [s for s, v in codes.items() if v == c and s != symbol and _SYMBOL.fullmatch(s) and (root / folder / f"{s}.json").is_file()]
+        level2 = others(icb, code)
+        for lv in (4, 3):
+            codes_n = listing.get(f"icb{lv}_codes") or {}
+            c = codes_n.get(symbol)
+            mates = others(codes_n, c) if c else []
+            if len(mates) >= MIN_NARROW_PEERS and (lv == 4 or len(mates) < len(level2)):  # a level 3 no narrower than level 2 is level 2
+                group, code, level = codes_n, c, lv
+                sector = (listing.get(f"icb{lv}_names") or {}).get(c) or f"ICB {c}"
+                break
     return {"kind": kind, "folder": folder, "codes": codes or (OWN[kind][0] if kind else SECTOR_CODES), "code": code, "sector": sector,
             "level": level, "peers": sorted(s for s, c in group.items() if c == code and s != symbol)}
 

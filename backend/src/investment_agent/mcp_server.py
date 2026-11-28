@@ -84,7 +84,8 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
     def chuoi_gia_tri(ma: str) -> dict:
         """Chuỗi giá trị của ngành ICB cấp 2 mà mã thuộc về (mọi chuỗi của ngành, không cho biết mã có trong chuỗi hay không): các khâu
         đầu vào – trung gian – đầu ra kèm nguồn, từng yếu tố vĩ mô (chiều 1 tháng, tốt hay xấu cho ngành, trọng số), tỷ trọng tốt/xấu,
-        nhận định tổng chỉ khi chuỗi đã duyệt, hiệu suất bình quân theo kỳ và P/E, P/B trung vị so với 5 năm."""
+        nhận định tổng chỉ khi chuỗi đã duyệt; kèm thong_ke_nganh trên mọi mã HOSE cùng ngành: hiệu suất bình quân theo kỳ và P/E, P/B
+        trung vị so với 5 năm. Mã HOSE trong phần chữ được thay bằng [mã]."""
         return vn_times(data.chuoi_gia_tri(ma))
 
     @tool

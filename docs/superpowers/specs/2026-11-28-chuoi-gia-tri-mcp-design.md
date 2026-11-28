@@ -41,3 +41,11 @@ Một công cụ `chuoi_gia_tri(ma)` trong `public_tools.py`, đăng ký ở `mc
 
 - Tên trường tiếng Việt không dấu theo kiểu các công cụ đang có; số giữ dạng chuỗi như kho.
 - Định giá chỉ tính cho các chuỗi của mã hỏi, không tính cả 25 chuỗi.
+
+## Sửa sau khi thử trên dữ liệu thật (chủ sở hữu chọn ngày 28/11/2026, cách 1)
+
+Thử trên kho thật cho thấy vẫn lộ thành viên: 10/25 chuỗi chỉ có 1 mã và 10 chuỗi có 2 mã, nên "bình quân" và "trung vị" của chuỗi gần như là số của từng mã; 10/25 chuỗi có mã HOSE trong phần chữ (tên khâu, ghi chú, lý do). Kho `trend-sources` mà trang web dùng để tính hiệu suất cũng chỉ có khoảng 98 mã, phần lớn là mã đang theo dõi.
+
+- Hiệu suất và định giá chuyển từ từng chuỗi lên `thong_ke_nganh`, tính trên mọi mã HOSE cùng ngành ICB cấp 2: hiệu suất là bình quân giá đã điều chỉnh trong `price-history` (đủ mã HOSE), cùng cách tính kỳ của `chain_returns`; định giá là trung vị P/E, P/B hiện tại và trung vị của các trung vị 5 năm, theo số tự tính của từng mã trong `index-history` (như `dinh_gia_lich_su`), kèm số mã đang thấp hơn trung vị 5 năm của chính nó. Số này khác số trên trang Chuỗi giá trị (tính theo thành viên chuỗi).
+- Mã HOSE trong phần chữ thay bằng "[mã]"; "HRC" (thép cuộn cán nóng) giữ nguyên. Tên doanh nghiệp viết bằng chữ (Vingroup, Formosa, Lọc dầu Dung Quất) vẫn còn trong phần chữ.
+- Nguồn trích dẫn của chuỗi phần lớn là báo cáo từng doanh nghiệp ("Cập nhật KDH – MUA", đường dẫn PDF mang mã): tên báo cáo cũng thay mã bằng "[mã]", đường dẫn bị bỏ; còn đơn vị phát hành, ngày, trang. "VND" (đơn vị tiền) giữ nguyên như "HRC". Đã kiểm 14 ngành có chuỗi trên kho thật ngày 28/11/2026: không còn mã HOSE nào trong kết quả ngoài mã được hỏi.

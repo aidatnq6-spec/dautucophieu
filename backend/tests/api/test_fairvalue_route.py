@@ -602,6 +602,7 @@ def test_a_securities_firms_ratios_carry_the_median_of_the_other_investment_serv
     body = call(c, clock, "GET", "/internal/fairvalue/ratios/SSI").json()
     sector = body["sector"]
     assert sector["name"] == "Dịch vụ đầu tư (chứng khoán)" and sector["peers"] == 3 and sector["medians"]["ROAE_TR_AVG4Q"] == "0.1"
+    assert sector["level"] == 4
     assert set(sector["medians"]) == {m["code"] for m in body["metrics"]}
 
 
@@ -618,6 +619,7 @@ def test_an_insurers_ratios_carry_the_median_of_the_other_hose_insurers(tmp_path
     c, clock = _app(tmp_path)
     sector = call(c, clock, "GET", "/internal/fairvalue/ratios/BMI").json()["sector"]
     assert sector["name"] == "Bảo hiểm" and sector["peers"] == 3 and sector["medians"]["COMBINED_RATIO_TR"] == "0.98"
+    assert sector["level"] == 2
 
 
 def test_a_banks_sector_carries_each_quarters_median_in_the_order_of_its_quarters(tmp_path):

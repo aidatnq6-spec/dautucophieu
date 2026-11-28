@@ -367,6 +367,49 @@ def test_a_ticker_set_against_its_icb_sector_on_the_same_quarter(data):
     assert data.so_sanh_nganh("ZZZ")["thieu"] is True
 
 
+def _level4_group(data, *, peers4: int, name: bool = True):
+    """KKK in level 4 "2357" with peers4 others; PPx share only level 2 "2300". Every ticker has ROAE for Q3/2026."""
+    in4 = [f"Q4{i}" for i in range(peers4)]
+    level2 = ["PPA", "PPB", "PPC"]
+    syms = ["KKK", *in4, *level2]
+    write(data.root / "hose-listing.json", {"at": "t", "listing": {"symbols": syms, "icb_codes": {s: "2300" for s in syms},
+        "icb_names": {"2300": "Xây dựng và Vật liệu"}, "icb4_codes": {**{s: "2357" for s in ["KKK", *in4]}, **{s: "2353" for s in level2}},
+        **({"icb4_names": {"2357": "Xây dựng công trình", "2353": "Vật liệu xây dựng"}} if name else {})}})
+    values = {"KKK": "0.08", **{s: "0.10" for s in in4}, **{s: "0.50" for s in level2}}
+    for sym, roe in values.items():
+        write(data.root / "financial-ratios-general" / f"{sym}.json", {"symbol": sym, "kind": "general", "fetched_at": "t", "source": "vndirect:finfo",
+            "names": {"ROAE_TR_AVG4Q": "ROAE"}, "quarters": {"2026-09-30": {"ROAE_TR_AVG4Q": roe}, "2026-06-30": {"ROAE_TR_AVG4Q": roe}}})
+
+
+def test_a_company_is_set_against_its_icb_level_four_group_with_five_peers_having_figures(data):
+    _level4_group(data, peers4=5)
+    out = data.so_sanh_nganh("KKK", so_quy=2)
+    assert out["nganh"] == "Xây dựng công trình" and out["ma_nganh"] == "2357" and out["cap_nganh"] == 4 and out["so_doanh_nghiep_nganh"] == 5
+    roe = next(c for c in out["chi_so"] if c["ma_chi_so"] == "ROAE_TR_AVG4Q")
+    assert roe["trung_vi"] == "0.1" and roe["so_doanh_nghiep"] == 5  # level-2 peers (0.50) left out
+    assert "ICB cấp 4" in out["luu_y"] and "ICB cấp 2" not in out["luu_y"]
+    assert out["theo_quy"]["chi_so"]["ROAE_TR_AVG4Q"]["trung_vi"] == ["0.1", "0.1"]  # the same group every quarter
+
+
+def test_a_level_four_group_under_five_peers_keeps_the_level_two_sector(data):
+    _level4_group(data, peers4=4)
+    out = data.so_sanh_nganh("KKK")
+    assert out["nganh"] == "Xây dựng và Vật liệu" and out["ma_nganh"] == "2300" and out["cap_nganh"] == 2 and out["so_doanh_nghiep_nganh"] == 7
+    assert "ICB cấp 2" in out["luu_y"]
+
+
+def test_a_level_four_peer_without_a_ratios_file_is_not_counted_toward_five(data):
+    _level4_group(data, peers4=5)
+    (data.root / "financial-ratios-general" / "Q40.json").unlink()
+    assert data.so_sanh_nganh("KKK")["cap_nganh"] == 2
+
+
+def test_a_level_four_group_without_its_name_is_named_by_its_code(data):
+    _level4_group(data, peers4=5, name=False)
+    out = data.so_sanh_nganh("KKK")
+    assert out["cap_nganh"] == 4 and out["nganh"] == "ICB 2357"
+
+
 def test_a_bank_set_against_the_other_hose_banks_on_the_same_quarter(data):
     from investment_agent.market.financial_ratios import DISPLAY
     write(data.root / "hose-listing.json", {"at": "t", "listing": {"symbols": ["BNK", "BAA", "BBB", "BCC", "BDD", "SEC"],

@@ -20,8 +20,9 @@ type Kind = "bank" | "securities" | "insurance";
 type Ratios = { kind: Kind | "general"; quarters: { date: string; label: string }[];
   metrics: { code: string; label: string; format: "pct0" | "pct1" | "pct2" | "times" | "days"; values: (string | null)[] }[];
   fetched_at?: string | null; notes?: string[]; notes_fetched_at?: string | null; sector?: Sector | null };
-// Trung vị ngành (26/11/2026): peers of the same ICB level-2 sector on HOSE with figures for the ticker's own latest quarter
-export type Sector = { name: string; quarter: string; peers: number; medians: Record<string, string | null>; counts: Record<string, number>;
+// Trung vị ngành (26/11/2026): peers of the same ICB sector on HOSE with figures for the ticker's own latest quarter; a general
+// company's level-4 group when it has 5 others with figures, else level 2 (28/11/2026); `level` says which
+export type Sector = { name: string; level?: 2 | 4; quarter: string; peers: number; medians: Record<string, string | null>; counts: Record<string, number>;
   history?: Record<string, (string | null)[]> };  // a bank's group-2 share and CASA: quarters left blank or entered differently
 
 const SIGNED = new Set(["revenue_yoy", "gross_profit_yoy", "npat_parent_yoy", "ebitda_yoy", "fcff_yield"]);
@@ -139,7 +140,7 @@ export function showsSector(kind: Ratios["kind"] | undefined): boolean {
 export function sectorNote(r: { kind: Ratios["kind"]; sector?: Sector | null }): string | null {
   if (!showsSector(r.kind) || !r.sector) return null;
   const q = periodLabel(`${r.sector.quarter.slice(0, 4)}-Q${Math.floor((Number(r.sector.quarter.slice(5, 7)) - 1) / 3) + 1}`);
-  return `Trung vị ngành: trung vị của ${r.sector.peers} doanh nghiệp cùng ngành ${r.sector.name} (ICB cấp ${r.kind === "securities" ? 4 : 2}, HOSE) có số ở quý ${q}, không gồm mã này;`
+  return `Trung vị ngành: trung vị của ${r.sector.peers} doanh nghiệp cùng ngành ${r.sector.name} (ICB cấp ${r.sector.level ?? (r.kind === "securities" ? 4 : 2)}, HOSE) có số ở quý ${q}, không gồm mã này;`
     + ` cần ít nhất 3 doanh nghiệp, không thì để —${r.kind === "bank" ? "; CASA và tỷ lệ nợ nhóm 2 không có trung vị (chỉ có cho ngân hàng đang theo dõi)" : ""}${r.kind === "insurance"
       ? "; nhóm gồm cả bảo hiểm nhân thọ (BVH) và phi nhân thọ, tỷ lệ kết hợp và biên lợi nhuận khó so trực tiếp" : ""};`
     + " cao hơn hay thấp hơn trung vị không có nghĩa là tốt hay xấu.";

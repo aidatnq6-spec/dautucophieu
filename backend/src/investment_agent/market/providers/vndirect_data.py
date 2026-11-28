@@ -64,13 +64,16 @@ def hose_listing(get: Callable[[str], str] = default_get, *, known_names: dict[s
             if symbol.strip().upper() in wanted:
                 codes[symbol.strip().upper()] = code
     out = {"symbols": symbols, "icb_codes": codes, "icb_names": {**names, **{c: n for c, n in (known_names or {}).items() if c in names}}}
-    try:  # level 4 only serves the securities firms' peers: a failure leaves it out (asked again next run), never the listing
-        level4 = {}
+    try:  # level 4 serves Trung vị ngành's peers: a failure leaves it out (asked again next run), never the listing
+        level4, names4 = {}, {}
         for row in _data(get, INDUSTRY4_URL):
+            if not row.get("industryCode"):
+                continue
+            names4[str(row["industryCode"])] = str(row.get("vietnameseName") or row["industryCode"]).strip()  # cấp 4 names (28/11/2026)
             for symbol in str(row.get("codeList") or "").split(","):
-                if symbol.strip().upper() in wanted and row.get("industryCode"):
+                if symbol.strip().upper() in wanted:
                     level4[symbol.strip().upper()] = str(row["industryCode"])
-        out["icb4_codes"] = level4
+        out["icb4_codes"], out["icb4_names"] = level4, names4
     except Exception:  # noqa: BLE001 - any failure of this one call
         pass
     return out

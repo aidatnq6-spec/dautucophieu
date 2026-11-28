@@ -114,6 +114,20 @@ def test_a_source_paces_the_sync_with_its_own_pause(tmp_path):
     assert VndirectFundamentals.pace_seconds == 1
 
 
+def test_a_ticker_without_stored_statements_fails_at_once_without_the_65_s_wait(tmp_path):
+    """No wait brings statements that were never fetched: 19 unwatched tickers once took 19 x 65 s and passed the 15-minute step
+    limit (28/11/2026)."""
+    from investment_agent.market.fundamentals import FundamentalsStore, sync_fundamentals
+    from investment_agent.market.series import SeriesStore
+
+    waits = []
+    source = VndirectFundamentals(tmp_path, get=lambda url: "{}")
+    out = sync_fundamentals(FundamentalsStore(tmp_path / "fundamentals"), SeriesStore(tmp_path / "trend-sources"), ["SAB", "VJC"],
+                            provider=source, now=NOW, limit=None, sleep=waits.append)
+    assert out == {"updated": [], "errors": {"SAB": "error:NoStoredStatements", "VJC": "error:NoStoredStatements"}}
+    assert waits == [1]  # the pause between the two tickers, no retry wait
+
+
 def test_figures_vndirect_lacks_stay_as_fetched_before(tmp_path):
     from investment_agent.market.fundamentals import FundamentalsStore, sync_fundamentals
     from investment_agent.market.series import SeriesStore

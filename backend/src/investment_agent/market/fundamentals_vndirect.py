@@ -88,6 +88,12 @@ def build_record(symbol: str, statements: dict, events: list[dict], *, shares: s
             "share_issues": sorted(share_issues, key=lambda d: d["date"]), "shares_outstanding": shares}
 
 
+class NoStoredStatements(LookupError):
+    """The ticker's statements were never fetched (statements-sync covers watched tickers): the code marks it permanent, so the
+    sync's retry does not wait 65 s for an answer no wait brings (28/11/2026)."""
+    code = "NO_STORED_STATEMENTS"
+
+
 class VndirectFundamentals:
     """record(symbol, now) for sync_fundamentals; daily closes keep coming from the price provider."""
 
@@ -103,7 +109,7 @@ class VndirectFundamentals:
         store = StatementStore(self.data_dir / ("statements" if kind_of(sector) is None else "statements-financial"))
         statements = store.read(symbol) or {}
         if not statements.get("years") and not statements.get("quarters"):
-            raise LookupError("no stored VNDirect statements yet")
+            raise NoStoredStatements("no stored VNDirect statements yet")
         events = vndirect_events(symbol, get=self.get, today=now.date(), years=10)
         rows = json.loads(self.get(SHARES_URL.format(symbol=symbol.upper()))).get("data", [])
         shares = next((_num(int(r["value"])) for r in rows if str(r.get("itemCode")) == "51004" and r.get("value")), None)

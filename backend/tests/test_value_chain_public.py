@@ -113,10 +113,23 @@ def test_a_sector_without_a_chain_says_so(env):
         "thieu": True, "ly_do": "Chưa có chuỗi giá trị cho ngành Y tế.", "ma": "DHG", "nganh": "Y tế"}
 
 
+def test_a_newly_listed_ticker_without_a_sector_says_when_it_was_listed(env):
+    """AMY and DVV were listed in 11/2026 before VNDirect classified them (28/11/2026): the reason says so, in both tools."""
+    root, path = env
+    listing = json.loads((root / "hose-listing.json").read_text(encoding="utf-8"))
+    listing["listing"]["symbols"].append("AMY")
+    listing["listing"]["listed_dates"] = {"AMY": "2026-11-20"}
+    (root / "hose-listing.json").write_text(json.dumps(listing, ensure_ascii=False), encoding="utf-8")
+    why = "Chưa có ngành ICB của AMY trong danh sách HOSE: mã mới niêm yết ngày 20/11/2026, VNDirect chưa phân ngành."
+    assert chains_for_sector(root, "AMY", today=TODAY, config_path=path)["ly_do"] == why
+    assert PublicData(root).so_sanh_nganh("AMY")["ly_do"] == why
+
+
 def test_a_ticker_without_a_sector_or_invalid_is_missing(env):
     root, path = env
     zzz = chains_for_sector(root, "ZZZ", today=TODAY, config_path=path)
     assert zzz["thieu"] is True and "Chưa có ngành ICB của ZZZ" in zzz["ly_do"]
+    assert zzz["ly_do"] == "Chưa có ngành ICB của ZZZ trong danh sách HOSE."  # no listing date known: the plain reason
     data = PublicData(root)
     assert data.chuoi_gia_tri("!!", today=TODAY, config_path=path)["thieu"] is True
     assert data.chuoi_gia_tri(" hpg ", today=TODAY, config_path=path)["ma"] == "HPG"

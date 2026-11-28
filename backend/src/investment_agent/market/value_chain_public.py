@@ -19,6 +19,7 @@ from investment_agent.market.value_chain_scores import scored_chains
 from investment_agent.market.value_chains import VALUE_CHAINS_PATH, load_value_chains
 from investment_agent.domain.chain_returns import STALE, chain_returns
 from investment_agent.market.price_history import PriceHistoryStore
+from investment_agent.market.sector_compare import no_sector_reason
 from investment_agent.market.valuation_history import own_history
 
 LABELS = {"tailwind": "thuan_loi", "neutral": "trung_tinh", "headwind": "bat_loi", "insufficient": "chua_du_du_lieu", None: None}
@@ -118,7 +119,7 @@ def chains_for_sector(data_dir: Path, symbol: str, *, today: date, config_path: 
     listing = (json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}).get("listing") or {}
     code = (listing.get("icb_codes") or {}).get(symbol)
     if code is None:
-        return _missing(f"Chưa có ngành ICB của {symbol} trong danh sách HOSE.", ma=symbol)
+        return _missing(no_sector_reason(listing, symbol), ma=symbol)
     sector = (listing.get("icb_names") or {}).get(code, code)
     config = load_value_chains(config_path)
     own = [c for c in config.chains if c.icb == sector]

@@ -46,3 +46,7 @@ Sau bản cấp 4, 85/361 mã còn so ở cấp 2 vì nhóm cấp 4 dưới 5 m�
 - `hose_listing` lưu thêm `icb3_codes` và `icb3_names` từ một lượt gọi `industryLevel:3` (danh sách mã của từng nhóm, như cấp 2 và cấp 4; không suy từ mã cấp 4 vì `higherLevelCode` của VNDirect không thống nhất). Lượt gọi này lỗi thì không có cấp 3, cấp 4 và cấp 2 vẫn giữ. Bản lưu thiếu `icb3_names` thì làm mới ở lượt kế tiếp.
 - Nhóm cấp 3 chỉ được dùng khi nó hẹp hơn ngành cấp 2 (có ít mã hơn); trùng với cấp 2 thì ghi là cấp 2.
 - `cap_nganh` và `sector.level` có thể là 3; chú thích ghi "ICB cấp 3". Plugin 0.27.0.
+
+## Bổ sung 28/11/2026: mã chưa phân ngành
+
+Mã mới niêm yết có thể chưa được VNDirect phân ngành ICB (AMY niêm yết 20/11/2026, DVV 02/11/2026). Chủ sở hữu duyệt: không gán ngành bằng tay; lý do "thiếu" nêu ngày niêm yết. `hose_listing` lấy thêm `listedDate` trong cùng lượt gọi danh sách mã và lưu `listed_dates` chỉ cho mã chưa có ngành cấp 2. `so_sanh_nganh` và `chuoi_gia_tri` trả "Chưa có ngành ICB của <mã> trong danh sách HOSE: mã mới niêm yết ngày <dd/mm/yyyy>, VNDirect chưa phân ngành."; không có ngày thì giữ câu cũ. Khi VNDirect phân ngành, lượt làm mới danh sách (7 ngày) tự đưa mã vào nhóm.

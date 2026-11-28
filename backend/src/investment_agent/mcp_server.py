@@ -72,7 +72,7 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
     @tool
     def so_sanh_nganh(ma: str, so_quy: int = 4) -> dict:
         """Đặt một mã cạnh các doanh nghiệp cùng ngành trên HOSE ở quý mới nhất (nhóm ICB cấp 4 khi có ít nhất 5 mã khác có số, không thì
-        cấp 2; cap_nganh nói cấp nào): 16 chỉ số VNDirect (ROAE, ROIC, biên, nợ vay,
+        cấp 3, không thì cấp 2; cap_nganh nói cấp nào): 16 chỉ số VNDirect (ROAE, ROIC, biên, nợ vay,
         khả năng trả lãi, thanh toán, dòng tiền, số ngày phải thu và tồn kho, tăng trưởng, trả cổ tức), mỗi chỉ số có trung vị, tứ phân vị
         và thứ hạng; ngân hàng so với các ngân hàng HOSE trên 9 chỉ số (NPL, nợ quá hạn, bao phủ nợ xấu, NIM, LDR, tăng trưởng cho vay,
         vốn chủ/tài sản, ROAA, ROAE); công ty chứng khoán so với các mã HOSE thuộc ICB cấp 4 Dịch vụ đầu tư trên 5 chỉ số (ROAA, ROAE, biên

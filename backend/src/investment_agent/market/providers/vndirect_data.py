@@ -14,6 +14,7 @@ from typing import Callable
 BASE = "https://api-finfo.vndirect.com.vn/v4/"
 LISTING_URL = BASE + "stocks?q=type:STOCK~floor:HOSE~status:LISTED&size=9999&fields=code,type,floor"
 INDUSTRY_URL = BASE + "industry_classification?q=industryLevel:2&size=100"
+INDUSTRY3_URL = BASE + "industry_classification?q=industryLevel:3&size=200"  # Trung vị ngành cấp 3 (28/11/2026)
 INDUSTRY4_URL = BASE + "industry_classification?q=industryLevel:4&size=500"  # securities firms' peers (27/11/2026)
 BOARD_URL = (BASE + "stock_prices?q=floor:HOSE~date:gte:{start}~date:lte:{end}&size=9999"
              "&fields=code,date,basicPrice,close,nmVolume,nmValue,ceilingPrice,floorPrice,high,low")
@@ -74,6 +75,18 @@ def hose_listing(get: Callable[[str], str] = default_get, *, known_names: dict[s
                 if symbol.strip().upper() in wanted:
                     level4[symbol.strip().upper()] = str(row["industryCode"])
         out["icb4_codes"], out["icb4_names"] = level4, names4
+    except Exception:  # noqa: BLE001 - any failure of this one call
+        pass
+    try:  # level 3 from its own member lists (VNDirect's higherLevelCode is not uniform); a failure leaves out only level 3
+        level3, names3 = {}, {}
+        for row in _data(get, INDUSTRY3_URL):
+            if not row.get("industryCode"):
+                continue
+            names3[str(row["industryCode"])] = str(row.get("vietnameseName") or row["industryCode"]).strip()
+            for symbol in str(row.get("codeList") or "").split(","):
+                if symbol.strip().upper() in wanted:
+                    level3[symbol.strip().upper()] = str(row["industryCode"])
+        out["icb3_codes"], out["icb3_names"] = level3, names3
     except Exception:  # noqa: BLE001 - any failure of this one call
         pass
     return out

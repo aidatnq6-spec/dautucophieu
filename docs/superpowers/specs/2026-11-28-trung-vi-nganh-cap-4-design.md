@@ -31,3 +31,18 @@ ICB cấp 2 gộp các ngành có cấu trúc tài chính khác nhau: "Xây dự
 ## Quyết định của người dựng
 
 - "5 mã khác có số" đếm mã có tệp chỉ số trong kho, không đếm theo từng quý, để nhóm không nhảy giữa các quý.
+
+## Bổ sung: bước cấp 3 (chủ sở hữu chọn ngày 28/11/2026, cách A)
+
+Sau bản cấp 4, 85/361 mã còn so ở cấp 2 vì nhóm cấp 4 dưới 5 mã khác (Giấy, Bao bì, Nước, Bán lẻ tổng hợp…). Thứ tự chọn nhóm nay là cấp 4 → cấp 3 → cấp 2, cùng ngưỡng 5 mã khác có tệp chỉ số.
+
+| | Cách | Cấp 4 / 3 / 2 (28/11/2026) |
+|---|---|---|
+| **A (chọn)** | Giữ ngưỡng 5, thêm bước cấp 3 | 276 / 36 / 49 |
+| B | Ngưỡng 4 | 281 / – / 80 |
+| C | Ngưỡng 3 | 289 / – / 72 (trung vị 3 mã dao động, quý thiếu một mã thành "—") |
+| D | Giữ nguyên | 276 / – / 85 |
+
+- `hose_listing` lưu thêm `icb3_codes` và `icb3_names` từ một lượt gọi `industryLevel:3` (danh sách mã của từng nhóm, như cấp 2 và cấp 4; không suy từ mã cấp 4 vì `higherLevelCode` của VNDirect không thống nhất). Lượt gọi này lỗi thì không có cấp 3, cấp 4 và cấp 2 vẫn giữ. Bản lưu thiếu `icb3_names` thì làm mới ở lượt kế tiếp.
+- Nhóm cấp 3 chỉ được dùng khi nó hẹp hơn ngành cấp 2 (có ít mã hơn); trùng với cấp 2 thì ghi là cấp 2.
+- `cap_nganh` và `sector.level` có thể là 3; chú thích ghi "ICB cấp 3". Plugin 0.27.0.

@@ -404,6 +404,36 @@ def test_a_level_four_peer_without_a_ratios_file_is_not_counted_toward_five(data
     assert data.so_sanh_nganh("KKK")["cap_nganh"] == 2
 
 
+def _level3_group(data, *, level2_extra: int):
+    """KKK in level 4 "2723" (2 others) inside level 3 "2720" (5 others: 2723 and 2727); level 2 "2700" has level2_extra more in "2770"."""
+    in4, in3, extra = ["BB1", "BB2"], ["CN1", "CN2", "CN3"], [f"VT{i}" for i in range(level2_extra)]
+    syms = ["KKK", *in4, *in3, *extra]
+    write(data.root / "hose-listing.json", {"at": "t", "listing": {"symbols": syms, "icb_codes": {s: "2700" for s in syms},
+        "icb_names": {"2700": "Hàng & Dịch vụ Công nghiệp"},
+        "icb4_codes": {**{s: "2723" for s in ["KKK", *in4]}, **{s: "2727" for s in in3}, **{s: "2777" for s in extra}},
+        "icb4_names": {"2723": "Bao bì & đóng gói"},
+        "icb3_codes": {**{s: "2720" for s in ["KKK", *in4, *in3]}, **{s: "2770" for s in extra}},
+        "icb3_names": {"2720": "Công nghiệp tổng hợp", "2770": "Giao thông công nghiệp"}}})
+    values = {"KKK": "0.08", **{s: "0.10" for s in [*in4, *in3]}, **{s: "0.50" for s in extra}}
+    for sym, roe in values.items():
+        write(data.root / "financial-ratios-general" / f"{sym}.json", {"symbol": sym, "kind": "general", "fetched_at": "t", "source": "vndirect:finfo",
+            "names": {"ROAE_TR_AVG4Q": "ROAE"}, "quarters": {"2026-09-30": {"ROAE_TR_AVG4Q": roe}}})
+
+
+def test_a_small_level_four_group_falls_back_to_its_level_three_group_with_five_peers(data):
+    _level3_group(data, level2_extra=3)
+    out = data.so_sanh_nganh("KKK")
+    assert out["nganh"] == "Công nghiệp tổng hợp" and out["ma_nganh"] == "2720" and out["cap_nganh"] == 3 and out["so_doanh_nghiep_nganh"] == 5
+    roe = next(c for c in out["chi_so"] if c["ma_chi_so"] == "ROAE_TR_AVG4Q")
+    assert roe["trung_vi"] == "0.1" and roe["so_doanh_nghiep"] == 5 and "ICB cấp 3" in out["luu_y"]
+
+
+def test_a_level_three_group_no_narrower_than_level_two_is_told_as_level_two(data):
+    _level3_group(data, level2_extra=0)
+    out = data.so_sanh_nganh("KKK")
+    assert out["cap_nganh"] == 2 and out["nganh"] == "Hàng & Dịch vụ Công nghiệp" and out["ma_nganh"] == "2700"
+
+
 def test_a_level_four_group_without_its_name_is_named_by_its_code(data):
     _level4_group(data, peers4=5, name=False)
     out = data.so_sanh_nganh("KKK")

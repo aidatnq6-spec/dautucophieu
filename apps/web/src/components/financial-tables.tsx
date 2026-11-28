@@ -21,8 +21,8 @@ type Ratios = { kind: Kind | "general"; quarters: { date: string; label: string 
   metrics: { code: string; label: string; format: "pct0" | "pct1" | "pct2" | "times" | "days"; values: (string | null)[] }[];
   fetched_at?: string | null; notes?: string[]; notes_fetched_at?: string | null; sector?: Sector | null };
 // Trung vị ngành (26/11/2026): peers of the same ICB sector on HOSE with figures for the ticker's own latest quarter; a general
-// company's level-4 group when it has 5 others with figures, else level 2 (28/11/2026); `level` says which
-export type Sector = { name: string; level?: 2 | 4; quarter: string; peers: number; medians: Record<string, string | null>; counts: Record<string, number>;
+// company's level-4 group when it has 5 others with figures, else level 3, else level 2 (28/11/2026); `level` says which
+export type Sector = { name: string; level?: 2 | 3 | 4; quarter: string; peers: number; medians: Record<string, string | null>; counts: Record<string, number>;
   history?: Record<string, (string | null)[]> };  // a bank's group-2 share and CASA: quarters left blank or entered differently
 
 const SIGNED = new Set(["revenue_yoy", "gross_profit_yoy", "npat_parent_yoy", "ebitda_yoy", "fcff_yield"]);

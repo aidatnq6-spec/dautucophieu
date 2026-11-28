@@ -171,3 +171,25 @@ def test_an_unreadable_price_or_valuation_file_counts_as_no_figure(env):
     (root / "index-history" / "HPG.json").write_text("{not json", encoding="utf-8")
     stats = chains_for_sector(root, "HPG", today=TODAY, config_path=path)["thong_ke_nganh"]
     assert stats["hieu_suat"]["so_ma_co_gia"] == 1 and stats["dinh_gia"]["so_ma_co_dinh_gia"] == 0
+
+
+def test_company_names_read_doanh_nghiep_longest_first(env):
+    root, path = env
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    doc["chains"][0]["stages"]["input"][0]["note"] = "Tập đoàn Hoa Sen mua của Formosa; Masan MEATLife và Vinhomes; Vingroupx là chữ khác"
+    path.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+    note = chains_for_sector(root, "HSG", today=TODAY, config_path=path)["chuoi"][0]["cac_khau"]["dau_vao"][0]["ghi_chu"]
+    assert note == "[doanh nghiệp] mua của Formosa; [doanh nghiệp] và [doanh nghiệp]; Vingroupx là chữ khác"  # Formosa: not on HOSE
+
+
+def test_a_capitalised_name_before_a_bracketed_ticker_in_the_committed_chains_is_on_the_list():
+    # the common way a chain names a member's company ("Vingroup (VIC)", "Lọc dầu Dung Quất (BSR)"): a new one must join COMPANY_NAMES
+    import re
+    from investment_agent.market.value_chain_public import COMPANY_NAMES
+    from investment_agent.market.value_chains import VALUE_CHAINS_PATH, load_value_chains
+    config = load_value_chains(VALUE_CHAINS_PATH)
+    pattern = re.compile(r"((?:[A-ZĐ][\wÀ-ỹ]+ )*[A-ZĐ][\wÀ-ỹ]{2,}) \([A-Z][A-Z0-9]{2}")  # a ticker-like code in brackets
+    dump = config.model_dump(mode="json")
+    text = json.dumps([dump["chains"], [s["title"] for s in dump["sources"].values()]], ensure_ascii=False)
+    found = {m.group(1) for m in pattern.finditer(text)}
+    assert all(any(n in f or f in n for n in COMPANY_NAMES) for f in found), found - {f for f in found if any(n in f or f in n for n in COMPANY_NAMES)}

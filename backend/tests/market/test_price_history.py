@@ -26,7 +26,7 @@ def _listing(tmp_path, symbols):
 def test_every_hose_ticker_missing_or_older_than_a_week_is_fetched_oldest_first_up_to_the_limit(tmp_path):
     _listing(tmp_path, ["AAA", "BBB", "CCC", "DDD"])
     store = PriceHistoryStore(tmp_path)
-    store.save("BBB", {"symbol": "BBB", "fetched_at": "2026-11-25T00:00:00+00:00", "closes": []})  # fresh: skipped
+    store.save("BBB", {"symbol": "BBB", "fetched_at": "2026-11-26T05:00:00+00:00", "closes": []})  # fetched 8 hours ago: skipped
     store.save("CCC", {"symbol": "CCC", "fetched_at": "2026-11-01T00:00:00+00:00", "closes": []})  # stale
     asked, urls = [], []
 
@@ -91,3 +91,22 @@ def test_a_run_before_the_close_keeps_no_price_of_the_session_still_trading(tmp_
     evening = datetime(2026, 11, 26, 13, 0, tzinfo=timezone.utc)  # 20:00 in Hà Nội: the session is closed
     sync_price_history(tmp_path, get=get, now=evening, symbols=["KDH"], sleep=lambda s: None)
     assert PriceHistoryStore(tmp_path).read("KDH")["closes"][-1] == ["2026-11-26", "14.3"]
+
+
+def test_the_stalest_are_refreshed_every_night_even_under_a_week_so_a_whole_load_spreads_out(tmp_path):
+    # 28/11/2026: all 412 tickers were loaded on 26/11 and none was due again until 3/12; now the stalest go first each night,
+    # so the round is spread over the nights at once, and only a ticker fetched in the last 20 hours waits
+    _listing(tmp_path, ["AAA", "BBB", "CCC"])
+    store = PriceHistoryStore(tmp_path)
+    store.save("AAA", {"symbol": "AAA", "fetched_at": "2026-11-25T13:00:00+00:00", "closes": []})  # a day ago
+    store.save("BBB", {"symbol": "BBB", "fetched_at": "2026-11-24T13:00:00+00:00", "closes": []})  # two days ago
+    store.save("CCC", {"symbol": "CCC", "fetched_at": "2026-11-26T00:00:00+00:00", "closes": []})  # 13 hours ago
+    asked = []
+
+    def get(url):
+        symbol = url.split("code:")[1].split("~")[0]
+        asked.append(symbol)
+        return rows(symbol, [("2026-11-25", 10.5)])
+
+    out = sync_price_history(tmp_path, get=get, now=NOW, limit=1, sleep=lambda s: None)
+    assert asked == ["BBB"] and out["due"] == 2

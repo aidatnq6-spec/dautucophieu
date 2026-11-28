@@ -76,7 +76,7 @@ def sector_valuation(histories: dict[str, dict]) -> dict:
         out[ratio] = {"hien_tai_trung_vi": _plain(median(n for n, _, _ in pairs)) if pairs else None,
                       "trung_vi_5_nam_trung_vi": _plain(median(f for _, f, _ in pairs)) if pairs else None,
                       "so_ma": len(pairs), "so_ma_thap_hon_5_nam": sum(1 for n, f, _ in pairs if n < f),
-                      # counted, not left out: which length is enough is the owner's call (review, 28/11/2026)
+                      # counted, not left out (owner, 28/11/2026): a length threshold would mostly drop tickers with loss months
                       "so_ma_duoi_60_thang": sum(1 for _, _, m in pairs if m < 60)}
     return out
 

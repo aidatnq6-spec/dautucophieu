@@ -12,6 +12,7 @@ import re
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+from investment_agent.market.filings import FilingStore, snippets
 from investment_agent.market.price_history import read_index_sessions
 from investment_agent.market.company_notes import NOTE_GROUPS, NOTE_LABELS
 from investment_agent.market.insider_docs import DocStore, fill_from_docs
@@ -255,6 +256,33 @@ class PublicData:
             return _missing("Mã không hợp lệ.")
         today = today or datetime.now(VN_TZ).date()
         return chains_for_sector(self.root, symbol, today=today, config_path=config_path or VALUE_CHAINS_PATH)
+
+    FILINGS_NOTE = ("Chữ đọc từ bản PDF, phần lớn là bản scan đọc bằng OCR trên máy: số, ngày và dấu có thể sai. Con số quan trọng thì "
+                    "kiểm lại ở trang ghi kèm trong văn bản nguồn. trang_chua_doc là các trang OCR chưa đọc được: không có chữ của "
+                    "các trang đó, nên không tìm thấy không có nghĩa là văn bản không nói tới.")
+
+    def van_ban_cong_bo(self, ma, tu_khoa=None, loai=None, tu_ngay=None) -> dict:
+        """Văn bản công bố cho Claude (owner, 28/11/2026): the stored filings of a ticker, or passages matching a keyword. The same
+        reason for every ticker without filings, so the answer never tells which tickers the app reads filings for."""
+        symbol = self._symbol(ma)
+        if not symbol:
+            return _missing("Mã không hợp lệ.")
+        if loai not in (None, "", "bctc", "nghi_quyet"):
+            return _missing("loai cần là bctc hoặc nghi_quyet.")
+        try:
+            since = date.fromisoformat(str(tu_ngay).strip()).isoformat() if tu_ngay else None
+        except ValueError:
+            return _missing("Ngày không hợp lệ (cần YYYY-MM-DD).")
+        records = FilingStore(self.root / "filings").records(symbol)
+        if not records:
+            return _missing(f"Chưa có văn bản công bố của {symbol} trong kho.")
+        records = [r for r in records if (not loai or r.get("loai") == loai) and (not since or (r.get("ngay") or "") >= since)]
+        if tu_khoa and str(tu_khoa).strip():
+            found, more = snippets(records, str(tu_khoa))
+            return {"ma": symbol, "tu_khoa": str(tu_khoa).strip(), "doan": found, "con_nua": more, "luu_y": self.FILINGS_NOTE}
+        listed = [{k: r.get(k) for k in ("tieu_de", "loai", "ngay", "so_trang", "ocr", "trang_chua_doc", "nguon", "lay_luc")}
+                  for r in records[:40]]
+        return {"ma": symbol, "van_ban": listed, **({"con_nua": True} if len(records) > 40 else {}), "luu_y": self.FILINGS_NOTE}
 
     def so_sanh_nganh(self, ma, so_quy=4) -> dict:
         symbol = self._symbol(ma)

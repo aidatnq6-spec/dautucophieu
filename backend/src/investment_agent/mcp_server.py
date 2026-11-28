@@ -95,6 +95,16 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
         return vn_times(data.chuoi_gia_tri(ma))
 
     @tool
+    def van_ban_cong_bo(ma: str, tu_khoa: str | None = None, loai: str | None = None, tu_ngay: str | None = None) -> dict:
+        """Văn bản công bố của chính công ty (báo cáo tài chính hợp nhất kèm thuyết minh; nghị quyết, quyết định HĐQT, ĐHĐCĐ), chữ đọc
+        trên máy theo từng trang, từ 04/2026. Dùng để biết khoản lãi bất thường đến từ đâu (tu_khoa "thoái vốn", "thu nhập khác",
+        "mua rẻ", "doanh thu hoạt động tài chính"), công ty vay ai và bao nhiêu ("vay", tên ngân hàng), HĐQT vừa quyết định gì
+        ("quyết định", "nghị quyết", "chuyển nhượng"). Không có tu_khoa: danh sách văn bản, mới nhất trước. Có tu_khoa: các đoạn khớp
+        (không phân biệt dấu) kèm số trang và đường dẫn nguồn. loai: bctc hoặc nghi_quyet; tu_ngay: YYYY-MM-DD. Chữ OCR có thể sai số,
+        ngày, dấu: trích nguyên văn và ghi trang, không sửa số."""
+        return vn_times(data.van_ban_cong_bo(ma, tu_khoa, loai, tu_ngay))
+
+    @tool
     def thuyet_minh(ma: str, ky: str = "quy", so_ky: int = 4) -> dict:
         """Thuyết minh BCTC (Vietcap): doanh thu và chi phí tài chính theo khoản (lãi tiền gửi, cổ tức, thanh lý đầu tư, tỷ giá, khác),
         nợ vay theo loại, tồn kho theo loại, tài sản cố định, chi phí theo yếu tố; ky "quy" hoặc "nam"."""

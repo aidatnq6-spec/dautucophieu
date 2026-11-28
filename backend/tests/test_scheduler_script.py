@@ -247,6 +247,14 @@ def test_insider_volumes_are_read_from_hose_documents_in_the_evening_slot_owner_
     assert next(i for i, l in enumerate(ls) if "jobs.step --timeout 900 insider-docs-sync --data-dir $data --limit 30" in l) > evening
 
 
+def test_filings_are_read_after_the_insider_notices_in_the_evening_slot():
+    """Văn bản công bố (28/11/2026): up to four filings a night within 25 minutes, so the step gets 30."""
+    ls = lines()
+    insider = next(i for i, l in enumerate(ls) if "insider-docs-sync --data-dir" in l)
+    filings = next(i for i, l in enumerate(ls) if "jobs.step --timeout 1800 filings-sync --data-dir $data" in l)
+    assert filings > insider and any("filings-sync exit=$LASTEXITCODE" in l for l in ls[filings:filings + 3])
+
+
 def test_long_history_for_p_e_against_its_own_past_is_refreshed_in_the_evening_slot():
     ls = lines()
     evening = next(i for i, l in enumerate(ls) if "(Get-Date).Hour -ge 20" in l)

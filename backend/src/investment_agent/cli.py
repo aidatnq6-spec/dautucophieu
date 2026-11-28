@@ -926,7 +926,7 @@ def filings_sync(data_dir: Path, *, get_text=None, get_bytes=None, read_pdf=None
     from investment_agent.market.filings import MAX_PAGES, sync_filings
     from investment_agent.market.watchlist import load_watchlist
     if read_pdf is None:
-        from investment_agent.insights.ocr import default_reader, with_ocr
+        from investment_agent.insights.ocr import default_reader, needs_ocr, with_ocr
         from investment_agent.insights.pdf import extract_pages
         ocr = default_reader()
         if ocr is None:
@@ -936,11 +936,12 @@ def filings_sync(data_dir: Path, *, get_text=None, get_bytes=None, read_pdf=None
         def read_pdf(data):
             pages = extract_pages(data, max_pages=MAX_PAGES + 1)
             if len(pages) > MAX_PAGES:
-                return pages, 0  # over the limit: skipped without spending OCR on it
-            pages, read_by_ocr, notes = with_ocr(data, pages, read=ocr, max_pages=MAX_PAGES, max_seconds=900)
+                return pages, 0, []  # over the limit: skipped without spending OCR on it
+            # 480 s of OCR plus a 180 s download fit the 600 s a file must have left in the step's budget
+            pages, read_by_ocr, notes = with_ocr(data, pages, read=ocr, max_pages=MAX_PAGES, max_seconds=480)
             if notes and not any(p.strip() for p in pages):
                 raise RuntimeError(notes[0])  # OCR ran out of time or failed: tried again next night
-            return pages, len(read_by_ocr)
+            return pages, len(read_by_ocr), [i + 1 for i, text in enumerate(pages) if needs_ocr(text)]  # said, never hidden
     if get_bytes is None:
         import httpx
 
@@ -961,14 +962,14 @@ def filings_check(url: str, *, get_text=None) -> int:
     from urllib.parse import urljoin
     from urllib.robotparser import RobotFileParser
 
-    from investment_agent.market.filings import classify, label_date, links_on_page
+    from investment_agent.market.filings import classify, is_parent_only, label_date, links_on_page
     get_text = get_text or _filings_get_text
     robots = RobotFileParser()
     try:
         robots.parse(get_text(urljoin(url, "/robots.txt")).splitlines())
         allowed = "allow" if robots.can_fetch(_FILINGS_HEADERS["User-Agent"], url) else "disallow"
-    except Exception:  # noqa: BLE001 - no robots.txt to read
-        allowed = "khong_doc_duoc"
+    except Exception as exc:  # noqa: BLE001 - no robots.txt (404, 410) allows all; any other failure allows nothing
+        allowed = "allow" if getattr(getattr(exc, "response", None), "status_code", None) in (404, 410) else "disallow"
     out = {"url": url, "robots": allowed, "bctc": [], "nghi_quyet": []}
     if allowed == "disallow":
         print(json.dumps(out, ensure_ascii=False))
@@ -982,6 +983,8 @@ def filings_check(url: str, *, get_text=None) -> int:
         kind = classify(link["nhan"])
         if kind:
             out[kind].append({"nhan": link["nhan"], "ngay": label_date(link["nhan"], link["url"]), "url": link["url"]})
+    days = {x["ngay"] for x in out["bctc"] if not is_parent_only(x["nhan"])}  # as filings-sync: parent-only goes when consolidated is there
+    out["bctc"] = [x for x in out["bctc"] if not (is_parent_only(x["nhan"]) and x["ngay"] in days)]
     print(json.dumps(out, ensure_ascii=False))
     return 0 if allowed == "allow" and (out["bctc"] or out["nghi_quyet"]) else 1
 

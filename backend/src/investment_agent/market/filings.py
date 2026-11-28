@@ -67,13 +67,23 @@ def links_on_page(page_html: str, page_url: str) -> list[dict]:
 _STATEMENTS = ("bctc", "bao cao tai chinh")
 _PARENT_ONLY = ("cong ty me", "rieng")
 _RESOLUTIONS = ("nghi quyet", "nq hdqt", "quyet dinh", "dhdcd")
+_RESOLUTION_FIRST = ("nghi quyet", "nq ", "quyet dinh", "bien ban", "cbtt nq")
+
+
+def is_parent_only(label: str) -> bool:
+    """The parent company's own statement ("Công ty Mẹ", "riêng"), not a consolidated one ("hợp nhất Công ty mẹ và các công ty con")."""
+    p = plain(label)
+    return "hop nhat" not in p and any(k in p for k in _PARENT_ONLY)
 
 
 def classify(label: str) -> str | None:
-    """bctc for a consolidated (or only) financial statement, nghi_quyet for a resolution or decision, None for anything else."""
-    p = plain(label)
+    """bctc for a financial statement, nghi_quyet for a resolution or decision (also one that approves a statement), None otherwise.
+    A parent-only statement is still bctc: the sync drops it only when a consolidated one carries the same day."""
+    p = plain(label).strip()
+    if p.startswith(_RESOLUTION_FIRST):
+        return "nghi_quyet"
     if any(k in p for k in _STATEMENTS):
-        return None if any(k in p for k in _PARENT_ONLY) else "bctc"
+        return "bctc"
     return "nghi_quyet" if any(k in p for k in _RESOLUTIONS) else None
 
 
@@ -154,23 +164,45 @@ MAX_BYTES, MAX_PAGES, MAX_ATTEMPTS = 30 * 1024 * 1024, 120, 3
 SINCE = "2026-04-01"
 
 
+USER_AGENT = "investment-agent/0.1 (personal use)"
+ROBOTS_NO = "robots.txt không cho đọc"
+
+
 def _file_key(url: str) -> str:
-    """The file name folded to letters and digits, "sign" and a trailing copy number dropped: the same file under the company's
-    name and VNDirect's (20260818-kdh-cbtt-nq-...-cong-ty-con-1.pdf, "20260818 - KDH - CBTT NQ ... Cong ty con sign.pdf")."""
+    """The file name folded to letters and digits with "sign" dropped, to match a company's file with VNDirect's copy of it
+    (20260818-kdh-cbtt-nq-...-cong-ty-con-1.pdf, "20260818 - KDH - CBTT NQ ... Cong ty con sign.pdf")."""
     from urllib.parse import unquote
     name = plain(unquote(url.rsplit("/", 1)[-1].split("?")[0]))
     name = re.sub(r"\.pdf$", "", name)
-    name = re.sub(r"[^a-z0-9]+", " ", name).split()
-    name = [w for w in name if w != "sign"]
-    if len(name) > 1 and re.fullmatch(r"\d{1,2}", name[-1]):
-        name = name[:-1]
-    return "".join(name)
+    return "".join(w for w in re.sub(r"[^a-z0-9]+", " ", name).split() if w != "sign")
 
 
-def _label_key(label: str) -> str:
-    text = re.sub(r"\([^)]*\)", " ", plain(label))
-    text = re.sub(r"^[a-z0-9]{3,10}\s*:\s*", "", text.strip())
-    return re.sub(r"[^a-z0-9]+", "", text)
+def _same_file(company_key: str, vndirect_key: str) -> bool:
+    """VNDirect's copy of a company's file: the same name, or the company's with a copy number after it ("...-1")."""
+    rest = company_key[len(vndirect_key):] if company_key.startswith(vndirect_key) else None
+    return bool(vndirect_key) and rest is not None and re.fullmatch(r"\d{0,2}", rest) is not None
+
+
+def _robots(url: str, get_text, cache: dict) -> bool:
+    """Whether robots.txt of the url's site lets this app read it. No robots.txt (404, 410) allows all; any other failure to read it
+    allows nothing tonight."""
+    from urllib.parse import urlsplit
+    from urllib.robotparser import RobotFileParser
+    parts = urlsplit(url)
+    origin = f"{parts.scheme}://{parts.netloc}"
+    if origin not in cache:
+        parser = RobotFileParser()
+        try:
+            parser.parse(get_text(origin + "/robots.txt").splitlines())
+        except Exception as exc:  # noqa: BLE001
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            if status not in (404, 410):
+                cache[origin] = None
+                return False
+            parser.parse([])
+        cache[origin] = parser
+    parser = cache[origin]
+    return parser is not None and parser.can_fetch(USER_AGENT, url)
 
 
 def _sources(data_dir: Path) -> dict:
@@ -181,12 +213,17 @@ def _sources(data_dir: Path) -> dict:
         return {}
 
 
-def _candidates(ma: str, source: dict, *, get_text, sleep, since: str, page_errors: dict) -> list[dict]:
-    """The PDFs to keep for one ticker: the company's pages first (they carry decisions VNDirect lacks), then VNDirect's news."""
-    found = []
+def _candidates(ma: str, source: dict, *, get_text, sleep, since: str, page_errors: dict, robots: dict) -> list[dict]:
+    """The PDFs to keep for one ticker: the company's pages first (they carry decisions VNDirect lacks), then VNDirect's news.
+    Distinct urls stay distinct; a VNDirect attachment is dropped only when it is the company's own file; a parent-only statement is
+    dropped when a consolidated one carries the same day."""
+    company, vndirect = [], []
     for field in ("bctc", "cbtt"):
         url = source.get(field)
         if not url:
+            continue
+        if not _robots(url, get_text, robots):
+            page_errors[f"{ma} {field}"] = ROBOTS_NO
             continue
         try:
             page = get_text(url)
@@ -198,8 +235,8 @@ def _candidates(ma: str, source: dict, *, get_text, sleep, since: str, page_erro
         for link in links_on_page(page, url):
             kind = classify(link["nhan"])
             if kind:
-                found.append({"url": link["url"], "nhan": link["nhan"], "loai": kind,
-                              "ngay": label_date(link["nhan"], link["url"]), "trang_nguon": url})
+                company.append({"url": link["url"], "nhan": link["nhan"], "loai": kind, "ngay": label_date(link["nhan"], link["url"]),
+                                "trang_nguon": url, "robots": _robots(link["url"], get_text, robots)})
     try:
         rows = json.loads(get_text(NEWS_URL.format(ma=ma, since=since))).get("data") or []
     except Exception as exc:  # noqa: BLE001
@@ -213,65 +250,74 @@ def _candidates(ma: str, source: dict, *, get_text, sleep, since: str, page_erro
         for att in row.get("attachments") or []:
             url = str(att.get("url") or "")
             if url.lower().split("?")[0].endswith(".pdf"):
-                title = str(row.get("newsTitle") or "").strip()
-                found.append({"url": url, "nhan": title, "loai": "nghi_quyet", "ngay": str(row.get("newsDate") or "")[:10] or None,
-                              "trang_nguon": row.get("dstockUrl")})
-    kept, files, labels = [], set(), set()
-    for c in found:
-        if c["ngay"] is not None and c["ngay"] < since:
+                vndirect.append({"url": url, "nhan": str(row.get("newsTitle") or "").strip(), "loai": "nghi_quyet",
+                                 "ngay": str(row.get("newsDate") or "")[:10] or None, "trang_nguon": row.get("dstockUrl"), "robots": True})
+    consolidated_days = {c["ngay"] for c in company if c["loai"] == "bctc" and not is_parent_only(c["nhan"])}
+    company = [c for c in company if not (c["loai"] == "bctc" and is_parent_only(c["nhan"]) and c["ngay"] in consolidated_days)]
+    company_keys = [_file_key(c["url"]) for c in company]
+    vndirect = [v for v in vndirect if not any(_same_file(k, _file_key(v["url"])) for k in company_keys)]
+    kept, urls = [], set()
+    for c in company + vndirect:
+        if (c["ngay"] is not None and c["ngay"] < since) or c["url"] in urls:
             continue
-        fkey, lkey = _file_key(c["url"]), (c["ngay"], _label_key(c["nhan"]))
-        if fkey in files or (c["ngay"] and lkey in labels):
-            continue
-        files.add(fkey)
-        labels.add(lkey)
+        urls.add(c["url"])
         kept.append({**c, "ma": ma, "id": doc_id(c["url"])})
     return kept
 
 
 def sync_filings(data_dir: Path, symbols: list[str], *, get_text, get_bytes, read_pdf, now, clock=None, sleep=None,
-                 max_files: int = 4, budget_seconds: float = 1500, since: str = SINCE) -> dict:
-    """Read up to max_files new filings of the given tickers within the time budget: statements before resolutions, newest first.
-    read_pdf(bytes) -> (page texts, pages read by OCR). A file over 30 MB or 120 pages is skipped for good; one that fails is tried
-    again on the next three nights; what the budget leaves stays pending."""
+                 max_files: int = 4, budget_seconds: float = 1500, file_seconds: float = 600, since: str = SINCE) -> dict:
+    """Read up to max_files new filings of the given tickers within the time budget (counted from the start, source pages included):
+    statements before resolutions, newest first; a file starts only when file_seconds of the budget are left. read_pdf(bytes) ->
+    (page texts, pages read by OCR[, page numbers OCR could not read]). A file over 30 MB or 120 pages is skipped for good; each start
+    counts as an attempt before the download, so a file whose step is killed is not retried for ever; three attempts and it is left.
+    What the budget leaves stays pending."""
     import time
     clock, sleep = clock or time.monotonic, sleep or time.sleep
+    start = clock()
     store = FilingStore(Path(data_dir) / "filings")
-    state, sources, page_errors = store.state(), _sources(data_dir), {}
-    todo = []
+    state, sources, page_errors, robots = store.state(), _sources(data_dir), {}, {}
+    todo, skipped = [], {}
     for ma in symbols:
         if not _SYMBOL.fullmatch(ma or ""):
             continue
-        for c in _candidates(ma, sources.get(ma) or {}, get_text=get_text, sleep=sleep, since=since, page_errors=page_errors):
+        for c in _candidates(ma, sources.get(ma) or {}, get_text=get_text, sleep=sleep, since=since, page_errors=page_errors,
+                             robots=robots):
             seen = state.get(c["id"]) or {}
             if seen.get("skipped") or seen.get("attempts", 0) >= MAX_ATTEMPTS or store.read(ma, c["id"]) is not None:
                 continue
+            if not c["robots"]:
+                skipped[c["id"]] = ROBOTS_NO
+                continue
             todo.append(c)
     todo.sort(key=lambda c: (c["loai"] == "bctc", c["ngay"] is not None, c["ngay"] or ""), reverse=True)
-    read, skipped, errors, start, tried = [], {}, {}, clock(), 0
+    read, errors, tried = [], {}, 0
     for c in todo:
-        if tried >= max_files or clock() - start >= budget_seconds:
+        if tried >= max_files or budget_seconds - (clock() - start) < file_seconds:
             break
         tried += 1
         entry = state.setdefault(c["id"], {"ma": c["ma"], "nguon": c["url"]})
+        entry["attempts"] = entry.get("attempts", 0) + 1
+        store.save_state(state)
         try:
             data = get_bytes(c["url"])
             if len(data) > MAX_BYTES:
                 entry["skipped"] = skipped[c["id"]] = "tệp quá 30 MB"
+                store.save_state(state)
                 continue
-            pages, ocr_pages = read_pdf(data)
+            result = read_pdf(data)
+            pages, ocr_pages = result[0], result[1]
+            unread = sorted(result[2]) if len(result) > 2 else []
             if len(pages) > MAX_PAGES:
                 entry["skipped"] = skipped[c["id"]] = "quá 120 trang"
+                store.save_state(state)
                 continue
         except Exception as exc:  # noqa: BLE001 - one file failing never stops the others
-            entry["attempts"] = entry.get("attempts", 0) + 1
             errors[c["id"]] = f"error:{type(exc).__name__}"
             continue
-        finally:
-            store.save_state(state)
         store.save({"ma": c["ma"], "id": c["id"], "loai": c["loai"], "tieu_de": c["nhan"], "ngay": c["ngay"], "nguon": c["url"],
                     "trang_nguon": c["trang_nguon"], "lay_luc": now.isoformat(), "so_trang": len(pages), "ocr": ocr_pages,
-                    "trang": pages})
+                    "trang_chua_doc": unread, "trang": [unicodedata.normalize("NFC", p) for p in pages]})
         state.pop(c["id"], None)
         store.save_state(state)
         read.append(c["id"])
@@ -279,22 +325,42 @@ def sync_filings(data_dir: Path, symbols: list[str], *, get_text, get_bytes, rea
     return {**out, **({"page_errors": page_errors} if page_errors else {})}
 
 
+def _folded_with_map(text: str) -> tuple[str, list[int]]:
+    """The text folded (plain) with every run of whitespace as one space, and the index in the text of each folded character."""
+    out, where = [], []
+    for i, ch in enumerate(text):
+        if ch.isspace():
+            if out and out[-1] == " ":
+                continue
+            out.append(" ")
+        else:
+            out.append(_fold(ch))
+        where.append(i)
+    return "".join(out), where
+
+
 def snippets(records: list[dict], keyword: str, *, width: int = 600, limit: int = 12) -> tuple[list[dict], bool]:
-    """Passages around each match of the keyword (accents and case ignored), in the records' order, at most `limit`; True when more
-    matched than were returned."""
-    needle = plain(keyword).strip()
+    """Passages around each match of the keyword (accents, case, line breaks and doubled spaces ignored), in the records' order, at
+    most `limit`; True when more matched than were returned. The passage is the page's own text, never the folded one."""
+    needle = re.sub(r"\s+", " ", plain(unicodedata.normalize("NFC", keyword))).strip()[: width // 2]
     if not needle:
         return [], False
     found = []
     for rec in records:
         for number, page in enumerate(rec.get("trang") or [], start=1):
-            folded, at = plain(page), 0
+            page = unicodedata.normalize("NFC", page)
+            folded, where = _folded_with_map(page)
+            at, shown_to = 0, -1
             while (pos := folded.find(needle, at)) >= 0:
+                at = pos + len(needle)
+                origin = where[pos]
+                if origin < shown_to:
+                    continue
                 if len(found) == limit:
                     return found, True
-                start = max(0, pos - (width - len(needle)) // 2)
+                start = max(0, origin - (width - len(needle)) // 2)
                 text = re.sub(r"\s+", " ", page[start:start + width]).strip()
                 found.append({"tieu_de": rec.get("tieu_de"), "ngay": rec.get("ngay"), "loai": rec.get("loai"), "trang": number,
                               "nguon": rec.get("nguon"), "doan": text})
-                at = start + width
+                shown_to = start + width
     return found, False

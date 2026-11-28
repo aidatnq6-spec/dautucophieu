@@ -258,7 +258,8 @@ class PublicData:
         return chains_for_sector(self.root, symbol, today=today, config_path=config_path or VALUE_CHAINS_PATH)
 
     FILINGS_NOTE = ("Chữ đọc từ bản PDF, phần lớn là bản scan đọc bằng OCR trên máy: số, ngày và dấu có thể sai. Con số quan trọng thì "
-                    "kiểm lại ở trang ghi kèm trong văn bản nguồn.")
+                    "kiểm lại ở trang ghi kèm trong văn bản nguồn. trang_chua_doc là các trang OCR chưa đọc được: không có chữ của "
+                    "các trang đó, nên không tìm thấy không có nghĩa là văn bản không nói tới.")
 
     def van_ban_cong_bo(self, ma, tu_khoa=None, loai=None, tu_ngay=None) -> dict:
         """Văn bản công bố cho Claude (owner, 28/11/2026): the stored filings of a ticker, or passages matching a keyword. The same
@@ -279,7 +280,8 @@ class PublicData:
         if tu_khoa and str(tu_khoa).strip():
             found, more = snippets(records, str(tu_khoa))
             return {"ma": symbol, "tu_khoa": str(tu_khoa).strip(), "doan": found, "con_nua": more, "luu_y": self.FILINGS_NOTE}
-        listed = [{k: r.get(k) for k in ("tieu_de", "loai", "ngay", "so_trang", "ocr", "nguon", "lay_luc")} for r in records[:40]]
+        listed = [{k: r.get(k) for k in ("tieu_de", "loai", "ngay", "so_trang", "ocr", "trang_chua_doc", "nguon", "lay_luc")}
+                  for r in records[:40]]
         return {"ma": symbol, "van_ban": listed, **({"con_nua": True} if len(records) > 40 else {}), "luu_y": self.FILINGS_NOTE}
 
     def so_sanh_nganh(self, ma, so_quy=4) -> dict:

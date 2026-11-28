@@ -6,10 +6,10 @@ from investment_agent.market.filings import FilingStore, doc_id
 from investment_agent.public_tools import PublicData
 
 
-def save(store, url, ngay, loai, pages, tieu_de):
+def save(store, url, ngay, loai, pages, tieu_de, unread=()):
     store.save({"ma": "KDH", "id": doc_id(url), "loai": loai, "tieu_de": tieu_de, "ngay": ngay, "nguon": url,
                 "trang_nguon": "https://www.example.vn/co-dong", "lay_luc": "2026-11-28T13:00:00+00:00", "so_trang": len(pages),
-                "ocr": len(pages), "trang": pages})
+                "ocr": len(pages), "trang_chua_doc": list(unread), "trang": pages})
 
 
 @pytest.fixture
@@ -17,7 +17,8 @@ def data(tmp_path):
     store = FilingStore(tmp_path / "filings")
     save(store, "https://x.vn/q2.pdf", "2026-07-29", "bctc",
          ["Bảng cân đối", "26.2 Doanh thu hoạt động tài chính: Lãi từ thoái vón công ty con 896.333.984"], "BCTC Hợp nhất Q2.2026")
-    save(store, "https://x.vn/q3.pdf", "2026-10-30", "bctc", ["Vay dài hạn ngân hàng 16.125.462.490"], "BCTC Hợp nhất Q3.2026")
+    save(store, "https://x.vn/q3.pdf", "2026-10-30", "bctc", ["", "Vay dài hạn ngân hàng 16.125.462.490"], "BCTC Hợp nhất Q3.2026",
+         unread=[1])
     save(store, "https://x.vn/qd.pdf", "2026-06-05", "nghi_quyet", ["Quyết định chuyển nhượng 51% vốn Bình Trưng Mới"], "Quyết định")
     return PublicData(tmp_path)
 
@@ -26,6 +27,7 @@ def test_without_a_keyword_the_tool_lists_filings_newest_first(data):
     out = data.van_ban_cong_bo("kdh")
     assert out["ma"] == "KDH" and [v["tieu_de"] for v in out["van_ban"]] == ["BCTC Hợp nhất Q3.2026", "BCTC Hợp nhất Q2.2026", "Quyết định"]
     assert all("trang" not in v for v in out["van_ban"]) and "OCR" in out["luu_y"]
+    assert out["van_ban"][0]["trang_chua_doc"] == [1]  # pages OCR could not read are said, not hidden
     assert [v["tieu_de"] for v in data.van_ban_cong_bo("KDH", loai="nghi_quyet")["van_ban"]] == ["Quyết định"]
     assert [v["tieu_de"] for v in data.van_ban_cong_bo("KDH", tu_ngay="2026-07-01")["van_ban"]] == ["BCTC Hợp nhất Q3.2026", "BCTC Hợp nhất Q2.2026"]
 

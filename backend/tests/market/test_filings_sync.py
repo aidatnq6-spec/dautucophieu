@@ -25,6 +25,8 @@ class Web:
         self.pages, self.files, self.fetched = pages, files, []
 
     def get_text(self, url):
+        if url.endswith("/robots.txt") and url not in self.pages:
+            return ""  # no rules: everything allowed
         for prefix, body in self.pages.items():
             if url.startswith(prefix):
                 return body
@@ -131,8 +133,59 @@ def test_the_time_budget_leaves_the_rest_pending_not_failed(data):
     web = Web({f"{SITE}/bctc": statements_page(*[(u, f"BCTC Hợp nhất (2{i + 1}/07/2026)") for i, u in enumerate(urls)]),
                f"{SITE}/cbtt": "", "https://api-finfo": vnd_news()}, {u: b"c" for u in urls})
     clock = Clock()
-    out = run(data, web, read_pdf=reader(clock), clock=clock, budget_seconds=1000)
-    assert len(out["read"]) == 2 and out["pending"] == 1 and out["errors"] == {}  # 0 s and 600 s start a file; 1200 s does not
+    out = run(data, web, read_pdf=reader(clock), clock=clock, budget_seconds=1300, file_seconds=600)
+    assert len(out["read"]) == 2 and out["pending"] == 1 and out["errors"] == {}  # 0 s and 600 s start a file; 1200 s has 100 s left
+
+
+def test_distinct_numbered_files_and_same_day_resolutions_are_all_kept(data):
+    a, b = f"{SITE}/2026/08/20260818-nq-hdqt-so-15.pdf", f"{SITE}/2026/08/20260818-nq-hdqt-so-16.pdf"
+    c, d = f"{SITE}/up/nq.pdf", f"{SITE}/up2/nq.pdf"
+    web = Web({f"{SITE}/bctc": "", f"{SITE}/cbtt": statements_page(
+        (a, "Nghị quyết HĐQT (18/08/2026)"), (b, "Nghị quyết HĐQT (18/08/2026)"), (c, "NQ HĐQT (19/08/2026)"), (d, "NQ HĐQT (20/08/2026)")),
+        "https://api-finfo": vnd_news()}, {u: b"x" for u in (a, b, c, d)})
+    assert len(run(data, web)["read"]) == 4
+
+
+def test_a_parent_only_statement_is_dropped_only_when_a_consolidated_one_has_the_same_day(data):
+    hn, me, me_alone = (f"{SITE}/2026/07/20260729-hop-nhat.pdf", f"{SITE}/2026/07/20260729-me.pdf", f"{SITE}/2026/04/20260429-me.pdf")
+    web = Web({f"{SITE}/bctc": statements_page((hn, "BCTC Hợp nhất Q2.2026 (29/07/2026)"), (me, "BCTC Công ty Mẹ Q2.2026 (29/07/2026)"),
+                                               (me_alone, "BCTC Công ty Mẹ Q1.2026 (29/04/2026)")),
+               f"{SITE}/cbtt": "", "https://api-finfo": vnd_news()}, {u: b"x" for u in (hn, me, me_alone)})
+    run(data, web)
+    assert web.fetched == [hn, me_alone]
+
+
+def test_a_file_killed_mid_read_has_its_attempt_counted(data):
+    url = f"{SITE}/2026/07/20260729-b.pdf"
+    web = Web({f"{SITE}/bctc": statements_page((url, "BCTC Hợp nhất (29/07/2026)")), f"{SITE}/cbtt": "",
+               "https://api-finfo": vnd_news()}, {url: b"x"})
+
+    class Killed(BaseException):
+        pass
+
+    def killed(data):
+        raise Killed
+    with pytest.raises(Killed):
+        run(data, web, read_pdf=killed)
+    assert FilingStore(data / "filings").state()[doc_id(url)]["attempts"] == 1
+
+
+def test_pages_ocr_did_not_read_are_kept_with_the_record(data):
+    url = f"{SITE}/2026/07/20260729-b.pdf"
+    web = Web({f"{SITE}/bctc": statements_page((url, "BCTC Hợp nhất (29/07/2026)")), f"{SITE}/cbtt": "",
+               "https://api-finfo": vnd_news()}, {url: b"x"})
+    run(data, web, read_pdf=lambda d: (["một", "", "ba"], 2, [2]))
+    assert FilingStore(data / "filings").read("KDH", doc_id(url))["trang_chua_doc"] == [2]
+
+
+def test_robots_disallowed_pages_and_files_are_not_read(data):
+    url = f"{SITE}/private/20260729-b.pdf"
+    web = Web({f"{SITE}/robots.txt": "User-agent: *\nDisallow: /cbtt\nDisallow: /private/\n",
+               f"{SITE}/bctc": statements_page((url, "BCTC Hợp nhất (29/07/2026)")), f"{SITE}/cbtt": statements_page(),
+               "https://api-finfo": vnd_news()}, {url: b"x"})
+    out = run(data, web)
+    assert web.fetched == [] and out["page_errors"]["KDH cbtt"] == "robots.txt không cho đọc"
+    assert out["skipped"] == {doc_id(url): "robots.txt không cho đọc"}
 
 
 def test_files_before_april_are_left_out(data):

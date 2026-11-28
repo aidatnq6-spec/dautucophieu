@@ -1,6 +1,12 @@
 """Văn bản công bố (docs/superpowers/specs/2026-11-28-van-ban-cong-bo-design.md): the pure parts."""
 
-from investment_agent.market.filings import FilingStore, classify, doc_id, label_date, links_on_page, snippets
+from investment_agent.market.filings import FilingStore, classify, doc_id, is_parent_only, label_date, links_on_page, snippets
+
+
+def test_parent_only_statements_are_told_apart_from_consolidated_ones():
+    assert is_parent_only("BCTC Công ty Mẹ Q2.2026 (29/07/2026)") and is_parent_only("Báo cáo tài chính riêng quý 3/2026")
+    assert not is_parent_only("Báo cáo tài chính hợp nhất Công ty mẹ và các công ty con quý 2/2026")
+    assert not is_parent_only("BCTC Hợp nhất Q2.2026")
 
 PAGE = """<ul>
 <li><a href="/wp-content/uploads/2026/07/20260729-kdh-bctc-hop-nhat-q22026.pdf"><span>BCTC Hợp nhất Q2.2026 +
@@ -21,8 +27,9 @@ def test_links_are_absolute_pdf_links_with_their_labels():
 def test_consolidated_statements_and_resolutions_are_classified_parent_only_is_not():
     assert classify("BCTC Hợp nhất Q2.2026 + Giải trình trong TM (29/07/2026)") == "bctc"
     assert classify("Báo cáo tài chính hợp nhất soát xét 6 tháng năm 2026") == "bctc"
-    assert classify("BCTC Công ty Mẹ Q2.2026 (29/07/2026)") is None
-    assert classify("Báo cáo tài chính riêng quý 3/2026") is None
+    assert classify("BCTC Công ty Mẹ Q2.2026 (29/07/2026)") == "bctc"  # kept unless a consolidated one has the same day (sync)
+    assert classify("Báo cáo tài chính hợp nhất Công ty mẹ và các công ty con quý 2/2026") == "bctc"
+    assert classify("Nghị quyết HĐQT thông qua BCTC kiểm toán năm 2025") == "nghi_quyet"
     assert classify("NQ HĐQT số 23 ngày 12/11/2026") == "nghi_quyet"
     assert classify("Quyết định về việc chuyển nhượng phần vốn góp tại Công ty con") == "nghi_quyet"
     assert classify("Biên bản họp và Nghị quyết ĐHĐCĐ thường niên năm 2026") == "nghi_quyet"
@@ -74,3 +81,11 @@ def test_snippets_match_without_accents_and_say_when_there_are_more():
     assert len(found) == 12 and more is True
     long = record("KDH", "https://x.vn/l.pdf", "2026-07-29", "bctc", ["x" * 2000 + " vay " + "y" * 2000])
     assert len(snippets([long], "vay", width=600)[0][0]["doan"]) <= 600
+
+
+def test_a_phrase_broken_across_lines_or_in_decomposed_letters_still_matches():
+    import unicodedata
+    wrapped = record("KDH", "https://x.vn/w.pdf", "2026-10-30", "bctc", ["12. Thu nhập\n   khác 141.432.614"])
+    assert snippets([wrapped], "thu nhập khác")[0][0]["trang"] == 1
+    nfd = record("KDH", "https://x.vn/n.pdf", "2026-10-30", "bctc", [unicodedata.normalize("NFD", "Lãi từ thoái vốn công ty con")])
+    assert len(snippets([nfd], "thoái vốn")[0]) == 1

@@ -42,6 +42,10 @@ Hôm 28/11/2026 các câu hỏi này với KDH phải tải tay và đọc OCR t
 
 - Bước `filings-sync` trong lượt 20:00, sau `insider-docs-sync`, `jobs.step --timeout 1800`.
 - Mỗi đêm: đọc trang nguồn của từng mã theo dõi (một lần gọi mỗi trang, nghỉ 1 giây), lập danh sách tệp mới, rồi tải và OCR tối đa 4 tệp, mới nhất trước, báo cáo tài chính trước nghị quyết. Hết 25 phút thì dừng và để phần còn lại cho đêm sau.
+- Thời gian tính từ đầu bước (cả lúc đọc trang nguồn); một tệp chỉ bắt đầu khi còn ít nhất 10 phút, OCR mỗi tệp tối đa 8 phút. Mỗi lần bắt đầu một tệp được tính là một lần thử trước khi tải, nên tệp làm bước bị dừng giữa chừng không bị thử mãi.
+- Trang OCR không đọc được ghi vào `trang_chua_doc` và hiện trong danh sách của công cụ; không giấu.
+- robots.txt được kiểm mỗi đêm cho trang công ty và tệp PDF trên trang đó; không có robots.txt (404, 410) thì được đọc, lỗi khác thì không đọc đêm đó.
+- Bỏ trùng (sửa sau rà soát 28/11): đường dẫn khác nhau là văn bản khác nhau; tệp VNDirect chỉ bỏ khi trùng tên tệp với tệp của công ty; báo cáo riêng (Công ty Mẹ) chỉ bỏ khi cùng ngày có bản hợp nhất.
 - Tệp quá 30 MB hoặc quá 120 trang: lưu tên, đường dẫn, lý do bỏ qua; không tải lại.
 - Lỗi một tệp không dừng các tệp khác; tệp lỗi được thử lại tối đa 3 đêm.
 - Lưu `data/filings/<MÃ>/<id>.json`: `ma`, `loai` (`bctc` | `nghi_quyet`), `tieu_de`, `ngay` (ngày trong nhãn hoặc tin; thiếu thì `null`), `nguon` (url), `trang_nguon`, `lay_luc`, `so_trang`, `ocr` (số trang đọc bằng OCR), `trang` (danh sách chữ theo trang). Không giữ tệp PDF.

@@ -46,6 +46,13 @@ def test_filings_check_lists_readable_links_and_robots(capsys):
     assert filings_check("https://www.example.vn/co-dong/bctc", get_text=web("User-agent: *\nDisallow: /co-dong/\n")) == 1
     assert json.loads(capsys.readouterr().out)["robots"] == "disallow"
 
+    def robots_fails(url):
+        if url.endswith("/robots.txt"):
+            raise OSError("403")
+        return web()(url)
+    assert filings_check("https://www.example.vn/co-dong/bctc", get_text=robots_fails) == 1  # unreadable robots.txt: not read
+    assert json.loads(capsys.readouterr().out)["robots"] == "disallow"
+
 
 def test_the_commands_are_registered(tmp_path, monkeypatch):
     seen = {}

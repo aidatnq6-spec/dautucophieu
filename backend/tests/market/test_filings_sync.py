@@ -75,7 +75,7 @@ def test_new_statements_are_read_first_up_to_four_a_night(data):
     web = Web({f"{SITE}/bctc": statements_page(*statements), f"{SITE}/cbtt": statements_page(*resolutions),
                "https://api-finfo": vnd_news()},
               {u: b"chu" for u, _ in statements + resolutions})
-    out = run(data, web)
+    out = run(data, web, max_files=4)
     assert web.fetched == [statements[2][0], statements[1][0], statements[0][0], resolutions[2][0]]
     assert len(out["read"]) == 4 and out["pending"] == 2 and out["errors"] == {}
     rec = FilingStore(data / "filings").read("KDH", doc_id(statements[2][0]))
@@ -135,6 +135,15 @@ def test_the_time_budget_leaves_the_rest_pending_not_failed(data):
     clock = Clock()
     out = run(data, web, read_pdf=reader(clock), clock=clock, budget_seconds=1300, file_seconds=600)
     assert len(out["read"]) == 2 and out["pending"] == 1 and out["errors"] == {}  # 0 s and 600 s start a file; 1200 s has 100 s left
+
+
+def test_up_to_twenty_files_a_night_within_the_time_budget(data):
+    """Owner, 28/11/2026: four a night left 901 filings waiting; short resolutions take about a minute, so the 25 minutes decide."""
+    urls = [f"{SITE}/2026/08/202608{d:02d}-nq.pdf" for d in range(1, 26)]
+    web = Web({f"{SITE}/bctc": "", f"{SITE}/cbtt": statements_page(*[(u, f"NQ HĐQT ({i + 1:02d}/08/2026)") for i, u in enumerate(urls)]),
+               "https://api-finfo": vnd_news()}, {u: b"x" for u in urls})
+    out = run(data, web)
+    assert len(out["read"]) == 20 and out["pending"] == 5
 
 
 def test_distinct_numbered_files_and_same_day_resolutions_are_all_kept(data):

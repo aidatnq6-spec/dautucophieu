@@ -155,7 +155,7 @@ if ((Get-Date).Hour -ge 20) {
     $idoc = & $python -W ignore -m investment_agent.jobs.step --timeout 900 insider-docs-sync --data-dir $data --limit 30 2>$null
     "$(Get-Date -Format o) insider-docs-sync exit=$LASTEXITCODE $idoc" | Add-Content -LiteralPath $log -Encoding UTF8
     # Van ban cong bo: watched tickers' statements (company shareholder pages, data/report-sources.json) and resolutions (those
-    # pages and VNDirect), read on this machine (OCR) into data/filings; at most 4 files and 25 minutes a night.
+    # pages and VNDirect), read on this machine (OCR) into data/filings; at most 20 files and 25 minutes a night.
     $fil = & $python -W ignore -m investment_agent.jobs.step --timeout 1800 filings-sync --data-dir $data 2>$null
     "$(Get-Date -Format o) filings-sync exit=$LASTEXITCODE $fil" | Add-Content -LiteralPath $log -Encoding UTF8
     # Ke hoach nam: the current year's business plan of each watched ticker from CafeF (one public call each, weekly per ticker).

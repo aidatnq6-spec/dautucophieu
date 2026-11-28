@@ -81,6 +81,13 @@ def build_server(data_dir: Path | str | None = None) -> MCPServer:
         return vn_times(data.so_sanh_nganh(ma, so_quy))
 
     @tool
+    def chuoi_gia_tri(ma: str) -> dict:
+        """Chuỗi giá trị của ngành ICB cấp 2 mà mã thuộc về (mọi chuỗi của ngành, không cho biết mã có trong chuỗi hay không): các khâu
+        đầu vào – trung gian – đầu ra kèm nguồn, từng yếu tố vĩ mô (chiều 1 tháng, tốt hay xấu cho ngành, trọng số), tỷ trọng tốt/xấu,
+        nhận định tổng chỉ khi chuỗi đã duyệt, hiệu suất bình quân theo kỳ và P/E, P/B trung vị so với 5 năm."""
+        return vn_times(data.chuoi_gia_tri(ma))
+
+    @tool
     def thuyet_minh(ma: str, ky: str = "quy", so_ky: int = 4) -> dict:
         """Thuyết minh BCTC (Vietcap): doanh thu và chi phí tài chính theo khoản (lãi tiền gửi, cổ tức, thanh lý đầu tư, tỷ giá, khác),
         nợ vay theo loại, tồn kho theo loại, tài sản cố định, chi phí theo yếu tố; ky "quy" hoặc "nam"."""

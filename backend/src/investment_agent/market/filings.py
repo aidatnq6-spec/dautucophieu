@@ -216,12 +216,49 @@ def _sources(data_dir: Path) -> dict:
         return {}
 
 
+CAFEF_URL = "https://cafef.vn/du-lieu/Ajax/PageNew/FileBCTC.ashx?Symbol={ma}&Type=1&Year=0"
+
+
+def _cafef_statements(ma: str, *, get_text, sleep, since: str, page_errors: dict, robots: dict) -> list[dict] | None:
+    """CafeF's statements for one ticker, or None when CafeF has none or cannot be read (the company's page is used then). A
+    parent-only statement is dropped when the same period has a consolidated one. The date is the YYYYMMDD after "<MÃ>_" in the file
+    name; a file without it is kept only when its year is the since year or later."""
+    url = CAFEF_URL.format(ma=ma)
+    if not _robots(url, get_text, robots):
+        page_errors[f"{ma} cafef"] = ROBOTS_NO
+        return None
+    try:
+        rows = json.loads(get_text(url)).get("Data") or []
+    except Exception as exc:  # noqa: BLE001 - CafeF failing leaves the company's page
+        page_errors[f"{ma} cafef"] = f"error:{type(exc).__name__}"
+        return None
+    finally:
+        sleep(1)
+    found = []
+    for row in rows:
+        link, name = str(row.get("Link") or "").split("?")[0], str(row.get("Name") or "").strip()
+        if not link.lower().endswith(".pdf") or not name:
+            continue
+        m = re.match(rf"{re.escape(ma)}_(\d{{4}})(\d{{2}})(\d{{2}})", link.rsplit("/", 1)[-1])
+        day = _day(int(m[1]), int(m[2]), int(m[3])) if m else None
+        if day is None and int(row.get("Year") or 0) < int(since[:4]):
+            continue
+        found.append({"url": link, "nhan": name, "loai": "bctc", "ngay": day, "ky": str(row.get("Time") or ""), "trang_nguon": url,
+                      "robots": _robots(link, get_text, robots)})
+    if not found:
+        return None
+    consolidated = {f["ky"] for f in found if not is_parent_only(f["nhan"])}
+    return [{k: v for k, v in f.items() if k != "ky"} for f in found if not (is_parent_only(f["nhan"]) and f["ky"] in consolidated)]
+
+
 def _candidates(ma: str, source: dict, *, get_text, sleep, since: str, page_errors: dict, robots: dict) -> list[dict]:
     """The PDFs to keep for one ticker: the company's pages first (they carry decisions VNDirect lacks), then VNDirect's news.
     Distinct urls stay distinct; a VNDirect attachment is dropped only when it is the company's own file; a parent-only statement is
     dropped when a consolidated one carries the same day."""
     company, vndirect = [], []
-    for field in ("bctc", "cbtt"):
+    cafef = _cafef_statements(ma, get_text=get_text, sleep=sleep, since=since, page_errors=page_errors, robots=robots)
+    company += cafef or []
+    for field in ("cbtt",) if cafef else ("bctc", "cbtt"):
         url = source.get(field)
         if not url:
             continue

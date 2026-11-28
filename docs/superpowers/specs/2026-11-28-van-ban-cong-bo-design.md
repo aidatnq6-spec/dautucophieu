@@ -41,7 +41,7 @@ Hôm 28/11/2026 các câu hỏi này với KDH phải tải tay và đọc OCR t
 ## Lượt chạy
 
 - Bước `filings-sync` trong lượt 20:00, sau `insider-docs-sync`, `jobs.step --timeout 1800`.
-- Mỗi đêm: đọc trang nguồn của từng mã theo dõi (một lần gọi mỗi trang, nghỉ 1 giây), lập danh sách tệp mới, rồi tải và OCR tối đa 4 tệp, mới nhất trước, báo cáo tài chính trước nghị quyết. Hết 25 phút thì dừng và để phần còn lại cho đêm sau.
+- Mỗi đêm: đọc trang nguồn của từng mã theo dõi (một lần gọi mỗi trang, nghỉ 1 giây), lập danh sách tệp mới, rồi tải và OCR tối đa 20 tệp (chủ sở hữu nâng từ 4 ngày 28/11/2026, sau khi lượt chạy thử để 901 văn bản chờ), mới nhất trước, báo cáo tài chính trước nghị quyết. Hết 25 phút thì dừng và để phần còn lại cho đêm sau.
 - Thời gian tính từ đầu bước (cả lúc đọc trang nguồn); một tệp chỉ bắt đầu khi còn ít nhất 10 phút, OCR mỗi tệp tối đa 8 phút. Mỗi lần bắt đầu một tệp được tính là một lần thử trước khi tải, nên tệp làm bước bị dừng giữa chừng không bị thử mãi.
 - Trang OCR không đọc được ghi vào `trang_chua_doc` và hiện trong danh sách của công cụ; không giấu.
 - robots.txt được kiểm mỗi đêm cho trang công ty và tệp PDF trên trang đó; không có robots.txt (404, 410) thì được đọc, lỗi khác thì không đọc đêm đó.
@@ -74,7 +74,7 @@ Hôm 28/11/2026 các câu hỏi này với KDH phải tải tay và đọc OCR t
 
 ## Các quyết định của người thiết kế (chủ sở hữu kiểm khi đọc)
 
-- 4 tệp và 25 phút mỗi đêm. Với 56 mã, mỗi quý thêm khoảng 56 báo cáo tài chính, nên mùa báo cáo cần khoảng hai tuần để đọc hết.
+- 20 tệp và 25 phút mỗi đêm (ban đầu 4 tệp). Một báo cáo tài chính 40–110 trang chiếm gần hết một suất 10 phút; một nghị quyết 2–3 trang chỉ khoảng một phút, nên đêm có nghị quyết đọc được nhiều tệp hơn.
 - Chỉ lưu chữ, không giữ PDF (một báo cáo 8–11 MB, chữ khoảng 100–200 KB).
 - Đoạn trích 600 ký tự, tối đa 12 đoạn mỗi lần hỏi, để câu trả lời của công cụ vừa phải.
 - Danh sách nguồn 56 mã do Claude tìm và kiểm robots.txt, chủ sở hữu duyệt trước khi bật bước chạy tối.

@@ -269,7 +269,7 @@ def _candidates(ma: str, source: dict, *, get_text, sleep, since: str, page_erro
 
 
 def sync_filings(data_dir: Path, symbols: list[str], *, get_text, get_bytes, read_pdf, now, clock=None, sleep=None,
-                 max_files: int = 4, budget_seconds: float = 1500, file_seconds: float = 600, since: str = SINCE) -> dict:
+                 max_files: int = 20, budget_seconds: float = 1500, file_seconds: float = 600, since: str = SINCE) -> dict:
     """Read up to max_files new filings of the given tickers within the time budget (counted from the start, source pages included):
     statements before resolutions, newest first; a file starts only when file_seconds of the budget are left. read_pdf(bytes) ->
     (page texts, pages read by OCR[, page numbers OCR could not read]). A file over 30 MB or 120 pages is skipped for good; each start

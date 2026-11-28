@@ -113,7 +113,7 @@ def main() -> int:
     ids = commands.add_parser("insider-docs-sync", help="volumes of watched tickers' HOSE insider reports that VNDirect lacks, read on this machine from the attached PDFs and kept only when before ± traded = after (30 a run) into data/insider-docs")
     ids.add_argument("--data-dir", type=Path, required=True)
     ids.add_argument("--limit", type=int, default=30)
-    fls = commands.add_parser("filings-sync", help="Văn bản công bố: up to four new filings of watched tickers a night (statements from the company's shareholder page in data/report-sources.json, resolutions from it and VNDirect), read on this machine into data/filings")
+    fls = commands.add_parser("filings-sync", help="Văn bản công bố: up to 20 new filings of watched tickers a night within 25 minutes (statements from the company's shareholder page in data/report-sources.json, resolutions from it and VNDirect), read on this machine into data/filings")
     fls.add_argument("--data-dir", type=Path, required=True)
     flc = commands.add_parser("filings-check", help="whether robots.txt lets this app read a company's shareholder page, and the statements and resolutions it links to; writes nothing")
     flc.add_argument("--url", required=True)

@@ -8,7 +8,7 @@ import pytest
 from investment_agent.market.leading import MacroStore
 from investment_agent.public_tools import PublicData
 from investment_agent.services import value_chain_approvals as approvals
-from investment_agent.services.value_chain_public import chains_for_sector
+from investment_agent.market.value_chain_public import chains_for_sector
 
 TODAY = date(2027, 1, 15)
 SOURCE = {"title": "Câu chuyện đầu tư HT1", "publisher": "ACBS", "date": "2026-10-28", "url": "https://acbs.com.vn/x.pdf"}

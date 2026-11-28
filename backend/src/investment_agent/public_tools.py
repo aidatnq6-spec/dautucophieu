@@ -238,7 +238,7 @@ class PublicData:
     def chuoi_gia_tri(self, ma, *, today: date | None = None, config_path: Path | None = None) -> dict:
         """Chuỗi giá trị cho Claude (owner, 28/11/2026): every chain of the ticker's ICB sector, no member named."""
         from investment_agent.market.value_chains import VALUE_CHAINS_PATH
-        from investment_agent.services.value_chain_public import chains_for_sector
+        from investment_agent.market.value_chain_public import chains_for_sector
         symbol = self._symbol(ma)
         if not symbol:
             return _missing("Mã không hợp lệ.")

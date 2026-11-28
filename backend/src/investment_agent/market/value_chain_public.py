@@ -9,7 +9,7 @@ import json
 from datetime import date
 from pathlib import Path
 
-from investment_agent.api.routes.value_chains import scored_chains
+from investment_agent.market.value_chain_scores import scored_chains
 from investment_agent.market.value_chains import VALUE_CHAINS_PATH, load_value_chains
 from investment_agent.services.chain_valuation import chain_valuation_board
 from investment_agent.services.flow_board import chain_board

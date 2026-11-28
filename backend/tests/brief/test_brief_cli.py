@@ -17,7 +17,7 @@ def test_cli_writes_the_session_snapshot_and_caches_the_listing(tmp_path, capsys
     SeriesStore(tmp_path / "trend-sources").upsert("VNINDEX-1d", [(datetime(2026, 10, 23), "1658.52"), (datetime(2026, 10, 26), "1650.12")])
     calls = []
     listing = lambda: calls.append(1) or {"symbols": ["FPT"], "icb_names": {"9500": "Công nghệ Thông tin"}, "icb_codes": {"FPT": "9500"},
-                                          "icb4_codes": {"FPT": "9537"}}
+                                          "icb4_codes": {"FPT": "9537"}, "icb4_names": {"9537": "Phần mềm"}}
     run = lambda: brief_snapshot_cli(tmp_path, tmp_path / "cal.json", listing=listing, board=lambda s: BOARD,
                                      http_get=lambda url: json.dumps({"data": []}) if "hsx" in url else "<rss></rss>",
                                      now=datetime(2026, 10, 26, 15, 40, tzinfo=VN))
@@ -32,6 +32,11 @@ def test_cli_writes_the_session_snapshot_and_caches_the_listing(tmp_path, capsys
     (tmp_path / "hose-listing.json").write_text(json.dumps(saved), encoding="utf-8")
     run()
     assert len(calls) == 2
+    saved = json.loads((tmp_path / "hose-listing.json").read_text(encoding="utf-8"))
+    del saved["listing"]["icb4_names"]  # and one kept before the level-4 names (28/11/2026)
+    (tmp_path / "hose-listing.json").write_text(json.dumps(saved), encoding="utf-8")
+    run()
+    assert len(calls) == 3
 
 
 def test_cli_reads_the_vn_index_bars_from_the_price_store_for_the_session_shape(tmp_path, capsys):

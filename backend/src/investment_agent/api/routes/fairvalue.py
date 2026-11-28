@@ -196,7 +196,7 @@ def _sector_medians(data_dir: Path, symbol: str, rows: list[str], codes: tuple[s
         return None
     medians = {c["ma_chi_so"]: c["trung_vi"] for c in out["chi_so"]}
     counts = {c["ma_chi_so"]: c["so_doanh_nghiep"] for c in out["chi_so"]}
-    return {"name": out["nganh"], "quarter": out["quy"], "peers": out["so_doanh_nghiep_nganh"] - out["chua_co_quy_nay"] - out["chua_co_chi_so"],
+    return {"name": out["nganh"], "level": out["cap_nganh"], "quarter": out["quy"], "peers": out["so_doanh_nghiep_nganh"] - out["chua_co_quy_nay"] - out["chua_co_chi_so"],
             "medians": {c: medians.get(c) for c in rows}, "counts": {c: counts.get(c, 0) for c in rows},
             # Trung vị ngành theo quý (27/11/2026): each compared ratio's median for every quarter of the table, in the same order
             "history": sector_history(data_dir, symbol, list(quarters), codes)}

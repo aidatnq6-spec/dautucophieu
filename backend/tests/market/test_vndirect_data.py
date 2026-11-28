@@ -33,6 +33,7 @@ def test_the_hose_listing_has_symbols_level_two_codes_and_keeps_known_sector_nam
     assert out["icb_codes"] == {"FPT": "9500", "HPG": "1700"}  # NEW has no sector yet
     assert out["icb_names"] == {"9500": "Công nghệ", "1700": "Tài nguyên Cơ bản"}
     assert out["icb4_codes"] == {"FPT": "9537"}  # level 4 too, for the securities firms' peers (27/11/2026); HPG has none here
+    assert out["icb4_names"] == {"9537": "Phần mềm", "1757": "Thép"}  # level-4 names for Trung vị ngành cấp 4 (28/11/2026)
 
 
 def test_the_board_is_the_latest_session_in_the_units_the_brief_reads():

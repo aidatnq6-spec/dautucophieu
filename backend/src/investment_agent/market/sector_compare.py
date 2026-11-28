@@ -27,6 +27,9 @@ OWN = {"bank": (BANK_CODES, BANK_NAMES), "securities": (SECURITIES_CODES, {code:
        # an insurer against the other HOSE insurers (owner, 27/11/2026), life (BVH) and non-life together: only five on HOSE
        "insurance": (tuple(code for code, _, _ in DISPLAY["insurance"]), {code: label for code, label, _ in DISPLAY["insurance"]})}
 MIN_PEERS = 3
+# Trung vị ngành cấp 4 (owner, 28/11/2026): a general company is set against its ICB level-4 group when at least this many other
+# tickers of it have a ratios file, else its level-2 sector; chosen once per ticker, so every quarter uses the same group
+MIN_LEVEL4_PEERS = 5
 NOTE = ("So với các doanh nghiệp cùng ngành ICB cấp 2 trên HOSE có số ở đúng quý này; trung vị và tứ phân vị là phép tính thống kê "
         "trên số VNDirect, không gồm mã đang xem. Không gắn nhãn tốt hay xấu: cao hơn không phải lúc nào cũng tốt (nợ vay, số "
         "ngày phải thu, tồn kho). Tỷ lệ ở dạng thập phân (0,08 là 8%); số ngày là ngày; hệ số là lần.")
@@ -59,14 +62,14 @@ def compare_sector(data_dir: Path, symbol: str, codes: tuple[str, ...] | None = 
     found = _group(root, symbol, codes)
     if "thieu" in found:
         return found
-    kind, folder, codes, peers, code, sector = (found[k] for k in ("kind", "folder", "codes", "peers", "code", "sector"))
+    kind, folder, codes, peers, code, sector, level = (found[k] for k in ("kind", "folder", "codes", "peers", "code", "sector", "level"))
     own = _json(root / folder / f"{symbol}.json")
     quarters = [q for q, v in ((own or {}).get("quarters") or {}).items() if any(c in v for c in codes)]
     if not quarters:
         return _missing(f"Chưa có chỉ số tài chính VNDirect của {symbol} trong kho.")
     quarter = max(quarters)
     mine = own["quarters"][quarter]
-    return _against(root, symbol, kind, folder, codes, peers, code, sector, own, quarter, mine)
+    return _against(root, symbol, kind, folder, codes, peers, code, sector, own, quarter, mine, level)
 
 
 def sector_history(data_dir: Path, symbol: str, quarters: list[str], codes: tuple[str, ...] | None = None) -> dict[str, list[str | None]]:
@@ -123,11 +126,19 @@ def _group(root: Path, symbol: str, codes: tuple[str, ...] | None) -> dict:
             return _missing(f"{symbol} không thuộc nhóm Dịch vụ đầu tư (ICB cấp 4, công ty chứng khoán); không có nhóm để so.")
         group, code, sector = level4, INVESTMENT_SERVICES, SECURITIES_NAME
     folder = "financial-ratios-general" if kind is None else "financial-ratios"
+    level = 4 if kind == "securities" else 2
+    if kind is None and (c4 := (listing.get("icb4_codes") or {}).get(symbol)):
+        level4 = listing["icb4_codes"]
+        with_file = [s for s, c in level4.items() if c == c4 and s != symbol and _SYMBOL.fullmatch(s) and (root / folder / f"{s}.json").is_file()]
+        if len(with_file) >= MIN_LEVEL4_PEERS:
+            group, code, level = level4, c4, 4
+            sector = (listing.get("icb4_names") or {}).get(c4) or f"ICB {c4}"
     return {"kind": kind, "folder": folder, "codes": codes or (OWN[kind][0] if kind else SECTOR_CODES), "code": code, "sector": sector,
-            "peers": sorted(s for s, c in group.items() if c == code and s != symbol)}
+            "level": level, "peers": sorted(s for s, c in group.items() if c == code and s != symbol)}
 
 
-def _against(root: Path, symbol: str, kind, folder: str, codes, peers: list[str], code, sector, own: dict, quarter: str, mine: dict) -> dict:
+def _against(root: Path, symbol: str, kind, folder: str, codes, peers: list[str], code, sector, own: dict, quarter: str, mine: dict,
+             level: int = 2) -> dict:
     rows, no_file, no_quarter = {}, 0, 0
     for s in peers:
         rec = _json(root / folder / f"{s}.json") if _SYMBOL.fullmatch(s) else None
@@ -152,5 +163,6 @@ def _against(root: Path, symbol: str, kind, folder: str, codes, peers: list[str]
         rank = 1 + sum(1 for v in others if v > value)
         out.append({**item, "trung_vi": _plain(median(others)), "phan_vi_25": _plain(q1), "phan_vi_75": _plain(q3),
                     "so_doanh_nghiep": len(others), "thu_hang": f"{rank}/{len(others) + 1} (cao xuống thấp)"})
-    return {"ma": symbol, "nganh": sector, "ma_nganh": code, "quy": quarter, "nguon": own.get("source"), "lay_luc": own.get("fetched_at"),
-            "so_doanh_nghiep_nganh": len(peers), "chua_co_quy_nay": no_quarter, "chua_co_chi_so": no_file, "chi_so": out, "luu_y": NOTE.replace("ICB cấp 2", "ICB cấp 4 (Dịch vụ đầu tư)") if kind == "securities" else NOTE}
+    note = NOTE.replace("ICB cấp 2", "ICB cấp 4 (Dịch vụ đầu tư)") if kind == "securities" else NOTE.replace("ICB cấp 2", f"ICB cấp {level}")
+    return {"ma": symbol, "nganh": sector, "ma_nganh": code, "cap_nganh": level, "quy": quarter, "nguon": own.get("source"), "lay_luc": own.get("fetched_at"),
+            "so_doanh_nghiep_nganh": len(peers), "chua_co_quy_nay": no_quarter, "chua_co_chi_so": no_file, "chi_so": out, "luu_y": note}

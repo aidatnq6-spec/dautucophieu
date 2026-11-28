@@ -131,6 +131,9 @@ it("the median note names the peers and quarter, and for a bank why CASA and nh�
   const insurer = sectorNote({ kind: "insurance", sector: { ...sector, name: "Bảo hiểm", peers: 3 } })!;
   expect(insurer).toContain("trung vị của 3 doanh nghiệp cùng ngành Bảo hiểm (ICB cấp 2, HOSE)");
   expect(insurer).toContain("gồm cả bảo hiểm nhân thọ (BVH) và phi nhân thọ");
+  const builder = sectorNote({ kind: "general", sector: { ...sector, name: "Xây dựng công trình", peers: 29, level: 4 } })!;
+  expect(builder).toContain("trung vị của 29 doanh nghiệp cùng ngành Xây dựng công trình (ICB cấp 4, HOSE)");  // cấp 4 (28/11/2026)
+  expect(sectorNote({ kind: "general", sector: { ...sector, name: "Viễn thông", level: 2 } })).toContain("(ICB cấp 2, HOSE)");
   expect(sectorNote({ kind: "bank", sector: null })).toBeNull();
 });
 

@@ -127,3 +127,47 @@ def test_an_app_approval_of_older_content_is_not_approved(env):
     approvals.approve(root, "coated", fingerprint="old", note=None, on=TODAY)
     coated = chains_for_sector(root, "HPG", today=TODAY, config_path=path)["chuoi"][1]
     assert coated["da_duyet"] is False and coated["nhan"] is None
+
+
+def test_the_kept_words_never_stand_for_a_member_of_the_same_chain_in_the_committed_chains():
+    # HRC and VND stay as words (hot-rolled coil, the currency); a chain listing one of them as a member must not write it in its text
+    import re
+    from investment_agent.market.value_chain_public import NOT_TICKERS
+    from investment_agent.market.value_chains import VALUE_CHAINS_PATH, load_value_chains
+    config = load_value_chains(VALUE_CHAINS_PATH)
+    for c in config.chains:
+        kept = NOT_TICKERS & set(c.symbols)
+        if not kept:
+            continue
+        dump = c.model_dump(mode="json")
+        text = json.dumps([dump["name"], dump["stages"], [(f["label"], f["why"]) for f in dump["factors"]],
+                           [config.sources[r["source"]].title for f in dump["factors"] for r in f["refs"]]], ensure_ascii=False)
+        assert not any(re.search(rf"(?<![A-Za-z]){w}(?![A-Za-z])", text) for w in kept), (c.id, kept)
+
+
+def test_a_chain_name_with_a_ticker_reads_ma(env):
+    root, path = env
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    doc["chains"][0]["name"] = "Thép (HPG)"
+    path.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+    assert chains_for_sector(root, "HSG", today=TODAY, config_path=path)["chuoi"][0]["ten"] == "Thép ([mã])"
+
+
+def test_a_ticker_joined_to_digits_reads_ma_but_a_longer_word_is_kept(env):
+    root, path = env
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    doc["chains"][0]["stages"]["input"][0]["note"] = "HPG2025 tăng; HPGX và AHPG là chữ khác"
+    path.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+    note = chains_for_sector(root, "HSG", today=TODAY, config_path=path)["chuoi"][0]["cac_khau"]["dau_vao"][0]["ghi_chu"]
+    assert note == "[mã]2025 tăng; HPGX và AHPG là chữ khác"
+
+
+def test_an_unreadable_price_or_valuation_file_counts_as_no_figure(env):
+    root, path = env
+    _closes(root, "HPG", [[(TODAY - timedelta(days=31)).isoformat(), "10"], [(TODAY - timedelta(days=1)).isoformat(), "11"]])
+    (root / "price-history" / "NKG.json").write_text("{not json", encoding="utf-8")
+    _closes(root, "HSG", [["2027-13-40", "x"]])
+    (root / "index-history").mkdir()
+    (root / "index-history" / "HPG.json").write_text("{not json", encoding="utf-8")
+    stats = chains_for_sector(root, "HPG", today=TODAY, config_path=path)["thong_ke_nganh"]
+    assert stats["hieu_suat"]["so_ma_co_gia"] == 1 and stats["dinh_gia"]["so_ma_co_dinh_gia"] == 0

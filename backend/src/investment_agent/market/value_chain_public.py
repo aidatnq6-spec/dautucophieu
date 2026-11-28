@@ -85,12 +85,22 @@ def _sector_returns(root: Path, symbols: list[str], sector: str, *, today: date)
     store = PriceHistoryStore(root)
     closes = {}
     for s in symbols:
-        rec = store.read(s) or {}
-        closes[s] = [(date.fromisoformat(d), Decimal(str(v))) for d, v in rec.get("closes") or []]
+        try:  # one unreadable file counts as a ticker without prices, never fails the sector
+            rec = store.read(s) or {}
+            closes[s] = [(date.fromisoformat(d), Decimal(str(v))) for d, v in rec.get("closes") or []]
+        except (OSError, ValueError, TypeError, ArithmeticError):
+            closes[s] = []
     r = chain_returns([{"id": "sector", "name": sector, "symbols": symbols}], closes, today=today)[0]
     return {"so_ma_co_gia": r["priced"], "ky": {PERIODS[k]: {"thay_doi": p["change"], "so_ma": p["n"]} for k, p in r["periods"].items()},
             "phien_gan_nhat": {"tang": r["breadth"]["up"], "giam": r["breadth"]["down"], "dung": r["breadth"]["flat"]},
             "vi_tri_52_tuan": r["position_52w"]}
+
+
+def _own(root: Path, symbol: str) -> dict:
+    try:  # one unreadable file counts as a ticker without valuation, never fails the sector
+        return own_history(root, symbol)
+    except (OSError, ValueError, TypeError, KeyError, ArithmeticError):
+        return {"thieu": True, "ly_do": "tệp không đọc được"}
 
 
 def chains_for_sector(data_dir: Path, symbol: str, *, today: date, config_path: Path = VALUE_CHAINS_PATH) -> dict:
@@ -109,7 +119,8 @@ def chains_for_sector(data_dir: Path, symbol: str, *, today: date, config_path: 
     scored = [c for c in scored_chains(root, config, today=today, held=set()) if c["id"] in ids]
     members = sorted(s for s, c in (listing.get("icb_codes") or {}).items() if c == code)
     names = sorted((set(listing.get("symbols") or []) | set(listing.get("icb_codes") or {})) - NOT_TICKERS, key=len, reverse=True)
-    tickers = re.compile(r"(?<![A-Za-z0-9])(" + "|".join(map(re.escape, names)) + r")(?![A-Za-z0-9])") if names else None
+    # a ticker joined to digits (HPG2025) is still the ticker; one inside a longer word (AHPG, HPGX) is not
+    tickers = re.compile(r"(?<![A-Za-z])(" + "|".join(map(re.escape, names)) + r")(?![A-Za-z])") if names else None
 
     def text(value):
         return tickers.sub("[mã]", value) if tickers and isinstance(value, str) else value
@@ -137,12 +148,12 @@ def chains_for_sector(data_dir: Path, symbol: str, *, today: date, config_path: 
     for c in scored:
         approved = c["status"] == "approved"
         chains.append({
-            "id": c["id"], "ten": c["name"], "da_duyet": approved, "duyet_ngay": (c["approval"] or {}).get("on") if approved else None,
+            "id": c["id"], "ten": text(c["name"]), "da_duyet": approved, "duyet_ngay": (c["approval"] or {}).get("on") if approved else None,
             "nhan": LABELS.get(c["label"]), "ghi_chu_duyet": None if approved else DRAFT_NOTE,
             "ty_trong": {STATUS[k]: v for k, v in c["score"].items()},
             "cac_khau": {STAGES[k]: [{"ten": text(i["name"]), "ghi_chu": text(i.get("note")), "ty_trong": i.get("share"), "nguon": refs(i.get("refs"))} for i in items]
                          for k, items in c["stages"].items()},
             "yeu_to": [factor(f) for f in c["factors"]]})
     stats = {"so_ma_nganh": len(members), "hieu_suat": _sector_returns(root, members, sector, today=today),
-             "dinh_gia": sector_valuation({s: own_history(root, s) for s in members})}
+             "dinh_gia": sector_valuation({s: _own(root, s) for s in members})}
     return {"ma": symbol, "nganh": sector, "ngay": today.isoformat(), "chuoi": chains, "thong_ke_nganh": stats, "nguon": SOURCE, "luu_y": NOTE}

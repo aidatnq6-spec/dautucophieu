@@ -113,6 +113,10 @@ def main() -> int:
     ids = commands.add_parser("insider-docs-sync", help="volumes of watched tickers' HOSE insider reports that VNDirect lacks, read on this machine from the attached PDFs and kept only when before ± traded = after (30 a run) into data/insider-docs")
     ids.add_argument("--data-dir", type=Path, required=True)
     ids.add_argument("--limit", type=int, default=30)
+    fls = commands.add_parser("filings-sync", help="Văn bản công bố: up to four new filings of watched tickers a night (statements from the company's shareholder page in data/report-sources.json, resolutions from it and VNDirect), read on this machine into data/filings")
+    fls.add_argument("--data-dir", type=Path, required=True)
+    flc = commands.add_parser("filings-check", help="whether robots.txt lets this app read a company's shareholder page, and the statements and resolutions it links to; writes nothing")
+    flc.add_argument("--url", required=True)
     vcs = commands.add_parser("valuation-check-sync", help="VNDirect's market value, P/E and P/B of each watched ticker, to compare with Bảng số tài chính")
     vcs.add_argument("--data-dir", type=Path, required=True)
     ivs = commands.add_parser("index-valuation-sync", help="fetch daily P/E and P/B of VNINDEX and VN30 (VNDirect) into data/index-valuation")
@@ -263,6 +267,10 @@ def main() -> int:
         return company_notes_sync(args.data_dir)
     if args.command == "insider-docs-sync":
         return insider_docs_sync(args.data_dir, limit=args.limit)
+    if args.command == "filings-sync":
+        return filings_sync(args.data_dir)
+    if args.command == "filings-check":
+        return filings_check(args.url)
     if args.command == "industries":
         return industries(_symbols(args.symbols), args.output)
     if args.command == "backup":
@@ -898,6 +906,84 @@ def insider_docs_sync(data_dir: Path, *, limit: int = 30, read=None, now=None) -
     out = sync_insider_docs(data_dir, list(load_watchlist(data_dir).symbols), read=read, limit=limit)
     print(json.dumps({"status": "ok" if not out["errors"] else "partial", **out}))
     return 0 if not out["errors"] else 1
+
+
+_FILINGS_HEADERS = {"User-Agent": "investment-agent/0.1 (personal use)"}
+
+
+def _filings_get_text(url: str) -> str:
+    import httpx
+    response = httpx.get(url, timeout=60, follow_redirects=True, headers=_FILINGS_HEADERS)
+    response.raise_for_status()
+    return response.text
+
+
+def filings_sync(data_dir: Path, *, get_text=None, get_bytes=None, read_pdf=None, now=None, sleep=None) -> int:
+    """Văn bản công bố (28/11/2026): exit 0 when every file tried was read or skipped for good, 1 when a file or a source page failed
+    or the machine has no Tesseract with Vietnamese (nothing is read then)."""
+    from datetime import datetime, timezone
+
+    from investment_agent.market.filings import MAX_PAGES, sync_filings
+    from investment_agent.market.watchlist import load_watchlist
+    if read_pdf is None:
+        from investment_agent.insights.ocr import default_reader, with_ocr
+        from investment_agent.insights.pdf import extract_pages
+        ocr = default_reader()
+        if ocr is None:
+            print(json.dumps({"status": "error", "reason": "Tesseract with Vietnamese (vie) is not installed"}))
+            return 1
+
+        def read_pdf(data):
+            pages = extract_pages(data, max_pages=MAX_PAGES + 1)
+            if len(pages) > MAX_PAGES:
+                return pages, 0  # over the limit: skipped without spending OCR on it
+            pages, read_by_ocr, notes = with_ocr(data, pages, read=ocr, max_pages=MAX_PAGES, max_seconds=900)
+            if notes and not any(p.strip() for p in pages):
+                raise RuntimeError(notes[0])  # OCR ran out of time or failed: tried again next night
+            return pages, len(read_by_ocr)
+    if get_bytes is None:
+        import httpx
+
+        def get_bytes(url):
+            response = httpx.get(url, timeout=180, follow_redirects=True, headers=_FILINGS_HEADERS)
+            response.raise_for_status()
+            return response.content
+    out = sync_filings(data_dir, list(load_watchlist(data_dir).symbols), get_text=get_text or _filings_get_text, get_bytes=get_bytes,
+                       read_pdf=read_pdf, now=now or datetime.now(timezone.utc), sleep=sleep)
+    failed = bool(out["errors"] or out.get("page_errors"))
+    print(json.dumps({"status": "partial" if failed else "ok", **out}, ensure_ascii=False))
+    return 1 if failed else 0
+
+
+def filings_check(url: str, *, get_text=None) -> int:
+    """Before a company's page goes into data/report-sources.json: whether robots.txt allows reading it, and the consolidated
+    statements and resolutions it links to. Exit 0 when allowed and something was found."""
+    from urllib.parse import urljoin
+    from urllib.robotparser import RobotFileParser
+
+    from investment_agent.market.filings import classify, label_date, links_on_page
+    get_text = get_text or _filings_get_text
+    robots = RobotFileParser()
+    try:
+        robots.parse(get_text(urljoin(url, "/robots.txt")).splitlines())
+        allowed = "allow" if robots.can_fetch(_FILINGS_HEADERS["User-Agent"], url) else "disallow"
+    except Exception:  # noqa: BLE001 - no robots.txt to read
+        allowed = "khong_doc_duoc"
+    out = {"url": url, "robots": allowed, "bctc": [], "nghi_quyet": []}
+    if allowed == "disallow":
+        print(json.dumps(out, ensure_ascii=False))
+        return 1
+    try:
+        links = links_on_page(get_text(url), url)
+    except Exception as exc:  # noqa: BLE001
+        print(json.dumps({**out, "loi": f"error:{type(exc).__name__}"}, ensure_ascii=False))
+        return 1
+    for link in links:
+        kind = classify(link["nhan"])
+        if kind:
+            out[kind].append({"nhan": link["nhan"], "ngay": label_date(link["nhan"], link["url"]), "url": link["url"]})
+    print(json.dumps(out, ensure_ascii=False))
+    return 0 if allowed == "allow" and (out["bctc"] or out["nghi_quyet"]) else 1
 
 
 def general_ratios_sync(data_dir: Path, *, limit: int = 60, symbols: list[str] | None = None, get=None, now=None) -> int:

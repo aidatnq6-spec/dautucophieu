@@ -216,4 +216,75 @@ def test_a_page_that_fails_is_reported_and_the_other_sources_still_run(data):
     url = "https://cdn.example/2026-06-05/qd.pdf"
     web = Web({f"{SITE}/cbtt": "", "https://api-finfo": vnd_news(("KDH: Quyết định", "2026-06-05", "resolutions", url))}, {url: b"q"})
     out = run(data, web)
-    assert out["read"] == [doc_id(url)] and out["page_errors"] == {"KDH bctc": "error:OSError"}
+    assert out["read"] == [doc_id(url)] and out["page_errors"] == {"KDH cafef": "error:OSError", "KDH bctc": "error:OSError"}
+
+
+CAFEF = "https://cafef.vn/du-lieu/Ajax/PageNew/FileBCTC.ashx?Symbol="
+CDN = "https://cafefnew.mediacdn.vn/Images/Uploaded/DuLieuDownload/BCTC/"
+
+
+def cafef_list(*rows):
+    return json.dumps({"Data": [{"id": i, "Type": 0, "Quarter": int(t[1]), "Year": int(t[3:]), "Time": t, "Name": n, "Link": u}
+                                for i, (t, n, u) in enumerate(rows)], "Message": None, "Success": True})
+
+
+Q3_HN = ("Q3/2026", "Báo cáo tài chính hợp nhất quý 3 năm 2026",
+         f"{CDN}KDH_202610302020KDH2020BCTC20Hop20nhat20Q3_30102026153454.pdf?v=1793349295564")
+Q3_ME = ("Q3/2026", "Báo cáo tài chính công ty mẹ quý 3 năm 2026",
+         f"{CDN}KDH_202610302020KDH2020BCTC20Cong20ty20Me20Q3_30102026153222.pdf?v=1793349144539")
+
+
+def test_statements_come_from_cafef_and_the_company_page_is_not_read_for_them(data):
+    company = (f"{SITE}/2026/10/20261029-bctc-hop-nhat.pdf", "BCTC Hợp nhất (29/10/2026)")
+    web = Web({CAFEF + "KDH": cafef_list(Q3_HN), f"{SITE}/bctc": statements_page(company), f"{SITE}/cbtt": "",
+               "https://api-finfo": vnd_news()},
+              {Q3_HN[2].split("?")[0]: b"chu"})
+    out = run(data, web)
+    assert web.fetched == [Q3_HN[2].split("?")[0]] and "page_errors" not in out
+    rec = FilingStore(data / "filings").records("KDH")[0]
+    assert rec["loai"] == "bctc" and rec["ngay"] == "2026-10-30" and rec["tieu_de"] == Q3_HN[1]
+    assert rec["nguon"] == Q3_HN[2].split("?")[0] and rec["trang_nguon"] == CAFEF + "KDH&Type=1&Year=0"
+
+
+def test_a_cafef_parent_only_statement_is_dropped_when_the_same_period_has_a_consolidated_one(data):
+    q2_me = ("Q2/2026", "Báo cáo tài chính công ty mẹ quý 2 năm 2026", f"{CDN}KDH_20260731_Me_Q2.pdf")
+    web = Web({CAFEF + "KDH": cafef_list(Q3_HN, Q3_ME, q2_me), f"{SITE}/bctc": "", f"{SITE}/cbtt": "",
+               "https://api-finfo": vnd_news()},
+              {u.split("?")[0]: b"chu" for _, _, u in (Q3_HN, Q3_ME, q2_me)})
+    run(data, web)
+    assert web.fetched == [Q3_HN[2].split("?")[0], q2_me[2]]
+
+
+def test_cafef_files_without_a_date_keep_only_this_years_and_older_ones_are_left_out(data):
+    old = ("Q2/2025", "Báo cáo tài chính hợp nhất quý 2 năm 2025", f"{CDN}KDH_20250730_HN_Q2.pdf")
+    undated_now = ("Q1/2026", "Báo cáo tài chính hợp nhất quý 1 năm 2026", f"{CDN}CTC_Hop_nhat_Q1.2026_1777447818.pdf")
+    undated_old = ("Q4/2025", "Báo cáo tài chính hợp nhất quý 4 năm 2025", f"{CDN}CTC_Hop_nhat_Q4.2025_1769000000.pdf")
+    web = Web({CAFEF + "KDH": cafef_list(old, undated_now, undated_old), f"{SITE}/bctc": "", f"{SITE}/cbtt": "",
+               "https://api-finfo": vnd_news()},
+              {u: b"chu" for _, _, u in (old, undated_now, undated_old)})
+    run(data, web)
+    assert web.fetched == [undated_now[2]]
+    assert FilingStore(data / "filings").records("KDH")[0]["ngay"] is None
+
+
+def test_the_company_statements_page_is_used_when_cafef_has_none_or_fails(data):
+    company = (f"{SITE}/2026/10/20261029-bctc-hop-nhat.pdf", "BCTC Hợp nhất (29/10/2026)")
+    for cafef, error in ((cafef_list(), False), (None, True)):
+        pages = {f"{SITE}/bctc": statements_page(company), f"{SITE}/cbtt": "", "https://api-finfo": vnd_news()}
+        if cafef is not None:
+            pages[CAFEF + "KDH"] = cafef
+        web = Web(pages, {company[0]: b"chu"})
+        d = data / ("loi" if error else "rong")
+        d.mkdir()
+        (d / "report-sources.json").write_text((data / "report-sources.json").read_text(encoding="utf-8"), encoding="utf-8")
+        out = run(d, web)
+        assert web.fetched == [company[0]]
+        assert ("KDH cafef" in out.get("page_errors", {})) is error
+
+
+def test_a_watched_ticker_without_any_company_page_still_gets_cafef_statements(data):
+    web = Web({CAFEF + "VCB": cafef_list(("Q3/2026", "Báo cáo tài chính hợp nhất quý 3 năm 2026", f"{CDN}VCB_20261030_HN.pdf")),
+               "https://api-finfo": vnd_news()},
+              {f"{CDN}VCB_20261030_HN.pdf": b"chu"})
+    out = run(data, web, symbols=("VCB",))
+    assert out["read"] and web.fetched == [f"{CDN}VCB_20261030_HN.pdf"]

@@ -62,15 +62,15 @@ Hôm 28/11/2026 các câu hỏi này với KDH phải tải tay và đọc OCR t
 - Thiếu: `thieu: true`, lý do "chưa có văn bản công bố của <mã> trong kho" (cùng câu cho mọi trường hợp không có).
 - Kèm: hướng dẫn dùng trong `docs/claude-project-instructions.md`, skill `/dautu-ma` (gợi ý tìm "thoái vốn", "thu nhập khác", "vay" khi lợi nhuận có cảnh báo ngoài bán hàng), danh sách công cụ đã duyệt trong test, plugin 0.30.0.
 
-## Bổ sung 28/11/2026: báo cáo tài chính từ CafeF (chờ chủ sở hữu duyệt)
+## Bổ sung 28/11/2026: báo cáo tài chính từ CafeF (chủ sở hữu duyệt 28/11/2026)
 
 Dò trang cổ đông của 56 mã theo dõi chỉ tìm được trang báo cáo tài chính cho 10 mã: phần lớn website doanh nghiệp lớn nạp danh sách tài liệu bằng JavaScript (mã trang chỉ có khuôn `{{item.title}}`, `${fileUrl}`), một số chặn truy cập tự động hoặc robots.txt không cho đọc. CafeF có danh mục báo cáo tài chính cho mọi mã HOSE: `https://cafef.vn/du-lieu/Ajax/PageNew/FileBCTC.ashx?Symbol=<MÃ>&Type=1&Year=0` trả JSON (`Quarter`, `Year`, `Time` như "Q3/2026", `Name` như "Báo cáo tài chính hợp nhất quý 3 năm 2026", `Link` tới PDF trên `cafefnew.mediacdn.vn`). robots.txt của cafef.vn là `Allow: /`; mediacdn không có robots.txt (404). Kiểm 28/11/2026 với KDH (196 báo cáo) và MBB (188).
 
 - Báo cáo tài chính lấy từ CafeF cho mọi mã theo dõi; trang báo cáo tài chính của công ty chỉ dùng khi CafeF không có báo cáo nào của mã đó. Trang công bố thông tin của công ty và VNDirect vẫn là nguồn nghị quyết như trên.
 - Cùng `Time` có bản hợp nhất thì bỏ bản công ty mẹ; không có thì giữ bản công ty mẹ.
-- Ngày văn bản: 8 chữ số `YYYYMMDD` ngay sau `<MÃ>_` trong tên tệp; không đọc được thì `null`. Vẫn chỉ lấy văn bản từ 01/04/2026.
+- Ngày văn bản: 8 chữ số `YYYYMMDD` ngay sau `<MÃ>_` trong tên tệp; không đọc được thì `null`. Vẫn chỉ lấy văn bản từ 01/04/2026. Một số tệp cũ không có ngày trong tên (ví dụ quý I/2026 của KDH, MBB): giữ khi `Year` của CafeF từ năm 2026, để báo cáo các năm trước không lọt qua bộ lọc ngày (quyết định của người làm).
 - Một lần gọi CafeF mỗi mã mỗi đêm, nghỉ 1 giây; CafeF lỗi thì ghi `page_errors` và dùng trang công ty nếu có.
-- `nguon` là đường dẫn PDF trên mediacdn (bỏ `?v=…`), `trang_nguon` là trang mã trên CafeF.
+- `nguon` là đường dẫn PDF trên mediacdn (bỏ `?v=…`), `trang_nguon` là đường dẫn danh mục CafeF của mã (`FileBCTC.ashx?Symbol=<MÃ>…`; trang mã trên CafeF có tên công ty trong đường dẫn nên không dựng được từ mã, quyết định của người làm).
 - Khối lượng lần đầu: khoảng 3–4 báo cáo hợp nhất mỗi mã từ 04/2026 (quý I, bán niên soát xét, quý III), tức khoảng 200 tệp. Lượt chạy thử đọc một báo cáo 40–110 trang trong khoảng 5–6 phút, nên với 25 phút mỗi đêm mất khoảng 7 tuần; mỗi quý sau thêm khoảng 56 báo cáo.
 
 ## Các cách đã cân nhắc

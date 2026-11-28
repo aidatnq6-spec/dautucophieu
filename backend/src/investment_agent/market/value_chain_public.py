@@ -29,11 +29,16 @@ STAGES = {"input": "dau_vao", "middle": "trung_gian", "output": "dau_ra"}
 PERIODS = {"w1": "tuan", "m1": "thang", "m3": "quy", "y1": "nam", "ytd": "tu_dau_nam"}
 DRAFT_NOTE = "Chuỗi chưa được chủ sở hữu duyệt; không có nhận định tổng, chỉ có nhận định từng yếu tố."
 NOTE = ("Chuỗi theo ngành ICB cấp 2 của mã, không cho biết mã có thuộc danh sách của chuỗi hay không: tự xét chuỗi nào sát với hoạt động "
-        "của mã và nói rõ khi chưa chắc. Mã HOSE trong phần chữ được thay bằng [mã]. Nhận định là phép tính trên chiều 1 tháng của chỉ báo "
+        "của mã và nói rõ khi chưa chắc. Mã HOSE trong phần chữ được thay bằng [mã], tên doanh nghiệp niêm yết bằng [doanh nghiệp]. Nhận định là phép tính trên chiều 1 tháng của chỉ báo "
         "theo trọng số đã đặt, không phải dự báo. thong_ke_nganh tính trên mọi mã HOSE cùng ngành ICB cấp 2 có số trong kho, không theo "
         "chuỗi: hiệu suất là bình quân giá đã điều chỉnh, không theo vốn hóa; P/E, P/B là trung vị của số tự tính từng mã (như "
         "dinh_gia_lich_su), so_ma_thap_hon_5_nam là số mã đang thấp hơn trung vị 5 năm của chính nó, so_ma_duoi_60_thang là số mã chưa đủ 60 tháng có số trong cửa sổ 5 năm (vẫn được tính); các mã được làm mới lần lượt nên số hiện tại của từng mã có ngày khác nhau, từ ngay_cuoi_cu_nhat đến ngay_cuoi_moi_nhat. Nguồn có tên mã thì không ghi ngày. Tỷ lệ ở dạng thập phân (0,05 là 5%).")
 SOURCE = "config/value-chains.json; chuỗi vĩ mô; giá đã điều chỉnh (price-history) và lịch sử định giá (index-history) trong kho"
+# Company names that point at one HOSE ticker in the chains' text read "[doanh nghiệp]" (owner, 28/11/2026); names of companies not on
+# HOSE (Formosa, Nghi Sơn) stay. Longest first, so "Tập đoàn Hoa Sen" goes whole.
+COMPANY_NAMES = ("Tập đoàn Hoa Sen", "Hoa Sen", "May Sông Hồng", "Sông Hồng", "Masan MEATLife", "Masan", "WinCommerce", "Vingroup", "Vinhomes",
+                 "Nhơn Trạch", "Dung Quất", "TTC AgriS", "AgriS")
+_COMPANIES = re.compile(r"(?<!\w)(" + "|".join(map(re.escape, sorted(COMPANY_NAMES, key=len, reverse=True))) + r")(?!\w)")
 NOT_TICKERS = {"HRC", "VND"}  # hot-rolled coil and the currency in the chains' text, also HOSE tickers
 
 
@@ -123,7 +128,10 @@ def chains_for_sector(data_dir: Path, symbol: str, *, today: date, config_path: 
     tickers = re.compile(r"(?<![A-Za-z])(" + "|".join(map(re.escape, names)) + r")(?![A-Za-z])") if names else None
 
     def text(value):
-        return tickers.sub("[mã]", value) if tickers and isinstance(value, str) else value
+        if not isinstance(value, str):
+            return value
+        value = _COMPANIES.sub("[doanh nghiệp]", value)
+        return tickers.sub("[mã]", value) if tickers else value
     sources = {k: v.model_dump(mode="json") for k, v in config.sources.items()}
 
     def refs(items: list[dict]) -> list[dict]:

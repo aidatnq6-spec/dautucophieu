@@ -119,8 +119,9 @@ def _newest(periods: dict | None, n: int) -> dict:
 
 
 class PublicData:
-    def __init__(self, data_dir: Path | str):
+    def __init__(self, data_dir: Path | str, config_dir: Path | str | None = None):
         self.root = Path(data_dir)
+        self.config = Path(config_dir) if config_dir is not None else None  # None: the repository's config/ (calendar_dir)
 
     def _json(self, *parts: str):
         path = self.root.joinpath(*parts)
@@ -234,6 +235,16 @@ class PublicData:
                          "các mốc trong su_kien_co_phieu như thể giá liền mạch. Giá ngày đã điều chỉnh gần đây: gia_ngay.",
                 "ngay_cuoi": (record.get("closes") or [[None]])[-1][0], "diem": closes,
                 "su_kien_co_phieu": issues}
+
+    def lich_giao_dich(self, ngay=None, den_ngay=None) -> dict:
+        """Lịch giao dịch HOSE cho Claude (owner, 28/11/2026)."""
+        from investment_agent.market.calendar import calendar_dir, calendar_view
+        try:
+            day = date.fromisoformat(str(ngay).strip()) if ngay else datetime.now(VN_TZ).date()
+            until = date.fromisoformat(str(den_ngay).strip()) if den_ngay else None
+        except ValueError:
+            return _missing("Ngày không hợp lệ (cần YYYY-MM-DD).")
+        return calendar_view(self.config or calendar_dir(), day, until)
 
     def chuoi_gia_tri(self, ma, *, today: date | None = None, config_path: Path | None = None) -> dict:
         """Chuỗi giá trị cho Claude (owner, 28/11/2026): every chain of the ticker's ICB sector, no member named."""

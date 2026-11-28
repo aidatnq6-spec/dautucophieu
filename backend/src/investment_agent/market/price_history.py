@@ -23,7 +23,9 @@ SOURCE = "vndirect:finfo"
 # not an official calendar, and a day the whole source lacks is missing here too.
 INDEX_SESSIONS_URL = ("https://api-finfo.vndirect.com.vn/v4/vnmarket_prices?sort=date&q=code:VNINDEX~date:gte:2013-01-01&size=9999"
                       "&fields=code,date,close")
-STALE = timedelta(days=7)
+# The stalest tickers are refreshed every night, up to the limit (60 of about 410: each within about a week); only one fetched in the
+# last 20 hours waits. A fixed 7-day age let a whole load come due on one night and lag two weeks (owner, 28/11/2026).
+FRESH = timedelta(hours=20)
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
 CLOSED_AT = time_of_day(15, 0)  # HOSE's closing auction ends 14:45; before 15:00 the day's figure is the price of the moment, not a close
 _SYMBOL = re.compile(r"^[A-Z0-9]{1,10}$")
@@ -87,7 +89,7 @@ def _due(store: PriceHistoryStore, symbols: list[str], now: datetime) -> list[st
     for s in symbols:
         record = store.read(s)
         when = datetime.fromisoformat(record["fetched_at"]) if record and record.get("fetched_at") else None
-        if when is None or now - when >= STALE:
+        if when is None or now - when >= FRESH:
             ages.append((when is not None, when.isoformat() if when else "", s))
     return [s for _, _, s in sorted(ages)]
 

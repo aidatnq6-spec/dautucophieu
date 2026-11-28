@@ -20,6 +20,7 @@ Mã là phần người dùng gõ sau lệnh, viết hoa. Không có mã thì h�
 8. `thuyet_minh` 4 quý: khoản nào làm doanh thu, chi phí tài chính hay nợ vay đổi lớn.
 9. `lich_su_gia` từ 3 năm trước: giá cuối tháng, đã điều chỉnh khi kho có (dieu_chinh), kèm các đợt thưởng hay phát hành.
 10. `chuoi_gia_tri`: chuỗi giá trị của ngành và các yếu tố vĩ mô.
+11. `van_ban_cong_bo` khi canh_bao_loi_nhuan_ngoai_ban_hang vượt ngưỡng hoặc nợ vay tăng mạnh: tu_khoa "thoái vốn", "thu nhập khác", "mua rẻ" cho khoản lãi lớn; "vay" cho bên cho vay và số tiền; không tu_khoa để xem nghị quyết, quyết định gần nhất. Trích nguyên văn kèm văn bản và trang; chữ OCR có thể sai số, không sửa.
 
 ## Trình bày (tiếng Việt, gọn, bảng khi có nhiều số)
 

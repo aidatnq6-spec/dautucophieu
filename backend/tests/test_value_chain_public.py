@@ -49,7 +49,7 @@ def test_a_ticker_gets_every_chain_of_its_sector_and_never_a_member_name(env):
     assert chains_for_sector(root, "HSG", today=TODAY, config_path=path)["chuoi"] == out["chuoi"]
     stage = out["chuoi"][0]["cac_khau"]["dau_vao"][0]
     assert stage == {"ten": "Quặng sắt ([mã])", "ghi_chu": "[mã] lấy HRC nhập khẩu", "ty_trong": None,  # HRC: hot-rolled coil, kept
-                     "nguon": [{"tieu_de": "Cập nhật [mã] – MUA", "don_vi": "ACBS", "ngay": "2026-10-28", "trang": 3}]}  # no URL: it names the ticker
+                     "nguon": [{"tieu_de": "Cập nhật [mã] – MUA", "don_vi": "ACBS", "ngay": None, "trang": 3}]}  # no URL, no date: they find the report
     assert out["ngay"] == "2027-01-15" and "không theo vốn hóa" in out["luu_y"]
 
 
@@ -91,17 +91,20 @@ def test_a_sector_without_prices_or_valuations_gives_empty_stats(env):
     root, path = env
     stats = chains_for_sector(root, "HPG", today=TODAY, config_path=path)["thong_ke_nganh"]
     assert stats["hieu_suat"]["so_ma_co_gia"] == 0 and stats["hieu_suat"]["ky"]["thang"] == {"thay_doi": None, "so_ma": 0}
-    assert stats["dinh_gia"]["pe"] == {"hien_tai_trung_vi": None, "trung_vi_5_nam_trung_vi": None, "so_ma": 0, "so_ma_thap_hon_5_nam": 0}
+    assert stats["dinh_gia"]["pe"] == {"hien_tai_trung_vi": None, "trung_vi_5_nam_trung_vi": None, "so_ma": 0, "so_ma_thap_hon_5_nam": 0,
+                                       "so_ma_duoi_60_thang": 0}
+    assert stats["dinh_gia"]["ngay_cuoi_cu_nhat"] is None
 
 
 def test_sector_valuation_is_the_median_of_each_tickers_own_figures():
-    def own(pe, pe5, pb, pb5):
-        return {"ngay_cuoi": "2027-01-14", "hien_tai": {"pe": pe, "pb": pb}, "cua_so": {"5_nam": {"pe": {"trung_vi": pe5}, "pb": {"trung_vi": pb5}}}}
-    out = sector_valuation({"A": own("8", "10", "1", "1.2"), "B": own("12", "11", "2", "1.5"), "C": own(None, "9", "1.5", None),
-                            "D": {"thieu": True, "ly_do": "x"}})
-    assert out["pe"] == {"hien_tai_trung_vi": "10", "trung_vi_5_nam_trung_vi": "10.5", "so_ma": 2, "so_ma_thap_hon_5_nam": 1}
-    assert out["pb"] == {"hien_tai_trung_vi": "1.5", "trung_vi_5_nam_trung_vi": "1.35", "so_ma": 2, "so_ma_thap_hon_5_nam": 1}
-    assert out["so_ma_co_dinh_gia"] == 3 and out["ngay_cuoi_moi_nhat"] == "2027-01-14"
+    def own(pe, pe5, pb, pb5, day="2027-01-14", months=60):
+        return {"ngay_cuoi": day, "hien_tai": {"pe": pe, "pb": pb},
+                "cua_so": {"5_nam": {"pe": {"trung_vi": pe5, "so_thang": months}, "pb": {"trung_vi": pb5, "so_thang": months}}}}
+    out = sector_valuation({"A": own("8", "10", "1", "1.2", months=30), "B": own("12", "11", "2", "1.5", day="2026-12-20"),
+                            "C": own(None, "9", "1.5", None), "D": {"thieu": True, "ly_do": "x"}})
+    assert out["pe"] == {"hien_tai_trung_vi": "10", "trung_vi_5_nam_trung_vi": "10.5", "so_ma": 2, "so_ma_thap_hon_5_nam": 1, "so_ma_duoi_60_thang": 1}
+    assert out["pb"] == {"hien_tai_trung_vi": "1.5", "trung_vi_5_nam_trung_vi": "1.35", "so_ma": 2, "so_ma_thap_hon_5_nam": 1, "so_ma_duoi_60_thang": 1}
+    assert out["so_ma_co_dinh_gia"] == 3 and out["ngay_cuoi_moi_nhat"] == "2027-01-14" and out["ngay_cuoi_cu_nhat"] == "2026-12-20"
 
 
 def test_a_sector_without_a_chain_says_so(env):

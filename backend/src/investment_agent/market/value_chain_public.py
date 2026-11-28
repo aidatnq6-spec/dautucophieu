@@ -32,7 +32,7 @@ NOTE = ("Chuỗi theo ngành ICB cấp 2 của mã, không cho biết mã có th
         "của mã và nói rõ khi chưa chắc. Mã HOSE trong phần chữ được thay bằng [mã]. Nhận định là phép tính trên chiều 1 tháng của chỉ báo "
         "theo trọng số đã đặt, không phải dự báo. thong_ke_nganh tính trên mọi mã HOSE cùng ngành ICB cấp 2 có số trong kho, không theo "
         "chuỗi: hiệu suất là bình quân giá đã điều chỉnh, không theo vốn hóa; P/E, P/B là trung vị của số tự tính từng mã (như "
-        "dinh_gia_lich_su), so_ma_thap_hon_5_nam là số mã đang thấp hơn trung vị 5 năm của chính nó. Tỷ lệ ở dạng thập phân (0,05 là 5%).")
+        "dinh_gia_lich_su), so_ma_thap_hon_5_nam là số mã đang thấp hơn trung vị 5 năm của chính nó, so_ma_duoi_60_thang là số mã chưa đủ 60 tháng có số trong cửa sổ 5 năm (vẫn được tính); các mã được làm mới lần lượt nên số hiện tại của từng mã có ngày khác nhau, từ ngay_cuoi_cu_nhat đến ngay_cuoi_moi_nhat. Nguồn có tên mã thì không ghi ngày. Tỷ lệ ở dạng thập phân (0,05 là 5%).")
 SOURCE = "config/value-chains.json; chuỗi vĩ mô; giá đã điều chỉnh (price-history) và lịch sử định giá (index-history) trong kho"
 NOT_TICKERS = {"HRC", "VND"}  # hot-rolled coil and the currency in the chains' text, also HOSE tickers
 
@@ -63,18 +63,21 @@ def _plain(d) -> str | None:
 def sector_valuation(histories: dict[str, dict]) -> dict:
     """histories: symbol -> own_history output. Each ratio over the tickers with both a current figure and a 5-year median."""
     found = {s: h for s, h in histories.items() if not h.get("thieu")}
-    out = {"so_ma_co_dinh_gia": len(found),
-           "ngay_cuoi_moi_nhat": max((h["ngay_cuoi"] for h in found.values() if h.get("ngay_cuoi")), default=None)}
+    days = [h["ngay_cuoi"] for h in found.values() if h.get("ngay_cuoi")]  # tickers are refreshed in turns: say both ends
+    out = {"so_ma_co_dinh_gia": len(found), "ngay_cuoi_moi_nhat": max(days, default=None), "ngay_cuoi_cu_nhat": min(days, default=None)}
     for ratio in ("pe", "pb"):
         pairs = []
         for h in found.values():
             now = _num((h.get("hien_tai") or {}).get(ratio))
-            five = _num((((h.get("cua_so") or {}).get("5_nam") or {}).get(ratio) or {}).get("trung_vi"))
+            window = (((h.get("cua_so") or {}).get("5_nam") or {}).get(ratio) or {})
+            five = _num(window.get("trung_vi"))
             if now is not None and five is not None:
-                pairs.append((now, five))
-        out[ratio] = {"hien_tai_trung_vi": _plain(median(n for n, _ in pairs)) if pairs else None,
-                      "trung_vi_5_nam_trung_vi": _plain(median(f for _, f in pairs)) if pairs else None,
-                      "so_ma": len(pairs), "so_ma_thap_hon_5_nam": sum(1 for n, f in pairs if n < f)}
+                pairs.append((now, five, window.get("so_thang") or 0))
+        out[ratio] = {"hien_tai_trung_vi": _plain(median(n for n, _, _ in pairs)) if pairs else None,
+                      "trung_vi_5_nam_trung_vi": _plain(median(f for _, f, _ in pairs)) if pairs else None,
+                      "so_ma": len(pairs), "so_ma_thap_hon_5_nam": sum(1 for n, f, _ in pairs if n < f),
+                      # counted, not left out: which length is enough is the owner's call (review, 28/11/2026)
+                      "so_ma_duoi_60_thang": sum(1 for _, _, m in pairs if m < 60)}
     return out
 
 
@@ -116,8 +119,11 @@ def chains_for_sector(data_dir: Path, symbol: str, *, today: date, config_path: 
         out = []
         for r in items or []:
             s = sources.get(r["source"]) or {}
-            # company reports' titles and links name the ticker (owner, 28/11/2026): the title reads [mã], the link is left out
-            out.append({"tieu_de": text(s.get("title")), "don_vi": s.get("publisher"), "ngay": s.get("date"), "trang": r.get("page")})
+            # company reports' titles and links name the ticker (owner, 28/11/2026): the title reads [mã], the link is left out, and
+            # so is the date of a report whose title named a ticker, since publisher and date find it (review, 28/11/2026)
+            title = text(s.get("title"))
+            named = title != s.get("title")
+            out.append({"tieu_de": title, "don_vi": s.get("publisher"), "ngay": None if named else s.get("date"), "trang": r.get("page")})
         return out
 
     def factor(f: dict) -> dict:

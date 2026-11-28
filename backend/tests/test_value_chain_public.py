@@ -193,3 +193,20 @@ def test_a_capitalised_name_before_a_bracketed_ticker_in_the_committed_chains_is
     text = json.dumps([dump["chains"], [s["title"] for s in dump["sources"].values()]], ensure_ascii=False)
     found = {m.group(1) for m in pattern.finditer(text)}
     assert all(any(n in f or f in n for n in COMPANY_NAMES) for f in found), found - {f for f in found if any(n in f or f in n for n in COMPANY_NAMES)}
+
+
+def test_sector_returns_say_the_dates_of_the_closes_they_use(env):
+    root, path = env
+    month = (TODAY - timedelta(days=31)).isoformat()
+    _closes(root, "HPG", [[month, "10"], [(TODAY - timedelta(days=1)).isoformat(), "11"]])
+    _closes(root, "NKG", [[month, "10"], [(TODAY - timedelta(days=4)).isoformat(), "13"]])
+    _closes(root, "HSG", [[month, "10"], [(TODAY - timedelta(days=20)).isoformat(), "9"]])  # past 10 days: left out of the figures
+    ret = chains_for_sector(root, "HPG", today=TODAY, config_path=path)["thong_ke_nganh"]["hieu_suat"]
+    assert ret["so_ma_co_gia"] == 2
+    assert ret["ngay_gia_moi_nhat"] == (TODAY - timedelta(days=1)).isoformat() and ret["ngay_gia_cu_nhat"] == (TODAY - timedelta(days=4)).isoformat()
+
+
+def test_sector_returns_without_closes_have_no_dates(env):
+    root, path = env
+    ret = chains_for_sector(root, "HPG", today=TODAY, config_path=path)["thong_ke_nganh"]["hieu_suat"]
+    assert ret["ngay_gia_moi_nhat"] is None and ret["ngay_gia_cu_nhat"] is None

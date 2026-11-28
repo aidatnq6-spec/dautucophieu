@@ -7,6 +7,7 @@ latest quarter count; another quarter never stands in. Medians and quartiles are
 
 import json
 import re
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from statistics import median, quantiles
@@ -39,6 +40,18 @@ _SYMBOL = re.compile(r"^[A-Z0-9]{3,10}$")
 
 def _missing(reason: str) -> dict:
     return {"thieu": True, "ly_do": reason}
+
+
+def no_sector_reason(listing: dict, symbol: str) -> str:
+    """Why a ticker has no ICB sector; a newly listed one VNDirect has not classified yet says when it was listed (28/11/2026)."""
+    listed = (listing.get("listed_dates") or {}).get(symbol)
+    try:
+        when = date.fromisoformat(str(listed)).strftime("%d/%m/%Y") if listed else None
+    except ValueError:
+        when = None
+    if when is None:
+        return f"Chưa có ngành ICB của {symbol} trong danh sách HOSE."
+    return f"Chưa có ngành ICB của {symbol} trong danh sách HOSE: mã mới niêm yết ngày {when}, VNDirect chưa phân ngành."
 
 
 def _json(path: Path):
@@ -115,7 +128,7 @@ def _group(root: Path, symbol: str, codes: tuple[str, ...] | None) -> dict:
     icb, names = listing.get("icb_codes") or {}, listing.get("icb_names") or {}
     code = icb.get(symbol)
     if code is None:
-        return _missing(f"Chưa có ngành ICB của {symbol} trong danh sách HOSE.")
+        return _missing(no_sector_reason(listing, symbol))
     sector = names.get(code, code)
     kind = kind_of(sector)
     group = icb

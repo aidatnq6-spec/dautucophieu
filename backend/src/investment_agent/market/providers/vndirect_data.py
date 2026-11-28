@@ -12,7 +12,7 @@ from datetime import date, timedelta
 from typing import Callable
 
 BASE = "https://api-finfo.vndirect.com.vn/v4/"
-LISTING_URL = BASE + "stocks?q=type:STOCK~floor:HOSE~status:LISTED&size=9999&fields=code,type,floor"
+LISTING_URL = BASE + "stocks?q=type:STOCK~floor:HOSE~status:LISTED&size=9999&fields=code,type,floor,listedDate"
 INDUSTRY_URL = BASE + "industry_classification?q=industryLevel:2&size=100"
 INDUSTRY3_URL = BASE + "industry_classification?q=industryLevel:3&size=200"  # Trung vị ngành cấp 3 (28/11/2026)
 INDUSTRY4_URL = BASE + "industry_classification?q=industryLevel:4&size=500"  # securities firms' peers (27/11/2026)
@@ -54,7 +54,8 @@ def outstanding_shares(symbols: list[str], get: Callable[[str], str] = default_g
 def hose_listing(get: Callable[[str], str] = default_get, *, known_names: dict[str, str] | None = None) -> dict:
     """HOSE stock symbols, each one's ICB level-2 code and the level-2 names. Names already known (the ones the brief has shown so
     far) are kept, so a sector keeps its name; VNDirect's name is used for a code not seen before."""
-    symbols = sorted({str(r["code"]).upper() for r in _data(get, LISTING_URL) if r.get("code")})
+    rows = [r for r in _data(get, LISTING_URL) if r.get("code")]
+    symbols = sorted({str(r["code"]).upper() for r in rows})
     wanted, codes, names = set(symbols), {}, {}
     for row in _data(get, INDUSTRY_URL):
         code = str(row.get("industryCode") or "")
@@ -64,7 +65,10 @@ def hose_listing(get: Callable[[str], str] = default_get, *, known_names: dict[s
         for symbol in str(row.get("codeList") or "").split(","):
             if symbol.strip().upper() in wanted:
                 codes[symbol.strip().upper()] = code
-    out = {"symbols": symbols, "icb_codes": codes, "icb_names": {**names, **{c: n for c, n in (known_names or {}).items() if c in names}}}
+    out = {"symbols": symbols, "icb_codes": codes, "icb_names": {**names, **{c: n for c, n in (known_names or {}).items() if c in names}},
+           # a ticker VNDirect has not classified yet (newly listed: AMY, DVV in 11/2026) keeps its listing day, to say why (28/11/2026)
+           "listed_dates": {str(r["code"]).upper(): str(r["listedDate"])[:10] for r in rows
+                            if r.get("listedDate") and str(r["code"]).upper() not in codes}}
     try:  # level 4 serves Trung vị ngành's peers: a failure leaves it out (asked again next run), never the listing
         level4, names4 = {}, {}
         for row in _data(get, INDUSTRY4_URL):

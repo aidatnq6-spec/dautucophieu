@@ -7,8 +7,9 @@ from investment_agent.market.providers.vndirect_data import hose_listing, price_
 
 def fake_get(url: str) -> str:
     if "/stocks?" in url:
-        return json.dumps({"data": [{"code": "FPT", "type": "STOCK", "floor": "HOSE"}, {"code": "HPG", "type": "STOCK", "floor": "HOSE"},
-                                    {"code": "NEW", "type": "STOCK", "floor": "HOSE"}]})
+        return json.dumps({"data": [{"code": "FPT", "type": "STOCK", "floor": "HOSE", "listedDate": "2006-12-13"},
+                                    {"code": "HPG", "type": "STOCK", "floor": "HOSE"},
+                                    {"code": "NEW", "type": "STOCK", "floor": "HOSE", "listedDate": "2026-11-20"}]})
     if "industry_classification" in url and "industryLevel:4" in url:
         return json.dumps({"data": [{"industryCode": "9537", "vietnameseName": "Phần mềm", "codeList": "FPT,CMG"},
                                     {"industryCode": "1757", "vietnameseName": "Thép", "codeList": "HSG"}]})
@@ -39,6 +40,7 @@ def test_the_hose_listing_has_symbols_level_two_codes_and_keeps_known_sector_nam
     assert out["icb4_names"] == {"9537": "Phần mềm", "1757": "Thép"}  # level-4 names for Trung vị ngành cấp 4 (28/11/2026)
     assert out["icb3_codes"] == {"FPT": "9530", "HPG": "1750"}  # and level 3 from its own member lists (28/11/2026)
     assert out["icb3_names"] == {"9530": "Phần mềm & dịch vụ máy tính", "1750": "Kim loại công nghiệp"}
+    assert out["listed_dates"] == {"NEW": "2026-11-20"}  # only a ticker VNDirect has not classified yet, to say why (28/11/2026)
 
 
 def test_the_board_is_the_latest_session_in_the_units_the_brief_reads():

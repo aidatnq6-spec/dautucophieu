@@ -63,3 +63,55 @@ def test_the_commands_are_registered(tmp_path, monkeypatch):
     monkeypatch.setattr("sys.argv", ["cli", "filings-check", "--url", "https://www.example.vn/co-dong/bctc"])
     assert main() == 0
     assert seen == {"sync": tmp_path, "check": "https://www.example.vn/co-dong/bctc"}
+
+
+def test_a_file_over_30_mb_stops_downloading_once_it_passes_the_limit():
+    import httpx
+
+    from investment_agent.cli import _filings_get_bytes
+    from investment_agent.market.filings import MAX_BYTES
+    sent = []
+
+    def chunks():
+        for _ in range(64):  # 64 MB offered
+            sent.append(1)
+            yield b"x" * (1024 * 1024)
+
+    client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200, content=chunks())))
+    data = _filings_get_bytes("https://cdn.example/big.pdf", client=client)
+    assert len(data) > MAX_BYTES and len(sent) <= 32
+
+
+def test_a_small_file_is_downloaded_whole():
+    import httpx
+
+    from investment_agent.cli import _filings_get_bytes
+    client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200, content=b"%PDF-1.7 nho")))
+    assert _filings_get_bytes("https://cdn.example/a.pdf", client=client) == b"%PDF-1.7 nho"
+
+
+def test_a_page_keeps_the_address_it_was_redirected_to():
+    import httpx
+
+    from investment_agent.cli import _filings_get_text
+
+    def handler(request):
+        if request.url.path == "/co-dong":
+            return httpx.Response(301, headers={"Location": "https://www.example.vn/vi/co-dong/bctc/"})
+        return httpx.Response(200, text="<a href='a.pdf'>x</a>")
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    page = _filings_get_text("https://www.example.vn/co-dong", client=client)
+    assert page == "<a href='a.pdf'>x</a>" and page.url == "https://www.example.vn/vi/co-dong/bctc/"
+
+
+def test_filings_check_resolves_links_where_a_redirected_page_landed(capsys):
+    from investment_agent.cli import _Page
+
+    def get_text(url):
+        if url.endswith("/robots.txt"):
+            return ""
+        page = _Page('<a href="20261030-bctc-hop-nhat.pdf">BCTC Hợp nhất Q3.2026 (30/10/2026)</a>')
+        page.url = "https://www.example.vn/vi/co-dong/2026/"
+        return page
+    assert filings_check("https://www.example.vn/co-dong", get_text=get_text) == 0
+    assert "https://www.example.vn/vi/co-dong/2026/20261030-bctc-hop-nhat.pdf" in capsys.readouterr().out

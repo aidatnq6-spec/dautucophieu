@@ -911,11 +911,35 @@ def insider_docs_sync(data_dir: Path, *, limit: int = 30, read=None, now=None) -
 _FILINGS_HEADERS = {"User-Agent": "investment-agent/0.1 (personal use)"}
 
 
-def _filings_get_text(url: str) -> str:
+class _Page(str):
+    """A page's text that also carries the address it was redirected to (links resolve against it)."""
+    url: str
+
+
+def _filings_get_text(url: str, *, client=None) -> str:
     import httpx
-    response = httpx.get(url, timeout=60, follow_redirects=True, headers=_FILINGS_HEADERS)
+    client = client or httpx.Client(timeout=60, follow_redirects=True, headers=_FILINGS_HEADERS)
+    response = client.get(url)
     response.raise_for_status()
-    return response.text
+    page = _Page(response.text)
+    page.url = str(response.url)
+    return page
+
+
+def _filings_get_bytes(url: str, *, client=None) -> bytes:
+    """The file, or its first MAX_BYTES + 1 bytes when it is larger: the download stops there and sync_filings skips it as too big."""
+    import httpx
+
+    from investment_agent.market.filings import MAX_BYTES
+    client = client or httpx.Client(timeout=180, follow_redirects=True, headers=_FILINGS_HEADERS)
+    data = bytearray()
+    with client.stream("GET", url) as response:
+        response.raise_for_status()
+        for chunk in response.iter_bytes():
+            data += chunk
+            if len(data) > MAX_BYTES:
+                break
+    return bytes(data)
 
 
 def filings_sync(data_dir: Path, *, get_text=None, get_bytes=None, read_pdf=None, now=None, sleep=None) -> int:
@@ -942,14 +966,8 @@ def filings_sync(data_dir: Path, *, get_text=None, get_bytes=None, read_pdf=None
             if notes and not any(p.strip() for p in pages):
                 raise RuntimeError(notes[0])  # OCR ran out of time or failed: tried again next night
             return pages, len(read_by_ocr), [i + 1 for i, text in enumerate(pages) if needs_ocr(text)]  # said, never hidden
-    if get_bytes is None:
-        import httpx
-
-        def get_bytes(url):
-            response = httpx.get(url, timeout=180, follow_redirects=True, headers=_FILINGS_HEADERS)
-            response.raise_for_status()
-            return response.content
-    out = sync_filings(data_dir, list(load_watchlist(data_dir).symbols), get_text=get_text or _filings_get_text, get_bytes=get_bytes,
+    out = sync_filings(data_dir, list(load_watchlist(data_dir).symbols), get_text=get_text or _filings_get_text,
+                       get_bytes=get_bytes or _filings_get_bytes,
                        read_pdf=read_pdf, now=now or datetime.now(timezone.utc), sleep=sleep)
     failed = bool(out["errors"] or out.get("page_errors"))
     print(json.dumps({"status": "partial" if failed else "ok", **out}, ensure_ascii=False))
@@ -975,7 +993,8 @@ def filings_check(url: str, *, get_text=None) -> int:
         print(json.dumps(out, ensure_ascii=False))
         return 1
     try:
-        links = links_on_page(get_text(url), url)
+        page = get_text(url)
+        links = links_on_page(page, getattr(page, "url", url))
     except Exception as exc:  # noqa: BLE001
         print(json.dumps({**out, "loi": f"error:{type(exc).__name__}"}, ensure_ascii=False))
         return 1

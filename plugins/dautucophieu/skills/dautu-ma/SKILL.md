@@ -19,6 +19,7 @@ Mã là phần người dùng gõ sau lệnh, viết hoa. Không có mã thì h�
 7. `dinh_gia_ma`: vốn hoá, P/E, P/B do VNDirect công bố; `so_sanh_nganh`: vị trí của mã trong ngành ICB; `dinh_gia_lich_su`: P/E, P/B so với 3 và 5 năm của chính mã.
 8. `thuyet_minh` 4 quý: khoản nào làm doanh thu, chi phí tài chính hay nợ vay đổi lớn.
 9. `lich_su_gia` từ 3 năm trước: giá cuối tháng, đã điều chỉnh khi kho có (dieu_chinh), kèm các đợt thưởng hay phát hành.
+10. `chuoi_gia_tri`: chuỗi giá trị của ngành và các yếu tố vĩ mô.
 
 ## Trình bày (tiếng Việt, gọn, bảng khi có nhiều số)
 
@@ -29,11 +30,12 @@ Mã là phần người dùng gõ sau lệnh, viết hoa. Không có mã thì h�
 4. **So với ngành** (`so_sanh_nganh`): ghi ngành và cấp ICB mà công cụ trả về (cấp 4 là nhóm hẹp như Xây dựng công trình, cấp 3 rộng hơn như Công nghiệp tổng hợp, cấp 2 là ngành rộng), quý so và số doanh nghiệp cùng ngành. Một bảng các chỉ số mà mã nằm ngoài khoảng tứ phân vị 25–75%: tên chỉ số, giá trị của mã, trung vị, khoảng 25–75%, thứ hạng. Các chỉ số còn lại chỉ nói gọn là nằm trong khoảng giữa của ngành. Với các chỉ số lệch khỏi ngành, dùng theo_quy (4 quý) để nói mã đang tiến gần hay xa dần trung vị, ghi các quý dùng; quý trung vị null thì nói là không đủ doanh nghiệp, không lấp. Tỷ lệ đổi sang % khi trình bày. Không nói tốt hay xấu chỉ vì cao hay thấp hơn trung vị (nợ vay, số ngày phải thu, tồn kho cao chưa chắc tốt). Ngân hàng được so với các ngân hàng HOSE trên 9 chỉ số (NPL, nợ quá hạn, bao phủ nợ xấu, NIM, LDR, tăng trưởng cho vay, vốn chủ/tài sản, ROAA, ROAE); công ty chứng khoán được so với các mã HOSE thuộc ICB cấp 4 Dịch vụ đầu tư trên 5 chỉ số; bảo hiểm được so với 4 mã bảo hiểm HOSE còn lại (gồm cả nhân thọ BVH, nói rõ khi so tỷ lệ kết hợp và biên).
    **Định giá**: vốn hoá, P/E, P/B từ `dinh_gia_ma` kèm ngày. Nếu canh_bao_loi_nhuan_ngoai_ban_hang của `bao_cao_tai_chinh` vượt ngưỡng thì nêu tỷ lệ, kỳ và nói P/E dựa nhiều vào lợi nhuận không từ bán hàng. Thiếu thì ghi thiếu; nếu tự tính thì ghi rõ là tự tính và công thức.
    **So với lịch sử của chính mã** (`dinh_gia_lich_su`): một bảng P/E và P/B, mỗi dòng có giá trị tại ngay_cuoi, trung vị và khoảng 25–75% của 3 năm và 5 năm, thấp nhất, cao nhất, và thang_thap_hon_hien_tai (bao nhiêu tháng thấp hơn hiện tại). Ghi rõ đây là số tự tính theo cong_thuc của công cụ, ghi ngay_cuoi; nếu ngay_cuoi cũ hơn ngày của `dinh_gia_ma` thì nói rõ hai ngày khác nhau. Không đặt P/E của `dinh_gia_ma` cạnh trung vị lịch sử như cùng một cách tính. Tháng bị bỏ (bo_qua_lo, bo_qua_thieu) khác 0 thì nêu số tháng.
-5. **EPS, cổ tức, số cổ phiếu lưu hành**; nếu có shares_check thì nêu hai nguồn đang lệch.
-6. **Sự kiện**: sắp tới trước, rồi gần đây nhất.
-7. **Cổ đông lớn** (tối đa 5) và **giao dịch nội bộ** gần nhất.
-8. **Thiếu**: mỗi công cụ trả `thieu` thì ghi tên mục và lý do nguyên văn.
-9. **Nguồn**: nguồn và thời điểm lấy của từng nhóm số.
+5. **Ngành và vĩ mô** (`chuoi_gia_tri`): công cụ trả mọi chuỗi của ngành ICB, không cho biết mã có thuộc chuỗi hay không; chọn chuỗi sát với hoạt động của mã và nói rõ khi chưa chắc. Ghi chuỗi đã duyệt hay chưa; chưa duyệt thì không nói ngành thuận lợi hay bất lợi chung, chỉ nêu từng yếu tố. Một bảng các yếu tố chính: yếu tố, chỉ báo, chiều 1 tháng, tốt hay xấu cho ngành, trọng số, ngày của số; yếu tố chưa đánh giá được thì ghi lý do. Thêm hiệu suất bình quân của cả ngành (1 tháng, 1 năm, từ đầu năm, kèm số mã có giá) và P/E, P/B trung vị của ngành so với trung vị 5 năm, kèm số mã đang thấp hơn trung vị 5 năm của chính nó; ghi ngày cũ nhất và mới nhất của số định giá, và nêu số mã chưa đủ 60 tháng nếu khác 0; nói rõ đây là cả ngành ICB, không riêng chuỗi. Ngành chưa có chuỗi thì nói là thiếu, không suy từ ngành khác.
+6. **EPS, cổ tức, số cổ phiếu lưu hành**; nếu có shares_check thì nêu hai nguồn đang lệch.
+7. **Sự kiện**: sắp tới trước, rồi gần đây nhất.
+8. **Cổ đông lớn** (tối đa 5) và **giao dịch nội bộ** gần nhất.
+9. **Thiếu**: mỗi công cụ trả `thieu` thì ghi tên mục và lý do nguyên văn.
+10. **Nguồn**: nguồn và thời điểm lấy của từng nhóm số.
 
 ## Quy tắc
 

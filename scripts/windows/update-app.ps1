@@ -49,4 +49,7 @@ git checkout --quiet -- apps/web/next-env.d.ts 2>$null  # the build rewrites it;
 & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'stop-app.ps1') | Out-Null
 Start-Sleep -Seconds 2
 & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'start-app.ps1') | Out-Null
-Write-Log "$result restart exit=$LASTEXITCODE"
+$appExit = $LASTEXITCODE
+# The remote MCP for claude.ai (28/11/2026) loads the code once at start, so it restarts with the app.
+$mcp = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'restart-mcp-remote.ps1') | Out-String
+Write-Log "$result restart exit=$appExit mcp-remote=$($mcp.Trim())"

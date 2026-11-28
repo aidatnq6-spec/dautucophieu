@@ -46,3 +46,23 @@ def test_nothing_new_on_origin_still_rebuilds_and_restarts_when_the_build_is_not
     marker = next(i for i, l in enumerate(ls) if "deployed-commit" in l and "Set-Content" in l)
     restart = next(i for i, l in enumerate(ls) if "stop-app.ps1" in l)
     assert build < marker < restart
+
+
+def test_an_update_also_restarts_the_remote_mcp_after_the_app():
+    # 28/11/2026: three merges reached the API and web, but the remote MCP for claude.ai kept serving the code it loaded at logon
+    ls = code_lines("update-app.ps1")
+    start = next(i for i, l in enumerate(ls) if "start-app.ps1" in l)
+    mcp = next(i for i, l in enumerate(ls) if "restart-mcp-remote.ps1" in l)
+    assert start < mcp
+
+
+def test_the_remote_mcp_restart_stops_the_task_and_its_server_then_starts_it_and_skips_without_a_task():
+    ls = code_lines("restart-mcp-remote.ps1")
+    text = "\n".join(ls)
+    find = next(i for i, l in enumerate(ls) if "Get-ScheduledTask" in l and "InvestmentAgent-McpRemote" in text)
+    skip = next(i for i, l in enumerate(ls) if "Disabled" in l and "return" in l)
+    stop = next(i for i, l in enumerate(ls) if "Stop-ScheduledTask" in l)
+    kill = next(i for i, l in enumerate(ls) if "investment_agent\.mcp_remote" in l)
+    begin = next(i for i, l in enumerate(ls) if "Start-ScheduledTask" in l)
+    assert find < skip < stop < kill < begin
+    assert "Stop-Process" in text and "ErrorAction SilentlyContinue" in ls[find]

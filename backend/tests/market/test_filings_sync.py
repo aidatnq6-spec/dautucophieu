@@ -288,3 +288,16 @@ def test_a_watched_ticker_without_any_company_page_still_gets_cafef_statements(d
               {f"{CDN}VCB_20261030_HN.pdf": b"chu"})
     out = run(data, web, symbols=("VCB",))
     assert out["read"] and web.fetched == [f"{CDN}VCB_20261030_HN.pdf"]
+
+
+class Page(str):
+    url: str
+
+
+def test_links_on_a_redirected_page_resolve_against_where_it_landed(data):
+    page = Page(statements_page(("20261029-bctc-hop-nhat.pdf", "BCTC Hợp nhất (29/10/2026)")))
+    page.url = f"{SITE}/vi/co-dong/2026/"
+    landed = f"{SITE}/vi/co-dong/2026/20261029-bctc-hop-nhat.pdf"
+    web = Web({f"{SITE}/bctc": page, f"{SITE}/cbtt": "", "https://api-finfo": vnd_news()}, {landed: b"chu"})
+    out = run(data, web)
+    assert web.fetched == [landed] and out["read"] == [doc_id(landed)]

@@ -272,7 +272,7 @@ def _candidates(ma: str, source: dict, *, get_text, sleep, since: str, page_erro
             continue
         finally:
             sleep(1)
-        for link in links_on_page(page, url):
+        for link in links_on_page(page, getattr(page, "url", url)):  # a redirected page's links resolve where it landed
             kind = classify(link["nhan"])
             if kind:
                 company.append({"url": link["url"], "nhan": link["nhan"], "loai": kind, "ngay": label_date(link["nhan"], link["url"]),

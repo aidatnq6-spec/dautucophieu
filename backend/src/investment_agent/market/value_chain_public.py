@@ -17,7 +17,7 @@ from statistics import median
 
 from investment_agent.market.value_chain_scores import scored_chains
 from investment_agent.market.value_chains import VALUE_CHAINS_PATH, load_value_chains
-from investment_agent.domain.chain_returns import chain_returns
+from investment_agent.domain.chain_returns import STALE, chain_returns
 from investment_agent.market.price_history import PriceHistoryStore
 from investment_agent.market.valuation_history import own_history
 
@@ -31,7 +31,8 @@ DRAFT_NOTE = "Chuỗi chưa được chủ sở hữu duyệt; không có nhận
 NOTE = ("Chuỗi theo ngành ICB cấp 2 của mã, không cho biết mã có thuộc danh sách của chuỗi hay không: tự xét chuỗi nào sát với hoạt động "
         "của mã và nói rõ khi chưa chắc. Mã HOSE trong phần chữ được thay bằng [mã], tên doanh nghiệp niêm yết bằng [doanh nghiệp]. Nhận định là phép tính trên chiều 1 tháng của chỉ báo "
         "theo trọng số đã đặt, không phải dự báo. thong_ke_nganh tính trên mọi mã HOSE cùng ngành ICB cấp 2 có số trong kho, không theo "
-        "chuỗi: hiệu suất là bình quân giá đã điều chỉnh, không theo vốn hóa; P/E, P/B là trung vị của số tự tính từng mã (như "
+        "chuỗi: hiệu suất là bình quân giá đã điều chỉnh, không theo vốn hóa, tính đến các ngày từ "
+        "ngay_gia_cu_nhat đến ngay_gia_moi_nhat (có thể chậm hơn phiên gần nhất); P/E, P/B là trung vị của số tự tính từng mã (như "
         "dinh_gia_lich_su), so_ma_thap_hon_5_nam là số mã đang thấp hơn trung vị 5 năm của chính nó, so_ma_duoi_60_thang là số mã chưa đủ 60 tháng có số trong cửa sổ 5 năm (vẫn được tính); các mã được làm mới lần lượt nên số hiện tại của từng mã có ngày khác nhau, từ ngay_cuoi_cu_nhat đến ngay_cuoi_moi_nhat. Nguồn có tên mã thì không ghi ngày. Tỷ lệ ở dạng thập phân (0,05 là 5%).")
 SOURCE = "config/value-chains.json; chuỗi vĩ mô; giá đã điều chỉnh (price-history) và lịch sử định giá (index-history) trong kho"
 # Company names that point at one HOSE ticker in the chains' text read "[doanh nghiệp]" (owner, 28/11/2026); names of companies not on
@@ -96,7 +97,10 @@ def _sector_returns(root: Path, symbols: list[str], sector: str, *, today: date)
         except (OSError, ValueError, TypeError, ArithmeticError):
             closes[s] = []
     r = chain_returns([{"id": "sector", "name": sector, "symbols": symbols}], closes, today=today)[0]
-    return {"so_ma_co_gia": r["priced"], "ky": {PERIODS[k]: {"thay_doi": p["change"], "so_ma": p["n"]} for k, p in r["periods"].items()},
+    # the dates of the closes behind the figures (owner, 28/11/2026): price-history is refreshed in turns, so they can lag the session
+    used = [c[-1][0] for c in closes.values() if len(c) >= 2 and today - c[-1][0] <= STALE]
+    return {"so_ma_co_gia": r["priced"], "ngay_gia_moi_nhat": max(used).isoformat() if used else None,
+            "ngay_gia_cu_nhat": min(used).isoformat() if used else None, "ky": {PERIODS[k]: {"thay_doi": p["change"], "so_ma": p["n"]} for k, p in r["periods"].items()},
             "phien_gan_nhat": {"tang": r["breadth"]["up"], "giam": r["breadth"]["down"], "dung": r["breadth"]["flat"]},
             "vi_tri_52_tuan": r["position_52w"]}
 
